@@ -3,8 +3,10 @@
   <AdminLayout title="Face Enrollment">
     <div class="max-w-lg mx-auto space-y-6">
 
+      <AppPageHeader title="Face Enrollment" />
+
       <!-- Existing enrollment status -->
-      <div v-if="enrollment" class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 text-center space-y-3">
+      <AppCard v-if="enrollment" class="text-center space-y-3">
         <img v-if="enrollment.photo_url" :src="enrollment.photo_url" alt="Enrolled photo"
              class="w-32 h-32 rounded-full object-cover mx-auto border-4"
              :class="statusBorderClass" />
@@ -12,17 +14,13 @@
         <p v-if="enrollment.status === 'rejected' && enrollment.rejection_reason" class="text-sm text-slate-500">
           Reason: {{ enrollment.rejection_reason }}
         </p>
-        <button v-if="enrollment.status !== 'pending'" @click="showCamera = true"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+        <AppButton v-if="enrollment.status !== 'pending'" @click="showCamera = true">
           {{ enrollment.status === 'approved' ? 'Re-enroll' : 'Try Again' }}
-        </button>
-      </div>
+        </AppButton>
+      </AppCard>
 
       <!-- Consent + capture -->
-      <div v-if="!enrollment || showCamera" class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h2 class="text-lg font-semibold text-slate-800">Enroll Your Face</h2>
-        </div>
+      <AppCard v-if="!enrollment || showCamera" title="Enroll Your Face" :padded="false">
         <div class="p-5 space-y-4">
           <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-600">
             <p class="font-medium text-slate-700 mb-1">Data Privacy Notice</p>
@@ -37,28 +35,23 @@
           <div v-if="consent">
             <div v-if="!capturedImage" class="relative">
               <video ref="videoEl" autoplay playsinline class="w-full rounded-lg bg-black" style="max-height:280px;" />
-              <button @click="capture"
-                class="mt-3 w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              <AppButton block class="mt-3" @click="capture">
                 📸 Capture Photo
-              </button>
+              </AppButton>
             </div>
             <div v-else class="space-y-3">
               <img :src="capturedImage" class="w-full rounded-lg border border-slate-200" style="max-height:280px;object-fit:cover;" />
               <div class="flex gap-3">
-                <button @click="retake"
-                  class="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                  Retake
-                </button>
-                <button @click="submit" :disabled="loading"
-                  class="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                <AppButton variant="secondary" block @click="retake">Retake</AppButton>
+                <AppButton block :loading="loading" @click="submit">
                   {{ loading ? 'Submitting…' : 'Submit for Approval' }}
-                </button>
+                </AppButton>
               </div>
             </div>
             <canvas ref="canvasEl" class="hidden" />
           </div>
         </div>
-      </div>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>
@@ -67,6 +60,9 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
 import Swal from 'sweetalert2'
 import axios from 'axios'
 

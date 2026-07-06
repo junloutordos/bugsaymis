@@ -21,61 +21,54 @@
         </div>
 
         <!-- Meta pills -->
-        <div class="flex flex-wrap gap-2 text-xs">
-          <span class="inline-flex items-center gap-1 bg-slate-100 text-slate-600 rounded-full px-3 py-1">
-            <UsersIcon class="h-3.5 w-3.5" />
+        <div class="flex flex-wrap gap-2">
+          <AppBadge color="slate">
+            <UsersIcon class="h-3.5 w-3.5 mr-1" />
             {{ students.length }} student{{ students.length !== 1 ? 's' : '' }}
             <span v-if="section.capacity" class="text-slate-400">/ {{ section.capacity }}</span>
-          </span>
-          <span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 rounded-full px-3 py-1">
-            <BookOpenIcon class="h-3.5 w-3.5" />
+          </AppBadge>
+          <AppBadge color="indigo">
+            <BookOpenIcon class="h-3.5 w-3.5 mr-1" />
             {{ assignedCount }}/{{ subjects.length }} assigned
-          </span>
-          <span v-if="section.adviser" class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 rounded-full px-3 py-1">
-            <AcademicCapIcon class="h-3.5 w-3.5" />
+          </AppBadge>
+          <AppBadge v-if="section.adviser" color="amber">
+            <AcademicCapIcon class="h-3.5 w-3.5 mr-1" />
             {{ section.adviser.name }}
-          </span>
+          </AppBadge>
         </div>
       </div>
 
       <!-- Break Times Card -->
-      <div v-if="section.recess_start || section.lunch_start || section.afternoon_break_start"
-        class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4">
+      <AppCard v-if="section.recess_start || section.lunch_start || section.afternoon_break_start">
         <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
           <ClockIcon class="h-4 w-4" /> Break Times
         </h2>
         <div class="flex flex-wrap gap-6">
           <div v-if="section.recess_start" class="flex items-center gap-2">
-            <span class="inline-flex items-center rounded-full bg-sky-50 text-sky-700 px-3 py-1 text-xs font-medium">
-              Recess: {{ formatTime(section.recess_start) }} – {{ formatTime(section.recess_end) }}
-            </span>
+            <AppBadge color="blue">Recess: {{ formatTime(section.recess_start) }} – {{ formatTime(section.recess_end) }}</AppBadge>
           </div>
           <div v-if="section.lunch_start" class="flex items-center gap-2">
-            <span class="inline-flex items-center rounded-full bg-orange-50 text-orange-700 px-3 py-1 text-xs font-medium">
-              Lunch: {{ formatTime(section.lunch_start) }} – {{ formatTime(section.lunch_end) }}
-            </span>
+            <AppBadge color="orange">Lunch: {{ formatTime(section.lunch_start) }} – {{ formatTime(section.lunch_end) }}</AppBadge>
           </div>
           <div v-if="section.afternoon_break_start" class="flex items-center gap-2">
-            <span class="inline-flex items-center rounded-full bg-violet-50 text-violet-700 px-3 py-1 text-xs font-medium">
-              Afternoon Break: {{ formatTime(section.afternoon_break_start) }} – {{ formatTime(section.afternoon_break_end) }}
-            </span>
+            <AppBadge color="purple">Afternoon Break: {{ formatTime(section.afternoon_break_start) }} – {{ formatTime(section.afternoon_break_end) }}</AppBadge>
           </div>
         </div>
-      </div>
+      </AppCard>
       <div v-else
-        class="bg-amber-50 border border-amber-100 rounded-xl px-5 py-3 text-xs text-amber-700 flex items-center gap-2">
+        class="bg-warning-50 border border-warning-100 rounded-xl px-5 py-3 text-xs text-warning-700 flex items-center gap-2">
         <ExclamationTriangleIcon class="h-4 w-4 shrink-0" />
         No break times set. Schedule generation will not block recess, lunch, or afternoon break periods for this section.
         <Link :href="route('faculty-loading.sections.index')" class="underline ml-1">Set break times</Link>
       </div>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
 
       <!-- ── Subjects (full catalog for this grade) ──────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <AppCard :padded="false">
         <div class="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <BookOpenIcon class="h-4 w-4 text-indigo-500" />
@@ -101,125 +94,114 @@
           </div>
         </div>
 
-        <div v-if="filteredSubjects.length === 0" class="py-10 text-center">
-          <BookOpenIcon class="mx-auto h-10 w-10 text-slate-200 mb-2" />
-          <p class="text-sm text-slate-400">No subjects match the current filter.</p>
-        </div>
-
-        <table v-else class="min-w-full divide-y divide-slate-50 text-sm">
-          <thead>
-            <tr class="text-xs text-slate-400 uppercase tracking-wide bg-slate-50">
-              <th class="px-4 py-2 text-left">Code</th>
-              <th class="px-4 py-2 text-left">Subject</th>
-              <th class="px-4 py-2 text-left">Type</th>
-              <th class="px-4 py-2 text-center">Units</th>
-              <th class="px-4 py-2 text-left">Faculty</th>
-              <th class="px-4 py-2 text-center">Status</th>
+        <AppTable :card="false" :is-empty="filteredSubjects.length === 0">
+          <template #head>
+            <tr>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">Code</th>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">Subject</th>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">Type</th>
+              <th class="px-4 py-2 text-center text-xs text-slate-400 uppercase tracking-wide">Units</th>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">Faculty</th>
+              <th class="px-4 py-2 text-center text-xs text-slate-400 uppercase tracking-wide">Status</th>
               <th class="px-4 py-2"></th>
             </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="s in filteredSubjects" :key="s.id"
-              :class="s.is_assigned ? 'hover:bg-slate-50/50' : 'bg-red-50/30 hover:bg-red-50/50'">
-              <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ s.subject_code ?? '—' }}</td>
-              <td class="px-4 py-3 font-medium text-slate-800">
-                {{ s.subject_name }}
-                <span v-if="s.is_elective"
-                  class="ml-1.5 text-xs font-normal text-amber-600 bg-amber-50 rounded-full px-1.5 py-0.5">elective</span>
-              </td>
-              <td class="px-4 py-3">
-                <span :class="typeClass(s.subject_type)" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                  {{ s.subject_type ?? '—' }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center text-slate-600">{{ s.load_units }}</td>
-              <td class="px-4 py-3 text-slate-600">{{ s.faculty_name ?? '—' }}</td>
-              <td class="px-4 py-3 text-center">
-                <span v-if="s.is_assigned"
-                  class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5 text-xs font-medium">
-                  <CheckCircleIcon class="h-3 w-3" /> Assigned
-                </span>
-                <span v-else
-                  class="inline-flex items-center gap-1 bg-red-50 text-red-600 rounded-full px-2 py-0.5 text-xs font-medium">
-                  <ExclamationCircleIcon class="h-3 w-3" /> Unassigned
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <button v-if="s.is_assigned && s.assignment_id"
-                  @click="removeAssignment(s)"
-                  class="p-1.5 text-slate-300 hover:text-red-600 rounded transition-colors"
-                  title="Remove assignment">
-                  <TrashIcon class="h-4 w-4" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr class="bg-slate-50 border-t border-slate-100">
-              <td colspan="3" class="px-4 py-2 text-xs text-slate-500 font-medium text-right">Total Units (assigned)</td>
-              <td class="px-4 py-2 text-center text-xs font-semibold text-slate-700">{{ assignedTotalUnits }}</td>
-              <td colspan="3"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+          </template>
+
+          <tr v-for="s in filteredSubjects" :key="s.id"
+            :class="s.is_assigned ? 'hover:bg-slate-50/50' : 'bg-danger-50/30 hover:bg-danger-50/50'">
+            <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ s.subject_code ?? '—' }}</td>
+            <td class="px-4 py-3 font-medium text-slate-800">
+              {{ s.subject_name }}
+              <AppBadge v-if="s.is_elective" color="amber">elective</AppBadge>
+            </td>
+            <td class="px-4 py-3">
+              <AppBadge :color="typeClass(s.subject_type)" class="capitalize">{{ s.subject_type ?? '—' }}</AppBadge>
+            </td>
+            <td class="px-4 py-3 text-center text-slate-600">{{ s.load_units }}</td>
+            <td class="px-4 py-3 text-slate-600">{{ s.faculty_name ?? '—' }}</td>
+            <td class="px-4 py-3 text-center">
+              <AppBadge v-if="s.is_assigned" color="green">
+                <CheckCircleIcon class="h-3 w-3 mr-1" /> Assigned
+              </AppBadge>
+              <AppBadge v-else color="red">
+                <ExclamationCircleIcon class="h-3 w-3 mr-1" /> Unassigned
+              </AppBadge>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <AppIconButton v-if="s.is_assigned && s.assignment_id" label="Remove assignment" variant="danger" @click="removeAssignment(s)">
+                <TrashIcon class="h-4 w-4" />
+              </AppIconButton>
+            </td>
+          </tr>
+
+          <template #empty>
+            <EmptyState title="No subjects match the current filter." :icon="BookOpenIcon" />
+          </template>
+
+          <template #footer>
+            <div class="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-100">
+              <span class="text-xs text-slate-500 font-medium">Total Units (assigned)</span>
+              <span class="text-xs font-semibold text-slate-700">{{ assignedTotalUnits }}</span>
+            </div>
+          </template>
+        </AppTable>
+      </AppCard>
 
       <!-- ── Students ──────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <AppCard :padded="false">
         <div class="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-            <UsersIcon class="h-4 w-4 text-emerald-500" /> Students
+            <UsersIcon class="h-4 w-4 text-success-500" /> Students
             <span class="text-xs font-normal text-slate-400">({{ filteredStudents.length }})</span>
           </h2>
           <input v-model="studentSearch" type="search" placeholder="Search name / LRN / ID..."
             class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 w-48 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
         </div>
 
-        <div v-if="students.length === 0" class="py-10 text-center">
-          <UsersIcon class="mx-auto h-10 w-10 text-slate-200 mb-2" />
-          <p class="text-sm text-slate-400">No students enrolled in this section.</p>
-        </div>
-
-        <table v-else class="min-w-full divide-y divide-slate-50 text-sm">
-          <thead>
-            <tr class="text-xs text-slate-400 uppercase tracking-wide bg-slate-50">
-              <th class="px-4 py-2 text-left w-8">#</th>
-              <th class="px-4 py-2 text-left">Name</th>
-              <th class="px-4 py-2 text-left">LRN</th>
-              <th class="px-4 py-2 text-left">System ID</th>
-              <th class="px-4 py-2 text-center">Sex</th>
-              <th class="px-4 py-2 text-left">Email</th>
-              <th class="px-4 py-2 text-center">Status</th>
+        <AppTable :card="false" :is-empty="students.length === 0">
+          <template #head>
+            <tr>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide w-8">#</th>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">Name</th>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">LRN</th>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">System ID</th>
+              <th class="px-4 py-2 text-center text-xs text-slate-400 uppercase tracking-wide">Sex</th>
+              <th class="px-4 py-2 text-left text-xs text-slate-400 uppercase tracking-wide">Email</th>
+              <th class="px-4 py-2 text-center text-xs text-slate-400 uppercase tracking-wide">Status</th>
             </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="(st, i) in displayedStudents" :key="st.id" class="hover:bg-slate-50/50">
-              <td class="px-4 py-2.5 text-slate-400 text-xs">{{ (currentPage - 1) * PER_PAGE + i + 1 }}</td>
-              <td class="px-4 py-2.5 font-medium text-slate-800">{{ st.full_name }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ st.lrn ?? '—' }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ st.system_id ?? '—' }}</td>
-              <td class="px-4 py-2.5 text-center text-slate-600 text-xs">{{ st.sex ?? '—' }}</td>
-              <td class="px-4 py-2.5 text-slate-500 text-xs">{{ st.email ?? '—' }}</td>
-              <td class="px-4 py-2.5 text-center">
-                <span :class="!st.status || st.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                  {{ st.status ?? 'active' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          </template>
 
-        <PaginationControl
-          v-if="totalPages > 1"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          :total="filteredStudents.length"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+          <tr v-for="(st, i) in displayedStudents" :key="st.id" class="hover:bg-slate-50/50">
+            <td class="px-4 py-2.5 text-slate-400 text-xs">{{ (currentPage - 1) * PER_PAGE + i + 1 }}</td>
+            <td class="px-4 py-2.5 font-medium text-slate-800">{{ st.full_name }}</td>
+            <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ st.lrn ?? '—' }}</td>
+            <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ st.system_id ?? '—' }}</td>
+            <td class="px-4 py-2.5 text-center text-slate-600 text-xs">{{ st.sex ?? '—' }}</td>
+            <td class="px-4 py-2.5 text-slate-500 text-xs">{{ st.email ?? '—' }}</td>
+            <td class="px-4 py-2.5 text-center">
+              <AppBadge :color="!st.status || st.status === 'active' ? 'green' : 'slate'" class="capitalize">
+                {{ st.status ?? 'active' }}
+              </AppBadge>
+            </td>
+          </tr>
+
+          <template #empty>
+            <EmptyState title="No students enrolled in this section." :icon="UsersIcon" />
+          </template>
+
+          <template #footer>
+            <PaginationControl
+              v-if="totalPages > 1"
+              :current-page="currentPage"
+              :total-pages="totalPages"
+              :total="filteredStudents.length"
+              @prev="currentPage--"
+              @next="currentPage++"
+              @page="currentPage = $event"
+            />
+          </template>
+        </AppTable>
+      </AppCard>
 
     </div>
   </AdminLayout>
@@ -229,6 +211,13 @@
 import { computed, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import {
   AcademicCapIcon,
   ArrowLeftIcon,
@@ -278,8 +267,8 @@ const assignedTotalUnits = computed(() =>
     .toFixed(1)
 )
 
-function removeAssignment(s) {
-  if (!confirm(`Remove "${s.subject_name}" assignment from ${s.faculty_name}?`)) return
+async function removeAssignment(s) {
+  if (! await confirmDelete(`Remove "${s.subject_name}" assignment from ${s.faculty_name}?`)) return
   useForm({}).delete(route('faculty-loading.assignments.destroy', s.assignment_id), {
     preserveScroll: true,
   })
@@ -287,14 +276,14 @@ function removeAssignment(s) {
 
 function typeClass(type) {
   const map = {
-    lecture:     'bg-blue-50 text-blue-700',
-    laboratory:  'bg-violet-50 text-violet-700',
-    lecture_lab: 'bg-purple-50 text-purple-700',
-    elective:    'bg-amber-50 text-amber-700',
-    research:    'bg-teal-50 text-teal-700',
-    special:     'bg-pink-50 text-pink-700',
+    lecture:     'blue',
+    laboratory:  'purple',
+    lecture_lab: 'purple',
+    elective:    'amber',
+    research:    'indigo',
+    special:     'red',
   }
-  return map[type] ?? 'bg-slate-100 text-slate-500'
+  return map[type] ?? 'slate'
 }
 
 function formatTime(t) {

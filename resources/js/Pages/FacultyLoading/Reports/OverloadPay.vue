@@ -3,46 +3,35 @@
   <AdminLayout title="Overload Pay Report">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Overload Pay Report</h1>
-          <p class="text-sm text-slate-500 mt-0.5">PHTR-based overload pay computations per faculty and term</p>
-        </div>
-        <a :href="exportUrl" target="_blank"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-          <ArrowDownTrayIcon class="h-4 w-4" /> Export CSV
-        </a>
-      </div>
+      <AppPageHeader title="Overload Pay Report" subtitle="PHTR-based overload pay computations per faculty and term">
+        <template #actions>
+          <AppButton as="a" :href="exportUrl" target="_blank" variant="secondary">
+            <ArrowDownTrayIcon class="h-4 w-4" /> Export CSV
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex flex-wrap gap-3 items-end">
+      <AppFilterBar>
         <div class="flex-1 min-w-[180px]">
-          <label class="block text-xs font-medium text-slate-500 mb-1">Academic Term</label>
-          <select v-model="filters.term_id" @change="applyFilters"
-            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option value="">All Terms</option>
+          <AppSelect v-model="filters.term_id" label="Academic Term" placeholder="All Terms" @change="applyFilters">
             <option v-for="t in terms" :key="t.id" :value="t.id">
               {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
             </option>
-          </select>
+          </AppSelect>
         </div>
         <div class="w-44">
-          <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
-          <select v-model="filters.status" @change="applyFilters"
-            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option value="">All Statuses</option>
+          <AppSelect v-model="filters.status" label="Status" placeholder="All Statuses" @change="applyFilters">
             <option value="for_approval">For Approval</option>
             <option value="approved">Approved</option>
             <option value="paid">Paid</option>
             <option value="rejected">Rejected</option>
-          </select>
+          </AppSelect>
         </div>
-        <button v-if="hasActiveFilter" @click="clearFilters"
-          class="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg">
-          Clear
-        </button>
-      </div>
+        <template #actions>
+          <AppButton v-if="hasActiveFilter" size="sm" variant="secondary" @click="clearFilters">Clear</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Grand Total banner -->
       <div v-if="computations.length" class="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -60,66 +49,79 @@
       </div>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div v-if="computations.length === 0" class="py-16 text-center">
-          <BanknotesIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-          <p class="text-sm font-medium text-slate-500">No overload computations found</p>
-          <p class="text-xs text-slate-400 mt-1">Try adjusting the filters above.</p>
-        </div>
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead>
-              <tr class="text-xs text-slate-400 uppercase tracking-wide bg-slate-50">
-                <th class="px-4 py-2.5 text-left w-8">#</th>
-                <th class="px-4 py-2.5 text-left">Faculty</th>
-                <th class="px-4 py-2.5 text-center">SG</th>
-                <th class="px-4 py-2.5 text-right">Annual Rate</th>
-                <th class="px-4 py-2.5 text-right">PHTR</th>
-                <th class="px-4 py-2.5 text-center">OL Units</th>
-                <th class="px-4 py-2.5 text-center">Hrs/Week</th>
-                <th class="px-4 py-2.5 text-center">Weeks</th>
-                <th class="px-4 py-2.5 text-right font-semibold">Total Pay</th>
-                <th class="px-4 py-2.5 text-center">Status</th>
-                <th class="px-4 py-2.5 text-center">Approved</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-              <tr v-for="(c, i) in computations" :key="c.id" class="hover:bg-slate-50/50">
-                <td class="px-4 py-2.5 text-slate-400 text-xs">{{ i + 1 }}</td>
-                <td class="px-4 py-2.5">
-                  <p class="font-medium text-slate-800">{{ c.faculty_name }}</p>
-                  <p v-if="c.position" class="text-xs text-slate-400">{{ c.position }}</p>
-                </td>
-                <td class="px-4 py-2.5 text-center text-slate-600">{{ c.salary_grade ?? '—' }}</td>
-                <td class="px-4 py-2.5 text-right text-slate-600 font-mono text-xs">{{ phpFmt(c.annual_rate) }}</td>
-                <td class="px-4 py-2.5 text-right text-emerald-700 font-mono text-xs">{{ phpFmt(c.phtr) }}</td>
-                <td class="px-4 py-2.5 text-center text-slate-600">{{ c.overload_units }}</td>
-                <td class="px-4 py-2.5 text-center text-slate-600">{{ c.overload_hours }}</td>
-                <td class="px-4 py-2.5 text-center text-slate-600">{{ c.term_weeks }}</td>
-                <td class="px-4 py-2.5 text-right font-semibold text-slate-800">{{ phpFmt(c.total_overload_pay) }}</td>
-                <td class="px-4 py-2.5 text-center">
-                  <span :class="statusClass(c.status)"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                    {{ statusLabel(c.status) }}
-                  </span>
-                </td>
-                <td class="px-4 py-2.5 text-center text-xs text-slate-500">
-                  {{ c.approved_at ?? '—' }}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr class="bg-slate-50 border-t border-slate-200">
-                <td colspan="8" class="px-4 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  Grand Total
-                </td>
-                <td class="px-4 py-2.5 text-right font-bold text-slate-800">{{ phpFmt(grandTotal) }}</td>
-                <td colspan="2"></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+      <AppTable :is-empty="!computations.length" :skeleton-cols="11">
+        <template #head>
+          <tr>
+            <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-8">#</th>
+            <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
+            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">SG</th>
+            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Annual Rate</th>
+            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">PHTR</th>
+            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">OL Units</th>
+            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Hrs/Week</th>
+            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Weeks</th>
+            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Pay</th>
+            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Approved</th>
+          </tr>
+        </template>
+
+        <tr v-for="(c, i) in computations" :key="c.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-2.5 text-slate-400 text-xs">{{ i + 1 }}</td>
+          <td class="px-4 py-2.5">
+            <p class="font-medium text-slate-800">{{ c.faculty_name }}</p>
+            <p v-if="c.position" class="text-xs text-slate-400">{{ c.position }}</p>
+          </td>
+          <td class="px-4 py-2.5 text-center text-slate-600">{{ c.salary_grade ?? '—' }}</td>
+          <td class="px-4 py-2.5 text-right text-slate-600 font-mono text-xs">{{ phpFmt(c.annual_rate) }}</td>
+          <td class="px-4 py-2.5 text-right text-success-700 font-mono text-xs">{{ phpFmt(c.phtr) }}</td>
+          <td class="px-4 py-2.5 text-center text-slate-600">{{ c.overload_units }}</td>
+          <td class="px-4 py-2.5 text-center text-slate-600">{{ c.overload_hours }}</td>
+          <td class="px-4 py-2.5 text-center text-slate-600">{{ c.term_weeks }}</td>
+          <td class="px-4 py-2.5 text-right font-semibold text-slate-800">{{ phpFmt(c.total_overload_pay) }}</td>
+          <td class="px-4 py-2.5 text-center">
+            <AppBadge :color="statusColor(c.status)">{{ statusLabel(c.status) }}</AppBadge>
+          </td>
+          <td class="px-4 py-2.5 text-center text-xs text-slate-500">
+            {{ c.approved_at ?? '—' }}
+          </td>
+        </tr>
+
+        <!-- Grand total row -->
+        <tr v-if="computations.length" class="bg-slate-50/80 border-t border-slate-200">
+          <td colspan="8" class="px-4 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">
+            Grand Total
+          </td>
+          <td class="px-4 py-2.5 text-right font-bold text-slate-800">{{ phpFmt(grandTotal) }}</td>
+          <td colspan="2"></td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="(c, i) in computations" :key="c.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ c.faculty_name }}</p>
+                <p v-if="c.position" class="text-xs text-slate-400">{{ c.position }}</p>
+              </div>
+              <AppBadge :color="statusColor(c.status)">{{ statusLabel(c.status) }}</AppBadge>
+            </div>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-500">
+              <span>SG {{ c.salary_grade ?? '—' }}</span>
+              <span>{{ c.overload_units }} OL units · {{ c.overload_hours }}h × {{ c.term_weeks }}w</span>
+              <span>PHTR {{ phpFmt(c.phtr) }}</span>
+              <span>Approved {{ c.approved_at ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between text-xs pt-1">
+              <span class="text-slate-400">Annual {{ phpFmt(c.annual_rate) }}</span>
+              <span class="font-semibold text-slate-800">Total {{ phpFmt(c.total_overload_pay) }}</span>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No overload computations found" subtitle="Try adjusting the filters above." :icon="BanknotesIcon" />
+        </template>
+      </AppTable>
 
     </div>
   </AdminLayout>
@@ -129,6 +131,13 @@
 import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { ArrowDownTrayIcon, BanknotesIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -183,13 +192,13 @@ function statusLabel(s) {
   }[s] ?? s
 }
 
-function statusClass(s) {
+function statusColor(s) {
   return {
-    for_approval: 'bg-amber-50 text-amber-700',
-    approved:     'bg-emerald-50 text-emerald-700',
-    paid:         'bg-indigo-50 text-indigo-700',
-    rejected:     'bg-red-50 text-red-600',
-    pending:      'bg-slate-50 text-slate-600',
-  }[s] ?? 'bg-slate-50 text-slate-600'
+    for_approval: 'amber',
+    approved:     'green',
+    paid:         'indigo',
+    rejected:     'red',
+    pending:      'slate',
+  }[s] ?? 'slate'
 }
 </script>

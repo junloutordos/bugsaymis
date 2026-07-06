@@ -3,27 +3,23 @@
   <AdminLayout title="My Work Schedule">
     <div class="space-y-6 max-w-3xl mx-auto">
 
-      <!-- Header -->
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">My Work Schedule</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Set your preferred work schedule and submit it to HR for approval.</p>
-      </div>
+      <AppPageHeader title="My Work Schedule" subtitle="Set your preferred work schedule and submit it to HR for approval." />
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm">
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm">
         {{ $page.props.flash.error }}
       </div>
 
       <!-- ── Current Active Schedule ──────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
+      <AppCard :padded="false">
+        <template #header>
           <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <ClockIcon class="h-4 w-4 text-indigo-500" /> Current Active Schedule
           </h2>
-        </div>
+        </template>
         <div class="px-5 py-5">
           <div v-if="!currentSchedule" class="text-slate-400 text-sm text-center py-4">
             No active schedule assigned yet. Submit a request below.
@@ -38,7 +34,7 @@
                   <template v-if="currentSchedule.remarks"> · {{ currentSchedule.remarks }}</template>
                 </p>
               </div>
-              <span class="shrink-0 text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">Active</span>
+              <AppBadge color="green" class="shrink-0">Active</AppBadge>
             </div>
             <!-- Day breakdown -->
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
@@ -46,10 +42,9 @@
                 :class="['rounded-lg px-3 py-2', entry.work_from_home ? 'bg-blue-50' : 'bg-slate-50']">
                 <div class="flex items-center gap-1.5">
                   <p class="text-xs font-semibold text-slate-600">{{ entry.day }}</p>
-                  <span v-if="entry.work_from_home"
-                    class="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
-                    <HomeIcon class="h-2.5 w-2.5" /> WFH
-                  </span>
+                  <AppBadge v-if="entry.work_from_home" color="blue">
+                    <span class="inline-flex items-center gap-0.5"><HomeIcon class="h-2.5 w-2.5" /> WFH</span>
+                  </AppBadge>
                 </div>
                 <p class="text-xs text-slate-500 font-mono mt-0.5">{{ entry.time_in }} – {{ entry.time_out }}</p>
                 <p v-if="entry.lunch_start && entry.lunch_end" class="text-[10px] text-slate-400 font-mono mt-0.5">
@@ -59,38 +54,39 @@
             </div>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── Pending Submission ───────────────────────────────────────────── -->
-      <div v-if="pendingSubmission" class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
-        <div class="px-5 py-4 border-b border-amber-200 flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-amber-800 flex items-center gap-2">
-            <ClockIcon class="h-4 w-4 text-amber-500" /> Pending Submission
+      <div v-if="pendingSubmission" class="bg-warning-50 border border-warning-100 rounded-xl shadow-sm">
+        <div class="px-5 py-4 border-b border-warning-100 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-warning-700 flex items-center gap-2">
+            <ClockIcon class="h-4 w-4 text-warning-500" /> Pending Submission
           </h2>
-          <span class="text-xs font-semibold bg-amber-200 text-amber-800 px-2.5 py-1 rounded-full">Awaiting HR Review</span>
+          <AppBadge color="amber">Awaiting HR Review</AppBadge>
         </div>
         <div class="px-5 py-4">
-          <p class="font-medium text-amber-900">{{ pendingSubmission.name }}</p>
-          <p class="text-sm text-amber-700 mt-0.5">{{ formatDaysWithTimes(pendingSubmission.daily_schedules) }}</p>
-          <p class="text-xs text-amber-600 mt-1">Effective: {{ pendingSubmission.effective_date }}</p>
+          <p class="font-medium text-warning-700">{{ pendingSubmission.name }}</p>
+          <p class="text-sm text-warning-700 mt-0.5">{{ formatDaysWithTimes(pendingSubmission.daily_schedules) }}</p>
+          <p class="text-xs text-warning-600 mt-1">Effective: {{ pendingSubmission.effective_date }}</p>
           <div class="mt-3">
-            <button @click="cancelSubmission"
-              class="text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors">
+            <AppButton variant="danger" size="sm" @click="cancelSubmission">
               Cancel Submission
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
 
       <!-- ── Submit New Schedule ─────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm" :class="pendingSubmission ? 'opacity-60 pointer-events-none' : ''">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-            <PlusCircleIcon class="h-4 w-4 text-indigo-500" />
-            {{ pendingSubmission ? 'Submit New Schedule (cancel pending first)' : 'Submit New Schedule Request' }}
-          </h2>
-          <p class="text-xs text-slate-400 mt-0.5">Select a preset or customize your daily times. HR will review and approve.</p>
-        </div>
+      <AppCard :padded="false" :class="pendingSubmission ? 'opacity-60 pointer-events-none' : ''">
+        <template #header>
+          <div>
+            <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <PlusCircleIcon class="h-4 w-4 text-indigo-500" />
+              {{ pendingSubmission ? 'Submit New Schedule (cancel pending first)' : 'Submit New Schedule Request' }}
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Select a preset or customize your daily times. HR will review and approve.</p>
+          </div>
+        </template>
 
         <div class="px-5 py-5 space-y-5">
 
@@ -106,16 +102,16 @@
 
           <!-- Schedule name -->
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Schedule Name <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Schedule Name <span class="text-danger-600">*</span></label>
             <input v-model="submitForm.name" type="text" placeholder="e.g. My Flex Schedule"
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-            <p v-if="submitForm.errors.name" class="text-red-500 text-xs mt-1">{{ submitForm.errors.name }}</p>
+            <p v-if="submitForm.errors.name" class="text-danger-600 text-xs mt-1">{{ submitForm.errors.name }}</p>
           </div>
 
           <!-- Per-day schedule -->
           <div>
             <div class="flex items-center justify-between mb-2">
-              <label class="text-xs font-medium text-slate-600">Work Days &amp; Times <span class="text-red-500">*</span></label>
+              <label class="text-xs font-medium text-slate-600">Work Days &amp; Times <span class="text-danger-600">*</span></label>
               <button type="button" @click="copyFirstToAll"
                 class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Copy Mon to all active days</button>
             </div>
@@ -168,16 +164,16 @@
                 </div>
               </div>
             </div>
-            <p v-if="submitForm.errors.daily_schedules" class="text-red-500 text-xs mt-1">{{ submitForm.errors.daily_schedules }}</p>
+            <p v-if="submitForm.errors.daily_schedules" class="text-danger-600 text-xs mt-1">{{ submitForm.errors.daily_schedules }}</p>
           </div>
 
           <!-- Effective date + remarks -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Effective Date <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Effective Date <span class="text-danger-600">*</span></label>
               <input v-model="submitForm.effective_date" type="date" :min="today"
                 class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-              <p v-if="submitForm.errors.effective_date" class="text-red-500 text-xs mt-1">{{ submitForm.errors.effective_date }}</p>
+              <p v-if="submitForm.errors.effective_date" class="text-danger-600 text-xs mt-1">{{ submitForm.errors.effective_date }}</p>
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Remarks (optional)</label>
@@ -186,43 +182,38 @@
             </div>
           </div>
 
-          <button @click="submitSchedule"
+          <AppButton
+            block
+            :loading="submitForm.processing"
             :disabled="submitForm.processing || !submitForm.name || !Object.keys(submitForm.daily_schedules).length || !submitForm.effective_date"
-            class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
-            <svg v-if="submitForm.processing" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-            </svg>
+            @click="submitSchedule"
+          >
             {{ submitForm.processing ? 'Submitting…' : 'Submit for HR Approval' }}
-          </button>
+          </AppButton>
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── Schedule History ────────────────────────────────────────────── -->
-      <div v-if="history.length" class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
+      <AppCard v-if="history.length" :padded="false">
+        <template #header>
           <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <DocumentTextIcon class="h-4 w-4 text-indigo-500" /> Past Submissions
           </h2>
-        </div>
+        </template>
         <ul class="divide-y divide-slate-100">
           <li v-for="h in history" :key="h.id" class="px-5 py-3 flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="text-sm font-medium text-slate-700">{{ h.name }}</p>
               <p class="text-xs text-slate-500 mt-0.5">{{ formatDaysWithTimes(h.daily_schedules) }}</p>
               <p class="text-xs text-slate-400 mt-0.5">Effective: {{ h.effective_date }}</p>
-              <p v-if="h.rejection_reason" class="text-xs text-red-500 mt-0.5">Reason: {{ h.rejection_reason }}</p>
+              <p v-if="h.rejection_reason" class="text-xs text-danger-600 mt-0.5">Reason: {{ h.rejection_reason }}</p>
             </div>
-            <span class="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full"
-              :class="{
-                'bg-emerald-100 text-emerald-700': h.status === 'approved',
-                'bg-red-100 text-red-600': h.status === 'rejected',
-              }">
+            <AppBadge :color="h.status === 'approved' ? 'green' : 'red'" class="shrink-0">
               {{ h.status === 'approved' ? 'Approved' : 'Rejected' }}
-            </span>
+            </AppBadge>
           </li>
         </ul>
-      </div>
+      </AppCard>
 
     </div>
   </AdminLayout>
@@ -232,6 +223,11 @@
 import { ref, computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import {
   ClockIcon, CheckCircleIcon, PlusCircleIcon, DocumentTextIcon, HomeIcon,
 } from '@heroicons/vue/24/outline'
@@ -318,8 +314,13 @@ function submitSchedule() {
 
 // ── Cancel pending submission ─────────────────────────────────────────────────
 
-function cancelSubmission() {
-  if (!confirm('Cancel your pending schedule submission?')) return
+async function cancelSubmission() {
+  const confirmed = await confirmAction({
+    title: 'Cancel submission?',
+    text: 'Cancel your pending schedule submission?',
+    confirmText: 'Cancel Submission',
+  })
+  if (!confirmed) return
   useForm({}).delete(route('hr.schedules.cancel', props.pendingSubmission.id))
 }
 

@@ -7,6 +7,8 @@ import {
   adjectivalColor,
 } from '@/Utils/ClassRecord/gradeUtils.js'
 import ManageStudentsModal from './ManageStudentsModal.vue'
+import AppButton from '@/Components/AppButton.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import { LockClosedIcon, UsersIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -233,15 +235,12 @@ function onKeydown(e, studentIdx, assessmentIdx) {
 const locking = ref(false)
 
 async function lockQuarter() {
-  const result = await Swal.fire({
-    title:             `Lock Quarter ${props.quarterNumber}?`,
-    text:              'Score entry will be disabled. Administrators can unlock it.',
-    icon:              'warning',
-    showCancelButton:  true,
-    confirmButtonText: 'Yes, Lock',
-    confirmButtonColor:'#d97706',
+  const confirmed = await confirmAction({
+    title: `Lock Quarter ${props.quarterNumber}?`,
+    text: 'Score entry will be disabled. Administrators can unlock it.',
+    confirmText: 'Yes, Lock',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
 
   locking.value = true
   try {
@@ -289,10 +288,9 @@ const showRunning = computed(() => props.quarterNumber > 1)
         <span v-if="saveStatus === 'error'"  class="text-xs text-red-500">Save failed — will retry</span>
       </div>
       <div class="flex items-center gap-2">
-        <button @click="showStudentsModal = true"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium">
+        <AppButton variant="secondary" size="sm" @click="showStudentsModal = true">
           <UsersIcon class="h-3.5 w-3.5" /> Manage Students
-        </button>
+        </AppButton>
       </div>
     </div>
 
@@ -316,7 +314,7 @@ const showRunning = computed(() => props.quarterNumber > 1)
 
     <!-- Locked banner -->
     <div v-if="isLocked"
-      class="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-4 py-2.5 text-sm">
+      class="flex items-center gap-2 bg-warning-50 border border-warning-100 text-warning-700 rounded-lg px-4 py-2.5 text-sm">
       <LockClosedIcon class="h-4 w-4 shrink-0" />
       This quarter is locked. Unlock it (admin only) to allow score changes.
     </div>
@@ -528,11 +526,10 @@ const showRunning = computed(() => props.quarterNumber > 1)
 
     <!-- Lock button -->
     <div v-if="!isLocked && students.length && allAssessments.length" class="flex justify-end">
-      <button @click="lockQuarter" :disabled="locking"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 text-sm font-medium disabled:opacity-50">
-        <LockClosedIcon class="h-4 w-4" />
+      <AppButton variant="warning" :loading="locking" @click="lockQuarter">
+        <LockClosedIcon v-if="!locking" class="h-4 w-4" />
         {{ locking ? 'Locking…' : `Lock Quarter ${quarterNumber}` }}
-      </button>
+      </AppButton>
     </div>
 
   </div>

@@ -2,7 +2,15 @@
 import { ref, computed } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { FunnelIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const page = usePage()
 const logs    = computed(() => page.props.logs    ?? { data: [], current_page: 1, last_page: 1 })
@@ -48,116 +56,92 @@ function studentName(log) {
   return `${s.lastname ?? ''}, ${s.firstname ?? ''}`.trim().replace(/^,\s*/, '')
 }
 
-const typeColors = {
-  in:  'bg-emerald-100 text-emerald-700',
-  out: 'bg-amber-100 text-amber-700',
-}
 const typeLabels = { in: 'Time In', out: 'Time Out' }
+
+function typeBadgeColor(type) {
+  return { in: 'green', out: 'amber' }[type] ?? 'slate'
+}
 </script>
 
 <template>
   <Head title="Student Attendance Logs" />
   <AdminLayout title="Student Attendance Logs">
+    <div class="space-y-5">
 
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">Attendance Logs</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Immutable gate scan records — never edited or deleted</p>
-      </div>
-      <a
-        :href="route('student-attendance.kiosk')"
-        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-      >
-        Open Kiosk
-      </a>
-    </div>
+      <AppPageHeader title="Attendance Logs" subtitle="Immutable gate scan records — never edited or deleted">
+        <template #actions>
+          <AppButton as="a" :href="route('student-attendance.kiosk')">Open Kiosk</AppButton>
+        </template>
+      </AppPageHeader>
 
-    <!-- Filters -->
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm mb-4">
-      <div class="px-5 py-4 flex flex-wrap items-end gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Date</label>
-          <input
-            v-model="filterDate"
-            type="date"
-            @change="applyFilters"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Type</label>
-          <select
-            v-model="filterType"
-            @change="applyFilters"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All types</option>
+      <!-- Filters -->
+      <AppFilterBar>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full sm:w-auto">
+          <AppInput v-model="filterDate" type="date" label="Date" @change="applyFilters" />
+          <AppSelect v-model="filterType" label="Type" placeholder="All types" @change="applyFilters">
             <option value="in">Time In</option>
             <option value="out">Time Out</option>
-          </select>
+          </AppSelect>
         </div>
-        <button
-          v-if="filterDate || filterType || filterName"
-          @click="clearFilters"
-          class="text-sm text-slate-500 hover:text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-50 border border-slate-200"
-        >
-          Clear filters
-        </button>
-      </div>
+        <template #actions>
+          <AppButton
+            v-if="filterDate || filterType || filterName"
+            variant="secondary" size="sm" @click="clearFilters"
+          >Clear filters</AppButton>
+        </template>
+      </AppFilterBar>
+
+      <!-- Table -->
+      <AppTable :is-empty="!logs.data.length" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Barcode</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Scan Time</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Gate</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Source</th>
+          </tr>
+        </template>
+
+        <tr v-for="log in logs.data" :key="log.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 font-medium text-slate-800">{{ studentName(log) }}</td>
+          <td class="px-4 py-3 text-slate-500 font-mono text-xs">{{ log.raw_barcode }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="typeBadgeColor(log.type)">{{ typeLabels[log.type] ?? log.type }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ formatDateTime(log.scan_time) }}</td>
+          <td class="px-4 py-3 text-slate-500">{{ log.gate_location ?? '—' }}</td>
+          <td class="px-4 py-3 text-slate-400 text-xs capitalize">{{ log.source }}</td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="log in logs.data" :key="log.id" class="p-4 space-y-1.5">
+            <div class="flex items-start justify-between gap-2">
+              <p class="font-medium text-slate-800 text-xs">{{ studentName(log) }}</p>
+              <AppBadge :color="typeBadgeColor(log.type)">{{ typeLabels[log.type] ?? log.type }}</AppBadge>
+            </div>
+            <p class="text-xs text-slate-500 font-mono">{{ log.raw_barcode }}</p>
+            <p class="text-xs text-slate-500">{{ formatDateTime(log.scan_time) }} &middot; {{ log.gate_location ?? '—' }}</p>
+            <p class="text-xs text-slate-400 capitalize">{{ log.source }}</p>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No attendance logs found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="logs.current_page"
+            :total-pages="logs.last_page"
+            :total="logs.total"
+            @prev="goTo(logs.prev_page_url)"
+            @next="goTo(logs.next_page_url)"
+          />
+        </template>
+      </AppTable>
+
     </div>
-
-    <!-- Table -->
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Barcode</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Scan Time</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Gate</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Source</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-for="log in logs.data" :key="log.id" class="hover:bg-slate-50/60">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ studentName(log) }}</td>
-              <td class="px-4 py-3 text-slate-500 font-mono text-xs">{{ log.raw_barcode }}</td>
-              <td class="px-4 py-3">
-                <span
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                  :class="typeColors[log.type] ?? 'bg-slate-100 text-slate-600'"
-                >
-                  {{ typeLabels[log.type] ?? log.type }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ formatDateTime(log.scan_time) }}</td>
-              <td class="px-4 py-3 text-slate-500">{{ log.gate_location ?? '—' }}</td>
-              <td class="px-4 py-3 text-slate-400 text-xs capitalize">{{ log.source }}</td>
-            </tr>
-            <tr v-if="logs.data.length === 0">
-              <td colspan="6" class="py-16 text-center text-slate-400">No attendance logs found</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination -->
-      <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-        <button
-          @click="goTo(logs.prev_page_url)"
-          :disabled="!logs.prev_page_url"
-          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40"
-        >Prev</button>
-        <span>Page {{ logs.current_page }} of {{ logs.last_page }}</span>
-        <button
-          @click="goTo(logs.next_page_url)"
-          :disabled="!logs.next_page_url"
-          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40"
-        >Next</button>
-      </div>
-    </div>
-
   </AdminLayout>
 </template>

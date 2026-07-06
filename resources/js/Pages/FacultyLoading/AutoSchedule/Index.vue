@@ -17,88 +17,87 @@
       </div>
 
       <!-- ── Configuration Panel ─────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-5">
-        <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-          1. Select Term
-        </h2>
+      <AppCard>
+        <div class="space-y-5">
+          <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+            1. Select Term
+          </h2>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <!-- School Year -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
-            <select v-model="form.school_year_id" @change="onSchoolYearChange"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null" disabled>Select school year…</option>
-              <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
-                {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
-              </option>
-            </select>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- School Year -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
+              <select v-model="form.school_year_id" @change="onSchoolYearChange"
+                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <option :value="null" disabled>Select school year…</option>
+                <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+                  {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Academic Term -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term</label>
+              <select v-model="form.academic_term_id" :disabled="!form.school_year_id"
+                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50">
+                <option :value="null" disabled>Select term…</option>
+                <option v-for="t in selectedSchoolYear?.terms ?? []" :key="t.id" :value="t.id">
+                  {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
+                </option>
+              </select>
+            </div>
           </div>
 
-          <!-- Academic Term -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term</label>
-            <select v-model="form.academic_term_id" :disabled="!form.school_year_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50">
-              <option :value="null" disabled>Select term…</option>
-              <option v-for="t in selectedSchoolYear?.terms ?? []" :key="t.id" :value="t.id">
-                {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
-              </option>
-            </select>
+          <!-- Generate button -->
+          <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
+            <AppButton size="lg" :disabled="!canGenerate || generating" :loading="generating" @click="runGenerate">
+              <SparklesIcon v-if="!generating" class="h-4 w-4" />
+              {{ generating ? 'Generating…' : 'Generate Schedule' }}
+            </AppButton>
+            <p v-if="generating" class="text-xs text-slate-400">
+              Generating — this may take a few seconds…
+            </p>
           </div>
         </div>
-
-        <!-- Generate button -->
-        <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
-          <button @click="runGenerate"
-            :disabled="!canGenerate || generating"
-            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors shadow-sm">
-            <ArrowPathIcon v-if="generating" class="h-4 w-4 animate-spin" />
-            <SparklesIcon v-else class="h-4 w-4" />
-            {{ generating ? 'Generating…' : 'Generate Schedule' }}
-          </button>
-          <p v-if="generating" class="text-xs text-slate-400">
-            Generating — this may take a few seconds…
-          </p>
-        </div>
-      </div>
+      </AppCard>
 
       <!-- ── Result Panel ────────────────────────────────────────────── -->
       <template v-if="result">
 
         <!-- Summary cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          <AppCard class="text-center">
             <p class="text-2xl font-bold"
-              :class="liveConflictCount > 0 ? 'text-red-600' : 'text-emerald-600'">
+              :class="liveConflictCount > 0 ? 'text-danger-600' : 'text-success-600'">
               {{ liveConflictCount }}
             </p>
             <p class="text-xs text-slate-500 mt-1">Hard Conflicts</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          </AppCard>
+          <AppCard class="text-center">
             <p class="text-2xl font-bold text-indigo-600">{{ result.schedules_generated }}</p>
             <p class="text-xs text-slate-500 mt-1">Slots Generated</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-            <p class="text-2xl font-bold" :class="unplaceable.length === 0 ? 'text-emerald-600' : 'text-amber-600'">
+          </AppCard>
+          <AppCard class="text-center">
+            <p class="text-2xl font-bold" :class="unplaceable.length === 0 ? 'text-success-600' : 'text-warning-600'">
               {{ unplaceable.length }}
             </p>
             <p class="text-xs text-slate-500 mt-1">Unplaced</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          </AppCard>
+          <AppCard class="text-center">
             <p class="text-2xl font-bold text-slate-700">{{ result.duration_seconds ?? '—' }}s</p>
             <p class="text-xs text-slate-500 mt-1">Run Time</p>
-          </div>
+          </AppCard>
         </div>
 
         <!-- Conflict-free success -->
-        <div v-if="liveConflictCount === 0" class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <CheckCircleIcon class="h-5 w-5 text-emerald-500 shrink-0" />
-          <p class="text-sm font-semibold text-emerald-800">Conflict-free schedule generated!</p>
+        <div v-if="liveConflictCount === 0" class="bg-success-50 border border-success-100 rounded-xl px-4 py-3 flex items-center gap-3">
+          <CheckCircleIcon class="h-5 w-5 text-success-500 shrink-0" />
+          <p class="text-sm font-semibold text-success-700">Conflict-free schedule generated!</p>
         </div>
 
         <!-- ── Per-section coverage report ─────────────────────────────── -->
-        <div v-if="sectionReport.length" class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <AppCard v-if="sectionReport.length" :padded="false" class="overflow-hidden">
           <div class="px-5 py-3 border-b border-slate-100">
             <h2 class="text-sm font-semibold text-slate-700">Section Coverage</h2>
             <p class="text-xs text-slate-500 mt-0.5">Sessions placed vs. required per section.</p>
@@ -116,28 +115,28 @@
               </thead>
               <tbody class="divide-y divide-slate-50">
                 <tr v-for="r in sectionReport" :key="r.section_id"
-                  :class="['hover:bg-slate-50/50', r.unplaced > 0 ? 'bg-amber-50/40' : '']">
+                  :class="['hover:bg-slate-50/50', r.unplaced > 0 ? 'bg-warning-50/40' : '']">
                   <td class="px-4 py-2 text-slate-500">G{{ r.grade }}</td>
                   <td class="px-4 py-2 font-medium text-slate-700">{{ r.section_name }}</td>
                   <td class="px-4 py-2 text-center text-slate-600">{{ r.needed }}</td>
-                  <td class="px-4 py-2 text-center text-emerald-600 font-semibold">{{ r.placed }}</td>
+                  <td class="px-4 py-2 text-center text-success-600 font-semibold">{{ r.placed }}</td>
                   <td class="px-4 py-2 text-center font-semibold"
-                    :class="r.unplaced > 0 ? 'text-amber-600' : 'text-slate-300'">{{ r.unplaced }}</td>
+                    :class="r.unplaced > 0 ? 'text-warning-600' : 'text-slate-300'">{{ r.unplaced }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>
+        </AppCard>
 
         <!-- ── Unplaced sessions ──────────────────────────────────────── -->
-        <div v-if="unplaceable.length" class="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
-          <div class="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
-            <ExclamationTriangleIcon class="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+        <AppCard v-if="unplaceable.length" :padded="false" class="overflow-hidden">
+          <div class="px-5 py-3 bg-warning-50 border-b border-warning-100 flex items-start gap-2">
+            <ExclamationTriangleIcon class="h-5 w-5 text-warning-500 mt-0.5 shrink-0" />
             <div>
-              <p class="text-sm font-semibold text-amber-800">
+              <p class="text-sm font-semibold text-warning-700">
                 {{ unplaceable.length }} session(s) could not be placed
               </p>
-              <p class="text-xs text-amber-700 mt-0.5">
+              <p class="text-xs text-warning-600 mt-0.5">
                 These exceed the available periods for the grade (over-subscribed) or hit a fully-packed
                 section. Reduce the grade's load, adjust the bell schedule, or place these manually in the
                 Schedules module.
@@ -164,17 +163,17 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </AppCard>
 
         <!-- ── Conflict Resolution Panel ──────────────────────────────── -->
-        <div v-else-if="conflictSuggestions.length > 0" class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
-          <div class="px-5 py-3 bg-red-50 border-b border-red-200 flex items-center gap-2">
-            <ExclamationTriangleIcon class="h-5 w-5 text-red-500 shrink-0" />
+        <AppCard v-else-if="conflictSuggestions.length > 0" :padded="false" class="overflow-hidden">
+          <div class="px-5 py-3 bg-danger-50 border-b border-danger-100 flex items-center gap-2">
+            <ExclamationTriangleIcon class="h-5 w-5 text-danger-500 shrink-0" />
             <div>
-              <p class="text-sm font-semibold text-red-800">
+              <p class="text-sm font-semibold text-danger-700">
                 {{ liveConflictCount }} hard conflict(s) detected — Suggested Fixes
               </p>
-              <p class="text-xs text-red-600 mt-0.5">
+              <p class="text-xs text-danger-600 mt-0.5">
                 Click "Use This Fix" to apply an alternative. Fixes update the preview and will be saved when you click "Save as Tentative".
               </p>
             </div>
@@ -186,27 +185,27 @@
 
               <!-- Conflict header -->
               <div class="flex items-center gap-2 mb-3">
-                <span :class="conflictTypeBadge(c.type)">{{ c.type }}</span>
+                <AppBadge :color="conflictTypeBadge(c.type)">{{ c.type }}</AppBadge>
                 <span class="text-sm font-medium text-slate-700">
                   {{ c.entity_label }} — {{ c.day }}
                 </span>
                 <span v-if="isConflictResolved(c)"
-                  class="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  class="text-xs text-success-600 font-medium flex items-center gap-1">
                   <CheckCircleIcon class="h-3.5 w-3.5" /> Resolved
                 </span>
               </div>
 
               <!-- The two conflicting slots -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div class="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs space-y-0.5">
+                <div class="rounded-lg bg-danger-50 border border-danger-100 px-3 py-2 text-xs space-y-0.5">
                   <p class="font-semibold text-slate-700">{{ c.subject_a }}</p>
                   <p class="text-slate-500">{{ c.faculty_a }}</p>
-                  <p class="text-red-600 font-medium">{{ c.day }} {{ c.time_a }}</p>
+                  <p class="text-danger-600 font-medium">{{ c.day }} {{ c.time_a }}</p>
                 </div>
-                <div class="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs space-y-0.5">
+                <div class="rounded-lg bg-danger-50 border border-danger-100 px-3 py-2 text-xs space-y-0.5">
                   <p class="font-semibold text-slate-700">{{ c.subject_b }}</p>
                   <p class="text-slate-500">{{ c.faculty_b }}</p>
-                  <p class="text-red-600 font-medium">{{ c.day }} {{ c.time_b }}</p>
+                  <p class="text-danger-600 font-medium">{{ c.day }} {{ c.time_b }}</p>
                 </div>
               </div>
 
@@ -220,14 +219,14 @@
                   </p>
                   <div class="space-y-1.5">
                     <div v-for="(alt, ai) in c.alternatives_a" :key="ai"
-                      class="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5">
+                      class="flex items-center justify-between rounded-lg bg-success-50 border border-success-100 px-3 py-1.5">
                       <div class="text-xs">
                         <span class="font-semibold text-slate-700">{{ alt.day }}</span>
                         <span class="text-slate-500 ml-1">{{ fmtTime(alt.start_time) }}–{{ fmtTime(alt.end_time) }}</span>
                         <span class="text-slate-400 ml-1">· {{ alt.classroom_name }}</span>
                       </div>
                       <button @click="applyFix(c.req_id_a, alt, ci)"
-                        class="text-xs text-emerald-700 hover:text-emerald-900 font-semibold ml-2 shrink-0">
+                        class="text-xs text-success-700 hover:opacity-75 font-semibold ml-2 shrink-0">
                         Use This Fix
                       </button>
                     </div>
@@ -241,14 +240,14 @@
                   </p>
                   <div class="space-y-1.5">
                     <div v-for="(alt, bi) in c.alternatives_b" :key="bi"
-                      class="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5">
+                      class="flex items-center justify-between rounded-lg bg-success-50 border border-success-100 px-3 py-1.5">
                       <div class="text-xs">
                         <span class="font-semibold text-slate-700">{{ alt.day }}</span>
                         <span class="text-slate-500 ml-1">{{ fmtTime(alt.start_time) }}–{{ fmtTime(alt.end_time) }}</span>
                         <span class="text-slate-400 ml-1">· {{ alt.classroom_name }}</span>
                       </div>
                       <button @click="applyFix(c.req_id_b, alt, ci)"
-                        class="text-xs text-emerald-700 hover:text-emerald-900 font-semibold ml-2 shrink-0">
+                        class="text-xs text-success-700 hover:opacity-75 font-semibold ml-2 shrink-0">
                         Use This Fix
                       </button>
                     </div>
@@ -264,17 +263,17 @@
 
             </div>
           </div>
-        </div>
+        </AppCard>
 
         <!-- Conflict warning (no suggestions) -->
         <div v-else-if="liveConflictCount > 0"
-          class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
-          <ExclamationTriangleIcon class="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+          class="bg-warning-50 border border-warning-100 rounded-xl px-4 py-3 flex items-start gap-3">
+          <ExclamationTriangleIcon class="h-5 w-5 text-warning-500 mt-0.5 shrink-0" />
           <div>
-            <p class="text-sm font-semibold text-amber-800">
+            <p class="text-sm font-semibold text-warning-700">
               {{ liveConflictCount }} hard conflict(s) remain
             </p>
-            <p class="text-xs text-amber-700 mt-0.5">
+            <p class="text-xs text-warning-600 mt-0.5">
               The generated schedule is conflict-free by construction; this should not normally appear.
               You can still save and review in the Schedules module.
             </p>
@@ -282,22 +281,18 @@
         </div>
 
         <!-- Schedule preview table -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <AppCard :padded="false" class="overflow-hidden">
           <div class="px-5 py-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <h2 class="text-sm font-semibold text-slate-700">Preview — Generated Schedule</h2>
             <div class="flex items-center gap-2">
               <!-- Filter by day -->
-              <select v-model="previewFilter.day"
-                class="text-xs border border-slate-200 rounded-md px-2 py-1.5 focus:ring-2 focus:ring-indigo-500">
-                <option value="">All Days</option>
+              <AppSelect v-model="previewFilter.day" placeholder="All Days" class="w-36">
                 <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
-              </select>
+              </AppSelect>
               <!-- Filter by faculty -->
-              <select v-model="previewFilter.faculty"
-                class="text-xs border border-slate-200 rounded-md px-2 py-1.5 focus:ring-2 focus:ring-indigo-500">
-                <option value="">All Faculty</option>
+              <AppSelect v-model="previewFilter.faculty" placeholder="All Faculty" class="w-40">
                 <option v-for="f in previewFaculty" :key="f" :value="f">{{ f }}</option>
-              </select>
+              </AppSelect>
             </div>
           </div>
 
@@ -316,7 +311,7 @@
               </thead>
               <tbody class="divide-y divide-slate-50">
                 <tr v-for="(s, idx) in filteredSchedules" :key="idx"
-                  :class="['hover:bg-slate-50/50 transition-colors', hasConflict(s) ? 'bg-red-50' : '']">
+                  :class="['hover:bg-slate-50/50 transition-colors', hasConflict(s) ? 'bg-danger-50' : '']">
                   <td class="px-4 py-2.5 font-medium text-slate-700">{{ s.day_of_week }}</td>
                   <td class="px-4 py-2.5 text-slate-600 tabular-nums">
                     {{ fmtTime(s.start_time) }} – {{ fmtTime(s.end_time) }}
@@ -326,14 +321,10 @@
                   <td class="px-4 py-2.5 text-slate-500">{{ s._section_name }}</td>
                   <td class="px-4 py-2.5 text-slate-500">{{ s._classroom_name }}</td>
                   <td class="px-4 py-2.5 text-center">
-                    <span v-if="hasConflict(s)"
-                      class="inline-flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
-                      <ExclamationTriangleIcon class="h-3 w-3" /> Conflict
-                    </span>
-                    <span v-else
-                      class="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                      Tentative
-                    </span>
+                    <AppBadge v-if="hasConflict(s)" color="red">
+                      <ExclamationTriangleIcon class="h-3 w-3 mr-1" /> Conflict
+                    </AppBadge>
+                    <AppBadge v-else color="slate">Tentative</AppBadge>
                   </td>
                 </tr>
                 <tr v-if="filteredSchedules.length === 0">
@@ -344,21 +335,17 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </AppCard>
 
         <!-- Action buttons -->
         <div class="flex flex-wrap items-center gap-3">
-          <button @click="applySchedules"
-            :disabled="applying"
-            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors shadow-sm">
+          <AppButton variant="success" size="lg" :loading="applying" @click="applySchedules">
             <ArrowDownTrayIcon v-if="!applying" class="h-4 w-4" />
-            <ArrowPathIcon v-else class="h-4 w-4 animate-spin" />
             {{ applying ? 'Saving…' : 'Save as Tentative' }}
-          </button>
-          <button @click="discardResult"
-            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg font-medium transition-colors">
+          </AppButton>
+          <AppButton variant="secondary" size="lg" @click="discardResult">
             Discard
-          </button>
+          </AppButton>
           <p class="text-xs text-slate-400">
             Saving adds these as <strong>tentative</strong> schedules in the Schedules module.
             Existing tentative schedules for this term will be replaced.
@@ -367,7 +354,7 @@
       </template>
 
       <!-- ── Recent Jobs ─────────────────────────────────────────────── -->
-      <div v-if="recentJobs.length" class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <AppCard v-if="recentJobs.length" :padded="false" class="overflow-hidden">
         <div class="px-5 py-3 border-b border-slate-100">
           <h2 class="text-sm font-semibold text-slate-700">Recent Generation History</h2>
         </div>
@@ -394,26 +381,26 @@
               <td class="px-4 py-2.5 text-center">
                 <span :class="[
                     'text-xs font-semibold',
-                    job.hard_conflicts === 0 ? 'text-emerald-600' : 'text-red-600'
+                    job.hard_conflicts === 0 ? 'text-success-600' : 'text-danger-600'
                   ]">{{ job.hard_conflicts }}</span>
               </td>
               <td class="px-4 py-2.5 text-center text-slate-500 tabular-nums text-xs">
                 {{ job.fitness_score != null ? Math.abs(job.fitness_score) : '—' }}
               </td>
               <td class="px-4 py-2.5 text-center">
-                <span :class="statusClass(job.status)">{{ job.status }}</span>
+                <AppBadge :color="statusClass(job.status)">{{ job.status }}</AppBadge>
               </td>
               <td class="px-4 py-2.5 text-center">
                 <button v-if="job.status === 'completed'"
                   @click="loadJob(job)"
-                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                  class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
                   Load
                 </button>
               </td>
             </tr>
           </tbody>
         </table>
-      </div>
+      </AppCard>
 
     </div>
   </AdminLayout>
@@ -425,9 +412,12 @@ import { Head } from '@inertiajs/vue3'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import {
   SparklesIcon,
-  ArrowPathIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ArrowDownTrayIcon,
@@ -526,13 +516,14 @@ function isConflictResolved(conflict) {
   return resolvedConflicts.value.has(conflict.req_id_a) || resolvedConflicts.value.has(conflict.req_id_b)
 }
 
+/** Maps a conflict type to an AppBadge color. */
 function conflictTypeBadge(type) {
   const map = {
-    faculty: 'inline-flex text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium',
-    room:    'inline-flex text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium',
-    section: 'inline-flex text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium',
+    faculty: 'purple',
+    room:    'blue',
+    section: 'orange',
   }
-  return map[type] ?? 'inline-flex text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full'
+  return map[type] ?? 'slate'
 }
 
 /**
@@ -678,13 +669,14 @@ function timeToMin(t) {
   return (h || 0) * 60 + (m || 0)
 }
 
+/** Maps a generation-job status to an AppBadge color. */
 function statusClass(status) {
   const map = {
-    completed: 'inline-flex text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium',
-    running:   'inline-flex text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium',
-    failed:    'inline-flex text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium',
-    pending:   'inline-flex text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full',
+    completed: 'green',
+    running:   'blue',
+    failed:    'red',
+    pending:   'slate',
   }
-  return map[status] ?? map.pending
+  return map[status] ?? 'slate'
 }
 </script>

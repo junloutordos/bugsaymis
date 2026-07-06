@@ -1,6 +1,8 @@
 <script setup>
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
 import { PrinterIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 
 function printDiagram() {
@@ -13,19 +15,14 @@ function printDiagram() {
   <AdminLayout title="System Architecture">
 
     <!-- Page header -->
-    <div class="flex items-center justify-between mb-5">
-      <div>
-        <h1 class="text-xl font-bold text-slate-800">System Architecture</h1>
-        <p class="text-sm text-slate-400 mt-0.5">Atlas (crcmis-prod) — AWS Deployment Architecture</p>
-      </div>
-      <button
-        @click="printDiagram"
-        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-      >
-        <PrinterIcon class="w-4 h-4" />
-        Print / Export PDF
-      </button>
-    </div>
+    <AppPageHeader title="System Architecture" subtitle="Atlas (crcmis-prod) — AWS Deployment Architecture">
+      <template #actions>
+        <AppButton @click="printDiagram">
+          <PrinterIcon class="w-4 h-4" />
+          Print / Export PDF
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <!-- Diagram container -->
     <div class="arch-wrap">

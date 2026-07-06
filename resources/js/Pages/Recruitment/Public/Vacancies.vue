@@ -4,6 +4,8 @@ import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import axios from 'axios'
 import { storageUrl } from "@/Composables/useStorage.js"
 import PaginationControl from '@/Components/PaginationControl.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 
 const props = defineProps({
   vacancies:          { type: Object, required: true },
@@ -128,7 +130,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
     <div class="max-w-5xl mx-auto px-4 pb-16">
 
       <!-- Flash -->
-      <div v-if="successMsg" class="mb-4 bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm">
+      <div v-if="successMsg" class="mb-4 bg-success-50 border border-success-100 text-success-700 rounded-xl px-4 py-3 text-sm">
         {{ successMsg }}
       </div>
 
@@ -174,9 +176,9 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
 
           <!-- Type badge -->
           <div class="col-span-2 hidden sm:flex items-center">
-            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 leading-tight text-center">
+            <AppBadge color="blue" class="text-center leading-tight">
               {{ v.job_item?.recruitment_type?.name ?? '—' }}
-            </span>
+            </AppBadge>
           </div>
 
           <!-- Compensation -->
@@ -184,12 +186,12 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
             <template v-if="v.job_item?.salary_grade">
               <span class="font-medium text-gray-800">SG {{ v.job_item.salary_grade }}</span>
               <span v-if="v.job_item?.salary_step"> · Step {{ v.job_item.salary_step }}</span>
-              <div v-if="v.job_item?.monthly_salary" class="text-green-700 font-semibold">
+              <div v-if="v.job_item?.monthly_salary" class="text-success-700 font-semibold">
                 ₱{{ Number(v.job_item.monthly_salary).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}/mo
               </div>
             </template>
             <template v-else-if="v.job_item?.daily_rate">
-              <div class="text-green-700 font-semibold">
+              <div class="text-success-700 font-semibold">
                 ₱{{ Number(v.job_item.daily_rate).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}/day
               </div>
             </template>
@@ -199,11 +201,11 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
           <!-- Deadline -->
           <div class="col-span-2 hidden sm:block text-xs">
             <div class="text-gray-500">{{ fmt(v.posting_date) }}</div>
-            <div :class="daysLeft(v.closing_date) <= 3 ? 'text-red-600 font-bold' : 'text-gray-700 font-medium'">
+            <div :class="daysLeft(v.closing_date) <= 3 ? 'text-danger-600 font-bold' : 'text-gray-700 font-medium'">
               {{ fmt(v.closing_date) }}
             </div>
             <div v-if="daysLeft(v.closing_date) <= 7"
-                 :class="daysLeft(v.closing_date) <= 3 ? 'text-red-500' : 'text-orange-500'"
+                 :class="daysLeft(v.closing_date) <= 3 ? 'text-danger-500' : 'text-orange-500'"
                  class="text-xs font-semibold">
               {{ daysLeft(v.closing_date) }}d left
             </div>
@@ -215,10 +217,10 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
                     class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap">
               Apply
             </button>
-            <Link :href="route('recruitment.public.vacancies.show', v.id)"
-                  class="px-3 py-1.5 border border-gray-300 hover:bg-gray-100 text-gray-600 rounded-lg text-xs whitespace-nowrap">
+            <AppButton as="link" :href="route('recruitment.public.vacancies.show', v.id)"
+                       variant="secondary" size="sm">
               Details
-            </Link>
+            </AppButton>
           </div>
         </div>
 
@@ -247,7 +249,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
       <!-- Success state -->
       <div v-if="submitSuccess" class="text-center py-10">
         <div class="text-5xl mb-4">🎉</div>
-        <h2 class="text-xl font-bold text-green-700 mb-2">Application Submitted!</h2>
+        <h2 class="text-xl font-bold text-success-700 mb-2">Application Submitted!</h2>
         <p class="text-sm text-gray-600 mb-2">Your documents have been uploaded to our system.</p>
         <p class="text-sm text-gray-500">You will receive an email confirmation. Use your reference number to track your application status.</p>
         <button @click="showApply = false; submitSuccess = null"
@@ -263,7 +265,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
           · {{ selected?.job_item?.office?.name }}
         </p>
 
-        <div v-if="submitErrors._general" class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+        <div v-if="submitErrors._general" class="mb-4 bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-4 py-3 text-sm">
           {{ submitErrors._general[0] }}
         </div>
 
@@ -277,7 +279,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
                 <label class="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
                 <input v-model="personalForm.first_name" required type="text"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.first_name" class="text-red-500 text-xs mt-1">{{ submitErrors.first_name[0] }}</p>
+                <p v-if="submitErrors.first_name" class="text-danger-500 text-xs mt-1">{{ submitErrors.first_name[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Middle Name</label>
@@ -288,7 +290,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
                 <label class="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
                 <input v-model="personalForm.last_name" required type="text"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.last_name" class="text-red-500 text-xs mt-1">{{ submitErrors.last_name[0] }}</p>
+                <p v-if="submitErrors.last_name" class="text-danger-500 text-xs mt-1">{{ submitErrors.last_name[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Suffix</label>
@@ -299,7 +301,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
                 <label class="block text-xs font-medium text-gray-600 mb-1">Birthdate *</label>
                 <input v-model="personalForm.birthdate" required type="date"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.birthdate" class="text-red-500 text-xs mt-1">{{ submitErrors.birthdate[0] }}</p>
+                <p v-if="submitErrors.birthdate" class="text-danger-500 text-xs mt-1">{{ submitErrors.birthdate[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Civil Status *</label>
@@ -316,7 +318,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
               <label class="block text-xs font-medium text-gray-600 mb-1">Complete Address *</label>
               <textarea v-model="personalForm.address" required rows="2"
                         class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-              <p v-if="submitErrors.address" class="text-red-500 text-xs mt-1">{{ submitErrors.address[0] }}</p>
+              <p v-if="submitErrors.address" class="text-danger-500 text-xs mt-1">{{ submitErrors.address[0] }}</p>
             </div>
           </fieldset>
 
@@ -328,13 +330,13 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
                 <label class="block text-xs font-medium text-gray-600 mb-1">Email *</label>
                 <input v-model="personalForm.email" required type="email"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.email" class="text-red-500 text-xs mt-1">{{ submitErrors.email[0] }}</p>
+                <p v-if="submitErrors.email" class="text-danger-500 text-xs mt-1">{{ submitErrors.email[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Contact Number *</label>
                 <input v-model="personalForm.contact_number" required type="text"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.contact_number" class="text-red-500 text-xs mt-1">{{ submitErrors.contact_number[0] }}</p>
+                <p v-if="submitErrors.contact_number" class="text-danger-500 text-xs mt-1">{{ submitErrors.contact_number[0] }}</p>
               </div>
             </div>
           </fieldset>
@@ -391,14 +393,14 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
               <li v-for="(label, key) in required_documents" :key="key"
                   class="flex items-start gap-2 text-xs text-gray-700">
                 <span class="mt-0.5 flex-shrink-0"
-                      :class="key !== 'ipcr' ? 'text-red-500' : 'text-gray-400'">
+                      :class="key !== 'ipcr' ? 'text-danger-500' : 'text-gray-400'">
                   {{ key !== 'ipcr' ? '●' : '○' }}
                 </span>
                 <span>{{ label }}</span>
               </li>
             </ul>
             <label class="block text-xs font-medium text-gray-700 mb-1">
-              Consolidated Application Documents <span class="text-red-500">*</span>
+              Consolidated Application Documents <span class="text-danger-500">*</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="file"
@@ -407,21 +409,20 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
                      class="hidden"
                      @change="(e) => consolidatedFile = e.target.files[0]" />
               <span class="flex-1 px-3 py-1.5 rounded-lg border text-sm truncate"
-                    :class="consolidatedFile ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-white text-gray-400'">
+                    :class="consolidatedFile ? 'border-success-500 bg-success-50 text-success-700' : 'border-gray-300 bg-white text-gray-400'">
                 {{ consolidatedFile ? consolidatedFile.name : 'Choose file…' }}
               </span>
               <span class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
                 Browse
               </span>
             </label>
-            <p v-if="submitErrors['documents_base64']" class="text-red-500 text-xs mt-1">{{ submitErrors['documents_base64'][0] }}</p>
+            <p v-if="submitErrors['documents_base64']" class="text-danger-500 text-xs mt-1">{{ submitErrors['documents_base64'][0] }}</p>
           </fieldset>
 
           <div class="flex justify-end gap-3 pt-2">
-            <button type="button" @click="showApply = false"
-                    class="px-5 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">
+            <AppButton type="button" variant="secondary" @click="showApply = false">
               Cancel
-            </button>
+            </AppButton>
             <button type="submit" :disabled="submitting"
                     class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">
               {{ submitting ? 'Uploading & Submitting…' : 'Submit Application' }}

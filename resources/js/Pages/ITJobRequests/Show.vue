@@ -1,23 +1,51 @@
 <script setup>
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+import AppPageHeader from "@/Components/AppPageHeader.vue";
+import AppCard from "@/Components/AppCard.vue";
+import AppBadge from "@/Components/AppBadge.vue";
 
 const props = defineProps({
   request: Object,
 });
+
+function statusColor(status) {
+  return {
+    pending: 'amber',
+    approved: 'green',
+    in_progress: 'blue',
+    completed: 'green',
+    rejected: 'red',
+  }[status] ?? 'slate'
+}
 </script>
 
 <template>
   <AdminLayout>
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <h1 class="text-xl font-semibold text-slate-800">IT Job Request Details</h1>
-    </div>
+    <AppPageHeader title="IT Job Request Details" />
 
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-3 text-sm text-slate-700">
-      <p><strong>ID:</strong> {{ request.id }}</p>
-      <p><strong>Submitted By:</strong> {{ request.user?.name }}</p>
-      <p><strong>Request Type:</strong> {{ request.type }}</p>
-      <p><strong>Status:</strong> {{ request.status }}</p>
-      <p><strong>Created At:</strong> {{ request.created_at }}</p>
-    </div>
+    <AppCard>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div>
+          <dt class="text-xs text-slate-500">ID</dt>
+          <dd class="font-medium text-slate-800 mt-0.5">{{ request.id }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-500">Submitted By</dt>
+          <dd class="font-medium text-slate-800 mt-0.5">{{ request.user?.name }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-500">Request Type</dt>
+          <dd class="font-medium text-slate-800 mt-0.5">{{ request.type }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-500">Status</dt>
+          <dd class="mt-0.5"><AppBadge :color="statusColor(request.status)" class="capitalize">{{ request.status }}</AppBadge></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-500">Created At</dt>
+          <dd class="font-medium text-slate-800 mt-0.5">{{ request.created_at }}</dd>
+        </div>
+      </dl>
+    </AppCard>
   </AdminLayout>
 </template>

@@ -1,6 +1,8 @@
 <script setup>
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
 import {
   CalendarDaysIcon,
   MapPinIcon,
@@ -70,16 +72,16 @@ function storageUrl(path) {
 
       <!-- Status banner -->
       <div class="bg-white rounded-xl border shadow-sm overflow-hidden"
-           :class="participant.attended === 'yes' ? 'border-green-200' : 'border-red-200'">
+           :class="participant.attended === 'yes' ? 'border-success-100' : 'border-danger-100'">
         <div class="px-5 py-4 flex flex-wrap items-center gap-4"
-             :class="participant.attended === 'yes' ? 'bg-green-50' : 'bg-red-50'">
+             :class="participant.attended === 'yes' ? 'bg-success-50' : 'bg-danger-50'">
 
           <!-- Attendance -->
           <div class="flex items-center gap-2">
-            <CheckCircleIcon v-if="participant.attended === 'yes'" class="w-5 h-5 text-green-600" />
-            <XCircleIcon     v-else                                class="w-5 h-5 text-red-500" />
+            <CheckCircleIcon v-if="participant.attended === 'yes'" class="w-5 h-5 text-success-600" />
+            <XCircleIcon     v-else                                class="w-5 h-5 text-danger-500" />
             <span class="text-sm font-semibold"
-                  :class="participant.attended === 'yes' ? 'text-green-700' : 'text-red-600'">
+                  :class="participant.attended === 'yes' ? 'text-success-700' : 'text-danger-600'">
               {{ participant.attended === 'yes' ? 'You attended this activity' : 'Marked absent for this activity' }}
             </span>
           </div>
@@ -94,39 +96,29 @@ function storageUrl(path) {
           </div>
 
           <!-- Evaluated badge -->
-          <span v-if="evaluated"
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
-            <ClipboardDocumentCheckIcon class="w-3.5 h-3.5" /> Evaluated
-          </span>
-          <span v-else-if="participant.attended === 'yes'"
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-            <ClipboardDocumentListIcon class="w-3.5 h-3.5" /> Not Yet Evaluated
-          </span>
+          <AppBadge v-if="evaluated" color="indigo">
+            <ClipboardDocumentCheckIcon class="w-3.5 h-3.5 mr-1" /> Evaluated
+          </AppBadge>
+          <AppBadge v-else-if="participant.attended === 'yes'" color="amber">
+            <ClipboardDocumentListIcon class="w-3.5 h-3.5 mr-1" /> Not Yet Evaluated
+          </AppBadge>
 
           <!-- Certificate badge -->
-          <span v-if="participant.has_certificate"
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-            Certificate Ready
-          </span>
+          <AppBadge v-if="participant.has_certificate" color="green">Certificate Ready</AppBadge>
         </div>
 
         <!-- Action buttons -->
         <div v-if="evaluate_url && !evaluated || cert_url"
              class="px-5 py-3 border-t flex flex-wrap gap-3"
-             :class="participant.attended === 'yes' ? 'border-green-100' : 'border-red-100'">
-          <a v-if="!evaluated && evaluate_url && participant.attended === 'yes'"
-             :href="evaluate_url"
-             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
+             :class="participant.attended === 'yes' ? 'border-success-100' : 'border-danger-100'">
+          <AppButton v-if="!evaluated && evaluate_url && participant.attended === 'yes'" as="a" :href="evaluate_url">
             <ClipboardDocumentListIcon class="w-4 h-4" />
             Evaluate This Activity
-          </a>
-          <a v-if="cert_url"
-             :href="cert_url"
-             target="_blank"
-             class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors">
+          </AppButton>
+          <AppButton v-if="cert_url" as="a" :href="cert_url" target="_blank" variant="success">
             <ArrowDownTrayIcon class="w-4 h-4" />
             Download Certificate
-          </a>
+          </AppButton>
         </div>
       </div>
 
@@ -229,7 +221,7 @@ function storageUrl(path) {
 
       <!-- Certificate notice when not yet evaluated -->
       <div v-if="participant.attended === 'yes' && !evaluated && !cert_url"
-           class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800">
+           class="bg-warning-50 border border-warning-100 rounded-xl px-5 py-4 text-sm text-warning-700">
         <strong>Certificate not yet available.</strong>
         Your certificate will be available for download once you have completed the evaluation for this activity.
       </div>

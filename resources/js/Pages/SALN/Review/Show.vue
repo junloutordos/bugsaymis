@@ -11,63 +11,48 @@
 
       <!-- Flash -->
       <div v-if="$page.props.flash?.success"
-        class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
       <div v-if="$page.props.flash?.error"
-        class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        class="bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
       </div>
 
-      <!-- Header card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div>
-            <div class="flex items-center gap-2 mb-1">
-              <p class="text-2xl font-bold text-slate-800">{{ saln.year }}</p>
-              <span :class="statusBadge(saln.status)"
-                class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold">
-                {{ saln.status_label }}
-              </span>
-            </div>
-            <p class="text-sm text-slate-600 font-medium">{{ saln.user?.name }}</p>
-            <p class="text-xs text-slate-400">{{ saln.user?.employee_id ?? saln.user?.email }}</p>
-            <p class="text-xs text-slate-400 mt-0.5">As of {{ fmtDate(saln.as_of_date) }}</p>
-          </div>
+      <!-- Header -->
+      <AppPageHeader
+        :title="`Review SALN — ${saln.year}`"
+        :subtitle="`${saln.user?.name} · ${saln.user?.employee_id ?? saln.user?.email} · As of ${fmtDate(saln.as_of_date)}`">
+        <template #actions>
+          <AppBadge :color="statusBadge(saln.status)">{{ saln.status_label }}</AppBadge>
+          <AppButton v-if="saln.status === 'under_review'" variant="danger" @click="showReturn = true">
+            <ArrowUturnLeftIcon class="h-4 w-4" />Return
+          </AppButton>
+          <AppButton v-if="saln.status === 'under_review'" variant="success" @click="showApprove = true">
+            <CheckBadgeIcon class="h-4 w-4" />Approve
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-          <!-- Action buttons -->
-          <div v-if="saln.status === 'under_review'" class="flex gap-2 shrink-0">
-            <button type="button" @click="showReturn = true"
-              class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
-              <ArrowUturnLeftIcon class="h-4 w-4" />Return
-            </button>
-            <button type="button" @click="showApprove = true"
-              class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
-              <CheckBadgeIcon class="h-4 w-4" />Approve
-            </button>
-          </div>
+      <!-- Net Worth Summary Bar -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+          <p class="text-xs text-slate-400 uppercase tracking-wide">Real Properties</p>
+          <p class="text-base font-semibold text-slate-700 mt-1">{{ fmtMoney(saln.total_real_properties) }}</p>
         </div>
-
-        <!-- Net worth summary -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-slate-100">
-          <div class="text-center">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Real Properties</p>
-            <p class="text-base font-semibold text-slate-700 mt-1">{{ fmtMoney(saln.total_real_properties) }}</p>
-          </div>
-          <div class="text-center">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Personal Properties</p>
-            <p class="text-base font-semibold text-slate-700 mt-1">{{ fmtMoney(saln.total_personal_properties) }}</p>
-          </div>
-          <div class="text-center">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Total Liabilities</p>
-            <p class="text-base font-semibold text-red-600 mt-1">{{ fmtMoney(saln.total_liabilities) }}</p>
-          </div>
-          <div class="text-center">
-            <p class="text-xs text-slate-400 uppercase tracking-wide">Net Worth</p>
-            <p class="text-base font-bold mt-1" :class="saln.net_worth >= 0 ? 'text-emerald-700' : 'text-red-600'">
-              {{ fmtMoney(saln.net_worth) }}
-            </p>
-          </div>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+          <p class="text-xs text-slate-400 uppercase tracking-wide">Personal Properties</p>
+          <p class="text-base font-semibold text-slate-700 mt-1">{{ fmtMoney(saln.total_personal_properties) }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+          <p class="text-xs text-slate-400 uppercase tracking-wide">Total Liabilities</p>
+          <p class="text-base font-semibold text-danger-600 mt-1">{{ fmtMoney(saln.total_liabilities) }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+          <p class="text-xs text-slate-400 uppercase tracking-wide">Net Worth</p>
+          <p class="text-base font-bold mt-1" :class="saln.net_worth >= 0 ? 'text-success-700' : 'text-danger-600'">
+            {{ fmtMoney(saln.net_worth) }}
+          </p>
         </div>
       </div>
 
@@ -112,102 +97,115 @@
           </div>
 
           <!-- Real Properties -->
-          <div v-if="activeTab === 'real'" class="space-y-3">
-            <div v-if="saln.real_properties.length === 0" class="py-8 text-center text-sm text-slate-400">
-              No real properties declared.
-            </div>
-            <div v-else class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-slate-100 text-sm">
-                <thead class="bg-slate-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Description</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Location</th>
-                    <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500">Fair Market Value</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Owner</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50">
-                  <tr v-for="p in saln.real_properties" :key="p.id">
-                    <td class="px-4 py-3 text-slate-700">{{ p.kind }}</td>
-                    <td class="px-4 py-3 text-slate-500 text-xs">{{ p.exact_location }}</td>
-                    <td class="px-4 py-3 text-right font-medium text-slate-700">{{ fmtMoney(p.current_fair_market_value) }}</td>
-                    <td class="px-4 py-3 capitalize text-slate-500">{{ p.owner }}</td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr class="bg-slate-50">
-                    <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-500 text-right">Total</td>
-                    <td class="px-4 py-2 text-right font-bold text-slate-800">{{ fmtMoney(saln.total_real_properties) }}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+          <div v-if="activeTab === 'real'">
+            <AppTable :card="false" :is-empty="saln.real_properties.length === 0" :skeleton-cols="4">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Location</th>
+                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Fair Market Value</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Owner</th>
+                </tr>
+              </template>
+              <tr v-for="p in saln.real_properties" :key="p.id">
+                <td class="px-4 py-3 text-slate-700">{{ p.kind }}</td>
+                <td class="px-4 py-3 text-slate-500 text-xs">{{ p.exact_location }}</td>
+                <td class="px-4 py-3 text-right font-medium text-slate-700">{{ fmtMoney(p.current_fair_market_value) }}</td>
+                <td class="px-4 py-3 capitalize text-slate-500">{{ p.owner }}</td>
+              </tr>
+              <template #empty>
+                <p class="text-sm text-slate-400">No real properties declared.</p>
+              </template>
+              <template #footer>
+                <div class="px-4 py-2.5 flex items-center justify-end gap-3 text-sm">
+                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</span>
+                  <span class="font-bold text-slate-800">{{ fmtMoney(saln.total_real_properties) }}</span>
+                </div>
+              </template>
+              <template #mobileCard>
+                <div v-for="p in saln.real_properties" :key="p.id" class="p-4 space-y-1">
+                  <p class="text-sm font-medium text-slate-800">{{ p.kind }}</p>
+                  <p class="text-xs text-slate-500">{{ p.exact_location }}</p>
+                  <div class="flex items-center justify-between text-xs text-slate-600 pt-1">
+                    <span class="capitalize">Owner: {{ p.owner }}</span>
+                    <span class="font-semibold text-slate-800">{{ fmtMoney(p.current_fair_market_value) }}</span>
+                  </div>
+                </div>
+              </template>
+            </AppTable>
           </div>
 
           <!-- Personal Properties -->
-          <div v-if="activeTab === 'personal_prop'" class="space-y-3">
-            <div v-if="saln.personal_properties.length === 0" class="py-8 text-center text-sm text-slate-400">
-              No personal properties declared.
-            </div>
-            <div v-else class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-slate-100 text-sm">
-                <thead class="bg-slate-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Description</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Category</th>
-                    <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500">Acquisition Cost</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Owner</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50">
-                  <tr v-for="p in saln.personal_properties" :key="p.id">
-                    <td class="px-4 py-3 text-slate-700">{{ p.description }}</td>
-                    <td class="px-4 py-3 text-slate-500 capitalize text-xs">{{ p.category?.replace(/_/g, ' ') }}</td>
-                    <td class="px-4 py-3 text-right font-medium text-slate-700">{{ fmtMoney(p.acquisition_cost) }}</td>
-                    <td class="px-4 py-3 capitalize text-slate-500">{{ p.owner }}</td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr class="bg-slate-50">
-                    <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-500 text-right">Total</td>
-                    <td class="px-4 py-2 text-right font-bold text-slate-800">{{ fmtMoney(saln.total_personal_properties) }}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+          <div v-if="activeTab === 'personal_prop'">
+            <AppTable :card="false" :is-empty="saln.personal_properties.length === 0" :skeleton-cols="4">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Acquisition Cost</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Owner</th>
+                </tr>
+              </template>
+              <tr v-for="p in saln.personal_properties" :key="p.id">
+                <td class="px-4 py-3 text-slate-700">{{ p.description }}</td>
+                <td class="px-4 py-3 text-slate-500 capitalize text-xs">{{ p.category?.replace(/_/g, ' ') }}</td>
+                <td class="px-4 py-3 text-right font-medium text-slate-700">{{ fmtMoney(p.acquisition_cost) }}</td>
+                <td class="px-4 py-3 capitalize text-slate-500">{{ p.owner }}</td>
+              </tr>
+              <template #empty>
+                <p class="text-sm text-slate-400">No personal properties declared.</p>
+              </template>
+              <template #footer>
+                <div class="px-4 py-2.5 flex items-center justify-end gap-3 text-sm">
+                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</span>
+                  <span class="font-bold text-slate-800">{{ fmtMoney(saln.total_personal_properties) }}</span>
+                </div>
+              </template>
+              <template #mobileCard>
+                <div v-for="p in saln.personal_properties" :key="p.id" class="p-4 space-y-1">
+                  <p class="text-sm font-medium text-slate-800">{{ p.description }}</p>
+                  <p class="text-xs text-slate-500 capitalize">{{ p.category?.replace(/_/g, ' ') }}</p>
+                  <div class="flex items-center justify-between text-xs text-slate-600 pt-1">
+                    <span class="capitalize">Owner: {{ p.owner }}</span>
+                    <span class="font-semibold text-slate-800">{{ fmtMoney(p.acquisition_cost) }}</span>
+                  </div>
+                </div>
+              </template>
+            </AppTable>
           </div>
 
           <!-- Liabilities -->
           <div v-if="activeTab === 'liabilities'">
-            <div v-if="saln.liabilities.length === 0" class="py-8 text-center text-sm text-slate-400">
-              No liabilities declared.
-            </div>
-            <div v-else class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-slate-100 text-sm">
-                <thead class="bg-slate-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Nature</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Creditor</th>
-                    <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500">Outstanding Balance</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50">
-                  <tr v-for="l in saln.liabilities" :key="l.id">
-                    <td class="px-4 py-3 text-slate-700 capitalize">{{ l.nature_label ?? l.nature?.replace(/_/g, ' ') }}</td>
-                    <td class="px-4 py-3 text-slate-500">{{ l.creditor_name }}</td>
-                    <td class="px-4 py-3 text-right font-medium text-red-600">{{ fmtMoney(l.outstanding_balance) }}</td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr class="bg-slate-50">
-                    <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-500 text-right">Total</td>
-                    <td class="px-4 py-2 text-right font-bold text-red-700">{{ fmtMoney(saln.total_liabilities) }}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <AppTable :card="false" :is-empty="saln.liabilities.length === 0" :skeleton-cols="3">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Nature</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Creditor</th>
+                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Outstanding Balance</th>
+                </tr>
+              </template>
+              <tr v-for="l in saln.liabilities" :key="l.id">
+                <td class="px-4 py-3 text-slate-700 capitalize">{{ l.nature_label ?? l.nature?.replace(/_/g, ' ') }}</td>
+                <td class="px-4 py-3 text-slate-500">{{ l.creditor_name }}</td>
+                <td class="px-4 py-3 text-right font-medium text-danger-600">{{ fmtMoney(l.outstanding_balance) }}</td>
+              </tr>
+              <template #empty>
+                <p class="text-sm text-slate-400">No liabilities declared.</p>
+              </template>
+              <template #footer>
+                <div class="px-4 py-2.5 flex items-center justify-end gap-3 text-sm">
+                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</span>
+                  <span class="font-bold text-danger-700">{{ fmtMoney(saln.total_liabilities) }}</span>
+                </div>
+              </template>
+              <template #mobileCard>
+                <div v-for="l in saln.liabilities" :key="l.id" class="p-4 space-y-1">
+                  <p class="text-sm font-medium text-slate-800 capitalize">{{ l.nature_label ?? l.nature?.replace(/_/g, ' ') }}</p>
+                  <p class="text-xs text-slate-500">{{ l.creditor_name }}</p>
+                  <p class="text-xs font-semibold text-danger-600 pt-1">{{ fmtMoney(l.outstanding_balance) }}</p>
+                </div>
+              </template>
+            </AppTable>
           </div>
 
           <!-- Business Interests -->
@@ -232,29 +230,32 @@
 
           <!-- Relatives -->
           <div v-if="activeTab === 'relatives'">
-            <div v-if="saln.relatives.length === 0" class="py-8 text-center text-sm text-slate-400">
-              No relatives in government declared.
-            </div>
-            <div v-else class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-slate-100 text-sm">
-                <thead class="bg-slate-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Name</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Relationship</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Position</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Agency</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50">
-                  <tr v-for="r in saln.relatives" :key="r.id">
-                    <td class="px-4 py-3 font-medium text-slate-700">{{ r.name }}</td>
-                    <td class="px-4 py-3 text-slate-500">{{ r.relationship }}</td>
-                    <td class="px-4 py-3 text-slate-500">{{ r.position ?? '—' }}</td>
-                    <td class="px-4 py-3 text-slate-500 text-xs">{{ r.agency_office }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <AppTable :card="false" :is-empty="saln.relatives.length === 0" :skeleton-cols="4">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Relationship</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Agency</th>
+                </tr>
+              </template>
+              <tr v-for="r in saln.relatives" :key="r.id">
+                <td class="px-4 py-3 font-medium text-slate-700">{{ r.name }}</td>
+                <td class="px-4 py-3 text-slate-500">{{ r.relationship }}</td>
+                <td class="px-4 py-3 text-slate-500">{{ r.position ?? '—' }}</td>
+                <td class="px-4 py-3 text-slate-500 text-xs">{{ r.agency_office }}</td>
+              </tr>
+              <template #empty>
+                <p class="text-sm text-slate-400">No relatives in government declared.</p>
+              </template>
+              <template #mobileCard>
+                <div v-for="r in saln.relatives" :key="r.id" class="p-4 space-y-1">
+                  <p class="text-sm font-medium text-slate-800">{{ r.name }}</p>
+                  <p class="text-xs text-slate-500">{{ r.relationship }}<span v-if="r.position"> · {{ r.position }}</span></p>
+                  <p class="text-xs text-slate-400">{{ r.agency_office }}</p>
+                </div>
+              </template>
+            </AppTable>
           </div>
 
           <!-- Audit Trail -->
@@ -320,6 +321,10 @@
 import { ref, computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
 import ConfirmModal from '../Partials/ConfirmModal.vue'
 import InfoRow from '../Partials/InfoRow.vue'
 import {
@@ -361,18 +366,20 @@ function doReturn(remarks) {
 }
 
 const statusBadge = (s) => ({
-  submitted:    'bg-blue-100 text-blue-700',
-  under_review: 'bg-amber-100 text-amber-700',
-  approved:     'bg-emerald-100 text-emerald-700',
-  returned:     'bg-red-100 text-red-600',
-}[s] ?? 'bg-slate-100 text-slate-600')
+  draft:        'slate',
+  submitted:    'blue',
+  under_review: 'amber',
+  approved:     'green',
+  returned:     'red',
+  filed:        'indigo',
+}[s] ?? 'slate')
 
 const auditDotColor = (action) => ({
   created:   'bg-slate-400',
   submitted: 'bg-blue-500',
-  reviewed:  'bg-amber-500',
-  approved:  'bg-emerald-500',
-  returned:  'bg-red-500',
+  reviewed:  'bg-warning-500',
+  approved:  'bg-success-500',
+  returned:  'bg-danger-500',
   filed:     'bg-indigo-500',
   updated:   'bg-slate-400',
   reopened:  'bg-purple-500',

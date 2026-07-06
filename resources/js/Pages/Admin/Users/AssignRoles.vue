@@ -2,6 +2,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import { MagnifyingGlassIcon, UserCircleIcon, CheckIcon, ShieldCheckIcon, KeyIcon } from '@heroicons/vue/24/outline'
@@ -96,10 +105,8 @@ function roleNames(user) {
   return user.roles?.map(r => r.name).join(', ') || '—'
 }
 
-function statusClass(status) {
-  return status === 'active'
-    ? 'bg-emerald-50 text-emerald-700'
-    : 'bg-slate-100 text-slate-600'
+function statusBadgeColor(status) {
+  return status === 'active' ? 'green' : 'slate'
 }
 
 // Group permissions by module for preview
@@ -126,99 +133,100 @@ function groupedPerms(permissions) {
       <Link href="/admin/assign-roles" class="px-4 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white shadow-sm">Assign to Users</Link>
     </div>
 
-    <!-- Page header -->
-    <div class="mb-5">
-      <h1 class="text-xl font-semibold text-slate-800">Assign Roles to Users</h1>
-      <p class="text-sm text-slate-500 mt-0.5">Click a user to open the role assignment panel. Hover a role to preview its permissions.</p>
-    </div>
+    <AppPageHeader title="Assign Roles to Users" subtitle="Click a user to open the role assignment panel. Hover a role to preview its permissions." />
 
     <div class="flex gap-4 min-h-0">
       <!-- Left: User list -->
       <div class="flex-1 min-w-0">
         <!-- Filters -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 mb-4 flex flex-wrap items-center gap-2">
-          <div class="flex items-center gap-1 flex-1 min-w-[180px]">
+        <AppFilterBar :result-label="`${pagination?.total ?? 0} user(s)`">
+          <div class="relative flex items-center gap-1 flex-1 min-w-[180px]">
             <MagnifyingGlassIcon class="w-4 h-4 text-slate-400 shrink-0" />
             <input v-model="search" @input="onSearch" type="text" placeholder="Search name, email, position…"
               class="flex-1 border-none outline-none text-sm text-slate-800 placeholder-slate-400 bg-transparent" />
           </div>
-          <select v-model="filterRole" @change="onFilterChange"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-            <option value="">All roles</option>
+          <AppSelect v-model="filterRole" @change="onFilterChange" placeholder="All roles" class="min-w-[160px]">
             <option v-for="r in allRoles" :key="r.id" :value="r.name">{{ r.name }}</option>
-          </select>
-          <span class="text-xs text-slate-400 shrink-0">{{ pagination?.total ?? 0 }} user(s)</span>
-        </div>
+          </AppSelect>
+        </AppFilterBar>
 
         <!-- Table -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div v-if="loading" class="py-16 text-center text-slate-400 text-sm">Loading…</div>
-          <div v-else class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-100 text-sm">
-              <thead class="bg-slate-50">
-                <tr>
-                  <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                  <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden sm:table-cell">Position</th>
-                  <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Roles</th>
-                  <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                <tr v-for="user in users" :key="user.id"
-                  @click="selectUser(user)"
-                  class="hover:bg-indigo-50/40 cursor-pointer transition-colors"
-                  :class="{ 'bg-indigo-50 ring-1 ring-inset ring-indigo-200': selected?.id === user.id }">
-                  <td class="px-4 py-3">
-                    <div class="font-medium text-slate-800">{{ user.name }}</div>
-                    <div class="text-xs text-slate-400">{{ user.email }}</div>
-                  </td>
-                  <td class="px-4 py-3 text-slate-500 hidden sm:table-cell">{{ user.position ?? '—' }}</td>
-                  <td class="px-4 py-3 text-slate-600 max-w-[200px]">
-                    <div class="flex flex-wrap gap-1">
-                      <span v-for="r in (user.roles ?? [])" :key="r.id"
-                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700">
-                        {{ r.name }}
-                      </span>
-                      <span v-if="!(user.roles?.length)" class="text-slate-400 text-xs">—</span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 text-center">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" :class="statusClass(user.status)">
-                      {{ user.status ?? 'active' }}
-                    </span>
-                  </td>
-                </tr>
-                <tr v-if="users.length === 0">
-                  <td colspan="4" class="py-16 text-center text-slate-400 text-sm">No users found.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <AppTable :loading="loading" :is-empty="!users.length" :skeleton-cols="4">
+          <template #head>
+            <tr>
+              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden sm:table-cell">Position</th>
+              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Roles</th>
+              <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            </tr>
+          </template>
 
-          <!-- Pagination -->
-          <div v-if="pagination && pagination.last_page > 1"
-            class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-            <button @click="loadUsers(pagination.current_page - 1)"
-              :disabled="pagination.current_page <= 1"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">← Prev</button>
-            <span>Page {{ pagination.current_page }} / {{ pagination.last_page }}</span>
-            <button @click="loadUsers(pagination.current_page + 1)"
-              :disabled="pagination.current_page >= pagination.last_page"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Next →</button>
-          </div>
-        </div>
+          <tr v-for="user in users" :key="user.id"
+            @click="selectUser(user)"
+            class="hover:bg-indigo-50/40 cursor-pointer transition-colors"
+            :class="{ 'bg-indigo-50 ring-1 ring-inset ring-indigo-200': selected?.id === user.id }">
+            <td class="px-4 py-3">
+              <div class="font-medium text-slate-800">{{ user.name }}</div>
+              <div class="text-xs text-slate-400">{{ user.email }}</div>
+            </td>
+            <td class="px-4 py-3 text-slate-500 hidden sm:table-cell">{{ user.position ?? '—' }}</td>
+            <td class="px-4 py-3 text-slate-600 max-w-[200px]">
+              <div class="flex flex-wrap gap-1">
+                <AppBadge v-for="r in (user.roles ?? [])" :key="r.id" color="indigo">{{ r.name }}</AppBadge>
+                <span v-if="!(user.roles?.length)" class="text-slate-400 text-xs">—</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-center">
+              <AppBadge :color="statusBadgeColor(user.status)">{{ user.status ?? 'active' }}</AppBadge>
+            </td>
+          </tr>
+
+          <template #mobileCard>
+            <div v-for="user in users" :key="user.id" @click="selectUser(user)"
+              class="p-4 space-y-2 cursor-pointer transition-colors"
+              :class="{ 'bg-indigo-50': selected?.id === user.id }">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-slate-800">{{ user.name }}</p>
+                  <p class="text-xs text-slate-400">{{ user.email }}</p>
+                  <p v-if="user.position" class="text-xs text-slate-400">{{ user.position }}</p>
+                </div>
+                <AppBadge :color="statusBadgeColor(user.status)">{{ user.status ?? 'active' }}</AppBadge>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <AppBadge v-for="r in (user.roles ?? [])" :key="r.id" color="indigo">{{ r.name }}</AppBadge>
+                <span v-if="!(user.roles?.length)" class="text-slate-400 text-xs">—</span>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No users found" />
+          </template>
+
+          <template #footer>
+            <PaginationControl
+              v-if="pagination && pagination.last_page > 1"
+              :current-page="pagination.current_page"
+              :total-pages="pagination.last_page"
+              :total="pagination.total"
+              @prev="loadUsers(pagination.current_page - 1)"
+              @next="loadUsers(pagination.current_page + 1)"
+              @page="loadUsers"
+            />
+          </template>
+        </AppTable>
       </div>
 
       <!-- Right panel: fixed width, relative so preview can float left without affecting layout -->
       <div class="w-72 shrink-0 self-start sticky top-4 relative">
         <!-- Empty state -->
-        <div v-if="!selected" class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 text-center text-slate-400 flex flex-col items-center gap-3">
-          <UserCircleIcon class="w-12 h-12 text-slate-200" />
-          <p class="text-sm">Select a user to assign roles</p>
-        </div>
+        <AppCard v-if="!selected">
+          <EmptyState title="Select a user to assign roles" :icon="UserCircleIcon" />
+        </AppCard>
 
         <!-- Role assignment card -->
-        <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <AppCard v-else>
           <!-- User info -->
           <div class="pb-3 mb-3 border-b border-slate-100">
             <p class="font-semibold text-slate-800 truncate">{{ selected.name }}</p>
@@ -242,20 +250,18 @@ function groupedPerms(permissions) {
                 <div class="flex items-center gap-1.5">
                   <ShieldCheckIcon class="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                   <span class="text-sm font-medium text-slate-700 truncate group-hover:text-indigo-700 transition-colors">{{ role.name }}</span>
-                  <span v-if="role.name === 'Administrator'"
-                    class="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full shrink-0">Super</span>
+                  <AppBadge v-if="role.name === 'Administrator'" color="amber">Super</AppBadge>
                 </div>
                 <p v-if="role.description" class="text-[11px] text-slate-400 ml-5 truncate">{{ role.description }}</p>
               </div>
             </label>
           </div>
 
-          <button @click="saveRoles" :disabled="syncing"
-            class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+          <AppButton block :loading="syncing" :disabled="syncing" @click="saveRoles">
             <CheckIcon class="w-4 h-4" />
             {{ syncing ? 'Saving…' : 'Save Roles' }}
-          </button>
-        </div>
+          </AppButton>
+        </AppCard>
 
         <!-- Permissions preview: absolutely positioned to the LEFT — never shifts the card or button -->
         <Transition enter-active-class="transition-all duration-150" enter-from-class="opacity-0 translate-x-2" enter-to-class="opacity-100 translate-x-0"
@@ -266,7 +272,7 @@ function groupedPerms(permissions) {
               <KeyIcon class="w-4 h-4 text-indigo-500" />
               <p class="text-xs font-semibold text-indigo-700">{{ previewRole.name }} — Permissions</p>
             </div>
-            <div v-if="previewRole.name === 'Administrator'" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <div v-if="previewRole.name === 'Administrator'" class="text-xs text-warning-700 bg-warning-50 border border-warning-100 rounded-lg px-3 py-2">
               Administrator bypasses all permission checks — has access to everything.
             </div>
             <div v-else-if="!previewRole.permissions?.length" class="text-xs text-slate-400 text-center py-2">

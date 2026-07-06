@@ -1,7 +1,14 @@
 <script setup>
 import { ref, computed } from "vue"
-import { Head, Link, router } from "@inertiajs/vue3"
+import { Head, Link } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
+import AppButton from "@/Components/AppButton.vue"
+import AppCard from "@/Components/AppCard.vue"
+import AppBadge from "@/Components/AppBadge.vue"
+import AppInput from "@/Components/AppInput.vue"
+import AppTextarea from "@/Components/AppTextarea.vue"
+import AppModal from "@/Components/AppModal.vue"
+import EmptyState from "@/Components/EmptyState.vue"
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
@@ -97,29 +104,29 @@ const liveAvg = computed(() => {
 })
 
 const statusColor = (status) => {
-  if (status === 'Submitted for Rating') return 'bg-blue-100 text-blue-700'
-  if (status === 'Rated & For PMT Review' || status === 'Submitted to PMT') return 'bg-green-100 text-green-700'
-  if (status === 'PMT Returned for Revision') return 'bg-red-100 text-red-700'
-  if (status === 'Approved by PMT') return 'bg-purple-100 text-purple-700'
-  return 'bg-gray-100 text-gray-600'
+  if (status === 'Submitted for Rating') return 'blue'
+  if (status === 'Rated & For PMT Review' || status === 'Submitted to PMT') return 'green'
+  if (status === 'PMT Returned for Revision') return 'red'
+  if (status === 'Approved by PMT') return 'purple'
+  return 'slate'
 }
 </script>
 
 <template>
   <Head :title="`Special Assignment — ${assignment.name}`" />
   <AdminLayout :title="assignment.name">
-    <div>
+    <div class="space-y-5">
       <!-- Header -->
-      <div class="flex items-center gap-3 mb-6">
+      <div class="flex items-center gap-3">
         <Link :href="route('pm-special-assignments.index')"
           class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 transition-colors">
           <ArrowLeftIcon class="w-4 h-4" /> Back
         </Link>
-        <h1 class="text-xl font-semibold text-slate-800">{{ assignment.name }}</h1>
+        <h1 class="font-heading text-xl font-semibold text-slate-800">{{ assignment.name }}</h1>
       </div>
 
       <!-- Assignment Info -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-6">
+      <AppCard>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div>
             <span class="text-slate-500 font-medium">Coordinator:</span>
@@ -134,46 +141,40 @@ const statusColor = (status) => {
             <p class="text-slate-700 mt-0.5">{{ assignment.description ?? "—" }}</p>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- No tagged plans -->
-      <div v-if="!planMemberData?.length" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center text-slate-400 text-sm">
-        No WDP plans tagged to this special assignment yet.
-        <span v-if="canManage" class="text-slate-500"> Edit the assignment to tag plans.</span>
-      </div>
+      <AppCard v-if="!planMemberData?.length">
+        <EmptyState title="No WDP plans tagged to this special assignment yet." :subtitle="canManage ? 'Edit the assignment to tag plans.' : null" />
+      </AppCard>
 
       <!-- Plan sections -->
-      <div v-for="entry in planMemberData" :key="entry.plan.id" class="bg-white rounded-xl border border-slate-100 shadow-sm mb-6">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h2 class="text-base font-semibold text-slate-800">{{ entry.plan.success_indicator }}</h2>
-          <p class="text-xs text-slate-400 mt-0.5">Rated by: {{ entry.plan.rated_by || "Division Chief" }}</p>
-        </div>
-
+      <AppCard v-for="entry in planMemberData" :key="entry.plan.id" :padded="false"
+        :title="entry.plan.success_indicator" :subtitle="`Rated by: ${entry.plan.rated_by || 'Division Chief'}`">
         <div v-if="!entry.members?.length" class="p-5 text-sm text-slate-400 italic">
           No members in this assignment.
         </div>
 
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Member</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Task / Role</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">IPCR Status</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Accomplishment</th>
-                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Q</th>
-                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">E</th>
-                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">T</th>
-                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg</th>
-                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating</th>
-                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <template v-for="member in entry.members" :key="member.user_id">
-                <template v-if="member.periods.length">
-                  <tr
+        <AppTable v-else :card="false">
+          <template #head>
+            <tr>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Member</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Task / Role</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">IPCR Status</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Accomplishment</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Q</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">E</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">T</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+            </tr>
+          </template>
+
+          <template v-for="member in entry.members" :key="member.user_id">
+            <template v-if="member.periods.length">
+              <tr
                     v-for="(period, pIdx) in member.periods"
                     :key="`${member.user_id}-${period.ipcr_id}`"
                     :class="pIdx === 0 ? 'border-t-2 border-slate-200 hover:bg-slate-50/60' : 'hover:bg-slate-50/60'"
@@ -187,9 +188,7 @@ const statusColor = (status) => {
                     </td>
                     <td class="px-3 py-2 text-sm text-indigo-700 font-medium whitespace-nowrap">{{ period.rating_period }}</td>
                     <td class="px-3 py-2">
-                      <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusColor(period.ipcr_status)]">
-                        {{ period.ipcr_status ?? "—" }}
-                      </span>
+                      <AppBadge :color="statusColor(period.ipcr_status)">{{ period.ipcr_status ?? "—" }}</AppBadge>
                     </td>
                     <td class="px-3 py-2 max-w-xs text-sm text-slate-700">
                       <p class="truncate">{{ period.accomplishment || "—" }}</p>
@@ -202,20 +201,18 @@ const statusColor = (status) => {
                     <td class="px-3 py-2 text-center text-sm font-semibold text-slate-800">{{ period.sup_average ?? "—" }}</td>
                     <td class="px-3 py-2 text-center text-xs text-slate-600">{{ adjectival(period.sup_average) }}</td>
                     <td class="px-3 py-2 text-center">
-                      <button
+                      <AppButton
                         v-if="authUser?.id == member.user_id && !(isCoordinator || canManage)"
-                        @click="openEditModal(entry, member, period)"
-                        class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-2 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                        size="sm" variant="secondary" @click="openEditModal(entry, member, period)">
                         Edit
-                      </button>
+                      </AppButton>
                       <template v-else-if="isCoordinator || canManage">
-                        <button
+                        <AppButton
                           v-if="period.can_rate"
-                          @click="openEditModal(entry, member, period)"
-                          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                          size="sm" @click="openEditModal(entry, member, period)">
                           Rate
-                        </button>
-                        <span v-else class="text-xs text-amber-600 italic" title="IPCR is no longer open for rating">
+                        </AppButton>
+                        <span v-else class="text-xs text-warning-600 italic" title="IPCR is no longer open for rating">
                           Locked
                         </span>
                       </template>
@@ -232,78 +229,39 @@ const statusColor = (status) => {
                   <td colspan="9" class="px-3 py-2 text-center text-xs text-slate-400">No IPCR linked to this plan</td>
                 </tr>
               </template>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        </AppTable>
+      </AppCard>
     </div>
 
     <!-- Edit / Rate Modal -->
-    <Teleport to="body">
-    <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h2 class="text-base font-semibold text-slate-800">
-              {{ (modalEntry?.isOwn && !modalEntry?.canRate) ? 'Edit Accomplishment' : 'Rate Member' }}
-              — {{ modalEntry?.member?.user_name }}
-            </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Period: {{ modalEntry?.period?.rating_period }}</p>
+    <AppModal :show="showModal" :title="(modalEntry?.isOwn && !modalEntry?.canRate) ? 'Edit Accomplishment' : 'Rate Member'"
+      :subtitle="modalEntry ? `${modalEntry.member?.user_name} — Period: ${modalEntry.period?.rating_period}` : null"
+      size="lg" @close="closeModal">
+      <form @submit.prevent="submitEdit" class="space-y-4">
+        <AppTextarea v-model="editForm.accomplishment" label="Accomplishment" :rows="3" />
+        <AppInput v-model="editForm.mov_link" type="url" label="MOV Link" placeholder="https://..." />
+
+        <template v-if="modalEntry?.canRate">
+          <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+            <p class="font-semibold text-slate-700 mb-1">Rating Scale:</p>
+            <p>5 — Outstanding &nbsp; 4 — Very Satisfactory &nbsp; 3 — Satisfactory &nbsp; 2 — Unsatisfactory &nbsp; 1 — Poor</p>
           </div>
-          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
+          <div class="grid grid-cols-3 gap-3">
+            <AppInput v-model.number="editForm.sup_quality" type="number" min="1" max="5" step="0.01" label="Quality (1–5)" />
+            <AppInput v-model.number="editForm.sup_efficiency" type="number" min="1" max="5" step="0.01" label="Efficiency (1–5)" />
+            <AppInput v-model.number="editForm.sup_timeliness" type="number" min="1" max="5" step="0.01" label="Timeliness (1–5)" />
+          </div>
+          <div class="text-sm text-slate-700">
+            Live Average: <strong class="text-indigo-700">{{ liveAvg }}</strong>
+            <span v-if="liveAvg !== '—'" class="ml-2 text-slate-500">— {{ adjectival(liveAvg) }}</span>
+          </div>
+        </template>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
+          <AppButton type="submit" :loading="isSubmitting" :disabled="isSubmitting">{{ isSubmitting ? 'Saving…' : 'Save' }}</AppButton>
         </div>
-
-        <form @submit.prevent="submitEdit">
-          <div class="px-6 py-5 space-y-4">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment</label>
-              <textarea v-model="editForm.accomplishment" rows="3"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">MOV Link</label>
-              <input v-model="editForm.mov_link" type="url" placeholder="https://..."
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            </div>
-
-            <template v-if="modalEntry?.canRate">
-              <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
-                <p class="font-semibold text-slate-700 mb-1">Rating Scale:</p>
-                <p>5 — Outstanding &nbsp; 4 — Very Satisfactory &nbsp; 3 — Satisfactory &nbsp; 2 — Unsatisfactory &nbsp; 1 — Poor</p>
-              </div>
-              <div class="grid grid-cols-3 gap-3">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Quality (1–5)</label>
-                  <input v-model.number="editForm.sup_quality" type="number" min="1" max="5" step="0.01"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Efficiency (1–5)</label>
-                  <input v-model.number="editForm.sup_efficiency" type="number" min="1" max="5" step="0.01"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Timeliness (1–5)</label>
-                  <input v-model.number="editForm.sup_timeliness" type="number" min="1" max="5" step="0.01"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-              </div>
-              <div class="text-sm text-slate-700">
-                Live Average: <strong class="text-indigo-700">{{ liveAvg }}</strong>
-                <span v-if="liveAvg !== '—'" class="ml-2 text-slate-500">— {{ adjectival(liveAvg) }}</span>
-              </div>
-            </template>
-          </div>
-
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button type="button" @click="closeModal"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button type="submit" :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    </Teleport>
+      </form>
+    </AppModal>
   </AdminLayout>
 </template>

@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import { router } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
+import AppButton from '@/Components/AppButton.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
 
 const props = defineProps({
   application: { type: Object, required: true },
@@ -52,43 +56,24 @@ const disapprove = async () => {
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div v-if="isPlantilla" class="sm:col-span-2">
-        <label class="block text-xs font-medium text-slate-600 mb-1">Plantilla Item No. *</label>
-        <select v-model="approveForm.plantilla_number_id" required
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-          <option value="" disabled>Select the item number to fill</option>
+        <AppSelect v-model="approveForm.plantilla_number_id" label="Plantilla Item No." required
+                   :error="approveErrors.plantilla_number_id" placeholder="Select the item number to fill">
           <option v-for="p in vacantPlantillaNumbers" :key="p.id" :value="p.id">{{ p.plantilla_item_no }}</option>
-        </select>
-        <p v-if="!vacantPlantillaNumbers.length" class="text-amber-600 text-xs mt-1">No vacant plantilla item numbers left on this job item.</p>
-        <p v-if="approveErrors.plantilla_number_id" class="text-red-500 text-xs mt-1">{{ approveErrors.plantilla_number_id }}</p>
+        </AppSelect>
+        <p v-if="!vacantPlantillaNumbers.length" class="text-warning-600 text-xs mt-1">No vacant plantilla item numbers left on this job item.</p>
       </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Start Date *</label>
-        <input v-model="approveForm.start_date" type="date" required
-               class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-        <p v-if="approveErrors.start_date" class="text-red-500 text-xs mt-1">{{ approveErrors.start_date }}</p>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">End Date <span class="text-slate-400">(leave blank if permanent)</span></label>
-        <input v-model="approveForm.end_date" type="date"
-               class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-      </div>
+      <AppInput v-model="approveForm.start_date" type="date" label="Start Date" required :error="approveErrors.start_date" />
+      <AppInput v-model="approveForm.end_date" type="date" label="End Date (leave blank if permanent)" />
       <div class="sm:col-span-2">
-        <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-        <textarea v-model="approveForm.remarks" rows="2"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  placeholder="Optional remarks…"></textarea>
+        <AppTextarea v-model="approveForm.remarks" :rows="2" label="Remarks" placeholder="Optional remarks…" />
       </div>
     </div>
 
     <div class="flex gap-3">
-      <button @click="submitApprove" :disabled="approveLoading"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+      <AppButton :loading="approveLoading" :disabled="approveLoading" @click="submitApprove">
         {{ approveLoading ? 'Approving…' : 'Approve & Place' }}
-      </button>
-      <button @click="disapprove"
-              class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-        Disapprove
-      </button>
+      </AppButton>
+      <AppButton variant="danger" @click="disapprove">Disapprove</AppButton>
     </div>
   </div>
 </template>

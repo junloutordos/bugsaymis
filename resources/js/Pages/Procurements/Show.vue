@@ -2,6 +2,13 @@
 import { ref, computed } from 'vue'
 import { Head, usePage, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppTable from '@/Components/AppTable.vue'
 import { ArrowLeftIcon, CheckIcon, XMarkIcon, ClockIcon, PrinterIcon, DocumentArrowDownIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
@@ -25,10 +32,17 @@ const formatDateTime = (d) => {
 }
 
 const statusClass = (status) => {
-    if (!status || status === 'approved') return 'bg-emerald-100 text-emerald-700'
-    if (status === 'rejected') return 'bg-red-100 text-red-700'
-    if (status === 'draft') return 'bg-slate-100 text-slate-600'
-    return 'bg-amber-100 text-amber-700'
+    if (!status || status === 'approved') return 'green'
+    if (status === 'rejected') return 'red'
+    if (status === 'draft') return 'slate'
+    return 'amber'
+}
+
+const rfqStatusColor = (status) => {
+    if (status === 'awarded') return 'green'
+    if (status === 'closed') return 'slate'
+    if (status === 'open') return 'blue'
+    return 'amber'
 }
 
 // ── Timeline steps ─────────────────────────────────────────────────────────
@@ -107,6 +121,17 @@ const actionModal = ref(null)
 const actionForm = ref({ remarks: '', reason: '', pr_number: '' })
 const actionSubmitting = ref(false)
 
+const actionModalTitles = {
+    dc_sign: 'Sign Purchase Request',
+    bo_initial: 'Budget Officer Initial',
+    supp_ocd: 'Approve Supplemental Documents',
+    assign_number: 'Assign Official PR Number',
+    ocd_sign: 'Approve Purchase Request',
+    reject: 'Reject Purchase Request',
+    submit: 'Submit for Approval',
+}
+const actionModalTitle = computed(() => actionModalTitles[actionModal.value] ?? '')
+
 const openAction = (type) => {
     actionModal.value = type
     actionForm.value = { remarks: '', reason: '', pr_number: '' }
@@ -180,21 +205,21 @@ const createRfq = () => {
                 Back to Purchase Requests
             </a>
             <div class="flex items-center gap-2">
-                <a v-if="p.has_market_study" :href="route('procurements.market-study', procurement.id)"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+                <AppButton v-if="p.has_market_study" as="a" :href="route('procurements.market-study', procurement.id)"
+                    variant="secondary" size="sm">
                     <DocumentArrowDownIcon class="w-4 h-4" />
                     Market Study
-                </a>
-                <a :href="route('procurements.print', procurement.id)" target="_blank"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+                </AppButton>
+                <AppButton as="a" :href="route('procurements.print', procurement.id)" target="_blank"
+                    variant="secondary" size="sm">
                     <PrinterIcon class="w-4 h-4" />
                     Print / Save PDF
-                </a>
+                </AppButton>
             </div>
         </div>
 
         <!-- Flash -->
-        <div v-if="flash?.success" class="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
+        <div v-if="flash?.success" class="mb-4 rounded-lg bg-success-50 border border-success-100 px-4 py-3 text-sm text-success-700">
             {{ flash.success }}
         </div>
 
@@ -203,56 +228,44 @@ const createRfq = () => {
             <!-- Left: Details -->
             <div class="lg:col-span-2 space-y-5">
                 <!-- Status header card -->
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                <AppCard>
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <div class="flex items-center gap-2 flex-wrap">
                                 <h2 class="text-lg font-bold text-slate-800 font-mono">{{ p.assigned_pr_number || p.pr_no }}</h2>
-                                <span :class="['inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', statusClass(p.status)]">
-                                    {{ p.status_label || p.status }}
-                                </span>
-                                <span v-if="p.is_supplemental" class="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-purple-100 text-purple-700">
-                                    SUPPLEMENTAL
-                                </span>
+                                <AppBadge :color="statusClass(p.status)">{{ p.status_label || p.status }}</AppBadge>
+                                <AppBadge v-if="p.is_supplemental" color="purple">SUPPLEMENTAL</AppBadge>
                             </div>
                             <p class="text-sm text-slate-500 mt-1">{{ formatDate(p.pr_date) }}</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <button v-if="canSubmit" @click="openAction('submit')"
-                                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                            <AppButton v-if="canSubmit" @click="openAction('submit')">
                                 Submit for Approval
-                            </button>
-                            <button v-if="canDcSign" @click="openAction('dc_sign')"
-                                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                            </AppButton>
+                            <AppButton v-if="canDcSign" variant="success" @click="openAction('dc_sign')">
                                 <CheckIcon class="w-4 h-4" /> Sign
-                            </button>
-                            <button v-if="canBoInitial" @click="openAction('bo_initial')"
-                                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                            </AppButton>
+                            <AppButton v-if="canBoInitial" variant="success" @click="openAction('bo_initial')">
                                 <CheckIcon class="w-4 h-4" /> Initial (Budget Officer)
-                            </button>
-                            <button v-if="canSuppOcd" @click="openAction('supp_ocd')"
-                                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                            </AppButton>
+                            <AppButton v-if="canSuppOcd" variant="success" @click="openAction('supp_ocd')">
                                 <CheckIcon class="w-4 h-4" /> Approve Supplemental
-                            </button>
-                            <button v-if="canAssignNumber" @click="openAction('assign_number')"
-                                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                            </AppButton>
+                            <AppButton v-if="canAssignNumber" @click="openAction('assign_number')">
                                 Assign PR Number
-                            </button>
-                            <button v-if="canOcdSign" @click="openAction('ocd_sign')"
-                                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                            </AppButton>
+                            <AppButton v-if="canOcdSign" variant="success" @click="openAction('ocd_sign')">
                                 <CheckIcon class="w-4 h-4" /> Approve
-                            </button>
-                            <button v-if="canReject" @click="openAction('reject')"
-                                class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                            </AppButton>
+                            <AppButton v-if="canReject" variant="danger" @click="openAction('reject')">
                                 <XMarkIcon class="w-4 h-4" /> Reject
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
-                </div>
+                </AppCard>
 
                 <!-- Details card -->
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Details</h3>
+                <AppCard title="Details">
                     <dl class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                         <div>
                             <dt class="text-slate-500">Requested By</dt>
@@ -275,34 +288,26 @@ const createRfq = () => {
                             <dd class="text-slate-800 font-medium mt-0.5">{{ p.division_chief_remarks }}</dd>
                         </div>
                         <div v-if="p.rejection_reason" class="col-span-2">
-                            <dt class="text-red-500">Rejection Reason</dt>
-                            <dd class="text-red-700 font-medium mt-0.5">{{ p.rejection_reason }}</dd>
+                            <dt class="text-danger-500">Rejection Reason</dt>
+                            <dd class="text-danger-700 font-medium mt-0.5">{{ p.rejection_reason }}</dd>
                         </div>
                     </dl>
-                </div>
+                </AppCard>
 
                 <!-- RFQ Section -->
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Request for Quotation</h3>
-                        <button v-if="canCreateRfq" @click="showRfqModal = true"
-                            class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                <AppCard title="Request for Quotation">
+                    <template #header>
+                        <AppButton v-if="canCreateRfq" size="sm" @click="showRfqModal = true">
                             <PlusIcon class="w-4 h-4" />
                             Create RFQ
-                        </button>
-                    </div>
+                        </AppButton>
+                    </template>
                     <div v-if="(p.rfqs || []).length" class="space-y-2">
                         <a v-for="rfq in p.rfqs" :key="rfq.id" :href="route('rfq.show', rfq.id)"
                             class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
                             <div>
                                 <span class="font-mono text-sm font-medium text-slate-800">{{ rfq.rfq_number }}</span>
-                                <span :class="['ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                                    rfq.status === 'awarded' ? 'bg-emerald-100 text-emerald-700' :
-                                    rfq.status === 'closed' ? 'bg-slate-100 text-slate-600' :
-                                    rfq.status === 'open' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-amber-100 text-amber-700']">
-                                    {{ rfq.status_label }}
-                                </span>
+                                <AppBadge :color="rfqStatusColor(rfq.status)" class="ml-2">{{ rfq.status_label }}</AppBadge>
                             </div>
                             <ArrowLeftIcon class="w-4 h-4 text-slate-400 rotate-180" />
                         </a>
@@ -311,167 +316,109 @@ const createRfq = () => {
                         <span v-if="p.status === 'approved'">No RFQ created yet.</span>
                         <span v-else>RFQ can be created once this PR is approved.</span>
                     </p>
-                </div>
+                </AppCard>
 
                 <!-- Items -->
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-                    <div class="px-5 py-4 border-b border-slate-100">
-                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Items ({{ (p.items || []).length }})</h3>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP No</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-                                    <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Qty</th>
-                                    <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit Cost</th>
-                                    <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <tr v-for="it in (p.items || [])" :key="it.id" class="hover:bg-slate-50/60">
-                                    <td class="px-4 py-3 text-sm text-slate-600">{{ it.ppmp_line_item_no || '—' }}</td>
-                                    <td class="px-4 py-3 text-sm text-slate-700">{{ it.unit }}</td>
-                                    <td class="px-4 py-3 text-sm text-slate-700">{{ it.description }}</td>
-                                    <td class="px-4 py-3 text-sm text-slate-700 text-right">{{ it.quantity }}</td>
-                                    <td class="px-4 py-3 text-sm text-slate-700 text-right">{{ Number(it.unit_cost).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</td>
-                                    <td class="px-4 py-3 text-sm text-slate-800 font-medium text-right">
-                                        {{ Number(it.unit_cost * it.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}
-                                    </td>
-                                </tr>
-                                <tr v-if="!(p.items || []).length">
-                                    <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No items.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <AppCard :title="`Items (${(p.items || []).length})`" :padded="false">
+                    <AppTable :is-empty="!(p.items || []).length" :skeleton-cols="6" :card="false">
+                        <template #head>
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP No</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Qty</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit Cost</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+                            </tr>
+                        </template>
+
+                        <tr v-for="it in (p.items || [])" :key="it.id" class="hover:bg-slate-50/60">
+                            <td class="px-4 py-3 text-sm text-slate-600">{{ it.ppmp_line_item_no || '—' }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700">{{ it.unit }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700">{{ it.description }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 text-right">{{ it.quantity }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 text-right">{{ Number(it.unit_cost).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-800 font-medium text-right">
+                                {{ Number(it.unit_cost * it.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}
+                            </td>
+                        </tr>
+
+                        <template #empty>
+                            <p class="text-sm text-slate-400">No items.</p>
+                        </template>
+                    </AppTable>
+                </AppCard>
             </div>
 
             <!-- Right: Timeline -->
             <div class="space-y-4">
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Approval Timeline</h3>
+                <AppCard title="Approval Timeline">
                     <ol class="space-y-4">
                         <li v-for="(step, i) in timelineSteps" :key="i" class="flex gap-3">
                             <div class="flex flex-col items-center">
                                 <div :class="['w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
-                                    step.rejected ? 'bg-red-100' : step.done ? 'bg-emerald-100' : step.pending ? 'bg-amber-100' : 'bg-slate-100']">
-                                    <CheckIcon v-if="step.done && !step.rejected" class="w-4 h-4 text-emerald-600" />
-                                    <XMarkIcon v-else-if="step.rejected" class="w-4 h-4 text-red-600" />
-                                    <ClockIcon v-else-if="step.pending" class="w-4 h-4 text-amber-500" />
+                                    step.rejected ? 'bg-danger-100' : step.done ? 'bg-success-100' : step.pending ? 'bg-warning-100' : 'bg-slate-100']">
+                                    <CheckIcon v-if="step.done && !step.rejected" class="w-4 h-4 text-success-600" />
+                                    <XMarkIcon v-else-if="step.rejected" class="w-4 h-4 text-danger-600" />
+                                    <ClockIcon v-else-if="step.pending" class="w-4 h-4 text-warning-500" />
                                     <span v-else class="w-2 h-2 rounded-full bg-slate-300"></span>
                                 </div>
                                 <div v-if="i < timelineSteps.length - 1" class="w-0.5 flex-1 bg-slate-100 mt-1"></div>
                             </div>
                             <div class="pb-4">
-                                <p :class="['text-sm font-medium', step.rejected ? 'text-red-700' : step.done ? 'text-slate-800' : step.pending ? 'text-amber-700' : 'text-slate-400']">
+                                <p :class="['text-sm font-medium', step.rejected ? 'text-danger-700' : step.done ? 'text-slate-800' : step.pending ? 'text-warning-700' : 'text-slate-400']">
                                     {{ step.label }}
                                 </p>
                                 <p v-if="step.actor" class="text-xs text-slate-500 mt-0.5">{{ step.actor }}</p>
                                 <p v-if="step.at" class="text-xs text-slate-400 mt-0.5">{{ formatDateTime(step.at) }}</p>
-                                <p v-else-if="step.pending" class="text-xs text-amber-500 mt-0.5">Awaiting action</p>
+                                <p v-else-if="step.pending" class="text-xs text-warning-500 mt-0.5">Awaiting action</p>
                             </div>
                         </li>
                     </ol>
-                </div>
+                </AppCard>
             </div>
         </div>
 
-        <!-- Action Modals -->
-        <div v-if="actionModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <div class="bg-white w-full max-w-md rounded-2xl shadow-xl">
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 class="text-base font-semibold text-slate-800">
-                        <span v-if="actionModal === 'dc_sign'">Sign Purchase Request</span>
-                        <span v-else-if="actionModal === 'bo_initial'">Budget Officer Initial</span>
-                        <span v-else-if="actionModal === 'supp_ocd'">Approve Supplemental Documents</span>
-                        <span v-else-if="actionModal === 'assign_number'">Assign Official PR Number</span>
-                        <span v-else-if="actionModal === 'ocd_sign'">Approve Purchase Request</span>
-                        <span v-else-if="actionModal === 'reject'">Reject Purchase Request</span>
-                        <span v-else-if="actionModal === 'submit'">Submit for Approval</span>
-                    </h3>
-                    <button @click="closeAction" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                        <XMarkIcon class="h-5 w-5" />
-                    </button>
-                </div>
-                <div class="px-6 py-5 space-y-4">
-                    <div v-if="['dc_sign', 'ocd_sign'].includes(actionModal)">
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Remarks (optional)</label>
-                        <textarea v-model="actionForm.remarks" rows="3"
-                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-                    </div>
-                    <div v-if="actionModal === 'assign_number'">
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Official PR Number <span class="text-red-500">*</span></label>
-                        <input v-model="actionForm.pr_number"
-                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="e.g. 2024-01-0001" />
-                    </div>
-                    <div v-if="actionModal === 'reject'">
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Reason for Rejection <span class="text-red-500">*</span></label>
-                        <textarea v-model="actionForm.reason" rows="3"
-                            class="w-full rounded-lg border border-red-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
-                    </div>
-                    <div v-if="['bo_initial', 'supp_ocd', 'submit'].includes(actionModal)">
-                        <p class="text-sm text-slate-600">Are you sure you want to proceed?</p>
-                    </div>
-                </div>
-                <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-                    <button @click="closeAction" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button @click="submitAction" :disabled="actionSubmitting"
-                        :class="['inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60 transition-colors',
-                            actionModal === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700']">
-                        {{ actionSubmitting ? 'Processing…' : 'Confirm' }}
-                    </button>
-                </div>
+        <!-- Action Modal -->
+        <AppModal :show="!!actionModal" :title="actionModalTitle" @close="closeAction">
+            <div class="space-y-4">
+                <AppTextarea v-if="['dc_sign', 'ocd_sign'].includes(actionModal)"
+                    v-model="actionForm.remarks" :rows="3" label="Remarks (optional)" />
+                <AppInput v-if="actionModal === 'assign_number'"
+                    v-model="actionForm.pr_number" label="Official PR Number" required placeholder="e.g. 2024-01-0001" />
+                <AppTextarea v-if="actionModal === 'reject'"
+                    v-model="actionForm.reason" :rows="3" label="Reason for Rejection" required />
+                <p v-if="['bo_initial', 'supp_ocd', 'submit'].includes(actionModal)" class="text-sm text-slate-600">
+                    Are you sure you want to proceed?
+                </p>
             </div>
-        </div>
+            <template #footer>
+                <AppButton variant="secondary" @click="closeAction">Cancel</AppButton>
+                <AppButton :variant="actionModal === 'reject' ? 'danger' : 'primary'" :loading="actionSubmitting"
+                    :disabled="actionSubmitting" @click="submitAction">
+                    {{ actionSubmitting ? 'Processing…' : 'Confirm' }}
+                </AppButton>
+            </template>
+        </AppModal>
 
         <!-- Create RFQ Modal -->
-        <div v-if="showRfqModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl">
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 class="text-base font-semibold text-slate-800">Create Request for Quotation</h3>
-                    <button @click="showRfqModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                        <XMarkIcon class="h-5 w-5" />
-                    </button>
+        <AppModal :show="showRfqModal" title="Create Request for Quotation" size="lg" @close="showRfqModal = false">
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <AppInput v-model="rfqForm.rfq_date" type="date" label="RFQ Date" required />
+                    <AppInput v-model.number="rfqForm.validity_days" type="number" min="1" max="365" label="Validity (days)" required />
                 </div>
-                <div class="px-6 py-5 space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">RFQ Date <span class="text-red-500">*</span></label>
-                            <input v-model="rfqForm.rfq_date" type="date"
-                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Validity (days) <span class="text-red-500">*</span></label>
-                            <input v-model.number="rfqForm.validity_days" type="number" min="1" max="365"
-                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Delivery Place</label>
-                        <input v-model="rfqForm.delivery_place"
-                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Payment Terms</label>
-                        <input v-model="rfqForm.payment_terms"
-                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                    </div>
-                    <p v-if="rfqForm.errors?.procurement_id" class="text-xs text-red-600">{{ rfqForm.errors.procurement_id }}</p>
-                </div>
-                <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-                    <button @click="showRfqModal = false" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button @click="createRfq" :disabled="rfqForm.processing"
-                        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
-                        {{ rfqForm.processing ? 'Creating…' : 'Create RFQ' }}
-                    </button>
-                </div>
+                <AppInput v-model="rfqForm.delivery_place" label="Delivery Place" />
+                <AppInput v-model="rfqForm.payment_terms" label="Payment Terms" />
+                <p v-if="rfqForm.errors?.procurement_id" class="text-xs text-danger-600">{{ rfqForm.errors.procurement_id }}</p>
             </div>
-        </div>
+            <template #footer>
+                <AppButton variant="secondary" @click="showRfqModal = false">Cancel</AppButton>
+                <AppButton :loading="rfqForm.processing" :disabled="rfqForm.processing" @click="createRfq">
+                    {{ rfqForm.processing ? 'Creating…' : 'Create RFQ' }}
+                </AppButton>
+            </template>
+        </AppModal>
 
     </AdminLayout>
 </template>

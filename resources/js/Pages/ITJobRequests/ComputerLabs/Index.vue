@@ -1,6 +1,9 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { ComputerDesktopIcon, ExclamationTriangleIcon, SignalIcon } from '@heroicons/vue/24/outline'
 
 defineProps({
@@ -12,12 +15,10 @@ defineProps({
   <Head title="Computer Laboratories" />
   <AdminLayout title="Computer Laboratories">
     <div class="space-y-4">
-      <p class="text-sm text-slate-500">
-        Visual map of each computer laboratory. Click a lab to see its seating layout and click any unit to view its live Atlas Sentinel specs.
-      </p>
+      <AppPageHeader title="Computer Laboratories" subtitle="Visual map of each computer laboratory. Click a lab to see its seating layout and click any unit to view its live Atlas Sentinel specs." />
 
-      <div v-if="!labs.length" class="bg-white rounded-lg shadow-sm border border-slate-200 px-4 py-10 text-center text-slate-400 text-sm">
-        No rooms are tagged as "Computer Laboratory" yet. Set a room's type in Data Management &rarr; Rooms.
+      <div v-if="!labs.length" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <EmptyState title="No computer laboratories yet" subtitle="Set a room's type in Data Management → Rooms." />
       </div>
 
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -25,7 +26,7 @@ defineProps({
           v-for="lab in labs"
           :key="lab.room.id"
           :href="route('computer-labs.show', lab.room.id)"
-          class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-md transition-all"
+          class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 hover:border-indigo-300 hover:shadow-md transition-all"
         >
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-2">
@@ -35,12 +36,9 @@ defineProps({
                 <div class="text-xs text-slate-400">{{ lab.total }} unit(s)</div>
               </div>
             </div>
-            <span
-              v-if="lab.critical > 0"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-100 text-red-700"
-            >
-              <ExclamationTriangleIcon class="w-3.5 h-3.5" /> {{ lab.critical }} critical
-            </span>
+            <AppBadge v-if="lab.critical > 0" color="red">
+              <ExclamationTriangleIcon class="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" /> {{ lab.critical }} critical
+            </AppBadge>
           </div>
 
           <div class="mt-4 flex items-center gap-1.5 text-xs text-slate-500">

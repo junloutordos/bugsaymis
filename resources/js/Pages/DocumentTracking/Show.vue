@@ -2,13 +2,22 @@
 import { ref, computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppBreadcrumb from '@/Components/AppBreadcrumb.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTabs from '@/Components/AppTabs.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
 import axios from 'axios'
-import Swal from 'sweetalert2'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import { userDisplayName } from '@/Utils/userDisplay.js'
 import { badgeBase, statusBadgeClass, priorityBadgeClass, originBadgeClass, routingStatusBadgeClass } from '@/Composables/useStatusBadge.js'
 import {
-  ChevronLeftIcon, LockClosedIcon, ExclamationTriangleIcon,
-  CheckCircleIcon, ClockIcon, ArrowRightIcon, ArrowUturnLeftIcon,
+  LockClosedIcon, ExclamationTriangleIcon,
+  CheckCircleIcon, ClockIcon, ArrowRightIcon,
   PaperClipIcon, PencilSquareIcon, EyeIcon, DocumentCheckIcon,
   UserIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
@@ -28,6 +37,11 @@ const props = defineProps({
 
 const page = usePage()
 const uid  = computed(() => props.currentUserId ?? page.props.auth?.user?.id)
+
+const breadcrumbItems = computed(() => [
+  { label: 'Document Tracking', href: route('document-tracking.index') },
+  { label: props.document.tracking_no },
+])
 
 // ── Active routing step for current user ──────────────────────────────────
 const myActiveRouting = computed(() =>
@@ -104,6 +118,13 @@ const reviewForm       = ref({
   completion_notes:          '',
 })
 
+// Decision tabs shown in the Review & Process modal
+const reviewTabs = computed(() => [
+  { key: 'forward', label: 'Forward' },
+  { key: 'return',  label: 'Return to Sender' },
+  ...(props.canCompleteAsReceiver ? [{ key: 'complete', label: 'Complete' }] : []),
+])
+
 // User search for forward-to field
 const forwardSearch = ref('')
 const filteredUsers = computed(() => {
@@ -134,18 +155,12 @@ function openReviewModal() {
 function closeReviewModal() { reviewOpen.value = false }
 
 async function confirmCompleteAndFile() {
-  const result = await Swal.fire({
+  return confirmAction({
     title: 'Mark complete and file?',
     text: 'This will close the document process and mark the document as filed.',
+    confirmText: 'Yes, complete and file',
     icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#059669',
-    cancelButtonColor: '#64748b',
-    confirmButtonText: 'Yes, complete and file',
-    cancelButtonText: 'Cancel',
   })
-
-  return result.isConfirmed
 }
 
 async function doReview() {
@@ -316,31 +331,24 @@ const overallBadgeCls = computed(() => {
   <AdminLayout :title="document.tracking_no">
     <div class="space-y-5 max-w-5xl">
 
-      <!-- Back -->
-      <button @click="router.visit(route('document-tracking.index'))"
-        class="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800">
-        <ChevronLeftIcon class="h-4 w-4" /> Back to Document Tracking
-      </button>
+      <AppBreadcrumb :items="breadcrumbItems" />
 
       <!-- ── Document Header Card ─────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <AppCard>
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div class="flex-1">
             <div class="flex flex-wrap items-center gap-2 mb-2">
               <span class="font-mono text-sm font-bold text-indigo-700">{{ document.tracking_no }}</span>
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="document.origin_type === 'external' ? 'bg-green-100 text-green-700' : 'bg-indigo-100 text-indigo-700'">
+              <span :class="[badgeBase, originBadgeClass(document.origin_type)]">
                 {{ document.origin_type === 'external' ? 'External Incoming' : 'Internal' }}
               </span>
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="{ Normal: 'bg-slate-100 text-slate-600', Urgent: 'bg-amber-100 text-amber-700', Rush: 'bg-red-100 text-red-700' }[document.priority] ?? 'bg-slate-100 text-slate-600'">
+              <span :class="[badgeBase, priorityBadgeClass(document.priority)]">
                 {{ document.priority }}
               </span>
-              <span v-if="document.is_confidential"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700">
+              <AppBadge v-if="document.is_confidential" color="purple" class="gap-1">
                 <LockClosedIcon class="h-3 w-3" /> Confidential
-              </span>
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="overallBadgeCls">
+              </AppBadge>
+              <span :class="[badgeBase, overallBadgeCls]">
                 {{ document.overall_status }}
               </span>
             </div>
@@ -351,10 +359,9 @@ const overallBadgeCls = computed(() => {
             <div>Filed: <strong>{{ fmtDate(document.created_at) }}</strong></div>
             <div>By: <strong class="text-slate-700">{{ document.creator?.name }}</strong></div>
             <div v-if="document.completed_at">Completed: <strong>{{ fmtDate(document.completed_at) }}</strong></div>
-            <button v-if="canEdit" @click="openEditModal()"
-              class="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+            <AppButton v-if="canEdit" variant="secondary" size="sm" class="mt-2" @click="openEditModal()">
               <PencilSquareIcon class="h-3.5 w-3.5" /> Edit Details
-            </button>
+            </AppButton>
           </div>
         </div>
 
@@ -406,31 +413,27 @@ const overallBadgeCls = computed(() => {
         <div v-if="myActiveRouting && !isCompleted" class="mt-4 pt-4 border-t border-slate-100 space-y-2">
           <div class="flex flex-wrap gap-2">
             <!-- Acknowledge Receipt — only when Pending -->
-            <button v-if="isPending"
-              :disabled="acknowledging"
-              @click="doReceive()"
-              class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed">
+            <AppButton v-if="isPending" :loading="acknowledging" :disabled="acknowledging" @click="doReceive()">
               <CheckCircleIcon class="h-4 w-4" />
               {{ acknowledging ? 'Acknowledging…' : 'Acknowledge Receipt' }}
-            </button>
+            </AppButton>
 
             <!-- Review & Process — primary action, disabled until acknowledged -->
-            <button
+            <AppButton
               :disabled="isPending"
-              @click="!isPending && openReviewModal()"
               :title="isPending ? 'Acknowledge receipt first' : ''"
-              class="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              @click="!isPending && openReviewModal()">
               <DocumentCheckIcon class="h-4 w-4" /> Review & Process
-            </button>
+            </AppButton>
 
             <!-- Add Note — disabled until acknowledged -->
-            <button
+            <AppButton
+              variant="secondary"
               :disabled="isPending"
-              @click="!isPending && openModal('annotate')"
               :title="isPending ? 'Acknowledge receipt first' : ''"
-              class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              @click="!isPending && openModal('annotate')">
               <PencilSquareIcon class="h-4 w-4" /> Add Note
-            </button>
+            </AppButton>
           </div>
 
           <!-- Hint shown while status is Pending -->
@@ -442,15 +445,14 @@ const overallBadgeCls = computed(() => {
 
         <!-- Mark Complete & File — admin or terminal/manual receiver -->
         <div v-if="canCompleteAndFile" class="mt-3 flex justify-end">
-          <button @click="openModal('complete')"
-            class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50">
+          <AppButton variant="secondary" @click="openModal('complete')">
             <CheckCircleIcon class="h-4 w-4 text-emerald-500" /> Mark Complete & File
-          </button>
+          </AppButton>
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── Attachments / Scans ──────────────────────────────────────────── -->
-      <div v-if="document.attachments?.length" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <AppCard v-if="document.attachments?.length">
         <h2 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
           <PaperClipIcon class="h-4 w-4 text-slate-400" /> Scans & Attachments
         </h2>
@@ -465,23 +467,19 @@ const overallBadgeCls = computed(() => {
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <button v-if="att.has_preview" @click="openPreview(att)"
-                class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium">
+              <AppButton v-if="att.has_preview" variant="secondary" size="sm" @click="openPreview(att)">
                 <EyeIcon class="h-3.5 w-3.5" /> Preview
-              </button>
-              <a v-if="att.gdrive_link" :href="att.gdrive_link" target="_blank" rel="noopener"
-                class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
+              </AppButton>
+              <AppButton v-if="att.gdrive_link" as="a" :href="att.gdrive_link" target="_blank" variant="secondary" size="sm">
                 <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" /> Google Drive
-              </a>
+              </AppButton>
             </div>
           </li>
         </ul>
-      </div>
+      </AppCard>
 
       <!-- ── Routing Timeline ────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <h2 class="text-sm font-semibold text-slate-700 mb-5">Routing Timeline</h2>
-
+      <AppCard title="Routing Timeline">
         <div class="relative">
           <!-- Vertical line -->
           <div class="absolute left-5 top-4 bottom-4 w-px bg-slate-200" />
@@ -512,13 +510,12 @@ const overallBadgeCls = computed(() => {
                     <span class="font-semibold text-slate-800 flex items-center gap-1 text-xs">
                       <UserIcon class="h-3.5 w-3.5 text-indigo-400" /> {{ r.receiver?.name ?? '—' }}
                     </span>
-                    <span v-if="r.receiver?.id === uid && ['Pending','Received'].includes(r.status)"
-                      class="text-[10px] font-bold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded-full">YOU</span>
+                    <AppBadge v-if="r.receiver?.id === uid && ['Pending','Received'].includes(r.status)" color="indigo">YOU</AppBadge>
                   </div>
                   <div class="flex items-center gap-1.5">
                     <ExclamationTriangleIcon v-if="r.is_overdue && ['Pending','Received'].includes(r.status)"
                       class="h-3.5 w-3.5 text-red-500" />
-                    <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="routingStatusBadgeClass(r)">
+                    <span :class="[badgeBase, routingStatusBadgeClass(r)]">
                       {{ statusLabel(r) }}
                     </span>
                   </div>
@@ -577,378 +574,216 @@ const overallBadgeCls = computed(() => {
             </div>
           </div>
         </div>
-      </div>
+      </AppCard>
 
     </div>
 
     <!-- ── Review Document Modal ─────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="reviewOpen" class="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div class="fixed inset-0 bg-black/40" @click="closeReviewModal" />
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
-          <!-- Header -->
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-            <h3 class="font-bold text-slate-800">Review Document</h3>
-            <button @click="closeReviewModal" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
+    <AppModal :show="reviewOpen" title="Review Document" size="lg" body-class="px-6 py-5 space-y-4" @close="closeReviewModal">
+      <AppTabs :tabs="reviewTabs" v-model="reviewTab">
 
-          <!-- Tabs -->
-          <div class="flex border-b border-slate-100 shrink-0">
-            <button
-              @click="reviewTab = 'forward'"
-              class="flex-1 py-2.5 text-sm font-medium transition-colors"
-              :class="reviewTab === 'forward' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-slate-500 hover:text-slate-700'">
-              Forward
-            </button>
-            <button
-              @click="reviewTab = 'return'"
-              class="flex-1 py-2.5 text-sm font-medium transition-colors"
-              :class="reviewTab === 'return' ? 'border-b-2 border-red-500 text-red-600' : 'text-slate-500 hover:text-slate-700'">
-              Return to Sender
-            </button>
-            <button
-              v-if="canCompleteAsReceiver"
-              @click="reviewTab = 'complete'"
-              class="flex-1 py-2.5 text-sm font-medium transition-colors"
-              :class="reviewTab === 'complete' ? 'border-b-2 border-emerald-500 text-emerald-600' : 'text-slate-500 hover:text-slate-700'">
-              Complete
-            </button>
-          </div>
+        <!-- Action notes (shared across all tabs) -->
+        <div class="space-y-3 pb-3 border-b border-slate-100">
+          <AppTextarea v-model="reviewForm.action_taken" :rows="2" label="Action Taken (optional)"
+            placeholder="What did you do with this document? e.g. Reviewed, signed, and initialled." />
+          <AppTextarea v-model="reviewForm.remarks" :rows="2" label="Remarks (optional)"
+            placeholder="Additional notes…" />
+          <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Route to next step ↓</p>
+        </div>
 
-          <!-- Body -->
-          <div class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
-
-            <!-- Action notes (shared across all tabs) -->
-            <div class="space-y-3 pb-3 border-b border-slate-100">
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Action Taken <span class="text-slate-400 font-normal">(optional)</span></label>
-                <textarea v-model="reviewForm.action_taken" rows="2"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="What did you do with this document? e.g. Reviewed, signed, and initialled." />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Remarks <span class="text-slate-400 font-normal">(optional)</span></label>
-                <textarea v-model="reviewForm.remarks" rows="2"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Additional notes…" />
-              </div>
-              <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Route to next step ↓</p>
+        <!-- Return tab -->
+        <template v-if="reviewTab === 'return'">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Return to</p>
+            <div class="space-y-2">
+              <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                :class="reviewForm.return_target === 'original' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
+                <input type="radio" value="original" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
+                <div>
+                  <p class="text-sm font-medium text-slate-800">Original Sender</p>
+                  <p class="text-xs text-slate-500">{{ originalSender?.name ?? '—' }}</p>
+                </div>
+              </label>
+              <label v-if="latestActionTaker && latestActionTaker.id !== originalSender?.id"
+                class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                :class="reviewForm.return_target === 'latest_action_taker' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
+                <input type="radio" value="latest_action_taker" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
+                <div>
+                  <p class="text-sm font-medium text-slate-800">Latest Action Taker <AppBadge color="amber" class="ml-1">Recommended</AppBadge></p>
+                  <p class="text-xs text-slate-500">{{ latestActionTaker?.name }} — most recently processed this document</p>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                :class="reviewForm.return_target === 'step' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
+                <input type="radio" value="step" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-slate-800">Choose a previous step</p>
+                  <select
+                    v-if="reviewForm.return_target === 'step'"
+                    v-model="reviewForm.return_target_routing_id"
+                    class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option :value="null">Select step…</option>
+                    <option v-for="r in routingChain" :key="r.id" :value="r.id">
+                      Step {{ r.sequence }} — {{ r.receiver?.name }} ({{ r.status }})
+                    </option>
+                  </select>
+                </div>
+              </label>
             </div>
-
-            <!-- Return tab -->
-            <template v-if="reviewTab === 'return'">
-              <div>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Return to</p>
-                <div class="space-y-2">
-                  <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
-                    :class="reviewForm.return_target === 'original' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
-                    <input type="radio" value="original" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
-                    <div>
-                      <p class="text-sm font-medium text-slate-800">Original Sender</p>
-                      <p class="text-xs text-slate-500">{{ originalSender?.name ?? '—' }}</p>
-                    </div>
-                  </label>
-                  <label v-if="latestActionTaker && latestActionTaker.id !== originalSender?.id"
-                    class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
-                    :class="reviewForm.return_target === 'latest_action_taker' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
-                    <input type="radio" value="latest_action_taker" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
-                    <div>
-                      <p class="text-sm font-medium text-slate-800">Latest Action Taker <span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold ml-1">Recommended</span></p>
-                      <p class="text-xs text-slate-500">{{ latestActionTaker?.name }} — most recently processed this document</p>
-                    </div>
-                  </label>
-                  <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
-                    :class="reviewForm.return_target === 'step' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
-                    <input type="radio" value="step" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-slate-800">Choose a previous step</p>
-                      <select
-                        v-if="reviewForm.return_target === 'step'"
-                        v-model="reviewForm.return_target_routing_id"
-                        class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option :value="null">Select step…</option>
-                        <option v-for="r in routingChain" :key="r.id" :value="r.id">
-                          Step {{ r.sequence }} — {{ r.receiver?.name }} ({{ r.status }})
-                        </option>
-                      </select>
-                    </div>
-                  </label>
-                </div>
-                <p v-if="reviewErrors.return_target" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_target }}</p>
-                <p v-if="reviewErrors.return_target_routing_id" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_target_routing_id }}</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Reason <span class="text-red-500">*</span></label>
-                <textarea v-model="reviewForm.return_reason" rows="3" required
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Explain why this document is being returned…" />
-                <p v-if="reviewErrors.return_reason" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_reason }}</p>
-              </div>
-            </template>
-
-            <!-- Forward tab -->
-            <template v-if="reviewTab === 'forward'">
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Forward To <span class="text-red-500">*</span></label>
-                <div class="relative mb-1">
-                  <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  <input v-model="forwardSearch" type="text" placeholder="Search name…"
-                    class="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <select v-model="reviewForm.forward_to" required size="5"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option v-for="u in filteredUsers" :key="u.id" :value="u.id">{{ userDisplayName(u, users) }}</option>
-                </select>
-                <p v-if="reviewErrors.forward_to" class="text-xs text-red-500 mt-1">{{ reviewErrors.forward_to }}</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Instructions for Receiver</label>
-                <textarea v-model="reviewForm.instructions" rows="2"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="What should the next person do?" />
-              </div>
-            </template>
-
-            <!-- Complete tab -->
-            <template v-if="reviewTab === 'complete'">
-              <div class="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
-                <CheckCircleIcon class="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                <p>You are the final step in this routing chain. Completing will close the document process and notify the creator.</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Completion Notes (optional)</label>
-                <textarea v-model="reviewForm.completion_notes" rows="3"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="e.g. Filed in Records. No further action required." />
-              </div>
-            </template>
-
+            <p v-if="reviewErrors.return_target" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_target }}</p>
+            <p v-if="reviewErrors.return_target_routing_id" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_target_routing_id }}</p>
           </div>
+          <AppTextarea v-model="reviewForm.return_reason" :rows="3" required label="Reason"
+            :error="reviewErrors.return_reason"
+            placeholder="Explain why this document is being returned…" />
+        </template>
 
-          <!-- Footer -->
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
-            <button @click="closeReviewModal"
-              class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button :disabled="reviewSubmitting" @click="doReview()"
-              class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
-              :class="{
-                'bg-blue-600 hover:bg-blue-700':       reviewTab === 'forward',
-                'bg-red-600 hover:bg-red-700':         reviewTab === 'return',
-                'bg-emerald-600 hover:bg-emerald-700': reviewTab === 'complete',
-              }">
-              {{ reviewSubmitting ? 'Saving…' : { forward: 'Forward Document', return: 'Return Document', complete: 'Complete Document' }[reviewTab] }}
-            </button>
+        <!-- Forward tab -->
+        <template v-if="reviewTab === 'forward'">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Forward To <span class="text-red-500">*</span></label>
+            <div class="relative mb-1">
+              <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none z-10" />
+              <AppInput v-model="forwardSearch" placeholder="Search name…" class="[&_input]:pl-9" />
+            </div>
+            <select v-model="reviewForm.forward_to" required size="5"
+              class="w-full rounded-lg border border-slate-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option v-for="u in filteredUsers" :key="u.id" :value="u.id">{{ userDisplayName(u, users) }}</option>
+            </select>
+            <p v-if="reviewErrors.forward_to" class="text-xs text-red-500 mt-1">{{ reviewErrors.forward_to }}</p>
           </div>
-        </div>
-      </div>
-    </Teleport>
+          <AppTextarea v-model="reviewForm.instructions" :rows="2" label="Instructions for Receiver"
+            placeholder="What should the next person do?" />
+        </template>
 
-    <!-- ── Modals ──────────────────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="modal" class="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div class="fixed inset-0 bg-black/40" @click="closeModal" />
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="font-bold text-slate-800">
-              {{ { annotate: 'Add Note', complete: 'Complete & File' }[modal] }}
-            </h3>
-            <button @click="closeModal" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
+        <!-- Complete tab -->
+        <template v-if="reviewTab === 'complete'">
+          <div class="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+            <CheckCircleIcon class="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+            <p>You are the final step in this routing chain. Completing will close the document process and notify the creator.</p>
           </div>
+          <AppTextarea v-model="reviewForm.completion_notes" :rows="3" label="Completion Notes (optional)"
+            placeholder="e.g. Filed in Records. No further action required." />
+        </template>
 
-          <div class="px-6 py-5 space-y-4">
+      </AppTabs>
 
-            <!-- Annotate -->
-            <template v-if="modal === 'annotate'">
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Note / Remarks <span class="text-red-500">*</span></label>
-                <textarea v-model="modalForm.remarks" rows="3" required
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Add a note without recording an action…" />
-              </div>
-            </template>
+      <template #footer>
+        <AppButton variant="secondary" @click="closeReviewModal">Cancel</AppButton>
+        <AppButton
+          :loading="reviewSubmitting"
+          :disabled="reviewSubmitting"
+          :variant="{ forward: 'primary', return: 'danger', complete: 'success' }[reviewTab]"
+          @click="doReview()">
+          {{ { forward: 'Forward Document', return: 'Return Document', complete: 'Complete Document' }[reviewTab] }}
+        </AppButton>
+      </template>
+    </AppModal>
 
-            <!-- Complete -->
-            <template v-if="modal === 'complete'">
-              <p class="text-sm text-slate-600">This will close the document and mark it as filed. All remaining routing steps will be resolved.</p>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Final Action / Notes (optional)</label>
-                <textarea v-model="modalForm.action_taken" rows="2"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="e.g. Filed in Records. No further action required." />
-              </div>
-            </template>
+    <!-- ── Modals (Add Note / Complete & File) ────────────────────────────── -->
+    <AppModal :show="!!modal" :title="modal ? { annotate: 'Add Note', complete: 'Complete & File' }[modal] : ''" size="lg" @close="closeModal">
 
-          </div>
+      <!-- Annotate -->
+      <template v-if="modal === 'annotate'">
+        <AppTextarea v-model="modalForm.remarks" :rows="3" required label="Note / Remarks"
+          placeholder="Add a note without recording an action…" />
+      </template>
 
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click="closeModal"
-              class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button :disabled="submitting"
-              @click="{ annotate: doAnnotate, complete: doComplete }[modal]()"
-              class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
-              {{ submitting ? 'Saving…' : { annotate: 'Save Note', complete: 'Complete & File' }[modal] }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+      <!-- Complete -->
+      <template v-if="modal === 'complete'">
+        <p class="text-sm text-slate-600 mb-3">This will close the document and mark it as filed. All remaining routing steps will be resolved.</p>
+        <AppTextarea v-model="modalForm.action_taken" :rows="2" label="Final Action / Notes (optional)"
+          placeholder="e.g. Filed in Records. No further action required." />
+      </template>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+        <AppButton :loading="submitting" :disabled="submitting"
+          @click="{ annotate: doAnnotate, complete: doComplete }[modal]()">
+          {{ { annotate: 'Save Note', complete: 'Complete & File' }[modal] }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- ── Scan Preview Modal ──────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="previewAtt" class="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/60">
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
-          <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <p class="text-sm font-semibold text-slate-800">{{ previewAtt.file_name }}</p>
-            <button @click="closePreview" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-          </div>
-          <div class="flex-1 overflow-auto p-2">
-            <div v-if="previewLoading" class="flex items-center justify-center h-64 text-slate-400 text-sm">
-              Loading from Google Drive…
-            </div>
-            <iframe v-else-if="previewMime.includes('pdf') && previewUrl"
-              :src="previewUrl" class="w-full h-[75vh] rounded-lg border border-slate-100" />
-            <img v-else-if="previewUrl"
-              :src="previewUrl" class="max-w-full mx-auto rounded-lg" alt="Document scan" />
-          </div>
-        </div>
+    <AppModal :show="!!previewAtt" :title="previewAtt?.file_name" size="4xl" body-class="p-2" @close="closePreview">
+      <div v-if="previewLoading" class="flex items-center justify-center h-64 text-slate-400 text-sm">
+        Loading from Google Drive…
       </div>
-    </Teleport>
+      <iframe v-else-if="previewMime.includes('pdf') && previewUrl"
+        :src="previewUrl" class="w-full h-[75vh] rounded-lg border border-slate-100" />
+      <img v-else-if="previewUrl"
+        :src="previewUrl" class="max-w-full mx-auto rounded-lg" alt="Document scan" />
+    </AppModal>
 
     <!-- ── Edit Document Details Modal ─────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div class="fixed inset-0 bg-black/40" @click="editOpen = false" />
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+    <AppModal :show="editOpen" title="Edit Document Details" :subtitle="document.tracking_no" size="2xl" @close="editOpen = false">
+      <form @submit.prevent="submitEdit" class="space-y-4">
 
-          <!-- Header -->
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
-            <div>
-              <h3 class="font-bold text-slate-800">Edit Document Details</h3>
-              <p class="text-xs text-slate-500 mt-0.5">{{ document.tracking_no }}</p>
-            </div>
-            <button @click="editOpen = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-
-          <!-- Body -->
-          <form @submit.prevent="submitEdit" class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
-
-            <!-- Document Type -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Document Type <span class="text-red-500">*</span></label>
-              <select v-model="editForm.document_type_id" required
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">Select type…</option>
-                <option v-for="t in availableEditTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
-              </select>
-              <p v-if="editErrors.document_type_id" class="text-xs text-red-500 mt-1">{{ editErrors.document_type_id }}</p>
-            </div>
-
-            <!-- Subject -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Subject <span class="text-red-500">*</span></label>
-              <input v-model="editForm.subject" type="text" required
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <p v-if="editErrors.subject" class="text-xs text-red-500 mt-1">{{ editErrors.subject }}</p>
-            </div>
-
-            <!-- Description -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <textarea v-model="editForm.description" rows="2"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Additional details…" />
-              <p v-if="editErrors.description" class="text-xs text-red-500 mt-1">{{ editErrors.description }}</p>
-            </div>
-
-            <!-- Priority / Urgency -->
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Priority</label>
-                <select v-model="editForm.priority"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option>Normal</option><option>Urgent</option><option>Rush</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Urgency</label>
-                <select v-model="editForm.urgency"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option>Normal</option><option>Urgent</option><option>Very Urgent</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Deadline -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Deadline</label>
-              <input v-model="editForm.deadline_at" type="datetime-local"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-
-            <!-- Confidential -->
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" v-model="editForm.is_confidential" class="rounded border-slate-300 text-indigo-600" />
-              <span class="text-sm text-slate-700 flex items-center gap-1">
-                <LockClosedIcon class="h-3.5 w-3.5 text-purple-500" /> Mark as confidential
-              </span>
-            </label>
-
-            <!-- External-only fields -->
-            <template v-if="document.origin_type === 'external'">
-              <div class="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-                <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">External Document Details</p>
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Source Office <span class="text-red-500">*</span></label>
-                    <input v-model="editForm.source_office" type="text" required
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Sender Name</label>
-                    <input v-model="editForm.sender_name" type="text"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                </div>
-                <div class="grid grid-cols-3 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Doc Date</label>
-                    <input v-model="editForm.date_of_document" type="date"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Date Received</label>
-                    <input v-model="editForm.date_received" type="date"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Ref. No.</label>
-                    <input v-model="editForm.document_number" type="text"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                </div>
-              </div>
-            </template>
-
-          </form>
-
-          <!-- Footer -->
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 rounded-b-2xl bg-white">
-            <button type="button" @click="editOpen = false"
-              class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
-              Cancel
-            </button>
-            <button @click="submitEdit" :disabled="editSubmitting"
-              class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
-              {{ editSubmitting ? 'Saving…' : 'Save Changes' }}
-            </button>
-          </div>
+        <!-- Document Type -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Document Type <span class="text-red-500">*</span></label>
+          <select v-model="editForm.document_type_id" required
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Select type…</option>
+            <option v-for="t in availableEditTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
+          </select>
+          <p v-if="editErrors.document_type_id" class="text-xs text-red-500 mt-1">{{ editErrors.document_type_id }}</p>
         </div>
-      </div>
-    </Teleport>
+
+        <!-- Subject -->
+        <AppInput v-model="editForm.subject" label="Subject" required :error="editErrors.subject" />
+
+        <!-- Description -->
+        <AppTextarea v-model="editForm.description" :rows="2" label="Description" :error="editErrors.description"
+          placeholder="Additional details…" />
+
+        <!-- Priority / Urgency -->
+        <div class="grid grid-cols-2 gap-3">
+          <AppSelect v-model="editForm.priority" label="Priority" :show-blank="false">
+            <option>Normal</option><option>Urgent</option><option>Rush</option>
+          </AppSelect>
+          <AppSelect v-model="editForm.urgency" label="Urgency" :show-blank="false">
+            <option>Normal</option><option>Urgent</option><option>Very Urgent</option>
+          </AppSelect>
+        </div>
+
+        <!-- Deadline -->
+        <AppInput v-model="editForm.deadline_at" type="datetime-local" label="Deadline" />
+
+        <!-- Confidential -->
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" v-model="editForm.is_confidential" class="rounded border-slate-300 text-indigo-600" />
+          <span class="text-sm text-slate-700 flex items-center gap-1">
+            <LockClosedIcon class="h-3.5 w-3.5 text-purple-500" /> Mark as confidential
+          </span>
+        </label>
+
+        <!-- External-only fields -->
+        <template v-if="document.origin_type === 'external'">
+          <div class="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+            <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">External Document Details</p>
+            <div class="grid grid-cols-2 gap-3">
+              <AppInput v-model="editForm.source_office" label="Source Office" required />
+              <AppInput v-model="editForm.sender_name" label="Sender Name" />
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <AppInput v-model="editForm.date_of_document" type="date" label="Doc Date" />
+              <AppInput v-model="editForm.date_received" type="date" label="Date Received" />
+              <AppInput v-model="editForm.document_number" label="Ref. No." />
+            </div>
+          </div>
+        </template>
+
+      </form>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="editOpen = false">Cancel</AppButton>
+        <AppButton :loading="editSubmitting" :disabled="editSubmitting" @click="submitEdit">
+          Save Changes
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

@@ -4,6 +4,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppButton from '@/Components/AppButton.vue'
 import AgentSpecsModal from '@/Components/AgentSpecsModal.vue'
 import { ComputerDesktopIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
 
@@ -117,9 +118,9 @@ function openSpecs(eq) {
   <Head :title="`${room.name} — Computer Laboratory`" />
   <AdminLayout :title="room.name">
     <div class="space-y-4">
-      <Link :href="route('computer-labs.index')" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600">
+      <AppButton as="link" variant="ghost" size="sm" :href="route('computer-labs.index')">
         <ArrowLeftIcon class="w-4 h-4" /> Back to Computer Laboratories
-      </Link>
+      </AppButton>
 
       <div class="flex flex-wrap items-center gap-3 text-xs">
         <span v-for="(label, key) in statusLabels" :key="key" class="inline-flex items-center gap-1.5">

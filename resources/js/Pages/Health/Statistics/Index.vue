@@ -1,4 +1,6 @@
 <template>
+  <Head title="Health Statistics — Print" />
+
   <div class="p-4 bg-white printable-report">
     <div class="report-header-wrap text-center mb-4">
       <img src="/images/report_header.jpeg" alt="Report Header" class="report-header mx-auto" />
@@ -61,8 +63,10 @@
 
 <script>
 import { onMounted, ref } from 'vue';
+import { Head } from '@inertiajs/vue3';
 
 export default {
+  components: { Head },
   props: {
     labels: { type: Array, default: () => [] },
     facultyMale: { type: Array, default: () => [] },

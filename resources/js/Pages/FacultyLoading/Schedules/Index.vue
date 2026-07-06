@@ -3,36 +3,29 @@
   <AdminLayout title="Class Schedules">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Class Schedules</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Weekly timetable by section</p>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <Link :href="route('faculty-loading.auto-schedule.index')"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-medium transition-colors">
+      <AppPageHeader title="Class Schedules" subtitle="Weekly timetable by section">
+        <template #actions>
+          <AppButton variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
             <SparklesIcon class="h-4 w-4" /> AI Generate
-          </Link>
-          <button @click="openForm()"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm">
+          </AppButton>
+          <AppButton @click="openForm()">
             <PlusIcon class="h-4 w-4" /> Assign Schedule
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
       <div v-if="$page.props.flash?.success"
-        class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
       <div v-if="Object.keys($page.props.errors ?? {}).length"
-        class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm space-y-1">
+        class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm space-y-1">
         <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2 items-center">
+      <AppFilterBar>
         <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
           <button type="button" @click="setViewBy('section')"
             :class="['px-3 py-1.5 font-medium transition-colors', viewBy === 'section' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
@@ -70,7 +63,7 @@
           <option :value="null">All Grades</option>
           <option v-for="g in GRADE_LEVELS" :key="g" :value="g">Grade {{ g }}</option>
         </select>
-      </div>
+      </AppFilterBar>
 
       <!-- Unplaced subjects tray (mobile/tablet — full-width horizontal bar) -->
       <div v-if="unplacedLoads.length"
@@ -101,12 +94,9 @@
         <div class="flex-1 min-w-0 space-y-6">
 
           <!-- Empty state -->
-          <div v-if="groupsWithSchedules.length === 0"
-            class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-            <CalendarIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-            <p class="text-sm font-medium text-slate-500">No schedules found</p>
-            <p class="text-xs text-slate-400 mt-1">Assign a schedule or use AI Generate to get started.</p>
-          </div>
+          <AppCard v-if="groupsWithSchedules.length === 0">
+            <EmptyState title="No schedules found" subtitle="Assign a schedule or use AI Generate to get started." :icon="CalendarIcon" />
+          </AppCard>
 
           <!-- Calendar cards per section / per faculty -->
           <template v-else>
@@ -127,10 +117,9 @@
                   </h3>
                   <span class="text-xs text-slate-400">· {{ byGroup[groupId]?.length ?? 0 }} slot(s)</span>
                 </div>
-                <button v-if="viewBy === 'section'" @click="openForm({ section_id: groupId })"
-                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-md font-medium transition-colors">
+                <AppButton v-if="viewBy === 'section'" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
                   <PlusIcon class="h-3 w-3" /> Add
-                </button>
+                </AppButton>
               </div>
 
               <!-- Calendar grid -->
@@ -302,147 +291,130 @@
     </div>
 
     <!-- Schedule Form Modal -->
-    <div v-if="modal"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 my-8">
-        <h2 class="text-lg font-semibold text-slate-800">{{ form.id ? 'Edit' : 'Assign' }} Schedule</h2>
+    <AppModal :show="modal" :title="(form.id ? 'Edit' : 'Assign') + ' Schedule'" size="lg"
+      body-class="px-6 py-4 space-y-4" @close="modal = false">
 
-        <!-- Validation result banner -->
-        <div v-if="validationResult" class="space-y-1.5">
-          <div v-for="err in validationResult.errors ?? []" :key="err"
-            class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-3 py-2 text-xs flex items-start gap-1.5">
-            <ExclamationCircleIcon class="h-4 w-4 shrink-0 mt-0.5" /> {{ err }}
-          </div>
-          <div v-for="w in validationResult.warnings ?? []" :key="w"
-            class="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 py-2 text-xs flex items-start gap-1.5">
-            <ExclamationTriangleIcon class="h-4 w-4 shrink-0 mt-0.5" /> {{ w }}
-          </div>
+      <!-- Validation result banner -->
+      <div v-if="validationResult" class="space-y-1.5">
+        <div v-for="err in validationResult.errors ?? []" :key="err"
+          class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-3 py-2 text-xs flex items-start gap-1.5">
+          <ExclamationCircleIcon class="h-4 w-4 shrink-0 mt-0.5" /> {{ err }}
         </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
-            <select v-model="form.faculty_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select faculty...</option>
-              <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Subject *</label>
-            <select v-model="form.subject_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select subject...</option>
-              <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Section *</label>
-            <select v-model="form.section_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select section...</option>
-              <option v-for="sec in sections" :key="sec.id" :value="sec.id">
-                Grade {{ sec.levelid }} — {{ sec.sectionname }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Classroom *</label>
-            <select v-model="form.classroom_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select classroom...</option>
-              <option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }} ({{ c.code }})</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
-            <select v-model="form.academic_term_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select term...</option>
-              <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">School Year *</label>
-            <select v-model="form.school_year_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select school year...</option>
-              <option v-for="t in terms" :key="'sy-' + t.id" :value="t.id">{{ t.label }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Day *</label>
-            <select v-model="form.day_of_week"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option value="">Select day...</option>
-              <option v-for="d in WEEKDAYS" :key="d" :value="d">{{ d }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Start Time *</label>
-            <input v-model="form.start_time" type="time"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">End Time *</label>
-            <input v-model="form.end_time" type="time"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-            <select v-model="form.status"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option value="active">Active</option>
-              <option value="tentative">Tentative</option>
-              <option v-if="form.id" value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-            <textarea v-model="form.remarks" rows="2"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
-          </div>
-
-          <!-- Override warnings -->
-          <div v-if="validationResult && validationResult.warnings?.length && !validationResult.errors?.length"
-            class="col-span-2 flex items-center gap-2">
-            <input v-model="form.force" type="checkbox" id="force-save" class="rounded text-amber-500" />
-            <label for="force-save" class="text-sm text-amber-700">
-              I acknowledge the warnings — save anyway
-            </label>
-          </div>
-        </div>
-
-        <div class="flex justify-between gap-3 pt-1">
-          <button type="button" @click="checkConflicts"
-            class="px-4 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium flex items-center gap-1.5">
-            <MagnifyingGlassIcon class="h-4 w-4" /> Check Conflicts
-          </button>
-          <div class="flex gap-2">
-            <button @click="modal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">
-              Cancel
-            </button>
-            <button @click="save" :disabled="form.processing"
-              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
-              {{ form.id ? 'Update' : 'Save' }}
-            </button>
-          </div>
+        <div v-for="w in validationResult.warnings ?? []" :key="w"
+          class="bg-warning-50 border border-warning-100 text-warning-700 rounded-lg px-3 py-2 text-xs flex items-start gap-1.5">
+          <ExclamationTriangleIcon class="h-4 w-4 shrink-0 mt-0.5" /> {{ w }}
         </div>
       </div>
-    </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
+          <select v-model="form.faculty_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select faculty...</option>
+            <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </div>
+        <div class="col-span-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Subject *</label>
+          <select v-model="form.subject_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select subject...</option>
+            <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Section *</label>
+          <select v-model="form.section_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select section...</option>
+            <option v-for="sec in sections" :key="sec.id" :value="sec.id">
+              Grade {{ sec.levelid }} — {{ sec.sectionname }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Classroom *</label>
+          <select v-model="form.classroom_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select classroom...</option>
+            <option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }} ({{ c.code }})</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
+          <select v-model="form.academic_term_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select term...</option>
+            <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">School Year *</label>
+          <select v-model="form.school_year_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select school year...</option>
+            <option v-for="t in terms" :key="'sy-' + t.id" :value="t.id">{{ t.label }}</option>
+          </select>
+        </div>
+        <AppSelect v-model="form.day_of_week" label="Day" required placeholder="Select day...">
+          <option v-for="d in WEEKDAYS" :key="d" :value="d">{{ d }}</option>
+        </AppSelect>
+        <AppInput v-model="form.start_time" type="time" label="Start Time" required />
+        <AppInput v-model="form.end_time" type="time" label="End Time" required />
+        <AppSelect v-model="form.status" label="Status" :show-blank="false">
+          <option value="active">Active</option>
+          <option value="tentative">Tentative</option>
+          <option v-if="form.id" value="cancelled">Cancelled</option>
+        </AppSelect>
+        <div class="col-span-2">
+          <AppTextarea v-model="form.remarks" label="Remarks" :rows="2" />
+        </div>
+
+        <!-- Override warnings -->
+        <div v-if="validationResult && validationResult.warnings?.length && !validationResult.errors?.length"
+          class="col-span-2 flex items-center gap-2">
+          <input v-model="form.force" type="checkbox" id="force-save" class="rounded text-amber-500" />
+          <label for="force-save" class="text-sm text-amber-700">
+            I acknowledge the warnings — save anyway
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-between items-center gap-3 w-full">
+          <AppButton variant="secondary" @click="checkConflicts">
+            <MagnifyingGlassIcon class="h-4 w-4" /> Check Conflicts
+          </AppButton>
+          <div class="flex gap-2">
+            <AppButton variant="ghost" @click="modal = false">Cancel</AppButton>
+            <AppButton :loading="form.processing" @click="save">{{ form.id ? 'Update' : 'Save' }}</AppButton>
+          </div>
+        </div>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
   CalendarIcon, CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-  LockClosedIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon,
+  LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────

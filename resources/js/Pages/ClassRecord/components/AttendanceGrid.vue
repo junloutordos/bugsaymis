@@ -2,6 +2,9 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -116,16 +119,9 @@ async function addDate() {
 }
 
 async function removeDate(dateObj) {
-  const label  = formatDate(dateObj.date)
-  const result = await Swal.fire({
-    title:             `Remove ${label}?`,
-    text:              'All attendance records for this date will be permanently deleted.',
-    icon:              'warning',
-    showCancelButton:  true,
-    confirmButtonText: 'Remove',
-    confirmButtonColor: '#ef4444',
-  })
-  if (!result.isConfirmed) return
+  const label = formatDate(dateObj.date)
+  const confirmed = await confirmDelete(`Remove ${label}? All attendance records for this date will be permanently deleted.`)
+  if (!confirmed) return
 
   try {
     await axios.delete(
@@ -182,24 +178,21 @@ function studentTotals(studentId) {
           <div v-if="showAddDate" class="flex items-center gap-2">
             <input v-model="newDateInput" type="date"
               class="rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-            <button @click="addDate" :disabled="!newDateInput || addingDate"
-              class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 transition-colors">
+            <AppButton size="sm" :disabled="!newDateInput || addingDate" @click="addDate">
               {{ addingDate ? 'Adding…' : 'Add' }}
-            </button>
-            <button @click="showAddDate = false; newDateInput = ''"
-              class="p-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-400">
+            </AppButton>
+            <AppIconButton label="Cancel add date" variant="secondary" size="sm"
+              @click="showAddDate = false; newDateInput = ''">
               <XMarkIcon class="h-3.5 w-3.5" />
-            </button>
+            </AppIconButton>
           </div>
-          <button v-else @click="showAddDate = true"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium transition-colors">
+          <AppButton v-else variant="secondary" size="sm" @click="showAddDate = true">
             <PlusIcon class="h-3.5 w-3.5" /> Add Date
-          </button>
+          </AppButton>
 
-          <button @click="saveAttendance" :disabled="!hasPendingChanges || saving"
-            class="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition-colors">
+          <AppButton size="sm" :disabled="!hasPendingChanges || saving" @click="saveAttendance">
             {{ saving ? 'Saving…' : (hasPendingChanges ? `Save (${pendingChanges.size} change${pendingChanges.size > 1 ? 's' : ''})` : 'Save Attendance') }}
-          </button>
+          </AppButton>
         </template>
       </div>
     </div>

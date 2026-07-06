@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import RichTextEditor from '@/Components/RichTextEditor.vue'
+import AppCard from '@/Components/AppCard.vue'
 import AppInput from '@/Components/AppInput.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import AppTextarea from '@/Components/AppTextarea.vue'
+import AppButton from '@/Components/AppButton.vue'
 import {
   DocumentTextIcon, PaperClipIcon, UserGroupIcon,
   BuildingOfficeIcon, BuildingLibraryIcon, UserIcon, CheckCircleIcon, ChevronLeftIcon,
@@ -173,10 +173,10 @@ watch(type, (t) => {
     <div class="max-w-3xl">
 
       <!-- Back -->
-      <button @click="router.visit(route('issuances.index'))"
-        class="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 mb-5">
+      <Link :href="route('issuances.index')"
+        class="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 mb-5">
         <ChevronLeftIcon class="h-4 w-4" /> Back to Issuances
-      </button>
+      </Link>
 
       <!-- Step indicator -->
       <div class="flex items-center gap-2 mb-6">
@@ -184,7 +184,7 @@ watch(type, (t) => {
           class="flex items-center gap-2">
           <div class="flex items-center gap-1.5">
             <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-              :class="step === i+1 ? 'bg-indigo-600 text-white' : step > i+1 ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'">
+              :class="step === i+1 ? 'bg-indigo-600 text-white' : step > i+1 ? 'bg-success-500 text-white' : 'bg-slate-100 text-slate-500'">
               <span v-if="step > i+1">✓</span>
               <span v-else>{{ i+1 }}</span>
             </div>
@@ -195,195 +195,188 @@ watch(type, (t) => {
       </div>
 
       <!-- ── Step 1: Details ──────────────────────────────────────────────── -->
-      <div v-if="step === 1" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-        <h3 class="font-semibold text-slate-800">Issuance Details</h3>
+      <AppCard v-if="step === 1" title="Issuance Details">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Issuance Type <span class="text-red-500">*</span></label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button v-for="opt in typeOptions" :key="opt.code"
+                @click="type = opt.code"
+                class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors text-left"
+                :class="type === opt.code
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'">
+                <span class="block text-xs font-bold">{{ opt.code }}</span>
+                <span class="block text-[11px] text-slate-500 leading-tight">{{ opt.label }}</span>
+              </button>
+            </div>
+          </div>
 
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Issuance Type <span class="text-red-500">*</span></label>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <button v-for="opt in typeOptions" :key="opt.code"
-              @click="type = opt.code"
-              class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors text-left"
-              :class="type === opt.code
-                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'">
-              <span class="block text-xs font-bold">{{ opt.code }}</span>
-              <span class="block text-[11px] text-slate-500 leading-tight">{{ opt.label }}</span>
-            </button>
+          <AppInput
+            v-model="title"
+            label="Title / Subject"
+            :required="true"
+            :error="errors.title"
+            maxlength="500"
+            :placeholder="{ SO: 'e.g. Designation of Committee Members for...', TO: 'e.g. Official Travel of...', MEMO: 'e.g. Submission of IPCR for...' }[type] ?? 'Title or subject of the issuance'"
+          />
+          <p class="text-xs -mt-2" :class="title.length > 400 ? 'text-warning-600 font-medium' : 'text-slate-400'">
+            {{ title.length }} / 500 characters
+          </p>
+
+          <div class="flex justify-end pt-2">
+            <AppButton @click="step = 2" :disabled="!type || !title.trim()">
+              Next: Content →
+            </AppButton>
           </div>
         </div>
-
-        <AppInput
-          v-model="title"
-          label="Title / Subject"
-          :required="true"
-          :error="errors.title"
-          maxlength="500"
-          :placeholder="{ SO: 'e.g. Designation of Committee Members for...', TO: 'e.g. Official Travel of...', MEMO: 'e.g. Submission of IPCR for...' }[type] ?? 'Title or subject of the issuance'"
-        />
-        <p class="text-xs -mt-2" :class="title.length > 400 ? 'text-amber-500 font-medium' : 'text-slate-400'">
-          {{ title.length }} / 500 characters
-        </p>
-
-        <div class="flex justify-end pt-2">
-          <button @click="step = 2" :disabled="!type || !title.trim()"
-            class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 bg-indigo-600 hover:bg-indigo-700">
-            Next: Content →
-          </button>
-        </div>
-      </div>
+      </AppCard>
 
       <!-- ── Step 2: Content ──────────────────────────────────────────────── -->
-      <div v-if="step === 2" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-        <h3 class="font-semibold text-slate-800">Issuance Content</h3>
-
-        <!-- Mode toggle -->
-        <div class="flex gap-2">
-          <button @click="contentMode = 'editor'"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors"
-            :class="contentMode === 'editor' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'">
-            <DocumentTextIcon class="h-4 w-4" /> Type in editor
-          </button>
-          <button @click="contentMode = 'upload'"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors"
-            :class="contentMode === 'upload' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'">
-            <PaperClipIcon class="h-4 w-4" /> Upload scan
-          </button>
-        </div>
-
-        <!-- Editor mode -->
-        <div v-if="contentMode === 'editor'" class="space-y-2">
-          <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-500 flex gap-3 flex-wrap">
-            <span>The system auto-generates the official header ({{ type }} No., year) and signature block.</span>
-            <span>Type only the body content below.</span>
+      <AppCard v-if="step === 2" title="Issuance Content">
+        <div class="space-y-4">
+          <!-- Mode toggle -->
+          <div class="flex gap-2">
+            <button @click="contentMode = 'editor'"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors"
+              :class="contentMode === 'editor' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'">
+              <DocumentTextIcon class="h-4 w-4" /> Type in editor
+            </button>
+            <button @click="contentMode = 'upload'"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors"
+              :class="contentMode === 'upload' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'">
+              <PaperClipIcon class="h-4 w-4" /> Upload scan
+            </button>
           </div>
-          <RichTextEditor v-model="content" :placeholder="editorTemplates[type] ? undefined : 'Type the body of the issuance here…'" />
-        </div>
 
-        <!-- Upload mode -->
-        <div v-else class="space-y-3">
-          <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
-            Upload an already-signed or scanned issuance document. The system will attach a QR verification code.
+          <!-- Editor mode -->
+          <div v-if="contentMode === 'editor'" class="space-y-2">
+            <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-500 flex gap-3 flex-wrap">
+              <span>The system auto-generates the official header ({{ type }} No., year) and signature block.</span>
+              <span>Type only the body content below.</span>
+            </div>
+            <RichTextEditor v-model="content" :placeholder="editorTemplates[type] ? undefined : 'Type the body of the issuance here…'" />
           </div>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="handleScan"
-            class="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-          <p class="text-xs text-slate-400">PDF, JPG, PNG · Max 20 MB</p>
-          <div v-if="scanFilename" class="flex items-center gap-2 text-xs text-emerald-600">
-            <CheckCircleIcon class="h-4 w-4" /> {{ scanFilename }} selected
-          </div>
-        </div>
 
-        <div class="flex justify-between pt-2">
-          <button @click="step = 1" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">← Back</button>
-          <button @click="step = 3" :disabled="!canAdvance()"
-            class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 bg-indigo-600 hover:bg-indigo-700">
-            Next: Recipients →
-          </button>
+          <!-- Upload mode -->
+          <div v-else class="space-y-3">
+            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
+              Upload an already-signed or scanned issuance document. The system will attach a QR verification code.
+            </div>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="handleScan"
+              class="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+            <p class="text-xs text-slate-400">PDF, JPG, PNG · Max 20 MB</p>
+            <div v-if="scanFilename" class="flex items-center gap-2 text-xs text-success-600">
+              <CheckCircleIcon class="h-4 w-4" /> {{ scanFilename }} selected
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <AppButton variant="secondary" @click="step = 1">← Back</AppButton>
+            <AppButton @click="step = 3" :disabled="!canAdvance()">
+              Next: Recipients →
+            </AppButton>
+          </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── Step 3: Recipients + Release ────────────────────────────────── -->
-      <div v-if="step === 3" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
-        <h3 class="font-semibold text-slate-800">Recipients & Release</h3>
+      <AppCard v-if="step === 3" title="Recipients & Release">
+        <div class="space-y-5">
+          <!-- Recipient type -->
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-2">Who receives this issuance?</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button v-for="opt in [
+                { key:'all', icon: UserGroupIcon, label:'All Staff', sub:'Every active user' },
+                { key:'office', icon: BuildingOfficeIcon, label:'By Office', sub:'Select offices' },
+                { key:'division', icon: BuildingLibraryIcon, label:'By Division', sub:'Select divisions' },
+                { key:'individual', icon: UserIcon, label:'Individual(s)', sub:'Pick specific users' },
+              ]" :key="opt.key"
+                @click="recipientType = opt.key"
+                class="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-colors"
+                :class="recipientType === opt.key ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'">
+                <component :is="opt.icon" class="h-5 w-5" :class="recipientType === opt.key ? 'text-indigo-600' : 'text-slate-400'" />
+                <p class="text-xs font-semibold" :class="recipientType === opt.key ? 'text-indigo-700' : 'text-slate-700'">{{ opt.label }}</p>
+                <p class="text-[10px] text-slate-400">{{ opt.sub }}</p>
+              </button>
+            </div>
+          </div>
 
-        <!-- Recipient type -->
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-2">Who receives this issuance?</label>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button v-for="opt in [
-              { key:'all', icon: UserGroupIcon, label:'All Staff', sub:'Every active user' },
-              { key:'office', icon: BuildingOfficeIcon, label:'By Office', sub:'Select offices' },
-              { key:'division', icon: BuildingLibraryIcon, label:'By Division', sub:'Select divisions' },
-              { key:'individual', icon: UserIcon, label:'Individual(s)', sub:'Pick specific users' },
-            ]" :key="opt.key"
-              @click="recipientType = opt.key"
-              class="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-colors"
-              :class="recipientType === opt.key ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'">
-              <component :is="opt.icon" class="h-5 w-5" :class="recipientType === opt.key ? 'text-indigo-600' : 'text-slate-400'" />
-              <p class="text-xs font-semibold" :class="recipientType === opt.key ? 'text-indigo-700' : 'text-slate-700'">{{ opt.label }}</p>
-              <p class="text-[10px] text-slate-400">{{ opt.sub }}</p>
-            </button>
+          <!-- Office selection -->
+          <div v-if="recipientType === 'office'" class="space-y-2">
+            <AppInput v-model="officeSearch" type="text" placeholder="Search offices…" />
+            <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+              <label v-for="o in filteredOffices" :key="o.id"
+                class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" :checked="selectedOfficeIds.includes(o.id)"
+                  @change="toggleOffice(o.id)" class="rounded border-slate-300 text-indigo-600" />
+                <span class="text-sm text-slate-700">{{ o.name }}</span>
+              </label>
+            </div>
+            <p v-if="selectedOfficeIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedOfficeIds.length }} office(s) selected</p>
+          </div>
+
+          <!-- Division selection -->
+          <div v-if="recipientType === 'division'" class="space-y-2">
+            <AppInput v-model="divisionSearch" type="text" placeholder="Search divisions…" />
+            <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+              <label v-for="d in filteredDivisions" :key="d.id"
+                class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
+                  @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
+                <div>
+                  <p class="text-sm text-slate-700">{{ d.division_name }}</p>
+                  <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
+                </div>
+              </label>
+            </div>
+            <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
+          </div>
+
+          <!-- Individual selection -->
+          <div v-if="recipientType === 'individual'" class="space-y-2">
+            <AppInput v-model="userSearch" type="text" placeholder="Search by name or position…" />
+            <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+              <label v-for="u in filteredUsers.slice(0, 50)" :key="u.id"
+                class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" :checked="selectedUserIds.includes(u.id)"
+                  @change="toggleUser(u.id)" class="rounded border-slate-300 text-indigo-600" />
+                <div>
+                  <p class="text-sm font-medium text-slate-700">{{ u.name }}</p>
+                  <p v-if="u.position" class="text-xs text-slate-400">{{ u.position }}</p>
+                </div>
+              </label>
+            </div>
+            <p v-if="selectedUserIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedUserIds.length }} person(s) selected</p>
+          </div>
+
+          <!-- Summary -->
+          <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm space-y-1">
+            <p><span class="text-slate-500">Type:</span> <strong>{{ typeLabels[type] }}</strong></p>
+            <p><span class="text-slate-500">Title:</span> <strong>{{ title }}</strong></p>
+            <p><span class="text-slate-500">Content:</span> {{ contentMode === 'editor' ? content.length + ' characters typed' : scanFilename }}</p>
+            <p><span class="text-slate-500">Recipients:</span>
+              <strong>{{ { all: 'All Staff', office: selectedOfficeIds.length + ' Office(s)', division: selectedDivisionIds.length + ' Division(s)', individual: selectedUserIds.length + ' Person(s)' }[recipientType] }}</strong>
+            </p>
+            <p class="text-xs text-warning-700 mt-2">
+              ⚠ Releasing is permanent. The issuance will be signed with your digital signature and sent to all recipients.
+            </p>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <div class="flex gap-2">
+              <AppButton variant="secondary" @click="step = 2">← Back</AppButton>
+              <AppButton variant="secondary" :disabled="savingDraft" :loading="savingDraft" @click="saveDraft">
+                {{ savingDraft ? 'Saving…' : 'Save as Draft' }}
+              </AppButton>
+            </div>
+            <AppButton @click="openPinModal">
+              Sign & Release
+            </AppButton>
           </div>
         </div>
-
-        <!-- Office selection -->
-        <div v-if="recipientType === 'office'" class="space-y-2">
-          <input v-model="officeSearch" type="text" placeholder="Search offices…"
-            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-            <label v-for="o in filteredOffices" :key="o.id"
-              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-              <input type="checkbox" :checked="selectedOfficeIds.includes(o.id)"
-                @change="toggleOffice(o.id)" class="rounded border-slate-300 text-indigo-600" />
-              <span class="text-sm text-slate-700">{{ o.name }}</span>
-            </label>
-          </div>
-          <p v-if="selectedOfficeIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedOfficeIds.length }} office(s) selected</p>
-        </div>
-
-        <!-- Division selection -->
-        <div v-if="recipientType === 'division'" class="space-y-2">
-          <input v-model="divisionSearch" type="text" placeholder="Search divisions…"
-            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-            <label v-for="d in filteredDivisions" :key="d.id"
-              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-              <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
-                @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
-              <div>
-                <p class="text-sm text-slate-700">{{ d.division_name }}</p>
-                <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
-              </div>
-            </label>
-          </div>
-          <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
-        </div>
-
-        <!-- Individual selection -->
-        <div v-if="recipientType === 'individual'" class="space-y-2">
-          <input v-model="userSearch" type="text" placeholder="Search by name or position…"
-            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-            <label v-for="u in filteredUsers.slice(0, 50)" :key="u.id"
-              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-              <input type="checkbox" :checked="selectedUserIds.includes(u.id)"
-                @change="toggleUser(u.id)" class="rounded border-slate-300 text-indigo-600" />
-              <div>
-                <p class="text-sm font-medium text-slate-700">{{ u.name }}</p>
-                <p v-if="u.position" class="text-xs text-slate-400">{{ u.position }}</p>
-              </div>
-            </label>
-          </div>
-          <p v-if="selectedUserIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedUserIds.length }} person(s) selected</p>
-        </div>
-
-        <!-- Summary -->
-        <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm space-y-1">
-          <p><span class="text-slate-500">Type:</span> <strong>{{ typeLabels[type] }}</strong></p>
-          <p><span class="text-slate-500">Title:</span> <strong>{{ title }}</strong></p>
-          <p><span class="text-slate-500">Content:</span> {{ contentMode === 'editor' ? content.length + ' characters typed' : scanFilename }}</p>
-          <p><span class="text-slate-500">Recipients:</span>
-            <strong>{{ { all: 'All Staff', office: selectedOfficeIds.length + ' Office(s)', division: selectedDivisionIds.length + ' Division(s)', individual: selectedUserIds.length + ' Person(s)' }[recipientType] }}</strong>
-          </p>
-          <p class="text-xs text-amber-600 mt-2">
-            ⚠ Releasing is permanent. The issuance will be signed with your digital signature and sent to all recipients.
-          </p>
-        </div>
-
-        <div class="flex items-center justify-between pt-2">
-          <div class="flex gap-2">
-            <button @click="step = 2" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">← Back</button>
-            <button @click="saveDraft" :disabled="savingDraft"
-              class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50">
-              {{ savingDraft ? 'Saving…' : 'Save as Draft' }}
-            </button>
-          </div>
-          <button @click="openPinModal"
-            class="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
-            Sign & Release
-          </button>
-        </div>
-      </div>
+      </AppCard>
 
     </div>
 

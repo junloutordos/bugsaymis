@@ -3,110 +3,72 @@
   <AdminLayout title="Designations">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Designations</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage designations and assign faculty holders per term</p>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <!-- Term filter -->
+      <AppPageHeader title="Designations" subtitle="Manage designations and assign faculty holders per term">
+        <template #actions>
           <select v-model="selectedTermId" @change="applyTermFilter"
             class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
             <option v-for="t in terms" :key="t.id" :value="t.id">
               {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
             </option>
           </select>
-          <button @click="openCatForm()"
-            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-lg font-medium transition-colors">
+          <AppButton variant="secondary" @click="openCatForm()">
             <TagIcon class="h-4 w-4" /> New Category
-          </button>
-          <button @click="openDesigForm(null, activeCategory)"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm">
+          </AppButton>
+          <AppButton @click="openDesigForm(null, activeCategory)">
             <PlusIcon class="h-4 w-4" /> New Designation
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.errors?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.errors?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.errors.error }}
       </div>
 
       <!-- Empty state -->
-      <div v-if="categories.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-14 text-center text-sm text-slate-400">
-        No categories yet. Add one to get started.
-      </div>
+      <AppCard v-if="categories.length === 0">
+        <EmptyState title="No categories yet" subtitle="Add one to get started." />
+      </AppCard>
 
       <!-- Tabbed layout -->
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <AppCard v-else :padded="false">
+        <AppTabs :tabs="tabs" v-model="activeTabId">
+          <template v-for="cat in categories" :key="cat.id">
+            <div v-show="activeTabId === String(cat.id)">
 
-        <!-- Tab bar -->
-        <div class="flex overflow-x-auto border-b border-slate-100 scrollbar-hide">
-          <button
-            v-for="cat in categories"
-            :key="cat.id"
-            @click="activeTabId = cat.id"
-            class="flex-shrink-0 flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
-            :class="activeTabId === cat.id
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'">
-            {{ cat.name }}
-            <span class="text-xs px-1.5 py-0.5 rounded-full font-medium"
-              :class="activeTabId === cat.id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">
-              {{ cat.designations.length }}
-            </span>
-          </button>
-        </div>
-
-        <!-- Active tab panel -->
-        <template v-for="cat in categories" :key="cat.id">
-          <div v-show="activeTabId === cat.id">
-
-            <!-- Panel toolbar -->
-            <div class="flex items-center justify-between px-5 py-2.5 bg-slate-50/60 border-b border-slate-100">
-              <div class="flex items-center gap-2.5">
-                <span class="font-mono text-xs text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded">{{ cat.code }}</span>
-                <span v-if="cat.description" class="text-xs text-slate-400">{{ cat.description }}</span>
-                <span :class="cat.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
-                  class="text-xs px-2 py-0.5 rounded-full font-medium">
-                  {{ cat.is_active ? 'Active' : 'Inactive' }}
-                </span>
+              <!-- Panel toolbar -->
+              <div class="flex items-center justify-between px-5 py-2.5 bg-slate-50/60 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                  <span class="font-mono text-xs text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded">{{ cat.code }}</span>
+                  <span v-if="cat.description" class="text-xs text-slate-400">{{ cat.description }}</span>
+                  <AppBadge :color="cat.is_active ? 'green' : 'slate'">{{ cat.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+                </div>
+                <div class="flex items-center gap-1">
+                  <AppButton size="sm" variant="ghost" @click="openDesigForm(null, cat)">
+                    <PlusIcon class="h-3.5 w-3.5" /> Add Designation
+                  </AppButton>
+                  <AppIconButton label="Edit category" @click="openCatForm(cat)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+                  <AppIconButton label="Delete category" variant="danger" @click="deleteCat(cat)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                </div>
               </div>
-              <div class="flex items-center gap-1">
-                <button @click="openDesigForm(null, cat)"
-                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-indigo-50">
-                  <PlusIcon class="h-3.5 w-3.5" /> Add Designation
-                </button>
-                <button @click="openCatForm(cat)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded" title="Edit category">
-                  <PencilIcon class="h-4 w-4" />
-                </button>
-                <button @click="deleteCat(cat)" class="p-1.5 text-slate-400 hover:text-red-600 rounded" title="Delete category">
-                  <TrashIcon class="h-4 w-4" />
-                </button>
-              </div>
-            </div>
 
-            <!-- Designations table -->
-            <table class="w-full text-sm">
-              <thead class="border-b border-slate-50">
-                <tr class="text-xs text-slate-400 font-medium uppercase tracking-wide">
-                  <th class="px-5 py-2 text-left">Code</th>
-                  <th class="px-5 py-2 text-left">Name</th>
-                  <th class="px-5 py-2 text-center">Units</th>
-                  <th class="px-5 py-2 text-center">Max</th>
-                  <th class="px-5 py-2 text-left">Current Holders</th>
-                  <th class="px-5 py-2 text-center">Status</th>
-                  <th class="px-5 py-2"></th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-50">
-                <tr v-if="cat.designations.length === 0">
-                  <td colspan="7" class="px-5 py-6 text-xs text-slate-400 italic text-center">No designations in this category yet.</td>
-                </tr>
+              <!-- Designations table -->
+              <AppTable :card="false" :is-empty="cat.designations.length === 0" :skeleton-cols="7">
+                <template #head>
+                  <tr>
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Code</th>
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                    <th class="px-5 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Units</th>
+                    <th class="px-5 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Max</th>
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Current Holders</th>
+                    <th class="px-5 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                    <th class="px-5 py-2"></th>
+                  </tr>
+                </template>
+
                 <tr v-for="d in cat.designations" :key="d.id" class="hover:bg-slate-50/50">
                   <td class="px-5 py-3 font-mono text-xs text-slate-600">{{ d.code }}</td>
                   <td class="px-5 py-3">
@@ -120,7 +82,7 @@
                       </template>
                       <template v-else>{{ d.load_units }}</template>
                     </span>
-                    <span :class="assignmentTypeBadge(d.assignment_type)" class="text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-0.5 inline-block">{{ d.assignment_type }}</span>
+                    <AppBadge :color="assignmentTypeBadge(d.assignment_type)">{{ d.assignment_type }}</AppBadge>
                   </td>
                   <td class="px-5 py-3 text-center text-slate-500">{{ d.max_holders ?? '∞' }}</td>
 
@@ -130,7 +92,7 @@
                       <span v-for="h in d.holders" :key="h.assignment_id"
                         class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
                         {{ h.user_name }}<span class="text-indigo-400 font-normal">&nbsp;({{ h.load_units }}u)</span>
-                        <button v-if="!isManagedExternally(d)" @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
+                        <button v-if="!isManagedExternally(d)" @click="revokeHolder(h)" class="hover:text-danger-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-danger-50" title="Remove">
                           <XMarkIcon class="h-3 w-3" />
                         </button>
                       </span>
@@ -143,10 +105,7 @@
 
                   <!-- Status -->
                   <td class="px-5 py-3 text-center">
-                    <span :class="d.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'"
-                      class="text-xs px-2 py-0.5 rounded-full font-medium">
-                      {{ d.is_active ? 'Active' : 'Inactive' }}
-                    </span>
+                    <AppBadge :color="d.is_active ? 'green' : 'slate'">{{ d.is_active ? 'Active' : 'Inactive' }}</AppBadge>
                   </td>
 
                   <!-- Actions -->
@@ -170,159 +129,136 @@
                         title="Manage in Research Advisories">
                         <ArrowTopRightOnSquareIcon class="h-4 w-4" />
                       </a>
-                      <button v-else @click="openAssignModal(d)"
-                        :disabled="d.max_holders !== null && d.holders.length >= d.max_holders"
-                        class="p-1.5 rounded transition-colors"
-                        :class="d.max_holders !== null && d.holders.length >= d.max_holders
-                          ? 'text-slate-200 cursor-not-allowed'
-                          : 'text-slate-400 hover:text-emerald-600'"
-                        :title="d.max_holders !== null && d.holders.length >= d.max_holders ? 'At capacity' : 'Assign faculty'">
+                      <AppIconButton v-else :label="atCapacity(d) ? 'At capacity' : 'Assign faculty'" variant="success" :disabled="atCapacity(d)" @click="openAssignModal(d)">
                         <UserPlusIcon class="h-4 w-4" />
-                      </button>
-                      <button @click="openDesigForm(d, cat)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                        <PencilIcon class="h-4 w-4" />
-                      </button>
-                      <button @click="deleteDesig(d)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                        <TrashIcon class="h-4 w-4" />
-                      </button>
+                      </AppIconButton>
+                      <AppIconButton label="Edit designation" @click="openDesigForm(d, cat)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+                      <AppIconButton label="Delete designation" variant="danger" @click="deleteDesig(d)"><TrashIcon class="h-4 w-4" /></AppIconButton>
                     </div>
                   </td>
                 </tr>
-              </tbody>
-            </table>
 
-          </div>
-        </template>
+                <template #empty>
+                  <p class="text-xs text-slate-400 italic">No designations in this category yet.</p>
+                </template>
 
-      </div>
+                <template #mobileCard>
+                  <div v-for="d in cat.designations" :key="d.id" class="p-4 space-y-2">
+                    <div class="flex items-start justify-between gap-2">
+                      <div>
+                        <p class="font-medium text-slate-800">{{ d.name }}</p>
+                        <p class="font-mono text-xs text-slate-500">{{ d.code }}</p>
+                        <p v-if="d.requires_unit" class="text-[10px] text-amber-600 font-medium mt-0.5">Unit-scoped</p>
+                      </div>
+                      <AppBadge :color="d.is_active ? 'green' : 'slate'">{{ d.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
+                      <span class="font-semibold text-slate-700">
+                        <template v-if="isManagedExternally(d) && d.load_units === 0">{{ d.holders.reduce((s, h) => s + h.load_units, 0) }}</template>
+                        <template v-else>{{ d.load_units }}</template>
+                        units
+                      </span>
+                      <AppBadge :color="assignmentTypeBadge(d.assignment_type)">{{ d.assignment_type }}</AppBadge>
+                      <span v-if="d.max_holders !== null">Max {{ d.max_holders }}</span>
+                    </div>
+                    <div v-if="d.holders.length" class="flex flex-wrap gap-1.5">
+                      <span v-for="h in d.holders" :key="h.assignment_id"
+                        class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {{ h.user_name }}<span class="text-indigo-400 font-normal">&nbsp;({{ h.load_units }}u)</span>
+                        <button v-if="!isManagedExternally(d)" @click="revokeHolder(h)" class="hover:text-danger-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-danger-50" title="Remove">
+                          <XMarkIcon class="h-3 w-3" />
+                        </button>
+                      </span>
+                    </div>
+                    <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
+                    <p v-if="isAuhDesignation(d)" class="text-[10px] text-amber-600">Managed via Academic Units</p>
+                    <p v-else-if="isSectionDesignation(d)" class="text-[10px] text-amber-600">Managed via Sections</p>
+                    <p v-else-if="isResearchDesignation(d)" class="text-[10px] text-amber-600">Managed via Research Advisories</p>
+                    <div class="flex items-center justify-end gap-1 pt-1">
+                      <a v-if="isAuhDesignation(d)" :href="route('faculty-loading.academic-units.index')" class="p-1.5 rounded text-slate-400 hover:text-amber-600" title="Manage in Academic Units"><ArrowTopRightOnSquareIcon class="h-4 w-4" /></a>
+                      <a v-else-if="isSectionDesignation(d)" :href="route('faculty-loading.sections.index')" class="p-1.5 rounded text-slate-400 hover:text-amber-600" title="Manage in Sections"><ArrowTopRightOnSquareIcon class="h-4 w-4" /></a>
+                      <a v-else-if="isResearchDesignation(d)" :href="route('faculty-loading.research-advisories.index')" class="p-1.5 rounded text-slate-400 hover:text-amber-600" title="Manage in Research Advisories"><ArrowTopRightOnSquareIcon class="h-4 w-4" /></a>
+                      <AppIconButton v-else :label="atCapacity(d) ? 'At capacity' : 'Assign faculty'" variant="success" :disabled="atCapacity(d)" @click="openAssignModal(d)"><UserPlusIcon class="h-4 w-4" /></AppIconButton>
+                      <AppIconButton label="Edit designation" @click="openDesigForm(d, cat)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+                      <AppIconButton label="Delete designation" variant="danger" @click="deleteDesig(d)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                    </div>
+                  </div>
+                </template>
+              </AppTable>
+
+            </div>
+          </template>
+        </AppTabs>
+      </AppCard>
 
     </div>
 
     <!-- ── Category Modal ───────────────────────────────────────────────────── -->
-    <div v-if="catModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">{{ catForm.id ? 'Edit' : 'New' }} Category</h2>
-        <div class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Code <span class="text-red-500">*</span></label>
-            <input v-model="catForm.code" type="text" placeholder="e.g. ACADEMIC"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-            <p v-if="catForm.errors.code" class="text-red-500 text-xs mt-1">{{ catForm.errors.code }}</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
-            <input v-model="catForm.name" type="text" placeholder="e.g. Academic"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-            <textarea v-model="catForm.description" rows="2"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-          </div>
-          <div class="flex items-center gap-2">
-            <input v-model="catForm.is_active" type="checkbox" id="cat-active" class="rounded text-indigo-600" />
-            <label for="cat-active" class="text-sm text-slate-600">Active</label>
-          </div>
-        </div>
-        <div class="flex justify-end gap-3 pt-1">
-          <button @click="catModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="saveCat" :disabled="catForm.processing"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium">
-            {{ catForm.id ? 'Update' : 'Create' }}
-          </button>
+    <AppModal :show="catModal" :title="`${catForm.id ? 'Edit' : 'New'} Category`" size="sm" @close="catModal = false">
+      <div class="space-y-3">
+        <AppInput v-model="catForm.code" label="Code" required placeholder="e.g. ACADEMIC" :error="catForm.errors.code" />
+        <AppInput v-model="catForm.name" label="Name" required placeholder="e.g. Academic" />
+        <AppTextarea v-model="catForm.description" rows="2" label="Description" />
+        <div class="flex items-center gap-2">
+          <input v-model="catForm.is_active" type="checkbox" id="cat-active" class="rounded text-indigo-600" />
+          <label for="cat-active" class="text-sm text-slate-600">Active</label>
         </div>
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="catModal = false">Cancel</AppButton>
+        <AppButton :loading="catForm.processing" @click="saveCat">{{ catForm.id ? 'Update' : 'Create' }}</AppButton>
+      </template>
+    </AppModal>
 
     <!-- ── Designation Modal ────────────────────────────────────────────────── -->
-    <div v-if="desigModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">{{ desigForm.id ? 'Edit' : 'New' }} Designation</h2>
-        <div class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Category <span class="text-red-500">*</span></label>
-            <select v-model="desigForm.designation_category_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-              <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Code <span class="text-red-500">*</span></label>
-              <input v-model="desigForm.code" type="text" placeholder="e.g. DEPT_HEAD_SCI"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-              <p v-if="desigForm.errors.code" class="text-red-500 text-xs mt-1">{{ desigForm.errors.code }}</p>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Load Units <span class="text-red-500">*</span></label>
-              <input v-model="desigForm.load_units" type="number" min="0" step="0.5"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Load Type <span class="text-red-500">*</span></label>
-            <select v-model="desigForm.assignment_type"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-              <option value="admin">Admin</option>
-              <option value="teaching">Teaching</option>
-              <option value="research">Research</option>
-              <option value="cocurricular">Co-curricular</option>
-              <option value="committee">Committee</option>
-            </select>
-            <p class="text-[11px] text-slate-400 mt-1">Determines which column this load counts toward in faculty totals.</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
-            <input v-model="desigForm.name" type="text" placeholder="e.g. Department Head – Science"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-            <textarea v-model="desigForm.description" rows="2"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Max Holders</label>
-              <input v-model="desigForm.max_holders" type="number" min="1" placeholder="Unlimited"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-            </div>
-            <div class="space-y-1 pt-1">
-              <div class="flex items-center gap-2 pt-4">
-                <input v-model="desigForm.requires_unit" type="checkbox" id="desig-unit" class="rounded text-indigo-600" />
-                <label for="desig-unit" class="text-sm text-slate-600">Requires unit scope</label>
-              </div>
-              <div class="flex items-center gap-2">
-                <input v-model="desigForm.is_active" type="checkbox" id="desig-active" class="rounded text-indigo-600" />
-                <label for="desig-active" class="text-sm text-slate-600">Active</label>
-              </div>
-            </div>
-          </div>
+    <AppModal :show="desigModal" :title="`${desigForm.id ? 'Edit' : 'New'} Designation`" @close="desigModal = false">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Category <span class="text-red-500">*</span></label>
+          <select v-model="desigForm.designation_category_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
         </div>
-        <div class="flex justify-end gap-3 pt-1">
-          <button @click="desigModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="saveDesig" :disabled="desigForm.processing"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium">
-            {{ desigForm.id ? 'Update' : 'Create' }}
-          </button>
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model="desigForm.code" label="Code" required placeholder="e.g. DEPT_HEAD_SCI" :error="desigForm.errors.code" />
+          <AppInput v-model.number="desigForm.load_units" type="number" min="0" step="0.5" label="Load Units" required />
+        </div>
+        <div>
+          <AppSelect v-model="desigForm.assignment_type" label="Load Type" required :show-blank="false">
+            <option value="admin">Admin</option>
+            <option value="teaching">Teaching</option>
+            <option value="research">Research</option>
+            <option value="cocurricular">Co-curricular</option>
+            <option value="committee">Committee</option>
+          </AppSelect>
+          <p class="text-[11px] text-slate-400 mt-1">Determines which column this load counts toward in faculty totals.</p>
+        </div>
+        <AppInput v-model="desigForm.name" label="Name" required placeholder="e.g. Department Head – Science" />
+        <AppTextarea v-model="desigForm.description" rows="2" label="Description" />
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model.number="desigForm.max_holders" type="number" min="1" placeholder="Unlimited" label="Max Holders" />
+          <div class="space-y-1 pt-1">
+            <div class="flex items-center gap-2 pt-4">
+              <input v-model="desigForm.requires_unit" type="checkbox" id="desig-unit" class="rounded text-indigo-600" />
+              <label for="desig-unit" class="text-sm text-slate-600">Requires unit scope</label>
+            </div>
+            <div class="flex items-center gap-2">
+              <input v-model="desigForm.is_active" type="checkbox" id="desig-active" class="rounded text-indigo-600" />
+              <label for="desig-active" class="text-sm text-slate-600">Active</label>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="desigModal = false">Cancel</AppButton>
+        <AppButton :loading="desigForm.processing" @click="saveDesig">{{ desigForm.id ? 'Update' : 'Create' }}</AppButton>
+      </template>
+    </AppModal>
 
     <!-- ── Assign Faculty Modal ─────────────────────────────────────────────── -->
-    <div v-if="assignModal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 my-8">
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-lg font-semibold text-slate-800">Assign Faculty</h2>
-            <p class="text-xs text-slate-500 mt-0.5">
-              {{ selectedDesig?.name }}
-              <span class="ml-1 font-medium text-indigo-600">{{ selectedDesig?.load_units }} units</span>
-            </p>
-          </div>
-          <button @click="assignModal = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 mt-0.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-        </div>
-
+    <AppModal :show="assignModal" title="Assign Faculty" :subtitle="assignSubtitle" @close="assignModal = false">
+      <div class="space-y-4">
         <!-- Current holders from any module -->
         <div v-if="selectedDesig?.holders.length" class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5 space-y-1.5">
           <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Currently Assigned</p>
@@ -331,7 +267,7 @@
               class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
               {{ h.user_name }}<span class="text-indigo-400 font-normal">&nbsp;({{ h.load_units }}u)</span>
               <button v-if="!isManagedExternally(selectedDesig)" @click="revokeHolder(h); assignModal = false"
-                class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
+                class="hover:text-danger-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-danger-50" title="Remove">
                 <XMarkIcon class="h-3 w-3" />
               </button>
             </span>
@@ -339,8 +275,8 @@
         </div>
 
         <!-- At capacity warning -->
-        <div v-if="selectedDesig?.max_holders !== null && selectedDesig?.holders.length >= selectedDesig?.max_holders"
-          class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+        <div v-if="atCapacity(selectedDesig)"
+          class="rounded-lg bg-warning-50 border border-warning-100 px-3 py-2 text-xs text-warning-700">
           This designation has reached its maximum of {{ selectedDesig.max_holders }} holder(s).
           Remove an existing holder to assign someone new.
         </div>
@@ -376,17 +312,17 @@
               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
             <p class="text-xs text-slate-400 mt-1">Leave blank to use the designation's default units.</p>
           </div>
-
-          <div class="flex justify-end gap-2 pt-1">
-            <button @click="assignModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-            <button @click="saveAssign" :disabled="assignForm.processing || !assignForm.user_id || !assignForm.academic_term_id"
-              class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium">
-              Assign
-            </button>
-          </div>
         </template>
       </div>
-    </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="assignModal = false">Cancel</AppButton>
+        <AppButton v-if="!atCapacity(selectedDesig)" variant="success"
+          :disabled="assignForm.processing || !assignForm.user_id || !assignForm.academic_term_id" @click="saveAssign">
+          Assign
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
@@ -395,6 +331,19 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTabs from '@/Components/AppTabs.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import {
   ArrowTopRightOnSquareIcon, CheckCircleIcon, ExclamationCircleIcon, PencilIcon, PlusIcon,
   TagIcon, TrashIcon, UserPlusIcon, XMarkIcon,
@@ -410,8 +359,9 @@ const props = defineProps({
 
 // ── Active tab ────────────────────────────────────────────────────────────────
 
-const activeTabId = ref(props.categories[0]?.id ?? null)
-const activeCategory = computed(() => props.categories.find(c => c.id === activeTabId.value) ?? null)
+const activeTabId = ref(props.categories[0]?.id != null ? String(props.categories[0].id) : null)
+const activeCategory = computed(() => props.categories.find(c => String(c.id) === activeTabId.value) ?? null)
+const tabs = computed(() => props.categories.map(c => ({ key: String(c.id), label: `${c.name} (${c.designations.length})` })))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -431,14 +381,18 @@ function isManagedExternally(d) {
   return isAuhDesignation(d) || isSectionDesignation(d) || isResearchDesignation(d)
 }
 
+function atCapacity(d) {
+  return !!d && d.max_holders !== null && d.holders.length >= d.max_holders
+}
+
 function assignmentTypeBadge(type) {
   return {
-    admin:        'bg-slate-100 text-slate-600',
-    teaching:     'bg-blue-50 text-blue-700',
-    research:     'bg-violet-50 text-violet-700',
-    cocurricular: 'bg-teal-50 text-teal-700',
-    committee:    'bg-orange-50 text-orange-700',
-  }[type] ?? 'bg-slate-100 text-slate-500'
+    admin:        'slate',
+    teaching:     'blue',
+    research:     'purple',
+    cocurricular: 'green',
+    committee:    'orange',
+  }[type] ?? 'slate'
 }
 
 // ── Term filter ───────────────────────────────────────────────────────────────
@@ -468,8 +422,8 @@ function saveCat() {
   }
 }
 
-function deleteCat(cat) {
-  if (!confirm(`Delete category "${cat.name}"?`)) return
+async function deleteCat(cat) {
+  if (! await confirmDelete(`Delete category "${cat.name}"?`)) return
   useForm({}).delete(route('faculty-loading.designations.categories.destroy', cat.id))
 }
 
@@ -496,8 +450,8 @@ function saveDesig() {
   }
 }
 
-function deleteDesig(d) {
-  if (!confirm(`Delete designation "${d.name}"?`)) return
+async function deleteDesig(d) {
+  if (! await confirmDelete(`Delete designation "${d.name}"?`)) return
   useForm({}).delete(route('faculty-loading.designations.destroy', d.id))
 }
 
@@ -506,6 +460,7 @@ function deleteDesig(d) {
 const assignModal   = ref(false)
 const selectedDesig = ref(null)
 const assignForm    = useForm({ user_id: null, academic_term_id: null, override_units: null })
+const assignSubtitle = computed(() => selectedDesig.value ? `${selectedDesig.value.name} — ${selectedDesig.value.load_units} units` : null)
 
 function openAssignModal(d) {
   selectedDesig.value = d
@@ -524,8 +479,8 @@ function saveAssign() {
 
 // ── Revoke a holder ───────────────────────────────────────────────────────────
 
-function revokeHolder(holder) {
-  if (!confirm(`Remove "${holder.user_name}" from this designation?`)) return
+async function revokeHolder(holder) {
+  if (! await confirmDelete(`Remove "${holder.user_name}" from this designation?`)) return
   useForm({}).delete(route('faculty-loading.designations.revoke-direct', holder.assignment_id))
 }
 </script>

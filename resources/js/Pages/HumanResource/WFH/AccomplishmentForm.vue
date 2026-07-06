@@ -4,39 +4,29 @@
 
     <!-- Time Range -->
     <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Time From</label>
-        <input
-          v-model="form.time_from"
-          type="time"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-        />
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Time To</label>
-        <input
-          v-model="form.time_to"
-          type="time"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-          :class="{ 'border-red-400': errors.time_to }"
-        />
-        <p v-if="errors.time_to" class="text-red-500 text-xs mt-1">{{ errors.time_to }}</p>
-      </div>
+      <AppInput
+        v-model="form.time_from"
+        type="time"
+        label="Time From"
+      />
+      <AppInput
+        v-model="form.time_to"
+        type="time"
+        label="Time To"
+        :error="errors.time_to"
+      />
     </div>
 
     <!-- Accomplishment -->
-    <div>
-      <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment <span class="text-red-500">*</span></label>
-      <textarea
-        v-model="form.description"
-        rows="4"
-        maxlength="2000"
-        placeholder="Describe what you accomplished during this time…"
-        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full resize-none"
-        :class="{ 'border-red-400': errors.description }"
-      />
-      <p v-if="errors.description" class="text-red-500 text-xs mt-1">{{ errors.description }}</p>
-    </div>
+    <AppTextarea
+      v-model="form.description"
+      :rows="4"
+      maxlength="2000"
+      placeholder="Describe what you accomplished during this time…"
+      label="Accomplishment"
+      required
+      :error="errors.description"
+    />
 
     <!-- Proof Type -->
     <div>
@@ -77,7 +67,7 @@
         <div v-else class="relative inline-block">
           <img :src="photoPreview" class="max-h-40 rounded-lg mx-auto" alt="Preview" />
           <button @click.stop="clearPhoto"
-                  class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                  class="absolute -top-2 -right-2 bg-danger-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -90,30 +80,23 @@
         class="hidden"
         @change="onFileSelected"
       />
-      <p v-if="errors.photo" class="text-red-500 text-xs">{{ errors.photo }}</p>
+      <p v-if="errors.photo" class="text-danger-600 text-xs">{{ errors.photo }}</p>
     </div>
 
     <!-- Link input -->
-    <div v-if="form.proof_type === 'link'" class="space-y-1">
-      <label class="block text-xs font-medium text-slate-600">Proof URL</label>
-      <input
-        v-model="form.proof_link"
-        type="url"
-        placeholder="https://drive.google.com/…"
-        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-        :class="{ 'border-red-400': errors.proof_link }"
-      />
-      <p v-if="errors.proof_link" class="text-red-500 text-xs">{{ errors.proof_link }}</p>
-    </div>
+    <AppInput
+      v-if="form.proof_type === 'link'"
+      v-model="form.proof_link"
+      type="url"
+      placeholder="https://drive.google.com/…"
+      label="Proof URL"
+      :error="errors.proof_link"
+    />
 
     <!-- Submit -->
-    <button
-      @click="submit"
-      :disabled="loading"
-      class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-    >
+    <AppButton block :loading="loading" @click="submit">
       {{ loading ? 'Saving…' : 'Save Accomplishment' }}
-    </button>
+    </AppButton>
   </div>
 </template>
 
@@ -121,6 +104,9 @@
 import { ref, reactive } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppButton from '@/Components/AppButton.vue'
 
 // ── Props & Emits ─────────────────────────────────────────────────────────────
 const props = defineProps({

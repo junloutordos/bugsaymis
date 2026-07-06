@@ -3,33 +3,23 @@
   <AdminLayout title="My Faculty Load">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">My Faculty Load</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Your teaching load summary for the selected term</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <select v-model="selectedTermId" @change="applyFilter"
-            class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+      <AppPageHeader title="My Faculty Load" subtitle="Your teaching load summary for the selected term">
+        <template #actions>
+          <AppSelect v-model="selectedTermId" :show-blank="false" class="min-w-[200px]" @change="applyFilter">
             <option v-for="t in terms" :key="t.id" :value="t.id">
               {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
             </option>
-          </select>
-          <button v-if="load" @click="printLoad"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
-            title="Print faculty load">
+          </AppSelect>
+          <AppButton v-if="load" variant="secondary" size="sm" @click="printLoad">
             <PrinterIcon class="h-4 w-4" /> Print
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- No load record -->
-      <div v-if="!load" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <DocumentTextIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No load record for this term</p>
-        <p class="text-xs text-slate-400 mt-1">Your load record will appear here once schedules are assigned.</p>
-      </div>
+      <AppCard v-if="!load" :padded="false">
+        <EmptyState title="No load record for this term" subtitle="Your load record will appear here once schedules are assigned." :icon="DocumentTextIcon" />
+      </AppCard>
 
       <template v-else>
         <!-- Status banner -->
@@ -50,60 +40,59 @@
               </template>
             </p>
           </div>
-          <span :class="badgeClass" class="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold shrink-0">
-            {{ statusLabel }}
-          </span>
+          <AppBadge :color="statusColor" class="!text-sm !px-3 !py-1">{{ statusLabel }}</AppBadge>
         </div>
 
         <!-- Load breakdown -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div v-for="item in breakdown" :key="item.label"
-            class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-            <p class="text-2xl font-bold text-slate-800">{{ item.value }}</p>
-            <p class="text-xs text-slate-500 mt-0.5">{{ item.label }}</p>
-          </div>
+          <AppCard v-for="item in breakdown" :key="item.label" :padded="false">
+            <div class="p-4 text-center">
+              <p class="text-2xl font-bold text-slate-800">{{ item.value }}</p>
+              <p class="text-xs text-slate-500 mt-0.5">{{ item.label }}</p>
+            </div>
+          </AppCard>
         </div>
 
         <!-- Assignments list -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-100">
-            <h2 class="text-sm font-semibold text-slate-700">Load Assignments</h2>
-          </div>
-          <div v-if="!load.assignments || load.assignments.length === 0" class="py-10 text-center">
-            <p class="text-sm text-slate-400">No assignments recorded.</p>
-          </div>
-          <table v-else class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
+        <AppCard title="Load Assignments" :padded="false">
+          <AppTable :is-empty="!load.assignments || load.assignments.length === 0" :skeleton-cols="3" :card="false">
+            <template #head>
               <tr>
                 <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assignment</th>
                 <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
                 <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Units</th>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-              <tr v-for="a in load.assignments" :key="a.id" class="hover:bg-slate-50/50">
-                <td class="px-4 py-3 text-slate-800">{{ assignmentLabel(a) }}</td>
-                <td class="px-4 py-3">
-                  <span :class="typeBadge(a.assignment_type)"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                    {{ a.assignment_type }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ a.load_units }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            </template>
+
+            <tr v-for="a in load.assignments" :key="a.id" class="hover:bg-slate-50/60">
+              <td class="px-4 py-3 text-slate-800">{{ assignmentLabel(a) }}</td>
+              <td class="px-4 py-3">
+                <AppBadge :color="typeColor(a.assignment_type)">{{ a.assignment_type }}</AppBadge>
+              </td>
+              <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ a.load_units }}</td>
+            </tr>
+
+            <template #mobileCard>
+              <div v-for="a in load.assignments" :key="a.id" class="p-4 flex items-center justify-between gap-2">
+                <div>
+                  <p class="text-sm text-slate-800">{{ assignmentLabel(a) }}</p>
+                  <AppBadge :color="typeColor(a.assignment_type)">{{ a.assignment_type }}</AppBadge>
+                </div>
+                <span class="font-semibold text-slate-700 text-sm">{{ a.load_units }} units</span>
+              </div>
+            </template>
+
+            <template #empty>
+              <p class="text-sm text-slate-400">No assignments recorded.</p>
+            </template>
+          </AppTable>
+        </AppCard>
 
         <!-- Overload computation card -->
-        <div v-if="load.overload_computation" class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-700">Overload Pay Computation</h2>
-            <span :class="ocStatusClass(load.overload_computation.status)"
-              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
-              {{ ocStatusLabel(load.overload_computation.status) }}
-            </span>
-          </div>
+        <AppCard v-if="load.overload_computation" title="Overload Pay Computation" :padded="false">
+          <template #header>
+            <AppBadge :color="ocStatusColor(load.overload_computation.status)">{{ ocStatusLabel(load.overload_computation.status) }}</AppBadge>
+          </template>
           <div class="px-4 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div class="text-center">
               <p class="text-xs text-slate-500 mb-1">Annual Rate</p>
@@ -111,7 +100,7 @@
             </div>
             <div class="text-center">
               <p class="text-xs text-slate-500 mb-1">PHTR</p>
-              <p class="text-sm font-semibold text-emerald-700">{{ phpFmt(load.overload_computation.phtr) }}</p>
+              <p class="text-sm font-semibold text-success-700">{{ phpFmt(load.overload_computation.phtr) }}</p>
             </div>
             <div class="text-center">
               <p class="text-xs text-slate-500 mb-1">Hours × Weeks</p>
@@ -126,7 +115,7 @@
             class="px-4 pb-3 text-xs text-slate-400">
             Approved on {{ load.overload_computation.approved_at }}
           </p>
-        </div>
+        </AppCard>
       </template>
 
     </div>
@@ -137,6 +126,13 @@
 import { computed, ref } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { DocumentTextIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -161,16 +157,16 @@ const statusLabel = computed(() => ({
 })[props.load?.load_status] ?? '—')
 
 const bannerClass = computed(() => ({
-  underload: 'bg-amber-50 border-amber-200 text-amber-800',
-  full_load: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-  overload:  'bg-red-50 border-red-200 text-red-800',
+  underload: 'bg-warning-50 border-warning-100 text-warning-700',
+  full_load: 'bg-success-50 border-success-100 text-success-700',
+  overload:  'bg-danger-50 border-danger-100 text-danger-600',
 })[props.load?.load_status] ?? 'bg-slate-50 border-slate-200 text-slate-700')
 
-const badgeClass = computed(() => ({
-  underload: 'bg-amber-100 text-amber-700',
-  full_load: 'bg-emerald-100 text-emerald-700',
-  overload:  'bg-red-100 text-red-700',
-})[props.load?.load_status] ?? 'bg-slate-100 text-slate-600')
+const statusColor = computed(() => ({
+  underload: 'amber',
+  full_load: 'green',
+  overload:  'red',
+})[props.load?.load_status] ?? 'slate')
 
 const breakdown = computed(() => {
   if (! props.load) return []
@@ -192,14 +188,14 @@ function ocStatusLabel(s) {
   return { for_approval: 'For Approval', approved: 'Approved', paid: 'Paid', rejected: 'Rejected', pending: 'Pending' }[s] ?? s
 }
 
-function ocStatusClass(s) {
+function ocStatusColor(s) {
   return {
-    for_approval: 'bg-amber-50 text-amber-700',
-    approved:     'bg-emerald-50 text-emerald-700',
-    paid:         'bg-indigo-50 text-indigo-700',
-    rejected:     'bg-red-50 text-red-600',
-    pending:      'bg-slate-50 text-slate-600',
-  }[s] ?? 'bg-slate-50 text-slate-600'
+    for_approval: 'amber',
+    approved:     'green',
+    paid:         'indigo',
+    rejected:     'red',
+    pending:      'slate',
+  }[s] ?? 'slate'
 }
 
 function assignmentLabel(a) {
@@ -209,13 +205,13 @@ function assignmentLabel(a) {
   return a.display_label
 }
 
-function typeBadge(type) {
+function typeColor(type) {
   return {
-    teaching:    'bg-indigo-50 text-indigo-700',
-    research:    'bg-violet-50 text-violet-700',
-    admin:       'bg-blue-50 text-blue-700',
-    cocurricular:'bg-teal-50 text-teal-700',
-    committee:   'bg-orange-50 text-orange-700',
-  }[type] ?? 'bg-slate-50 text-slate-600'
+    teaching:    'indigo',
+    research:    'purple',
+    admin:       'blue',
+    cocurricular:'green',
+    committee:   'orange',
+  }[type] ?? 'slate'
 }
 </script>

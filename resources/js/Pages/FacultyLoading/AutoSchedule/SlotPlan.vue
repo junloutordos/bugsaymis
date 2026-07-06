@@ -2,14 +2,14 @@
 import { ref, computed } from 'vue'
 import { Head, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   TableCellsIcon,
   SparklesIcon,
-  ArrowPathIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -147,19 +147,18 @@ function typeLabel(type) {
             Generates a constraint-first, conflict-free weekly slot plan for a grade using the rule-based placement pipeline.
           </p>
         </div>
-        <a :href="route('faculty-loading.auto-schedule.index')"
-          class="text-sm text-indigo-600 hover:underline flex items-center gap-1">
+        <AppButton variant="secondary" as="a" :href="route('faculty-loading.auto-schedule.index')">
           <SparklesIcon class="h-4 w-4" />
           Switch to GA Generator
-        </a>
+        </AppButton>
       </div>
 
       <!-- Alert -->
       <div v-if="alert.message" :class="[
           'rounded-lg px-4 py-3 text-sm flex items-start gap-2',
-          alert.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-            : alert.type === 'warning' ? 'bg-amber-50 border border-amber-200 text-amber-700'
-            : 'bg-red-50 border border-red-200 text-red-700',
+          alert.type === 'success' ? 'bg-success-50 border border-success-100 text-success-700'
+            : alert.type === 'warning' ? 'bg-warning-50 border border-warning-100 text-warning-700'
+            : 'bg-danger-50 border border-danger-100 text-danger-700',
         ]">
         <CheckCircleIcon v-if="alert.type === 'success'" class="h-4 w-4 mt-0.5 shrink-0" />
         <ExclamationTriangleIcon v-else class="h-4 w-4 mt-0.5 shrink-0" />
@@ -167,73 +166,70 @@ function typeLabel(type) {
       </div>
 
       <!-- ── Configuration ──────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-4">
-        <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-          Select Grade
-        </h2>
+      <AppCard>
+        <div class="space-y-4">
+          <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+            Select Grade
+          </h2>
 
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="g in grades"
-            :key="g.value"
-            @click="selectedGrade = g.value; result = null"
-            :class="[
-              'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
-              selectedGrade === g.value
-                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700',
-            ]">
-            {{ g.label }}
-          </button>
-        </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="g in grades"
+              :key="g.value"
+              @click="selectedGrade = g.value; result = null"
+              :class="[
+                'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
+                selectedGrade === g.value
+                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700',
+              ]">
+              {{ g.label }}
+            </button>
+          </div>
 
-        <div class="pt-2 border-t border-slate-100 flex items-center gap-3">
-          <button @click="runGenerate"
-            :disabled="!canGenerate"
-            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-700
-                   disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium
-                   transition-colors shadow-sm">
-            <ArrowPathIcon v-if="generating" class="h-4 w-4 animate-spin" />
-            <TableCellsIcon v-else class="h-4 w-4" />
-            {{ generating ? 'Generating…' : 'Generate Slot Plan' }}
-          </button>
-          <p v-if="generating" class="text-xs text-slate-400">
-            Running constraint-first placement pipeline…
-          </p>
+          <div class="pt-2 border-t border-slate-100 flex items-center gap-3">
+            <AppButton size="lg" :disabled="!canGenerate" :loading="generating" @click="runGenerate">
+              <TableCellsIcon v-if="!generating" class="h-4 w-4" />
+              {{ generating ? 'Generating…' : 'Generate Slot Plan' }}
+            </AppButton>
+            <p v-if="generating" class="text-xs text-slate-400">
+              Running constraint-first placement pipeline…
+            </p>
+          </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── Results ────────────────────────────────────────────────────── -->
       <template v-if="result">
 
         <!-- Metrics row -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          <AppCard class="text-center">
             <p class="text-2xl font-bold text-indigo-600">{{ metrics.placed_count ?? 0 }}</p>
             <p class="text-xs text-slate-500 mt-1">Sessions Placed</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          </AppCard>
+          <AppCard class="text-center">
             <p class="text-2xl font-bold"
-              :class="(metrics.unresolved_count ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'">
+              :class="(metrics.unresolved_count ?? 0) > 0 ? 'text-warning-600' : 'text-success-600'">
               {{ metrics.unresolved_count ?? 0 }}
             </p>
             <p class="text-xs text-slate-500 mt-1">Unresolved</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          </AppCard>
+          <AppCard class="text-center">
             <p class="text-2xl font-bold"
-              :class="validationPasses ? 'text-emerald-600' : 'text-red-600'">
+              :class="validationPasses ? 'text-success-600' : 'text-danger-600'">
               {{ validationPasses ? '✓' : violations.length }}
             </p>
             <p class="text-xs text-slate-500 mt-1">Constraint Violations</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          </AppCard>
+          <AppCard class="text-center">
             <p class="text-2xl font-bold text-slate-700">{{ result.subjects_loaded }}</p>
             <p class="text-xs text-slate-500 mt-1">Subjects Loaded</p>
-          </div>
+          </AppCard>
         </div>
 
         <!-- Advisory / SCALE info -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <AppCard>
           <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Fixed Blocks (not in grid)</p>
           <div class="flex flex-wrap gap-3 text-sm text-slate-600">
             <span class="inline-flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1 text-xs">
@@ -245,28 +241,28 @@ function typeLabel(type) {
               {{ result.plan.scale?.day }} {{ result.plan.scale?.start }}–{{ result.plan.scale?.end }}
             </span>
           </div>
-        </div>
+        </AppCard>
 
         <!-- Violations panel -->
-        <div v-if="!validationPasses" class="bg-red-50 border border-red-200 rounded-xl p-4">
-          <p class="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+        <div v-if="!validationPasses" class="bg-danger-50 border border-danger-100 rounded-xl p-4">
+          <p class="text-sm font-semibold text-danger-700 mb-2 flex items-center gap-2">
             <ExclamationTriangleIcon class="h-4 w-4" />
             Constraint Violations
           </p>
-          <ul class="text-xs text-red-600 space-y-1 list-disc list-inside">
+          <ul class="text-xs text-danger-600 space-y-1 list-disc list-inside">
             <li v-for="(v, i) in violations" :key="i">{{ v }}</li>
           </ul>
         </div>
 
         <!-- Unresolved sessions -->
-        <div v-if="unresolved.length" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p class="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-2">
+        <div v-if="unresolved.length" class="bg-warning-50 border border-warning-100 rounded-xl p-4">
+          <p class="text-sm font-semibold text-warning-700 mb-2 flex items-center gap-2">
             <ExclamationTriangleIcon class="h-4 w-4" />
             {{ unresolved.length }} Unresolved Session(s)
           </p>
           <div class="flex flex-wrap gap-2">
             <span v-for="(u, i) in unresolved" :key="i"
-              class="text-xs bg-amber-100 text-amber-700 rounded px-2 py-0.5">
+              class="text-xs bg-warning-100 text-warning-700 rounded px-2 py-0.5">
               {{ u.subject }} s{{ u.session }} ({{ u.type }})
             </span>
           </div>
@@ -347,12 +343,12 @@ function typeLabel(type) {
       </template>
 
       <!-- Empty state -->
-      <div v-if="!result && !generating"
-        class="bg-white rounded-xl border border-dashed border-slate-200 p-10 text-center">
-        <TableCellsIcon class="h-10 w-10 text-slate-300 mx-auto mb-3" />
-        <p class="text-sm text-slate-400">
-          Select a grade and click <strong>Generate Slot Plan</strong> to preview the weekly timetable.
-        </p>
+      <div v-if="!result && !generating" class="bg-white rounded-xl border border-dashed border-slate-200">
+        <EmptyState title="No slot plan generated yet" :icon="TableCellsIcon">
+          <p class="text-xs text-slate-400 mt-1">
+            Select a grade and click <strong>Generate Slot Plan</strong> to preview the weekly timetable.
+          </p>
+        </EmptyState>
       </div>
 
     </div>

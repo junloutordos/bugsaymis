@@ -2,7 +2,15 @@
 import { ref, computed, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import { PlusIcon, BuildingStorefrontIcon, Square2StackIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -93,23 +101,6 @@ function submitPropertyConsolidate() {
 const formatPeso = (v) => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 // ── Status helpers ────────────────────────────────────────────────────────
-const statusColors = {
-    draft:                      'bg-slate-100 text-slate-700',
-    pending_division:           'bg-orange-100 text-orange-700',
-    division_approved:          'bg-teal-100 text-teal-700',
-    pending_property_officer:   'bg-yellow-100 text-yellow-800',
-    property_officer_approved:  'bg-teal-100 text-teal-700',
-    pending_budget_officer:     'bg-sky-100 text-sky-700',
-    pending_ocd:                'bg-violet-100 text-violet-700',
-    pending_head:               'bg-rose-100 text-rose-700',
-    pending_bac:                'bg-purple-100 text-purple-700',
-    submitted:                  'bg-blue-100 text-blue-700',
-    returned:                   'bg-amber-100 text-amber-700',
-    approved:                   'bg-green-100 text-green-700',
-    submitted_to_dbm:           'bg-emerald-100 text-emerald-800',
-    consolidated:               'bg-indigo-100 text-indigo-700',
-}
-
 const statusLabel = (s) => ({
     draft:                      'Draft',
     pending_division:           'Pending Division',
@@ -127,6 +118,28 @@ const statusLabel = (s) => ({
     consolidated:               'Consolidated',
 }[s] ?? s)
 
+// AppBadge only ships slate|indigo|blue|green|amber|orange|red|purple — map the
+// full PPMP status set onto that palette (mirrors PPMP/Show.vue's statusBadgeColor).
+function statusBadgeColor(status) {
+    const map = {
+        draft:                     'slate',
+        pending_division:          'orange',
+        division_approved:         'green',
+        pending_property_officer:  'amber',
+        property_officer_approved: 'green',
+        pending_budget_officer:    'blue',
+        pending_ocd:               'purple',
+        pending_head:              'red',
+        pending_bac:               'purple',
+        submitted:                 'blue',
+        returned:                  'amber',
+        approved:                  'green',
+        submitted_to_dbm:          'green',
+        consolidated:              'indigo',
+    }
+    return map[status] ?? 'slate'
+}
+
 const deadlinePassed = computed(() => {
     if (!props.deadline) return false
     return new Date(props.deadline) < new Date()
@@ -136,9 +149,30 @@ const deadlinePassed = computed(() => {
 <template>
     <Head title="PPMP" />
     <AdminLayout title="Project Procurement Management Plan">
+      <div class="space-y-5">
+
+        <AppPageHeader title="Project Procurement Management Plan"
+                        subtitle="Unit → Division → Property Officer → Budget Officer → OCD approval workflow.">
+            <template #actions>
+                <AppButton v-if="canManageCatalogue" as="a" variant="secondary" :href="route('ppmp.catalogue.index')">
+                    <BuildingStorefrontIcon class="w-4 h-4" /> PS-DBM Catalogue
+                </AppButton>
+                <AppButton v-if="canDivisionReview && approvableUnitPpmps?.length" variant="secondary" @click="openConsolidateModal">
+                    <Square2StackIcon class="w-4 h-4" /> Create Division PPMP
+                    <AppBadge color="indigo">{{ approvableUnitPpmps.length }}</AppBadge>
+                </AppButton>
+                <AppButton v-if="canPropertyOfficerReview && approvableDivisionPpmps?.length" variant="secondary" @click="openPropertyConsolidateModal">
+                    <Square2StackIcon class="w-4 h-4" /> Create Property PPMP
+                    <AppBadge color="indigo">{{ approvableDivisionPpmps.length }}</AppBadge>
+                </AppButton>
+                <AppButton v-if="canCreate" as="a" :href="route('ppmp.create')">
+                    <PlusIcon class="w-4 h-4" /> Create PPMP
+                </AppButton>
+            </template>
+        </AppPageHeader>
 
         <!-- Deadline banner -->
-        <div v-if="deadline" class="mb-4 rounded-lg border px-4 py-3 text-sm"
+        <div v-if="deadline" class="rounded-lg border px-4 py-3 text-sm"
              :class="deadlinePassed ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-blue-50 border-blue-200 text-blue-800'">
             <template v-if="deadlinePassed">
                 ⚠ Submission deadline for FY {{ fiscalYear }} has passed. Contact the Procurement Office for late submissions.
@@ -150,7 +184,7 @@ const deadlinePassed = computed(() => {
 
         <!-- Property Officer review queue banner -->
         <div v-if="canPropertyOfficerReview && pendingPropertyOfficerPpmps?.length"
-             class="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
+             class="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
             <div class="flex items-start gap-3">
                 <ExclamationCircleIcon class="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
                 <div>
@@ -172,7 +206,7 @@ const deadlinePassed = computed(() => {
 
         <!-- DC review queue banner (B2) -->
         <div v-if="canDivisionReview && pendingDivisionPpmps.length"
-             class="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
+             class="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
             <div class="flex items-start gap-3">
                 <ExclamationCircleIcon class="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
                 <div>
@@ -192,246 +226,187 @@ const deadlinePassed = computed(() => {
             </div>
         </div>
 
-        <!-- Toolbar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div class="flex flex-wrap items-center gap-2">
-                <select v-model="fiscalYear" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
-                </select>
-                <select v-model="statusFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="">All Statuses</option>
-                    <option value="draft">Draft</option>
-                    <option value="pending_division">Pending Division</option>
-                    <option value="division_approved">Division Approved</option>
-                    <option value="pending_property_officer">Pending Property Officer</option>
-                    <option value="pending_budget_officer">Pending Budget Officer</option>
-                    <option value="pending_head">Pending Head of Agency</option>
-                    <option value="pending_bac">Pending BAC</option>
-                    <option value="submitted">Submitted</option>
-                    <option value="returned">Returned</option>
-                    <option value="property_officer_approved">PO Approved</option>
-                    <option value="pending_budget_officer">Pending Budget Officer</option>
-                    <option value="pending_ocd">Pending OCD</option>
-                    <option value="approved">OCD Approved</option>
-                    <option value="submitted_to_dbm">Submitted to DBM</option>
-                    <option value="consolidated">Consolidated</option>
-                </select>
-                <select v-if="divisions.length" v-model="divisionFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="">All Divisions</option>
-                    <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.acronym || d.division_name }}</option>
-                </select>
-                <input v-model="search" type="text" placeholder="Search..."
-                       class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48" />
-            </div>
-            <div class="flex items-center gap-2">
-                <a v-if="canManageCatalogue" :href="route('ppmp.catalogue.index')"
-                   class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">
-                    <BuildingStorefrontIcon class="w-4 h-4" /> PS-DBM Catalogue
-                </a>
-                <button v-if="canDivisionReview && approvableUnitPpmps?.length"
-                        @click="openConsolidateModal"
-                        class="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    <Square2StackIcon class="w-4 h-4" /> Create Division PPMP
-                    <span class="ml-0.5 bg-teal-500 text-white text-xs rounded-full px-1.5 py-0.5">{{ approvableUnitPpmps.length }}</span>
-                </button>
-                <button v-if="canPropertyOfficerReview && approvableDivisionPpmps?.length"
-                        @click="openPropertyConsolidateModal"
-                        class="inline-flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    <Square2StackIcon class="w-4 h-4" /> Create Property PPMP
-                    <span class="ml-0.5 bg-yellow-400 text-white text-xs rounded-full px-1.5 py-0.5">{{ approvableDivisionPpmps.length }}</span>
-                </button>
-                <a v-if="canCreate" :href="route('ppmp.create')"
-                   class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    <PlusIcon class="w-4 h-4" /> Create PPMP
-                </a>
-            </div>
-        </div>
+        <!-- Filters -->
+        <AppFilterBar>
+            <select v-model="fiscalYear" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+            </select>
+            <select v-model="statusFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="pending_division">Pending Division</option>
+                <option value="division_approved">Division Approved</option>
+                <option value="pending_property_officer">Pending Property Officer</option>
+                <option value="pending_budget_officer">Pending Budget Officer</option>
+                <option value="pending_head">Pending Head of Agency</option>
+                <option value="pending_bac">Pending BAC</option>
+                <option value="submitted">Submitted</option>
+                <option value="returned">Returned</option>
+                <option value="property_officer_approved">PO Approved</option>
+                <option value="pending_budget_officer">Pending Budget Officer</option>
+                <option value="pending_ocd">Pending OCD</option>
+                <option value="approved">OCD Approved</option>
+                <option value="submitted_to_dbm">Submitted to DBM</option>
+                <option value="consolidated">Consolidated</option>
+            </select>
+            <select v-if="divisions.length" v-model="divisionFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">All Divisions</option>
+                <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.acronym || d.division_name }}</option>
+            </select>
+            <input v-model="search" type="text" placeholder="Search..."
+                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48" />
+        </AppFilterBar>
 
         <!-- Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="overflow-x-auto">
+        <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
+            <template #head>
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP No.</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit / Division</th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Items</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Budget</th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Prepared By</th>
+                </tr>
+            </template>
+
+            <tr v-for="p in displayed" :key="p.id"
+                class="cursor-pointer"
+                :class="(canDivisionReview && p.status === 'pending_division') ? 'bg-orange-50/60 hover:bg-orange-50' : (canPropertyOfficerReview && p.status === 'pending_property_officer') ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'"
+                @click="router.visit(route('ppmp.show', p.id))">
+                <td class="px-4 py-3 font-medium text-indigo-600">
+                    {{ p.ppmp_number }}
+                    <AppBadge v-if="p.ppmp_type === 'division'" color="blue" class="ml-1">DIV</AppBadge>
+                    <AppBadge v-if="p.ppmp_type === 'property'" color="purple" class="ml-1">PROP</AppBadge>
+                </td>
+                <td class="px-4 py-3 text-slate-700">{{ p.title }}</td>
+                <td class="px-4 py-3 text-slate-600">
+                    <span v-if="p.office" class="block font-medium text-slate-700">{{ p.office.name }}</span>
+                    <span class="text-xs text-slate-500">{{ p.division?.acronym || p.division?.division_name }}</span>
+                </td>
+                <td class="px-4 py-3 text-center text-slate-600">{{ p.item_count }}</td>
+                <td class="px-4 py-3 text-right text-slate-700 font-medium">₱{{ formatPeso(p.grand_total) }}</td>
+                <td class="px-4 py-3 text-center">
+                    <AppBadge :color="statusBadgeColor(p.status)">{{ statusLabel(p.status) }}</AppBadge>
+                </td>
+                <td class="px-4 py-3 text-slate-600">{{ p.preparer?.name }}</td>
+            </tr>
+
+            <template #empty>
+                <EmptyState title="No PPMPs found." />
+            </template>
+
+            <template #footer>
+                <PaginationControl :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
+                                    @prev="currentPage--" @next="currentPage++" @page="currentPage = $event" />
+            </template>
+        </AppTable>
+
+        <!-- Division Consolidate Modal (B4) -->
+        <AppModal :show="showDivisionConsolidateModal" title="Create Division PPMP"
+                  subtitle="The following approved unit PPMPs will be merged into one Division PPMP."
+                  size="lg" @close="showDivisionConsolidateModal = false">
+            <!-- Unit PPMPs preview table -->
+            <div class="max-h-52 overflow-y-auto mb-4">
                 <table class="w-full text-sm">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP No.</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit / Division</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Items</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Budget</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Prepared By</th>
+                    <thead>
+                        <tr class="text-xs font-semibold text-slate-500 uppercase">
+                            <th class="pb-1 text-left">PPMP No.</th>
+                            <th class="pb-1 text-left">Office / Unit</th>
+                            <th class="pb-1 text-right">Total</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-for="p in displayed" :key="p.id"
-                            class="cursor-pointer"
-                            :class="(canDivisionReview && p.status === 'pending_division') ? 'bg-orange-50/60 hover:bg-orange-50' : (canPropertyOfficerReview && p.status === 'pending_property_officer') ? 'bg-yellow-50/60 hover:bg-yellow-50' : 'hover:bg-slate-50/60'"
-                            @click="router.visit(route('ppmp.show', p.id))">
-                            <td class="px-4 py-3 font-medium text-indigo-600">
-                                {{ p.ppmp_number }}
-                                <span v-if="p.ppmp_type === 'division'"
-                                      class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">DIV</span>
-                                <span v-if="p.ppmp_type === 'property'"
-                                      class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700">PROP</span>
-                            </td>
-                            <td class="px-4 py-3 text-slate-700">{{ p.title }}</td>
-                            <td class="px-4 py-3 text-slate-600">
-                                <span v-if="p.office" class="block font-medium text-slate-700">{{ p.office.name }}</span>
-                                <span class="text-xs text-slate-500">{{ p.division?.acronym || p.division?.division_name }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-center text-slate-600">{{ p.item_count }}</td>
-                            <td class="px-4 py-3 text-right text-slate-700 font-medium">₱{{ formatPeso(p.grand_total) }}</td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                      :class="statusColors[p.status] || 'bg-slate-100 text-slate-700'">
-                                    {{ statusLabel(p.status) }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-slate-600">{{ p.preparer?.name }}</td>
-                        </tr>
-                        <tr v-if="!displayed.length">
-                            <td colspan="7" class="px-4 py-8 text-center text-slate-400">No PPMPs found.</td>
+                        <tr v-for="p in approvableUnitPpmps" :key="p.id">
+                            <td class="py-1.5 font-medium text-indigo-600">{{ p.ppmp_number }}</td>
+                            <td class="py-1.5 text-slate-700">{{ p.office_name || p.title }}</td>
+                            <td class="py-1.5 text-right text-slate-700">₱{{ formatPeso(p.grand_total) }}</td>
                         </tr>
                     </tbody>
+                    <tfoot>
+                        <tr class="border-t border-slate-200">
+                            <td colspan="2" class="pt-2 text-xs font-semibold text-slate-500 uppercase">Combined Total</td>
+                            <td class="pt-2 text-right font-bold text-slate-800">
+                                ₱{{ formatPeso(approvableUnitPpmps.reduce((s, p) => s + p.grand_total, 0)) }}
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
 
-            <!-- Pagination -->
-            <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-                <span class="text-sm text-slate-500">{{ filtered.length }} PPMP(s)</span>
-                <div class="flex gap-1">
-                    <button v-for="pg in totalPages" :key="pg" @click="currentPage = pg"
-                            class="px-3 py-1 rounded text-sm"
-                            :class="pg === currentPage ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
-                        {{ pg }}
-                    </button>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Fiscal Year</label>
+                    <select v-model="divisionConsolidateForm.fiscal_year"
+                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                        <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+                    </select>
                 </div>
+                <AppInput v-model="divisionConsolidateForm.title" type="text" label="Division PPMP Title"
+                          placeholder="e.g. SSD Division PPMP FY 2026" />
             </div>
-        </div>
 
-        <!-- Division Consolidate Modal (B4) -->
-        <div v-if="showDivisionConsolidateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
-                <div class="px-6 pt-5 pb-4 border-b border-slate-100">
-                    <h3 class="text-base font-semibold text-slate-800">Create Division PPMP</h3>
-                    <p class="text-sm text-slate-500 mt-0.5">The following approved unit PPMPs will be merged into one Division PPMP.</p>
-                </div>
+            <template #footer>
+                <AppButton variant="secondary" @click="showDivisionConsolidateModal = false">Cancel</AppButton>
+                <AppButton :disabled="!divisionConsolidateForm.title" @click="submitDivisionConsolidate">
+                    Consolidate {{ approvableUnitPpmps.length }} Unit PPMP{{ approvableUnitPpmps.length > 1 ? 's' : '' }}
+                </AppButton>
+            </template>
+        </AppModal>
 
-                <!-- Unit PPMPs preview table -->
-                <div class="px-6 py-3 max-h-52 overflow-y-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="text-xs font-semibold text-slate-500 uppercase">
-                                <th class="pb-1 text-left">PPMP No.</th>
-                                <th class="pb-1 text-left">Office / Unit</th>
-                                <th class="pb-1 text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="p in approvableUnitPpmps" :key="p.id">
-                                <td class="py-1.5 font-medium text-indigo-600">{{ p.ppmp_number }}</td>
-                                <td class="py-1.5 text-slate-700">{{ p.office_name || p.title }}</td>
-                                <td class="py-1.5 text-right text-slate-700">₱{{ formatPeso(p.grand_total) }}</td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="border-t border-slate-200">
-                                <td colspan="2" class="pt-2 text-xs font-semibold text-slate-500 uppercase">Combined Total</td>
-                                <td class="pt-2 text-right font-bold text-slate-800">
-                                    ₱{{ formatPeso(approvableUnitPpmps.reduce((s, p) => s + p.grand_total, 0)) }}
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                <div class="px-6 pb-5 pt-3 space-y-3 border-t border-slate-100">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Fiscal Year</label>
-                        <select v-model="divisionConsolidateForm.fiscal_year"
-                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 w-full">
-                            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Division PPMP Title</label>
-                        <input v-model="divisionConsolidateForm.title" type="text"
-                               placeholder="e.g. SSD Division PPMP FY 2026"
-                               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 w-full" />
-                    </div>
-                    <div class="flex justify-end gap-2 pt-1">
-                        <button @click="showDivisionConsolidateModal = false"
-                                class="px-4 py-2 rounded-lg text-sm bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
-                        <button @click="submitDivisionConsolidate"
-                                :disabled="!divisionConsolidateForm.title"
-                                class="px-4 py-2 rounded-lg text-sm bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
-                            Consolidate {{ approvableUnitPpmps.length }} Unit PPMP{{ approvableUnitPpmps.length > 1 ? 's' : '' }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
         <!-- Property Consolidate Modal -->
-        <div v-if="showPropertyConsolidateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
-                <div class="px-6 pt-5 pb-4 border-b border-slate-100">
-                    <h3 class="text-base font-semibold text-slate-800">Create Property PPMP</h3>
-                    <p class="text-sm text-slate-500 mt-0.5">The following approved division PPMPs will be merged into one Property PPMP.</p>
-                </div>
-
-                <!-- Division PPMPs preview table -->
-                <div class="px-6 py-3 max-h-52 overflow-y-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="text-xs font-semibold text-slate-500 uppercase">
-                                <th class="pb-1 text-left">PPMP No.</th>
-                                <th class="pb-1 text-left">Division</th>
-                                <th class="pb-1 text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="p in approvableDivisionPpmps" :key="p.id">
-                                <td class="py-1.5 font-medium text-indigo-600">{{ p.ppmp_number }}</td>
-                                <td class="py-1.5 text-slate-700">{{ p.division_name || p.title }}</td>
-                                <td class="py-1.5 text-right text-slate-700">₱{{ formatPeso(p.grand_total) }}</td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="border-t border-slate-200">
-                                <td colspan="2" class="pt-2 text-xs font-semibold text-slate-500 uppercase">Combined Total</td>
-                                <td class="pt-2 text-right font-bold text-slate-800">
-                                    ₱{{ formatPeso(approvableDivisionPpmps.reduce((s, p) => s + p.grand_total, 0)) }}
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                <div class="px-6 pb-5 pt-3 space-y-3 border-t border-slate-100">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Fiscal Year</label>
-                        <select v-model="propertyConsolidateForm.fiscal_year"
-                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full">
-                            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Property PPMP Title</label>
-                        <input v-model="propertyConsolidateForm.title" type="text"
-                               placeholder="e.g. PSHS-CRC Property PPMP/APP-CSE FY 2026"
-                               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full" />
-                    </div>
-                    <div class="flex justify-end gap-2 pt-1">
-                        <button @click="showPropertyConsolidateModal = false"
-                                class="px-4 py-2 rounded-lg text-sm bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
-                        <button @click="submitPropertyConsolidate"
-                                :disabled="!propertyConsolidateForm.title"
-                                class="px-4 py-2 rounded-lg text-sm bg-yellow-500 hover:bg-yellow-600 text-white disabled:opacity-50">
-                            Consolidate {{ approvableDivisionPpmps.length }} Division PPMP{{ approvableDivisionPpmps.length > 1 ? 's' : '' }}
-                        </button>
-                    </div>
-                </div>
+        <AppModal :show="showPropertyConsolidateModal" title="Create Property PPMP"
+                  subtitle="The following approved division PPMPs will be merged into one Property PPMP."
+                  size="lg" @close="showPropertyConsolidateModal = false">
+            <!-- Division PPMPs preview table -->
+            <div class="max-h-52 overflow-y-auto mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-xs font-semibold text-slate-500 uppercase">
+                            <th class="pb-1 text-left">PPMP No.</th>
+                            <th class="pb-1 text-left">Division</th>
+                            <th class="pb-1 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr v-for="p in approvableDivisionPpmps" :key="p.id">
+                            <td class="py-1.5 font-medium text-indigo-600">{{ p.ppmp_number }}</td>
+                            <td class="py-1.5 text-slate-700">{{ p.division_name || p.title }}</td>
+                            <td class="py-1.5 text-right text-slate-700">₱{{ formatPeso(p.grand_total) }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-t border-slate-200">
+                            <td colspan="2" class="pt-2 text-xs font-semibold text-slate-500 uppercase">Combined Total</td>
+                            <td class="pt-2 text-right font-bold text-slate-800">
+                                ₱{{ formatPeso(approvableDivisionPpmps.reduce((s, p) => s + p.grand_total, 0)) }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
-        </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Fiscal Year</label>
+                    <select v-model="propertyConsolidateForm.fiscal_year"
+                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                        <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+                    </select>
+                </div>
+                <AppInput v-model="propertyConsolidateForm.title" type="text" label="Property PPMP Title"
+                          placeholder="e.g. PSHS-CRC Property PPMP/APP-CSE FY 2026" />
+            </div>
+
+            <template #footer>
+                <AppButton variant="secondary" @click="showPropertyConsolidateModal = false">Cancel</AppButton>
+                <AppButton :disabled="!propertyConsolidateForm.title" @click="submitPropertyConsolidate">
+                    Consolidate {{ approvableDivisionPpmps.length }} Division PPMP{{ approvableDivisionPpmps.length > 1 ? 's' : '' }}
+                </AppButton>
+            </template>
+        </AppModal>
+
+      </div>
     </AdminLayout>
 </template>

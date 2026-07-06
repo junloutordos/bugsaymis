@@ -1,9 +1,17 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { QueueListIcon, ArrowPathIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon } from '@heroicons/vue/24/outline'
 import MISAssessmentModal from '@/Components/MISAssessmentModal.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 
 const props = defineProps({
   items:        { type: Array,   default: () => [] },
@@ -51,11 +59,9 @@ const PRIORITY_LABELS = {
   low:    'Low',
 }
 
-const PRIORITY_COLORS = {
-  urgent: 'bg-red-100 text-red-700 ring-1 ring-red-300',
-  high:   'bg-orange-100 text-orange-700 ring-1 ring-orange-300',
-  normal: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200',
-  low:    'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
+function priorityBadgeColor(priority) {
+  const map = { urgent: 'red', high: 'orange', normal: 'blue', low: 'slate' }
+  return map[priority] ?? 'blue'
 }
 
 const POSITION_COLORS = [
@@ -69,9 +75,8 @@ function positionBadgeClass(pos) {
   return 'bg-slate-100 text-slate-600'
 }
 
-function statusChipClass(status) {
-  if (status === 'In Progress') return 'bg-orange-100 text-orange-700 ring-1 ring-orange-200'
-  return 'bg-amber-100 text-amber-700 ring-1 ring-amber-200'
+function statusBadgeColor(status) {
+  return status === 'In Progress' ? 'orange' : 'amber'
 }
 
 function timeInQueue(queuedAt) {
@@ -131,210 +136,158 @@ const stats = computed(() => {
   <Head title="IT Job Request Queue" />
   <AdminLayout title="IT Job Request Queue">
     <div>
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div class="flex items-center gap-2">
-          <QueueListIcon class="w-6 h-6 text-indigo-600" />
-          <h1 class="text-xl font-semibold text-slate-800">MIS Work Queue</h1>
-        </div>
-        <a
-          :href="route('jobrequests.index')"
-          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          All Requests
-        </a>
-      </div>
+      <AppPageHeader title="MIS Work Queue">
+        <template #actions>
+          <AppButton as="a" :href="route('jobrequests.index')" variant="secondary">
+            All Requests
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Stats row -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3">
+        <AppCard>
           <div class="text-xs text-slate-500 uppercase tracking-wide">Total</div>
           <div class="text-2xl font-bold text-slate-800 mt-0.5">{{ stats.total }}</div>
-        </div>
-        <div class="bg-red-50 rounded-xl border border-red-100 shadow-sm px-4 py-3">
+        </AppCard>
+        <AppCard>
           <div class="text-xs text-red-500 uppercase tracking-wide">Urgent</div>
           <div class="text-2xl font-bold text-red-700 mt-0.5">{{ stats.urgent }}</div>
-        </div>
-        <div class="bg-orange-50 rounded-xl border border-orange-100 shadow-sm px-4 py-3">
+        </AppCard>
+        <AppCard>
           <div class="text-xs text-orange-500 uppercase tracking-wide">High</div>
           <div class="text-2xl font-bold text-orange-700 mt-0.5">{{ stats.high }}</div>
-        </div>
-        <div class="bg-indigo-50 rounded-xl border border-indigo-100 shadow-sm px-4 py-3">
+        </AppCard>
+        <AppCard>
           <div class="text-xs text-indigo-500 uppercase tracking-wide">In Progress</div>
           <div class="text-2xl font-bold text-indigo-700 mt-0.5">{{ stats.inProg }}</div>
-        </div>
-        <div class="bg-amber-50 rounded-xl border border-amber-100 shadow-sm px-4 py-3">
+        </AppCard>
+        <AppCard>
           <div class="text-xs text-amber-500 uppercase tracking-wide">Assessed</div>
           <div class="text-2xl font-bold text-amber-700 mt-0.5">{{ stats.assessed }}</div>
-        </div>
+        </AppCard>
       </div>
 
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="relative flex-1 sm:w-64 sm:flex-none">
-            <input
-              v-model="search"
-              type="text"
-              placeholder="Search queue..."
-              @keydown.enter.prevent="applyFilters"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-            />
-            <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
-              <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-              </svg>
-            </span>
-          </div>
-          <select
-            v-model="filterCategory"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-          >
-            <option value="">All Categories</option>
-            <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
-          </select>
-          <button
-            @click="applyFilters"
-            :disabled="isLoading"
-            class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-          >
-            <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
-            Search
-          </button>
-          <button
-            v-if="search || filterCategory"
-            @click="clearFilters"
-            :disabled="isLoading"
-            class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-          >
-            Clear
-          </button>
+      <AppFilterBar class="mb-4">
+        <div class="relative flex-1 sm:w-64 sm:flex-none">
+          <AppInput
+            v-model="search"
+            type="text"
+            placeholder="Search queue..."
+            @keydown.enter.prevent="applyFilters"
+          />
+          <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⏳</span>
         </div>
-      </div>
+        <select
+          v-model="filterCategory"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+        >
+          <option value="">All Categories</option>
+          <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+        </select>
+
+        <template #actions>
+          <AppButton @click="applyFilters" :disabled="isLoading">Search</AppButton>
+          <AppButton v-if="search || filterCategory" @click="clearFilters" :disabled="isLoading" variant="secondary">Clear</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Queue table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Desktop -->
-        <div class="hidden sm:block overflow-x-auto" :class="{ 'opacity-50 pointer-events-none': isLoading }">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-14">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ITJR #</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Requestor</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Time in Queue</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assigned To</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Change Priority</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr
-                v-for="item in props.items"
-                :key="item.id"
-                class="hover:bg-slate-50/60 transition-colors"
-                :class="item.priority === 'urgent' ? 'bg-red-50/40' : item.priority === 'high' ? 'bg-orange-50/30' : ''"
+      <AppTable :is-empty="props.items.length === 0" :skeleton-cols="11">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-14">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ITJR #</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Requestor</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Time in Queue</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assigned To</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Change Priority</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+          </tr>
+        </template>
+
+        <tr
+          v-for="item in props.items"
+          :key="item.id"
+          class="hover:bg-slate-50/60 transition-colors"
+          :class="item.priority === 'urgent' ? 'bg-red-50/40' : item.priority === 'high' ? 'bg-orange-50/30' : ''"
+        >
+          <!-- Position -->
+          <td class="px-4 py-3">
+            <span
+              class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold"
+              :class="positionBadgeClass(item.queue_position)"
+            >
+              {{ item.queue_position }}
+            </span>
+          </td>
+
+          <!-- Priority badge -->
+          <td class="px-4 py-3">
+            <AppBadge :color="priorityBadgeColor(item.priority)">{{ PRIORITY_LABELS[item.priority] ?? item.priority }}</AppBadge>
+          </td>
+
+          <td class="px-4 py-3 text-slate-700 font-mono text-xs">{{ item.itjr_no }}</td>
+
+          <td class="px-4 py-3 text-slate-800 max-w-xs">
+            <div class="truncate font-medium">{{ item.title }}</div>
+          </td>
+
+          <td class="px-4 py-3 text-slate-600">{{ item.user?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ item.category }}</td>
+
+          <!-- Status badge -->
+          <td class="px-4 py-3">
+            <AppBadge :color="statusBadgeColor(item.status)">{{ item.status === 'MIS Assessed the Request' ? 'Assessed' : item.status }}</AppBadge>
+          </td>
+
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ timeInQueue(item.queued_at) }}</td>
+
+          <td class="px-4 py-3 text-slate-600 text-sm">{{ item.assigned_to?.name ?? '—' }}</td>
+
+          <!-- Priority dropdown -->
+          <td class="px-4 py-3">
+            <div class="relative">
+              <select
+                :value="item.priority ?? 'normal'"
+                :disabled="updatingId === item.id"
+                @change="changePriority(item, $event.target.value)"
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 w-28"
               >
-                <!-- Position -->
-                <td class="px-4 py-3">
-                  <span
-                    class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold"
-                    :class="positionBadgeClass(item.queue_position)"
-                  >
-                    {{ item.queue_position }}
-                  </span>
-                </td>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+              <span v-if="updatingId === item.id" class="absolute right-6 top-1/2 -translate-y-1/2">
+                <svg class="animate-spin h-3 w-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              </span>
+            </div>
+          </td>
 
-                <!-- Priority badge -->
-                <td class="px-4 py-3">
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                    :class="PRIORITY_COLORS[item.priority] ?? PRIORITY_COLORS.normal"
-                  >
-                    {{ PRIORITY_LABELS[item.priority] ?? item.priority }}
-                  </span>
-                </td>
+          <!-- Assess button -->
+          <td class="px-4 py-3 text-center">
+            <AppButton size="sm" @click="openAssessment(item)" title="Open MIS Assessment">
+              <PencilSquareIcon class="w-3.5 h-3.5" />
+              Assess
+            </AppButton>
+          </td>
+        </tr>
 
-                <td class="px-4 py-3 text-slate-700 font-mono text-xs">{{ item.itjr_no }}</td>
-
-                <td class="px-4 py-3 text-slate-800 max-w-xs">
-                  <div class="truncate font-medium">{{ item.title }}</div>
-                </td>
-
-                <td class="px-4 py-3 text-slate-600">{{ item.user?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ item.category }}</td>
-
-                <!-- Status chip -->
-                <td class="px-4 py-3">
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                    :class="statusChipClass(item.status)"
-                  >
-                    {{ item.status === 'MIS Assessed the Request' ? 'Assessed' : item.status }}
-                  </span>
-                </td>
-
-                <td class="px-4 py-3 text-slate-500 text-xs">{{ timeInQueue(item.queued_at) }}</td>
-
-                <td class="px-4 py-3 text-slate-600 text-sm">{{ item.assigned_to?.name ?? '—' }}</td>
-
-                <!-- Priority dropdown -->
-                <td class="px-4 py-3">
-                  <div class="relative">
-                    <select
-                      :value="item.priority ?? 'normal'"
-                      :disabled="updatingId === item.id"
-                      @change="changePriority(item, $event.target.value)"
-                      class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 w-28"
-                    >
-                      <option value="urgent">Urgent</option>
-                      <option value="high">High</option>
-                      <option value="normal">Normal</option>
-                      <option value="low">Low</option>
-                    </select>
-                    <span v-if="updatingId === item.id" class="absolute right-6 top-1/2 -translate-y-1/2">
-                      <svg class="animate-spin h-3 w-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
-                    </span>
-                  </div>
-                </td>
-
-                <!-- Assess button -->
-                <td class="px-4 py-3 text-center">
-                  <button
-                    @click="openAssessment(item)"
-                    class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm"
-                    title="Open MIS Assessment"
-                  >
-                    <PencilSquareIcon class="w-3.5 h-3.5" />
-                    Assess
-                  </button>
-                </td>
-              </tr>
-
-              <tr v-if="props.items.length === 0">
-                <td colspan="11" class="py-16 text-center text-slate-400 text-sm">
-                  No requests currently in the queue.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Mobile cards -->
-        <div class="sm:hidden p-4 space-y-3" :class="{ 'opacity-50 pointer-events-none': isLoading }">
+        <template #mobileCard>
           <div
             v-for="item in props.items"
             :key="item.id"
-            class="border rounded-xl p-4"
-            :class="item.priority === 'urgent' ? 'border-red-200 bg-red-50/30' : item.priority === 'high' ? 'border-orange-200 bg-orange-50/20' : 'border-slate-100'"
+            class="p-4"
+            :class="item.priority === 'urgent' ? 'bg-red-50/30' : item.priority === 'high' ? 'bg-orange-50/20' : ''"
           >
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-2">
@@ -349,12 +302,7 @@ const stats = computed(() => {
                   <div class="text-xs text-slate-400 font-mono mt-0.5">{{ item.itjr_no }}</div>
                 </div>
               </div>
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0"
-                :class="PRIORITY_COLORS[item.priority] ?? PRIORITY_COLORS.normal"
-              >
-                {{ PRIORITY_LABELS[item.priority] ?? item.priority }}
-              </span>
+              <AppBadge :color="priorityBadgeColor(item.priority)">{{ PRIORITY_LABELS[item.priority] ?? item.priority }}</AppBadge>
             </div>
 
             <div class="mt-3 grid grid-cols-2 gap-y-1 text-sm text-slate-600">
@@ -362,12 +310,7 @@ const stats = computed(() => {
               <div><span class="text-slate-400">Category:</span> {{ item.category }}</div>
               <div>
                 <span class="text-slate-400">Status:</span>
-                <span
-                  class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                  :class="statusChipClass(item.status)"
-                >
-                  {{ item.status === 'MIS Assessed the Request' ? 'Assessed' : item.status }}
-                </span>
+                <AppBadge :color="statusBadgeColor(item.status)">{{ item.status === 'MIS Assessed the Request' ? 'Assessed' : item.status }}</AppBadge>
               </div>
               <div><span class="text-slate-400">In queue:</span> {{ timeInQueue(item.queued_at) }}</div>
             </div>
@@ -385,21 +328,18 @@ const stats = computed(() => {
                 <option value="normal">Normal</option>
                 <option value="low">Low</option>
               </select>
-              <button
-                @click="openAssessment(item)"
-                class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm"
-              >
+              <AppButton size="sm" @click="openAssessment(item)">
                 <PencilSquareIcon class="w-3.5 h-3.5" />
                 Assess
-              </button>
+              </AppButton>
             </div>
           </div>
+        </template>
 
-          <div v-if="props.items.length === 0" class="py-16 text-center text-slate-400 text-sm">
-            No requests currently in the queue.
-          </div>
-        </div>
-      </div>
+        <template #empty>
+          <EmptyState title="No requests currently in the queue" />
+        </template>
+      </AppTable>
     </div>
 
     <MISAssessmentModal

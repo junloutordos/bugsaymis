@@ -2,6 +2,13 @@
 import { ref, computed } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { ArrowUpTrayIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -63,20 +70,23 @@ const filtered = computed(() => {
 <template>
     <Head title="PS-DBM Catalogue — Part I" />
     <AdminLayout title="PS-DBM Catalogue (Part I)">
+      <div class="space-y-5">
+
+        <AppPageHeader title="PS-DBM Catalogue (Part I)"
+                        subtitle="Upload and browse the official PS-DBM APP-CSE price list used for PPMP costing." />
 
         <!-- Flash -->
-        <div v-if="flash.success" class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">{{ flash.success }}</div>
-        <div v-if="flash.error"   class="mb-4 rounded-lg bg-red-50   border border-red-200   px-4 py-3 text-sm text-red-800">{{ flash.error }}</div>
-        <div v-if="uploadErrors.length" class="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
-            <p class="text-sm font-semibold text-amber-800 mb-1">Row-level warnings during upload:</p>
-            <ul class="text-xs text-amber-700 list-disc list-inside space-y-0.5">
+        <div v-if="flash.success" class="rounded-lg bg-success-50 border border-success-100 px-4 py-3 text-sm text-success-700">{{ flash.success }}</div>
+        <div v-if="flash.error"   class="rounded-lg bg-danger-50  border border-danger-100  px-4 py-3 text-sm text-danger-600">{{ flash.error }}</div>
+        <div v-if="uploadErrors.length" class="rounded-lg bg-warning-50 border border-warning-100 px-4 py-3">
+            <p class="text-sm font-semibold text-warning-700 mb-1">Row-level warnings during upload:</p>
+            <ul class="text-xs text-warning-600 list-disc list-inside space-y-0.5">
                 <li v-for="(e, i) in uploadErrors" :key="i">{{ e }}</li>
             </ul>
         </div>
 
         <!-- Upload card -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Upload PS-DBM Price List</h3>
+        <AppCard title="Upload PS-DBM Price List">
             <p class="text-xs text-slate-500 mb-3">
                 Upload the official <strong>APP-CSE Excel template</strong> from PS-DBM (the "APP-CSE YYYY FORM" sheet).
                 Column layout: <strong>A</strong> Seq# · <strong>B</strong> UNSPSC/Stock Number · <strong>C</strong> Description · <strong>D</strong> Unit · <strong>Z</strong> Unit Price.
@@ -93,67 +103,62 @@ const filtered = computed(() => {
                 </div>
                 <div>
                     <input id="catalogue-file" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="handleFile" />
-                    <button @click="triggerUpload" :disabled="uploading"
-                            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <AppButton @click="triggerUpload" :disabled="uploading" :loading="uploading">
                         <ArrowUpTrayIcon class="w-4 h-4" />
                         {{ uploading ? 'Uploading…' : 'Select & Upload File' }}
-                    </button>
+                    </AppButton>
                 </div>
             </div>
+        </AppCard>
+
+        <!-- Catalogue header + filters -->
+        <div class="flex flex-wrap items-center gap-3">
+            <h3 class="text-sm font-semibold text-slate-700">FY {{ fiscalYear }} Catalogue</h3>
+            <AppBadge color="indigo">Part I: {{ part1Count }}</AppBadge>
+            <AppBadge color="green">Part II: {{ part2Count }}</AppBadge>
         </div>
+
+        <AppFilterBar>
+            <select v-model="selectedYear" @change="changeYear"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option v-for="y in availableYears" :key="y" :value="y">FY {{ y }}</option>
+            </select>
+            <div class="relative">
+                <MagnifyingGlassIcon class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input v-model="search" placeholder="Search stock no. or description…"
+                       class="pl-8 pr-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64" />
+            </div>
+        </AppFilterBar>
 
         <!-- Catalogue table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
-                <div class="flex items-center gap-3">
-                    <h3 class="text-sm font-semibold text-slate-700">FY {{ fiscalYear }} Catalogue</h3>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">Part I: {{ part1Count }}</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Part II: {{ part2Count }}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <select v-model="selectedYear" @change="changeYear"
-                            class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option v-for="y in availableYears" :key="y" :value="y">FY {{ y }}</option>
-                    </select>
-                    <div class="relative">
-                        <MagnifyingGlassIcon class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        <input v-model="search" placeholder="Search stock no. or description…"
-                               class="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64" />
-                    </div>
-                </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-32">Stock Number</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-20">Unit</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Unit Cost</th>
-                            <th class="px-3 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-28">Price Valid Until</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-32">Uploaded By</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-for="item in filtered" :key="item.id" class="hover:bg-slate-50">
-                            <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ item.stock_number }}</td>
-                            <td class="px-3 py-2 text-slate-700">{{ item.description }}</td>
-                            <td class="px-3 py-2 text-slate-600">{{ item.unit }}</td>
-                            <td class="px-3 py-2 text-right text-slate-700">₱{{ formatPeso(item.unit_cost) }}</td>
-                            <td class="px-3 py-2 text-center text-slate-500 text-xs">
-                                {{ item.price_validity_date ? new Date(item.price_validity_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—' }}
-                            </td>
-                            <td class="px-3 py-2 text-slate-500 text-xs">{{ item.uploader?.name ?? '—' }}</td>
-                        </tr>
-                        <tr v-if="!filtered.length">
-                            <td colspan="6" class="px-4 py-8 text-center text-slate-400">
-                                {{ items.length ? 'No items match your search.' : 'No catalogue uploaded for this fiscal year yet.' }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <AppTable :is-empty="!filtered.length" :skeleton-cols="6">
+            <template #head>
+                <tr>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-32">Stock Number</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-20">Unit</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Unit Cost</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-28">Price Valid Until</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-32">Uploaded By</th>
+                </tr>
+            </template>
 
+            <tr v-for="item in filtered" :key="item.id" class="hover:bg-slate-50">
+                <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ item.stock_number }}</td>
+                <td class="px-3 py-2 text-slate-700">{{ item.description }}</td>
+                <td class="px-3 py-2 text-slate-600">{{ item.unit }}</td>
+                <td class="px-3 py-2 text-right text-slate-700">₱{{ formatPeso(item.unit_cost) }}</td>
+                <td class="px-3 py-2 text-center text-slate-500 text-xs">
+                    {{ item.price_validity_date ? new Date(item.price_validity_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—' }}
+                </td>
+                <td class="px-3 py-2 text-slate-500 text-xs">{{ item.uploader?.name ?? '—' }}</td>
+            </tr>
+
+            <template #empty>
+                <EmptyState :title="items.length ? 'No items match your search.' : 'No catalogue uploaded for this fiscal year yet.'" />
+            </template>
+        </AppTable>
+
+      </div>
     </AdminLayout>
 </template>

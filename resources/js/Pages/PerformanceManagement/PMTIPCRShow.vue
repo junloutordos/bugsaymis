@@ -1,12 +1,13 @@
 <script setup>
 import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
+import AppButton from "@/Components/AppButton.vue"
+import AppBadge from "@/Components/AppBadge.vue"
+import { ArrowLeftIcon, PrinterIcon } from "@heroicons/vue/24/outline"
 import { computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
-import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 
 const props = defineProps({
@@ -18,7 +19,24 @@ const props = defineProps({
 })
 
 // ---------- Status badge ----------
-const statusClasses = ipcrStatusClass
+// Maps each distinct IPCR status string to the closest AppBadge color.
+function statusBadgeColor(status) {
+  const map = {
+    'New Target':                'blue',
+    'For Review':                'amber',
+    'Targets Approved':          'green',
+    'Submitted for Rating':      'orange',
+    'Rated & For PMT Review':    'purple',
+    'Submitted to PMT':          'purple',
+    'PMT Returned for Revision': 'red',
+    'Submitted to HR':           'blue',
+    'Approved by PMT':           'green',
+    'Director Signed':           'green',
+    'Returned for Revision':     'red',
+    'Rejected':                  'red',
+  }
+  return map[status] ?? 'slate'
+}
 
 // ---------- Date helpers ----------
 const extractYearFromRatingPeriod = (ratingPeriod) => {
@@ -238,12 +256,9 @@ const printIPCR = () => window.print()
     <div>
 
       <!-- Back -->
-      <button
-        @click="router.visit(route('pmt-ipcr.index'))"
-        class="mb-4 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors"
-      >
+      <AppButton variant="ghost" size="sm" class="mb-4" @click="router.visit(route('pmt-ipcr.index'))">
         <ArrowLeftIcon class="w-4 h-4" /> Back to PMT Review List
-      </button>
+      </AppButton>
 
       <!-- IPCR Details Card (retained outside printable area) -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4 no-print">
@@ -255,9 +270,7 @@ const printIPCR = () => window.print()
             <p class="text-slate-500 text-sm">Division: {{ employee?.division?.name ?? '—' }}</p>
           </div>
           <div class="flex flex-col items-end gap-3">
-            <span :class="`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${statusClasses(ipcr.status)}`">
-              {{ ipcr.status }}
-            </span>
+            <AppBadge :color="statusBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
             <span class="text-xs text-slate-400">Submitted to PMT: {{ ipcr.submitted_for_pmtreview_at ?? '—' }}</span>
             <div class="text-right">
               <div class="text-2xl font-bold text-slate-800">{{ finalIPCRRating }}</div>
@@ -271,30 +284,24 @@ const printIPCR = () => window.print()
 
         <!-- Action buttons -->
         <div class="mt-4 flex flex-wrap gap-2">
-          <button v-if="ipcr.status === 'Submitted to PMT'" @click="approvIPCR"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          <AppButton v-if="ipcr.status === 'Submitted to PMT'" variant="success" :loading="isSubmitting" :disabled="isSubmitting" @click="approvIPCR">
             {{ isSubmitting ? 'Processing…' : 'Approve' }}
-          </button>
-          <button v-if="ipcr.status === 'Submitted to PMT'" @click="returnForRevision"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          </AppButton>
+          <AppButton v-if="ipcr.status === 'Submitted to PMT'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="returnForRevision">
             {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
-          </button>
-          <button v-if="isOCD && ipcr.status === 'Approved by PMT'" @click="directorSign"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          </AppButton>
+          <AppButton v-if="isOCD && ipcr.status === 'Approved by PMT'" :loading="isSubmitting" :disabled="isSubmitting" @click="directorSign">
             {{ isSubmitting ? 'Processing…' : 'Director Sign' }}
-          </button>
+          </AppButton>
           <div v-if="ipcr.status === 'Director Signed' && ipcr.director_signature"
-            class="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
+            class="flex items-center gap-2 text-sm text-success-700 bg-success-50 border border-success-100 px-3 py-2 rounded-lg">
             <img :src="ipcr.director_signature" alt="Director Signature" class="h-10 object-contain" />
             <span>Signed by Director</span>
           </div>
-          <button @click="printIPCR"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <AppButton variant="secondary" @click="printIPCR">
+            <PrinterIcon class="h-4 w-4" />
             Print / View PDF
-          </button>
+          </AppButton>
         </div>
       </div>
 

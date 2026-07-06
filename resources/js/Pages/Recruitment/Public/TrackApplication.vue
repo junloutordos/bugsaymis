@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import { Head, useForm, Link } from '@inertiajs/vue3'
 import { storageUrl } from "@/Composables/useStorage.js"
+import AppInput from '@/Components/AppInput.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 
 const props = defineProps({
   result: { type: Object, default: null },
@@ -27,7 +29,7 @@ const stageIcons = {
 }
 
 const stageColors = {
-  completed: { dot: 'bg-green-500', line: 'bg-green-400', badge: 'bg-green-100 text-green-700', label: 'text-gray-800' },
+  completed: { dot: 'bg-success-500', line: 'bg-success-500', badge: 'bg-success-100 text-success-700', label: 'text-gray-800' },
   current:   { dot: 'bg-blue-600 ring-4 ring-blue-200 animate-pulse', line: 'bg-gray-200', badge: 'bg-blue-100 text-blue-700', label: 'text-blue-700 font-bold' },
   pending:   { dot: 'bg-gray-200', line: 'bg-gray-200', badge: 'bg-gray-100 text-gray-400', label: 'text-gray-400' },
 }
@@ -35,16 +37,16 @@ const stageColors = {
 const terminalBadge = computed(() => {
   if (!props.result) return null
   const s = props.result.current_stage
-  if (s === 'rejected')  return { text: 'Application Not Selected', cls: 'bg-red-100 text-red-700' }
+  if (s === 'rejected')  return { text: 'Application Not Selected', cls: 'bg-danger-100 text-danger-700' }
   if (s === 'withdrawn') return { text: 'Application Withdrawn',    cls: 'bg-gray-100 text-gray-600' }
-  if (s === 'placement') return { text: 'Congratulations — Placement Confirmed!', cls: 'bg-green-100 text-green-700' }
+  if (s === 'placement') return { text: 'Congratulations — Placement Confirmed!', cls: 'bg-success-100 text-success-700' }
   return null
 })
 
-const docStatusColors = {
-  pending:  'bg-yellow-100 text-yellow-700',
-  verified: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
+const docStatusBadgeColor = {
+  pending:  'amber',
+  verified: 'green',
+  rejected: 'red',
 }
 </script>
 
@@ -72,18 +74,10 @@ const docStatusColors = {
       <div class="bg-white rounded-2xl shadow-xl p-6">
         <h2 class="text-base font-semibold text-gray-700 mb-4">Look up your application</h2>
         <form @submit.prevent="submit" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">Email Address</label>
-            <input v-model="form.email" required type="email" placeholder="your@email.com"
-                   class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-            <p v-if="form.errors.email" class="text-red-500 text-xs mt-1">{{ form.errors.email }}</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-600 mb-1">Application Reference No.</label>
-            <input v-model="form.application_id" required type="number" min="1" placeholder="e.g. 12"
-                   class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-            <p v-if="form.errors.application_id" class="text-red-500 text-xs mt-1">{{ form.errors.application_id }}</p>
-          </div>
+          <AppInput v-model="form.email" label="Email Address" required type="email"
+                    placeholder="your@email.com" :error="form.errors.email" />
+          <AppInput v-model="form.application_id" label="Application Reference No." required type="number"
+                    min="1" placeholder="e.g. 12" :error="form.errors.application_id" />
           <button type="submit" :disabled="form.processing"
                   class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm">
             {{ form.processing ? 'Searching…' : 'Track Application' }}
@@ -132,7 +126,7 @@ const docStatusColors = {
           <!-- Terminal overlay for rejected/withdrawn -->
           <div v-if="result.is_terminal && result.current_stage !== 'placement'"
                class="mb-5 rounded-xl px-4 py-3 text-sm font-medium"
-               :class="result.current_stage === 'rejected' ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-gray-50 border border-gray-200 text-gray-600'">
+               :class="result.current_stage === 'rejected' ? 'bg-danger-50 border border-danger-100 text-danger-700' : 'bg-gray-50 border border-gray-200 text-gray-600'">
             <span v-if="result.current_stage === 'rejected'">
               ✗ Your application was not selected to proceed further. Thank you for your interest.
             </span>
@@ -156,7 +150,7 @@ const docStatusColors = {
                 </div>
                 <div v-if="idx < result.timeline.length - 1"
                      class="w-0.5 h-10 flex-shrink-0 mt-1"
-                     :class="step.status === 'completed' ? 'bg-green-400' : 'bg-gray-200'" />
+                     :class="step.status === 'completed' ? 'bg-success-500' : 'bg-gray-200'" />
               </div>
 
               <!-- Content -->
@@ -165,14 +159,12 @@ const docStatusColors = {
                   <p class="text-sm font-medium" :class="stageColors[step.status].label">
                     {{ step.label }}
                   </p>
-                  <span v-if="step.status === 'current'" class="text-xs px-2 py-0.5 rounded-full font-semibold"
-                        :class="stageColors[step.status].badge">
+                  <AppBadge v-if="step.status === 'current'" color="blue" class="font-semibold">
                     Current Stage
-                  </span>
-                  <span v-else-if="step.status === 'completed'" class="text-xs px-2 py-0.5 rounded-full"
-                        :class="stageColors[step.status].badge">
+                  </AppBadge>
+                  <AppBadge v-else-if="step.status === 'completed'" color="green">
                     Completed
-                  </span>
+                  </AppBadge>
                 </div>
                 <p v-if="step.status === 'current' && !result.is_terminal" class="text-xs text-blue-600 mt-0.5">
                   Your application is currently being processed at this stage.
@@ -198,10 +190,9 @@ const docStatusColors = {
                 </div>
               </div>
               <div class="flex items-center gap-2 flex-shrink-0 ml-2">
-                <span class="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-                      :class="docStatusColors[doc.status] ?? 'bg-gray-100 text-gray-500'">
+                <AppBadge :color="docStatusBadgeColor[doc.status] ?? 'slate'" class="capitalize">
                   {{ doc.status }}
-                </span>
+                </AppBadge>
                 <a v-if="doc.drive_url" :href="doc.drive_url" target="_blank"
                    class="text-xs text-blue-600 hover:underline">View →</a>
               </div>

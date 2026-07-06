@@ -2,6 +2,12 @@
 import { ref, computed } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
@@ -22,11 +28,14 @@ const totalTasks     = computed(() => tasks.value.length)
 const completedTasks = computed(() => tasks.value.filter(t => ['completed', 'skipped'].includes(t.status)).length)
 const progressPct    = computed(() => totalTasks.value ? Math.round((completedTasks.value / totalTasks.value) * 100) : 0)
 
-const taskStatusColors = {
-  pending:     'bg-slate-100 text-slate-600',
-  in_progress: 'bg-amber-50 text-amber-700',
-  completed:   'bg-emerald-50 text-emerald-700',
-  skipped:     'bg-slate-50 text-slate-400',
+function taskStatusColor(status) {
+  const map = { pending: 'slate', in_progress: 'amber', completed: 'green', skipped: 'slate' }
+  return map[status] ?? 'slate'
+}
+
+function placementStatusColor(status) {
+  const map = { pending: 'amber', active: 'green', completed: 'blue', terminated: 'red' }
+  return map[status] ?? 'slate'
 }
 
 // ── Complete task ──────────────────────────────────────────────────────────────
@@ -108,7 +117,7 @@ const position  = computed(() => props.placement.application?.job_vacancy?.job_i
     <div class="max-w-4xl mx-auto space-y-4">
 
       <!-- Flash -->
-      <div v-if="page.props.flash?.success" class="px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm">
+      <div v-if="page.props.flash?.success" class="px-4 py-3 rounded-lg bg-success-50 border border-success-100 text-success-700 text-sm">
         {{ page.props.flash.success }}
       </div>
 
@@ -119,7 +128,7 @@ const position  = computed(() => props.placement.application?.job_vacancy?.job_i
       </Link>
 
       <!-- Header Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+      <AppCard>
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 class="text-xl font-semibold text-slate-800">
@@ -134,55 +143,45 @@ const position  = computed(() => props.placement.application?.job_vacancy?.job_i
             </p>
           </div>
           <div class="flex flex-col items-end gap-2">
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize"
-                  :class="{
-                    'bg-amber-50 text-amber-700':     placement.status === 'pending',
-                    'bg-emerald-50 text-emerald-700': placement.status === 'active',
-                    'bg-blue-50 text-blue-700':       placement.status === 'completed',
-                    'bg-red-50 text-red-600':         placement.status === 'terminated',
-                  }">
-              {{ placement.status }}
-            </span>
+            <AppBadge :color="placementStatusColor(placement.status)"><span class="capitalize">{{ placement.status }}</span></AppBadge>
             <Link :href="route('recruitment.applications.show', placement.application?.id)"
                   class="text-xs text-indigo-600 hover:underline">
               View Application &rarr;
             </Link>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Progress Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+      <AppCard>
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-sm font-semibold text-slate-700">Onboarding Progress</h3>
           <span class="text-sm font-bold text-slate-700">{{ completedTasks }} / {{ totalTasks }} tasks</span>
         </div>
         <div class="w-full bg-slate-100 rounded-full h-2.5">
-          <div class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+          <div class="bg-success-500 h-2.5 rounded-full transition-all duration-500"
                :style="{ width: progressPct + '%' }"></div>
         </div>
         <div class="text-right text-xs text-slate-400 mt-1">{{ progressPct }}% complete</div>
-      </div>
+      </AppCard>
 
       <!-- Tasks Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
-        <h3 class="text-sm font-semibold text-slate-700 mb-4">Onboarding Tasks</h3>
-
+      <AppCard title="Onboarding Tasks">
         <div v-if="tasks.length" class="space-y-2">
           <div v-for="task in tasks" :key="task.id"
                class="flex items-start gap-3 p-3 rounded-lg border"
                :class="{
-                 'border-emerald-200 bg-emerald-50':  task.status === 'completed',
+                 'border-success-100 bg-success-50':  task.status === 'completed',
                  'border-slate-100 bg-slate-50':      task.status === 'skipped',
-                 'border-amber-200 bg-amber-50':      task.status === 'in_progress',
+                 'border-warning-100 bg-warning-50':  task.status === 'in_progress',
                  'border-slate-200':                  task.status === 'pending',
                }">
             <!-- Status Icon -->
             <div class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs"
                  :class="{
-                   'bg-emerald-500 text-white':  task.status === 'completed',
+                   'bg-success-500 text-white':  task.status === 'completed',
                    'bg-slate-300 text-white':    task.status === 'skipped',
-                   'bg-amber-400 text-white':    task.status === 'in_progress',
+                   'bg-warning-500 text-white':  task.status === 'in_progress',
                    'bg-slate-200 text-slate-500':task.status === 'pending',
                  }">
               <span v-if="task.status === 'completed'">✓</span>
@@ -202,68 +201,36 @@ const position  = computed(() => props.placement.application?.job_vacancy?.job_i
                     <span v-if="task.completion_notes">· {{ task.completion_notes }}</span>
                   </div>
                 </div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap flex-shrink-0" :class="taskStatusColors[task.status]">
-                  {{ task.status.replace('_', ' ') }}
-                </span>
+                <AppBadge :color="taskStatusColor(task.status)">
+                  <span class="whitespace-nowrap capitalize">{{ task.status.replace('_', ' ') }}</span>
+                </AppBadge>
               </div>
 
               <!-- Action buttons for pending/in_progress tasks -->
               <div v-if="['pending', 'in_progress'].includes(task.status)" class="mt-2 flex gap-2">
-                <button @click="completeTask(task)"
-                        class="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                  Complete
-                </button>
-                <button @click="openAssign(task)"
-                        class="inline-flex items-center gap-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                  Assign
-                </button>
-                <button @click="skipTask(task)"
-                        class="inline-flex items-center gap-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                  Skip
-                </button>
+                <AppButton size="sm" @click="completeTask(task)">Complete</AppButton>
+                <AppButton size="sm" variant="secondary" @click="openAssign(task)">Assign</AppButton>
+                <AppButton size="sm" variant="secondary" @click="skipTask(task)">Skip</AppButton>
               </div>
             </div>
           </div>
         </div>
-        <div v-else class="py-16 text-center text-slate-400 text-sm">
-          No onboarding tasks generated. Ensure the recruitment type has onboarding requirements configured.
-        </div>
-      </div>
+        <EmptyState v-else title="No onboarding tasks generated." subtitle="Ensure the recruitment type has onboarding requirements configured." />
+      </AppCard>
     </div>
 
     <!-- ── Assign Modal ──────────────────────────────────────────────────────── -->
-    <div v-if="showAssignModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-      <div class="bg-white rounded-2xl w-full max-w-sm shadow-xl relative">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h2 class="text-base font-semibold text-slate-800">Assign Task</h2>
-            <p class="text-sm text-slate-500">{{ assignTarget?.task_name }}</p>
-          </div>
-          <button @click="showAssignModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-        </div>
-
-        <form @submit.prevent="submitAssign" class="px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Assign To (User ID) *</label>
-            <input v-model="assignForm.assigned_to" type="number" required
-                   placeholder="Enter user ID"
-                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Due Date</label>
-            <input v-model="assignForm.due_date" type="date"
-                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-          </div>
-          <div class="flex justify-end gap-3 pt-2 border-t border-slate-100">
-            <button type="button" @click="showAssignModal = false"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button type="submit" :disabled="assignLoading"
-                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              {{ assignLoading ? 'Saving…' : 'Assign' }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <AppModal :show="showAssignModal" title="Assign Task" :subtitle="assignTarget?.task_name" size="sm" @close="showAssignModal = false">
+      <form @submit.prevent="submitAssign" class="space-y-4">
+        <AppInput v-model="assignForm.assigned_to" type="number" required label="Assign To (User ID)" placeholder="Enter user ID" />
+        <AppInput v-model="assignForm.due_date" type="date" label="Due Date" />
+      </form>
+      <template #footer>
+        <AppButton variant="secondary" @click="showAssignModal = false">Cancel</AppButton>
+        <AppButton :loading="assignLoading" :disabled="assignLoading" @click="submitAssign">
+          {{ assignLoading ? 'Saving…' : 'Assign' }}
+        </AppButton>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>

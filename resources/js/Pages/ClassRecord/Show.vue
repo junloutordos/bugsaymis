@@ -3,7 +3,12 @@ import { ref, computed, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { badgeBase } from '@/Composables/useStatusBadge.js'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppTabs from '@/Components/AppTabs.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
 import {
   LockClosedIcon,
@@ -14,6 +19,10 @@ import {
   PlusIcon,
   XMarkIcon,
   DocumentDuplicateIcon,
+  Cog6ToothIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  PlayCircleIcon,
 } from '@heroicons/vue/24/outline'
 import ScoreGrid from './components/ScoreGrid.vue'
 import AttendanceGrid from './components/AttendanceGrid.vue'
@@ -34,10 +43,10 @@ const page = usePage()
 // ── Status badge ──────────────────────────────────────────────────────────────
 function statusBadge(status) {
   return {
-    draft:     'bg-slate-100 text-slate-600',
-    submitted: 'bg-blue-100 text-blue-700',
-    checked:   'bg-emerald-100 text-emerald-700',
-  }[status] ?? 'bg-slate-100 text-slate-600'
+    draft:     'slate',
+    submitted: 'blue',
+    checked:   'green',
+  }[status] ?? 'slate'
 }
 
 function hostQuiz(quiz) {
@@ -58,6 +67,14 @@ const currentQuarterData = computed(() =>
 
 const isLocked   = computed(() => currentQuarterData.value?.is_locked ?? false)
 const isReadOnly = computed(() => !props.isCurrentSY)  // past school year → fully read-only
+
+// Sub-tab bar (Setup / Scores / Attendance / Live Quiz)
+const subTabs = [
+  { key: 'setup',       label: 'Setup',              icon: Cog6ToothIcon },
+  { key: 'scores',      label: 'Scores & Grades',    icon: ChartBarIcon },
+  { key: 'attendance',  label: 'Attendance',          icon: ClipboardDocumentListIcon },
+  { key: 'quiz',        label: 'Live Quiz',           icon: PlayCircleIcon },
+]
 
 // ── Assessment setup ──────────────────────────────────────────────────────────
 // Build editable assessment rows from the grading option categories
@@ -259,15 +276,12 @@ function openFinalGrades() {
 
 // ── Quarter lock / unlock ─────────────────────────────────────────────────────
 async function lockQuarter() {
-  const result = await Swal.fire({
+  const confirmed = await confirmAction({
     title: `Lock Quarter ${activeQuarter.value}?`,
     text: 'Score entry will be disabled after locking. Admins can unlock it.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: 'Lock',
-    confirmButtonColor: '#d97706',
+    confirmText: 'Lock',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
 
   try {
     await axios.post(route('class-records.quarters.lock', { classRecord: props.classRecord.id, q: activeQuarter.value }))
@@ -288,14 +302,12 @@ async function unlockQuarter() {
 
 // ── Workflow: submit / check ──────────────────────────────────────────────────
 async function submitRecord() {
-  const result = await Swal.fire({
-    title:             'Submit for Review?',
-    text:              'The class record will be locked for editing and sent to the Academic Unit Head for review.',
-    icon:              'question',
-    showCancelButton:  true,
-    confirmButtonText: 'Yes, Submit',
+  const confirmed = await confirmAction({
+    title: 'Submit for Review?',
+    text: 'The class record will be locked for editing and sent to the Academic Unit Head for review.',
+    confirmText: 'Yes, Submit',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
 
   try {
     await axios.post(route('class-records.submit', props.classRecord.id))
@@ -324,10 +336,10 @@ async function checkRecord() {
       <!-- Back + header -->
       <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div class="flex items-start gap-3">
-          <button @click="router.visit(route('class-records.page.index'))"
-            class="mt-0.5 p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500">
+          <AppIconButton label="Back to Class Records" variant="secondary" class="mt-0.5"
+            @click="router.visit(route('class-records.page.index'))">
             <ArrowLeftIcon class="h-4 w-4" />
-          </button>
+          </AppIconButton>
           <div>
             <h1 class="text-xl font-bold text-slate-800">{{ classRecord.subject_name }}</h1>
             <p class="text-sm text-slate-500 mt-0.5">
@@ -335,37 +347,31 @@ async function checkRecord() {
               &middot; {{ classRecord.grading_option?.name }}
             </p>
             <div class="mt-1.5">
-              <span :class="[badgeBase, statusBadge(classRecord.status)]">
+              <AppBadge :color="statusBadge(classRecord.status)">
                 {{ classRecord.status === 'checked' ? 'Checked ✓' : classRecord.status.charAt(0).toUpperCase() + classRecord.status.slice(1) }}
-              </span>
+              </AppBadge>
             </div>
           </div>
         </div>
 
         <!-- Workflow actions -->
         <div class="flex items-center gap-2 shrink-0">
-          <!-- Export All button -->
-          <a :href="route('class-records.export', classRecord.id)"
-            class="inline-flex items-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+          <AppButton variant="secondary" as="a" :href="route('class-records.export', classRecord.id)">
             <ArrowDownTrayIcon class="h-4 w-4" /> Export All
-          </a>
-          <button v-if="classRecord.status === 'draft' && isCurrentSY"
-            @click="submitRecord"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          </AppButton>
+          <AppButton v-if="classRecord.status === 'draft' && isCurrentSY" @click="submitRecord">
             Submit for Review
-          </button>
-          <button v-if="classRecord.status === 'submitted' && isAdmin"
-            @click="checkRecord"
-            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          </AppButton>
+          <AppButton v-if="classRecord.status === 'submitted' && isAdmin" variant="success" @click="checkRecord">
             <CheckCircleIcon class="h-4 w-4" /> Mark as Checked
-          </button>
+          </AppButton>
         </div>
       </div>
 
       <!-- Past SY read-only banner -->
       <div v-if="isReadOnly"
-        class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        <LockClosedIcon class="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+        class="flex items-start gap-3 rounded-xl border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">
+        <LockClosedIcon class="h-4 w-4 mt-0.5 shrink-0 text-warning-500" />
         <span>
           This class record is from <strong>SY {{ classRecord.school_year }}</strong> and is
           <strong>read-only</strong>. The school year is no longer active.
@@ -417,34 +423,20 @@ async function checkRecord() {
           </a>
         </div>
 
-        <!-- Sub-tab bar -->
-        <div class="flex gap-1 px-4 pt-1 border-b border-slate-50">
-          <button
-            v-for="tab in ['setup', 'scores', 'attendance', 'quiz']" :key="tab"
-            @click="activeSubTab = tab"
-            :class="[
-              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              activeSubTab === tab
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50',
-            ]">
-            {{ tab === 'setup' ? '⚙ Setup' : tab === 'scores' ? '📊 Scores & Grades' : tab === 'attendance' ? '📋 Attendance' : '🎮 Live Quiz' }}
-          </button>
-        </div>
+        <div class="px-4 pt-1">
+        <AppTabs :tabs="subTabs" v-model="activeSubTab">
 
         <!-- ── Live Quiz sub-tab ─────────────────────────────────────────── -->
         <div v-if="activeSubTab === 'quiz'" class="p-5">
-          <div v-if="!isCurrentSY" class="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3 mb-4">
+          <div v-if="!isCurrentSY" class="bg-warning-50 border border-warning-100 text-warning-700 text-sm rounded-lg px-4 py-3 mb-4">
             This class record is from a past school year — quizzes can't be hosted for locked records.
           </div>
           <template v-else>
             <div class="flex justify-end mb-3">
-              <a
-                :href="route('quiz.create', { source_type: 'class_record', source_id: classRecord.id })"
-                class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-              >
+              <AppButton as="a" size="sm"
+                :href="route('quiz.create', { source_type: 'class_record', source_id: classRecord.id })">
                 <PlusIcon class="w-4 h-4" /> New Quiz
-              </a>
+              </AppButton>
             </div>
             <div v-if="quizzes.length === 0" class="text-center py-10 text-sm text-slate-400">
               No quizzes yet — create one to run a live review game with this class.
@@ -456,7 +448,7 @@ async function checkRecord() {
                   <span class="text-xs text-slate-400 capitalize">{{ q.status }} · {{ q.question_count }} question{{ q.question_count === 1 ? '' : 's' }}</span>
                 </div>
                 <div class="flex items-center gap-3">
-                  <button type="button" class="text-sm text-emerald-600 hover:underline" @click="hostQuiz(q)">Host</button>
+                  <button type="button" class="text-sm text-success-600 hover:underline" @click="hostQuiz(q)">Host</button>
                   <a :href="route('quiz.edit', q.id)" class="text-sm text-indigo-600 hover:underline">Manage</a>
                 </div>
               </div>
@@ -474,24 +466,19 @@ async function checkRecord() {
             </p>
             <div class="flex items-center gap-2">
               <template v-if="!isReadOnly">
-                <button v-if="!isLocked"
-                  @click="lockQuarter"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 text-xs font-medium">
+                <AppButton v-if="!isLocked" variant="warning" size="sm" @click="lockQuarter">
                   <LockClosedIcon class="h-3.5 w-3.5" /> Lock Quarter
-                </button>
-                <button v-if="isLocked && isAdmin"
-                  @click="unlockQuarter"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium">
+                </AppButton>
+                <AppButton v-if="isLocked && isAdmin" variant="secondary" size="sm" @click="unlockQuarter">
                   <LockOpenIcon class="h-3.5 w-3.5" /> Unlock
-                </button>
-                <span v-if="isLocked && !isAdmin"
-                  class="inline-flex items-center gap-1 text-xs text-amber-600">
-                  <LockClosedIcon class="h-3.5 w-3.5" /> Locked
-                </span>
+                </AppButton>
+                <AppBadge v-if="isLocked && !isAdmin" color="amber">
+                  <span class="inline-flex items-center gap-1"><LockClosedIcon class="h-3 w-3" /> Locked</span>
+                </AppBadge>
               </template>
-              <span v-else class="inline-flex items-center gap-1 text-xs text-amber-600">
-                <LockClosedIcon class="h-3.5 w-3.5" /> Past School Year
-              </span>
+              <AppBadge v-else color="amber">
+                <span class="inline-flex items-center gap-1"><LockClosedIcon class="h-3 w-3" /> Past School Year</span>
+              </AppBadge>
             </div>
           </div>
 
@@ -500,23 +487,19 @@ async function checkRecord() {
             class="mb-4 flex flex-wrap items-center gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
             <DocumentDuplicateIcon class="h-4 w-4 text-indigo-400 shrink-0" />
             <span class="text-slate-600">No assessments yet. Copy structure from:</span>
-            <button v-for="q in quartersWithAssessments" :key="q.quarter"
-              @click="copyFromQuarter(q.quarter)"
-              :disabled="copyingFrom"
-              class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50 transition-colors">
+            <AppButton v-for="q in quartersWithAssessments" :key="q.quarter"
+              size="sm" :disabled="copyingFrom" @click="copyFromQuarter(q.quarter)">
               {{ copyingFrom ? 'Copying…' : `Q${q.quarter}` }}
-            </button>
-            <button v-if="sameSubjectRecords.length"
-              @click="showCopyFromRecordModal = true"
-              :disabled="copyingFrom"
-              class="px-2.5 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-100 font-medium disabled:opacity-50 transition-colors">
+            </AppButton>
+            <AppButton v-if="sameSubjectRecords.length"
+              variant="secondary" size="sm" :disabled="copyingFrom" @click="showCopyFromRecordModal = true">
               Another section…
-            </button>
+            </AppButton>
           </div>
 
           <!-- Errors -->
           <div v-if="setupErrors.length"
-            class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-xs space-y-1">
+            class="mb-4 bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-4 py-3 text-xs space-y-1">
             <p v-for="e in setupErrors" :key="e">{{ e }}</p>
           </div>
 
@@ -566,11 +549,10 @@ async function checkRecord() {
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
                       <td v-if="!isLocked && !isReadOnly" class="px-2 py-2 text-center">
-                        <button @click="removeAssessmentRow(cat.id, rIdx)"
-                          class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
-                          title="Remove this assessment row">
+                        <AppIconButton label="Remove this assessment row" variant="danger" size="sm"
+                          @click="removeAssessmentRow(cat.id, rIdx)">
                           <XMarkIcon class="h-4 w-4" />
-                        </button>
+                        </AppIconButton>
                       </td>
                     </tr>
                   </tbody>
@@ -588,12 +570,9 @@ async function checkRecord() {
 
           <!-- Save setup button -->
           <div class="mt-5 flex justify-end">
-            <button v-if="!isLocked && !isReadOnly"
-              @click="saveSetup"
-              :disabled="savingSetup"
-              class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <AppButton v-if="!isLocked && !isReadOnly" :loading="savingSetup" @click="saveSetup">
               {{ savingSetup ? 'Saving…' : 'Save Setup' }}
-            </button>
+            </AppButton>
           </div>
         </div>
 
@@ -622,6 +601,9 @@ async function checkRecord() {
             :is-locked="isLocked || isReadOnly"
           />
         </div>
+
+        </AppTabs>
+        </div>
         </template>
 
         <!-- ── Final Grades tab ──────────────────────────────────────────── -->
@@ -636,13 +618,10 @@ async function checkRecord() {
           <!-- Error / not-ready message -->
           <div v-else-if="finalGradesError"
             class="flex flex-col items-center gap-3 py-10">
-            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 w-full max-w-lg text-center">
+            <div class="rounded-xl border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700 w-full max-w-lg text-center">
               {{ finalGradesError }}
             </div>
-            <button @click="loadFinalGrades"
-              class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs">
-              Retry
-            </button>
+            <AppButton variant="secondary" size="sm" @click="loadFinalGrades">Retry</AppButton>
           </div>
 
           <!-- Table -->
@@ -687,10 +666,7 @@ async function checkRecord() {
           <!-- Empty fallback -->
           <div v-else class="flex flex-col items-center justify-center py-12 text-slate-400 text-sm gap-2">
             <p>No student data found. Ensure all 4 quarters have scores entered.</p>
-            <button @click="loadFinalGrades"
-              class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs">
-              Retry
-            </button>
+            <AppButton variant="secondary" size="sm" @click="loadFinalGrades">Retry</AppButton>
           </div>
         </div>
       </div>
@@ -698,47 +674,33 @@ async function checkRecord() {
   </AdminLayout>
 
   <!-- Copy-from-record modal -->
-  <div v-if="showCopyFromRecordModal"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-    @click.self="showCopyFromRecordModal = false">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="font-semibold text-slate-800">Copy from Another Section</h3>
-        <button @click="showCopyFromRecordModal = false" class="p-1 rounded hover:bg-slate-100">
-          <XMarkIcon class="h-5 w-5 text-slate-400" />
-        </button>
+  <AppModal :show="showCopyFromRecordModal" title="Copy from Another Section"
+    subtitle="Select a class record with the same subject to copy its assessment structure."
+    size="md" @close="showCopyFromRecordModal = false">
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Source Class Record</label>
+        <select v-model="copyFromRecordId"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option :value="null" disabled>Select section…</option>
+          <option v-for="r in sameSubjectRecords" :key="r.id" :value="r.id">
+            {{ r.year_level_section }} ({{ r.school_year }})
+          </option>
+        </select>
       </div>
-      <p class="text-xs text-slate-500">Select a class record with the same subject to copy its assessment structure.</p>
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Source Class Record</label>
-          <select v-model="copyFromRecordId"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option :value="null" disabled>Select section…</option>
-            <option v-for="r in sameSubjectRecords" :key="r.id" :value="r.id">
-              {{ r.year_level_section }} ({{ r.school_year }})
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Copy from Quarter</label>
-          <select v-model="copyFromRecordQ"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option v-for="n in 4" :key="n" :value="n">Quarter {{ n }}</option>
-          </select>
-        </div>
-      </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button @click="showCopyFromRecordModal = false"
-          class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium">
-          Cancel
-        </button>
-        <button @click="copyFromRecord"
-          :disabled="!copyFromRecordId || copyingFromRecord"
-          class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50 transition-colors">
-          {{ copyingFromRecord ? 'Copying…' : 'Copy Assessments' }}
-        </button>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Copy from Quarter</label>
+        <select v-model="copyFromRecordQ"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option v-for="n in 4" :key="n" :value="n">Quarter {{ n }}</option>
+        </select>
       </div>
     </div>
-  </div>
+    <template #footer>
+      <AppButton variant="secondary" @click="showCopyFromRecordModal = false">Cancel</AppButton>
+      <AppButton :loading="copyingFromRecord" :disabled="!copyFromRecordId || copyingFromRecord" @click="copyFromRecord">
+        {{ copyingFromRecord ? 'Copying…' : 'Copy Assessments' }}
+      </AppButton>
+    </template>
+  </AppModal>
 </template>

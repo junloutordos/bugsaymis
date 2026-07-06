@@ -8,6 +8,15 @@ import "sweetalert2/dist/sweetalert2.min.css"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 
 // Props
 const props = defineProps({
@@ -113,17 +122,14 @@ const handleApproveCancel = () => {
 }
 
 const rejectRequest = async (id) => {
-  const result = await Swal.fire({
+  const confirmed = await confirmAction({
     title: "Are you sure?",
     text: "Do you want to reject this request?",
+    confirmText: "Yes, reject it!",
     icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Yes, reject it!",
-    cancelButtonText: "Cancel",
-    reverseButtons: true
   })
 
-  if (result.isConfirmed) {
+  if (confirmed) {
     isSubmitting.value = true
     Swal.fire({ title: 'Rejecting request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
     router.post(route("job-requests.ocd-action", id), { action: "reject" }, {
@@ -138,38 +144,19 @@ const rejectRequest = async (id) => {
   <Head title="OCD Approval - IT Job Requests" />
   <AdminLayout title="OCD Approval - IT Job Requests">
     <div>
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">OCD Approval — IT Job Requests</h1>
-      </div>
+      <AppPageHeader title="OCD Approval — IT Job Requests" />
 
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+      <AppFilterBar class="mb-4">
         <div class="relative flex-1 sm:w-64 sm:flex-none">
-          <input
+          <AppInput
             v-model="search"
             type="text"
             placeholder="Search requests..."
             @keydown.enter.prevent="applyFilters"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
           />
           <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⏳</span>
         </div>
-        <button
-          @click="applyFilters"
-          :disabled="isLoading"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
-        >
-          Search
-        </button>
-        <button
-          v-if="search || filterCategory"
-          @click="clearFilters"
-          :disabled="isLoading"
-          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
-        >
-          Clear
-        </button>
         <select
           v-model="filterCategory"
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
@@ -177,108 +164,100 @@ const rejectRequest = async (id) => {
           <option value="">All Categories</option>
           <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
         </select>
-      </div>
+
+        <template #actions>
+          <AppButton @click="applyFilters" :disabled="isLoading">Search</AppButton>
+          <AppButton v-if="search || filterCategory" @click="clearFilters" :disabled="isLoading" variant="secondary">Clear</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ITJR #</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted By</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr
-                v-for="req in filteredRequests"
-                :key="req.id"
-                class="hover:bg-slate-50/60"
+      <AppTable :is-empty="filteredRequests.length === 0" :skeleton-cols="5">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ITJR #</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted By</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Actions</th>
+          </tr>
+        </template>
+
+        <tr
+          v-for="req in filteredRequests"
+          :key="req.id"
+          class="hover:bg-slate-50/60"
+        >
+          <td class="px-4 py-3 text-sm text-slate-700">{{ req.itjr_no ?? req.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ req.title }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ req.user?.name ?? "—" }}</td>
+          <td class="px-4 py-3">
+            <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <div class="flex items-center gap-2 justify-center">
+              <AppButton
+                  v-if="req.status === 'Pending OCD Approval'"
+                  @click="approveRequest(req.id)"
+                  :disabled="isSubmitting"
+                  variant="success"
+                  size="sm"
               >
-                <td class="px-4 py-3 text-sm text-slate-700">{{ req.itjr_no ?? req.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ req.title }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ req.user?.name ?? "—" }}</td>
-                <td class="px-4 py-3">
-                  <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-2 justify-center">
-                    <!-- Approve Button -->
-                    <button
-                        v-if="req.status === 'Pending OCD Approval'"
-                        @click="approveRequest(req.id)"
-                        :disabled="isSubmitting"
-                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <CheckCircleIcon class="w-4 h-4" />
-                        <span>Approve</span>
-                    </button>
+                  <CheckCircleIcon class="w-4 h-4" />
+                  <span>Approve</span>
+              </AppButton>
 
-                    <!-- Reject Button -->
-                    <button
-                        v-if="req.status === 'Pending OCD Approval'"
-                        @click="rejectRequest(req.id)"
-                        :disabled="isSubmitting"
-                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <XCircleIcon class="w-4 h-4" />
-                        <span>Reject</span>
-                    </button>
+              <AppButton
+                  v-if="req.status === 'Pending OCD Approval'"
+                  @click="rejectRequest(req.id)"
+                  :disabled="isSubmitting"
+                  variant="danger"
+                  size="sm"
+              >
+                  <XCircleIcon class="w-4 h-4" />
+                  <span>Reject</span>
+              </AppButton>
 
-                    <!-- View Button -->
-                    <button
-                        @click="openModal(req)"
-                        class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-                    >
-                        <EyeIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              <AppIconButton
+                  label="View details"
+                  @click="openModal(req)"
+              >
+                  <EyeIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
 
-              <tr v-if="filteredRequests.length === 0">
-                <td colspan="5" class="py-16 text-center text-slate-400 text-sm">
-                  No requests found.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <template #empty>
+          <EmptyState title="No requests found" />
+        </template>
 
-        <!-- Pagination -->
-        <PaginationControl
-          :links="props.requests?.links"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          :total="props.requests?.total ?? 0"
-          @prev="goToPage(currentPage - 1)"
-          @next="goToPage(currentPage + 1)"
-          @page="goToPage"
-        />
-      </div>
+        <template #footer>
+          <PaginationControl
+            :links="props.requests?.links"
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :total="props.requests?.total ?? 0"
+            @prev="goToPage(currentPage - 1)"
+            @next="goToPage(currentPage + 1)"
+            @page="goToPage"
+          />
+        </template>
+      </AppTable>
 
       <!-- Modal -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">{{ selectedRequest.title }}</h2>
-            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">✖</button>
-          </div>
-          <div class="px-6 py-5 space-y-2 text-sm text-slate-700">
-            <p><strong>ITJR #:</strong> {{ selectedRequest.itjr_no ?? selectedRequest.id }}</p>
-            <p><strong>Submitted By:</strong> {{ selectedRequest.user?.name ?? '—' }}</p>
-            <p><strong>Status:</strong> {{ selectedRequest.status }}</p>
-            <p><strong>Description:</strong> {{ selectedRequest.description ?? '—' }}</p>
-            <p><strong>Division Chief:</strong> {{ selectedRequest.divisionchief ?? '—' }}</p>
-            <p><strong>Assigned To:</strong> {{ selectedRequest.assignedto ?? '—' }}</p>
-            <p><strong>Created At:</strong> {{ selectedRequest.created_at }}</p>
-            <p><strong>Updated At:</strong> {{ selectedRequest.updated_at }}</p>
-          </div>
+      <AppModal :show="showModal" :title="selectedRequest?.title" @close="closeModal">
+        <div class="space-y-2 text-sm text-slate-700">
+          <p><strong>ITJR #:</strong> {{ selectedRequest?.itjr_no ?? selectedRequest?.id }}</p>
+          <p><strong>Submitted By:</strong> {{ selectedRequest?.user?.name ?? '—' }}</p>
+          <p><strong>Status:</strong> {{ selectedRequest?.status }}</p>
+          <p><strong>Description:</strong> {{ selectedRequest?.description ?? '—' }}</p>
+          <p><strong>Division Chief:</strong> {{ selectedRequest?.divisionchief ?? '—' }}</p>
+          <p><strong>Assigned To:</strong> {{ selectedRequest?.assignedto ?? '—' }}</p>
+          <p><strong>Created At:</strong> {{ selectedRequest?.created_at }}</p>
+          <p><strong>Updated At:</strong> {{ selectedRequest?.updated_at }}</p>
         </div>
-      </div>
+      </AppModal>
     </div>
 
     <DigitalSignaturePin

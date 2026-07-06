@@ -2,6 +2,13 @@
 import { ref, computed } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import {
     ArrowLeftIcon, PrinterIcon, PlusIcon, XMarkIcon,
     CheckIcon, DocumentArrowUpIcon, DocumentArrowDownIcon,
@@ -29,11 +36,11 @@ const formatCurrency = (v) =>
     Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const statusClass = (status) => {
-    if (status === 'awarded') return 'bg-emerald-100 text-emerald-700'
-    if (status === 'open') return 'bg-blue-100 text-blue-700'
-    if (status === 'closed') return 'bg-slate-100 text-slate-600'
-    if (status === 'cancelled') return 'bg-red-100 text-red-700'
-    return 'bg-amber-100 text-amber-700'
+    if (status === 'awarded') return 'green'
+    if (status === 'open') return 'blue'
+    if (status === 'closed') return 'slate'
+    if (status === 'cancelled') return 'red'
+    return 'amber'
 }
 
 // ── Add Supplier ──────────────────────────────────────────────────────────
@@ -55,7 +62,8 @@ const addSupplier = async () => {
 }
 
 const removeSupplier = async (supplier) => {
-    if (!confirm(`Remove ${supplier.supplier_name}?`)) return
+    const confirmed = await confirmDelete(`Remove ${supplier.supplier_name}?`)
+    if (!confirmed) return
     try {
         await axios.delete(route('rfq.suppliers.remove', { rfq: r.value.id, supplier: supplier.id }))
         router.reload({ preserveScroll: true })
@@ -67,7 +75,8 @@ const removeSupplier = async (supplier) => {
 // ── Open RFQ ──────────────────────────────────────────────────────────────
 const openingRfq = ref(false)
 const openRfq = async () => {
-    if (!confirm('Mark this RFQ as Open and distribute to suppliers?')) return
+    const confirmed = await confirmAction({ title: 'Open this RFQ?', text: 'Mark this RFQ as Open and distribute to suppliers?', confirmText: 'Open' })
+    if (!confirmed) return
     openingRfq.value = true
     try {
         await axios.post(route('rfq.open', r.value.id))
@@ -159,7 +168,8 @@ const saveQuotations = async () => {
 // ── Close RFQ ─────────────────────────────────────────────────────────────
 const closingRfq = ref(false)
 const closeRfq = async () => {
-    if (!confirm('Close this RFQ for evaluation?')) return
+    const confirmed = await confirmAction({ title: 'Close this RFQ?', text: 'Close this RFQ for evaluation?', confirmText: 'Close' })
+    if (!confirmed) return
     closingRfq.value = true
     try {
         await axios.post(route('rfq.close', r.value.id))
@@ -182,7 +192,8 @@ const initAwardSelections = () => {
 }
 
 const awardRfq = async () => {
-    if (!confirm('Save award selections? This will update the Abstract of Quotations.')) return
+    const confirmed = await confirmAction({ title: 'Save award selections?', text: 'This will update the Abstract of Quotations.', confirmText: 'Save' })
+    if (!confirmed) return
     awardingRfq.value = true
     try {
         const awards = Object.entries(awardSelections.value)
@@ -198,7 +209,8 @@ const awardRfq = async () => {
 // ── Generate POs ──────────────────────────────────────────────────────────
 const generatingPos = ref(false)
 const generatePos = async () => {
-    if (!confirm('Generate Purchase Orders for all awarded suppliers?')) return
+    const confirmed = await confirmAction({ title: 'Generate Purchase Orders?', text: 'Generate Purchase Orders for all awarded suppliers?', confirmText: 'Generate' })
+    if (!confirmed) return
     generatingPos.value = true
     try {
         await axios.post(route('rfq.generate-pos', r.value.id))
@@ -240,56 +252,49 @@ initAwardSelections()
                 Back to RFQ List
             </a>
             <div class="flex flex-wrap gap-2">
-                <a :href="route('rfq.print', rfq.id)" target="_blank"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 shadow-sm">
+                <AppButton variant="secondary" size="sm" as="a" :href="route('rfq.print', rfq.id)" target="_blank">
                     <PrinterIcon class="w-4 h-4" /> Print RFQ
-                </a>
-                <a v-if="!isDraft" :href="route('rfq.aoq', rfq.id)" target="_blank"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 shadow-sm">
+                </AppButton>
+                <AppButton v-if="!isDraft" variant="secondary" size="sm" as="a" :href="route('rfq.aoq', rfq.id)" target="_blank">
                     <PrinterIcon class="w-4 h-4" /> Print AoQ
-                </a>
+                </AppButton>
             </div>
         </div>
 
         <!-- Flash -->
-        <div v-if="flash?.success" class="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
+        <div v-if="flash?.success" class="mb-4 rounded-lg bg-success-50 border border-success-100 px-4 py-3 text-sm text-success-700">
             {{ flash.success }}
         </div>
-        <div v-if="flash?.error" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div v-if="flash?.error" class="mb-4 rounded-lg bg-danger-50 border border-danger-100 px-4 py-3 text-sm text-danger-700">
             {{ flash.error }}
         </div>
 
         <div class="space-y-5">
 
             <!-- Header card -->
-            <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <AppCard>
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <div class="flex items-center gap-2 flex-wrap">
                             <h2 class="text-lg font-bold text-slate-800 font-mono">{{ r.rfq_number }}</h2>
-                            <span :class="['inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', statusClass(r.status)]">
-                                {{ r.status_label }}
-                            </span>
+                            <AppBadge :color="statusClass(r.status)">{{ r.status_label }}</AppBadge>
                         </div>
                         <p class="text-sm text-slate-500 mt-1">{{ r.pr?.purpose }}</p>
                         <p class="text-xs text-slate-400 mt-0.5">PR: {{ r.pr?.pr_no }} &nbsp;·&nbsp; {{ r.pr?.division?.division_name }}</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button v-if="isDraft && perms.canCreate && (r.suppliers?.length >= 1)"
-                            @click="openRfq" :disabled="openingRfq"
-                            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
+                        <AppButton v-if="isDraft && perms.canCreate && (r.suppliers?.length >= 1)"
+                            :disabled="openingRfq" @click="openRfq">
                             Open for Quotations
-                        </button>
-                        <button v-if="isOpen && perms.canEvaluate"
-                            @click="closeRfq" :disabled="closingRfq"
-                            class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
+                        </AppButton>
+                        <AppButton v-if="isOpen && perms.canEvaluate" variant="secondary"
+                            :disabled="closingRfq" @click="closeRfq">
                             Close for Evaluation
-                        </button>
-                        <button v-if="isClosed && perms.canAward && hasAwardedItems"
-                            @click="generatePos" :disabled="generatingPos"
-                            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
+                        </AppButton>
+                        <AppButton v-if="isClosed && perms.canAward && hasAwardedItems" variant="success"
+                            :disabled="generatingPos" @click="generatePos">
                             <TrophyIcon class="w-4 h-4" /> Generate POs
-                        </button>
+                        </AppButton>
                     </div>
                 </div>
 
@@ -312,26 +317,28 @@ initAwardSelections()
                     </div>
                     <div v-if="r.awarded_at">
                         <dt class="text-slate-400 text-xs">Awarded</dt>
-                        <dd class="text-emerald-700 font-medium">{{ formatDate(r.awarded_at) }}</dd>
+                        <dd class="text-success-700 font-medium">{{ formatDate(r.awarded_at) }}</dd>
                     </div>
                 </dl>
-            </div>
+            </AppCard>
 
             <!-- Items / AoQ Section -->
-            <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        {{ isClosed || isAwarded ? 'Abstract of Quotations' : 'Items' }}
-                    </h3>
-                    <div class="flex gap-2 text-xs text-slate-500">
-                        <span class="inline-flex items-center gap-1">
-                            <span class="w-3 h-3 rounded bg-blue-100 border border-blue-300 inline-block"></span>Awarded
-                        </span>
-                        <span class="inline-flex items-center gap-1">
-                            <span class="w-3 h-3 rounded bg-emerald-100 border border-emerald-300 inline-block"></span>Lowest
-                        </span>
+            <AppCard :padded="false">
+                <template #header>
+                    <div class="flex items-center justify-between gap-3 w-full">
+                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                            {{ isClosed || isAwarded ? 'Abstract of Quotations' : 'Items' }}
+                        </h3>
+                        <div class="flex gap-2 text-xs text-slate-500">
+                            <span class="inline-flex items-center gap-1">
+                                <span class="w-3 h-3 rounded bg-blue-100 border border-blue-300 inline-block"></span>Awarded
+                            </span>
+                            <span class="inline-flex items-center gap-1">
+                                <span class="w-3 h-3 rounded bg-success-100 border border-success-500/40 inline-block"></span>Lowest
+                            </span>
+                        </div>
                     </div>
-                </div>
+                </template>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead class="bg-slate-50 border-b border-slate-100">
@@ -371,12 +378,12 @@ initAwardSelections()
                                 <template v-for="sup in (r.suppliers || [])" :key="sup.id">
                                     <td :class="['px-3 py-2.5 text-right font-mono text-xs',
                                         row.quotations[sup.id]?.is_awarded ? 'bg-blue-50 text-blue-800 font-semibold' :
-                                        isLowest(row, sup.id) ? 'bg-emerald-50 text-emerald-800' : 'text-slate-600']">
+                                        isLowest(row, sup.id) ? 'bg-success-50 text-success-700' : 'text-slate-600']">
                                         {{ row.quotations[sup.id]?.unit_cost > 0 ? formatCurrency(row.quotations[sup.id].unit_cost) : '—' }}
                                     </td>
                                     <td :class="['px-3 py-2.5 text-right font-mono text-xs',
                                         row.quotations[sup.id]?.is_awarded ? 'bg-blue-50 text-blue-800 font-semibold' :
-                                        isLowest(row, sup.id) ? 'bg-emerald-50 text-emerald-800' : 'text-slate-600']">
+                                        isLowest(row, sup.id) ? 'bg-success-50 text-success-700' : 'text-slate-600']">
                                         {{ row.quotations[sup.id]?.total_cost > 0 ? formatCurrency(row.quotations[sup.id].total_cost) : '—' }}
                                     </td>
                                 </template>
@@ -411,30 +418,30 @@ initAwardSelections()
                                     </td>
                                 </template>
                                 <td v-if="isClosed && perms.canAward" class="px-3 py-2.5 text-right">
-                                    <button @click="awardRfq" :disabled="awardingRfq"
-                                        class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-60">
+                                    <AppButton size="sm" :disabled="awardingRfq" @click="awardRfq">
                                         <TrophyIcon class="w-3.5 h-3.5" />
                                         {{ awardingRfq ? 'Saving…' : 'Save Award' }}
-                                    </button>
+                                    </AppButton>
                                 </td>
                                 <td v-else-if="isAwarded"></td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
-            </div>
+            </AppCard>
 
             <!-- Suppliers Section -->
-            <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        Suppliers ({{ (r.suppliers || []).length }})
-                    </h3>
-                    <button v-if="isDraft && perms.canCreate" @click="showAddSupplier = true"
-                        class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
-                        <PlusIcon class="w-4 h-4" /> Add Supplier
-                    </button>
-                </div>
+            <AppCard :padded="false">
+                <template #header>
+                    <div class="flex items-center justify-between gap-3 w-full">
+                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                            Suppliers ({{ (r.suppliers || []).length }})
+                        </h3>
+                        <AppButton v-if="isDraft && perms.canCreate" size="sm" @click="showAddSupplier = true">
+                            <PlusIcon class="w-4 h-4" /> Add Supplier
+                        </AppButton>
+                    </div>
+                </template>
 
                 <div class="divide-y divide-slate-100">
                     <div v-for="sup in (r.suppliers || [])" :key="sup.id" class="px-5 py-4">
@@ -453,50 +460,43 @@ initAwardSelections()
                                     ₱ {{ formatCurrency(sup.quotation_total) }}
                                 </span>
                                 <!-- Award badge -->
-                                <span v-if="sup.awarded_items_count > 0"
-                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                <AppBadge v-if="sup.awarded_items_count > 0" color="blue">
                                     <TrophyIcon class="w-3 h-3" /> {{ sup.awarded_items_count }} item{{ sup.awarded_items_count > 1 ? 's' : '' }}
-                                </span>
+                                </AppBadge>
                                 <!-- NOA button (awarded) -->
-                                <a v-if="isAwarded && sup.awarded_items_count > 0"
-                                    :href="route('rfq.noa', { rfq: rfq.id, supplier: sup.id })" target="_blank"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700 hover:bg-emerald-100">
+                                <AppButton v-if="isAwarded && sup.awarded_items_count > 0" variant="success" size="sm"
+                                    as="a" :href="route('rfq.noa', { rfq: rfq.id, supplier: sup.id })" target="_blank">
                                     <PrinterIcon class="w-3.5 h-3.5" /> NOA
-                                </a>
+                                </AppButton>
                                 <!-- Sent badge / button -->
                                 <span v-if="sup.sent_at" class="inline-flex items-center gap-1 text-xs text-slate-500">
-                                    <CheckIcon class="w-3.5 h-3.5 text-emerald-500" /> Sent
+                                    <CheckIcon class="w-3.5 h-3.5 text-success-500" /> Sent
                                 </span>
-                                <button v-else-if="isOpen && perms.canCreate"
-                                    @click="markSent(sup)" :disabled="markingSent === sup.id"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                                <AppButton v-else-if="isOpen && perms.canCreate" variant="secondary" size="sm"
+                                    :disabled="markingSent === sup.id" @click="markSent(sup)">
                                     Mark Sent
-                                </button>
+                                </AppButton>
                                 <!-- Quotation file -->
-                                <a v-if="sup.quotation_filename"
-                                    :href="route('rfq.suppliers.download', { rfq: rfq.id, supplier: sup.id })"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">
+                                <AppButton v-if="sup.quotation_filename" variant="secondary" size="sm"
+                                    as="a" :href="route('rfq.suppliers.download', { rfq: rfq.id, supplier: sup.id })">
                                     <DocumentArrowDownIcon class="w-3.5 h-3.5" /> {{ sup.quotation_filename }}
-                                </a>
+                                </AppButton>
                                 <!-- Upload button -->
-                                <button v-if="(isOpen || isClosed) && perms.canUpload"
-                                    @click="uploadFile(sup)" :disabled="uploadingFor === sup.id"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                                <AppButton v-if="(isOpen || isClosed) && perms.canUpload" variant="secondary" size="sm"
+                                    :disabled="uploadingFor === sup.id" @click="uploadFile(sup)">
                                     <DocumentArrowUpIcon class="w-3.5 h-3.5" />
                                     {{ uploadingFor === sup.id ? 'Uploading…' : 'Upload' }}
-                                </button>
+                                </AppButton>
                                 <!-- Enter prices button -->
-                                <button v-if="(isOpen || isClosed) && perms.canEvaluate"
-                                    @click="openQuotationModal(sup)"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs text-indigo-700 hover:bg-indigo-100">
+                                <AppButton v-if="(isOpen || isClosed) && perms.canEvaluate" size="sm"
+                                    @click="openQuotationModal(sup)">
                                     <PencilSquareIcon class="w-3.5 h-3.5" /> Enter Prices
-                                </button>
+                                </AppButton>
                                 <!-- Remove button (draft only) -->
-                                <button v-if="isDraft && perms.canCreate"
-                                    @click="removeSupplier(sup)"
-                                    class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600">
+                                <AppIconButton v-if="isDraft && perms.canCreate" label="Remove supplier" variant="danger" size="sm"
+                                    @click="removeSupplier(sup)">
                                     <XMarkIcon class="w-4 h-4" />
-                                </button>
+                                </AppIconButton>
                             </div>
                         </div>
                     </div>
@@ -504,102 +504,66 @@ initAwardSelections()
                         No suppliers added yet.
                     </div>
                 </div>
-            </div>
+            </AppCard>
 
         </div>
 
         <!-- Add Supplier Modal -->
-        <div v-if="showAddSupplier" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl">
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 class="text-base font-semibold text-slate-800">Add Supplier</h3>
-                    <button @click="showAddSupplier = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                        <XMarkIcon class="h-5 w-5" />
-                    </button>
-                </div>
-                <div class="px-6 py-5 space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Supplier Name <span class="text-red-500">*</span></label>
-                        <input v-model="supplierForm.supplier_name"
-                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="Business or vendor name" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Business Address</label>
-                        <input v-model="supplierForm.supplier_address"
-                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">TIN</label>
-                            <input v-model="supplierForm.supplier_tin"
-                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                placeholder="000-000-000-000" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Contact No.</label>
-                            <input v-model="supplierForm.supplier_contact"
-                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
-                    </div>
-                </div>
-                <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-                    <button @click="showAddSupplier = false" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button @click="addSupplier" :disabled="addingSupplier || !supplierForm.supplier_name.trim()"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
-                        {{ addingSupplier ? 'Adding…' : 'Add Supplier' }}
-                    </button>
+        <AppModal :show="showAddSupplier" title="Add Supplier" @close="showAddSupplier = false">
+            <div class="space-y-4">
+                <AppInput v-model="supplierForm.supplier_name" label="Supplier Name" required
+                    placeholder="Business or vendor name" />
+                <AppInput v-model="supplierForm.supplier_address" label="Business Address" />
+                <div class="grid grid-cols-2 gap-4">
+                    <AppInput v-model="supplierForm.supplier_tin" label="TIN" placeholder="000-000-000-000" />
+                    <AppInput v-model="supplierForm.supplier_contact" label="Contact No." />
                 </div>
             </div>
-        </div>
+            <template #footer>
+                <AppButton variant="secondary" @click="showAddSupplier = false">Cancel</AppButton>
+                <AppButton :disabled="addingSupplier || !supplierForm.supplier_name.trim()" @click="addSupplier">
+                    {{ addingSupplier ? 'Adding…' : 'Add Supplier' }}
+                </AppButton>
+            </template>
+        </AppModal>
 
         <!-- Enter Quotation Prices Modal -->
-        <div v-if="quotationModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-                    <h3 class="text-base font-semibold text-slate-800">Quotation Prices — {{ quotationModal.supplier_name }}</h3>
-                    <button @click="quotationModal = null" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                        <XMarkIcon class="h-5 w-5" />
-                    </button>
-                </div>
-                <div class="overflow-y-auto flex-1 px-6 py-4">
-                    <table class="min-w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-slate-200">
-                                <th class="pb-2 text-left text-xs font-semibold text-slate-500 uppercase">Item</th>
-                                <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-16">Qty</th>
-                                <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-20">ABC/u</th>
-                                <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Unit Cost <span class="text-red-400">*</span></th>
-                                <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="row in quotationRows" :key="row.rfq_item_id">
-                                <td class="py-2.5 pr-3 text-slate-700 text-xs">{{ row.description }}</td>
-                                <td class="py-2.5 text-right text-slate-500 text-xs">{{ row.quantity }}</td>
-                                <td class="py-2.5 text-right text-slate-400 text-xs font-mono">
-                                    {{ row.abc > 0 ? formatCurrency(row.abc / row.quantity) : '—' }}
-                                </td>
-                                <td class="py-2.5 text-right">
-                                    <input v-model.number="row.unit_cost" type="number" step="0.01" min="0"
-                                        class="w-full rounded border border-slate-200 px-2 py-1 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                                </td>
-                                <td class="py-2.5 text-right text-xs font-mono text-slate-700">
-                                    {{ row.unit_cost > 0 ? formatCurrency(Number(row.unit_cost) * row.quantity) : '—' }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
-                    <button @click="quotationModal = null" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button @click="saveQuotations" :disabled="savingQuotations"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
-                        {{ savingQuotations ? 'Saving…' : 'Save Prices' }}
-                    </button>
-                </div>
-            </div>
-        </div>
+        <AppModal :show="!!quotationModal" :title="`Quotation Prices — ${quotationModal?.supplier_name}`" size="2xl"
+            body-class="px-6 py-4" @close="quotationModal = null">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-200">
+                        <th class="pb-2 text-left text-xs font-semibold text-slate-500 uppercase">Item</th>
+                        <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-16">Qty</th>
+                        <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-20">ABC/u</th>
+                        <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Unit Cost <span class="text-danger-600">*</span></th>
+                        <th class="pb-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr v-for="row in quotationRows" :key="row.rfq_item_id">
+                        <td class="py-2.5 pr-3 text-slate-700 text-xs">{{ row.description }}</td>
+                        <td class="py-2.5 text-right text-slate-500 text-xs">{{ row.quantity }}</td>
+                        <td class="py-2.5 text-right text-slate-400 text-xs font-mono">
+                            {{ row.abc > 0 ? formatCurrency(row.abc / row.quantity) : '—' }}
+                        </td>
+                        <td class="py-2.5 text-right">
+                            <input v-model.number="row.unit_cost" type="number" step="0.01" min="0"
+                                class="w-full rounded border border-slate-200 px-2 py-1 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        </td>
+                        <td class="py-2.5 text-right text-xs font-mono text-slate-700">
+                            {{ row.unit_cost > 0 ? formatCurrency(Number(row.unit_cost) * row.quantity) : '—' }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <template #footer>
+                <AppButton variant="secondary" @click="quotationModal = null">Cancel</AppButton>
+                <AppButton :disabled="savingQuotations" @click="saveQuotations">
+                    {{ savingQuotations ? 'Saving…' : 'Save Prices' }}
+                </AppButton>
+            </template>
+        </AppModal>
 
     </AdminLayout>
 </template>

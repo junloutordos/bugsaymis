@@ -3,96 +3,98 @@
   <AdminLayout title="Load Assignments">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Load Assignments</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Assign teaching, research, admin and co-curricular loads to faculty</p>
-        </div>
-        <div class="flex gap-2">
-          <button @click="syncLoads"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg font-medium transition-colors shrink-0">
+      <AppPageHeader title="Load Assignments" subtitle="Assign teaching, research, admin and co-curricular loads to faculty">
+        <template #actions>
+          <AppButton variant="secondary" @click="syncLoads">
             <ArrowPathIcon class="h-4 w-4" /> Re-sync Loads
-          </button>
-          <button @click="openAutoAssign()"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-medium transition-colors shrink-0">
-            <SparklesIcon class="h-4 w-4" /> Auto-Assign
-          </button>
-          <button @click="openForm()"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
+          </AppButton>
+          <AppButton variant="secondary" @click="openAutoAssign()">
+            <SparklesIcon class="h-4 w-4 text-purple-500" /> Auto-Assign
+          </AppButton>
+          <AppButton @click="openForm()">
             <PlusIcon class="h-4 w-4" /> Add Assignment
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
-      <div v-if="Object.keys($page.props.errors ?? {}).length" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm space-y-1">
+      <div v-if="Object.keys($page.props.errors ?? {}).length" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm space-y-1">
         <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
       </div>
 
       <!-- Term filter -->
-      <div class="flex flex-wrap gap-2">
+      <AppFilterBar>
         <select v-model="filters.term_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option v-for="t in terms" :key="t.id" :value="t.id">
             {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
           </option>
         </select>
-        <input v-model="search" type="search" placeholder="Search faculty..."
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-48 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-      </div>
-
-      <!-- Empty -->
-      <div v-if="filteredFaculty.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No assignments found for this term</p>
-        <p class="text-xs text-slate-400 mt-1">Run Auto-Assign or add assignments manually to get started.</p>
-      </div>
+        <div class="w-48">
+          <AppInput v-model="search" type="search" placeholder="Search faculty..." />
+        </div>
+      </AppFilterBar>
 
       <!-- Faculty list -->
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Teaching</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Other</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="fl in filteredFaculty" :key="fl.faculty_id" class="hover:bg-slate-50/50">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ fl.faculty_name }}</td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ fl.position ?? '—' }}</td>
-              <td class="px-4 py-3 text-center font-semibold text-indigo-700">{{ fl.teaching_units }}u</td>
-              <td class="px-4 py-3 text-center text-slate-500">{{ fl.other_units }}u</td>
-              <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ fl.total_units }}u</td>
-              <td class="px-4 py-3 text-center">
-                <span :class="statusBadge(fl.load_status)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                  {{ fl.load_status ?? '—' }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <button @click="openDetail(fl)"
-                  class="p-1.5 text-slate-400 hover:text-emerald-600 rounded transition-colors" title="View assignments">
-                  <EyeIcon class="h-4 w-4" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <AppTable :is-empty="filteredFaculty.length === 0" :skeleton-cols="7">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Teaching</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Other</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
+
+        <tr v-for="fl in filteredFaculty" :key="fl.faculty_id" class="hover:bg-slate-50/50">
+          <td class="px-4 py-3 font-medium text-slate-800">{{ fl.faculty_name }}</td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ fl.position ?? '—' }}</td>
+          <td class="px-4 py-3 text-center font-semibold text-indigo-700">{{ fl.teaching_units }}u</td>
+          <td class="px-4 py-3 text-center text-slate-500">{{ fl.other_units }}u</td>
+          <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ fl.total_units }}u</td>
+          <td class="px-4 py-3 text-center">
+            <AppBadge :color="statusBadge(fl.load_status)" class="capitalize">{{ fl.load_status ?? '—' }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <AppIconButton label="View assignments" variant="success" @click="openDetail(fl)">
+              <EyeIcon class="h-4 w-4" />
+            </AppIconButton>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="fl in filteredFaculty" :key="fl.faculty_id" class="p-4 space-y-2" @click="openDetail(fl)">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ fl.faculty_name }}</p>
+                <p class="text-xs text-slate-500">{{ fl.position ?? '—' }}</p>
+              </div>
+              <AppBadge :color="statusBadge(fl.load_status)" class="capitalize">{{ fl.load_status ?? '—' }}</AppBadge>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-slate-500">
+              <span>Teaching: <strong class="text-indigo-700">{{ fl.teaching_units }}u</strong></span>
+              <span>Other: <strong class="text-slate-700">{{ fl.other_units }}u</strong></span>
+              <span>Total: <strong class="text-slate-800">{{ fl.total_units }}u</strong></span>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No assignments found for this term"
+            subtitle="Run Auto-Assign or add assignments manually to get started."
+            :icon="ClipboardDocumentListIcon" />
+        </template>
+      </AppTable>
 
     </div>
 
-    <!-- ── Detail panel ─────────────────────────────────────────────────────── -->
+    <!-- ── Detail panel (slide-over — kept as bespoke chrome, no shared drawer component exists) ── -->
     <div v-if="detail.open" class="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm"
       @click.self="detail.open = false">
       <div class="bg-white w-full max-w-xl h-full shadow-2xl flex flex-col overflow-hidden">
@@ -104,22 +106,19 @@
             <p class="text-xs text-slate-500 mt-0.5">{{ detail.faculty?.position ?? '' }}</p>
           </div>
           <div class="flex items-center gap-2">
-            <button @click="openForm(null, detail.faculty?.faculty_id)"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
+            <AppButton size="sm" @click="openForm(null, detail.faculty?.faculty_id)">
               <PlusIcon class="h-3.5 w-3.5" /> Add
-            </button>
-            <button @click="detail.open = false" class="p-1.5 text-slate-400 hover:text-slate-600 rounded">
-              <XMarkIcon class="h-5 w-5" />
-            </button>
+            </AppButton>
+            <AppIconButton label="Close" @click="detail.open = false"><XMarkIcon class="h-5 w-5" /></AppIconButton>
           </div>
         </div>
 
         <!-- Load summary strip -->
-        <div class="px-6 py-3 bg-slate-50 border-b border-slate-100 flex gap-4 text-xs shrink-0">
+        <div class="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-4 text-xs shrink-0">
           <span class="text-slate-500">Teaching: <strong class="text-indigo-700">{{ detail.faculty?.teaching_units }}u</strong></span>
           <span class="text-slate-500">Other: <strong class="text-slate-700">{{ detail.faculty?.other_units }}u</strong></span>
           <span class="text-slate-500">Total: <strong class="text-slate-800">{{ detail.faculty?.total_units }}u</strong></span>
-          <span v-if="detail.faculty?.is_locked" class="ml-auto text-amber-600 font-medium">Locked</span>
+          <AppBadge v-if="detail.faculty?.is_locked" color="amber" class="ml-auto">Locked</AppBadge>
         </div>
 
         <!-- Assignment list -->
@@ -132,137 +131,108 @@
             <div class="min-w-0">
               <p class="text-sm font-medium text-slate-800 truncate">{{ assignmentLabel(a) }}</p>
               <div class="flex items-center gap-2 mt-0.5">
-                <span :class="typeBadge(a.assignment_type)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium">
-                  {{ typeLabel(a.assignment_type) }}
-                </span>
+                <AppBadge :color="typeBadge(a.assignment_type)">{{ typeLabel(a.assignment_type) }}</AppBadge>
                 <span class="text-xs text-slate-500">{{ a.load_units }}u</span>
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <button @click="openForm(a)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                <PencilIcon class="h-4 w-4" />
-              </button>
-              <button @click="remove(a)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                <TrashIcon class="h-4 w-4" />
-              </button>
+              <AppIconButton label="Edit assignment" @click="openForm(a)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+              <AppIconButton label="Remove assignment" variant="danger" @click="remove(a)"><TrashIcon class="h-4 w-4" /></AppIconButton>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Modal -->
-    <div v-if="modal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 my-8">
-        <h2 class="text-lg font-semibold text-slate-800">{{ form.id ? 'Edit' : 'Add' }} Load Assignment</h2>
-
-        <div class="space-y-3">
-          <!-- Faculty (create only) -->
-          <div v-if="!form.id">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
-            <select v-model="form.user_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select faculty...</option>
-              <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
-          </div>
-
-          <!-- Term (create only) -->
-          <div v-if="!form.id">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
-            <select v-model="form.academic_term_id" @change="onTermChange"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select term...</option>
-              <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
-            </select>
-          </div>
-
-          <!-- Type -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Assignment Type *</label>
-            <select v-model="form.assignment_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option value="">Select type...</option>
-              <option v-for="t in assignmentTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-            </select>
-          </div>
-
-          <!-- Subject (teaching only) — shown before section so elective check can react -->
-          <div v-if="form.assignment_type === 'teaching'">
-            <label class="block text-xs font-medium text-slate-600 mb-1">
-              Subject *
-              <span v-if="form.section_id && !selectedSubjectIsElective" class="text-indigo-500 font-normal ml-1">
-                ({{ filteredSubjects.length }} for Grade {{ selectedSectionGrade }})
-              </span>
-            </label>
-            <select v-model="form.subject_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">{{ form.section_id && !selectedSubjectIsElective ? 'Select subject...' : 'Select subject...' }}</option>
-              <option v-for="s in filteredSubjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
-            </select>
-          </div>
-
-          <!-- Section (teaching only, non-elective subjects) -->
-          <div v-if="form.assignment_type === 'teaching' && !selectedSubjectIsElective">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Section *</label>
-            <select v-model="form.section_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select section...</option>
-              <option v-for="s in filteredSections" :key="s.id" :value="s.id">Grade {{ s.levelid }} — {{ s.sectionname }}</option>
-            </select>
-          </div>
-
-          <!-- Elective notice (no section needed) -->
-          <div v-if="form.assignment_type === 'teaching' && selectedSubjectIsElective"
-            class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-            Elective subject — offered across sections, no specific section required.
-          </div>
-
-          <!-- Description (non-teaching) -->
-          <div v-if="form.assignment_type && form.assignment_type !== 'teaching'">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-            <input v-model="form.description" type="text" placeholder="Brief description..."
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-
-          <!-- Load units -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">
-              Load Units *
-              <span v-if="form.subject_id" class="text-indigo-500 font-normal ml-1">(auto-filled from subject)</span>
-            </label>
-            <input v-model.number="form.load_units" type="number" step="0.5" min="0.5" max="30"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              :class="form.subject_id ? 'bg-indigo-50 border-indigo-200' : ''" />
-          </div>
+    <!-- Add/Edit Modal -->
+    <AppModal :show="modal" :title="`${form.id ? 'Edit' : 'Add'} Load Assignment`" size="lg" @close="modal = false">
+      <div class="space-y-3">
+        <!-- Faculty (create only) -->
+        <div v-if="!form.id">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
+          <select v-model="form.user_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select faculty...</option>
+            <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
         </div>
 
-        <div class="flex justify-end gap-2 pt-1">
-          <button @click="modal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="save" :disabled="form.processing"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
-            {{ form.id ? 'Update' : 'Save' }}
-          </button>
+        <!-- Term (create only) -->
+        <div v-if="!form.id">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
+          <select v-model="form.academic_term_id" @change="onTermChange"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select term...</option>
+            <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
+          </select>
+        </div>
+
+        <!-- Type -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Assignment Type *</label>
+          <select v-model="form.assignment_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option value="">Select type...</option>
+            <option v-for="t in assignmentTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
+        </div>
+
+        <!-- Subject (teaching only) — shown before section so elective check can react -->
+        <div v-if="form.assignment_type === 'teaching'">
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            Subject *
+            <span v-if="form.section_id && !selectedSubjectIsElective" class="text-indigo-500 font-normal ml-1">
+              ({{ filteredSubjects.length }} for Grade {{ selectedSectionGrade }})
+            </span>
+          </label>
+          <select v-model="form.subject_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">{{ form.section_id && !selectedSubjectIsElective ? 'Select subject...' : 'Select subject...' }}</option>
+            <option v-for="s in filteredSubjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
+          </select>
+        </div>
+
+        <!-- Section (teaching only, non-elective subjects) -->
+        <div v-if="form.assignment_type === 'teaching' && !selectedSubjectIsElective">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Section *</label>
+          <select v-model="form.section_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select section...</option>
+            <option v-for="s in filteredSections" :key="s.id" :value="s.id">Grade {{ s.levelid }} — {{ s.sectionname }}</option>
+          </select>
+        </div>
+
+        <!-- Elective notice (no section needed) -->
+        <div v-if="form.assignment_type === 'teaching' && selectedSubjectIsElective"
+          class="rounded-lg bg-warning-50 border border-warning-100 px-3 py-2 text-xs text-warning-700">
+          Elective subject — offered across sections, no specific section required.
+        </div>
+
+        <!-- Description (non-teaching) -->
+        <div v-if="form.assignment_type && form.assignment_type !== 'teaching'">
+          <AppInput v-model="form.description" label="Description" placeholder="Brief description..." />
+        </div>
+
+        <!-- Load units -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            Load Units *
+            <span v-if="form.subject_id" class="text-indigo-500 font-normal ml-1">(auto-filled from subject)</span>
+          </label>
+          <input v-model.number="form.load_units" type="number" step="0.5" min="0.5" max="30"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            :class="form.subject_id ? 'bg-indigo-50 border-indigo-200' : ''" />
         </div>
       </div>
-    </div>
 
-  <!-- ── Auto-Assign Modal ──────────────────────────────────────── -->
-  <div v-if="autoAssign.open" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8 overflow-hidden">
+      <template #footer>
+        <AppButton variant="secondary" @click="modal = false">Cancel</AppButton>
+        <AppButton :loading="form.processing" @click="save">{{ form.id ? 'Update' : 'Save' }}</AppButton>
+      </template>
+    </AppModal>
 
-      <!-- Header -->
-      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full bg-purple-50 flex items-center justify-center">
-            <SparklesIcon class="h-5 w-5 text-purple-500" />
-          </div>
-          <div>
-            <h2 class="text-base font-semibold text-slate-800">Smart Auto-Assign Loads</h2>
-            <p class="text-xs text-slate-500">Matches faculty to subjects by specialization · auto-assigns sections by grade level · balances section load.</p>
-          </div>
-        </div>
-        <button @click="autoAssign.open = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-      </div>
+    <!-- ── Auto-Assign Modal ──────────────────────────────────────── -->
+    <AppModal :show="autoAssign.open" title="Smart Auto-Assign Loads"
+      subtitle="Matches faculty to subjects by specialization · auto-assigns sections by grade level · balances section load."
+      size="4xl" body-class="" @close="autoAssign.open = false">
 
       <!-- Controls -->
       <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-end">
@@ -281,16 +251,14 @@
             <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
           </select>
         </div>
-        <button @click="runPreview" :disabled="autoAssign.loading"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
-          <ArrowPathIcon v-if="autoAssign.loading" class="h-4 w-4 animate-spin" />
-          <MagnifyingGlassIcon v-else class="h-4 w-4" />
+        <AppButton :loading="autoAssign.loading" @click="runPreview">
+          <MagnifyingGlassIcon v-if="!autoAssign.loading" class="h-4 w-4" />
           {{ autoAssign.loading ? 'Generating…' : 'Generate Preview' }}
-        </button>
+        </AppButton>
       </div>
 
       <!-- Alert -->
-      <div v-if="autoAssign.error" class="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+      <div v-if="autoAssign.error" class="mx-6 mt-4 bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-4 py-3 text-sm">
         {{ autoAssign.error }}
       </div>
 
@@ -299,7 +267,7 @@
         <span><strong>{{ autoAssign.gapCount }}</strong> unfilled slots detected</span>
         <span><strong>{{ allProposedItems.length }}</strong> proposed to fill</span>
         <span><strong>{{ autoAssign.proposals.filter(p => p.assignments.length).length }}</strong> faculty matched</span>
-        <span v-if="autoAssign.gapCount > allProposedItems.length" class="text-amber-600 font-medium">
+        <span v-if="autoAssign.gapCount > allProposedItems.length" class="text-warning-600 font-medium">
           ⚠ {{ autoAssign.gapCount - allProposedItems.length }} slots may still need manual assignment
         </span>
       </div>
@@ -307,16 +275,16 @@
       <!-- Coverage gaps accordion -->
       <div v-if="autoAssign.gaps?.length" class="px-6 pt-4">
         <button @click="autoAssign.gapsOpen = !autoAssign.gapsOpen"
-          class="w-full flex items-center justify-between text-xs font-medium text-slate-600 hover:text-slate-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          class="w-full flex items-center justify-between text-xs font-medium text-slate-600 hover:text-slate-800 bg-warning-50 border border-warning-100 rounded-lg px-3 py-2">
           <span>
-            <span class="text-amber-700 font-semibold">{{ autoAssign.gapCount }} uncovered subject-section slots</span>
+            <span class="text-warning-700 font-semibold">{{ autoAssign.gapCount }} uncovered subject-section slots</span>
             — click to {{ autoAssign.gapsOpen ? 'hide' : 'view' }} details by grade level
           </span>
-          <span class="text-amber-500 ml-2">{{ autoAssign.gapsOpen ? '▲' : '▼' }}</span>
+          <span class="text-warning-500 ml-2">{{ autoAssign.gapsOpen ? '▲' : '▼' }}</span>
         </button>
-        <div v-if="autoAssign.gapsOpen" class="mt-2 border border-amber-100 rounded-lg overflow-hidden">
-          <div v-for="(slots, grade) in gapsByGrade" :key="grade" class="border-b border-amber-50 last:border-0">
-            <div class="px-3 py-1.5 bg-amber-50 text-xs font-semibold text-amber-700">Grade {{ grade }}</div>
+        <div v-if="autoAssign.gapsOpen" class="mt-2 border border-warning-100 rounded-lg overflow-hidden">
+          <div v-for="(slots, grade) in gapsByGrade" :key="grade" class="border-b border-warning-50 last:border-0">
+            <div class="px-3 py-1.5 bg-warning-50 text-xs font-semibold text-warning-700">Grade {{ grade }}</div>
             <div class="divide-y divide-slate-50">
               <div v-for="slot in slots" :key="`${slot.section_id}-${slot.subject_id}`"
                 class="px-3 py-1.5 flex items-center gap-3 text-xs text-slate-600">
@@ -405,7 +373,7 @@
                 <!-- Sections — all assigned -->
                 <td class="px-2 py-2">
                   <div v-if="group.sections.length" class="flex flex-wrap gap-1">
-                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success-50 text-success-700">
                       {{ group.sections.length }} section{{ group.sections.length !== 1 ? 's' : '' }}
                     </span>
                     <span v-for="sec in group.sections" :key="sec.id"
@@ -413,7 +381,7 @@
                       {{ sec.label.split('—')[1]?.trim() ?? sec.label }}
                     </span>
                   </div>
-                  <span v-else class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
+                  <span v-else class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-warning-50 text-warning-700">
                     No section
                   </span>
                 </td>
@@ -444,27 +412,27 @@
         </div>
 
         <!-- Manual assignment panel for remaining unfilled slots -->
-        <div v-if="autoAssign.manualSlots.length" class="mt-3 border border-amber-200 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 bg-amber-50 flex items-center justify-between">
+        <div v-if="autoAssign.manualSlots.length" class="mt-3 border border-warning-100 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-warning-50 flex items-center justify-between">
             <div>
-              <p class="text-sm font-semibold text-amber-800">
+              <p class="text-sm font-semibold text-warning-700">
                 Needs Manual Assignment
-                <span class="ml-1.5 inline-flex items-center rounded-full bg-amber-200 text-amber-800 px-2 py-0.5 text-xs font-bold">
+                <span class="ml-1.5 inline-flex items-center rounded-full bg-warning-100 text-warning-700 px-2 py-0.5 text-xs font-bold">
                   {{ autoAssign.manualSlots.length }} slot{{ autoAssign.manualSlots.length !== 1 ? 's' : '' }}
                 </span>
               </p>
-              <p class="text-xs text-amber-600 mt-0.5">
+              <p class="text-xs text-warning-600 mt-0.5">
                 These subjects have no matching faculty specialization — select a faculty for each slot to include in Apply.
               </p>
             </div>
-            <span v-if="manualSelected.length" class="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+            <span v-if="manualSelected.length" class="text-xs font-semibold text-success-700 bg-success-50 border border-success-100 rounded-full px-2.5 py-1">
               {{ manualSelected.length }} assigned
             </span>
           </div>
 
           <div v-for="group in manualSlotsBySection" :key="`${group.grade}-${group.section_id}`">
             <!-- Section header -->
-            <div class="px-4 py-1.5 bg-slate-50 border-t border-amber-100 text-xs font-semibold text-slate-600 uppercase tracking-wide">
+            <div class="px-4 py-1.5 bg-slate-50 border-t border-warning-100 text-xs font-semibold text-slate-600 uppercase tracking-wide">
               Grade {{ group.grade }} — {{ group.section_name }}
             </div>
 
@@ -485,8 +453,8 @@
 
               <!-- Faculty picker -->
               <select v-model="slot.faculty_id"
-                class="text-sm border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-400 focus:border-transparent shrink-0 max-w-[220px]"
-                :class="slot.faculty_id ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'">
+                class="text-sm border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-warning-500 focus:border-transparent shrink-0 max-w-[220px]"
+                :class="slot.faculty_id ? 'border-success-100 bg-success-50 text-success-700' : 'border-slate-200 text-slate-600'">
                 <option :value="null">Select faculty…</option>
                 <option v-for="f in props.faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
               </select>
@@ -494,30 +462,27 @@
           </div>
         </div>
 
-      </div>
-
-      <!-- Footer -->
-      <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-        <p class="text-xs text-slate-400">
+        <!-- Helper note (kept in body so the AppModal footer stays a simple right-aligned action row) -->
+        <p class="text-xs text-slate-400 pt-2 border-t border-slate-100">
           Sections are auto-assigned by grade level. You can override any section above before applying.
         </p>
-        <div class="flex gap-3">
-          <button @click="autoAssign.open = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium">Cancel</button>
-          <button @click="applyAutoAssign"
-            :disabled="(!autoAssign.selected.length && !manualSelected.length) || autoAssign.applying"
-            class="inline-flex items-center gap-2 px-5 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
-            <ArrowPathIcon v-if="autoAssign.applying" class="h-4 w-4 animate-spin" />
-            <CheckIcon v-else class="h-4 w-4" />
-            Apply
-            <span v-if="autoAssign.selected.length || manualSelected.length">
-              ({{ autoAssign.selected.length + manualSelected.length }})
-            </span>
-          </button>
-        </div>
+
       </div>
 
-    </div>
-  </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="autoAssign.open = false">Cancel</AppButton>
+        <AppButton variant="success"
+          :disabled="(!autoAssign.selected.length && !manualSelected.length) || autoAssign.applying"
+          :loading="autoAssign.applying"
+          @click="applyAutoAssign">
+          <CheckIcon v-if="!autoAssign.applying" class="h-4 w-4" />
+          Apply
+          <span v-if="autoAssign.selected.length || manualSelected.length">
+            ({{ autoAssign.selected.length + manualSelected.length }})
+          </span>
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
@@ -527,6 +492,16 @@ import { reactive, ref, computed, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import {
   AcademicCapIcon, ArrowPathIcon, CheckCircleIcon, CheckIcon, ClipboardDocumentListIcon,
   EyeIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
@@ -695,31 +670,33 @@ function syncLoads() {
   })
 }
 
-function remove(a) {
-  if (!confirm(`Remove "${assignmentLabel(a)}" assignment?`)) return
+async function remove(a) {
+  if (! await confirmDelete(`Remove "${assignmentLabel(a)}" assignment?`)) return
   useForm({}).delete(route('faculty-loading.assignments.destroy', a.id), {
     onSuccess: () => router.reload({ only: ['assignments'] }),
   })
 }
 
+// Color-mapping helpers for AppBadge (simple list/status pills)
 function statusBadge(status) {
   return {
-    underload: 'bg-amber-50 text-amber-700',
-    full_load: 'bg-emerald-50 text-emerald-700',
-    overload:  'bg-red-50 text-red-700',
-  }[status] ?? 'bg-slate-100 text-slate-400'
+    underload: 'amber',
+    full_load: 'green',
+    overload:  'red',
+  }[status] ?? 'slate'
 }
 
 function typeBadge(type) {
   return {
-    teaching:     'bg-indigo-50 text-indigo-700',
-    research:     'bg-violet-50 text-violet-700',
-    admin:        'bg-blue-50 text-blue-700',
-    cocurricular: 'bg-teal-50 text-teal-700',
-    committee:    'bg-orange-50 text-orange-700',
-  }[type] ?? 'bg-slate-50 text-slate-600'
+    teaching:     'indigo',
+    research:     'purple',
+    admin:        'blue',
+    cocurricular: 'green',
+    committee:    'orange',
+  }[type] ?? 'slate'
 }
 
+// Raw class-map helpers kept for the dense Auto-Assign preview widget (rows/badges below)
 function nonTeachingBadge(type) {
   return {
     research:     'bg-violet-100 text-violet-700',

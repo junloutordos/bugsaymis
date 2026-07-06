@@ -3,284 +3,222 @@
   <AdminLayout title="Faculty List">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Faculty List</h1>
-          <p class="text-sm text-slate-500 mt-0.5">All active faculty members with their positions and specializations</p>
-        </div>
-        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium">
-          <UsersIcon class="h-4 w-4" />
-          {{ faculty.length }} faculty
-        </span>
-      </div>
+      <AppPageHeader title="Faculty List" subtitle="All active faculty members with their positions and specializations">
+        <template #actions>
+          <AppBadge color="indigo">
+            <UsersIcon class="h-4 w-4" />
+            {{ faculty.length }} faculty
+          </AppBadge>
+        </template>
+      </AppPageHeader>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
-        <input
-          v-model="search"
-          @input="onSearch"
-          type="search"
-          placeholder="Search name, badge ID, position, specialization..."
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-72 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        />
-        <select
-          v-model="divisionFilter"
-          @change="applyFilters"
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        >
+      <AppFilterBar>
+        <div class="w-72">
+          <AppInput v-model="search" type="search" placeholder="Search name, badge ID, position, specialization..." />
+        </div>
+        <select v-model="divisionFilter" @change="applyFilters"
+          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option value="">All Divisions</option>
           <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
         </select>
-        <select
-          v-model="categoryFilter"
-          @change="applyFilters"
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        >
-          <option value="">All Categories</option>
+        <div class="w-52">
+          <AppSelect :model-value="categoryFilter" :show-blank="false"
+            @update:model-value="v => { categoryFilter = v; applyFilters() }">
+            <option value="">All Categories</option>
+            <option value="Plantilla Teaching">Plantilla Teaching</option>
+            <option value="Plantilla Non-Teaching">Plantilla Non-Teaching</option>
+            <option value="COS Teaching">COS Teaching</option>
+            <option value="COS Non Teaching">COS Non Teaching</option>
+          </AppSelect>
+        </div>
+      </AppFilterBar>
+
+      <!-- Table -->
+      <AppTable :is-empty="faculty.length === 0" :skeleton-cols="9">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Badge ID</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Position</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Specialization</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Division / Office</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Category</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sex</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
+
+        <tr v-for="(f, i) in paged" :key="f.id" class="hover:bg-slate-50 transition-colors">
+          <td class="px-4 py-3 text-slate-400 tabular-nums">{{ (currentPage - 1) * perPage + i + 1 }}</td>
+          <td class="px-4 py-3">
+            <div class="font-medium text-slate-800">{{ f.name }}</div>
+            <AppBadge v-if="f.on_study_leave" color="amber">Study Leave</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-600">{{ f.badge_id || '—' }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ f.position || '—' }}</td>
+          <td class="px-4 py-3 text-slate-600">
+            <span v-if="f.specialization" class="inline-flex items-center gap-1">
+              <AcademicCapIcon class="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+              {{ f.specialization }}
+            </span>
+            <span v-else class="text-slate-400">—</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600">
+            <div>{{ f.division?.name || '—' }}</div>
+            <div v-if="f.office" class="text-xs text-slate-400">{{ f.office.name }}</div>
+          </td>
+          <td class="px-4 py-3">
+            <AppBadge v-if="f.emp_category" :color="categoryBadge(f.emp_category)">{{ f.emp_category }}</AppBadge>
+            <span v-else class="text-slate-400">—</span>
+          </td>
+          <td class="px-4 py-3 text-center text-slate-600">{{ f.sex || '—' }}</td>
+          <td class="px-4 py-3 text-center">
+            <AppIconButton label="Edit faculty" @click="openEdit(f)"><PencilSquareIcon class="h-4 w-4" /></AppIconButton>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="(f, i) in paged" :key="f.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ f.name }}</p>
+                <p class="text-xs text-slate-400">{{ f.badge_id || '—' }} &middot; {{ f.position || '—' }}</p>
+              </div>
+              <AppBadge v-if="f.on_study_leave" color="amber">Study Leave</AppBadge>
+            </div>
+            <p v-if="f.specialization" class="inline-flex items-center gap-1 text-xs text-slate-600">
+              <AcademicCapIcon class="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+              {{ f.specialization }}
+            </p>
+            <p class="text-xs text-slate-500">
+              {{ f.division?.name || '—' }}<span v-if="f.office"> &middot; {{ f.office.name }}</span>
+            </p>
+            <div class="flex items-center gap-2">
+              <AppBadge v-if="f.emp_category" :color="categoryBadge(f.emp_category)">{{ f.emp_category }}</AppBadge>
+              <span class="text-xs text-slate-500">Sex: {{ f.sex || '—' }}</span>
+            </div>
+            <div class="pt-1">
+              <AppIconButton label="Edit faculty" @click="openEdit(f)"><PencilSquareIcon class="h-4 w-4" /></AppIconButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No faculty members found" subtitle="Try adjusting your filters or ensure users are assigned the Faculty role." :icon="UsersIcon" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :total="faculty.length"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
+
+    </div>
+
+    <!-- Edit Modal -->
+    <AppModal :show="editModal.open" title="Edit Faculty Details" :subtitle="editModal.name" @close="closeEdit">
+      <form @submit.prevent="submitEdit" class="space-y-4">
+
+        <AppInput v-model="form.name" label="Full Name" required placeholder="e.g. Juan dela Cruz" />
+
+        <AppSelect v-model="form.sex" label="Sex" placeholder="— Select —">
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </AppSelect>
+
+        <AppInput v-model="form.position" label="Position" placeholder="e.g. Teacher I" />
+
+        <div>
+          <AppInput v-model="form.specialization" label="Specialization" placeholder="e.g. Mathematics, Science" />
+          <p class="text-xs text-slate-400 mt-1">Used for auto-assignment of teaching loads.</p>
+        </div>
+
+        <!-- Division -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Division</label>
+          <select v-model="form.division_id" @change="form.office_id = ''"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option value="">— None —</option>
+            <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
+          </select>
+        </div>
+
+        <!-- Office (filtered by division) -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Office</label>
+          <select v-model="form.office_id"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option value="">— None —</option>
+            <option v-for="o in filteredOffices" :key="o.id" :value="o.id">{{ o.name }}</option>
+          </select>
+        </div>
+
+        <AppSelect v-model="form.emp_category" label="Employment Category" placeholder="— None —">
           <option value="Plantilla Teaching">Plantilla Teaching</option>
           <option value="Plantilla Non-Teaching">Plantilla Non-Teaching</option>
           <option value="COS Teaching">COS Teaching</option>
           <option value="COS Non Teaching">COS Non Teaching</option>
-        </select>
-      </div>
+        </AppSelect>
 
-      <!-- Empty -->
-      <div v-if="faculty.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <UsersIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No faculty members found</p>
-        <p class="text-xs text-slate-400 mt-1">Try adjusting your filters or ensure users are assigned the Faculty role.</p>
-      </div>
-
-      <!-- Table -->
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Badge ID</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Specialization</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Division / Office</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Sex</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr
-              v-for="(f, i) in paged"
-              :key="f.id"
-              class="hover:bg-slate-50 transition-colors"
-            >
-              <td class="px-4 py-3 text-slate-400 tabular-nums">{{ (currentPage - 1) * perPage + i + 1 }}</td>
-              <td class="px-4 py-3">
-                <div class="font-medium text-slate-800">{{ f.name }}</div>
-                <span v-if="f.on_study_leave"
-                  class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
-                  Study Leave
-                </span>
-              </td>
-              <td class="px-4 py-3 text-slate-600">{{ f.badge_id || '—' }}</td>
-              <td class="px-4 py-3 text-slate-600">{{ f.position || '—' }}</td>
-              <td class="px-4 py-3 text-slate-600">
-                <span v-if="f.specialization" class="inline-flex items-center gap-1">
-                  <AcademicCapIcon class="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                  {{ f.specialization }}
-                </span>
-                <span v-else class="text-slate-400">—</span>
-              </td>
-              <td class="px-4 py-3 text-slate-600">
-                <div>{{ f.division?.name || '—' }}</div>
-                <div v-if="f.office" class="text-xs text-slate-400">{{ f.office.name }}</div>
-              </td>
-              <td class="px-4 py-3">
-                <span
-                  v-if="f.emp_category"
-                  :class="categoryBadge(f.emp_category)"
-                  class="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
-                >
-                  {{ f.emp_category }}
-                </span>
-                <span v-else class="text-slate-400">—</span>
-              </td>
-              <td class="px-4 py-3 text-center text-slate-600">{{ f.sex || '—' }}</td>
-              <td class="px-4 py-3 text-center">
-                <button
-                  @click="openEdit(f)"
-                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
-                >
-                  <PencilSquareIcon class="h-3.5 w-3.5" /> Edit
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <PaginationControl
-          v-if="totalPages > 1"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          :total="faculty.length"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
-
-    </div>
-
-    <!-- ── Edit Modal ─────────────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="closeEdit" />
-
-        <!-- Panel -->
-        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-
-          <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-            <div>
-              <h2 class="text-base font-semibold text-slate-800">Edit Faculty Details</h2>
-              <p class="text-xs text-slate-400 mt-0.5">{{ editModal.name }}</p>
-            </div>
-            <button @click="closeEdit" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
-              <XMarkIcon class="h-5 w-5" />
-            </button>
+        <!-- Study Leave -->
+        <div class="rounded-xl border p-4 flex items-start gap-3"
+          :class="form.on_study_leave ? 'border-warning-100 bg-warning-50' : 'border-slate-200 bg-slate-50'">
+          <div class="flex-1">
+            <p class="text-sm font-medium" :class="form.on_study_leave ? 'text-warning-700' : 'text-slate-700'">
+              On Study Leave
+            </p>
+            <p class="text-xs mt-0.5" :class="form.on_study_leave ? 'text-warning-600' : 'text-slate-400'">
+              {{ form.on_study_leave
+                ? 'This faculty is on study leave and will be excluded from load assignments and scheduling.'
+                : 'Mark this faculty as on study leave to exclude them from load assignments and scheduling.' }}
+            </p>
           </div>
-
-          <!-- Body -->
-          <form @submit.prevent="submitEdit" class="px-6 py-5 space-y-4">
-
-            <!-- Name -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Full Name <span class="text-red-400">*</span></label>
-              <input v-model="form.name" type="text" required
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="e.g. Juan dela Cruz" />
-            </div>
-
-            <!-- Sex -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Sex</label>
-              <select v-model="form.sex"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option value="">— Select —</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
-
-            <!-- Position -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Position</label>
-              <input v-model="form.position" type="text"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="e.g. Teacher I" />
-            </div>
-
-            <!-- Specialization -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Specialization</label>
-              <input v-model="form.specialization" type="text"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="e.g. Mathematics, Science" />
-              <p class="text-xs text-slate-400 mt-1">Used for auto-assignment of teaching loads.</p>
-            </div>
-
-            <!-- Division -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Division</label>
-              <select v-model="form.division_id" @change="form.office_id = ''"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option value="">— None —</option>
-                <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
-              </select>
-            </div>
-
-            <!-- Office (filtered by division) -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Office</label>
-              <select v-model="form.office_id"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option value="">— None —</option>
-                <option
-                  v-for="o in filteredOffices"
-                  :key="o.id"
-                  :value="o.id"
-                >{{ o.name }}</option>
-              </select>
-            </div>
-
-            <!-- Employment Category -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Employment Category</label>
-              <select v-model="form.emp_category"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option value="">— None —</option>
-                <option value="Plantilla Teaching">Plantilla Teaching</option>
-                <option value="Plantilla Non-Teaching">Plantilla Non-Teaching</option>
-                <option value="COS Teaching">COS Teaching</option>
-                <option value="COS Non Teaching">COS Non Teaching</option>
-              </select>
-            </div>
-
-            <!-- Study Leave -->
-            <div class="rounded-xl border p-4 flex items-start gap-3"
-              :class="form.on_study_leave ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'">
-              <div class="flex-1">
-                <p class="text-sm font-medium" :class="form.on_study_leave ? 'text-amber-800' : 'text-slate-700'">
-                  On Study Leave
-                </p>
-                <p class="text-xs mt-0.5" :class="form.on_study_leave ? 'text-amber-600' : 'text-slate-400'">
-                  {{ form.on_study_leave
-                    ? 'This faculty is on study leave and will be excluded from load assignments and scheduling.'
-                    : 'Mark this faculty as on study leave to exclude them from load assignments and scheduling.' }}
-                </p>
-              </div>
-              <button type="button" @click="form.on_study_leave = !form.on_study_leave"
-                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
-                :class="form.on_study_leave ? 'bg-amber-500' : 'bg-slate-300'">
-                <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform"
-                  :class="form.on_study_leave ? 'translate-x-5' : 'translate-x-0'" />
-              </button>
-            </div>
-
-            <!-- Footer -->
-            <div class="flex justify-end gap-2 pt-2">
-              <button type="button" @click="closeEdit"
-                class="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">
-                Cancel
-              </button>
-              <button type="submit" :disabled="saving"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors">
-                <ArrowPathIcon v-if="saving" class="h-4 w-4 animate-spin" />
-                <CheckIcon v-else class="h-4 w-4" />
-                {{ saving ? 'Saving…' : 'Save Changes' }}
-              </button>
-            </div>
-          </form>
+          <button type="button" @click="form.on_study_leave = !form.on_study_leave"
+            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-warning-500 focus:ring-offset-2"
+            :class="form.on_study_leave ? 'bg-warning-500' : 'bg-slate-300'">
+            <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform"
+              :class="form.on_study_leave ? 'translate-x-5' : 'translate-x-0'" />
+          </button>
         </div>
-      </div>
-    </Teleport>
+      </form>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeEdit">Cancel</AppButton>
+        <AppButton :loading="saving" @click="submitEdit">Save Changes</AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import {
   UsersIcon,
   AcademicCapIcon,
   PencilSquareIcon,
-  XMarkIcon,
-  ArrowPathIcon,
-  CheckIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -315,6 +253,8 @@ function applyFilters() {
     { preserveState: true, replace: true }
   )
 }
+
+watch(search, onSearch)
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 const totalPages = computed(() => Math.max(1, Math.ceil(props.faculty.length / perPage)))
@@ -389,11 +329,11 @@ async function submitEdit() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function categoryBadge(cat) {
   const map = {
-    'Plantilla Teaching':     'bg-blue-100 text-blue-700',
-    'Plantilla Non-Teaching': 'bg-purple-100 text-purple-700',
-    'COS Teaching':           'bg-amber-100 text-amber-700',
-    'COS Non Teaching':       'bg-orange-100 text-orange-700',
+    'Plantilla Teaching':     'blue',
+    'Plantilla Non-Teaching': 'purple',
+    'COS Teaching':           'amber',
+    'COS Non Teaching':       'orange',
   }
-  return map[cat] ?? 'bg-slate-100 text-slate-600'
+  return map[cat] ?? 'slate'
 }
 </script>

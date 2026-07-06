@@ -3,45 +3,37 @@
   <AdminLayout title="Overload Computations">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Overload Computations</h1>
-          <p class="text-sm text-slate-500 mt-0.5">PHTR = (Annual Rate ÷ 1,600) × 1.25 · Pay = PHTR × hrs/wk × weeks</p>
-        </div>
-        <div class="flex gap-2">
-          <Link :href="route('faculty-loading.salary-schedules.index')"
-            class="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium">
+      <AppPageHeader title="Overload Computations" subtitle="PHTR = (Annual Rate ÷ 1,600) × 1.25 · Pay = PHTR × hrs/wk × weeks">
+        <template #actions>
+          <AppButton variant="secondary" as="link" :href="route('faculty-loading.salary-schedules.index')">
             <TableCellsIcon class="h-4 w-4" /> Salary Schedule
-          </Link>
-          <button @click="openBulk()"
-            class="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-indigo-200 text-indigo-700 hover:bg-indigo-50 rounded-lg font-medium">
+          </AppButton>
+          <AppButton variant="secondary" @click="openBulk()">
             <BoltIcon class="h-4 w-4" /> Bulk Compute
-          </button>
-          <button @click="openForm()"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
+          </AppButton>
+          <AppButton @click="openForm()">
             <PlusIcon class="h-4 w-4" /> New Computation
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
-      <div v-if="Object.keys($page.props.errors ?? {}).length" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm space-y-1">
+      <div v-if="Object.keys($page.props.errors ?? {}).length" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm space-y-1">
         <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
+      <AppFilterBar>
         <select v-model="filters.term_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option v-for="t in terms" :key="t.id" :value="t.id">
             {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
           </option>
         </select>
-      </div>
+      </AppFilterBar>
 
       <!-- Pending overloaded faculty (no computation yet) -->
       <div v-if="pendingLoads.length" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
@@ -60,30 +52,23 @@
       </div>
 
       <!-- Empty -->
-      <div v-if="computations.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <BanknotesIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No overload computations for this term</p>
-        <p class="text-xs text-slate-400 mt-1">Use Bulk Compute or add individual computations for overloaded faculty.</p>
-      </div>
+      <AppCard v-if="computations.length === 0">
+        <EmptyState title="No overload computations for this term" subtitle="Use Bulk Compute or add individual computations for overloaded faculty." :icon="BanknotesIcon" />
+      </AppCard>
 
       <!-- Computation cards -->
       <div v-else class="space-y-3">
-        <div v-for="c in computations" :key="c.id"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard v-for="c in computations" :key="c.id">
           <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
 
             <div class="min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <p class="font-semibold text-slate-800">{{ c.faculty?.name ?? '—' }}</p>
-                <span v-if="c.faculty?.position"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700">
+                <AppBadge v-if="c.faculty?.position" color="indigo">
                   {{ c.faculty.position }}
-                  <span v-if="c.faculty.salary_grade" class="ml-1 text-indigo-400">SG {{ c.faculty.salary_grade }}</span>
-                </span>
-                <span :class="statusBadge(c.status)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                  {{ statusLabel(c.status) }}
-                </span>
+                  <span v-if="c.faculty.salary_grade" class="ml-1">SG {{ c.faculty.salary_grade }}</span>
+                </AppBadge>
+                <AppBadge :color="statusBadge(c.status)">{{ statusLabel(c.status) }}</AppBadge>
               </div>
               <p class="text-xs text-slate-400 mt-0.5">{{ c.term?.label ?? '—' }}</p>
             </div>
@@ -112,7 +97,7 @@
               </div>
               <div class="border-l border-slate-100 pl-4">
                 <p class="text-xs text-slate-400">Total Pay</p>
-                <p class="text-base font-bold text-emerald-700">{{ phpFmt(c.total_overload_pay) }}</p>
+                <p class="text-base font-bold text-success-700">{{ phpFmt(c.total_overload_pay) }}</p>
               </div>
             </div>
           </div>
@@ -121,127 +106,86 @@
           <div v-if="['for_approval', 'approved'].includes(c.status)"
             class="flex gap-2 mt-4 pt-4 border-t border-slate-50">
             <template v-if="c.status === 'for_approval'">
-              <button @click="act(c, false)"
-                class="px-3 py-1.5 text-xs bg-red-50 text-red-700 hover:bg-red-100 rounded-lg font-medium">
-                Reject
-              </button>
-              <button @click="act(c, true)"
-                class="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
-                Approve
-              </button>
+              <AppButton size="sm" variant="danger" @click="act(c, false)">Reject</AppButton>
+              <AppButton size="sm" variant="success" @click="act(c, true)">Approve</AppButton>
             </template>
-            <button v-if="c.status === 'approved'" @click="markPaid(c)"
-              class="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
-              Mark as Paid
-            </button>
+            <AppButton v-if="c.status === 'approved'" size="sm" @click="markPaid(c)">Mark as Paid</AppButton>
           </div>
-        </div>
+        </AppCard>
       </div>
 
     </div>
 
     <!-- Single computation modal -->
-    <div v-if="modal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 my-8">
-        <h2 class="text-lg font-semibold text-slate-800">New Overload Computation</h2>
-
-        <!-- Preview -->
-        <div v-if="preview" class="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-sm space-y-1">
-          <div class="flex justify-between"><span class="text-slate-500">PHTR:</span><span class="font-semibold">{{ phpFmt(preview.phtr) }}</span></div>
-          <div class="flex justify-between"><span class="text-slate-500">Overload units:</span><span class="font-semibold">{{ preview.overload_units }}</span></div>
-          <div class="flex justify-between"><span class="text-slate-500">Hrs/week × weeks:</span><span class="font-semibold">{{ preview.overload_hours }} × {{ preview.term_weeks }}</span></div>
-          <div class="flex justify-between pt-1 border-t border-slate-200 mt-1">
-            <span class="text-slate-600 font-medium">Estimated Total Pay:</span>
-            <span class="font-bold text-emerald-700">{{ phpFmt(preview.total_overload_pay) }}</span>
-          </div>
-        </div>
-
-        <div class="space-y-3">
-          <!-- Faculty load selector -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Faculty (overloaded only)</label>
-            <select v-model="form.faculty_load_id" @change="onLoadChange"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select faculty load...</option>
-              <option v-for="l in pendingLoads" :key="l.id" :value="l.id">
-                {{ l.faculty?.name }} — +{{ l.overload_units }} OL units
-                {{ l.faculty?.position ? `(${l.faculty.position}, SG ${l.faculty.salary_grade ?? '?'})` : '' }}
-              </option>
-            </select>
-          </div>
-
-          <!-- Salary grade + step for auto-fill -->
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Salary Grade</label>
-              <input v-model.number="salaryGrade" type="number" min="1" max="33" @change="fillRate"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Step</label>
-              <select v-model.number="salaryStep" @change="fillRate"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option v-for="s in 8" :key="s" :value="s">Step {{ s }}</option>
-              </select>
-            </div>
-            <div class="flex items-end">
-              <button @click="fillRate"
-                class="w-full px-3 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium">
-                Auto-fill Rate
-              </button>
-            </div>
-          </div>
-
-          <!-- Annual rate -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Annual Rate (₱) *</label>
-            <input v-model.number="form.annual_rate" type="number" step="1" min="1"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            <p v-if="form.annual_rate" class="text-xs text-slate-400 mt-1">
-              PHTR: {{ phpFmt((form.annual_rate / 1600) * 1.25) }}
-            </p>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Overload Hrs/week *</label>
-              <input v-model.number="form.overload_hours" type="number" step="0.5" min="0.5"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Term Weeks</label>
-              <input v-model.number="form.term_weeks" type="number" min="1" max="26"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-            <textarea v-model="form.remarks" rows="2"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
-          </div>
-        </div>
-
-        <div class="flex justify-between gap-3 pt-1">
-          <button type="button" @click="runPreview"
-            class="px-4 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium flex items-center gap-1.5">
-            <CalculatorIcon class="h-4 w-4" /> Preview
-          </button>
-          <div class="flex gap-2">
-            <button @click="modal = false; preview = null" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-            <button @click="save" :disabled="form.processing"
-              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
-              Submit
-            </button>
-          </div>
+    <AppModal :show="modal" title="New Overload Computation" size="lg" @close="modal = false; preview = null">
+      <!-- Preview -->
+      <div v-if="preview" class="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-sm space-y-1 mb-4">
+        <div class="flex justify-between"><span class="text-slate-500">PHTR:</span><span class="font-semibold">{{ phpFmt(preview.phtr) }}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">Overload units:</span><span class="font-semibold">{{ preview.overload_units }}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">Hrs/week × weeks:</span><span class="font-semibold">{{ preview.overload_hours }} × {{ preview.term_weeks }}</span></div>
+        <div class="flex justify-between pt-1 border-t border-slate-200 mt-1">
+          <span class="text-slate-600 font-medium">Estimated Total Pay:</span>
+          <span class="font-bold text-success-700">{{ phpFmt(preview.total_overload_pay) }}</span>
         </div>
       </div>
-    </div>
+
+      <div class="space-y-3">
+        <!-- Faculty load selector -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Faculty (overloaded only)</label>
+          <select v-model="form.faculty_load_id" @change="onLoadChange"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Select faculty load...</option>
+            <option v-for="l in pendingLoads" :key="l.id" :value="l.id">
+              {{ l.faculty?.name }} — +{{ l.overload_units }} OL units
+              {{ l.faculty?.position ? `(${l.faculty.position}, SG ${l.faculty.salary_grade ?? '?'})` : '' }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Salary grade + step for auto-fill -->
+        <div class="grid grid-cols-3 gap-3">
+          <AppInput v-model.number="salaryGrade" type="number" min="1" max="33" label="Salary Grade" @change="fillRate" />
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Step</label>
+            <select v-model.number="salaryStep" @change="fillRate"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option v-for="s in 8" :key="s" :value="s">Step {{ s }}</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <AppButton variant="secondary" block @click="fillRate">Auto-fill Rate</AppButton>
+          </div>
+        </div>
+
+        <!-- Annual rate -->
+        <div>
+          <AppInput v-model.number="form.annual_rate" type="number" step="1" min="1" label="Annual Rate (₱)" required />
+          <p v-if="form.annual_rate" class="text-xs text-slate-400 mt-1">
+            PHTR: {{ phpFmt((form.annual_rate / 1600) * 1.25) }}
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model.number="form.overload_hours" type="number" step="0.5" min="0.5" label="Overload Hrs/week" required />
+          <AppInput v-model.number="form.term_weeks" type="number" min="1" max="26" label="Term Weeks" />
+        </div>
+
+        <AppTextarea v-model="form.remarks" rows="2" label="Remarks" />
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="runPreview">
+          <CalculatorIcon class="h-4 w-4" /> Preview
+        </AppButton>
+        <AppButton variant="secondary" @click="modal = false; preview = null">Cancel</AppButton>
+        <AppButton :loading="form.processing" @click="save">Submit</AppButton>
+      </template>
+    </AppModal>
 
     <!-- Bulk compute modal -->
-    <div v-if="bulkModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">Bulk Overload Computation</h2>
+    <AppModal :show="bulkModal" title="Bulk Overload Computation" @close="bulkModal = false">
+      <div class="space-y-4">
         <p class="text-sm text-slate-600">
           Generates computations for all <strong>{{ pendingLoads.length }}</strong> overloaded faculty in the current term
           that don't have an existing computation. Annual rates are looked up from the current salary schedule using
@@ -249,64 +193,60 @@
         </p>
 
         <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Overload Hrs/week *</label>
-            <input v-model.number="bulkForm.overload_hours" type="number" step="0.5" min="0.5"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Term Weeks</label>
-            <input v-model.number="bulkForm.term_weeks" type="number" min="1" max="26"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
+          <AppInput v-model.number="bulkForm.overload_hours" type="number" step="0.5" min="0.5" label="Overload Hrs/week" required />
+          <AppInput v-model.number="bulkForm.term_weeks" type="number" min="1" max="26" label="Term Weeks" />
           <div class="col-span-2">
             <label class="block text-xs font-medium text-slate-600 mb-1">Salary Step</label>
-            <select v-model.number="bulkForm.step" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model.number="bulkForm.step"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option v-for="s in 8" :key="s" :value="s">Step {{ s }}</option>
             </select>
           </div>
         </div>
 
-        <div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+        <div class="bg-warning-50 border border-warning-100 rounded-lg px-3 py-2 text-xs text-warning-700">
           Faculty without an SST position or a matching salary schedule entry will be skipped.
         </div>
-
-        <div class="flex justify-end gap-2">
-          <button @click="bulkModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="submitBulk" :disabled="bulkForm.processing"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
-            Generate Computations
-          </button>
-        </div>
       </div>
-    </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="bulkModal = false">Cancel</AppButton>
+        <AppButton :loading="bulkForm.processing" @click="submitBulk">Generate Computations</AppButton>
+      </template>
+    </AppModal>
 
     <!-- Approval modal -->
-    <div v-if="approvalTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">{{ approvalApproved ? 'Approve' : 'Reject' }} Computation</h2>
-        <p class="text-sm text-slate-600">{{ approvalTarget.faculty?.name }} — {{ phpFmt(approvalTarget.total_overload_pay) }}</p>
-        <textarea v-model="approvalRemarks" rows="3" placeholder="Remarks (optional)"
-          class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
-        <div class="flex justify-end gap-3">
-          <button @click="approvalTarget = null" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="submitApproval"
-            :class="approvalApproved ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'"
-            class="px-4 py-2 text-sm text-white rounded-lg font-medium">
-            {{ approvalApproved ? 'Approve' : 'Reject' }}
-          </button>
-        </div>
+    <AppModal :show="!!approvalTarget" :title="`${approvalApproved ? 'Approve' : 'Reject'} Computation`" @close="approvalTarget = null">
+      <div class="space-y-3">
+        <p class="text-sm text-slate-600">{{ approvalTarget?.faculty?.name }} — {{ phpFmt(approvalTarget?.total_overload_pay) }}</p>
+        <AppTextarea v-model="approvalRemarks" rows="3" placeholder="Remarks (optional)" />
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="approvalTarget = null">Cancel</AppButton>
+        <AppButton :variant="approvalApproved ? 'success' : 'danger'" @click="submitApproval">
+          {{ approvalApproved ? 'Approve' : 'Reject' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import {
   BanknotesIcon, BoltIcon, CalculatorIcon, CheckCircleIcon,
   ExclamationTriangleIcon, PlusIcon, TableCellsIcon,
@@ -443,19 +383,19 @@ function submitApproval() {
     })
 }
 
-function markPaid(c) {
-  if (!confirm(`Mark payment for ${c.faculty?.name} as paid?`)) return
+async function markPaid(c) {
+  if (! await confirmAction({ title: 'Mark as paid?', text: `Mark payment for ${c.faculty?.name} as paid?`, confirmText: 'Mark as Paid' })) return
   useForm({}).post(route('faculty-loading.overload-computations.mark-paid', c.id))
 }
 
 function statusBadge(status) {
   return {
-    for_approval: 'bg-amber-50 text-amber-700',
-    approved:     'bg-emerald-50 text-emerald-700',
-    rejected:     'bg-red-50 text-red-600',
-    paid:         'bg-blue-50 text-blue-700',
-    pending:      'bg-slate-100 text-slate-500',
-  }[status] ?? 'bg-slate-50 text-slate-600'
+    for_approval: 'amber',
+    approved:     'green',
+    rejected:     'red',
+    paid:         'blue',
+    pending:      'slate',
+  }[status] ?? 'slate'
 }
 
 function statusLabel(status) {

@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 
 const props = defineProps({
   employees:   Object,
@@ -74,7 +76,7 @@ function sumMF(obj) {
         </div>
         <div class="flex-shrink-0 flex items-center gap-2">
           <span class="hidden sm:inline text-xs text-slate-400">Cached:</span>
-          <span class="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-full whitespace-nowrap">{{ formattedDate }}</span>
+          <AppBadge color="slate" class="whitespace-nowrap">{{ formattedDate }}</AppBadge>
         </div>
       </div>
       <!-- Jump-nav -->
@@ -144,7 +146,7 @@ function sumMF(obj) {
 
         <div class="grid md:grid-cols-2 gap-6">
           <!-- By Division -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <AppCard>
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Division</h3>
             <div v-if="!employees.byDivision?.length" class="text-sm text-slate-400 italic">No data available.</div>
             <div v-else class="space-y-3">
@@ -168,9 +170,9 @@ function sumMF(obj) {
                 </div>
               </div>
             </div>
-          </div>
+          </AppCard>
           <!-- By Salary Band -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <AppCard>
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Salary Band</h3>
             <div v-if="!employees.bySalaryBand?.length" class="text-sm text-slate-400 italic">No data available.</div>
             <div v-else class="space-y-3">
@@ -192,7 +194,7 @@ function sumMF(obj) {
                 </div>
               </div>
             </div>
-          </div>
+          </AppCard>
         </div>
       </section>
 
@@ -221,7 +223,7 @@ function sumMF(obj) {
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard>
           <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Grade Level</h3>
           <div v-if="!students.byGrade?.length" class="text-sm text-slate-400 italic">No enrollment data available.</div>
           <div v-else class="space-y-3">
@@ -243,7 +245,7 @@ function sumMF(obj) {
               </div>
             </div>
           </div>
-        </div>
+        </AppCard>
       </section>
 
       <!-- ════════════════════════════════════════════════════
@@ -275,7 +277,7 @@ function sumMF(obj) {
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard>
           <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Leave Type</h3>
           <div v-if="!leave.byType?.length" class="text-sm text-slate-400 italic">No data available.</div>
           <div v-else class="space-y-3">
@@ -297,7 +299,7 @@ function sumMF(obj) {
               </div>
             </div>
           </div>
-        </div>
+        </AppCard>
       </section>
 
       <!-- ════════════════════════════════════════════════════
@@ -325,7 +327,7 @@ function sumMF(obj) {
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard>
           <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Training Participants by Year</h3>
           <div v-if="!training.byYear?.length" class="text-sm text-slate-400 italic">No training records found.</div>
           <div v-else class="space-y-3">
@@ -347,7 +349,7 @@ function sumMF(obj) {
               </div>
             </div>
           </div>
-        </div>
+        </AppCard>
       </section>
 
       <!-- ════════════════════════════════════════════════════
@@ -375,7 +377,7 @@ function sumMF(obj) {
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard>
           <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Nomination Status</h3>
           <div v-if="!rewards.byStatus?.length" class="text-sm text-slate-400 italic">No nomination data available.</div>
           <div v-else class="space-y-3">
@@ -397,7 +399,7 @@ function sumMF(obj) {
               </div>
             </div>
           </div>
-        </div>
+        </AppCard>
       </section>
 
       <!-- ════════════════════════════════════════════════════
@@ -425,7 +427,7 @@ function sumMF(obj) {
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard>
           <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Sessions by School Year</h3>
           <div v-if="!guidance.byYear?.length" class="text-sm text-slate-400 italic">No guidance session data available.</div>
           <div v-else class="space-y-3">
@@ -447,7 +449,7 @@ function sumMF(obj) {
               </div>
             </div>
           </div>
-        </div>
+        </AppCard>
       </section>
 
       <!-- ════════════════════════════════════════════════════
@@ -509,7 +511,7 @@ function sumMF(obj) {
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard>
           <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Client Type</h3>
           <div v-if="!csm.byClientType?.length" class="text-sm text-slate-400 italic">No CSM data available.</div>
           <div v-else class="space-y-3">
@@ -531,7 +533,7 @@ function sumMF(obj) {
               </div>
             </div>
           </div>
-        </div>
+        </AppCard>
       </section>
 
     </main>

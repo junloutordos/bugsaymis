@@ -2,6 +2,10 @@
 import { ref, computed, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 import axios from 'axios'
 import {
   CalendarDaysIcon,
@@ -63,6 +67,13 @@ function eventStyle(ev) {
     return { bg: 'bg-red-50 border border-red-300', text: 'text-red-700', dot: 'bg-red-400' }
   }
   return CID_TYPE_COLORS[ev.type] ?? CID_TYPE_COLORS.other
+}
+
+// AppBadge color mapping for the day-detail panel's event-type badge
+const TYPE_BADGE_COLOR = { meeting: 'blue', event: 'green', training: 'amber', other: 'slate' }
+function badgeColor(ev) {
+  if (ev.source === 'class_record') return 'red'
+  return TYPE_BADGE_COLOR[ev.type] ?? 'slate'
 }
 
 function formatDate(d) {
@@ -279,19 +290,14 @@ const donutChartOptions = {
   <AdminLayout title="CID Dashboard">
 
     <!-- Header -->
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">CID Dashboard</h1>
-        <p class="text-sm text-slate-500 mt-0.5">{{ schoolYear?.name ?? 'No active school year' }}</p>
-      </div>
-      <button
-        @click="openCreate(todayStr)"
-        class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-      >
-        <PlusIcon class="w-4 h-4" />
-        New Activity
-      </button>
-    </div>
+    <AppPageHeader title="CID Dashboard" :subtitle="schoolYear?.name ?? 'No active school year'">
+      <template #actions>
+        <AppButton @click="openCreate(todayStr)">
+          <PlusIcon class="w-4 h-4" />
+          New Activity
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <!-- ── Row 1: Summary Cards ─────────────────────────────────────────── -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
@@ -347,7 +353,7 @@ const donutChartOptions = {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
 
       <!-- Calendar (2/3) -->
-      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4">
+      <AppCard class="lg:col-span-2">
         <!-- Month nav -->
         <div class="flex items-center justify-between mb-4">
           <button @click="navigateMonth(-1)" class="p-1.5 rounded hover:bg-slate-100">
@@ -419,10 +425,10 @@ const donutChartOptions = {
             <span class="text-xs text-slate-500 capitalize">{{ type }} (CID)</span>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Today / Selected Day Panel (1/3) -->
-      <div class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col">
+      <AppCard class="flex flex-col">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold text-slate-700">
             {{ selectedDayDate && selectedDayDate !== todayStr ? selectedDayDate : 'Today' }}
@@ -451,9 +457,9 @@ const donutChartOptions = {
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5 mb-1">
-                  <span :class="['inline-block text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded', eventStyle(ev).bg, eventStyle(ev).text]">
+                  <AppBadge :color="badgeColor(ev)" class="uppercase">
                     {{ ev.source === 'class_record' ? 'Assessment' : ev.type }}
-                  </span>
+                  </AppBadge>
                   <EyeIcon v-if="ev.source === 'class_record'" class="w-3 h-3 text-slate-400" title="Read-only — set by teacher" />
                 </div>
                 <p class="text-sm font-medium text-slate-800 leading-tight">{{ ev.title }}</p>
@@ -477,36 +483,26 @@ const donutChartOptions = {
             </div>
           </div>
         </div>
-      </div>
+      </AppCard>
     </div>
 
     <!-- ── Row 3: Charts ─────────────────────────────────────────────────── -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-      <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Assessment Load by Section (This Month)
-        </h3>
-        <p class="text-[11px] text-slate-400 mb-2">From class records</p>
+      <AppCard class="lg:col-span-1" title="Assessment Load by Section (This Month)" subtitle="From class records">
         <div class="h-48">
           <Bar v-if="charts.assessmentLoad.length" :data="barChartData" :options="barChartOptions" />
           <div v-else class="flex items-center justify-center h-full text-slate-300 text-xs">No assessments scheduled</div>
         </div>
-      </div>
+      </AppCard>
 
-      <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Teacher Attendance Rate (This Week)
-        </h3>
+      <AppCard class="lg:col-span-1" title="Teacher Attendance Rate (This Week)">
         <div class="h-48">
           <Line :data="lineChartData" :options="lineChartOptions" />
         </div>
-      </div>
+      </AppCard>
 
-      <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Class Record Status (Current SY)
-        </h3>
+      <AppCard class="lg:col-span-1" title="Class Record Status (Current SY)">
         <div class="h-48 flex items-center justify-center">
           <Doughnut
             v-if="charts.classRecordStatus.some(r => r.count > 0)"
@@ -515,7 +511,7 @@ const donutChartOptions = {
           />
           <div v-else class="text-slate-300 text-xs">No class records</div>
         </div>
-      </div>
+      </AppCard>
 
     </div>
 
@@ -533,7 +529,7 @@ const donutChartOptions = {
 
         <div class="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
 
-          <div v-if="formErrors._general" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
+          <div v-if="formErrors._general" class="bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-3 py-2 text-sm">
             {{ formErrors._general }}
           </div>
 
@@ -602,14 +598,12 @@ const donutChartOptions = {
         </div>
 
         <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-100">
-          <button @click="closeModal"
-            class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
+          <AppButton variant="secondary" @click="closeModal">
             Cancel
-          </button>
-          <button @click="saveSchedule" :disabled="saving"
-            class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          </AppButton>
+          <AppButton @click="saveSchedule" :loading="saving">
             {{ saving ? 'Saving…' : (editingSchedule ? 'Update' : 'Create') }}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>

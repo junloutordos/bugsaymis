@@ -2,8 +2,11 @@
 import { ref, computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import Swal from 'sweetalert2'
-import { CheckCircleIcon, QuestionMarkCircleIcon, XCircleIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, QuestionMarkCircleIcon, XCircleIcon, ChevronLeftIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   batch:        Object,
@@ -153,7 +156,7 @@ function sendAll() {
       <div class="mb-4">
         <a :href="route('payroll.cashier.index')"
            class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          <ChevronLeftIcon class="w-4 h-4" />
           Back to Payroll List
         </a>
       </div>
@@ -168,15 +171,13 @@ function sendAll() {
           </p>
         </div>
         <div class="flex gap-2">
-          <a :href="route('payroll.cashier.audit-csv', batch.id)"
-             class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          <AppButton as="a" variant="secondary" :href="route('payroll.cashier.audit-csv', batch.id)">
             Download CSV
-          </a>
+          </AppButton>
           <template v-if="isPrimaryBatch">
-            <button @click="sendAll" :disabled="sendLoading || !matched.length"
-                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+            <AppButton :loading="sendLoading" :disabled="sendLoading || !matched.length" @click="sendAll">
               {{ sendLoading ? 'Queuing…' : `Send ${matched.length} Payslips` }}
-            </button>
+            </AppButton>
           </template>
         </div>
       </div>
@@ -238,10 +239,9 @@ function sendAll() {
         <div class="flex items-center gap-2 shrink-0">
           <input v-model="secondHalfDate" type="date"
                  class="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400" />
-          <button @click="sendSecondHalf" :disabled="secondHalfLoading || !secondHalfDate"
-                  class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap">
+          <AppButton variant="warning" :loading="secondHalfLoading" :disabled="secondHalfLoading || !secondHalfDate" @click="sendSecondHalf">
             {{ secondHalfLoading ? 'Queuing…' : 'Notify 2nd Half' }}
-          </button>
+          </AppButton>
         </div>
       </div>
 
@@ -262,69 +262,63 @@ function sendAll() {
 
       <!-- Save resolutions button (probable/unmatched) -->
       <div v-if="activeTab !== 'matched' && Object.keys(resolutions).length" class="mb-3 flex justify-end">
-        <button @click="saveResolutions" :disabled="submitting"
-                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+        <AppButton variant="success" :loading="submitting" :disabled="submitting" @click="saveResolutions">
           {{ submitting ? 'Saving…' : 'Save Matches' }}
-        </button>
+        </AppButton>
       </div>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Excel Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Matched User</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Basic</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Pay</th>
-              <th v-if="activeTab !== 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign to</th>
-              <th v-if="activeTab === 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-for="item in currentItems" :key="item.id" class="hover:bg-slate-50/60">
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ item.excel_row_number }}</td>
-              <td class="px-4 py-3 font-medium text-slate-800">{{ item.employee_name_raw }}</td>
-              <td class="px-4 py-3 text-slate-600 text-xs">
-                {{ item.employee?.name ?? (resolutions[item.id] ? users.find(u=>u.id===resolutions[item.id].user_id)?.name : '—') }}
-              </td>
-              <td class="px-4 py-3 text-slate-600 text-xs">{{ item.position || '—' }}</td>
-              <td class="px-4 py-3 text-right text-slate-700">{{ fmt(item.basic_salary) }}</td>
-              <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ fmt(item.net_pay) }}</td>
-              <td v-if="activeTab !== 'matched'" class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                  <select @change="(e) => setResolution(item.id, parseInt(e.target.value))"
-                          class="w-48 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="">— Select employee —</option>
-                    <option v-for="u in users" :key="u.id" :value="u.id"
-                            :selected="item.matched_user_id === u.id || resolutions[item.id]?.user_id === u.id">
-                      {{ u.name }} {{ u.employee_no ? `(${u.employee_no})` : '' }}
-                    </option>
-                  </select>
-                  <label v-if="resolutions[item.id]?.user_id" class="flex items-center gap-1 text-xs text-slate-600 whitespace-nowrap">
-                    <input type="checkbox" @change="(e) => setResolution(item.id, resolutions[item.id].user_id, e.target.checked)"
-                           class="rounded" />
-                    Save alias
-                  </label>
-                </div>
-              </td>
-              <td v-if="activeTab === 'matched'" class="px-4 py-3">
-                <button @click="resendOne(item)" :disabled="resendingIds.includes(item.id)"
-                        class="inline-flex items-center gap-1.5 border border-indigo-300 text-indigo-600 hover:bg-indigo-50 px-3 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 whitespace-nowrap">
-                  {{ resendingIds.includes(item.id) ? '…' : 'Resend' }}
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!currentItems.length">
-              <td colspan="7" class="py-12 text-center text-slate-400 text-sm">
-                No {{ activeTab }} rows.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <AppTable :is-empty="!currentItems.length" :skeleton-cols="7">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Excel Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Matched User</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
+            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Basic</th>
+            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Pay</th>
+            <th v-if="activeTab !== 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign to</th>
+            <th v-if="activeTab === 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+          </tr>
+        </template>
+
+        <tr v-for="item in currentItems" :key="item.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ item.excel_row_number }}</td>
+          <td class="px-4 py-3 font-medium text-slate-800">{{ item.employee_name_raw }}</td>
+          <td class="px-4 py-3 text-slate-600 text-xs">
+            {{ item.employee?.name ?? (resolutions[item.id] ? users.find(u=>u.id===resolutions[item.id].user_id)?.name : '—') }}
+          </td>
+          <td class="px-4 py-3 text-slate-600 text-xs">{{ item.position || '—' }}</td>
+          <td class="px-4 py-3 text-right text-slate-700">{{ fmt(item.basic_salary) }}</td>
+          <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ fmt(item.net_pay) }}</td>
+          <td v-if="activeTab !== 'matched'" class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <select @change="(e) => setResolution(item.id, parseInt(e.target.value))"
+                      class="w-48 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">— Select employee —</option>
+                <option v-for="u in users" :key="u.id" :value="u.id"
+                        :selected="item.matched_user_id === u.id || resolutions[item.id]?.user_id === u.id">
+                  {{ u.name }} {{ u.employee_no ? `(${u.employee_no})` : '' }}
+                </option>
+              </select>
+              <label v-if="resolutions[item.id]?.user_id" class="flex items-center gap-1 text-xs text-slate-600 whitespace-nowrap">
+                <input type="checkbox" @change="(e) => setResolution(item.id, resolutions[item.id].user_id, e.target.checked)"
+                       class="rounded" />
+                Save alias
+              </label>
+            </div>
+          </td>
+          <td v-if="activeTab === 'matched'" class="px-4 py-3">
+            <AppButton size="sm" variant="secondary" :disabled="resendingIds.includes(item.id)" @click="resendOne(item)">
+              {{ resendingIds.includes(item.id) ? '…' : 'Resend' }}
+            </AppButton>
+          </td>
+        </tr>
+
+        <template #empty>
+          <EmptyState :title="`No ${activeTab} rows.`" />
+        </template>
+      </AppTable>
     </div>
   </AdminLayout>
 </template>

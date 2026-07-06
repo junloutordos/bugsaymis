@@ -1,10 +1,22 @@
 <script setup>
 import { ref, computed } from "vue"
-import { Head, router, Link } from "@inertiajs/vue3"
+import { Head, Link } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
+import AppPageHeader from "@/Components/AppPageHeader.vue"
+import AppButton from "@/Components/AppButton.vue"
+import AppFilterBar from "@/Components/AppFilterBar.vue"
+import AppInput from "@/Components/AppInput.vue"
+import AppSelect from "@/Components/AppSelect.vue"
+import AppTextarea from "@/Components/AppTextarea.vue"
+import AppTable from "@/Components/AppTable.vue"
+import AppIconButton from "@/Components/AppIconButton.vue"
+import AppModal from "@/Components/AppModal.vue"
+import EmptyState from "@/Components/EmptyState.vue"
+import PaginationControl from "@/Components/PaginationControl.vue"
 import { PencilSquareIcon, TrashIcon, PlusIcon, ArrowRightIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
+import { confirmAction } from "@/Composables/useConfirm.js"
 
 const props = defineProps({
   assignments: Array,
@@ -103,14 +115,13 @@ const submitAssignment = () => {
 }
 
 const deleteAssignment = async (assignment) => {
-  const result = await Swal.fire({
+  const ok = await confirmAction({
     title: "Delete Special Assignment?",
     text: "This action cannot be undone.",
+    confirmText: "Delete",
     icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Delete",
   })
-  if (result.isConfirmed) {
+  if (ok) {
     submit.delete(route("pm-special-assignments.destroy", assignment.id), {
       onSuccess: () => Swal.fire("Deleted", "Special Assignment deleted.", "success"),
     })
@@ -121,151 +132,116 @@ const deleteAssignment = async (assignment) => {
 <template>
   <Head title="Special Assignments" />
   <AdminLayout title="Special Assignments">
-    <div>
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Special Assignments</h1>
-          <p class="text-sm text-slate-500">Manage special assignments and their members.</p>
-        </div>
-        <button @click="openModal('create')"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          <PlusIcon class="w-4 h-4" /> New Special Assignment
-        </button>
-      </div>
+    <div class="space-y-5">
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <input v-model="searchQuery" type="text" placeholder="Search special assignments..."
-            class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-        </div>
+      <AppPageHeader title="Special Assignments" subtitle="Manage special assignments and their members.">
+        <template #actions>
+          <AppButton @click="openModal('create')">
+            <PlusIcon class="w-4 h-4" /> New Special Assignment
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Coordinator</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Members</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Tagged Plans</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="assignment in paginated" :key="assignment.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.id }}</td>
-                <td class="px-4 py-3 text-sm font-medium text-slate-800">{{ assignment.name }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.coordinator?.name ?? "—" }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.members?.length ?? 0 }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.work_distribution_plans?.length ?? 0 }}</td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center justify-center gap-1">
-                    <Link :href="route('pm-special-assignments.show', assignment.id)"
-                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Performance">
-                      <ArrowRightIcon class="w-4 h-4" />
-                    </Link>
-                    <button @click="openModal('edit', assignment)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
-                    <button @click="deleteAssignment(assignment)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="paginated.length === 0">
-                <td colspan="6" class="py-16 text-center text-slate-400 text-sm">No special assignments found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <AppFilterBar>
+        <AppInput v-model="searchQuery" placeholder="Search special assignments..." class="w-full sm:w-72" />
+      </AppFilterBar>
 
-                <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+      <AppTable :is-empty="paginated.length === 0" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Coordinator</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Members</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Tagged Plans</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
+
+        <tr v-for="assignment in paginated" :key="assignment.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.id }}</td>
+          <td class="px-4 py-3 text-sm font-medium text-slate-800">{{ assignment.name }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.coordinator?.name ?? "—" }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.members?.length ?? 0 }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ assignment.work_distribution_plans?.length ?? 0 }}</td>
+          <td class="px-4 py-3 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <Link :href="route('pm-special-assignments.show', assignment.id)" title="View Performance"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                <ArrowRightIcon class="w-4 h-4" />
+              </Link>
+              <AppIconButton label="Edit" @click="openModal('edit', assignment)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+              <AppIconButton label="Delete" variant="danger" @click="deleteAssignment(assignment)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #empty>
+          <EmptyState title="No special assignments found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
       <!-- MODAL -->
-      <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-            <h2 class="text-base font-semibold text-slate-800">
-              {{ modalMode === 'create' ? 'New Special Assignment' : 'Edit Special Assignment' }}
-            </h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
+      <AppModal :show="showModal" :title="modalMode === 'create' ? 'New Special Assignment' : 'Edit Special Assignment'" size="2xl" @close="closeModal">
+        <form @submit.prevent="submitAssignment" class="space-y-4">
+          <AppInput v-model="form.name" label="Name" required />
+
+          <AppSelect v-model="form.coordinator_id" label="Coordinator" placeholder="— None —">
+            <option v-for="u in props.users" :key="u.id" :value="u.id">
+              {{ u.name }}<span v-if="u.position"> ({{ u.position }})</span>
+            </option>
+          </AppSelect>
+
+          <AppTextarea v-model="form.description" label="Description" :rows="2" />
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
+            <div class="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+              <div v-for="p in props.plans" :key="p.id" class="flex items-start gap-2">
+                <input type="checkbox" :value="p.id" :checked="form.plan_ids.includes(p.id)"
+                  @change="togglePlan(p.id)" class="mt-0.5 rounded border-slate-300" />
+                <span class="text-slate-700">{{ p.success_indicator }}
+                  <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+                </span>
+              </div>
+              <p v-if="props.plans.length === 0" class="text-slate-400">No plans available.</p>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">{{ form.plan_ids.length }} plan(s) selected</p>
           </div>
 
-          <form @submit.prevent="submitAssignment">
-            <div class="px-6 py-5 space-y-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
-                <input v-model="form.name" type="text" required
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Coordinator</label>
-                <select v-model="form.coordinator_id"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                  <option value="">— None —</option>
-                  <option v-for="u in props.users" :key="u.id" :value="u.id">
-                    {{ u.name }}<span v-if="u.position"> ({{ u.position }})</span>
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-                <textarea v-model="form.description" rows="2"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
-                <div class="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
-                  <div v-for="p in props.plans" :key="p.id" class="flex items-start gap-2">
-                    <input type="checkbox" :value="p.id" :checked="form.plan_ids.includes(p.id)"
-                      @change="togglePlan(p.id)" class="mt-0.5 rounded border-slate-300" />
-                    <span class="text-slate-700">{{ p.success_indicator }}
-                      <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
-                    </span>
-                  </div>
-                  <p v-if="props.plans.length === 0" class="text-slate-400">No plans available.</p>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Members</label>
+            <div class="border border-slate-200 rounded-lg p-2 max-h-52 overflow-y-auto space-y-2 text-sm">
+              <div v-for="u in props.users" :key="u.id" class="flex items-start gap-2">
+                <input type="checkbox" :value="u.id" :checked="form.member_ids.includes(u.id)"
+                  @change="toggleMember(u.id)" class="mt-1 rounded border-slate-300" />
+                <div class="flex-1">
+                  <span class="text-slate-700">{{ u.name }}<span v-if="u.position" class="text-slate-400"> ({{ u.position }})</span></span>
+                  <input v-if="form.member_ids.includes(u.id)" v-model="form.member_tasks[u.id]"
+                    type="text" placeholder="Task / Role..."
+                    class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
                 </div>
-                <p class="text-xs text-slate-400 mt-1">{{ form.plan_ids.length }} plan(s) selected</p>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Members</label>
-                <div class="border border-slate-200 rounded-lg p-2 max-h-52 overflow-y-auto space-y-2 text-sm">
-                  <div v-for="u in props.users" :key="u.id" class="flex items-start gap-2">
-                    <input type="checkbox" :value="u.id" :checked="form.member_ids.includes(u.id)"
-                      @change="toggleMember(u.id)" class="mt-1 rounded border-slate-300" />
-                    <div class="flex-1">
-                      <span class="text-slate-700">{{ u.name }}<span v-if="u.position" class="text-slate-400"> ({{ u.position }})</span></span>
-                      <input v-if="form.member_ids.includes(u.id)" v-model="form.member_tasks[u.id]"
-                        type="text" placeholder="Task / Role..."
-                        class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                    </div>
-                  </div>
-                </div>
-                <p class="text-xs text-slate-400 mt-1">{{ form.member_ids.length }} member(s) selected</p>
               </div>
             </div>
+            <p class="text-xs text-slate-400 mt-1">{{ form.member_ids.length }} member(s) selected</p>
+          </div>
 
-            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-              <button type="button" @click="closeModal"
-                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-              <button type="submit" :disabled="isSubmitting"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-      </Teleport>
+          <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
+            <AppButton type="submit" :loading="isSubmitting" :disabled="isSubmitting">{{ isSubmitting ? 'Saving…' : 'Save' }}</AppButton>
+          </div>
+        </form>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>

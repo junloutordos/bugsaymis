@@ -4,7 +4,10 @@ import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { storageUrl } from '@/Composables/useStorage.js'
 import FlashMessage from '@/Components/FlashMessage.vue'
+import AppCard from '@/Components/AppCard.vue'
 import AppInput from '@/Components/AppInput.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 import {
   UserCircleIcon, PencilSquareIcon,
   CameraIcon, FingerPrintIcon, ShieldCheckIcon,
@@ -83,7 +86,7 @@ const empCategoryLabel = {
     <div class="max-w-3xl space-y-5">
 
       <!-- ── Photo + Name card ─────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <AppCard>
         <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
 
           <!-- Photo -->
@@ -110,22 +113,21 @@ const empCategoryLabel = {
             <h2 class="text-xl font-bold text-slate-800">{{ profile.name }}</h2>
             <p v-if="profile.position" class="text-sm text-slate-500 mt-0.5">{{ profile.position }}</p>
             <div class="flex flex-wrap gap-1.5 mt-2 justify-center sm:justify-start">
-              <span v-for="role in profile.roles" :key="role"
-                class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100 text-indigo-700">
+              <AppBadge v-for="role in profile.roles" :key="role" color="indigo">
                 {{ role }}
-              </span>
+              </AppBadge>
             </div>
-            <p v-if="photoBase64" class="text-xs text-amber-600 mt-2 flex items-center gap-1">
-              <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+            <p v-if="photoBase64" class="text-xs text-warning-600 mt-2 flex items-center gap-1">
+              <span class="inline-block w-2 h-2 rounded-full bg-warning-500"></span>
               New photo selected — save to apply
             </p>
           </div>
         </div>
         <p class="text-xs text-slate-400 mt-3">JPEG or PNG · Max 5 MB</p>
-      </div>
+      </AppCard>
 
       <!-- ── Editable Info ─────────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <AppCard>
         <h3 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
           <PencilSquareIcon class="h-4 w-4 text-indigo-500" />
           Personal Information
@@ -147,16 +149,14 @@ const empCategoryLabel = {
 
         <!-- Save button -->
         <div class="mt-5 flex justify-end">
-          <button @click="save" :disabled="submitting"
-            class="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors">
-            <span v-if="submitting">Saving…</span>
-            <span v-else>Save Changes</span>
-          </button>
+          <AppButton @click="save" :loading="submitting" :disabled="submitting">
+            {{ submitting ? 'Saving…' : 'Save Changes' }}
+          </AppButton>
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── Employment Details (read-only) ───────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <AppCard>
         <h3 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
           <ShieldCheckIcon class="h-4 w-4 text-slate-400" />
           Employment Details
@@ -199,17 +199,16 @@ const empCategoryLabel = {
           <div>
             <dt class="text-xs text-slate-400 mb-0.5">Account Status</dt>
             <dd>
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="profile.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'">
+              <AppBadge :color="profile.status === 'active' ? 'green' : 'red'">
                 {{ profile.status ?? 'active' }}
-              </span>
+              </AppBadge>
             </dd>
           </div>
         </dl>
-      </div>
+      </AppCard>
 
       <!-- ── Digital Signature ─────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <AppCard>
         <h3 class="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
           <FingerPrintIcon class="h-4 w-4 text-indigo-500" />
           Digital Signature
@@ -218,12 +217,11 @@ const empCategoryLabel = {
           Used on official documents — leave requests, IT job requests, endorsements.
           {{ profile.has_signature ? 'You have a signature on file.' : 'No signature uploaded yet.' }}
         </p>
-        <a :href="route('profile.signature')"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+        <AppButton as="link" variant="secondary" :href="route('profile.signature')">
           <FingerPrintIcon class="h-4 w-4" />
           {{ profile.has_signature ? 'Manage Signature & PIN' : 'Upload Signature' }}
-        </a>
-      </div>
+        </AppButton>
+      </AppCard>
 
     </div>
   </AdminLayout>

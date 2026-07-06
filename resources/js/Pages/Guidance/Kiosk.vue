@@ -53,7 +53,7 @@
           </div>
 
           <div class="flex justify-center">
-            <button type="submit" :disabled="form.processing" class="px-8 py-4 bg-green-600 text-white rounded-lg text-lg disabled:opacity-60 inline-flex items-center justify-center">
+            <button type="submit" :disabled="form.processing" class="px-8 py-4 bg-success-600 hover:bg-success-700 text-white rounded-lg text-lg disabled:opacity-60 inline-flex items-center justify-center">
               <span v-if="form.processing" class="inline-flex items-center">
                 <svg class="animate-spin mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

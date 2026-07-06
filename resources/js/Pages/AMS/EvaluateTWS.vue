@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { Head, useForm, usePage } from '@inertiajs/vue3'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppButton from '@/Components/AppButton.vue'
 import { CheckBadgeIcon, ClipboardDocumentListIcon, MicrophoneIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -153,10 +156,10 @@ function submit() {
 
       <!-- Already evaluated -->
       <div v-if="alreadyEvaluated || flashSuccess"
-           class="bg-white rounded-2xl shadow-sm border border-green-200 p-8 text-center">
+           class="bg-white rounded-2xl shadow-sm border border-success-100 p-8 text-center">
         <div class="flex justify-center mb-4">
-          <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-            <CheckBadgeIcon class="w-9 h-9 text-green-600" />
+          <div class="w-16 h-16 rounded-full bg-success-100 flex items-center justify-center">
+            <CheckBadgeIcon class="w-9 h-9 text-success-600" />
           </div>
         </div>
         <h2 class="text-lg font-semibold text-slate-800 mb-1">Evaluation Submitted</h2>
@@ -170,24 +173,14 @@ function submit() {
 
         <!-- Evaluator info -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">
-              Name of Evaluator <span class="text-slate-400 font-normal">(Optional)</span>
-            </label>
-            <input v-model="form.evaluator_name"
-                   type="text"
-                   placeholder="Leave blank to stay anonymous"
-                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">
-              Function / Position <span class="text-slate-400 font-normal">(Optional)</span>
-            </label>
-            <input v-model="form.position_function"
-                   type="text"
-                   placeholder="e.g. Faculty, HR Officer…"
-                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
+          <AppInput v-model="form.evaluator_name"
+                    type="text"
+                    label="Name of Evaluator (Optional)"
+                    placeholder="Leave blank to stay anonymous" />
+          <AppInput v-model="form.position_function"
+                    type="text"
+                    label="Function / Position (Optional)"
+                    placeholder="e.g. Faculty, HR Officer…" />
         </div>
 
         <!-- Section A — Content -->
@@ -267,16 +260,8 @@ function submit() {
 
         <!-- Open-ended (overall) -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">In what ways could we make this more effective?</label>
-            <textarea v-model="form.suggestions" rows="3" placeholder="Your suggestions…"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">Any other comments?</label>
-            <textarea v-model="form.other_comments" rows="3" placeholder="Any other comments…"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-          </div>
+          <AppTextarea v-model="form.suggestions" :rows="3" label="In what ways could we make this more effective?" placeholder="Your suggestions…" />
+          <AppTextarea v-model="form.other_comments" :rows="3" label="Any other comments?" placeholder="Any other comments…" />
         </div>
 
         <!-- ── Speaker/Topic Evaluation — one block per speaker ────────────── -->
@@ -341,31 +326,20 @@ function submit() {
 
           <!-- Part III — Open-ended (per speaker) -->
           <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-5 space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Over-all, was the resource person effective? Why or why not?</label>
-              <textarea v-model="form.speakers[si].effectiveness_reason" rows="2"
-                        class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">How can he/she best improve on this topic/presentation?</label>
-              <textarea v-model="form.speakers[si].improvement_suggestions" rows="2"
-                        class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">What other topic would you have wanted covered?</label>
-              <textarea v-model="form.speakers[si].other_topics_wanted" rows="2"
-                        class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-            </div>
+            <AppTextarea v-model="form.speakers[si].effectiveness_reason" :rows="2"
+                         label="Over-all, was the resource person effective? Why or why not?" />
+            <AppTextarea v-model="form.speakers[si].improvement_suggestions" :rows="2"
+                         label="How can he/she best improve on this topic/presentation?" />
+            <AppTextarea v-model="form.speakers[si].other_topics_wanted" :rows="2"
+                         label="What other topic would you have wanted covered?" />
           </div>
         </div>
 
         <!-- Submit -->
         <div class="flex justify-end pb-4">
-          <button type="submit"
-                  :disabled="form.processing"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors">
+          <AppButton type="submit" size="lg" :loading="form.processing" :disabled="form.processing">
             {{ form.processing ? 'Submitting…' : 'Submit Evaluation' }}
-          </button>
+          </AppButton>
         </div>
 
       </form>

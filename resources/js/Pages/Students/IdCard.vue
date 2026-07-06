@@ -55,15 +55,15 @@ onMounted(() => {
   <Head :title="`ID Card — ${student.full_name}`" />
 
   <div class="page">
-    <div class="controls no-print">
-      <Link :href="route('students.index')" class="back-link">
+    <div class="no-print w-full max-w-[480px] text-center">
+      <Link :href="route('students.index')" class="mb-2 inline-flex items-center gap-1.5 text-[13px] text-slate-600 no-underline hover:text-indigo-600">
         <ArrowLeftIcon class="h-4 w-4" /> Back to Students
       </Link>
-      <h1>{{ student.full_name }}</h1>
-      <button @click="printCard" class="btn-print">
+      <h1 class="mb-3 text-base font-bold text-slate-800">{{ student.full_name }}</h1>
+      <button @click="printCard" class="mb-2.5 inline-flex items-center gap-1.5 rounded-lg border-none bg-indigo-600 px-[18px] py-2.5 text-[13px] font-semibold text-white cursor-pointer hover:bg-indigo-700">
         <PrinterIcon class="h-4 w-4" /> Print ID Card
       </button>
-      <p class="hint">
+      <p class="text-xs leading-relaxed text-slate-500">
         Load a blank CR-80 card into the Matica XID8300. This sends both the front and
         back as a single print job — make sure dual-sided / duplex printing is enabled
         in the printer driver so both sides print on one card.
@@ -165,40 +165,6 @@ html, body { background: #f1f5f9; }
   padding: 24px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
 }
-
-/* ── On-screen controls ───────────────────────────────────────── */
-.controls {
-  width: 100%;
-  max-width: 480px;
-  text-align: center;
-}
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #475569;
-  text-decoration: none;
-  margin-bottom: 8px;
-}
-.back-link:hover { color: #1447c0; }
-.controls h1 { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 12px; }
-.btn-print {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #1447c0;
-  color: #fff;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-bottom: 10px;
-}
-.btn-print:hover { background: #0f3a9e; }
-.hint { font-size: 12px; color: #64748b; line-height: 1.5; }
 
 /* ── Card preview layout ──────────────────────────────────────── */
 .cards {

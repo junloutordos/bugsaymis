@@ -2,6 +2,14 @@
 import { computed, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
@@ -19,11 +27,11 @@ const props = defineProps({
   currentUser: Object,
 })
 
-const statusClass = (status) => {
-  if (['liquidated', 'completed', 'released'].includes(status)) return 'bg-emerald-100 text-emerald-700'
-  if (['returned', 'cancelled'].includes(status)) return 'bg-red-100 text-red-700'
-  if (status === 'draft') return 'bg-slate-100 text-slate-600'
-  return 'bg-amber-100 text-amber-700'
+const statusBadgeColor = (status) => {
+  if (['liquidated', 'completed', 'released'].includes(status)) return 'green'
+  if (['returned', 'cancelled'].includes(status)) return 'red'
+  if (status === 'draft') return 'slate'
+  return 'amber'
 }
 
 const money = (value) => Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -165,82 +173,69 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
   <Head :title="travel.control_no || 'Travel'" />
   <AdminLayout :title="travel.control_no || 'Travel'">
     <div class="space-y-6">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <Link :href="route('travel.index')" class="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-indigo-600">
-            <ArrowLeftIcon class="h-4 w-4" />
-            Travel Requests
-          </Link>
-          <div class="flex flex-wrap items-center gap-3">
-            <h1 class="text-xl font-semibold text-slate-900">{{ travel.control_no }}</h1>
-            <span :class="['rounded-full px-2 py-0.5 text-xs font-medium', statusClass(travel.status)]">{{ travel.status_label }}</span>
-          </div>
-          <p class="mt-1 text-sm text-slate-500">{{ travel.traveler?.name }} · {{ travel.destination }} · {{ fmtDate(travel.start_date) }} to {{ fmtDate(travel.end_date) }}</p>
-          <p v-if="travel.return_reason" class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ travel.return_reason }}</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <a :href="route('travel.iot.print', travel.id)" target="_blank" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            <PrinterIcon class="h-4 w-4" />
-            Print IOT
-          </a>
-          <button v-if="canSubmit" @click="submitTravel" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            <ClipboardDocumentCheckIcon class="h-4 w-4" />
-            Submit
-          </button>
-          <button v-if="canDivisionApprove" @click="approveDivision" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-            <CheckCircleIcon class="h-4 w-4" />
-            Division Approve
-          </button>
-          <button v-if="canFadReview && travel.status === 'division_approved'" @click="reviewFad" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-            <CheckCircleIcon class="h-4 w-4" />
-            FAD Review
-          </button>
-          <button v-if="canOcdApprove" @click="approveOcd" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-            <CheckCircleIcon class="h-4 w-4" />
-            OCD Approve
-          </button>
-        </div>
-      </div>
+      <Link :href="route('travel.index')" class="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-indigo-600">
+        <ArrowLeftIcon class="h-4 w-4" />
+        Travel Requests
+      </Link>
 
-      <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-slate-900">Travel Details</h2>
-          <button v-if="canEdit" @click="saveDetails" :disabled="detailsForm.processing" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">Save Details</button>
+      <AppCard>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div class="flex flex-wrap items-center gap-3">
+              <h1 class="text-xl font-semibold text-slate-900">{{ travel.control_no }}</h1>
+              <AppBadge :color="statusBadgeColor(travel.status)">{{ travel.status_label }}</AppBadge>
+            </div>
+            <p class="mt-1 text-sm text-slate-500">{{ travel.traveler?.name }} · {{ travel.destination }} · {{ fmtDate(travel.start_date) }} to {{ fmtDate(travel.end_date) }}</p>
+            <p v-if="travel.return_reason" class="mt-2 rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-700">{{ travel.return_reason }}</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <AppButton as="a" :href="route('travel.iot.print', travel.id)" target="_blank" variant="secondary">
+              <PrinterIcon class="h-4 w-4" />
+              Print IOT
+            </AppButton>
+            <AppButton v-if="canSubmit" @click="submitTravel">
+              <ClipboardDocumentCheckIcon class="h-4 w-4" />
+              Submit
+            </AppButton>
+            <AppButton v-if="canDivisionApprove" variant="success" @click="approveDivision">
+              <CheckCircleIcon class="h-4 w-4" />
+              Division Approve
+            </AppButton>
+            <AppButton v-if="canFadReview && travel.status === 'division_approved'" variant="success" @click="reviewFad">
+              <CheckCircleIcon class="h-4 w-4" />
+              FAD Review
+            </AppButton>
+            <AppButton v-if="canOcdApprove" variant="success" @click="approveOcd">
+              <CheckCircleIcon class="h-4 w-4" />
+              OCD Approve
+            </AppButton>
+          </div>
         </div>
+      </AppCard>
+
+      <AppCard title="Travel Details">
+        <template #header>
+          <AppButton v-if="canEdit" size="sm" :loading="detailsForm.processing" :disabled="detailsForm.processing" @click="saveDetails">Save Details</AppButton>
+        </template>
         <div class="grid gap-4 md:grid-cols-3">
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">Type</label>
-            <select v-model="detailsForm.travel_type" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100">
-              <option value="oed_initiated">OED Initiated</option>
-              <option value="campus_initiated">Campus Initiated</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">Funding</label>
-            <select v-model="detailsForm.funding_source" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100">
-              <option value="campus_funds">Campus Funds</option>
-              <option value="oed_funds">OED Funds</option>
-              <option value="external_funds">External Funds</option>
-              <option value="personal_no_cost">No Cost to Campus</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">Travel Mode</label>
-            <select v-model="detailsForm.travel_mode" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100">
-              <option value="land">Land</option>
-              <option value="air">Air</option>
-              <option value="sea">Sea</option>
-              <option value="mixed">Mixed</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">Origin</label>
-            <input v-model="detailsForm.origin" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">Destination</label>
-            <input v-model="detailsForm.destination" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-          </div>
+          <AppSelect v-model="detailsForm.travel_type" label="Type" :disabled="!canEdit" :show-blank="false">
+            <option value="oed_initiated">OED Initiated</option>
+            <option value="campus_initiated">Campus Initiated</option>
+          </AppSelect>
+          <AppSelect v-model="detailsForm.funding_source" label="Funding" :disabled="!canEdit" :show-blank="false">
+            <option value="campus_funds">Campus Funds</option>
+            <option value="oed_funds">OED Funds</option>
+            <option value="external_funds">External Funds</option>
+            <option value="personal_no_cost">No Cost to Campus</option>
+          </AppSelect>
+          <AppSelect v-model="detailsForm.travel_mode" label="Travel Mode" :disabled="!canEdit" :show-blank="false">
+            <option value="land">Land</option>
+            <option value="air">Air</option>
+            <option value="sea">Sea</option>
+            <option value="mixed">Mixed</option>
+          </AppSelect>
+          <AppInput v-model="detailsForm.origin" label="Origin" :disabled="!canEdit" />
+          <AppInput v-model="detailsForm.destination" label="Destination" :disabled="!canEdit" />
           <div>
             <label class="mb-1 block text-xs font-medium text-slate-600">Division Chief</label>
             <select v-model="detailsForm.division_chief_id" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100">
@@ -248,40 +243,29 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
               <option v-for="chief in lookups.divisionChiefs" :key="chief.id" :value="chief.id">{{ chief.name }}</option>
             </select>
           </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">Start Date</label>
-            <input v-model="detailsForm.start_date" type="date" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">End Date</label>
-            <input v-model="detailsForm.end_date" type="date" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-slate-600">Cash Advance</label>
-            <input v-model="detailsForm.cash_advance_amount" type="number" min="0" step="0.01" :disabled="!canEdit || !detailsForm.requires_cash_advance" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-          </div>
+          <AppInput v-model="detailsForm.start_date" type="date" label="Start Date" :disabled="!canEdit" />
+          <AppInput v-model="detailsForm.end_date" type="date" label="End Date" :disabled="!canEdit" />
+          <AppInput v-model="detailsForm.cash_advance_amount" type="number" min="0" step="0.01" label="Cash Advance" :disabled="!canEdit || !detailsForm.requires_cash_advance" />
           <label class="flex items-center gap-2 text-sm text-slate-700">
             <input v-model="detailsForm.requires_cash_advance" :disabled="!canEdit" type="checkbox" class="rounded border-slate-300 text-indigo-600" />
             Requires cash advance
           </label>
           <div class="md:col-span-3">
-            <label class="mb-1 block text-xs font-medium text-slate-600">Purpose</label>
-            <textarea v-model="detailsForm.purpose" :disabled="!canEdit" rows="3" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100"></textarea>
+            <AppTextarea v-model="detailsForm.purpose" label="Purpose" :disabled="!canEdit" :rows="3" />
           </div>
         </div>
-      </section>
+      </AppCard>
 
-      <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 class="text-sm font-semibold text-slate-900">Proposed Itinerary of Travel</h2>
+      <AppCard title="Proposed Itinerary of Travel" :padded="false">
+        <template #header>
           <div class="flex gap-2">
-            <button v-if="canEdit" @click="addRow" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <AppButton v-if="canEdit" variant="secondary" size="sm" @click="addRow">
               <PlusIcon class="h-4 w-4" />
               Row
-            </button>
-            <button v-if="canEdit" @click="saveItinerary" :disabled="itineraryForm.processing" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">Save IOT</button>
+            </AppButton>
+            <AppButton v-if="canEdit" size="sm" :loading="itineraryForm.processing" :disabled="itineraryForm.processing" @click="saveItinerary">Save IOT</AppButton>
           </div>
-        </div>
+        </template>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-slate-100">
             <thead class="bg-slate-50">
@@ -310,9 +294,9 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
                 <td class="px-3 py-2"><input v-model="row.other_cost" type="number" min="0" step="0.01" :disabled="!canEdit" class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-100" /></td>
                 <td class="px-3 py-2 text-right text-sm font-medium text-slate-900">{{ money(rowTotal(row)) }}</td>
                 <td class="px-3 py-2">
-                  <button v-if="canEdit" @click="removeRow(index)" class="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                  <AppIconButton v-if="canEdit" label="Remove row" variant="danger" size="sm" @click="removeRow(index)">
                     <TrashIcon class="h-4 w-4" />
-                  </button>
+                  </AppIconButton>
                 </td>
               </tr>
             </tbody>
@@ -328,12 +312,11 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
             </tfoot>
           </table>
         </div>
-      </section>
+      </AppCard>
 
       <div class="grid gap-6 xl:grid-cols-2">
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 class="text-sm font-semibold text-slate-900">Documents and Linked Records</h2>
-          <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <AppCard title="Documents and Linked Records">
+          <div class="grid gap-4 md:grid-cols-2">
             <div>
               <label class="mb-1 block text-xs font-medium text-slate-600">Travel Order Issuance</label>
               <select v-model="linksForm.travel_order_issuance_id" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100">
@@ -371,13 +354,12 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
               </select>
             </div>
           </div>
-          <button v-if="canEdit" @click="saveLinks" class="mt-4 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Save Links</button>
-        </section>
+          <AppButton v-if="canEdit" class="mt-4" @click="saveLinks">Save Links</AppButton>
+        </AppCard>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 class="text-sm font-semibold text-slate-900">Attachments</h2>
-          <form v-if="canEdit" @submit.prevent="uploadAttachment" class="mt-4 grid gap-3 md:grid-cols-[180px_1fr_auto]">
-            <select v-model="uploadForm.type" class="rounded-lg border border-slate-200 px-3 py-2 text-sm">
+        <AppCard title="Attachments">
+          <form v-if="canEdit" @submit.prevent="uploadAttachment" class="grid gap-3 md:grid-cols-[180px_1fr_auto]">
+            <AppSelect v-model="uploadForm.type" :show-blank="false">
               <option value="oed_travel_order">OED Travel Order</option>
               <option value="special_order">Special Order</option>
               <option value="ticket">Ticket</option>
@@ -386,9 +368,9 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
               <option value="receipt">Receipt</option>
               <option value="liquidation">Liquidation</option>
               <option value="other">Other</option>
-            </select>
+            </AppSelect>
             <input type="file" @change="onFile" class="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <button :disabled="uploadForm.processing || !uploadForm.file_base64" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">Upload</button>
+            <AppButton type="submit" :disabled="uploadForm.processing || !uploadForm.file_base64">Upload</AppButton>
           </form>
           <div class="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-100">
             <div v-for="attachment in travel.attachments" :key="attachment.id" class="flex items-center justify-between gap-3 px-3 py-3">
@@ -396,57 +378,39 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
                 <PaperClipIcon class="h-4 w-4 shrink-0" />
                 <span class="truncate">{{ attachment.file_name }}</span>
               </a>
-              <button v-if="canEdit" @click="deleteAttachment(attachment)" class="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">
+              <AppIconButton v-if="canEdit" label="Delete attachment" variant="danger" size="sm" @click="deleteAttachment(attachment)">
                 <TrashIcon class="h-4 w-4" />
-              </button>
+              </AppIconButton>
             </div>
-            <p v-if="!travel.attachments?.length" class="px-3 py-8 text-center text-sm text-slate-400">No attachments uploaded.</p>
+            <EmptyState v-if="!travel.attachments?.length" title="No attachments uploaded." />
           </div>
-        </section>
+        </AppCard>
       </div>
 
       <div class="grid gap-6 xl:grid-cols-2">
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-900">Authority to Book Flights</h2>
-            <span v-if="travel.flight_authority" :class="['rounded-full px-2 py-0.5 text-xs font-medium', statusClass(travel.flight_authority.status)]">{{ travel.flight_authority.status }}</span>
-          </div>
-          <div class="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <label class="mb-1 block text-xs font-medium text-slate-600">Passenger</label>
-              <input v-model="flightForm.passenger_name" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-            </div>
-            <div>
-              <label class="mb-1 block text-xs font-medium text-slate-600">Route</label>
-              <input v-model="flightForm.route" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-            </div>
-            <div>
-              <label class="mb-1 block text-xs font-medium text-slate-600">Departure</label>
-              <input v-model="flightForm.preferred_departure_date" type="date" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-            </div>
-            <div>
-              <label class="mb-1 block text-xs font-medium text-slate-600">Return</label>
-              <input v-model="flightForm.preferred_return_date" type="date" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-            </div>
-            <div>
-              <label class="mb-1 block text-xs font-medium text-slate-600">Estimated Airfare</label>
-              <input v-model="flightForm.estimated_airfare" type="number" min="0" step="0.01" :disabled="!canEdit" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100" />
-            </div>
+        <AppCard title="Authority to Book Flights">
+          <template #header>
+            <AppBadge v-if="travel.flight_authority" :color="statusBadgeColor(travel.flight_authority.status)">{{ travel.flight_authority.status }}</AppBadge>
+          </template>
+          <div class="grid gap-4 md:grid-cols-2">
+            <AppInput v-model="flightForm.passenger_name" label="Passenger" :disabled="!canEdit" />
+            <AppInput v-model="flightForm.route" label="Route" :disabled="!canEdit" />
+            <AppInput v-model="flightForm.preferred_departure_date" type="date" label="Departure" :disabled="!canEdit" />
+            <AppInput v-model="flightForm.preferred_return_date" type="date" label="Return" :disabled="!canEdit" />
+            <AppInput v-model="flightForm.estimated_airfare" type="number" min="0" step="0.01" label="Estimated Airfare" :disabled="!canEdit" />
             <div class="md:col-span-2">
-              <label class="mb-1 block text-xs font-medium text-slate-600">Notes</label>
-              <textarea v-model="flightForm.booking_notes" :disabled="!canEdit" rows="3" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100"></textarea>
+              <AppTextarea v-model="flightForm.booking_notes" label="Notes" :disabled="!canEdit" :rows="3" />
             </div>
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
-            <button v-if="canEdit" @click="saveFlight(false)" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Save Draft</button>
-            <button v-if="canEdit" @click="saveFlight(true)" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Request Booking</button>
-            <button v-if="canFadReview && travel.flight_authority?.status === 'requested'" @click="approveFlight" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Approve Booking</button>
+            <AppButton v-if="canEdit" variant="secondary" @click="saveFlight(false)">Save Draft</AppButton>
+            <AppButton v-if="canEdit" @click="saveFlight(true)">Request Booking</AppButton>
+            <AppButton v-if="canFadReview && travel.flight_authority?.status === 'requested'" variant="success" @click="approveFlight">Approve Booking</AppButton>
           </div>
-        </section>
+        </AppCard>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 class="text-sm font-semibold text-slate-900">Finance and Liquidation</h2>
-          <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+        <AppCard title="Finance and Liquidation">
+          <dl class="grid gap-3 sm:grid-cols-2">
             <div class="rounded-lg bg-slate-50 p-3">
               <dt class="text-xs font-medium text-slate-500">Cash Advance</dt>
               <dd class="mt-1 text-sm font-semibold text-slate-900">PHP {{ money(travel.cash_advance_amount) }}</dd>
@@ -465,26 +429,27 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
             </div>
           </dl>
           <div class="mt-4">
-            <label class="mb-1 block text-xs font-medium text-slate-600">Liquidation Remarks</label>
-            <textarea v-model="liquidationForm.liquidation_remarks" :disabled="!perms.canFinance" rows="3" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100"></textarea>
+            <AppTextarea v-model="liquidationForm.liquidation_remarks" label="Liquidation Remarks" :disabled="!perms.canFinance" :rows="3" />
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
-            <button v-if="canFadReview && !['completed', 'liquidated'].includes(travel.status)" @click="completeTravel" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Mark Completed</button>
-            <button v-if="perms.canFinance && travel.status === 'completed'" @click="liquidateTravel" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Mark Liquidated</button>
+            <AppButton v-if="canFadReview && !['completed', 'liquidated'].includes(travel.status)" variant="secondary" @click="completeTravel">Mark Completed</AppButton>
+            <AppButton v-if="perms.canFinance && travel.status === 'completed'" variant="success" @click="liquidateTravel">Mark Liquidated</AppButton>
           </div>
-        </section>
+        </AppCard>
       </div>
 
-      <section v-if="canReturn" class="rounded-lg border border-red-200 bg-red-50 p-5">
-        <h2 class="text-sm font-semibold text-red-900">Return for Revision</h2>
+      <div v-if="canReturn" class="rounded-lg border border-danger-100 bg-danger-50 p-5">
+        <h2 class="text-sm font-semibold text-danger-700">Return for Revision</h2>
         <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input v-model="returnForm.return_reason" placeholder="Reason for return" class="min-w-0 flex-1 rounded-lg border border-red-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" />
-          <button @click="returnTravel" :disabled="returnForm.processing || !returnForm.return_reason" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
+          <div class="min-w-0 flex-1">
+            <AppInput v-model="returnForm.return_reason" placeholder="Reason for return" />
+          </div>
+          <AppButton variant="danger" :disabled="returnForm.processing || !returnForm.return_reason" @click="returnTravel">
             <XCircleIcon class="h-4 w-4" />
             Return
-          </button>
+          </AppButton>
         </div>
-      </section>
+      </div>
     </div>
   </AdminLayout>
 </template>

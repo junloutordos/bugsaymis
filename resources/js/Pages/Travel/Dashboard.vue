@@ -2,6 +2,11 @@
 import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { CalendarDaysIcon, ClipboardDocumentListIcon, BanknotesIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -18,11 +23,11 @@ const cards = computed(() => [
   { label: 'Unliquidated', value: props.stats?.unliquidated ?? 0, icon: BanknotesIcon, tone: 'bg-rose-100 text-rose-700' },
 ])
 
-const statusClass = (status) => {
-  if (['liquidated', 'completed', 'released'].includes(status)) return 'bg-emerald-100 text-emerald-700'
-  if (['returned', 'cancelled'].includes(status)) return 'bg-red-100 text-red-700'
-  if (status === 'draft') return 'bg-slate-100 text-slate-600'
-  return 'bg-amber-100 text-amber-700'
+const statusBadgeColor = (status) => {
+  if (['liquidated', 'completed', 'released'].includes(status)) return 'green'
+  if (['returned', 'cancelled'].includes(status)) return 'red'
+  if (status === 'draft') return 'slate'
+  return 'amber'
 }
 
 const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'
@@ -32,15 +37,13 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
   <Head title="Travel Dashboard" />
   <AdminLayout title="Travel Dashboard">
     <div class="space-y-6">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-900">Travel Dashboard</h1>
-          <p class="text-sm text-slate-500">Official travel, itinerary, transport, cash advance, ORS, DV, and liquidation monitoring.</p>
-        </div>
-        <Link :href="route('travel.index')" class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-          Open Travel Requests
-        </Link>
-      </div>
+      <AppPageHeader title="Travel Dashboard" subtitle="Official travel, itinerary, transport, cash advance, ORS, DV, and liquidation monitoring.">
+        <template #actions>
+          <AppButton as="link" :href="route('travel.index')">
+            Open Travel Requests
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div v-for="card in cards" :key="card.label" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -57,10 +60,7 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
       </div>
 
       <div class="grid gap-6 xl:grid-cols-2">
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div class="border-b border-slate-100 px-5 py-4">
-            <h2 class="text-sm font-semibold text-slate-900">Pending My Action</h2>
-          </div>
+        <AppCard title="Pending My Action" :padded="false">
           <div class="divide-y divide-slate-100">
             <Link v-for="travel in pendingAction" :key="travel.id" :href="route('travel.show', travel.id)" class="block px-5 py-4 hover:bg-slate-50">
               <div class="flex items-start justify-between gap-4">
@@ -68,17 +68,14 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
                   <p class="truncate text-sm font-medium text-slate-900">{{ travel.control_no }} - {{ travel.destination }}</p>
                   <p class="mt-1 truncate text-xs text-slate-500">{{ travel.traveler?.name }} · {{ fmtDate(travel.start_date) }} to {{ fmtDate(travel.end_date) }}</p>
                 </div>
-                <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', statusClass(travel.status)]">{{ travel.status_label }}</span>
+                <AppBadge :color="statusBadgeColor(travel.status)" class="shrink-0">{{ travel.status_label }}</AppBadge>
               </div>
             </Link>
-            <div v-if="!pendingAction?.length" class="px-5 py-10 text-center text-sm text-slate-400">No travel records need your action.</div>
+            <EmptyState v-if="!pendingAction?.length" title="No travel records need your action." />
           </div>
-        </section>
+        </AppCard>
 
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div class="border-b border-slate-100 px-5 py-4">
-            <h2 class="text-sm font-semibold text-slate-900">Recent Travel</h2>
-          </div>
+        <AppCard title="Recent Travel" :padded="false">
           <div class="divide-y divide-slate-100">
             <Link v-for="travel in recentTravels" :key="travel.id" :href="route('travel.show', travel.id)" class="block px-5 py-4 hover:bg-slate-50">
               <div class="flex items-start justify-between gap-4">
@@ -86,17 +83,16 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
                   <p class="truncate text-sm font-medium text-slate-900">{{ travel.control_no }} - {{ travel.destination }}</p>
                   <p class="mt-1 truncate text-xs text-slate-500">{{ travel.purpose }}</p>
                 </div>
-                <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', statusClass(travel.status)]">{{ travel.status_label }}</span>
+                <AppBadge :color="statusBadgeColor(travel.status)" class="shrink-0">{{ travel.status_label }}</AppBadge>
               </div>
             </Link>
-            <div v-if="!recentTravels?.length" class="px-5 py-10 text-center text-sm text-slate-400">No travel records found.</div>
+            <EmptyState v-if="!recentTravels?.length" title="No travel records found." />
           </div>
-        </section>
+        </AppCard>
       </div>
 
-      <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 class="text-sm font-semibold text-slate-900">Policy References</h2>
-        <div class="mt-3 grid gap-3 md:grid-cols-2">
+      <AppCard title="Policy References">
+        <div class="grid gap-3 md:grid-cols-2">
           <div v-for="rule in policyRules" :key="rule.id" class="rounded-lg border border-slate-100 bg-slate-50 p-3">
             <p class="text-sm font-medium text-slate-800">{{ rule.label }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ rule.source }}</p>
@@ -104,7 +100,7 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
           </div>
           <p v-if="!policyRules?.length" class="text-sm text-slate-500">No configurable policy rules have been seeded yet.</p>
         </div>
-      </section>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>

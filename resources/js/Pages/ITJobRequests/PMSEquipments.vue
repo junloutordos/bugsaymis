@@ -6,6 +6,12 @@ import html2pdf from "html2pdf.js"
 import { ArrowDownTrayIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
+import AppPageHeader from "@/Components/AppPageHeader.vue"
+import AppButton from "@/Components/AppButton.vue"
+import AppCard from "@/Components/AppCard.vue"
+import AppModal from "@/Components/AppModal.vue"
+import AppInput from "@/Components/AppInput.vue"
+import AppTextarea from "@/Components/AppTextarea.vue"
 
 const props = defineProps({
   pms: Object,
@@ -263,22 +269,17 @@ const equipmentHistoryMap = computed(() => {
   <AdminLayout title="Preventive Maintenance Schedule">
 
     <!-- Page Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">PMS Equipment Details</h1>
-        <p class="text-sm text-slate-500 mt-0.5">{{ pms.office_area }} — {{ pms.school_year }}</p>
-      </div>
-      <button
-        @click="exportPDF"
-        class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-      >
-        <ArrowDownTrayIcon class="w-4 h-4" />
-        Export PDF
-      </button>
-    </div>
+    <AppPageHeader title="PMS Equipment Details" :subtitle="`${pms.office_area} — ${pms.school_year}`">
+      <template #actions>
+        <AppButton variant="secondary" @click="exportPDF">
+          <ArrowDownTrayIcon class="w-4 h-4" />
+          Export PDF
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <!-- Card Display -->
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+    <AppCard>
       <div id="pdfContent">
         <!-- Header -->
         <div class="text-center mb-4">
@@ -385,63 +386,39 @@ const equipmentHistoryMap = computed(() => {
           <p>PSHS-00-F-GSM-06-Ver02-Rev0-02/01/20</p>
         </div>
       </div>
-    </div>
+    </AppCard>
 
     <!-- PMS Checklist Modal -->
-    <div v-if="showModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="text-base font-semibold text-slate-800">PMS Checklist</h3>
-          <button @click="showModal = false"
-            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+    <AppModal :show="showModal" title="PMS Checklist" @close="showModal = false">
+      <div class="space-y-4">
+        <div class="text-sm text-slate-700 space-y-1">
+          <p><span class="font-medium text-slate-600">Equipment:</span> {{ selectedEquipment.description }}</p>
+          <p><span class="font-medium text-slate-600">Month:</span> {{ months[selectedMonth] }}</p>
         </div>
-        <div class="px-6 py-5 space-y-4">
-          <div class="text-sm text-slate-700 space-y-1">
-            <p><span class="font-medium text-slate-600">Equipment:</span> {{ selectedEquipment.description }}</p>
-            <p><span class="font-medium text-slate-600">Month:</span> {{ months[selectedMonth] }}</p>
-          </div>
 
-          <!-- Checklist -->
-          <div class="space-y-2">
-            <label v-for="(item, idx) in checklistItems" :key="idx" class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input type="checkbox" v-model="checklistStatus[idx]" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-              <span>{{ item }}</span>
-            </label>
-          </div>
-
-          <!-- Additional Inputs -->
-          <div class="space-y-3 pt-2 border-t border-slate-100">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Actual PMS Date</label>
-              <input type="date" v-model="modalData.actualDate"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            </div>
-            <input type="hidden" v-model="modalData.pmsType" />
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Cost of Repair (if any)</label>
-              <input type="number" v-model="modalData.cost" min="0" step="0.01"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-              <textarea v-model="modalData.remarks" rows="2"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
-            </div>
-          </div>
+        <!-- Checklist -->
+        <div class="space-y-2">
+          <label v-for="(item, idx) in checklistItems" :key="idx" class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+            <input type="checkbox" v-model="checklistStatus[idx]" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+            <span>{{ item }}</span>
+          </label>
         </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click="showModal = false"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Cancel
-          </button>
-          <button @click="saveActivity" :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            {{ isSubmitting ? 'Saving…' : 'Save' }}
-          </button>
+
+        <!-- Additional Inputs -->
+        <div class="space-y-3 pt-2 border-t border-slate-100">
+          <AppInput type="date" v-model="modalData.actualDate" label="Actual PMS Date" />
+          <input type="hidden" v-model="modalData.pmsType" />
+          <AppInput type="number" v-model="modalData.cost" min="0" step="0.01" label="Cost of Repair (if any)" />
+          <AppTextarea v-model="modalData.remarks" :rows="2" label="Remarks" />
         </div>
       </div>
-    </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="showModal = false">Cancel</AppButton>
+        <AppButton :loading="isSubmitting" :disabled="isSubmitting" @click="saveActivity">
+          {{ isSubmitting ? 'Saving…' : 'Save' }}
+        </AppButton>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>

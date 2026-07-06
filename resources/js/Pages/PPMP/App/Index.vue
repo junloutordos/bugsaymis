@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import { useConfirm } from '@/Composables/useConfirm'
 import { ArrowPathIcon, DocumentArrowDownIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -53,8 +57,15 @@ const filteredConsolidated = computed(() => {
 const part1Total = computed(() => props.consolidated.filter(c => c.part === 1).reduce((s, c) => s + Number(c.total_quantity) * Number(c.unit_price), 0))
 const part2Total = computed(() => props.consolidated.filter(c => c.part === 2).reduce((s, c) => s + Number(c.total_quantity) * Number(c.unit_price), 0))
 
-const consolidate = () => {
-    if (!confirm(`Consolidate all approved PPMPs for FY ${props.fiscalYear} into the APP?`)) return
+const { confirmAction } = useConfirm()
+
+const consolidate = async () => {
+    const ok = await confirmAction({
+        title: 'Consolidate APP',
+        text: `Consolidate all approved PPMPs for FY ${props.fiscalYear} into the APP?`,
+        confirmText: 'Consolidate',
+    })
+    if (!ok) return
     router.post(route('ppmp.app.consolidate'), { fiscal_year: props.fiscalYear }, { preserveScroll: true })
 }
 </script>
@@ -62,54 +73,55 @@ const consolidate = () => {
 <template>
     <Head :title="`APP — FY ${fiscalYear}`" />
     <AdminLayout :title="`Annual Procurement Plan — FY ${fiscalYear}`">
+      <div class="space-y-5">
+
+        <AppPageHeader :title="`Annual Procurement Plan — FY ${fiscalYear}`"
+                        subtitle="Consolidated APP-CSE view of all approved PPMPs.">
+            <template #actions>
+                <AppButton as="a" variant="secondary" :href="route('ppmp.app.export.excel') + '?fiscal_year=' + fiscalYear">
+                    <DocumentArrowDownIcon class="w-4 h-4" /> Export APP-CSE Excel
+                </AppButton>
+                <AppButton @click="consolidate">
+                    <ArrowPathIcon class="w-4 h-4" /> Consolidate
+                </AppButton>
+            </template>
+        </AppPageHeader>
 
         <!-- Flash -->
-        <div v-if="flash.success" class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">{{ flash.success }}</div>
-        <div v-if="flash.error"   class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">{{ flash.error }}</div>
+        <div v-if="flash.success" class="rounded-lg bg-success-50 border border-success-100 px-4 py-3 text-sm text-success-700">{{ flash.success }}</div>
+        <div v-if="flash.error"   class="rounded-lg bg-danger-50  border border-danger-100  px-4 py-3 text-sm text-danger-600">{{ flash.error }}</div>
 
         <!-- Summary bar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div class="flex items-center gap-3 flex-wrap">
-                <div class="bg-white rounded-lg border border-slate-200 px-4 py-2">
-                    <span class="text-xs text-slate-500">Approved PPMPs</span>
-                    <span class="ml-2 text-lg font-bold text-slate-800">{{ approvedCount }}</span>
-                </div>
-                <div class="bg-indigo-50 rounded-lg border border-indigo-200 px-4 py-2">
-                    <span class="text-xs text-indigo-500">Grand Total</span>
-                    <span class="ml-2 text-lg font-bold text-indigo-800">₱{{ formatPeso(totals.grand_total) }}</span>
-                </div>
-                <div class="bg-blue-50 rounded-lg border border-blue-200 px-3 py-2">
-                    <span class="text-xs text-blue-600 font-semibold">Part I:</span>
-                    <span class="ml-1 text-sm font-bold text-blue-800">₱{{ formatPeso(part1Total) }}</span>
-                </div>
-                <div class="bg-emerald-50 rounded-lg border border-emerald-200 px-3 py-2">
-                    <span class="text-xs text-emerald-600 font-semibold">Part II:</span>
-                    <span class="ml-1 text-sm font-bold text-emerald-800">₱{{ formatPeso(part2Total) }}</span>
-                </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="bg-white rounded-lg border border-slate-200 px-4 py-2">
+                <span class="text-xs text-slate-500">Approved PPMPs</span>
+                <span class="ml-2 text-lg font-bold text-slate-800">{{ approvedCount }}</span>
             </div>
-            <div class="flex gap-2 flex-wrap">
-                <a :href="route('ppmp.app.export.excel') + '?fiscal_year=' + fiscalYear"
-                   class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    <DocumentArrowDownIcon class="w-4 h-4" /> Export APP-CSE Excel
-                </a>
-                <button @click="consolidate"
-                        class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    <ArrowPathIcon class="w-4 h-4" /> Consolidate
-                </button>
+            <div class="bg-indigo-50 rounded-lg border border-indigo-200 px-4 py-2">
+                <span class="text-xs text-indigo-500">Grand Total</span>
+                <span class="ml-2 text-lg font-bold text-indigo-800">₱{{ formatPeso(totals.grand_total) }}</span>
+            </div>
+            <div class="bg-blue-50 rounded-lg border border-blue-200 px-3 py-2">
+                <span class="text-xs text-blue-600 font-semibold">Part I:</span>
+                <span class="ml-1 text-sm font-bold text-blue-800">₱{{ formatPeso(part1Total) }}</span>
+            </div>
+            <div class="bg-success-50 rounded-lg border border-success-100 px-3 py-2">
+                <span class="text-xs text-success-600 font-semibold">Part II:</span>
+                <span class="ml-1 text-sm font-bold text-success-700">₱{{ formatPeso(part2Total) }}</span>
             </div>
         </div>
 
         <!-- Category totals -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <div v-for="cat in (totals.categories || [])" :key="cat.category" class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <AppCard v-for="cat in (totals.categories || [])" :key="cat.category">
                 <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ cat.label }}</p>
                 <p class="text-lg font-bold text-slate-800">₱{{ formatPeso(cat.subtotal) }}</p>
                 <p class="text-xs text-slate-500">{{ cat.item_count }} item(s)</p>
-            </div>
+            </AppCard>
         </div>
 
         <!-- View mode tabs -->
-        <div class="flex gap-1 mb-3">
+        <div class="flex gap-1">
             <button @click="viewMode = 'consolidated'"
                     :class="viewMode === 'consolidated' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'"
                     class="px-4 py-2 rounded-lg text-sm font-medium">
@@ -124,14 +136,15 @@ const consolidate = () => {
 
         <!-- ══ CONSOLIDATED VIEW ════════════════════════════════════════════════ -->
         <template v-if="viewMode === 'consolidated'">
-            <div class="mb-3 flex gap-2">
+          <div class="space-y-4">
+            <div class="flex gap-2">
                 <input v-model="search2" type="text" placeholder="Search items…"
                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-72" />
                 <span class="self-center text-xs text-slate-500">Showing only items with quantity > 0</span>
             </div>
 
             <!-- Part I -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-100 bg-blue-50">
                     <h3 class="text-sm font-semibold text-blue-800">Part I — PS-DBM Items (Agency-to-Agency)</h3>
                 </div>
@@ -216,11 +229,13 @@ const consolidate = () => {
                     </table>
                 </div>
             </div>
+          </div>
         </template>
 
         <!-- ══ BY-UNIT VIEW ════════════════════════════════════════════════════ -->
         <template v-if="viewMode === 'by-unit'">
-            <div class="mb-3">
+          <div class="space-y-3">
+            <div>
                 <input v-model="search" type="text" placeholder="Search by description or unit…"
                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-72" />
             </div>
@@ -266,7 +281,9 @@ const consolidate = () => {
                     </table>
                 </div>
             </div>
+          </div>
         </template>
 
+      </div>
     </AdminLayout>
 </template>

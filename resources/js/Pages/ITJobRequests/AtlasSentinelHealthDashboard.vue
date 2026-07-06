@@ -19,6 +19,7 @@ ChartJS.register(Title, Tooltip, Legend, CategoryScale, LinearScale, PointElemen
 
 const props = defineProps({
   devices: Array,
+  latestAgentVersion: { type: String, default: null },
 })
 
 const PER_PAGE = 15
@@ -30,6 +31,7 @@ const historyByDevice = ref({})
 const loadingHistory = ref(false)
 
 const riskTierOrder = { critical: 4, high: 3, medium: 2, low: 1 }
+const statusOrder = { offline: 4, stale: 3, active_outdated: 2, unknown_version: 1, current: 0 }
 
 function sortBy(key) {
   if (sortKey.value === key) {
@@ -52,6 +54,11 @@ const sorted = computed(() => {
     if (sortKey.value === 'risk_tier') {
       av = riskTierOrder[a.risk_tier] ?? 0
       bv = riskTierOrder[b.risk_tier] ?? 0
+    }
+
+    if (sortKey.value === 'agent_status') {
+      av = statusOrder[agentStatus(a).state] ?? 0
+      bv = statusOrder[agentStatus(b).state] ?? 0
     }
 
     if (av === null || av === undefined) return 1
@@ -151,14 +158,69 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+function formatDateTime(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function truncateVersion(v) {
+  if (!v) return ''
+  return v.split('.').slice(0, 3).join('.')
+}
+
+function checkinAgeMinutes(checkinAt) {
+  if (!checkinAt) return null
+  return Math.floor((Date.now() - new Date(checkinAt).getTime()) / 60000)
+}
+
+function versionIsOutdated(deviceVersion) {
+  const latest = truncateVersion(props.latestAgentVersion)
+  const device = truncateVersion(deviceVersion)
+  if (!latest || !device) return false
+  return latest.localeCompare(device, undefined, { numeric: true, sensitivity: 'base' }) > 0
+}
+
+function agentStatus(device) {
+  const age = checkinAgeMinutes(device.last_checkin_at)
+
+  if (age === null || age > 120) {
+    return { state: 'offline', label: 'Offline', cls: 'bg-red-50 text-red-700' }
+  }
+
+  if (age > 40) {
+    return { state: 'stale', label: 'Stale', cls: 'bg-amber-50 text-amber-700' }
+  }
+
+  if (!truncateVersion(device.agent_version)) {
+    return { state: 'unknown_version', label: 'Unknown version', cls: 'bg-slate-100 text-slate-600' }
+  }
+
+  if (versionIsOutdated(device.agent_version)) {
+    return { state: 'active_outdated', label: 'Active outdated', cls: 'bg-orange-50 text-orange-700' }
+  }
+
+  return { state: 'current', label: 'Current', cls: 'bg-emerald-50 text-emerald-700' }
+}
+
+function versionLabel(version) {
+  const truncated = truncateVersion(version)
+  return truncated ? `v${truncated}` : 'Unknown'
+}
+
 // A failed self-update can leave the agent's Windows service down rather
 // than just on an old version — that looks identical to "all is well" here
 // unless we flag check-ins that never resumed afterward.
 const STALE_CHECKIN_MINUTES = 40
 function offlineAfterFailedUpdate(device) {
   if (!['failed', 'failed_service_down'].includes(device.last_update_result)) return false
-  if (!device.last_checkin_at) return false
-  const minutesSinceCheckin = (Date.now() - new Date(device.last_checkin_at).getTime()) / 60000
+  const minutesSinceCheckin = checkinAgeMinutes(device.last_checkin_at)
+  if (minutesSinceCheckin === null) return false
   return minutesSinceCheckin > STALE_CHECKIN_MINUTES
 }
 </script>
@@ -183,6 +245,12 @@ function offlineAfterFailedUpdate(device) {
               </th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer" @click="sortBy('risk_tier')">
                 Risk
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer" @click="sortBy('agent_version')">
+                Version
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer" @click="sortBy('agent_status')">
+                Status
               </th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
                 Open Alerts
@@ -240,16 +308,30 @@ function offlineAfterFailedUpdate(device) {
                   </span>
                   <span v-else class="text-slate-400 text-xs">—</span>
                 </td>
+                <td class="px-4 py-3 text-xs text-slate-600">
+                  <div class="font-medium">{{ versionLabel(device.agent_version) }}</div>
+                  <div v-if="props.latestAgentVersion" class="text-slate-400">Latest v{{ truncateVersion(props.latestAgentVersion) }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <span :class="agentStatus(device).cls" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">
+                    {{ agentStatus(device).label }}
+                  </span>
+                </td>
                 <td class="px-4 py-3">
                   <span v-if="device.open_alerts_count > 0" class="inline-flex items-center gap-1 text-amber-600 text-xs font-medium">
                     <ExclamationTriangleIcon class="w-3.5 h-3.5" /> {{ device.open_alerts_count }}
                   </span>
                   <span v-else class="text-slate-400 text-xs">None</span>
                 </td>
-                <td class="px-4 py-3 text-slate-500 text-xs">{{ formatDate(device.last_checkin_at) }}</td>
+                <td class="px-4 py-3 text-slate-500 text-xs">
+                  <div>{{ formatDateTime(device.last_checkin_at) }}</div>
+                  <div v-if="checkinAgeMinutes(device.last_checkin_at) !== null" class="text-slate-400">
+                    {{ checkinAgeMinutes(device.last_checkin_at) }} min ago
+                  </div>
+                </td>
               </tr>
               <tr v-if="expandedDeviceId === device.id">
-                <td colspan="6" class="px-4 py-4 bg-slate-50">
+                <td colspan="9" class="px-4 py-4 bg-slate-50">
                   <div v-if="loadingHistory" class="text-sm text-slate-400">Loading trend...</div>
                   <div v-else-if="(historyByDevice[device.id] || []).length === 0" class="text-sm text-slate-400">
                     No scored history yet for this device.

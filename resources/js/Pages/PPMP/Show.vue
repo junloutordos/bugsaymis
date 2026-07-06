@@ -2,6 +2,14 @@
 import { ref, computed, watch } from 'vue'
 import { Head, useForm, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppTable from '@/Components/AppTable.vue'
+import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import {
     PlusIcon, PencilSquareIcon, TrashIcon, CheckCircleIcon,
     ArrowUturnLeftIcon, DocumentArrowDownIcon, ShieldCheckIcon,
@@ -76,23 +84,6 @@ const fundSourceTotals = computed(() => {
 })
 
 // ── Status helpers ────────────────────────────────────────────────────────
-const statusColors = {
-    draft:                        'bg-slate-100 text-slate-700',
-    pending_division:             'bg-orange-100 text-orange-700',
-    division_approved:            'bg-teal-100 text-teal-700',
-    pending_property_officer:     'bg-yellow-100 text-yellow-800',
-    property_officer_approved:    'bg-teal-100 text-teal-700',
-    pending_budget_officer:       'bg-sky-100 text-sky-700',
-    pending_ocd:                  'bg-violet-100 text-violet-700',
-    pending_head:                 'bg-rose-100 text-rose-700',
-    pending_bac:                  'bg-purple-100 text-purple-700',
-    submitted:                    'bg-blue-100 text-blue-700',
-    returned:                     'bg-amber-100 text-amber-700',
-    approved:                     'bg-green-100 text-green-700',
-    submitted_to_dbm:             'bg-emerald-100 text-emerald-800',
-    consolidated:                 'bg-indigo-100 text-indigo-700',
-}
-
 const statusLabel = (s) => ({
     draft:                        'Draft',
     pending_division:             'Pending Division Review',
@@ -109,6 +100,28 @@ const statusLabel = (s) => ({
     submitted_to_dbm:             'Submitted to DBM',
     consolidated:                 'Consolidated',
 }[s] ?? s)
+
+// AppBadge only ships slate|indigo|blue|green|amber|orange|red|purple — map the
+// full PPMP status set onto that palette (used in place of the old statusColors classes).
+function statusBadgeColor(status) {
+    const map = {
+        draft:                     'slate',
+        pending_division:          'orange',
+        division_approved:         'green',
+        pending_property_officer:  'amber',
+        property_officer_approved: 'green',
+        pending_budget_officer:    'blue',
+        pending_ocd:               'purple',
+        pending_head:              'red',
+        pending_bac:               'purple',
+        submitted:                 'blue',
+        returned:                  'amber',
+        approved:                  'green',
+        submitted_to_dbm:          'green',
+        consolidated:              'indigo',
+    }
+    return map[status] ?? 'slate'
+}
 
 // ── Part I Catalogue Picker Modal ─────────────────────────────────────────
 const showCatModal     = ref(false)
@@ -342,8 +355,8 @@ const saveEdit = () => {
     })
 }
 
-const deleteItem = (item) => {
-    if (!confirm(`Remove "${item.description}"?`)) return
+const deleteItem = async (item) => {
+    if (!(await confirmDelete(`Remove "${item.description}" from this PPMP?`))) return
     router.delete(route('ppmp.items.destroy', [props.ppmp.id, item.id]), { preserveScroll: true })
 }
 
@@ -385,16 +398,19 @@ const itemHasError   = (id) => validationResult.value?.errors?.some(e => e.item_
 const itemHasWarning = (id) => validationResult.value?.warnings?.some(w => w.item_id === id)
 
 // ── Workflow ──────────────────────────────────────────────────────────────
-const submitPpmp = () => {
+const submitPpmp = async () => {
     const msgs = {
         unit:     'Submit this PPMP to your Division Chief for review?',
         division: 'Submit this Division PPMP to the Property Officer for review?',
         property: 'Submit this Property PPMP to the Budget Officer for evaluation?',
     }
-    if (!confirm(msgs[props.ppmp.ppmp_type] ?? 'Submit this PPMP?')) return
+    if (!(await confirmAction({ title: 'Submit PPMP?', text: msgs[props.ppmp.ppmp_type] ?? 'Submit this PPMP?', confirmText: 'Submit' }))) return
     router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true })
 }
-const approvePpmp = () => { if (!confirm('Approve this PPMP?')) return; router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true }) }
+const approvePpmp = async () => {
+    if (!(await confirmAction({ title: 'Approve this PPMP?', confirmText: 'Approve' }))) return
+    router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true })
+}
 
 const returnRemarks   = ref('')
 const showReturnModal = ref(false)
@@ -409,8 +425,8 @@ const returnPpmp = () => {
 // Division review
 const showDivisionReturnModal = ref(false)
 const divisionRemarks         = ref('')
-const divisionEndorse = () => {
-    if (!confirm('Approve this unit PPMP? It will be marked as Division Approved and can then be consolidated into the Division PPMP.')) return
+const divisionEndorse = async () => {
+    if (!(await confirmAction({ title: 'Approve unit PPMP?', text: 'It will be marked as Division Approved and can then be consolidated into the Division PPMP.', confirmText: 'Approve' }))) return
     router.post(route('ppmp.division_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
 }
 const divisionReturn = () => {
@@ -423,7 +439,10 @@ const divisionReturn = () => {
 
 const showBacReturnModal = ref(false)
 const bacRemarks         = ref('')
-const bacEndorse = () => { if (!confirm('Endorse this PPMP to the approving authority?')) return; router.post(route('ppmp.bac_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true }) }
+const bacEndorse = async () => {
+    if (!(await confirmAction({ title: 'Endorse this PPMP?', text: 'Endorse this PPMP to the approving authority?', confirmText: 'Endorse' }))) return
+    router.post(route('ppmp.bac_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
+}
 const bacReturn  = () => {
     if (!bacRemarks.value.trim()) return
     router.post(route('ppmp.bac_review', props.ppmp.id), { action: 'return', remarks: bacRemarks.value }, {
@@ -435,8 +454,8 @@ const bacReturn  = () => {
 // Property Officer review
 const showPropertyReturnModal = ref(false)
 const propertyRemarks         = ref('')
-const propertyOfficerEndorse = () => {
-    if (!confirm('Endorse this PPMP and forward to Budget Officer?')) return
+const propertyOfficerEndorse = async () => {
+    if (!(await confirmAction({ title: 'Endorse this PPMP?', text: 'Endorse this PPMP and forward to Budget Officer?', confirmText: 'Endorse' }))) return
     router.post(route('ppmp.property_officer_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
 }
 const propertyOfficerReturn = () => {
@@ -450,8 +469,8 @@ const propertyOfficerReturn = () => {
 // Budget Officer review
 const showBudgetReturnModal = ref(false)
 const budgetRemarks         = ref('')
-const budgetOfficerEndorse = () => {
-    if (!confirm('Endorse this PPMP and forward to Head of Agency for approval?')) return
+const budgetOfficerEndorse = async () => {
+    if (!(await confirmAction({ title: 'Endorse this PPMP?', text: 'Endorse this PPMP and forward to Head of Agency for approval?', confirmText: 'Endorse' }))) return
     router.post(route('ppmp.budget_officer_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
 }
 const budgetOfficerReturn = () => {
@@ -463,8 +482,8 @@ const budgetOfficerReturn = () => {
 }
 
 // OCD approval / return
-const ocdApprove = () => {
-    if (!confirm('Approve this PPMP/APP-CSE? Budget Officer will be able to submit to DBM after this.')) return
+const ocdApprove = async () => {
+    if (!(await confirmAction({ title: 'Approve this PPMP/APP-CSE?', text: 'Budget Officer will be able to submit to DBM after this.', confirmText: 'Approve' }))) return
     router.post(route('ppmp.ocd_approve', props.ppmp.id), {}, { preserveScroll: true })
 }
 
@@ -479,8 +498,8 @@ const ocdReturn = () => {
 }
 
 // Budget Officer submits to DBM
-const submitToDbm = () => {
-    if (!confirm('Submit this approved PPMP/APP-CSE to DBM? This is the final step.')) return
+const submitToDbm = async () => {
+    if (!(await confirmAction({ title: 'Submit to DBM?', text: 'This is the final step for this PPMP/APP-CSE.', confirmText: 'Submit' }))) return
     router.post(route('ppmp.submit_to_dbm', props.ppmp.id), {}, { preserveScroll: true })
 }
 
@@ -496,8 +515,8 @@ const utilizationRate = computed(() => {
     <AdminLayout :title="ppmp.ppmp_number">
 
         <!-- Flash -->
-        <div v-if="flash.success" class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">{{ flash.success }}</div>
-        <div v-if="flash.error"   class="mb-4 rounded-lg bg-red-50   border border-red-200   px-4 py-3 text-sm text-red-800">{{ flash.error }}</div>
+        <div v-if="flash.success" class="mb-4 rounded-lg bg-success-50 border border-success-100 px-4 py-3 text-sm text-success-700">{{ flash.success }}</div>
+        <div v-if="flash.error"   class="mb-4 rounded-lg bg-danger-50  border border-danger-100  px-4 py-3 text-sm text-danger-600">{{ flash.error }}</div>
 
         <!-- Validation results -->
         <div v-if="validationResult?.errors?.length" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
@@ -514,20 +533,15 @@ const utilizationRate = computed(() => {
         </div>
 
         <!-- Header card -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
+        <AppCard class="mb-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="space-y-1">
                     <div class="flex items-center gap-3 flex-wrap">
                         <h2 class="text-lg font-semibold text-slate-800">{{ ppmp.title }}</h2>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                              :class="statusColors[ppmp.status] ?? 'bg-slate-100 text-slate-700'">
-                            {{ statusLabel(ppmp.status) }}
-                        </span>
-                        <span v-if="ppmp.ppmp_type === 'division'"
-                              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">Division PPMP</span>
-                        <span v-if="ppmp.ppmp_type === 'property'"
-                              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">Property PPMP</span>
-                        <span v-if="ppmp.is_supplemental" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Supplemental</span>
+                        <AppBadge :color="statusBadgeColor(ppmp.status)">{{ statusLabel(ppmp.status) }}</AppBadge>
+                        <AppBadge v-if="ppmp.ppmp_type === 'division'" color="blue">Division PPMP</AppBadge>
+                        <AppBadge v-if="ppmp.ppmp_type === 'property'" color="purple">Property PPMP</AppBadge>
+                        <AppBadge v-if="ppmp.is_supplemental" color="purple">Supplemental</AppBadge>
                     </div>
                     <p class="text-sm text-slate-500">
                         <template v-if="ppmp.office">{{ ppmp.office.name }} · </template>{{ ppmp.division?.division_name }} · FY {{ ppmp.fiscal_year }}
@@ -566,98 +580,81 @@ const utilizationRate = computed(() => {
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button v-if="canEdit" @click="runValidation" :disabled="validating"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
+                    <AppButton v-if="canEdit" variant="secondary" :disabled="validating" @click="runValidation">
                         <ShieldCheckIcon class="w-4 h-4" /> Validate
-                    </button>
+                    </AppButton>
 
                     <!-- Stage 1/2/3: Submit (unit/division/property) — only in draft or returned -->
-                    <button v-if="canSubmit && ['draft','returned'].includes(ppmp.status)" @click="submitPpmp"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white">
+                    <AppButton v-if="canSubmit && ['draft','returned'].includes(ppmp.status)" @click="submitPpmp">
                         {{ { unit: 'Submit to Division Chief', division: 'Submit to Property Officer', property: 'Submit to Budget Officer' }[ppmp.ppmp_type] ?? 'Submit' }}
-                    </button>
+                    </AppButton>
 
                     <!-- Stage 2: Division Chief reviews unit PPMP -->
-                    <button v-if="canDivisionReview && ppmp.ppmp_type === 'unit' && ppmp.status === 'pending_division'"
-                            @click="divisionEndorse"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white">
+                    <AppButton v-if="canDivisionReview && ppmp.ppmp_type === 'unit' && ppmp.status === 'pending_division'"
+                               variant="success" @click="divisionEndorse">
                         <CheckCircleIcon class="w-4 h-4" /> Approve Unit PPMP
-                    </button>
-                    <button v-if="canDivisionReview && ppmp.ppmp_type === 'unit' && ppmp.status === 'pending_division'"
-                            @click="showDivisionReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                    </AppButton>
+                    <AppButton v-if="canDivisionReview && ppmp.ppmp_type === 'unit' && ppmp.status === 'pending_division'"
+                               variant="warning" @click="showDivisionReturnModal = true">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Unit
-                    </button>
+                    </AppButton>
 
                     <!-- Stage 3: Property Officer reviews division PPMP -->
-                    <button v-if="canPropertyOfficerReview && ppmp.ppmp_type === 'division' && ppmp.status === 'pending_property_officer'"
-                            @click="propertyOfficerEndorse"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-yellow-500 hover:bg-yellow-600 text-white">
+                    <AppButton v-if="canPropertyOfficerReview && ppmp.ppmp_type === 'division' && ppmp.status === 'pending_property_officer'"
+                               variant="success" @click="propertyOfficerEndorse">
                         <CheckCircleIcon class="w-4 h-4" /> Approve Division PPMP
-                    </button>
-                    <button v-if="canPropertyOfficerReview && ppmp.ppmp_type === 'division' && ppmp.status === 'pending_property_officer'"
-                            @click="showPropertyReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                    </AppButton>
+                    <AppButton v-if="canPropertyOfficerReview && ppmp.ppmp_type === 'division' && ppmp.status === 'pending_property_officer'"
+                               variant="warning" @click="showPropertyReturnModal = true">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Division
-                    </button>
+                    </AppButton>
 
                     <!-- Stage 4: Budget Officer reviews property PPMP → submits to OCD -->
-                    <button v-if="canBudgetOfficerReview && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_budget_officer'"
-                            @click="budgetOfficerEndorse"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-700 text-white">
+                    <AppButton v-if="canBudgetOfficerReview && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_budget_officer'"
+                               @click="budgetOfficerEndorse">
                         <CheckCircleIcon class="w-4 h-4" /> Submit to OCD
-                    </button>
-                    <button v-if="canBudgetOfficerReview && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_budget_officer'"
-                            @click="showBudgetReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                    </AppButton>
+                    <AppButton v-if="canBudgetOfficerReview && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_budget_officer'"
+                               variant="warning" @click="showBudgetReturnModal = true">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Property Officer
-                    </button>
+                    </AppButton>
 
                     <!-- Stage 5: OCD final approval / return -->
-                    <button v-if="canOcdApprove && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_ocd'"
-                            @click="ocdApprove"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white">
+                    <AppButton v-if="canOcdApprove && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_ocd'"
+                               variant="success" @click="ocdApprove">
                         <CheckCircleIcon class="w-4 h-4" /> Approve PPMP/APP-CSE
-                    </button>
-                    <button v-if="canOcdReturn && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_ocd'"
-                            @click="showOcdReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                    </AppButton>
+                    <AppButton v-if="canOcdReturn && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_ocd'"
+                               variant="warning" @click="showOcdReturnModal = true">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Budget Officer
-                    </button>
+                    </AppButton>
 
                     <!-- Stage 6: Budget Officer submits to DBM -->
-                    <button v-if="canSubmitToDbm && ppmp.ppmp_type === 'property' && ppmp.status === 'approved'"
-                            @click="submitToDbm"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white">
+                    <AppButton v-if="canSubmitToDbm && ppmp.ppmp_type === 'property' && ppmp.status === 'approved'"
+                               @click="submitToDbm">
                         <CheckCircleIcon class="w-4 h-4" /> Submit to DBM
-                    </button>
+                    </AppButton>
 
                     <!-- Legacy BAC flow -->
-                    <button v-if="canBacReview" @click="bacEndorse"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white">
+                    <AppButton v-if="canBacReview" variant="success" @click="bacEndorse">
                         <CheckCircleIcon class="w-4 h-4" /> Endorse
-                    </button>
-                    <button v-if="canBacReview" @click="showBacReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                    </AppButton>
+                    <AppButton v-if="canBacReview" variant="warning" @click="showBacReturnModal = true">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Unit
-                    </button>
-                    <button v-if="canApprove" @click="approvePpmp"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white">
+                    </AppButton>
+                    <AppButton v-if="canApprove" variant="success" @click="approvePpmp">
                         <CheckCircleIcon class="w-4 h-4" /> Approve
-                    </button>
-                    <button v-if="canApprove" @click="showReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                    </AppButton>
+                    <AppButton v-if="canApprove" variant="warning" @click="showReturnModal = true">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return
-                    </button>
+                    </AppButton>
 
-                    <a v-if="canExport" :href="route('ppmp.export.pdf', ppmp.id)"
-                       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
+                    <AppButton v-if="canExport" as="a" variant="secondary" :href="route('ppmp.export.pdf', ppmp.id)">
                         <DocumentArrowDownIcon class="w-4 h-4" /> PDF
-                    </a>
-                    <a v-if="canExport" :href="route('ppmp.export.excel', ppmp.id)"
-                       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-100 hover:bg-emerald-200 text-emerald-800">
+                    </AppButton>
+                    <AppButton v-if="canExport" as="a" variant="secondary" :href="route('ppmp.export.excel', ppmp.id)">
                         <DocumentArrowDownIcon class="w-4 h-4" /> APP-CSE Excel
-                    </a>
+                    </AppButton>
                 </div>
             </div>
 
@@ -720,7 +717,7 @@ const utilizationRate = computed(() => {
                     </div>
                 </div>
             </div>
-        </div>
+        </AppCard>
 
         <!-- ══ WORKFLOW TRACKING TIMELINE ══════════════════════════════════════ -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
@@ -860,64 +857,54 @@ const utilizationRate = computed(() => {
 
         <!-- ══ SOURCE UNIT PPMPs (Division PPMP only) ═══════════════════════════ -->
         <div v-if="ppmp.ppmp_type === 'division' && unitPpmps?.length" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
-            <div class="px-4 py-3 border-b border-slate-100 bg-teal-50">
-                <h3 class="text-sm font-semibold text-teal-800">Consolidated Unit PPMPs</h3>
-                <p class="text-xs text-teal-600 mt-0.5">Unit PPMPs whose items were merged into this Division PPMP.</p>
+            <div class="px-4 py-3 border-b border-slate-100 bg-blue-50">
+                <h3 class="text-sm font-semibold text-blue-800">Consolidated Unit PPMPs</h3>
+                <p class="text-xs text-blue-600 mt-0.5">Unit PPMPs whose items were merged into this Division PPMP.</p>
             </div>
-            <table class="w-full text-sm">
-                <thead class="bg-slate-50">
+            <AppTable :card="false">
+                <template #head>
                     <tr>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">PPMP No.</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Title</th>
                         <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
                     </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <tr v-for="u in unitPpmps" :key="u.id" class="hover:bg-slate-50/60 cursor-pointer"
-                        @click="router.visit(route('ppmp.show', u.id))">
-                        <td class="px-4 py-2 font-medium text-indigo-600">{{ u.ppmp_number }}</td>
-                        <td class="px-4 py-2 text-slate-700">{{ u.title }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                  :class="statusColors[u.status] ?? 'bg-slate-100 text-slate-700'">
-                                {{ statusLabel(u.status) }}
-                            </span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                </template>
+                <tr v-for="u in unitPpmps" :key="u.id" class="hover:bg-slate-50/60 cursor-pointer"
+                    @click="router.visit(route('ppmp.show', u.id))">
+                    <td class="px-4 py-2 font-medium text-indigo-600">{{ u.ppmp_number }}</td>
+                    <td class="px-4 py-2 text-slate-700">{{ u.title }}</td>
+                    <td class="px-4 py-2 text-center">
+                        <AppBadge :color="statusBadgeColor(u.status)">{{ statusLabel(u.status) }}</AppBadge>
+                    </td>
+                </tr>
+            </AppTable>
         </div>
 
         <!-- ══ SOURCE DIVISION PPMPs (Property PPMP only) ══════════════════════ -->
         <div v-if="ppmp.ppmp_type === 'property' && divisionPpmps?.length" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
-            <div class="px-4 py-3 border-b border-slate-100 bg-violet-50">
-                <h3 class="text-sm font-semibold text-violet-800">Consolidated Division PPMPs</h3>
-                <p class="text-xs text-violet-600 mt-0.5">Division PPMPs whose items were merged into this Property PPMP.</p>
+            <div class="px-4 py-3 border-b border-slate-100 bg-purple-50">
+                <h3 class="text-sm font-semibold text-purple-800">Consolidated Division PPMPs</h3>
+                <p class="text-xs text-purple-600 mt-0.5">Division PPMPs whose items were merged into this Property PPMP.</p>
             </div>
-            <table class="w-full text-sm">
-                <thead class="bg-slate-50">
+            <AppTable :card="false">
+                <template #head>
                     <tr>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">PPMP No.</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Title</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Division</th>
                         <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
                     </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <tr v-for="d in divisionPpmps" :key="d.id" class="hover:bg-slate-50/60 cursor-pointer"
-                        @click="router.visit(route('ppmp.show', d.id))">
-                        <td class="px-4 py-2 font-medium text-indigo-600">{{ d.ppmp_number }}</td>
-                        <td class="px-4 py-2 text-slate-700">{{ d.title }}</td>
-                        <td class="px-4 py-2 text-slate-600">{{ d.division?.division_name }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                  :class="statusColors[d.status] ?? 'bg-slate-100 text-slate-700'">
-                                {{ statusLabel(d.status) }}
-                            </span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                </template>
+                <tr v-for="d in divisionPpmps" :key="d.id" class="hover:bg-slate-50/60 cursor-pointer"
+                    @click="router.visit(route('ppmp.show', d.id))">
+                    <td class="px-4 py-2 font-medium text-indigo-600">{{ d.ppmp_number }}</td>
+                    <td class="px-4 py-2 text-slate-700">{{ d.title }}</td>
+                    <td class="px-4 py-2 text-slate-600">{{ d.division?.division_name }}</td>
+                    <td class="px-4 py-2 text-center">
+                        <AppBadge :color="statusBadgeColor(d.status)">{{ statusLabel(d.status) }}</AppBadge>
+                    </td>
+                </tr>
+            </AppTable>
         </div>
 
         <!-- ══ PART I TABLE ════════════════════════════════════════════════════ -->
@@ -927,10 +914,9 @@ const utilizationRate = computed(() => {
                     <h3 class="text-sm font-semibold text-blue-800">Part I — Items from PS-DBM (Agency-to-Agency)</h3>
                     <p class="text-xs text-blue-600 mt-0.5">Common-Use Supplies and Equipment procured through Procurement Service – DBM at published catalogue prices.</p>
                 </div>
-                <button v-if="canEdit" @click="openCatModal"
-                        class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                <AppButton v-if="canEdit" size="sm" @click="openCatModal">
                     <BuildingStorefrontIcon class="w-4 h-4" /> Add from Catalogue
-                </button>
+                </AppButton>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-[1400px] w-full text-sm">
@@ -967,8 +953,8 @@ const utilizationRate = computed(() => {
                             <td class="px-2 py-1.5 text-center text-xs text-slate-600">{{ item.procurement_quarter ? 'Q' + item.procurement_quarter : '—' }}</td>
                             <td v-if="canEdit" class="px-2 py-1.5 text-center">
                                 <div class="flex items-center justify-center gap-1">
-                                    <button @click="startEdit(item)" class="text-slate-400 hover:text-indigo-600"><PencilSquareIcon class="w-4 h-4" /></button>
-                                    <button @click="deleteItem(item)" class="text-slate-400 hover:text-red-600"><TrashIcon class="w-4 h-4" /></button>
+                                    <AppIconButton label="Edit item" size="sm" @click="startEdit(item)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+                                    <AppIconButton label="Delete item" size="sm" variant="danger" @click="deleteItem(item)"><TrashIcon class="w-4 h-4" /></AppIconButton>
                                 </div>
                             </td>
                         </tr>
@@ -995,14 +981,12 @@ const utilizationRate = computed(() => {
                     <p class="text-xs text-emerald-600 mt-0.5">Items not available from PS-DBM. Procured via Competitive Bidding, Shopping, SVP, etc.</p>
                 </div>
                 <div v-if="canEdit" class="flex items-center gap-2">
-                    <button @click="openCat2Modal"
-                            class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                    <AppButton size="sm" @click="openCat2Modal">
                         <BuildingStorefrontIcon class="w-4 h-4" /> Add from List (Part II)
-                    </button>
-                    <button v-if="!showAddForm" @click="showAddForm = true"
-                            class="inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                    </AppButton>
+                    <AppButton v-if="!showAddForm" size="sm" variant="secondary" @click="showAddForm = true">
                         <PlusIcon class="w-4 h-4" /> Add Custom Item
-                    </button>
+                    </AppButton>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -1052,8 +1036,8 @@ const utilizationRate = computed(() => {
                                 <td class="px-2 py-1.5 text-center text-xs text-slate-600">{{ item.procurement_quarter ? 'Q' + item.procurement_quarter : '—' }}</td>
                                 <td v-if="canEdit" class="px-2 py-1.5 text-center">
                                     <div class="flex items-center justify-center gap-1">
-                                        <button @click="startEdit(item)" class="text-slate-400 hover:text-indigo-600"><PencilSquareIcon class="w-4 h-4" /></button>
-                                        <button @click="deleteItem(item)" class="text-slate-400 hover:text-red-600"><TrashIcon class="w-4 h-4" /></button>
+                                        <AppIconButton label="Edit item" size="sm" @click="startEdit(item)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+                                        <AppIconButton label="Delete item" size="sm" variant="danger" @click="deleteItem(item)"><TrashIcon class="w-4 h-4" /></AppIconButton>
                                     </div>
                                 </td>
                             </tr>
@@ -1151,7 +1135,7 @@ const utilizationRate = computed(() => {
                         <option value="quarterly">Quarterly (4)</option>
                         <option value="semi">Semi-Annual (2)</option>
                     </select>
-                    <button type="button" @click="addDist.run()" class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 hover:bg-slate-300 text-slate-700">Distribute</button>
+                    <AppButton type="button" variant="secondary" @click="addDist.run()">Distribute</AppButton>
                 </div>
                 <!-- Monthly quantities -->
                 <div>
@@ -1173,21 +1157,18 @@ const utilizationRate = computed(() => {
                     <textarea v-model="itemForm.remarks" rows="2" placeholder="Required for Direct Contracting, Emergency, etc." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                 </div>
                 <div class="flex justify-end gap-2">
-                    <button type="button" @click="resetItemForm" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button type="submit" :disabled="itemForm.processing" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Save Item</button>
+                    <AppButton type="button" variant="secondary" @click="resetItemForm">Cancel</AppButton>
+                    <AppButton type="submit" :disabled="itemForm.processing">Save Item</AppButton>
                 </div>
             </form>
         </div>
 
         <!-- Status History -->
-        <div v-if="ppmp.status_history?.length" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <AppCard v-if="ppmp.status_history?.length">
             <h3 class="text-sm font-semibold text-slate-700 mb-3">Status History</h3>
             <div class="space-y-2">
                 <div v-for="h in ppmp.status_history" :key="h.id" class="flex items-start gap-3 text-sm">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize"
-                          :class="statusColors[h.to_status] ?? 'bg-slate-100 text-slate-700'">
-                        {{ h.to_status?.replace('_', ' ') }}
-                    </span>
+                    <AppBadge :color="statusBadgeColor(h.to_status)" class="capitalize">{{ h.to_status?.replace('_', ' ') }}</AppBadge>
                     <div>
                         <span class="text-slate-700">{{ h.actor?.name }}</span>
                         <span class="text-slate-400 ml-2">{{ new Date(h.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
@@ -1195,7 +1176,7 @@ const utilizationRate = computed(() => {
                     </div>
                 </div>
             </div>
-        </div>
+        </AppCard>
 
         <!-- ══ PART I CATALOGUE PICKER MODAL ══════════════════════════════════ -->
         <div v-if="showCatModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -1205,7 +1186,7 @@ const utilizationRate = computed(() => {
                         <h3 class="text-base font-semibold text-slate-800">Add from PS-DBM Catalogue — Part I</h3>
                         <p class="text-xs text-slate-500 mt-0.5">FY {{ ppmp.fiscal_year }} · Agency-to-Agency · Prices from PS-DBM price list</p>
                     </div>
-                    <button @click="showCatModal = false; showScheduleEntry = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><XMarkIcon class="w-5 h-5" /></button>
+                    <AppIconButton label="Close" @click="showCatModal = false; showScheduleEntry = false"><XMarkIcon class="w-5 h-5" /></AppIconButton>
                 </div>
 
                 <!-- Step 1: Select items -->
@@ -1253,11 +1234,10 @@ const utilizationRate = computed(() => {
                         </table>
                     </div>
                     <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
-                        <button @click="showCatModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                        <button @click="proceedToSchedule" :disabled="!catSelectedItems.length"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                        <AppButton variant="secondary" @click="showCatModal = false">Cancel</AppButton>
+                        <AppButton :disabled="!catSelectedItems.length" @click="proceedToSchedule">
                             Next: Set Schedule ({{ catSelectedItems.length }})
-                        </button>
+                        </AppButton>
                     </div>
                 </div>
 
@@ -1310,11 +1290,10 @@ const utilizationRate = computed(() => {
                         </div>
                     </div>
                     <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
-                        <button @click="showScheduleEntry = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Back</button>
-                        <button @click="savePart1Items" :disabled="part1Submitting"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                        <AppButton variant="secondary" @click="showScheduleEntry = false">Back</AppButton>
+                        <AppButton :disabled="part1Submitting" @click="savePart1Items">
                             {{ part1Submitting ? 'Saving…' : 'Add to PPMP' }}
-                        </button>
+                        </AppButton>
                     </div>
                 </div>
             </div>
@@ -1328,7 +1307,7 @@ const utilizationRate = computed(() => {
                         <h3 class="text-base font-semibold text-slate-800">Add from PS-DBM List — Part II</h3>
                         <p class="text-xs text-slate-500 mt-0.5">FY {{ ppmp.fiscal_year }} · Items not available at PS-DBM · Enter your canvassed price per item</p>
                     </div>
-                    <button @click="showCat2Modal = false; showSchedule2Entry = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><XMarkIcon class="w-5 h-5" /></button>
+                    <AppIconButton label="Close" @click="showCat2Modal = false; showSchedule2Entry = false"><XMarkIcon class="w-5 h-5" /></AppIconButton>
                 </div>
 
                 <!-- Step 1: Select items -->
@@ -1376,11 +1355,10 @@ const utilizationRate = computed(() => {
                         </table>
                     </div>
                     <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
-                        <button @click="showCat2Modal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                        <button @click="proceedToSchedule2" :disabled="!cat2SelectedItems.length"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
+                        <AppButton variant="secondary" @click="showCat2Modal = false">Cancel</AppButton>
+                        <AppButton :disabled="!cat2SelectedItems.length" @click="proceedToSchedule2">
                             Next: Set Price & Schedule ({{ cat2SelectedItems.length }})
-                        </button>
+                        </AppButton>
                     </div>
                 </div>
 
@@ -1449,11 +1427,10 @@ const utilizationRate = computed(() => {
                         </div>
                     </div>
                     <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
-                        <button @click="showSchedule2Entry = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Back</button>
-                        <button @click="savePart2CatItems" :disabled="part2CatSubmitting"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
+                        <AppButton variant="secondary" @click="showSchedule2Entry = false">Back</AppButton>
+                        <AppButton :disabled="part2CatSubmitting" @click="savePart2CatItems">
                             {{ part2CatSubmitting ? 'Saving…' : 'Add to PPMP' }}
-                        </button>
+                        </AppButton>
                     </div>
                 </div>
             </div>
@@ -1469,7 +1446,7 @@ const utilizationRate = computed(() => {
                         </h3>
                         <p v-if="editingItem?.catalogue_id" class="text-xs text-slate-500 mt-0.5">Description and unit are from the catalogue and cannot be changed.</p>
                     </div>
-                    <button @click="cancelEdit" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><XMarkIcon class="w-5 h-5" /></button>
+                    <AppIconButton label="Close" @click="cancelEdit"><XMarkIcon class="w-5 h-5" /></AppIconButton>
                 </div>
                 <div class="p-5 space-y-4">
                     <!-- Part I: locked info banner -->
@@ -1587,7 +1564,7 @@ const utilizationRate = computed(() => {
                             <option value="quarterly">Quarterly (4)</option>
                             <option value="semi">Semi-Annual (2)</option>
                         </select>
-                        <button type="button" @click="editDist.run()" class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 hover:bg-slate-300 text-slate-700">Distribute</button>
+                        <AppButton type="button" variant="secondary" @click="editDist.run()">Distribute</AppButton>
                     </div>
 
                     <!-- Monthly quantities -->
@@ -1609,94 +1586,75 @@ const utilizationRate = computed(() => {
                     </div>
                 </div>
                 <div class="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
-                    <button @click="cancelEdit" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="saveEdit" :disabled="editForm.processing" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Update</button>
+                    <AppButton variant="secondary" @click="cancelEdit">Cancel</AppButton>
+                    <AppButton :disabled="editForm.processing" @click="saveEdit">Update</AppButton>
                 </div>
             </div>
         </div>
 
         <!-- Return Modal -->
-        <div v-if="showReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return PPMP for Revision</h3>
-                <textarea v-model="returnRemarks" rows="4" placeholder="Explain what needs to be corrected…"
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
-                <div class="flex justify-end gap-2">
-                    <button @click="showReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="returnPpmp" :disabled="!returnRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
-                </div>
-            </div>
-        </div>
+        <AppModal :show="showReturnModal" title="Return PPMP for Revision" @close="showReturnModal = false">
+            <AppTextarea v-model="returnRemarks" :rows="4" placeholder="Explain what needs to be corrected…" />
+            <template #footer>
+                <AppButton variant="secondary" @click="showReturnModal = false">Cancel</AppButton>
+                <AppButton variant="warning" :disabled="!returnRemarks.trim()" @click="returnPpmp">Return</AppButton>
+            </template>
+        </AppModal>
 
         <!-- Division Return Modal -->
-        <div v-if="showDivisionReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Unit for Revision</h3>
-                <p class="text-sm text-slate-500 mb-3">Explain what the unit needs to correct before the PPMP can be endorsed.</p>
-                <textarea v-model="divisionRemarks" rows="4" placeholder="Describe what needs to be revised or corrected…"
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
-                <div class="flex justify-end gap-2">
-                    <button @click="showDivisionReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="divisionReturn" :disabled="!divisionRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
-                </div>
-            </div>
-        </div>
+        <AppModal :show="showDivisionReturnModal" title="Return to Unit for Revision"
+                  subtitle="Explain what the unit needs to correct before the PPMP can be endorsed."
+                  @close="showDivisionReturnModal = false">
+            <AppTextarea v-model="divisionRemarks" :rows="4" placeholder="Describe what needs to be revised or corrected…" />
+            <template #footer>
+                <AppButton variant="secondary" @click="showDivisionReturnModal = false">Cancel</AppButton>
+                <AppButton variant="warning" :disabled="!divisionRemarks.trim()" @click="divisionReturn">Return</AppButton>
+            </template>
+        </AppModal>
 
         <!-- BAC Return Modal -->
-        <div v-if="showBacReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to End-User Unit</h3>
-                <p class="text-sm text-slate-500 mb-3">State what compliance issues need to be resolved.</p>
-                <textarea v-model="bacRemarks" rows="4" placeholder="Compliance issues, missing justifications…"
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
-                <div class="flex justify-end gap-2">
-                    <button @click="showBacReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="bacReturn" :disabled="!bacRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
-                </div>
-            </div>
-        </div>
+        <AppModal :show="showBacReturnModal" title="Return to End-User Unit"
+                  subtitle="State what compliance issues need to be resolved."
+                  @close="showBacReturnModal = false">
+            <AppTextarea v-model="bacRemarks" :rows="4" placeholder="Compliance issues, missing justifications…" />
+            <template #footer>
+                <AppButton variant="secondary" @click="showBacReturnModal = false">Cancel</AppButton>
+                <AppButton variant="warning" :disabled="!bacRemarks.trim()" @click="bacReturn">Return</AppButton>
+            </template>
+        </AppModal>
 
         <!-- Property Officer Return Modal -->
-        <div v-if="showPropertyReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Division Chief</h3>
-                <p class="text-sm text-slate-500 mb-3">State the reason for returning this PPMP.</p>
-                <textarea v-model="propertyRemarks" rows="4" placeholder="Property concerns, missing documents…"
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
-                <div class="flex justify-end gap-2">
-                    <button @click="showPropertyReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="propertyOfficerReturn" :disabled="!propertyRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
-                </div>
-            </div>
-        </div>
+        <AppModal :show="showPropertyReturnModal" title="Return to Division Chief"
+                  subtitle="State the reason for returning this PPMP."
+                  @close="showPropertyReturnModal = false">
+            <AppTextarea v-model="propertyRemarks" :rows="4" placeholder="Property concerns, missing documents…" />
+            <template #footer>
+                <AppButton variant="secondary" @click="showPropertyReturnModal = false">Cancel</AppButton>
+                <AppButton variant="warning" :disabled="!propertyRemarks.trim()" @click="propertyOfficerReturn">Return</AppButton>
+            </template>
+        </AppModal>
 
         <!-- Budget Officer Return Modal -->
-        <div v-if="showBudgetReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Property Officer</h3>
-                <p class="text-sm text-slate-500 mb-3">State the budget-related concerns for this Property PPMP.</p>
-                <textarea v-model="budgetRemarks" rows="4" placeholder="Budget availability, fund source issues…"
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
-                <div class="flex justify-end gap-2">
-                    <button @click="showBudgetReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="budgetOfficerReturn" :disabled="!budgetRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
-                </div>
-            </div>
-        </div>
+        <AppModal :show="showBudgetReturnModal" title="Return to Property Officer"
+                  subtitle="State the budget-related concerns for this Property PPMP."
+                  @close="showBudgetReturnModal = false">
+            <AppTextarea v-model="budgetRemarks" :rows="4" placeholder="Budget availability, fund source issues…" />
+            <template #footer>
+                <AppButton variant="secondary" @click="showBudgetReturnModal = false">Cancel</AppButton>
+                <AppButton variant="warning" :disabled="!budgetRemarks.trim()" @click="budgetOfficerReturn">Return</AppButton>
+            </template>
+        </AppModal>
 
         <!-- OCD Return Modal -->
-        <div v-if="showOcdReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Budget Officer</h3>
-                <p class="text-sm text-slate-500 mb-3">State the OCD's concerns or conditions for this PPMP/APP-CSE.</p>
-                <textarea v-model="ocdReturnRemarks" rows="4" placeholder="Policy concerns, budget alignment issues…"
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
-                <div class="flex justify-end gap-2">
-                    <button @click="showOcdReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="ocdReturn" :disabled="!ocdReturnRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
-                </div>
-            </div>
-        </div>
+        <AppModal :show="showOcdReturnModal" title="Return to Budget Officer"
+                  subtitle="State the OCD's concerns or conditions for this PPMP/APP-CSE."
+                  @close="showOcdReturnModal = false">
+            <AppTextarea v-model="ocdReturnRemarks" :rows="4" placeholder="Policy concerns, budget alignment issues…" />
+            <template #footer>
+                <AppButton variant="secondary" @click="showOcdReturnModal = false">Cancel</AppButton>
+                <AppButton variant="warning" :disabled="!ocdReturnRemarks.trim()" @click="ocdReturn">Return</AppButton>
+            </template>
+        </AppModal>
 
     </AdminLayout>
 </template>

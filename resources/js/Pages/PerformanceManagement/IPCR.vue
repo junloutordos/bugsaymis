@@ -2,6 +2,13 @@
 import { ref, reactive, computed } from "vue"
 import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
+import AppPageHeader from "@/Components/AppPageHeader.vue"
+import AppButton from "@/Components/AppButton.vue"
+import AppIconButton from "@/Components/AppIconButton.vue"
+import AppModal from "@/Components/AppModal.vue"
+import AppInput from "@/Components/AppInput.vue"
+import AppSelect from "@/Components/AppSelect.vue"
+import AppTextarea from "@/Components/AppTextarea.vue"
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -83,35 +90,25 @@ const countPIRows = (section, pi) => section.filter(
     <div class="p-6 space-y-6">
 
       <!-- HEADER -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">My IPCR Plans</h1>
-        <div class="flex flex-wrap items-center gap-2">
+      <AppPageHeader title="My IPCR Plans">
+        <template #actions>
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Search plans..."
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
-          <button
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            @click="showExportMetaModal = true"
-          >
+          <AppButton variant="secondary" @click="showExportMetaModal = true">
             <PrinterIcon class="w-4 h-4" /> CSC Format
-          </button>
-          <button
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            @click="exportAllExcel()"
-          >
+          </AppButton>
+          <AppButton variant="secondary" @click="exportAllExcel()">
             <ArrowDownTrayIcon class="w-4 h-4" /> Excel
-          </button>
-          <button
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            @click="openCreateModal()"
-          >
+          </AppButton>
+          <AppButton @click="openCreateModal()">
             <PlusIcon class="w-4 h-4" /> Create IPCR Target
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- TABLE -->
       <div class="overflow-x-auto rounded-xl border border-slate-100">
@@ -165,20 +162,19 @@ const countPIRows = (section, pi) => section.filter(
 
                 <td class="border border-slate-100 px-3 py-2 text-center">
                   <div class="flex items-center justify-center gap-1">
-                    <button v-if="!plan.ipcrs.length" @click="openModal('target', plan)"
-                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-700 transition-colors" title="Add target">
+                    <AppIconButton v-if="!plan.ipcrs.length" label="Add target" size="sm" @click="openModal('target', plan)">
                       <PlusIcon class="w-4 h-4"/>
-                    </button>
-                    <button v-if="plan.ipcrs[0]?.target_status === 'approved' && !plan.ipcrs[0]?.accomplishment"
-                            @click="openModal('accomplishment', plan)"
-                            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-amber-700 transition-colors" title="Add accomplishment">
+                    </AppIconButton>
+                    <AppIconButton v-if="plan.ipcrs[0]?.target_status === 'approved' && !plan.ipcrs[0]?.accomplishment"
+                            label="Add accomplishment" variant="warning" size="sm"
+                            @click="openModal('accomplishment', plan)">
                       <PencilSquareIcon class="w-4 h-4"/>
-                    </button>
+                    </AppIconButton>
                     <div v-if="props.currentUserIsChief && plan.ipcrs[0]" class="flex gap-1">
                       <button v-if="plan.ipcrs[0]?.target_status === 'submitted'" @click="approveIPCR(plan.ipcrs[0])"
-                        class="rounded px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50" title="Approve target">Approve</button>
+                        class="rounded px-2 py-1 text-xs font-medium text-success-700 hover:bg-success-50" title="Approve target">Approve</button>
                       <button v-if="plan.ipcrs[0]?.target_status !== 'approved'" @click="removeIPCR(plan.ipcrs[0])"
-                        class="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50" title="Remove target">Remove</button>
+                        class="rounded px-2 py-1 text-xs font-medium text-danger-600 hover:bg-danger-50" title="Remove target">Remove</button>
                     </div>
                   </div>
                 </td>
@@ -198,142 +194,86 @@ const countPIRows = (section, pi) => section.filter(
       </div>
 
       <!-- MODAL: CREATE / TARGET / ACCOMPLISHMENT -->
-      <div v-if="showModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">
-              {{
-                modalMode === "target" ? "Submit Target" :
-                modalMode === "accomplishment" ? "Submit Accomplishment" :
-                modalMode === "create" ? "Create IPCR Targets (Bulk)" : "View Plan"
-              }}
-            </h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" @click="closeModal">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+      <AppModal
+        :show="showModal"
+        :title="modalMode === 'target' ? 'Submit Target' :
+                modalMode === 'accomplishment' ? 'Submit Accomplishment' :
+                modalMode === 'create' ? 'Create IPCR Targets (Bulk)' : 'View Plan'"
+        size="2xl"
+        @close="closeModal"
+      >
+        <!-- CREATE (BULK) -->
+        <form v-if="modalMode === 'create'" @submit.prevent="submitBulkCreateTargets">
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <AppSelect v-model="createModalState.period" label="Rating Period" placeholder="Select period">
+              <option value="Jan-Jun">January - June</option>
+              <option value="Jul-Dec">July - December</option>
+            </AppSelect>
+            <AppInput v-model.number="createModalState.year" label="Year" type="number" min="2000" />
           </div>
-          <div class="px-6 py-5">
-
-            <!-- CREATE (BULK) -->
-            <form v-if="modalMode === 'create'" @submit.prevent="submitBulkCreateTargets">
-              <div class="grid grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Rating Period</label>
-                  <select v-model="createModalState.period" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="">Select period</option>
-                    <option value="Jan-Jun">January - June</option>
-                    <option value="Jul-Dec">July - December</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Year</label>
-                  <input type="number" v-model.number="createModalState.year" min="2000" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
+          <div>
+            <AppInput v-model="createModalState.search" label="Search Plans to add" type="text" placeholder="Search..." class="mb-2" />
+            <div class="max-h-48 overflow-auto rounded-lg border border-slate-200 p-2 space-y-1">
+              <div v-for="plan in filteredPlans" :key="'create-'+plan.id" class="flex items-start gap-2 py-2">
+                <input type="checkbox" :id="'plan-'+plan.id" :checked="isPlanSelected(plan.id)" @change="togglePlanSelection(plan)" class="mt-0.5" />
+                <label :for="'plan-'+plan.id" class="flex-1 cursor-pointer">
+                  <div class="text-sm font-medium text-slate-700">{{ plan.success_indicator }}</div>
+                  <div class="text-xs text-slate-500">{{ plan.performance_indicator?.description }}</div>
+                  <div class="text-xs text-slate-500">{{ plan.office_involved }}</div>
+                </label>
               </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Search Plans to add</label>
-                <input v-model="createModalState.search" type="text" placeholder="Search..." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2" />
-                <div class="max-h-48 overflow-auto rounded-lg border border-slate-200 p-2 space-y-1">
-                  <div v-for="plan in filteredPlans" :key="'create-'+plan.id" class="flex items-start gap-2 py-2">
-                    <input type="checkbox" :id="'plan-'+plan.id" :checked="isPlanSelected(plan.id)" @change="togglePlanSelection(plan)" class="mt-0.5" />
-                    <label :for="'plan-'+plan.id" class="flex-1 cursor-pointer">
-                      <div class="text-sm font-medium text-slate-700">{{ plan.success_indicator }}</div>
-                      <div class="text-xs text-slate-500">{{ plan.performance_indicator?.description }}</div>
-                      <div class="text-xs text-slate-500">{{ plan.office_involved }}</div>
-                    </label>
-                  </div>
-                  <div v-if="filteredPlans.length===0" class="text-sm text-slate-400 text-center py-4">No plans to choose from.</div>
-                </div>
-              </div>
-              <div class="flex justify-end gap-2 mt-5">
-                <button type="button" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors" @click="closeModal">Cancel</button>
-                <button class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Submit Targets</button>
-              </div>
-            </form>
-
-            <!-- TARGET FORM (single plan) -->
-            <form v-if="modalMode === 'target' && selectedPlan" @submit.prevent="submitTarget">
-              <div class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">{{ selectedPlan.success_indicator }}</div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Rating Period</label>
-              <select v-model="form.period" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2">
-                <option value="">Select period</option>
-                <option value="Jan-Jun">January - June</option>
-                <option value="Jul-Dec">July - December</option>
-              </select>
-              <div class="flex justify-end mt-4">
-                <button class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
-              </div>
-            </form>
-
-            <!-- ACCOMPLISHMENT FORM -->
-            <form v-if="modalMode === 'accomplishment' && selectedPlan" @submit.prevent="submitAccomplishment">
-              <div class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">{{ selectedPlan.success_indicator }}</div>
-              <div class="space-y-3">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Actual Accomplishment</label>
-                  <textarea v-model="form.accomplishment" rows="3" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" placeholder="Actual Accomplishment"></textarea>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Link to MOVs</label>
-                  <input v-model="form.mov_link" type="text" placeholder="https://..." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <div class="grid grid-cols-3 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Quality</label>
-                    <input v-model.number="form.self_quality" type="number" min="1" max="5" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Efficiency</label>
-                    <input v-model.number="form.self_efficiency" type="number" min="1" max="5" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Timeliness</label>
-                    <input v-model.number="form.self_timeliness" type="number" min="1" max="5" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end mt-4">
-                <button class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
-              </div>
-            </form>
-
+              <div v-if="filteredPlans.length===0" class="text-sm text-slate-400 text-center py-4">No plans to choose from.</div>
+            </div>
           </div>
-        </div>
-      </div>
+          <div class="flex justify-end gap-2 mt-5">
+            <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
+            <AppButton type="submit">Submit Targets</AppButton>
+          </div>
+        </form>
+
+        <!-- TARGET FORM (single plan) -->
+        <form v-if="modalMode === 'target' && selectedPlan" @submit.prevent="submitTarget">
+          <div class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">{{ selectedPlan.success_indicator }}</div>
+          <AppSelect v-model="form.period" label="Rating Period" placeholder="Select period" class="mb-2">
+            <option value="Jan-Jun">January - June</option>
+            <option value="Jul-Dec">July - December</option>
+          </AppSelect>
+          <div class="flex justify-end mt-4">
+            <AppButton type="submit">Save</AppButton>
+          </div>
+        </form>
+
+        <!-- ACCOMPLISHMENT FORM -->
+        <form v-if="modalMode === 'accomplishment' && selectedPlan" @submit.prevent="submitAccomplishment">
+          <div class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">{{ selectedPlan.success_indicator }}</div>
+          <div class="space-y-3">
+            <AppTextarea v-model="form.accomplishment" label="Actual Accomplishment" :rows="3" placeholder="Actual Accomplishment" />
+            <AppInput v-model="form.mov_link" label="Link to MOVs" type="text" placeholder="https://..." />
+            <div class="grid grid-cols-3 gap-3">
+              <AppInput v-model.number="form.self_quality" label="Quality" type="number" min="1" max="5" />
+              <AppInput v-model.number="form.self_efficiency" label="Efficiency" type="number" min="1" max="5" />
+              <AppInput v-model.number="form.self_timeliness" label="Timeliness" type="number" min="1" max="5" />
+            </div>
+          </div>
+          <div class="flex justify-end mt-4">
+            <AppButton type="submit">Save</AppButton>
+          </div>
+        </form>
+      </AppModal>
 
       <!-- MODAL: EXPORT META -->
-      <div v-if="showExportMetaModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">Export IPCR — Employee Info</h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" @click="showExportMetaModal=false">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-          <div class="px-6 py-5 space-y-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Employee Name</label>
-              <input v-model="meta.personName" type="text" placeholder="Employee Name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Position</label>
-              <input v-model="meta.position" type="text" placeholder="Position" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Office / Division</label>
-              <input v-model="meta.office" type="text" placeholder="Office / Division" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Rating Period</label>
-              <input v-model="meta.period" type="text" placeholder="Rating Period" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-          </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors" @click="showExportMetaModal=false">Cancel</button>
-            <button class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors" @click="() => { exportAllHTML(meta); showExportMetaModal=false }">Export HTML</button>
-          </div>
+      <AppModal :show="showExportMetaModal" title="Export IPCR — Employee Info" @close="showExportMetaModal = false">
+        <div class="space-y-3">
+          <AppInput v-model="meta.personName" label="Employee Name" type="text" placeholder="Employee Name" />
+          <AppInput v-model="meta.position" label="Position" type="text" placeholder="Position" />
+          <AppInput v-model="meta.office" label="Office / Division" type="text" placeholder="Office / Division" />
+          <AppInput v-model="meta.period" label="Rating Period" type="text" placeholder="Rating Period" />
         </div>
-      </div>
+        <template #footer>
+          <AppButton variant="secondary" @click="showExportMetaModal = false">Cancel</AppButton>
+          <AppButton @click="() => { exportAllHTML(meta); showExportMetaModal = false }">Export HTML</AppButton>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>

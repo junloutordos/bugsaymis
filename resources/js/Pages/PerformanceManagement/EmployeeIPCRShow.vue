@@ -605,15 +605,19 @@ const submitAddPlans = () => {
     { plan_ids: selectedPlans.value },
     {
       onSuccess: () => {
-        showAddPlansModal.value = false;
-        selectedPlans.value = [];
-        planSearchQuery.value = "";
+        closeAddPlansModal();
         Swal.fire({ icon: "success", title: "Plans Added", timer: 1500, showConfirmButton: false });
       },
       onError: () => Swal.fire({ icon: "error", title: "Failed", text: "Could not add plans." }),
     }
   );
 };
+
+function closeAddPlansModal() {
+  showAddPlansModal.value = false;
+  selectedPlans.value = [];
+  planSearchQuery.value = "";
+}
 
 const removePlan = (plan) => {
   Swal.fire({
@@ -1228,169 +1232,105 @@ const pullFLAccomplishments = () => {
   </AppModal>
 
   <!-- Add Plans Modal -->
-  <Teleport to="body">
-    <div v-if="showAddPlansModal"
-      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
-      @click.self="showAddPlansModal = false">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="text-base font-semibold text-slate-800">Add Plans</h3>
-          <button @click="showAddPlansModal = false; selectedPlans = []; planSearchQuery = ''"
-            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-        <div class="px-6 py-5">
-          <input
-            v-model="planSearchQuery"
-            type="text"
-            placeholder="Search plans..."
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 mb-3"
-          />
-          <div class="max-h-64 overflow-auto border border-slate-200 rounded-lg p-2 space-y-1">
-            <div
-              v-for="plan in filteredWorkPlans"
-              :key="plan.id"
-              class="flex items-start gap-2 py-1"
-            >
-              <input
-                type="checkbox"
-                :id="`add-plan-${plan.id}`"
-                :checked="isPlanSelected(plan.id)"
-                @change="togglePlanSelection(plan)"
-                class="mt-1"
-              />
-              <label :for="`add-plan-${plan.id}`" class="flex-1 cursor-pointer text-sm">
-                <div class="font-medium text-slate-800 flex items-center gap-2">
-                  {{ plan.success_indicator }}
-                  <span v-if="suggestedPlanIds.includes(plan.id)"
-                    class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700">
-                    ★ Suggested
-                  </span>
-                </div>
-                <div class="text-slate-500">{{ plan.performance_indicator?.description }}</div>
-              </label>
-            </div>
-            <div v-if="filteredWorkPlans.length === 0" class="py-8 text-center text-slate-400 text-sm">
-              No additional plans available.
-            </div>
+  <AppModal :show="showAddPlansModal" title="Add Plans" size="lg" @close="closeAddPlansModal">
+    <AppInput v-model="planSearchQuery" placeholder="Search plans..." class="mb-3" />
+    <div class="max-h-64 overflow-auto border border-slate-200 rounded-lg p-2 space-y-1">
+      <div
+        v-for="plan in filteredWorkPlans"
+        :key="plan.id"
+        class="flex items-start gap-2 py-1"
+      >
+        <input
+          type="checkbox"
+          :id="`add-plan-${plan.id}`"
+          :checked="isPlanSelected(plan.id)"
+          @change="togglePlanSelection(plan)"
+          class="mt-1"
+        />
+        <label :for="`add-plan-${plan.id}`" class="flex-1 cursor-pointer text-sm">
+          <div class="font-medium text-slate-800 flex items-center gap-2">
+            {{ plan.success_indicator }}
+            <AppBadge v-if="suggestedPlanIds.includes(plan.id)" color="green">★ Suggested</AppBadge>
           </div>
-        </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button
-            @click="showAddPlansModal = false; selectedPlans = []; planSearchQuery = ''"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >Cancel</button>
-          <button
-            @click="submitAddPlans"
-            :disabled="!selectedPlans.length || isSubmitting"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >{{ isSubmitting ? 'Adding…' : 'Add Selected' }}</button>
-        </div>
+          <div class="text-slate-500">{{ plan.performance_indicator?.description }}</div>
+        </label>
+      </div>
+      <div v-if="filteredWorkPlans.length === 0" class="py-8 text-center text-slate-400 text-sm">
+        No additional plans available.
       </div>
     </div>
-  </Teleport>
+    <template #footer>
+      <AppButton variant="secondary" @click="closeAddPlansModal">Cancel</AppButton>
+      <AppButton @click="submitAddPlans" :disabled="!selectedPlans.length || isSubmitting" :loading="isSubmitting">
+        {{ isSubmitting ? 'Adding…' : 'Add Selected' }}
+      </AppButton>
+    </template>
+  </AppModal>
 
   <!-- Daily Accomplishments Viewer Modal -->
-  <Teleport to="body">
-    <div v-if="accViewerPlan"
-      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
-      @click.self="closeAccViewer">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h2 class="text-base font-semibold text-slate-800">Accomplishments</h2>
-            <p class="text-xs text-slate-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
-          </div>
-          <button @click="closeAccViewer"
-            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-
-        <div class="overflow-y-auto flex-1 px-6 py-4">
-          <div v-if="!accViewerPlan.accomplishments?.length"
-            class="py-16 text-center text-slate-400 text-sm">
-            No accomplishments logged for this plan.
-          </div>
-
-          <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
-            class="mb-4 pb-4 border-b border-slate-100 last:border-0">
-
-            <!-- Edit mode -->
-            <template v-if="accEditId === acc.id">
-              <div class="space-y-2">
-                <input
-                  type="date"
-                  v-model="accEditForm.accomplishment_date"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-                />
-                <textarea
-                  v-model="accEditForm.description"
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full resize-none"
-                  placeholder="Description"
-                />
-                <div class="flex gap-2">
-                  <button
-                    @click="saveAccEdit(acc)"
-                    :disabled="isSubmitting"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-50"
-                  >{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
-                  <button
-                    @click="cancelAccEdit"
-                    class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium"
-                  >Cancel</button>
-                </div>
-              </div>
-            </template>
-
-            <!-- Read mode -->
-            <template v-else>
-              <div class="flex items-center gap-2 mb-1">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700">
-                  {{ formatAccDate(acc.accomplishment_date) }}
-                </span>
-                <template v-if="canEditGlobally">
-                  <button
-                    @click="startAccEdit(acc)"
-                    class="text-[11px] text-indigo-600 hover:underline no-print"
-                  >Edit</button>
-                  <button
-                    @click="deleteAcc(acc)"
-                    class="text-[11px] text-red-500 hover:underline no-print"
-                  >Delete</button>
-                </template>
-              </div>
-              <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
-              <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
-                <a v-for="photo in acc.photos" :key="photo.id"
-                  :href="photo.google_drive_link" target="_blank"
-                  class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
-                  {{ photo.file_name || 'Photo' }}
-                </a>
-              </div>
-            </template>
-
-          </div>
-        </div>
-
-        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-          <span class="text-xs text-slate-400">
-            {{ accViewerPlan.accomplishments_count }} accomplishment(s) total
-          </span>
-          <button @click="closeAccViewer"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Close
-          </button>
-        </div>
-      </div>
+  <AppModal
+    :show="!!accViewerPlan"
+    title="Accomplishments"
+    :subtitle="accViewerPlan?.success_indicator"
+    size="2xl"
+    @close="closeAccViewer"
+  >
+    <div v-if="!accViewerPlan?.accomplishments?.length"
+      class="py-16 text-center text-slate-400 text-sm">
+      No accomplishments logged for this plan.
     </div>
-  </Teleport>
+
+    <div v-for="acc in accViewerPlan?.accomplishments" :key="acc.id"
+      class="mb-4 pb-4 border-b border-slate-100 last:border-0">
+
+      <!-- Edit mode -->
+      <template v-if="accEditId === acc.id">
+        <div class="space-y-2">
+          <AppInput type="date" v-model="accEditForm.accomplishment_date" />
+          <AppTextarea v-model="accEditForm.description" :rows="3" placeholder="Description" />
+          <div class="flex gap-2">
+            <AppButton size="sm" @click="saveAccEdit(acc)" :loading="isSubmitting" :disabled="isSubmitting">
+              {{ isSubmitting ? 'Saving…' : 'Save' }}
+            </AppButton>
+            <AppButton size="sm" variant="secondary" @click="cancelAccEdit">Cancel</AppButton>
+          </div>
+        </div>
+      </template>
+
+      <!-- Read mode -->
+      <template v-else>
+        <div class="flex items-center gap-2 mb-1">
+          <AppBadge color="indigo">{{ formatAccDate(acc.accomplishment_date) }}</AppBadge>
+          <template v-if="canEditGlobally">
+            <button
+              @click="startAccEdit(acc)"
+              class="text-[11px] text-indigo-600 hover:underline no-print"
+            >Edit</button>
+            <button
+              @click="deleteAcc(acc)"
+              class="text-[11px] text-red-500 hover:underline no-print"
+            >Delete</button>
+          </template>
+        </div>
+        <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
+        <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
+          <a v-for="photo in acc.photos" :key="photo.id"
+            :href="photo.google_drive_link" target="_blank"
+            class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+            {{ photo.file_name || 'Photo' }}
+          </a>
+        </div>
+      </template>
+
+    </div>
+
+    <template #footer>
+      <span class="mr-auto text-xs text-slate-400">
+        {{ accViewerPlan?.accomplishments_count }} accomplishment(s) total
+      </span>
+      <AppButton variant="secondary" @click="closeAccViewer">Close</AppButton>
+    </template>
+  </AppModal>
 
 </template>
 

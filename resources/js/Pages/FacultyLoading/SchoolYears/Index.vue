@@ -3,73 +3,49 @@
   <AdminLayout title="School Years & Terms">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">School Years & Terms</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage school years and academic term periods</p>
-        </div>
-        <button @click="openSyForm()"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-          <PlusIcon class="h-4 w-4" />
-          New School Year
-        </button>
-      </div>
+      <AppPageHeader title="School Years & Terms" subtitle="Manage school years and academic term periods">
+        <template #actions>
+          <AppButton @click="openSyForm()">
+            <PlusIcon class="h-4 w-4" />
+            New School Year
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.errors?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.errors?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.errors.error }}
       </div>
 
       <!-- Empty -->
-      <div v-if="schoolYears.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <AcademicCapIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No school years yet</p>
-      </div>
+      <AppCard v-if="schoolYears.length === 0">
+        <EmptyState title="No school years yet" :icon="AcademicCapIcon" />
+      </AppCard>
 
       <!-- School years list -->
-      <div v-for="sy in schoolYears" :key="sy.id"
-        class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <AppCard v-for="sy in schoolYears" :key="sy.id" :padded="false">
         <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50/50">
           <div class="flex items-center gap-3">
             <p class="font-semibold text-slate-800">S.Y. {{ sy.name }}</p>
-            <span v-if="sy.is_current"
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">
-              Current
-            </span>
-            <span :class="sy.status === 'active' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'"
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-              {{ sy.status }}
-            </span>
-            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-              :class="workflowClass(sy.workflow_status)">
-              {{ sy.workflow_status ?? 'draft' }}
-            </span>
+            <AppBadge v-if="sy.is_current" color="green">Current</AppBadge>
+            <AppBadge :color="sy.status === 'active' ? 'blue' : 'slate'">{{ sy.status }}</AppBadge>
+            <AppBadge :color="workflowClass(sy.workflow_status)">{{ sy.workflow_status ?? 'draft' }}</AppBadge>
           </div>
           <div class="flex items-center gap-2">
-            <button v-if="sy.workflow_status !== 'archived'"
-              @click="advanceSy(sy)"
-              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium border border-indigo-200 hover:bg-indigo-50 px-2 py-1 rounded transition-colors">
+            <AppButton v-if="sy.workflow_status !== 'archived'" size="sm" variant="secondary" @click="advanceSy(sy)">
               Advance →
-            </button>
-            <button v-if="sy.workflow_status !== 'archived'"
-              @click="archiveSy(sy)"
-              class="text-xs text-slate-500 hover:text-slate-700 font-medium border border-slate-200 hover:bg-slate-50 px-2 py-1 rounded transition-colors">
+            </AppButton>
+            <AppButton v-if="sy.workflow_status !== 'archived'" size="sm" variant="secondary" @click="archiveSy(sy)">
               Archive
-            </button>
-            <button @click="openTermForm(sy)"
-              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+            </AppButton>
+            <AppButton size="sm" variant="ghost" @click="openTermForm(sy)">
               <PlusIcon class="h-3.5 w-3.5" /> Add Term
-            </button>
-            <button @click="openSyForm(sy)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-              <PencilIcon class="h-4 w-4" />
-            </button>
-            <button @click="deleteSy(sy)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-              <TrashIcon class="h-4 w-4" />
-            </button>
+            </AppButton>
+            <AppIconButton label="Edit school year" @click="openSyForm(sy)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+            <AppIconButton label="Delete school year" variant="danger" @click="deleteSy(sy)"><TrashIcon class="h-4 w-4" /></AppIconButton>
           </div>
         </div>
         <div class="px-5 py-2 text-xs text-slate-400">
@@ -86,123 +62,89 @@
                 <p class="text-sm font-medium text-slate-700">{{ term.name }}</p>
                 <p class="text-xs text-slate-400">{{ fmtDate(term.start_date) }} – {{ fmtDate(term.end_date) }}</p>
               </div>
-              <span v-if="term.is_current"
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-700">
-                Current
-              </span>
+              <AppBadge v-if="term.is_current" color="indigo">Current</AppBadge>
             </div>
             <div class="flex items-center gap-1">
-              <button @click="openTermForm(sy, term)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                <PencilIcon class="h-4 w-4" />
-              </button>
-              <button @click="deleteTerm(term)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                <TrashIcon class="h-4 w-4" />
-              </button>
+              <AppIconButton label="Edit term" @click="openTermForm(sy, term)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+              <AppIconButton label="Delete term" variant="danger" @click="deleteTerm(term)"><TrashIcon class="h-4 w-4" /></AppIconButton>
             </div>
           </div>
         </div>
         <div v-else class="px-5 py-4 text-xs text-slate-400 italic">No terms yet.</div>
-      </div>
+      </AppCard>
 
     </div>
 
     <!-- School Year Modal -->
-    <div v-if="syModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">{{ syForm.id ? 'Edit' : 'New' }} School Year</h2>
-        <div class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Name (e.g. 2025-2026)</label>
-            <input v-model="syForm.name" type="text" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
-              <input v-model="syForm.start_date" type="date" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
-              <input v-model="syForm.end_date" type="date" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <select v-model="syForm.status" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
-            <div class="flex items-center gap-2 pt-5">
-              <input v-model="syForm.is_current" type="checkbox" id="sy-current" class="rounded text-indigo-600" />
-              <label for="sy-current" class="text-sm text-slate-600">Set as current</label>
-            </div>
-          </div>
+    <AppModal :show="syModal" :title="`${syForm.id ? 'Edit' : 'New'} School Year`" @close="syModal = false">
+      <div class="space-y-3">
+        <AppInput v-model="syForm.name" label="Name (e.g. 2025-2026)" type="text" :error="syForm.errors.name" />
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model="syForm.start_date" label="Start Date" type="date" :error="syForm.errors.start_date" />
+          <AppInput v-model="syForm.end_date" label="End Date" type="date" :error="syForm.errors.end_date" />
         </div>
-        <div class="flex justify-end gap-3 pt-1">
-          <button @click="syModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="saveSy"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
-            {{ syForm.id ? 'Update' : 'Create' }}
-          </button>
+        <div class="grid grid-cols-2 gap-3">
+          <AppSelect v-model="syForm.status" label="Status" :show-blank="false">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
+          </AppSelect>
+          <div class="flex items-center gap-2 pt-5">
+            <input v-model="syForm.is_current" type="checkbox" id="sy-current" class="rounded text-indigo-600" />
+            <label for="sy-current" class="text-sm text-slate-600">Set as current</label>
+          </div>
         </div>
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="syModal = false">Cancel</AppButton>
+        <AppButton :loading="syForm.processing" @click="saveSy">{{ syForm.id ? 'Update' : 'Create' }}</AppButton>
+      </template>
+    </AppModal>
 
     <!-- Term Modal -->
-    <div v-if="termModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">{{ termForm.id ? 'Edit' : 'Add' }} Academic Term</h2>
-        <div class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Term Name</label>
-            <input v-model="termForm.name" type="text" placeholder="e.g. 1st Semester, S.Y. 2025-2026"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Term Type</label>
-            <select v-model="termForm.term_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option value="1st_semester">1st Semester</option>
-              <option value="2nd_semester">2nd Semester</option>
-              <option value="full_term">Full Term</option>
-              <option value="summer">Summer</option>
-              <option value="trimester">Trimester</option>
-              <option value="quarter">Quarter</option>
-            </select>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
-              <input v-model="termForm.start_date" type="date" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
-              <input v-model="termForm.end_date" type="date" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <input v-model="termForm.is_current" type="checkbox" id="term-current" class="rounded text-indigo-600" />
-            <label for="term-current" class="text-sm text-slate-600">Set as current term</label>
-          </div>
+    <AppModal :show="termModal" :title="`${termForm.id ? 'Edit' : 'Add'} Academic Term`" @close="termModal = false">
+      <div class="space-y-3">
+        <AppInput v-model="termForm.name" label="Term Name" type="text" placeholder="e.g. 1st Semester, S.Y. 2025-2026" :error="termForm.errors.name" />
+        <AppSelect v-model="termForm.term_type" label="Term Type" :show-blank="false">
+          <option value="1st_semester">1st Semester</option>
+          <option value="2nd_semester">2nd Semester</option>
+          <option value="full_term">Full Term</option>
+          <option value="summer">Summer</option>
+          <option value="trimester">Trimester</option>
+          <option value="quarter">Quarter</option>
+        </AppSelect>
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model="termForm.start_date" label="Start Date" type="date" :error="termForm.errors.start_date" />
+          <AppInput v-model="termForm.end_date" label="End Date" type="date" :error="termForm.errors.end_date" />
         </div>
-        <div class="flex justify-end gap-3 pt-1">
-          <button @click="termModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="saveTerm"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
-            {{ termForm.id ? 'Update' : 'Add Term' }}
-          </button>
+        <div class="flex items-center gap-2">
+          <input v-model="termForm.is_current" type="checkbox" id="term-current" class="rounded text-indigo-600" />
+          <label for="term-current" class="text-sm text-slate-600">Set as current term</label>
         </div>
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="termModal = false">Cancel</AppButton>
+        <AppButton :loading="termForm.processing" @click="saveTerm">{{ termForm.id ? 'Update' : 'Add Term' }}</AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import {
   AcademicCapIcon, CalendarIcon, CheckCircleIcon, ExclamationCircleIcon,
   PencilIcon, PlusIcon, TrashIcon,
@@ -243,31 +185,31 @@ function saveSy() {
   }
 }
 
-function deleteSy(sy) {
-  if (! confirm(`Delete S.Y. ${sy.name}?`)) return
+async function deleteSy(sy) {
+  if (! await confirmDelete(`Delete S.Y. ${sy.name}? This cannot be undone.`)) return
   useForm({}).delete(route('faculty-loading.school-years.destroy', sy.id))
 }
 
-function advanceSy(sy) {
+async function advanceSy(sy) {
   const next = { draft: 'proposed', proposed: 'approved', approved: 'published', published: 'archived' }[sy.workflow_status]
   if (! next) return
-  if (! confirm(`Advance S.Y. ${sy.name} from '${sy.workflow_status}' to '${next}'?`)) return
+  if (! await confirmAction({ title: 'Advance school year?', text: `Advance S.Y. ${sy.name} from '${sy.workflow_status}' to '${next}'?`, confirmText: 'Advance' })) return
   useForm({}).post(route('faculty-loading.school-years.advance', sy.id))
 }
 
-function archiveSy(sy) {
-  if (! confirm(`Archive S.Y. ${sy.name}? This cannot be undone if there are no active loads.`)) return
+async function archiveSy(sy) {
+  if (! await confirmAction({ title: 'Archive school year?', text: `Archive S.Y. ${sy.name}? This cannot be undone if there are no active loads.`, confirmText: 'Archive' })) return
   useForm({}).post(route('faculty-loading.school-years.archive', sy.id))
 }
 
-const WORKFLOW_CLASSES = {
-  draft:     'bg-slate-100 text-slate-500',
-  proposed:  'bg-yellow-100 text-yellow-700',
-  approved:  'bg-blue-100 text-blue-700',
-  published: 'bg-emerald-100 text-emerald-700',
-  archived:  'bg-slate-200 text-slate-500',
+const WORKFLOW_COLORS = {
+  draft:     'slate',
+  proposed:  'amber',
+  approved:  'blue',
+  published: 'green',
+  archived:  'slate',
 }
-const workflowClass = (s) => WORKFLOW_CLASSES[s] ?? 'bg-slate-100 text-slate-500'
+const workflowClass = (s) => WORKFLOW_COLORS[s] ?? 'slate'
 
 // ── Term CRUD ────────────────────────────────────────────────────────────────
 const termModal    = ref(false)
@@ -297,8 +239,8 @@ function saveTerm() {
   }
 }
 
-function deleteTerm(term) {
-  if (! confirm(`Delete term "${term.name}"?`)) return
+async function deleteTerm(term) {
+  if (! await confirmDelete(`Delete term "${term.name}"?`)) return
   useForm({}).delete(route('faculty-loading.school-years.terms.destroy', term.id))
 }
 </script>

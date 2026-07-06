@@ -1,9 +1,12 @@
 <script setup>
 import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
+import AppCard from "@/Components/AppCard.vue"
+import AppButton from "@/Components/AppButton.vue"
+import AppBadge from "@/Components/AppBadge.vue"
+import AppModal from "@/Components/AppModal.vue"
+import { ArrowLeftIcon, PrinterIcon } from "@heroicons/vue/24/outline"
 import { ref, computed } from "vue"
-import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 
 const props = defineProps({
@@ -13,8 +16,26 @@ const props = defineProps({
   plans:      Array,
 })
 
-const statusBadgeClass   = ipcrStatusClass
 const getAdjectivalRating = ipcrAdjectivalRating
+
+// Maps each distinct IPCR status string to the closest AppBadge color.
+function statusBadgeColor(status) {
+  const map = {
+    'New Target':                'blue',
+    'For Review':                'amber',
+    'Targets Approved':          'green',
+    'Submitted for Rating':      'orange',
+    'Rated & For PMT Review':    'purple',
+    'Submitted to PMT':          'purple',
+    'PMT Returned for Revision': 'red',
+    'Submitted to HR':           'blue',
+    'Approved by PMT':           'green',
+    'Director Signed':           'green',
+    'Returned for Revision':     'red',
+    'Rejected':                  'red',
+  }
+  return map[status] ?? 'slate'
+}
 
 // ---------- Date helpers ----------
 const extractYearFromRatingPeriod = (ratingPeriod) => {
@@ -156,32 +177,26 @@ const printIPCR = () => window.print()
   <AdminLayout :title="`HR IPCR Review: ${ipcr.title}`">
     <div>
       <!-- Back -->
-      <button @click="router.visit(route('hr-ipcr.index'))"
-        class="mb-4 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors">
+      <AppButton variant="ghost" size="sm" class="mb-4" @click="router.visit(route('hr-ipcr.index'))">
         <ArrowLeftIcon class="w-4 h-4" /> Back to HR IPCR List
-      </button>
+      </AppButton>
 
       <!-- Header card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4 no-print">
-        <div class="flex items-start justify-between flex-wrap gap-3">
+      <AppCard :padded="false" class="mb-4 no-print">
+        <div class="flex items-start justify-between flex-wrap gap-3 p-5">
           <div>
             <h2 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h2>
             <p class="text-slate-500 text-sm mt-0.5">Rating Period: {{ ipcr.rating_period }}</p>
           </div>
           <div class="flex items-center gap-3">
-            <span :class="statusBadgeClass(ipcr.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">
-              {{ ipcr.status }}
-            </span>
-            <button @click="printIPCR"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9v6h12V9M6 9V5h12v4M6 15v4h12v-4M6 15H4v4h16v-4h-2" />
-              </svg>
+            <AppBadge :color="statusBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
+            <AppButton variant="secondary" @click="printIPCR">
+              <PrinterIcon class="h-4 w-4" />
               Print IPCR
-            </button>
+            </AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Plans Table (same format as EmployeeIPCRShow) -->
       <div class="bg-white p-4 rounded-lg shadow" id="ipcr-printable">
@@ -436,39 +451,31 @@ const printIPCR = () => window.print()
     </div>
 
     <!-- Accomplishments Viewer Modal -->
-    <Teleport to="body">
-    <div v-if="accViewerPlan"
-      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
-      @click.self="closeAccViewer">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div class="flex items-start justify-between px-6 py-4 border-b border-slate-100">
-          <div>
-            <h2 class="text-base font-semibold text-slate-800">Accomplishments</h2>
-            <p class="text-xs text-slate-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
+    <AppModal
+      :show="!!accViewerPlan"
+      title="Accomplishments"
+      :subtitle="accViewerPlan?.success_indicator"
+      size="2xl"
+      panel-class="max-h-[80vh]"
+      @close="closeAccViewer"
+    >
+      <div v-if="!accViewerPlan?.accomplishments?.length" class="py-16 text-center text-slate-400 text-sm">
+        No daily accomplishments recorded.
+      </div>
+      <div v-else class="space-y-4">
+        <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id" class="border border-slate-100 rounded-lg p-3 text-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-medium text-slate-700">{{ formatAccDate(acc.accomplishment_date) }}</span>
           </div>
-          <button @click="closeAccViewer" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors ml-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-        </div>
-        <div class="overflow-y-auto flex-1 px-6 py-4">
-          <div v-if="!accViewerPlan.accomplishments?.length" class="py-16 text-center text-slate-400 text-sm">
-            No daily accomplishments recorded.
-          </div>
-          <div v-else class="space-y-4">
-            <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id" class="border border-slate-100 rounded-lg p-3 text-sm">
-              <div class="flex items-center justify-between mb-1">
-                <span class="font-medium text-slate-700">{{ formatAccDate(acc.accomplishment_date) }}</span>
-              </div>
-              <p class="text-slate-600">{{ acc.description || "—" }}</p>
-              <div v-if="acc.photos?.length" class="mt-2 flex flex-wrap gap-2">
-                <a v-for="photo in acc.photos" :key="photo.id" :href="photo.url" target="_blank">
-                  <img :src="photo.url" class="h-16 w-16 object-cover rounded-lg border border-slate-200" />
-                </a>
-              </div>
-            </div>
+          <p class="text-slate-600">{{ acc.description || "—" }}</p>
+          <div v-if="acc.photos?.length" class="mt-2 flex flex-wrap gap-2">
+            <a v-for="photo in acc.photos" :key="photo.id" :href="photo.url" target="_blank">
+              <img :src="photo.url" class="h-16 w-16 object-cover rounded-lg border border-slate-200" />
+            </a>
           </div>
         </div>
       </div>
-    </div>
-    </Teleport>
+    </AppModal>
 
   </AdminLayout>
 </template>

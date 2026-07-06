@@ -1,6 +1,12 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppButton from '@/Components/AppButton.vue'
 import Swal from 'sweetalert2'
 
 // Form state
@@ -32,54 +38,26 @@ const submit = () => {
 
   <AdminLayout title="Submit IT Job Request">
     <div>
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Submit IT Job Request</h1>
-      </div>
+      <AppPageHeader title="Submit IT Job Request" />
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm max-w-2xl">
+      <AppCard :padded="false" class="max-w-2xl">
         <div class="px-5 py-4 border-b border-slate-100">
           <p class="text-sm text-slate-500">Fill in the details below to submit a new request.</p>
         </div>
         <div class="p-5">
           <form @submit.prevent="submit" class="space-y-4">
-            <!-- Title -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Request Title</label>
-              <input
-                v-model="form.title"
-                type="text"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                required
-              />
-            </div>
+            <AppInput v-model="form.title" label="Request Title" required />
 
-            <!-- Category -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
-              <select
-                v-model="form.category"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                required
-              >
-                <option value="">-- Select --</option>
-                <option value="Hardware">Hardware</option>
-                <option value="Software">Software</option>
-                <option value="Network">Network</option>
-                <option value="Account Access">Account Access</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+            <AppSelect v-model="form.category" label="Category" required>
+              <option value="">-- Select --</option>
+              <option value="Hardware">Hardware</option>
+              <option value="Software">Software</option>
+              <option value="Network">Network</option>
+              <option value="Account Access">Account Access</option>
+              <option value="Other">Other</option>
+            </AppSelect>
 
-            <!-- Description -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-              <textarea
-                v-model="form.description"
-                rows="4"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                required
-              ></textarea>
-            </div>
+            <AppTextarea v-model="form.description" label="Description" :rows="4" required />
 
             <!-- Urgency -->
             <div>
@@ -90,7 +68,7 @@ const submit = () => {
                     { value: 'low',    label: 'Low',    color: 'peer-checked:bg-slate-100 peer-checked:border-slate-400 peer-checked:text-slate-700' },
                     { value: 'normal', label: 'Normal', color: 'peer-checked:bg-blue-50 peer-checked:border-blue-400 peer-checked:text-blue-700' },
                     { value: 'high',   label: 'High',   color: 'peer-checked:bg-orange-50 peer-checked:border-orange-400 peer-checked:text-orange-700' },
-                    { value: 'urgent', label: 'Urgent', color: 'peer-checked:bg-red-50 peer-checked:border-red-400 peer-checked:text-red-700' },
+                    { value: 'urgent', label: 'Urgent', color: 'peer-checked:bg-danger-50 peer-checked:border-danger-500 peer-checked:text-danger-600' },
                   ]"
                   :key="opt.value"
                   class="relative cursor-pointer"
@@ -114,17 +92,11 @@ const submit = () => {
 
             <!-- Submit -->
             <div class="pt-2">
-              <button
-                type="submit"
-                :disabled="form.processing"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm w-full justify-center disabled:opacity-60"
-              >
-                Submit Request
-              </button>
+              <AppButton type="submit" :loading="form.processing" block>Submit Request</AppButton>
             </div>
           </form>
         </div>
-      </div>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>

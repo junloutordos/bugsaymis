@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import axios from 'axios'
 import { storageUrl } from "@/Composables/useStorage.js"
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 
 const props = defineProps({
   vacancy:            { type: Object, required: true },
@@ -36,6 +38,7 @@ const isPlantilla = computed(() => PLANTILLA.includes(type.value.name))
 const vacantPlantillaNumbers = computed(() => (item.value.plantilla_numbers ?? []).filter(p => p.status === 'vacant'))
 
 const levelLabel = { basic: 'Basic', intermediate: 'Intermediate', advanced: 'Advanced' }
+const levelBadgeColor = { basic: 'green', intermediate: 'blue', advanced: 'purple' }
 
 // ── Apply modal state ──────────────────────────────────────────────────────
 const showModal     = ref(false)
@@ -128,9 +131,9 @@ const submitApply = async () => {
       <div class="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="flex-1 min-w-0">
-            <span class="inline-block text-xs font-semibold uppercase tracking-wide text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mb-2">
+            <AppBadge color="blue" class="uppercase tracking-wide mb-2">
               {{ type.name ?? '—' }}
-            </span>
+            </AppBadge>
             <h1 class="text-2xl font-bold text-gray-900 leading-tight">{{ item.position_title }}</h1>
             <p v-if="item.office?.name" class="text-gray-500 text-sm mt-1">{{ item.office.name }}</p>
             <p v-if="vacantPlantillaNumbers.length" class="text-gray-400 text-xs mt-0.5">
@@ -141,17 +144,17 @@ const submitApply = async () => {
             <!-- Plantilla: SG + monthly salary -->
             <template v-if="isPlantilla && item.salary_grade">
               <div class="font-bold text-blue-800 text-lg">SG {{ item.salary_grade }}<span v-if="item.salary_step"> · Step {{ item.salary_step }}</span></div>
-              <div v-if="item.monthly_salary" class="text-green-700 font-semibold text-sm">
+              <div v-if="item.monthly_salary" class="text-success-700 font-semibold text-sm">
                 ₱{{ Number(item.monthly_salary).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}/mo.
               </div>
             </template>
             <!-- Non-plantilla: daily rate -->
             <template v-else-if="item.daily_rate">
-              <div class="font-bold text-green-700 text-lg">
+              <div class="font-bold text-success-700 text-lg">
                 ₱{{ Number(item.daily_rate).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}/day
               </div>
             </template>
-            <div :class="daysLeft !== null && daysLeft <= 3 ? 'text-red-600 font-bold' : 'text-gray-500'" class="text-xs">
+            <div :class="daysLeft !== null && daysLeft <= 3 ? 'text-danger-600 font-bold' : 'text-gray-500'" class="text-xs">
               Closes {{ fmt(vacancy.closing_date) }}
               <span v-if="daysLeft !== null && daysLeft <= 7" class="font-semibold"> — {{ daysLeft }}d left</span>
             </div>
@@ -204,15 +207,9 @@ const submitApply = async () => {
           <div v-for="c in item.competencies" :key="c.name"
                class="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
             <span class="text-gray-700">{{ c.name }}</span>
-            <span v-if="c.level"
-                  class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  :class="{
-                    'bg-green-100 text-green-700':  c.level === 'basic',
-                    'bg-blue-100 text-blue-700':    c.level === 'intermediate',
-                    'bg-purple-100 text-purple-700': c.level === 'advanced',
-                  }">
+            <AppBadge v-if="c.level" :color="levelBadgeColor[c.level] ?? 'slate'" class="font-semibold">
               {{ levelLabel[c.level] ?? c.level }}
-            </span>
+            </AppBadge>
           </div>
         </div>
       </div>
@@ -224,7 +221,7 @@ const submitApply = async () => {
           <li v-for="req in docList" :key="req.id"
               class="flex items-start gap-2 text-sm text-gray-700">
             <span class="mt-0.5 flex-shrink-0"
-                  :class="req.pivot?.is_mandatory ? 'text-red-500' : 'text-gray-400'">
+                  :class="req.pivot?.is_mandatory ? 'text-danger-500' : 'text-gray-400'">
               {{ req.pivot?.is_mandatory ? '●' : '○' }}
             </span>
             <span>
@@ -272,7 +269,7 @@ const submitApply = async () => {
         <!-- Success state -->
         <div v-if="submitSuccess" class="text-center py-12 px-6">
           <div class="text-5xl mb-4">🎉</div>
-          <h3 class="text-xl font-bold text-green-700 mb-2">Application Submitted!</h3>
+          <h3 class="text-xl font-bold text-success-700 mb-2">Application Submitted!</h3>
           <p class="text-sm text-gray-600 mb-1">Your documents have been uploaded to our system.</p>
           <p class="text-sm text-gray-500">You will receive an email confirmation with your reference number.</p>
           <div class="flex justify-center gap-3 mt-6">
@@ -280,17 +277,16 @@ const submitApply = async () => {
                   class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold">
               🔍 Track My Application
             </Link>
-            <button @click="showModal = false"
-                    class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+            <AppButton variant="secondary" @click="showModal = false">
               Close
-            </button>
+            </AppButton>
           </div>
         </div>
 
         <form v-else @submit.prevent="submitApply" class="p-6 space-y-5">
 
           <div v-if="submitErrors._general"
-               class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+               class="bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-4 py-3 text-sm">
             {{ submitErrors._general[0] }}
           </div>
 
@@ -302,7 +298,7 @@ const submitApply = async () => {
                 <label class="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
                 <input v-model="personalForm.first_name" required type="text"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.first_name" class="text-red-500 text-xs mt-1">{{ submitErrors.first_name[0] }}</p>
+                <p v-if="submitErrors.first_name" class="text-danger-500 text-xs mt-1">{{ submitErrors.first_name[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Middle Name</label>
@@ -313,7 +309,7 @@ const submitApply = async () => {
                 <label class="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
                 <input v-model="personalForm.last_name" required type="text"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.last_name" class="text-red-500 text-xs mt-1">{{ submitErrors.last_name[0] }}</p>
+                <p v-if="submitErrors.last_name" class="text-danger-500 text-xs mt-1">{{ submitErrors.last_name[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Suffix</label>
@@ -324,7 +320,7 @@ const submitApply = async () => {
                 <label class="block text-xs font-medium text-gray-600 mb-1">Birthdate *</label>
                 <input v-model="personalForm.birthdate" required type="date"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.birthdate" class="text-red-500 text-xs mt-1">{{ submitErrors.birthdate[0] }}</p>
+                <p v-if="submitErrors.birthdate" class="text-danger-500 text-xs mt-1">{{ submitErrors.birthdate[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Civil Status *</label>
@@ -341,7 +337,7 @@ const submitApply = async () => {
               <label class="block text-xs font-medium text-gray-600 mb-1">Complete Address *</label>
               <textarea v-model="personalForm.address" required rows="2"
                         class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-              <p v-if="submitErrors.address" class="text-red-500 text-xs mt-1">{{ submitErrors.address[0] }}</p>
+              <p v-if="submitErrors.address" class="text-danger-500 text-xs mt-1">{{ submitErrors.address[0] }}</p>
             </div>
           </fieldset>
 
@@ -353,13 +349,13 @@ const submitApply = async () => {
                 <label class="block text-xs font-medium text-gray-600 mb-1">Email *</label>
                 <input v-model="personalForm.email" required type="email"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.email" class="text-red-500 text-xs mt-1">{{ submitErrors.email[0] }}</p>
+                <p v-if="submitErrors.email" class="text-danger-500 text-xs mt-1">{{ submitErrors.email[0] }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Contact Number *</label>
                 <input v-model="personalForm.contact_number" required type="text"
                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm" />
-                <p v-if="submitErrors.contact_number" class="text-red-500 text-xs mt-1">{{ submitErrors.contact_number[0] }}</p>
+                <p v-if="submitErrors.contact_number" class="text-danger-500 text-xs mt-1">{{ submitErrors.contact_number[0] }}</p>
               </div>
             </div>
           </fieldset>
@@ -415,7 +411,7 @@ const submitApply = async () => {
               <li v-for="req in docList" :key="req.id"
                   class="flex items-start gap-2 text-xs text-gray-700">
                 <span class="mt-0.5 flex-shrink-0"
-                      :class="req.pivot?.is_mandatory ? 'text-red-500' : 'text-gray-400'">
+                      :class="req.pivot?.is_mandatory ? 'text-danger-500' : 'text-gray-400'">
                   {{ req.pivot?.is_mandatory ? '●' : '○' }}
                 </span>
                 <span>
@@ -425,7 +421,7 @@ const submitApply = async () => {
               </li>
             </ul>
             <label class="block text-xs font-medium text-gray-700 mb-1">
-              Consolidated Application Documents <span class="text-red-500">*</span>
+              Consolidated Application Documents <span class="text-danger-500">*</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="file"
@@ -434,21 +430,20 @@ const submitApply = async () => {
                      class="hidden"
                      @change="(e) => consolidatedFile = e.target.files[0]" />
               <span class="flex-1 px-3 py-1.5 rounded-lg border text-sm truncate"
-                    :class="consolidatedFile ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-white text-gray-400'">
+                    :class="consolidatedFile ? 'border-success-500 bg-success-50 text-success-700' : 'border-gray-300 bg-white text-gray-400'">
                 {{ consolidatedFile ? consolidatedFile.name : 'Choose file…' }}
               </span>
               <span class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
                 Browse
               </span>
             </label>
-            <p v-if="submitErrors['documents_base64']" class="text-red-500 text-xs mt-1">{{ submitErrors['documents_base64'][0] }}</p>
+            <p v-if="submitErrors['documents_base64']" class="text-danger-500 text-xs mt-1">{{ submitErrors['documents_base64'][0] }}</p>
           </fieldset>
 
           <div class="flex justify-end gap-3 pt-1">
-            <button type="button" @click="showModal = false"
-                    class="px-5 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">
+            <AppButton type="button" variant="secondary" @click="showModal = false">
               Cancel
-            </button>
+            </AppButton>
             <button type="submit" :disabled="submitting"
                     class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold">
               {{ submitting ? 'Uploading & Submitting…' : 'Submit Application' }}

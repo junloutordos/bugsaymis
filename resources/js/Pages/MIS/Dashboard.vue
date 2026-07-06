@@ -1,5 +1,10 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { Head, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import {
@@ -242,16 +247,16 @@ function fmtDate(d) {
 
 function statusBadge(status) {
   const map = {
-    'Request Completed':               'bg-emerald-100 text-emerald-700',
-    'Acted by MIS':                    'bg-amber-100 text-amber-700',
-    'In Progress':                     'bg-orange-100 text-orange-700',
-    'MIS Assessed the Request':        'bg-violet-100 text-violet-700',
-    'Pending Division Chief Approval': 'bg-slate-100 text-slate-600',
-    'Pending OCD Approval':            'bg-slate-100 text-slate-600',
-    'Rejected by Division Chief':      'bg-red-100 text-red-600',
-    'Rejected by OCD':                 'bg-red-100 text-red-600',
+    'Request Completed':               'green',
+    'Acted by MIS':                    'amber',
+    'In Progress':                     'orange',
+    'MIS Assessed the Request':        'purple',
+    'Pending Division Chief Approval': 'slate',
+    'Pending OCD Approval':            'slate',
+    'Rejected by Division Chief':      'red',
+    'Rejected by OCD':                 'red',
   }
-  return map[status] ?? 'bg-slate-100 text-slate-600'
+  return map[status] ?? 'slate'
 }
 
 function statusShort(status) {
@@ -322,12 +327,12 @@ const riskDonutData = computed(() => {
 
 function riskTierBadge(tier) {
   const map = {
-    critical: 'bg-red-100 text-red-700',
-    high:     'bg-orange-100 text-orange-700',
-    medium:   'bg-amber-100 text-amber-700',
-    low:      'bg-emerald-100 text-emerald-700',
+    critical: 'red',
+    high:     'orange',
+    medium:   'amber',
+    low:      'green',
   }
-  return map[tier] ?? 'bg-slate-100 text-slate-500'
+  return map[tier] ?? 'slate'
 }
 
 function fmtDateTime(d) {
@@ -342,12 +347,8 @@ function fmtDateTime(d) {
     <div class="space-y-6">
 
       <!-- Header + month picker -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-bold text-slate-800">MIS Analytics Dashboard</h1>
-          <p class="text-sm text-slate-500 mt-0.5">IT Job Request performance and client satisfaction metrics</p>
-        </div>
-        <div class="flex items-center gap-2">
+      <AppPageHeader title="MIS Analytics Dashboard" subtitle="IT Job Request performance and client satisfaction metrics">
+        <template #actions>
           <label class="text-xs text-slate-500 font-medium">Month</label>
           <input
             v-model="currentMonth"
@@ -355,13 +356,13 @@ function fmtDateTime(d) {
             @change="goMonth"
             class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <!-- Pending action banner -->
       <div v-if="kpi.pending_action > 0"
-           class="bg-amber-50 border border-amber-300 rounded-xl px-5 py-3 flex items-center gap-3 text-sm text-amber-800">
-        <ClockIcon class="h-5 w-5 shrink-0 text-amber-500" />
+           class="bg-warning-50 border border-warning-100 rounded-xl px-5 py-3 flex items-center gap-3 text-sm text-warning-700">
+        <ClockIcon class="h-5 w-5 shrink-0 text-warning-500" />
         <span>
           <strong>{{ kpi.pending_action }}</strong>
           request{{ kpi.pending_action > 1 ? 's' : '' }} with status <em>Acted by MIS</em> are waiting for client confirmation and CSM rating.
@@ -383,20 +384,18 @@ function fmtDateTime(d) {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         <!-- Status Breakdown -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h2 class="text-sm font-semibold text-slate-700 mb-4">Request Status Breakdown</h2>
+        <AppCard title="Request Status Breakdown">
           <div style="height:240px;">
             <Doughnut :data="donutData" :options="donutOptions" />
           </div>
-        </div>
+        </AppCard>
 
         <!-- Monthly Trend -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h2 class="text-sm font-semibold text-slate-700 mb-4">Monthly Trend — Last 12 Months</h2>
+        <AppCard title="Monthly Trend — Last 12 Months">
           <div style="height:240px;">
             <Line :data="trendData" :options="lineOptions" />
           </div>
-        </div>
+        </AppCard>
 
       </div>
 
@@ -404,95 +403,81 @@ function fmtDateTime(d) {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         <!-- Category Breakdown -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h2 class="text-sm font-semibold text-slate-700 mb-4">Top Request Categories</h2>
+        <AppCard title="Top Request Categories">
           <div :style="{ height: Math.max(180, categoryBreakdown.length * 28) + 'px' }">
             <Bar :data="categoryData" :options="barOptions" />
           </div>
-        </div>
+        </AppCard>
 
         <!-- CSM SQD Breakdown -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h2 class="text-sm font-semibold text-slate-700 mb-1">Client Satisfaction — SQD Scores</h2>
-          <p class="text-xs text-slate-400 mb-4">Average score per dimension (1–5; N/A excluded)</p>
+        <AppCard title="Client Satisfaction — SQD Scores" subtitle="Average score per dimension (1–5; N/A excluded)">
           <div style="height:240px;">
             <Bar :data="sqdData" :options="sqdOptions" />
           </div>
-        </div>
+        </AppCard>
 
       </div>
 
       <!-- Personnel Workload table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h2 class="text-sm font-semibold text-slate-700">MIS Personnel Workload</h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Staff</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Handled</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Pending Confirmation</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide">Avg Rating</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="!personnelWorkload.length">
-                <td colspan="4" class="px-4 py-8 text-center text-slate-400 text-sm">No attendance data recorded yet.</td>
-              </tr>
-              <tr v-for="p in personnelWorkload" :key="p.attendedby" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 font-medium text-slate-700">{{ p.attendedby }}</td>
-                <td class="px-4 py-3 text-center text-slate-700 tabular-nums">{{ p.total }}</td>
-                <td class="px-4 py-3 text-center tabular-nums"
-                    :class="p.pending > 0 ? 'text-amber-600 font-semibold' : 'text-slate-300'">
-                  {{ p.pending > 0 ? p.pending : '—' }}
-                </td>
-                <td class="px-4 py-3 text-center tabular-nums"
-                    :class="p.avg_rating ? 'text-violet-600 font-semibold' : 'text-slate-300'">
-                  {{ p.avg_rating ? p.avg_rating + ' ★' : '—' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AppCard title="MIS Personnel Workload" :padded="false">
+        <AppTable :is-empty="!personnelWorkload.length" :card="false" :skeleton-cols="4">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Staff</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Handled</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Pending Confirmation</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide">Avg Rating</th>
+            </tr>
+          </template>
+          <tr v-for="p in personnelWorkload" :key="p.attendedby" class="hover:bg-slate-50/60">
+            <td class="px-4 py-3 font-medium text-slate-700">{{ p.attendedby }}</td>
+            <td class="px-4 py-3 text-center text-slate-700 tabular-nums">{{ p.total }}</td>
+            <td class="px-4 py-3 text-center tabular-nums"
+                :class="p.pending > 0 ? 'text-amber-600 font-semibold' : 'text-slate-300'">
+              {{ p.pending > 0 ? p.pending : '—' }}
+            </td>
+            <td class="px-4 py-3 text-center tabular-nums"
+                :class="p.avg_rating ? 'text-violet-600 font-semibold' : 'text-slate-300'">
+              {{ p.avg_rating ? p.avg_rating + ' ★' : '—' }}
+            </td>
+          </tr>
+          <template #empty>
+            <EmptyState title="No attendance data recorded yet." />
+          </template>
+        </AppTable>
+      </AppCard>
 
       <!-- Recent Requests table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-slate-700">Recent Requests</h2>
+      <AppCard title="Recent Requests" :padded="false">
+        <template #header>
           <a :href="route('jobrequests.index')" class="text-xs text-indigo-600 hover:underline">View all →</a>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ITJR #</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted By</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date Filed</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="r in recentRequests" :key="r.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-2.5 text-xs font-mono text-slate-600">{{ r.itjr_no }}</td>
-                <td class="px-4 py-2.5 text-slate-700 max-w-xs truncate">{{ r.title }}</td>
-                <td class="px-4 py-2.5 text-slate-500 text-xs">{{ r.category }}</td>
-                <td class="px-4 py-2.5 text-slate-500 text-xs">{{ r.user?.name ?? '—' }}</td>
-                <td class="px-4 py-2.5 text-slate-500 text-xs whitespace-nowrap">{{ fmtDate(r.created_at) }}</td>
-                <td class="px-4 py-2.5">
-                  <span :class="[statusBadge(r.status), 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap']">
-                    {{ statusShort(r.status) }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        </template>
+        <AppTable :is-empty="!recentRequests.length" :card="false" :skeleton-cols="6">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ITJR #</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted By</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date Filed</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            </tr>
+          </template>
+          <tr v-for="r in recentRequests" :key="r.id" class="hover:bg-slate-50/60">
+            <td class="px-4 py-2.5 text-xs font-mono text-slate-600">{{ r.itjr_no }}</td>
+            <td class="px-4 py-2.5 text-slate-700 max-w-xs truncate">{{ r.title }}</td>
+            <td class="px-4 py-2.5 text-slate-500 text-xs">{{ r.category }}</td>
+            <td class="px-4 py-2.5 text-slate-500 text-xs">{{ r.user?.name ?? '—' }}</td>
+            <td class="px-4 py-2.5 text-slate-500 text-xs whitespace-nowrap">{{ fmtDate(r.created_at) }}</td>
+            <td class="px-4 py-2.5">
+              <AppBadge :color="statusBadge(r.status)" class="whitespace-nowrap">{{ statusShort(r.status) }}</AppBadge>
+            </td>
+          </tr>
+          <template #empty>
+            <EmptyState title="No recent requests found." />
+          </template>
+        </AppTable>
+      </AppCard>
 
       <!-- Fleet & Infrastructure Health -->
       <div v-if="canViewFleet && fleet" class="space-y-4 pt-2 border-t border-slate-100">
@@ -515,22 +500,20 @@ function fmtDateTime(d) {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           <!-- Risk Tier Donut -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-slate-700 mb-4">Device Risk Tiers</h2>
+          <AppCard title="Device Risk Tiers">
             <div v-if="!Object.keys(fleet.risk_tier_breakdown).length" class="py-16 text-center text-slate-400 text-sm">
               No enrolled devices yet.
             </div>
             <div v-else style="height:240px;">
               <Doughnut :data="riskDonutData" :options="donutOptions" />
             </div>
-          </div>
+          </AppCard>
 
           <!-- Computer Laboratories -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-sm font-semibold text-slate-700">Computer Laboratories</h2>
+          <AppCard title="Computer Laboratories">
+            <template #header>
               <a :href="route('computer-labs.index')" class="text-xs text-indigo-600 hover:underline">View all →</a>
-            </div>
+            </template>
             <div v-if="!fleet.labs.length" class="py-12 text-center text-slate-400 text-sm">
               No rooms tagged as "Computer Laboratory" yet.
             </div>
@@ -547,52 +530,45 @@ function fmtDateTime(d) {
                 </div>
                 <div class="flex items-center gap-2 text-xs">
                   <span class="text-slate-400">{{ lab.enrolled }}/{{ lab.total }} enrolled</span>
-                  <span v-if="lab.critical > 0" class="px-1.5 py-0.5 rounded-full font-medium bg-red-100 text-red-700">{{ lab.critical }} critical</span>
+                  <AppBadge v-if="lab.critical > 0" color="red">{{ lab.critical }} critical</AppBadge>
                 </div>
               </a>
             </div>
-          </div>
+          </AppCard>
 
         </div>
 
         <!-- Top At-Risk Devices -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-700">Top At-Risk Devices</h2>
+        <AppCard title="Top At-Risk Devices" :padded="false">
+          <template #header>
             <a :href="route('atlas-sentinel.health-dashboard')" class="text-xs text-indigo-600 hover:underline">View Atlas Sentinel Health Dashboard →</a>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-100 text-sm">
-              <thead class="bg-slate-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Device</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
-                  <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Risk</th>
-                  <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Open Alerts</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Check-in</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                <tr v-if="!fleet.top_at_risk_devices.length">
-                  <td colspan="5" class="px-4 py-8 text-center text-slate-400 text-sm">No scored devices yet.</td>
-                </tr>
-                <tr v-for="d in fleet.top_at_risk_devices" :key="d.id" class="hover:bg-slate-50/60">
-                  <td class="px-4 py-3 font-medium text-slate-700">{{ d.hostname || '—' }}</td>
-                  <td class="px-4 py-3 text-slate-500 text-xs">{{ d.equipment?.room?.name || '—' }}</td>
-                  <td class="px-4 py-3 text-center">
-                    <span :class="[riskTierBadge(d.risk_tier), 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize']">
-                      {{ d.risk_tier ?? '—' }}
-                    </span>
-                  </td>
-                  <td class="px-4 py-3 text-center tabular-nums" :class="d.open_alerts_count > 0 ? 'text-amber-600 font-semibold' : 'text-slate-300'">
-                    {{ d.open_alerts_count > 0 ? d.open_alerts_count : '—' }}
-                  </td>
-                  <td class="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{{ fmtDateTime(d.last_checkin_at) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+          </template>
+          <AppTable :is-empty="!fleet.top_at_risk_devices.length" :card="false" :skeleton-cols="5">
+            <template #head>
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Device</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Risk</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Open Alerts</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Check-in</th>
+              </tr>
+            </template>
+            <tr v-for="d in fleet.top_at_risk_devices" :key="d.id" class="hover:bg-slate-50/60">
+              <td class="px-4 py-3 font-medium text-slate-700">{{ d.hostname || '—' }}</td>
+              <td class="px-4 py-3 text-slate-500 text-xs">{{ d.equipment?.room?.name || '—' }}</td>
+              <td class="px-4 py-3 text-center">
+                <AppBadge :color="riskTierBadge(d.risk_tier)" class="capitalize">{{ d.risk_tier ?? '—' }}</AppBadge>
+              </td>
+              <td class="px-4 py-3 text-center tabular-nums" :class="d.open_alerts_count > 0 ? 'text-amber-600 font-semibold' : 'text-slate-300'">
+                {{ d.open_alerts_count > 0 ? d.open_alerts_count : '—' }}
+              </td>
+              <td class="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{{ fmtDateTime(d.last_checkin_at) }}</td>
+            </tr>
+            <template #empty>
+              <EmptyState title="No scored devices yet." />
+            </template>
+          </AppTable>
+        </AppCard>
 
       </div>
 

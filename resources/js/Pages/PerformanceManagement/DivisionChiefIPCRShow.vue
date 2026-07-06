@@ -7,7 +7,7 @@ import AppBadge from "@/Components/AppBadge.vue";
 import AppModal from "@/Components/AppModal.vue";
 import AppInput from "@/Components/AppInput.vue";
 import AppTextarea from "@/Components/AppTextarea.vue";
-import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
+import { ArrowLeftIcon, DocumentTextIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import Swal from "sweetalert2";
 import { useSubmit } from "@/Composables/useSubmit";
@@ -611,8 +611,10 @@ const approveTargets = () => {
                           </p>
                           <button
                             v-if="piPlans[0].accomplishments_count > 0"
+                            type="button"
                             @click="openAccViewer(piPlans[0])"
-                            class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                            class="mt-1 inline-flex items-center gap-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                            <DocumentTextIcon class="w-3 h-3" />
                             {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
                           </button>
                           <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
@@ -656,11 +658,8 @@ const approveTargets = () => {
                         </td>
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <template v-if="['For Review', 'Submitted for Rating'].includes(ipcr.status)">
-                            <textarea v-model="planRemarks[piPlans[0].id]" rows="2"
-                              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                              placeholder="Add remark..."></textarea>
-                            <button @click="savePlanRemark(piPlans[0])" :disabled="isSubmitting"
-                              class="mt-1 inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
+                            <AppTextarea v-model="planRemarks[piPlans[0].id]" :rows="2" placeholder="Add remark..." />
+                            <AppButton size="sm" class="mt-1" :disabled="isSubmitting" @click="savePlanRemark(piPlans[0])">Save</AppButton>
                           </template>
                           <span v-else class="text-slate-600">{{ piPlans[0].pivot?.remarks ?? "—" }}</span>
                         </td>
@@ -681,8 +680,10 @@ const approveTargets = () => {
                           </p>
                           <button
                             v-if="plan.accomplishments_count > 0"
+                            type="button"
                             @click="openAccViewer(plan)"
-                            class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                            class="mt-1 inline-flex items-center gap-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                            <DocumentTextIcon class="w-3 h-3" />
                             {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
                           </button>
                           <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
@@ -722,11 +723,8 @@ const approveTargets = () => {
                         </td>
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <template v-if="['For Review', 'Submitted for Rating'].includes(ipcr.status)">
-                            <textarea v-model="planRemarks[plan.id]" rows="2"
-                              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                              placeholder="Add remark..."></textarea>
-                            <button @click="savePlanRemark(plan)" :disabled="isSubmitting"
-                              class="mt-1 inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
+                            <AppTextarea v-model="planRemarks[plan.id]" :rows="2" placeholder="Add remark..." />
+                            <AppButton size="sm" class="mt-1" :disabled="isSubmitting" @click="savePlanRemark(plan)">Save</AppButton>
                           </template>
                           <span v-else class="text-slate-600">{{ plan.pivot?.remarks ?? "—" }}</span>
                         </td>
@@ -742,30 +740,28 @@ const approveTargets = () => {
 
         <!-- Comments -->
         <div class="p-5 border-t border-slate-100">
-          <label class="block text-xs font-medium text-slate-600 mb-1">
-            Comments and Recommendations for Development Purposes:
-          </label>
-          <textarea
+          <AppTextarea
             v-model="divisionComments"
+            label="Comments and Recommendations for Development Purposes:"
             :readonly="!isEditing && divisionComments"
-            rows="2"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 mb-2"
+            :rows="2"
+            class="mb-2"
             placeholder="Add comments and suggestions for improvement..."
-          ></textarea>
+          />
           <div class="flex gap-2">
-            <button
+            <AppButton
               v-if="divisionComments && !isEditing && ipcr.status === 'Submitted for Rating'"
-              @click="isEditing = true"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              variant="secondary"
+              @click="isEditing = true">
               Edit
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               v-if="isEditing"
-              @click="saveDivisionComments"
+              :loading="isSubmitting"
               :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              @click="saveDivisionComments">
               {{ isSubmitting ? 'Saving…' : 'Save Comments' }}
-            </button>
+            </AppButton>
           </div>
         </div>
 
@@ -862,151 +858,87 @@ const approveTargets = () => {
       </div>
 
       <!-- Rate Accomplishment Modal -->
-      <Teleport to="body">
-        <div v-if="isModalOpen" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 class="text-base font-semibold text-slate-800">Rate Accomplishment</h3>
-              <button @click="isModalOpen = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <div class="px-6 py-5 space-y-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment</label>
-                <textarea v-model="form.accomplishment" rows="2"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">MOV Link</label>
-                <input type="text" v-model="form.mov_link"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              </div>
-              <div class="grid grid-cols-3 gap-3">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Quality</label>
-                  <input type="number" min="0" max="5" v-model="form.quality"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Efficiency</label>
-                  <input type="number" min="0" max="5" v-model="form.efficiency"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Timeliness</label>
-                  <input type="number" min="0" max="5" v-model="form.timeliness"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-              </div>
-              <div class="text-right text-sm font-semibold text-slate-700">Average: {{ liveAverage }}</div>
-            </div>
-            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-              <button @click="isModalOpen = false"
-                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-              <button @click="saveModal" :disabled="isSubmitting"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                {{ isSubmitting ? 'Saving…' : 'Save' }}
-              </button>
-            </div>
+      <AppModal :show="isModalOpen" title="Rate Accomplishment" @close="isModalOpen = false">
+        <div class="space-y-4">
+          <AppTextarea v-model="form.accomplishment" label="Accomplishment" :rows="2" />
+          <AppInput v-model="form.mov_link" label="MOV Link" type="text" />
+          <div class="grid grid-cols-3 gap-3">
+            <AppInput v-model="form.quality" label="Quality" type="number" min="0" max="5" />
+            <AppInput v-model="form.efficiency" label="Efficiency" type="number" min="0" max="5" />
+            <AppInput v-model="form.timeliness" label="Timeliness" type="number" min="0" max="5" />
           </div>
+          <div class="text-right text-sm font-semibold text-slate-700">Average: {{ liveAverage }}</div>
         </div>
-      </Teleport>
+        <template #footer>
+          <AppButton variant="secondary" @click="isModalOpen = false">Cancel</AppButton>
+          <AppButton :loading="isSubmitting" :disabled="isSubmitting" @click="saveModal">
+            {{ isSubmitting ? 'Saving…' : 'Save' }}
+          </AppButton>
+        </template>
+      </AppModal>
 
     </div>
 
     <!-- Return to Employee (from PMT) Modal -->
-    <Teleport to="body">
-      <div v-if="showReturnFromPMTModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">Return IPCR to Employee</h2>
-            <button @click="showReturnFromPMTModal = false; returnFromPMTRemarks = ''"
-              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-          <div class="px-6 py-5 space-y-4">
-            <p class="text-sm text-slate-500">
-              The PMT has requested a revision. Please provide remarks explaining what needs to be corrected.
-              The employee will need to re-submit their accomplishments.
-            </p>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                Remarks / Justification <span class="text-red-500">*</span>
-              </label>
-              <textarea
-                v-model="returnFromPMTRemarks"
-                rows="4"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                placeholder="Explain why the IPCR is being returned for revision..."
-              ></textarea>
-            </div>
-          </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click="showReturnFromPMTModal = false; returnFromPMTRemarks = ''"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button @click="confirmReturnFromPMT" :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-              {{ isSubmitting ? 'Processing…' : 'Return to Employee' }}
-            </button>
-          </div>
-        </div>
+    <AppModal
+      :show="showReturnFromPMTModal"
+      title="Return IPCR to Employee"
+      @close="showReturnFromPMTModal = false; returnFromPMTRemarks = ''"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-slate-500">
+          The PMT has requested a revision. Please provide remarks explaining what needs to be corrected.
+          The employee will need to re-submit their accomplishments.
+        </p>
+        <AppTextarea
+          v-model="returnFromPMTRemarks"
+          label="Remarks / Justification"
+          required
+          :rows="4"
+          placeholder="Explain why the IPCR is being returned for revision..."
+        />
       </div>
-    </Teleport>
+      <template #footer>
+        <AppButton variant="secondary" @click="showReturnFromPMTModal = false; returnFromPMTRemarks = ''">Cancel</AppButton>
+        <AppButton variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="confirmReturnFromPMT">
+          {{ isSubmitting ? 'Processing…' : 'Return to Employee' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- Accomplishments Viewer Modal -->
-    <Teleport to="body">
-      <div v-if="accViewerPlan"
-        class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
-        @click.self="closeAccViewer">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-semibold text-slate-800">Accomplishments</h2>
-              <p class="text-xs text-slate-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
-            </div>
-            <button @click="closeAccViewer"
-              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-
-          <div class="overflow-y-auto flex-1 px-6 py-5">
-            <div v-if="!accViewerPlan.accomplishments?.length"
-              class="py-16 text-center text-slate-400 text-sm">
-              No accomplishments logged for this plan.
-            </div>
-            <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
-              class="mb-4 pb-4 border-b border-slate-100 last:border-0">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700">
-                  {{ formatAccDate(acc.accomplishment_date) }}
-                </span>
-              </div>
-              <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
-              <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
-                <a v-for="photo in acc.photos" :key="photo.id"
-                  :href="photo.google_drive_link" target="_blank"
-                  class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
-                  {{ photo.file_name || 'Photo' }}
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-            <span class="text-xs text-slate-400">
-              {{ accViewerPlan.accomplishments_count }} accomplishment(s) total
-            </span>
-            <button @click="closeAccViewer"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              Close
-            </button>
-          </div>
+    <AppModal
+      :show="!!accViewerPlan"
+      title="Accomplishments"
+      :subtitle="accViewerPlan?.success_indicator"
+      size="2xl"
+      panel-class="max-h-[80vh]"
+      @close="closeAccViewer"
+    >
+      <div v-if="!accViewerPlan?.accomplishments?.length" class="py-16 text-center text-slate-400 text-sm">
+        No accomplishments logged for this plan.
+      </div>
+      <div v-for="acc in accViewerPlan?.accomplishments" :key="acc.id"
+        class="mb-4 pb-4 border-b border-slate-100 last:border-0">
+        <div class="flex items-center gap-2 mb-1">
+          <AppBadge color="indigo">{{ formatAccDate(acc.accomplishment_date) }}</AppBadge>
+        </div>
+        <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
+        <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
+          <a v-for="photo in acc.photos" :key="photo.id"
+            :href="photo.google_drive_link" target="_blank"
+            class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+            {{ photo.file_name || 'Photo' }}
+          </a>
         </div>
       </div>
-    </Teleport>
+      <template #footer>
+        <span class="mr-auto text-xs text-slate-400 self-center">
+          {{ accViewerPlan?.accomplishments_count }} accomplishment(s) total
+        </span>
+        <AppButton variant="secondary" @click="closeAccViewer">Close</AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

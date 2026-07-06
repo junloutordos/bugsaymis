@@ -14,6 +14,9 @@ import {
 import { ref, watch, computed } from 'vue'
 import Swal from 'sweetalert2'
 import AddressPicker from '@/Components/AddressPicker.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppCard from '@/Components/AppCard.vue'
 
 const passportPhotoUploading = ref(false)
 const passportPhotoError = ref(null)
@@ -497,31 +500,25 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
   <AdminLayout title="Personal Data Sheet">
     <div class="max-w-7xl mx-auto">
       <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Personal Data Sheet</h1>
-          <p class="text-sm text-slate-500">Manage your personal information for civil service records</p>
-        </div>
-        <div class="flex gap-2">
-          <button v-if="props.pds && !editMode" @click="editMode = true" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <AppPageHeader title="Personal Data Sheet" subtitle="Manage your personal information for civil service records">
+        <template #actions>
+          <AppButton v-if="props.pds && !editMode" variant="secondary" @click="editMode = true">
             <PencilSquareIcon class="h-4 w-4" />
             Edit PDS & WES
-          </button>
-          <button v-if="props.pds && !editMode" @click="exportPDS(props.pds.id)" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          </AppButton>
+          <AppButton v-if="props.pds && !editMode" variant="primary" @click="exportPDS(props.pds.id)">
             <DocumentArrowDownIcon class="h-4 w-4" />
             Export PDS XLSX
-          </button>
-          <a v-if="props.pds && !editMode"
-            :href="route('pds.wes.pdf', props.pds.id)"
-            target="_blank"
-            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          </AppButton>
+          <AppButton v-if="props.pds && !editMode" as="a" :href="route('pds.wes.pdf', props.pds.id)" target="_blank" variant="success">
             <DocumentArrowDownIcon class="h-4 w-4" />
             Export WES PDF
-          </a>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+      <AppCard :padded="false">
+        <div class="p-6">
 
         <!-- Tabs -->
         <div class="border-b border-slate-200 mb-6 flex gap-1">
@@ -1087,39 +1084,30 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         </h2>
 
         <!-- CSV Upload & Download (Only in Edit Mode) -->
-        <div v-if="editMode" class="mb-6 p-4 border-2 border-dashed border-emerald-300 rounded-xl bg-emerald-50 flex flex-col md:flex-row items-center gap-4">
+        <div v-if="editMode" class="mb-6 p-4 border-2 border-dashed border-success-500 rounded-xl bg-success-50 flex flex-col md:flex-row items-center gap-4">
 
           <!-- File Input -->
           <div class="flex-1">
-            <label class="block text-xs font-medium text-emerald-700 mb-1">Upload Trainings CSV</label>
+            <label class="block text-xs font-medium text-success-700 mb-1">Upload Trainings CSV</label>
             <input
               type="file"
               accept=".csv"
               @change="handleTrainingCSV"
-              class="block w-full text-sm text-emerald-900 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
+              class="block w-full text-sm text-success-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-success-600 file:text-white hover:file:bg-success-700"
             />
           </div>
 
           <!-- Buttons -->
           <div class="flex gap-2 mt-2 md:mt-0">
             <!-- Upload -->
-            <button
-              type="button"
-              @click="uploadTrainingCSV"
-              :disabled="isUploading"
-              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <AppButton type="button" variant="success" :loading="isUploading" :disabled="isUploading" @click="uploadTrainingCSV">
               {{ isUploading ? 'Uploading…' : 'Upload Trainings CSV' }}
-            </button>
+            </AppButton>
 
             <!-- Download Template -->
-            <a
-              :href="route('pds.trainings.download-template')"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-              download
-            >
+            <AppButton as="a" :href="route('pds.trainings.download-template')" variant="primary" download>
               Download Template
-            </a>
+            </AppButton>
           </div>
         </div>
 
@@ -1144,14 +1132,14 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
           <input v-model="train.conducted_by" placeholder="Conducted By" class="input" :readonly="!editMode" />
 
           <!-- Remove Row -->
-          <button v-if="editMode" @click="removeRow('trainings', index)" class="btn-icon h-10 w-10 bg-red-500 hover:bg-red-600 rounded flex items-center justify-center">
+          <button v-if="editMode" @click="removeRow('trainings', index)" class="btn-icon h-10 w-10 bg-danger-500 hover:bg-danger-600 rounded flex items-center justify-center">
             <TrashIcon class="h-5 w-5 text-white" />
           </button>
         </div>
 
         <!-- Add Row -->
         <div v-if="editMode" class="mt-2">
-          <button @click="addRow('trainings', emptyTraining())" class="btn-icon h-10 w-10 bg-green-500 hover:bg-green-600 rounded flex items-center justify-center">
+          <button @click="addRow('trainings', emptyTraining())" class="btn-icon h-10 w-10 bg-success-500 hover:bg-success-600 rounded flex items-center justify-center">
             <PlusIcon class="h-5 w-5 text-white" />
           </button>
         </div>
@@ -1588,7 +1576,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
               <label class="block text-xs font-medium text-slate-500 mb-1">Passport Photo</label>
               <input type="file" accept="image/*" :disabled="passportPhotoUploading" @change="e => uploadPassportPhoto(e.target.files[0])" class="input" />
               <p v-if="passportPhotoUploading" class="text-xs text-indigo-600 mt-1">Uploading…</p>
-              <p v-if="passportPhotoError" class="text-xs text-red-600 mt-1">{{ passportPhotoError }}</p>
+              <p v-if="passportPhotoError" class="text-xs text-danger-600 mt-1">{{ passportPhotoError }}</p>
             </div>
         </div>
 
@@ -1617,7 +1605,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
               <span class="text-sm font-semibold text-indigo-700">Entry #{{ wi + 1 }}</span>
               <button v-if="editMode"
                 @click="form.work_experience_sheets.splice(wi, 1)"
-                class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
+                class="p-1.5 rounded-lg hover:bg-danger-50 text-slate-300 hover:text-danger-500 transition-colors">
                 <TrashIcon class="h-4 w-4" />
               </button>
             </div>
@@ -1682,7 +1670,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
                   class="input flex-1" />
                 <button v-if="editMode && wes.accomplishments.length > 1"
                   @click="wes.accomplishments.splice(ai, 1)"
-                  class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500">
+                  class="p-1 rounded hover:bg-danger-50 text-slate-300 hover:text-danger-500">
                   <TrashIcon class="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -1704,7 +1692,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
                   class="input flex-1 resize-none text-sm"></textarea>
                 <button v-if="editMode && wes.summary_of_duties.length > 1"
                   @click="wes.summary_of_duties.splice(di, 1)"
-                  class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 mt-1">
+                  class="p-1 rounded hover:bg-danger-50 text-slate-300 hover:text-danger-500 mt-1">
                   <TrashIcon class="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -1737,12 +1725,13 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <!-- Submit -->
         <div v-if="editMode" class="pt-6 flex justify-end gap-2 border-t border-slate-100">
-          <button @click="submit" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          <AppButton variant="primary" size="lg" :loading="form.processing" :disabled="form.processing" @click="submit">
             {{ form.processing ? 'Saving…' : (props.pds ? 'Update PDS' : 'Save PDS') }}
-          </button>
+          </AppButton>
         </div>
 
-      </div>
+        </div>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>

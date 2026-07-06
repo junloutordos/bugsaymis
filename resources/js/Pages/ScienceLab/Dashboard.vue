@@ -1,6 +1,9 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 import {
   BeakerIcon, WrenchScrewdriverIcon, ClipboardDocumentCheckIcon,
   ExclamationTriangleIcon, ArchiveBoxIcon, CalendarDaysIcon,
@@ -37,15 +40,18 @@ const toneClass = {
   violet: 'bg-violet-50 text-violet-600',
   emerald: 'bg-emerald-50 text-emerald-600',
 }
+
+function calibrationBadgeColor(status) {
+  return status === 'overdue' ? 'red' : 'amber'
+}
 </script>
 
 <template>
   <Head title="Science Laboratory Management" />
   <AdminLayout title="Science Laboratory Management">
     <div class="space-y-6">
-      <p class="text-sm text-slate-500">
-        Manage science laboratories, equipment, reagents, maintenance, calibration, safety and waste — CIM 4.4.
-      </p>
+      <AppPageHeader title="Science Laboratory Management"
+        subtitle="Manage science laboratories, equipment, reagents, maintenance, calibration, safety and waste — CIM 4.4." />
 
       <!-- Stat tiles -->
       <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -65,31 +71,27 @@ const toneClass = {
 
       <div class="grid gap-6 lg:grid-cols-2">
         <!-- Calibration due -->
-        <section class="rounded-xl border border-slate-200 bg-white">
-          <header class="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <h2 class="text-sm font-semibold text-slate-700">Calibration Due / Overdue</h2>
+        <AppCard title="Calibration Due / Overdue" :padded="false">
+          <template #header>
             <Link :href="route('science-lab.calibration.index')" class="text-xs text-indigo-600 hover:underline">View all</Link>
-          </header>
+          </template>
           <ul class="divide-y divide-slate-50">
             <li v-for="c in calibrationDue" :key="c.id" class="flex items-center justify-between px-5 py-2.5 text-sm">
               <div>
                 <div class="font-medium text-slate-700">{{ c.equipment }}</div>
                 <div class="text-xs text-slate-400">{{ c.property_no || '—' }}</div>
               </div>
-              <span :class="['rounded-full px-2 py-0.5 text-xs font-medium', c.status === 'overdue' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600']">
-                {{ c.due_date }}
-              </span>
+              <AppBadge :color="calibrationBadgeColor(c.status)">{{ c.due_date }}</AppBadge>
             </li>
             <li v-if="!calibrationDue.length" class="px-5 py-6 text-center text-sm text-slate-400">Nothing due.</li>
           </ul>
-        </section>
+        </AppCard>
 
         <!-- Upcoming reservations -->
-        <section class="rounded-xl border border-slate-200 bg-white">
-          <header class="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <h2 class="text-sm font-semibold text-slate-700">Upcoming Laboratory Use</h2>
+        <AppCard title="Upcoming Laboratory Use" :padded="false">
+          <template #header>
             <Link :href="route('science-lab.reservations.index')" class="text-xs text-indigo-600 hover:underline">View all</Link>
-          </header>
+          </template>
           <ul class="divide-y divide-slate-50">
             <li v-for="r in upcoming" :key="r.id" class="flex items-center justify-between px-5 py-2.5 text-sm">
               <div>
@@ -102,11 +104,10 @@ const toneClass = {
             </li>
             <li v-if="!upcoming.length" class="px-5 py-6 text-center text-sm text-slate-400">No upcoming bookings.</li>
           </ul>
-        </section>
+        </AppCard>
 
         <!-- Low stock -->
-        <section class="rounded-xl border border-slate-200 bg-white">
-          <header class="border-b border-slate-100 px-5 py-3"><h2 class="text-sm font-semibold text-slate-700">Low Stock</h2></header>
+        <AppCard title="Low Stock" :padded="false">
           <ul class="divide-y divide-slate-50">
             <li v-for="s in lowStock" :key="s.id" class="flex items-center justify-between px-5 py-2.5 text-sm">
               <span class="text-slate-700">{{ s.name }}</span>
@@ -114,11 +115,10 @@ const toneClass = {
             </li>
             <li v-if="!lowStock.length" class="px-5 py-6 text-center text-sm text-slate-400">Stock levels healthy.</li>
           </ul>
-        </section>
+        </AppCard>
 
         <!-- Expiring reagents -->
-        <section class="rounded-xl border border-slate-200 bg-white">
-          <header class="border-b border-slate-100 px-5 py-3"><h2 class="text-sm font-semibold text-slate-700">Expiring Reagents (30d)</h2></header>
+        <AppCard title="Expiring Reagents (30d)" :padded="false">
           <ul class="divide-y divide-slate-50">
             <li v-for="e in expiringSoon" :key="e.id" class="flex items-center justify-between px-5 py-2.5 text-sm">
               <div>
@@ -129,7 +129,7 @@ const toneClass = {
             </li>
             <li v-if="!expiringSoon.length" class="px-5 py-6 text-center text-sm text-slate-400">Nothing expiring soon.</li>
           </ul>
-        </section>
+        </AppCard>
       </div>
     </div>
   </AdminLayout>

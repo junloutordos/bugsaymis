@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { Head, useForm, usePage } from '@inertiajs/vue3'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppButton from '@/Components/AppButton.vue'
 import { CheckBadgeIcon, ClipboardDocumentListIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -110,10 +113,10 @@ function submit() {
 
       <!-- Already evaluated -->
       <div v-if="alreadyEvaluated || flashSuccess"
-           class="bg-white rounded-2xl shadow-sm border border-green-200 p-8 text-center">
+           class="bg-white rounded-2xl shadow-sm border border-success-100 p-8 text-center">
         <div class="flex justify-center mb-4">
-          <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-            <CheckBadgeIcon class="w-9 h-9 text-green-600" />
+          <div class="w-16 h-16 rounded-full bg-success-100 flex items-center justify-center">
+            <CheckBadgeIcon class="w-9 h-9 text-success-600" />
           </div>
         </div>
         <h2 class="text-lg font-semibold text-slate-800 mb-1">Evaluation Submitted</h2>
@@ -127,13 +130,10 @@ function submit() {
 
         <!-- Evaluator name (optional) -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-5">
-          <label class="block text-sm font-medium text-slate-700 mb-1.5">
-            Name of Evaluator <span class="text-slate-400 font-normal">(Optional)</span>
-          </label>
-          <input v-model="form.evaluator_name"
-                 type="text"
-                 placeholder="Leave blank to stay anonymous"
-                 class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <AppInput v-model="form.evaluator_name"
+                    type="text"
+                    label="Name of Evaluator (Optional)"
+                    placeholder="Leave blank to stay anonymous" />
         </div>
 
         <!-- Section A -->
@@ -213,25 +213,15 @@ function submit() {
 
         <!-- Open-ended -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">Suggestions for Improvement</label>
-            <textarea v-model="form.suggestions" rows="3" placeholder="Your suggestions…"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">Other Comments</label>
-            <textarea v-model="form.other_comments" rows="3" placeholder="Any other comments…"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-          </div>
+          <AppTextarea v-model="form.suggestions" :rows="3" label="Suggestions for Improvement" placeholder="Your suggestions…" />
+          <AppTextarea v-model="form.other_comments" :rows="3" label="Other Comments" placeholder="Any other comments…" />
         </div>
 
         <!-- Submit -->
         <div class="flex justify-end pb-4">
-          <button type="submit"
-                  :disabled="form.processing"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors">
+          <AppButton type="submit" size="lg" :loading="form.processing" :disabled="form.processing">
             {{ form.processing ? 'Submitting…' : 'Submit Evaluation' }}
-          </button>
+          </AppButton>
         </div>
 
       </form>

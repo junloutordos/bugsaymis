@@ -2,16 +2,23 @@
 import { ref, computed, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
-  AcademicCapIcon,
   UserPlusIcon,
   MagnifyingGlassIcon,
   ArrowUpTrayIcon,
   XMarkIcon,
-  ChevronDownIcon,
-  FunnelIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon,
   UserGroupIcon,
 } from '@heroicons/vue/24/outline'
 import axios from 'axios'
@@ -323,15 +330,19 @@ function capacityColor(enrolled, capacity) {
   return 'text-slate-600'
 }
 
+function sectionCapacityBadge(section) {
+  return section.enrolled >= section.capacity ? 'red' : 'indigo'
+}
+
 function statusBadge(status) {
   const map = {
-    enrolled:        'bg-green-100 text-green-700',
-    dropped:         'bg-red-100 text-red-700',
-    transferred_out: 'bg-amber-100 text-amber-700',
-    on_leave:        'bg-blue-100 text-blue-700',
-    completed:       'bg-slate-100 text-slate-600',
+    enrolled:        'green',
+    dropped:         'red',
+    transferred_out: 'amber',
+    on_leave:        'blue',
+    completed:       'slate',
   }
-  return map[status] ?? 'bg-slate-100 text-slate-600'
+  return map[status] ?? 'slate'
 }
 
 function statusLabel(status) {
@@ -347,14 +358,14 @@ function statusLabel(status) {
 
 function clearanceBadge(status) {
   const map = {
-    cleared:             'bg-emerald-100 text-emerald-700',
-    ready_for_adviser:   'bg-indigo-100 text-indigo-700',
-    pending_registrar:   'bg-blue-100 text-blue-700',
-    with_accountability: 'bg-amber-100 text-amber-700',
-    in_progress:         'bg-slate-100 text-slate-600',
-    open:                'bg-slate-100 text-slate-600',
+    cleared:             'green',
+    ready_for_adviser:   'indigo',
+    pending_registrar:   'blue',
+    with_accountability: 'amber',
+    in_progress:         'slate',
+    open:                'slate',
   }
-  return map[status] ?? 'bg-slate-100 text-slate-500'
+  return map[status] ?? 'slate'
 }
 
 function clearanceLabel(status) {
@@ -365,120 +376,99 @@ function clearanceLabel(status) {
 <template>
   <Head title="Enrollment Management" />
   <AdminLayout title="Enrollment Management">
+    <div class="space-y-5">
 
-    <!-- Header bar -->
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-      <div class="flex items-center gap-2">
-        <AcademicCapIcon class="w-6 h-6 text-indigo-600" />
-        <h1 class="text-lg font-semibold text-slate-800">Enrollment Management</h1>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <!-- School year selector -->
-        <select
-          v-model="schoolYearId"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
-            {{ sy.name }}{{ sy.is_current ? ' (Current)' : '' }}
-          </option>
-        </select>
-
-        <!-- Enrollment periods link -->
-        <a
-          :href="route('registrar.enrollment-periods.index')"
-          class="text-sm text-indigo-600 hover:underline"
-        >Enrollment Periods</a>
-      </div>
-    </div>
-
-    <!-- Grade level tabs + enroll actions -->
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-200">
-      <div class="flex gap-1">
-        <button
-          v-for="grade in gradeLevels"
-          :key="grade"
-          @click="activeGrade = grade"
-          :class="[
-            'flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-            activeGrade === grade
-              ? 'bg-indigo-600 text-white'
-              : 'text-slate-600 hover:bg-slate-100'
-          ]"
-        >
-          Grade {{ grade }}
-          <span
-            v-if="pendingByGrade?.[grade]"
-            class="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5"
+      <AppPageHeader title="Enrollment Management">
+        <template #actions>
+          <!-- School year selector (FK-bound — native select) -->
+          <select
+            v-model="schoolYearId"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            {{ pendingByGrade[grade] }} pending
-          </span>
-        </button>
-      </div>
+            <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+              {{ sy.name }}{{ sy.is_current ? ' (Current)' : '' }}
+            </option>
+          </select>
 
-      <div class="flex items-center gap-2 pb-2">
-        <button
-          @click="openEnrollModal"
-          class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-        >
-          <UserPlusIcon class="w-4 h-4" />
-          Enroll Student
-        </button>
-        <button
-          @click="openBulkModal"
-          class="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium"
-        >
-          <ArrowUpTrayIcon class="w-4 h-4" />
-          Bulk Import
-        </button>
-      </div>
-    </div>
+          <!-- Enrollment periods link -->
+          <a
+            :href="route('registrar.enrollment-periods.index')"
+            class="text-sm text-indigo-600 hover:underline"
+          >Enrollment Periods</a>
+        </template>
+      </AppPageHeader>
 
-    <p class="text-xs text-slate-500 -mt-3 mb-5">
-      Enroll Student / Bulk Import add students to a grade level only. Once enrolled, place them into a
-      section using "Assign by Grade List" inside a section below.
-    </p>
-
-    <!-- Section cards grid -->
-    <div v-if="sectionsByGrade.length === 0" class="text-slate-500 text-sm py-8 text-center">
-      No sections found for Grade {{ activeGrade }} in this school year.
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-      <button
-        v-for="section in sectionsByGrade"
-        :key="section.id"
-        @click="openSection(section)"
-        class="text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-indigo-400 hover:shadow-sm transition-all"
-      >
-        <div class="flex items-start justify-between">
-          <div>
-            <p class="font-semibold text-slate-800 text-sm">{{ section.name }}</p>
-            <p class="text-xs text-slate-500 mt-0.5">{{ GRADE_LABELS[section.grade_level] }}</p>
-          </div>
-          <!-- Capacity indicator -->
-          <span
+      <!-- Grade level tabs + enroll actions -->
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
+        <div class="flex gap-1">
+          <button
+            v-for="grade in gradeLevels"
+            :key="grade"
+            @click="activeGrade = grade"
             :class="[
-              'text-xs font-medium px-2 py-0.5 rounded-full',
-              section.enrolled >= section.capacity
-                ? 'bg-red-100 text-red-700'
-                : 'bg-indigo-50 text-indigo-700'
+              'flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
+              activeGrade === grade
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-600 hover:bg-slate-100'
             ]"
           >
-            {{ section.enrolled }}/{{ section.capacity }}
-          </span>
+            Grade {{ grade }}
+            <AppBadge v-if="pendingByGrade?.[grade]" color="amber">{{ pendingByGrade[grade] }} pending</AppBadge>
+          </button>
         </div>
 
-        <div class="mt-3 flex items-center gap-4 text-xs text-slate-500">
-          <span>Adviser: {{ section.adviser_name ?? '—' }}</span>
+        <div class="flex items-center gap-2 pb-2">
+          <AppButton size="sm" @click="openEnrollModal">
+            <UserPlusIcon class="w-4 h-4" />
+            Enroll Student
+          </AppButton>
+          <AppButton size="sm" variant="secondary" @click="openBulkModal">
+            <ArrowUpTrayIcon class="w-4 h-4" />
+            Bulk Import
+          </AppButton>
         </div>
+      </div>
 
-        <div class="mt-2 flex items-center gap-3 text-xs">
-          <span class="text-green-700">{{ section.enrolled }} enrolled</span>
-          <span v-if="section.dropped > 0" class="text-red-600">{{ section.dropped }} dropped</span>
-          <span v-if="section.transferred > 0" class="text-amber-600">{{ section.transferred }} transferred</span>
-        </div>
-      </button>
+      <p class="text-xs text-slate-500 -mt-2">
+        Enroll Student / Bulk Import add students to a grade level only. Once enrolled, place them into a
+        section using "Assign by Grade List" inside a section below.
+      </p>
+
+      <!-- Section cards grid -->
+      <EmptyState
+        v-if="sectionsByGrade.length === 0"
+        title="No sections found"
+        :subtitle="`No sections found for Grade ${activeGrade} in this school year.`"
+      />
+
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <button
+          v-for="section in sectionsByGrade"
+          :key="section.id"
+          @click="openSection(section)"
+          class="text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-indigo-400 hover:shadow-sm transition-all"
+        >
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="font-semibold text-slate-800 text-sm">{{ section.name }}</p>
+              <p class="text-xs text-slate-500 mt-0.5">{{ GRADE_LABELS[section.grade_level] }}</p>
+            </div>
+            <!-- Capacity indicator -->
+            <AppBadge :color="sectionCapacityBadge(section)">{{ section.enrolled }}/{{ section.capacity }}</AppBadge>
+          </div>
+
+          <div class="mt-3 flex items-center gap-4 text-xs text-slate-500">
+            <span>Adviser: {{ section.adviser_name ?? '—' }}</span>
+          </div>
+
+          <div class="mt-2 flex items-center gap-3 text-xs">
+            <span class="text-green-700">{{ section.enrolled }} enrolled</span>
+            <span v-if="section.dropped > 0" class="text-red-600">{{ section.dropped }} dropped</span>
+            <span v-if="section.transferred > 0" class="text-amber-600">{{ section.transferred }} transferred</span>
+          </div>
+        </button>
+      </div>
+
     </div>
 
     <!-- ── Section detail side panel ─────────────────────────────────────────── -->
@@ -501,54 +491,41 @@ function clearanceLabel(status) {
               <p class="text-xs text-slate-500">{{ GRADE_LABELS[selectedSection.grade_level] }} · {{ selectedSection.enrolled }}/{{ selectedSection.capacity }} enrolled</p>
             </div>
             <div class="flex items-center gap-2">
-              <button
-                @click="openAssignModal"
-                class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-              >
+              <AppButton size="sm" @click="openAssignModal">
                 <UserGroupIcon class="w-4 h-4" />
                 Assign by Grade List
-              </button>
-              <button @click="closeSection" class="p-1 rounded-lg hover:bg-slate-100">
-                <XMarkIcon class="w-5 h-5 text-slate-500" />
-              </button>
+              </AppButton>
+              <AppIconButton label="Close" @click="closeSection">
+                <XMarkIcon class="h-5 w-5" />
+              </AppIconButton>
             </div>
           </div>
 
           <!-- Filters -->
-          <div class="flex items-center gap-3 px-6 py-3 border-b border-slate-100">
-            <div class="relative flex-1">
-              <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                v-model="studentSearch"
-                type="text"
-                placeholder="Search by name, PISAY ID, or LRN…"
-                class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <select
-              v-model="studentFilter"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="all">All statuses</option>
-              <option value="enrolled">Enrolled</option>
-              <option value="dropped">Dropped</option>
-              <option value="transferred_out">Transferred Out</option>
-              <option value="on_leave">On Leave</option>
-            </select>
+          <div class="px-6 pt-3">
+            <AppFilterBar>
+              <div class="relative flex-1 min-w-[220px]">
+                <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+                <AppInput
+                  v-model="studentSearch"
+                  placeholder="Search by name, PISAY ID, or LRN…"
+                  class="[&_input]:pl-9"
+                />
+              </div>
+              <AppSelect v-model="studentFilter" :show-blank="false" class="min-w-[170px]">
+                <option value="all">All statuses</option>
+                <option value="enrolled">Enrolled</option>
+                <option value="dropped">Dropped</option>
+                <option value="transferred_out">Transferred Out</option>
+                <option value="on_leave">On Leave</option>
+              </AppSelect>
+            </AppFilterBar>
           </div>
 
           <!-- Students list -->
-          <div class="flex-1 overflow-y-auto">
-            <div v-if="loadingStudents" class="flex justify-center py-12 text-slate-400 text-sm">
-              Loading students…
-            </div>
-
-            <div v-else-if="filteredStudents.length === 0" class="flex justify-center py-12 text-slate-400 text-sm">
-              No students found.
-            </div>
-
-            <table v-else class="min-w-full text-sm">
-              <thead class="sticky top-0 bg-slate-50 border-b border-slate-200">
+          <div class="flex-1 overflow-y-auto px-6 pb-6">
+            <AppTable :loading="loadingStudents" :is-empty="filteredStudents.length === 0" :skeleton-cols="7" :card="false">
+              <template #head>
                 <tr>
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
@@ -558,415 +535,309 @@ function clearanceLabel(status) {
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Clearance</th>
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                 </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                <tr
-                  v-for="(s, idx) in filteredStudents"
-                  :key="s.id"
-                  class="hover:bg-slate-50"
-                >
-                  <td class="px-4 py-2 text-slate-400 tabular-nums">{{ idx + 1 }}</td>
-                  <td class="px-4 py-2 font-medium text-slate-800">{{ s.full_name }}</td>
-                  <td class="px-4 py-2 text-slate-500 tabular-nums">{{ s.pisays_id ?? '—' }}</td>
-                  <td class="px-4 py-2 text-slate-500 capitalize">{{ s.enrollment_type }}</td>
-                  <td class="px-4 py-2">
-                    <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', statusBadge(s.status)]">
-                      {{ statusLabel(s.status) }}
-                    </span>
-                  </td>
-                  <td class="px-4 py-2">
-                    <span :class="['text-xs px-2 py-0.5 rounded-full font-medium capitalize', clearanceBadge(s.clearance_status)]">
-                      {{ clearanceLabel(s.clearance_status) }}
-                    </span>
-                    <p v-if="s.clearance_progress" class="mt-1 text-[11px] text-slate-400">
-                      {{ s.clearance_progress.done }}/{{ s.clearance_progress.total }} signed
-                    </p>
-                  </td>
-                  <td class="px-4 py-2">
-                    <button
-                      @click="openEditStatus(s)"
-                      class="text-xs text-indigo-600 hover:underline"
-                    >Edit</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+              </template>
+
+              <tr
+                v-for="(s, idx) in filteredStudents"
+                :key="s.id"
+                class="hover:bg-slate-50"
+              >
+                <td class="px-4 py-2 text-slate-400 tabular-nums">{{ idx + 1 }}</td>
+                <td class="px-4 py-2 font-medium text-slate-800">{{ s.full_name }}</td>
+                <td class="px-4 py-2 text-slate-500 tabular-nums">{{ s.pisays_id ?? '—' }}</td>
+                <td class="px-4 py-2 text-slate-500 capitalize">{{ s.enrollment_type }}</td>
+                <td class="px-4 py-2">
+                  <AppBadge :color="statusBadge(s.status)">{{ statusLabel(s.status) }}</AppBadge>
+                </td>
+                <td class="px-4 py-2">
+                  <AppBadge :color="clearanceBadge(s.clearance_status)" class="capitalize">{{ clearanceLabel(s.clearance_status) }}</AppBadge>
+                  <p v-if="s.clearance_progress" class="mt-1 text-[11px] text-slate-400">
+                    {{ s.clearance_progress.done }}/{{ s.clearance_progress.total }} signed
+                  </p>
+                </td>
+                <td class="px-4 py-2">
+                  <button
+                    @click="openEditStatus(s)"
+                    class="text-xs text-indigo-600 hover:underline"
+                  >Edit</button>
+                </td>
+              </tr>
+
+              <template #empty>
+                <EmptyState title="No students found" />
+              </template>
+            </AppTable>
           </div>
         </div>
       </div>
     </Teleport>
 
     <!-- ── Enroll student modal ───────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div
-        v-if="showEnrollModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div class="absolute inset-0 bg-black/40" @click="showEnrollModal = false" />
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-          <h3 class="font-semibold text-slate-800 mb-1">Enroll Student</h3>
-          <p class="text-xs text-slate-500 mb-4">
-            Adds the student to this school year. Section is assigned separately afterward.
-          </p>
+    <AppModal
+      :show="showEnrollModal"
+      title="Enroll Student"
+      subtitle="Adds the student to this school year. Section is assigned separately afterward."
+      size="md"
+      @close="showEnrollModal = false"
+    >
+      <div class="space-y-4">
 
-          <form @submit.prevent="submitEnroll" class="space-y-4">
-
-            <!-- Grade level -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
-              <select
-                v-model.number="enrollForm.grade_level"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option v-for="grade in gradeLevels" :key="grade" :value="grade">Grade {{ grade }}</option>
-              </select>
-            </div>
-
-            <!-- Student search -->
-            <div class="relative">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Search Student</label>
-              <div class="relative">
-                <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  v-model="studentQuery"
-                  type="text"
-                  placeholder="Name, PISAY ID, or LRN…"
-                  class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  autocomplete="off"
-                />
-              </div>
-              <!-- Dropdown results -->
-              <div
-                v-if="studentResults.length > 0"
-                class="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
-              >
-                <button
-                  v-for="s in studentResults"
-                  :key="s.id"
-                  type="button"
-                  @click="selectStudent(s)"
-                  class="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50"
-                >
-                  <span class="font-medium text-slate-800">{{ s.full_name }}</span>
-                  <span class="text-slate-400 ml-2 text-xs">{{ s.pisays_id }}</span>
-                </button>
-              </div>
-              <p v-if="enrollForm.errors.student_id" class="text-xs text-red-600 mt-1">{{ enrollForm.errors.student_id }}</p>
-            </div>
-
-            <!-- Selected student card -->
-            <div v-if="selectedStudent" class="bg-indigo-50 rounded-lg p-3 text-sm">
-              <p class="font-medium text-indigo-800">{{ selectedStudent.full_name }}</p>
-              <p class="text-indigo-600 text-xs mt-0.5">PISAY ID: {{ selectedStudent.pisays_id ?? '—' }} · LRN: {{ selectedStudent.lrn ?? '—' }}</p>
-            </div>
-
-            <!-- Enrollment type -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Enrollment Type</label>
-              <select
-                v-model="enrollForm.enrollment_type"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="new">New</option>
-                <option value="returning">Returning</option>
-                <option value="transferee">Transferee</option>
-                <option value="returnee">Returnee</option>
-              </select>
-            </div>
-
-            <!-- Enrollment date -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Enrollment Date</label>
-              <input
-                v-model="enrollForm.enrollment_date"
-                type="date"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <p v-if="enrollForm.errors.enrollment_date" class="text-xs text-red-600 mt-1">{{ enrollForm.errors.enrollment_date }}</p>
-            </div>
-
-            <!-- Notes -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Notes <span class="text-slate-400">(optional)</span></label>
-              <textarea
-                v-model="enrollForm.notes"
-                rows="2"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Scholarship status, special conditions, etc."
-              />
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                @click="showEnrollModal = false"
-                class="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50"
-              >Cancel</button>
-              <button
-                type="submit"
-                :disabled="!enrollForm.student_id || enrollForm.processing"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
-              >
-                {{ enrollForm.processing ? 'Enrolling…' : 'Enroll' }}
-              </button>
-            </div>
-          </form>
+        <!-- Grade level (native — plain integer enum, not FK) -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
+          <select
+            v-model.number="enrollForm.grade_level"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option v-for="grade in gradeLevels" :key="grade" :value="grade">Grade {{ grade }}</option>
+          </select>
         </div>
+
+        <!-- Student search -->
+        <div class="relative">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Search Student</label>
+          <div class="relative">
+            <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+            <AppInput
+              v-model="studentQuery"
+              placeholder="Name, PISAY ID, or LRN…"
+              autocomplete="off"
+              class="[&_input]:pl-9"
+            />
+          </div>
+          <!-- Dropdown results -->
+          <div
+            v-if="studentResults.length > 0"
+            class="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
+          >
+            <button
+              v-for="s in studentResults"
+              :key="s.id"
+              type="button"
+              @click="selectStudent(s)"
+              class="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50"
+            >
+              <span class="font-medium text-slate-800">{{ s.full_name }}</span>
+              <span class="text-slate-400 ml-2 text-xs">{{ s.pisays_id }}</span>
+            </button>
+          </div>
+          <p v-if="enrollForm.errors.student_id" class="text-xs text-danger-600 mt-1">{{ enrollForm.errors.student_id }}</p>
+        </div>
+
+        <!-- Selected student card -->
+        <div v-if="selectedStudent" class="bg-indigo-50 rounded-lg p-3 text-sm">
+          <p class="font-medium text-indigo-800">{{ selectedStudent.full_name }}</p>
+          <p class="text-indigo-600 text-xs mt-0.5">PISAY ID: {{ selectedStudent.pisays_id ?? '—' }} · LRN: {{ selectedStudent.lrn ?? '—' }}</p>
+        </div>
+
+        <!-- Enrollment type -->
+        <AppSelect v-model="enrollForm.enrollment_type" label="Enrollment Type" :show-blank="false">
+          <option value="new">New</option>
+          <option value="returning">Returning</option>
+          <option value="transferee">Transferee</option>
+          <option value="returnee">Returnee</option>
+        </AppSelect>
+
+        <!-- Enrollment date -->
+        <AppInput
+          v-model="enrollForm.enrollment_date"
+          type="date"
+          label="Enrollment Date"
+          :error="enrollForm.errors.enrollment_date"
+        />
+
+        <!-- Notes -->
+        <AppTextarea
+          v-model="enrollForm.notes"
+          label="Notes (optional)"
+          :rows="2"
+          placeholder="Scholarship status, special conditions, etc."
+        />
       </div>
-    </Teleport>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="showEnrollModal = false">Cancel</AppButton>
+        <AppButton
+          :disabled="!enrollForm.student_id"
+          :loading="enrollForm.processing"
+          @click="submitEnroll"
+        >{{ enrollForm.processing ? 'Enrolling…' : 'Enroll' }}</AppButton>
+      </template>
+    </AppModal>
 
     <!-- ── Assign by grade list modal (checkbox picker) ───────────────────────── -->
-    <Teleport to="body">
-      <div
-        v-if="showAssignModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div class="absolute inset-0 bg-black/40" @click="showAssignModal = false" />
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
-
-          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <h3 class="font-semibold text-slate-800">Assign by Grade List — {{ selectedSection?.name }}</h3>
-              <p class="text-xs text-slate-500 mt-0.5">
-                Students awaiting section placement for Grade {{ selectedSection?.grade_level }}.
-              </p>
-            </div>
-            <button @click="showAssignModal = false" class="p-1 rounded-lg hover:bg-slate-100">
-              <XMarkIcon class="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
-
-          <!-- Filter + select-all -->
-          <div class="flex items-center gap-3 px-6 py-3 border-b border-slate-100">
-            <div class="relative flex-1">
-              <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                v-model="assignSearch"
-                type="text"
-                placeholder="Filter by name, PISAY ID, or LRN…"
-                class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <button
-              type="button"
-              @click="toggleSelectAllAssign"
-              class="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap"
-            >
-              {{ selectedAssignIds.size === filteredUnassigned.length && filteredUnassigned.length > 0 ? 'Clear all' : 'Select all' }}
-            </button>
-          </div>
-
-          <!-- Error -->
-          <div v-if="assignError" class="px-6 pt-3 text-xs text-red-600">{{ assignError }}</div>
-
-          <!-- List -->
-          <div class="flex-1 overflow-y-auto px-6 py-2">
-            <div v-if="loadingUnassigned" class="flex justify-center py-10 text-slate-400 text-sm">
-              Loading students…
-            </div>
-            <div v-else-if="filteredUnassigned.length === 0" class="flex flex-col items-center gap-1 py-10 text-center text-sm">
-              <p class="text-slate-400">No students are currently pending placement for Grade {{ selectedSection?.grade_level }}.</p>
-              <p class="text-xs text-slate-400 max-w-md">
-                Students appear here once they're enrolled — either via an approved enrollment application, or
-                manually using "Enroll Student" / "Bulk Import" above.
-              </p>
-            </div>
-            <label
-              v-for="s in filteredUnassigned"
-              :key="s.enrollment_id"
-              class="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                :checked="selectedAssignIds.has(s.enrollment_id)"
-                @change="toggleAssign(s.enrollment_id)"
-                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-slate-800">{{ s.full_name }}</p>
-                <p class="text-xs text-slate-500">
-                  {{ s.pisays_id ?? '—' }}
-                  <span v-if="s.sex" class="mx-1">·</span>
-                  {{ s.sex }}
-                </p>
-              </div>
-              <span class="text-xs text-slate-400 capitalize">{{ s.enrollment_type }}</span>
-            </label>
-          </div>
-
-          <!-- Footer -->
-          <div class="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
-            <span class="text-xs text-slate-500">
-              {{ selectedAssignIds.size }} selected · {{ remainingCapacity }} slot(s) remaining
-            </span>
-            <div class="flex gap-2">
-              <button
-                type="button"
-                @click="showAssignModal = false"
-                class="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50"
-              >Cancel</button>
-              <button
-                type="button"
-                @click="submitAssign"
-                :disabled="selectedAssignIds.size === 0 || assigning"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
-              >
-                {{ assigning ? 'Assigning…' : `Assign ${selectedAssignIds.size} Student(s)` }}
-              </button>
-            </div>
-          </div>
-
+    <AppModal
+      :show="showAssignModal"
+      :title="`Assign by Grade List — ${selectedSection?.name ?? ''}`"
+      :subtitle="`Students awaiting section placement for Grade ${selectedSection?.grade_level ?? ''}.`"
+      size="2xl"
+      body-class="px-6 py-4"
+      @close="showAssignModal = false"
+    >
+      <AppFilterBar>
+        <div class="relative flex-1 min-w-[220px]">
+          <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+          <AppInput
+            v-model="assignSearch"
+            placeholder="Filter by name, PISAY ID, or LRN…"
+            class="[&_input]:pl-9"
+          />
         </div>
+        <template #actions>
+          <button
+            type="button"
+            @click="toggleSelectAllAssign"
+            class="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap"
+          >
+            {{ selectedAssignIds.size === filteredUnassigned.length && filteredUnassigned.length > 0 ? 'Clear all' : 'Select all' }}
+          </button>
+        </template>
+      </AppFilterBar>
+
+      <!-- Error -->
+      <p v-if="assignError" class="text-xs text-danger-600 mb-2">{{ assignError }}</p>
+
+      <!-- List -->
+      <div class="max-h-96 overflow-y-auto">
+        <div v-if="loadingUnassigned" class="flex justify-center py-10 text-slate-400 text-sm">
+          Loading students…
+        </div>
+        <EmptyState
+          v-else-if="filteredUnassigned.length === 0"
+          :title="`No students pending placement for Grade ${selectedSection?.grade_level}`"
+          subtitle="Students appear here once they're enrolled — either via an approved enrollment application, or manually using &quot;Enroll Student&quot; / &quot;Bulk Import&quot; above."
+        />
+        <label
+          v-for="s in filteredUnassigned"
+          :key="s.enrollment_id"
+          class="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+        >
+          <input
+            type="checkbox"
+            :checked="selectedAssignIds.has(s.enrollment_id)"
+            @change="toggleAssign(s.enrollment_id)"
+            class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-slate-800">{{ s.full_name }}</p>
+            <p class="text-xs text-slate-500">
+              {{ s.pisays_id ?? '—' }}
+              <span v-if="s.sex" class="mx-1">·</span>
+              {{ s.sex }}
+            </p>
+          </div>
+          <span class="text-xs text-slate-400 capitalize">{{ s.enrollment_type }}</span>
+        </label>
       </div>
-    </Teleport>
+
+      <template #footer>
+        <div class="flex items-center justify-between w-full">
+          <span class="text-xs text-slate-500">
+            {{ selectedAssignIds.size }} selected · {{ remainingCapacity }} slot(s) remaining
+          </span>
+          <div class="flex gap-2">
+            <AppButton variant="secondary" @click="showAssignModal = false">Cancel</AppButton>
+            <AppButton
+              :disabled="selectedAssignIds.size === 0"
+              :loading="assigning"
+              @click="submitAssign"
+            >{{ assigning ? 'Assigning…' : `Assign ${selectedAssignIds.size} Student(s)` }}</AppButton>
+          </div>
+        </div>
+      </template>
+    </AppModal>
 
     <!-- ── Bulk import modal ──────────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div
-        v-if="showBulkModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div class="absolute inset-0 bg-black/40" @click="showBulkModal = false" />
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
-          <h3 class="font-semibold text-slate-800 mb-1">Bulk Enroll</h3>
-          <p class="text-xs text-slate-500 mb-4">
-            Paste PISAY IDs separated by commas, semicolons, or new lines (max 200). Adds students to this
-            school year — section is assigned separately afterward.
-          </p>
+    <AppModal
+      :show="showBulkModal"
+      title="Bulk Enroll"
+      subtitle="Paste PISAY IDs separated by commas, semicolons, or new lines (max 200). Adds students to this school year — section is assigned separately afterward."
+      size="lg"
+      @close="showBulkModal = false"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-medium text-slate-600">PISAY IDs</label>
+          <button
+            type="button"
+            @click="loadContinuingStudents"
+            :disabled="loadingContinuing"
+            class="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50"
+          >
+            <UserGroupIcon class="w-3.5 h-3.5" />
+            {{ loadingContinuing ? 'Loading…' : `Load Continuing Students (Grade ${bulkForm.grade_level})` }}
+          </button>
+        </div>
+        <!-- Native textarea kept for the monospace CSV-paste styling (AppTextarea can't forward `font-mono` to the inner element) -->
+        <textarea
+          v-model="bulkCsvText"
+          rows="6"
+          placeholder="20240001&#10;20240002&#10;20240003"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
 
-          <form @submit.prevent="submitBulk" class="space-y-4">
-            <div class="flex items-center justify-between">
-              <label class="block text-xs font-medium text-slate-600">PISAY IDs</label>
-              <button
-                type="button"
-                @click="loadContinuingStudents"
-                :disabled="loadingContinuing"
-                class="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50"
-              >
-                <UserGroupIcon class="w-3.5 h-3.5" />
-                {{ loadingContinuing ? 'Loading…' : `Load Continuing Students (Grade ${bulkForm.grade_level})` }}
-              </button>
-            </div>
-            <textarea
-              v-model="bulkCsvText"
-              rows="6"
-              placeholder="20240001&#10;20240002&#10;20240003"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+        <div class="flex items-center gap-3">
+          <AppButton size="sm" variant="secondary" @click="parseBulkCsv">Preview ({{ bulkParsed.length }})</AppButton>
+          <span v-if="bulkParseError" class="text-xs text-danger-600">{{ bulkParseError }}</span>
+          <span v-else-if="bulkParsed.length > 0" class="text-xs text-success-600 flex items-center gap-1">
+            <CheckCircleIcon class="w-4 h-4" /> {{ bulkParsed.length }} IDs parsed
+          </span>
+        </div>
 
-            <div class="flex items-center gap-3">
-              <button
-                type="button"
-                @click="parseBulkCsv"
-                class="px-3 py-1.5 rounded-lg text-sm border border-slate-200 hover:bg-slate-50 text-slate-700"
-              >Preview ({{ bulkParsed.length }})</button>
-              <span v-if="bulkParseError" class="text-xs text-red-600">{{ bulkParseError }}</span>
-              <span v-else-if="bulkParsed.length > 0" class="text-xs text-green-600 flex items-center gap-1">
-                <CheckCircleIcon class="w-4 h-4" /> {{ bulkParsed.length }} IDs parsed
-              </span>
-            </div>
-
-            <div class="grid grid-cols-3 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
-                <select
-                  v-model.number="bulkForm.grade_level"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option v-for="grade in gradeLevels" :key="grade" :value="grade">Grade {{ grade }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Enrollment Type</label>
-                <select
-                  v-model="bulkForm.enrollment_type"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="new">New</option>
-                  <option value="returning">Returning</option>
-                  <option value="transferee">Transferee</option>
-                  <option value="returnee">Returnee</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Enrollment Date</label>
-                <input
-                  v-model="bulkForm.enrollment_date"
-                  type="date"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                @click="showBulkModal = false"
-                class="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50"
-              >Cancel</button>
-              <button
-                type="submit"
-                :disabled="bulkParsed.length === 0 || bulkForm.processing"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
-              >
-                {{ bulkForm.processing ? 'Enrolling…' : `Enroll ${bulkParsed.length} Students` }}
-              </button>
-            </div>
-          </form>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
+            <select
+              v-model.number="bulkForm.grade_level"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option v-for="grade in gradeLevels" :key="grade" :value="grade">Grade {{ grade }}</option>
+            </select>
+          </div>
+          <AppSelect v-model="bulkForm.enrollment_type" label="Enrollment Type" :show-blank="false">
+            <option value="new">New</option>
+            <option value="returning">Returning</option>
+            <option value="transferee">Transferee</option>
+            <option value="returnee">Returnee</option>
+          </AppSelect>
+          <AppInput v-model="bulkForm.enrollment_date" type="date" label="Enrollment Date" />
         </div>
       </div>
-    </Teleport>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="showBulkModal = false">Cancel</AppButton>
+        <AppButton
+          :disabled="bulkParsed.length === 0"
+          :loading="bulkForm.processing"
+          @click="submitBulk"
+        >{{ bulkForm.processing ? 'Enrolling…' : `Enroll ${bulkParsed.length} Students` }}</AppButton>
+      </template>
+    </AppModal>
 
     <!-- ── Edit enrollment status modal ──────────────────────────────────────── -->
-    <Teleport to="body">
-      <div
-        v-if="editingEnrollment"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div class="absolute inset-0 bg-black/40" @click="editingEnrollment = null" />
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
-          <h3 class="font-semibold text-slate-800 mb-4">Update Enrollment</h3>
-          <p class="text-sm text-slate-600 mb-4">{{ editingEnrollment.full_name }}</p>
+    <AppModal
+      :show="!!editingEnrollment"
+      title="Update Enrollment"
+      :subtitle="editingEnrollment?.full_name"
+      size="sm"
+      @close="editingEnrollment = null"
+    >
+      <div class="space-y-4">
+        <AppSelect v-model="statusForm.status" label="Status" :show-blank="false">
+          <option value="enrolled">Enrolled</option>
+          <option value="dropped">Dropped</option>
+          <option value="transferred_out">Transferred Out</option>
+          <option value="on_leave">On Leave</option>
+        </AppSelect>
 
-          <form @submit.prevent="submitStatus" class="space-y-4">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <select
-                v-model="statusForm.status"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="enrolled">Enrolled</option>
-                <option value="dropped">Dropped</option>
-                <option value="transferred_out">Transferred Out</option>
-                <option value="on_leave">On Leave</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Notes</label>
-              <textarea
-                v-model="statusForm.notes"
-                rows="2"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                @click="editingEnrollment = null"
-                class="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50"
-              >Cancel</button>
-              <button
-                type="submit"
-                :disabled="statusForm.processing"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
-              >Save</button>
-            </div>
-          </form>
-        </div>
+        <AppTextarea v-model="statusForm.notes" label="Notes" :rows="2" />
       </div>
-    </Teleport>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="editingEnrollment = null">Cancel</AppButton>
+        <AppButton :loading="statusForm.processing" @click="submitStatus">Save</AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

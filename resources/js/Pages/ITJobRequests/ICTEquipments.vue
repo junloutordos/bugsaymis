@@ -29,6 +29,18 @@ import {
   MagnifyingGlassIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
+import AppPageHeader from "@/Components/AppPageHeader.vue"
+import AppButton from "@/Components/AppButton.vue"
+import AppIconButton from "@/Components/AppIconButton.vue"
+import AppBadge from "@/Components/AppBadge.vue"
+import AppFilterBar from "@/Components/AppFilterBar.vue"
+import AppInput from "@/Components/AppInput.vue"
+import AppSelect from "@/Components/AppSelect.vue"
+import AppTextarea from "@/Components/AppTextarea.vue"
+import AppTable from "@/Components/AppTable.vue"
+import AppModal from "@/Components/AppModal.vue"
+import EmptyState from "@/Components/EmptyState.vue"
+import PaginationControl from "@/Components/PaginationControl.vue"
 
 // Props from backend
 const props = defineProps({
@@ -491,6 +503,17 @@ const goToPage = (pageNum) => {
   })
 }
 
+const EQUIPMENT_STATUS_BADGE_COLORS = {
+  'Good Working': 'green',
+  'For Repair': 'amber',
+  'Disposed': 'red',
+  'Pending Setup': 'orange',
+}
+
+function equipmentStatusBadgeColor(status) {
+  return EQUIPMENT_STATUS_BADGE_COLORS[status] ?? 'slate'
+}
+
 const visibleEquipments = computed(() => props.equipments?.data ?? [])
 const currentPage       = computed(() => props.equipments?.current_page ?? 1)
 const totalPages        = computed(() => props.equipments?.last_page ?? 1)
@@ -505,106 +528,87 @@ const showAllChecked    = computed({
   <AdminLayout title="ICT Equipment Inventory">
     <div>
       <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">ICT Equipment Inventory</h1>
-        <div class="flex items-center gap-2">
-          <button
-            @click="generateEnrollmentToken"
-            :disabled="isGeneratingToken"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-          >
+      <AppPageHeader title="ICT Equipment Inventory">
+        <template #actions>
+          <AppButton variant="secondary" @click="generateEnrollmentToken" :disabled="isGeneratingToken">
             <KeyIcon class="w-4 h-4" /> Generate Enrollment Token
-          </button>
-          <button
-            @click="switchEnrollmentMode('bulk'); showEnrollmentModal = true; loadOutstandingTokens()"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >
+          </AppButton>
+          <AppButton variant="secondary" @click="switchEnrollmentMode('bulk'); showEnrollmentModal = true; loadOutstandingTokens()">
             <Square3Stack3DIcon class="w-4 h-4" /> Bulk Enrollment
-          </button>
-          <button
-            @click="openModal('create')"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >
-            + Add Equipment
-          </button>
-        </div>
-      </div>
+          </AppButton>
+          <AppButton @click="openModal('create')">
+            <PlusIcon class="w-4 h-4" /> Add Equipment
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
-        <div class="flex items-center gap-2">
-          <div class="relative">
-            <input
-              v-model="search"
-              type="text"
-              placeholder="Search equipment..."
-              @keydown.enter.prevent="applyFilters"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-64"
-            />
-            <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
-              <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-              </svg>
-            </span>
-          </div>
-          <button @click="applyFilters" :disabled="isLoading" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Search
-          </button>
-          <button v-if="search || filterCategory || filterStatus" @click="clearFilters" :disabled="isLoading" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Clear
-          </button>
+      <AppFilterBar class="mb-4">
+        <div class="relative w-64">
+          <AppInput
+            v-model="search"
+            type="text"
+            placeholder="Search equipment..."
+            @keydown.enter.prevent="applyFilters"
+          />
+          <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
+            <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          </span>
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <select v-model="filterCategory" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-            <option value="">All Categories</option>
-            <option value="CPU/System Unit">CPU/System Unit</option>
-            <option value="Monitor">Monitor</option>
-            <option value="Mouse">Mouse</option>
-            <option value="Keyboard">Keyboard</option>
-            <option value="UPS">UPS</option>
-            <option value="AVR">AVR</option>
-            <option value="Printer">Printer</option>
-            <option value="Laptop">Laptop</option>
-            <option value="Scanner">Scanner</option>
-            <option value="Projector">Projector</option>
-            <option value="Network Devices">Network Devices</option>
-            <option value="CCTV Camera">CCTV Camera</option>
-            <option value="CCTV NVR/DVR">CCTV NVR/DVR</option>
-            <option value="Access Point">Access Point</option>
-            <option value="Other">Other</option>
-          </select>
-          <select v-model="filterStatus" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-            <option value="">All Statuses</option>
-            <option value="Good Working">Good Working</option>
-            <option value="For Repair">For Repair</option>
-            <option value="Disposed">Disposed</option>
-            <option value="Pending Setup">Pending Setup</option>
-          </select>
-          <button
-            v-if="props.pendingSetupCount > 0"
-            @click="filterStatus = 'Pending Setup'"
-            class="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            title="Show devices that enrolled automatically and need to be completed"
-          >
-            <ExclamationTriangleIcon class="w-3.5 h-3.5" />
-            Needs Setup ({{ props.pendingSetupCount }})
-          </button>
-        </div>
-        <div class="flex gap-2 items-center">
-          <label class="flex items-center gap-1 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              v-model="showAllChecked"
-              class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            Show All
-          </label>
-          <button @click="showReportModal = true" title="Generate Report" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-            <PrinterIcon class="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+        <AppSelect v-model="filterCategory" :show-blank="false">
+          <option value="">All Categories</option>
+          <option value="CPU/System Unit">CPU/System Unit</option>
+          <option value="Monitor">Monitor</option>
+          <option value="Mouse">Mouse</option>
+          <option value="Keyboard">Keyboard</option>
+          <option value="UPS">UPS</option>
+          <option value="AVR">AVR</option>
+          <option value="Printer">Printer</option>
+          <option value="Laptop">Laptop</option>
+          <option value="Scanner">Scanner</option>
+          <option value="Projector">Projector</option>
+          <option value="Network Devices">Network Devices</option>
+          <option value="CCTV Camera">CCTV Camera</option>
+          <option value="CCTV NVR/DVR">CCTV NVR/DVR</option>
+          <option value="Access Point">Access Point</option>
+          <option value="Other">Other</option>
+        </AppSelect>
+        <AppSelect v-model="filterStatus" :show-blank="false">
+          <option value="">All Statuses</option>
+          <option value="Good Working">Good Working</option>
+          <option value="For Repair">For Repair</option>
+          <option value="Disposed">Disposed</option>
+          <option value="Pending Setup">Pending Setup</option>
+        </AppSelect>
+        <AppButton
+          v-if="props.pendingSetupCount > 0"
+          variant="warning"
+          @click="filterStatus = 'Pending Setup'"
+          title="Show devices that enrolled automatically and need to be completed"
+        >
+          <ExclamationTriangleIcon class="w-3.5 h-3.5" />
+          Needs Setup ({{ props.pendingSetupCount }})
+        </AppButton>
+        <label class="flex items-center gap-1 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            v-model="showAllChecked"
+            class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          Show All
+        </label>
+        <AppIconButton label="Generate Report" variant="ghost" @click="showReportModal = true">
+          <PrinterIcon class="w-5 h-5" />
+        </AppIconButton>
+
+        <template #actions>
+          <AppButton @click="applyFilters" :disabled="isLoading">Search</AppButton>
+          <AppButton v-if="search || filterCategory || filterStatus" variant="secondary" @click="clearFilters" :disabled="isLoading">Clear</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Pending Setup banner -->
       <div
@@ -627,24 +631,21 @@ const showAllChecked    = computed({
       </div>
 
       <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="relative">
         <!-- Loading overlay -->
-        <div v-if="isLoading" class="relative">
-          <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-xl">
-            <div class="flex flex-col items-center gap-2 text-indigo-600">
-              <svg class="animate-spin h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-              </svg>
-              <span class="text-sm font-medium">Loading...</span>
-            </div>
+        <div v-if="isLoading" class="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-xl">
+          <div class="flex flex-col items-center gap-2 text-indigo-600">
+            <svg class="animate-spin h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <span class="text-sm font-medium">Loading...</span>
           </div>
         </div>
 
-        <!-- Equipment Table -->
-        <div class="overflow-x-auto" :class="{ 'opacity-50 pointer-events-none': isLoading }">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
+        <div :class="{ 'opacity-50 pointer-events-none': isLoading }">
+          <AppTable :is-empty="visibleEquipments.length === 0" :skeleton-cols="7">
+            <template #head>
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ID</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Serial No</th>
@@ -654,498 +655,442 @@ const showAllChecked    = computed({
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Agent</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Action</th>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="eq in visibleEquipments" :key="eq.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ eq.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ eq.serial_no }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ eq.description }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  {{ props.users.find(u => u.id === eq.owner_id)?.name || 'N/A' }}
-                </td>
-                <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    :class="{
-                      'bg-emerald-50 text-emerald-700': eq.status === 'Good Working',
-                      'bg-amber-50 text-amber-700': eq.status === 'For Repair',
-                      'bg-red-50 text-red-600': eq.status === 'Disposed',
-                      'bg-orange-50 text-orange-600': eq.status === 'Pending Setup',
-                      'bg-slate-100 text-slate-600': !['Good Working','For Repair','Disposed','Pending Setup'].includes(eq.status)
-                    }"
-                  >{{ eq.status ?? '—' }}</span>
-                </td>
-                <td class="px-4 py-3 text-xs">
-                  <div class="flex items-center gap-2">
-                    <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
-                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Linked
-                    </span>
-                    <span v-else class="text-slate-400">—</span>
-                    <button
-                      v-if="eq.alerts?.length"
-                      @click="openAlerts(eq)"
-                      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
-                      :title="`${eq.alerts.length} open alert(s)`"
-                    >
-                      <ExclamationTriangleIcon class="w-3 h-3" /> {{ eq.alerts.length }}
-                    </button>
-                  </div>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex justify-center gap-1 items-center">
-                    <button @click="viewEquipment(eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
-                      <EyeIcon class="w-4 h-4"/>
-                    </button>
-                    <button v-if="eq.agent_device" @click="openSpecs(eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-sky-600 transition-colors" title="Agent Specs">
-                      <ChartBarIcon class="w-4 h-4"/>
-                    </button>
-                    <button @click="openModal('edit', eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="w-4 h-4"/>
-                    </button>
-                    <button @click="openAddPmsHistory(eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors" title="Add PMS History">
-                      <PlusIcon class="w-4 h-4"/>
-                    </button>
-                    <button @click="openPmsHistory(eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="PMS History">
-                      <ClockIcon class="w-4 h-4" />
-                    </button>
-                    <button @click="destroyEquipment(eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
-                      <TrashIcon class="w-4 h-4"/>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="visibleEquipments.length===0">
-                <td colspan="7" class="py-16 text-center text-slate-400 text-sm">
-                  No equipment found.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            </template>
 
-        <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="goToPage(currentPage - 1)"
-          @next="goToPage(currentPage + 1)"
-          @page="goToPage"
-        />
+            <tr v-for="eq in visibleEquipments" :key="eq.id" class="hover:bg-slate-50/60">
+              <td class="px-4 py-3 text-sm text-slate-700">{{ eq.id }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ eq.serial_no }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ eq.description }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">
+                {{ props.users.find(u => u.id === eq.owner_id)?.name || 'N/A' }}
+              </td>
+              <td class="px-4 py-3">
+                <AppBadge :color="equipmentStatusBadgeColor(eq.status)">{{ eq.status ?? '—' }}</AppBadge>
+              </td>
+              <td class="px-4 py-3 text-xs">
+                <div class="flex items-center gap-2">
+                  <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Linked
+                  </span>
+                  <span v-else class="text-slate-400">—</span>
+                  <button
+                    v-if="eq.alerts?.length"
+                    @click="openAlerts(eq)"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                    :title="`${eq.alerts.length} open alert(s)`"
+                  >
+                    <ExclamationTriangleIcon class="w-3 h-3" /> {{ eq.alerts.length }}
+                  </button>
+                </div>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <div class="flex justify-center gap-1 items-center">
+                  <AppIconButton label="View" variant="ghost" @click="viewEquipment(eq)">
+                    <EyeIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton v-if="eq.agent_device" label="Agent Specs" variant="ghost" @click="openSpecs(eq)">
+                    <ChartBarIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton label="Edit" variant="ghost" @click="openModal('edit', eq)">
+                    <PencilSquareIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton label="Add PMS History" variant="ghost" @click="openAddPmsHistory(eq)">
+                    <PlusIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton label="PMS History" variant="ghost" @click="openPmsHistory(eq)">
+                    <ClockIcon class="w-4 h-4" />
+                  </AppIconButton>
+                  <AppIconButton label="Delete" variant="danger" @click="destroyEquipment(eq)">
+                    <TrashIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                </div>
+              </td>
+            </tr>
+
+            <template #mobileCard>
+              <div v-for="eq in visibleEquipments" :key="eq.id" class="p-4 space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <p class="text-sm font-medium text-slate-800">{{ eq.description }}</p>
+                    <p class="text-xs text-slate-400">#{{ eq.id }} &middot; {{ eq.serial_no }}</p>
+                  </div>
+                  <AppBadge :color="equipmentStatusBadgeColor(eq.status)">{{ eq.status ?? '—' }}</AppBadge>
+                </div>
+                <div class="text-xs text-slate-500">Owner: {{ props.users.find(u => u.id === eq.owner_id)?.name || 'N/A' }}</div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Linked
+                  </span>
+                  <span v-else class="text-slate-400">—</span>
+                  <button
+                    v-if="eq.alerts?.length"
+                    @click="openAlerts(eq)"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                    :title="`${eq.alerts.length} open alert(s)`"
+                  >
+                    <ExclamationTriangleIcon class="w-3 h-3" /> {{ eq.alerts.length }}
+                  </button>
+                </div>
+                <div class="flex justify-end gap-1 pt-1">
+                  <AppIconButton label="View" variant="ghost" @click="viewEquipment(eq)">
+                    <EyeIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton v-if="eq.agent_device" label="Agent Specs" variant="ghost" @click="openSpecs(eq)">
+                    <ChartBarIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton label="Edit" variant="ghost" @click="openModal('edit', eq)">
+                    <PencilSquareIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton label="Add PMS History" variant="ghost" @click="openAddPmsHistory(eq)">
+                    <PlusIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton label="PMS History" variant="ghost" @click="openPmsHistory(eq)">
+                    <ClockIcon class="w-4 h-4" />
+                  </AppIconButton>
+                  <AppIconButton label="Delete" variant="danger" @click="destroyEquipment(eq)">
+                    <TrashIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                </div>
+              </div>
+            </template>
+
+            <template #empty>
+              <EmptyState title="No equipment found" />
+            </template>
+
+            <template #footer>
+              <PaginationControl
+                :current-page="currentPage"
+                :total-pages="totalPages"
+                @prev="goToPage(currentPage - 1)"
+                @next="goToPage(currentPage + 1)"
+                @page="goToPage"
+              />
+            </template>
+          </AppTable>
+        </div>
       </div>
 
       <!-- Equipment Modal -->
-      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">
-              {{ modalMode==='create' ? 'New Equipment Form' : modalMode==='edit' ? 'Edit Equipment' : 'View Equipment Details' }}
-            </h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-          </div>
-
-          <div class="px-6 py-5">
-            <!-- VIEW MODE -->
-            <div v-if="modalMode==='view' && selectedEquipment" class="space-y-2">
-              <div id="printArea">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <!-- First column: QR Code -->
-                  <div class="flex items-center justify-center">
-                    <img
-                      v-if="selectedEquipment.id"
-                      :src="route('equipment.qr', { ictEquipment: selectedEquipment.id })"
-                      alt="QR Code"
-                      class="w-48 h-48 border border-slate-200 rounded-lg p-2"
-                    />
-                  </div>
-
-                  <!-- Second column: Details -->
-                  <div class="space-y-1 text-sm text-slate-700">
-                    <p><strong>Owner:</strong> {{ props.users.find(u => u.id === selectedEquipment.owner_id)?.name || 'N/A' }}</p>
-                    <p><strong>Category:</strong> {{ selectedEquipment.category }}</p>
-                    <p><strong>Property No:</strong> {{ selectedEquipment.property_no }}</p>
-                    <p><strong>Serial No:</strong> {{ selectedEquipment.serial_no }}</p>
-                    <p><strong>Description:</strong> {{ selectedEquipment.description }}</p>
-                    <p><strong>Date Acquired:</strong> {{ selectedEquipment.date_acquired }}</p>
-                    <p><strong>Amount:</strong> {{ selectedEquipment.amount }}</p>
-                    <p><strong>Status:</strong> {{ selectedEquipment.status }}</p>
-                    <p>
-                      <strong>Location:</strong>
-                      {{ selectedEquipment.room?.name || 'N/A' }}
-                    </p>
-                    <p><strong>Remarks:</strong> {{ selectedEquipment.remarks }}</p>
-                  </div>
-                </div>
+      <AppModal
+        :show="showModal"
+        :title="modalMode==='create' ? 'New Equipment Form' : modalMode==='edit' ? 'Edit Equipment' : 'View Equipment Details'"
+        size="2xl"
+        @close="closeModal"
+      >
+        <!-- VIEW MODE -->
+        <div v-if="modalMode==='view' && selectedEquipment" class="space-y-2">
+          <div id="printArea">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- First column: QR Code -->
+              <div class="flex items-center justify-center">
+                <img
+                  v-if="selectedEquipment.id"
+                  :src="route('equipment.qr', { ictEquipment: selectedEquipment.id })"
+                  alt="QR Code"
+                  class="w-48 h-48 border border-slate-200 rounded-lg p-2"
+                />
               </div>
 
-              <!-- Print button -->
-              <div class="mt-4 text-right">
-                <button @click="printModal" title="Print" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                  <PrinterIcon class="w-5 h-5" />
-                </button>
+              <!-- Second column: Details -->
+              <div class="space-y-1 text-sm text-slate-700">
+                <p><strong>Owner:</strong> {{ props.users.find(u => u.id === selectedEquipment.owner_id)?.name || 'N/A' }}</p>
+                <p><strong>Category:</strong> {{ selectedEquipment.category }}</p>
+                <p><strong>Property No:</strong> {{ selectedEquipment.property_no }}</p>
+                <p><strong>Serial No:</strong> {{ selectedEquipment.serial_no }}</p>
+                <p><strong>Description:</strong> {{ selectedEquipment.description }}</p>
+                <p><strong>Date Acquired:</strong> {{ selectedEquipment.date_acquired }}</p>
+                <p><strong>Amount:</strong> {{ selectedEquipment.amount }}</p>
+                <p><strong>Status:</strong> {{ selectedEquipment.status }}</p>
+                <p>
+                  <strong>Location:</strong>
+                  {{ selectedEquipment.room?.name || 'N/A' }}
+                </p>
+                <p><strong>Remarks:</strong> {{ selectedEquipment.remarks }}</p>
               </div>
             </div>
-
-            <!-- CREATE / EDIT FORM -->
-            <form v-else @submit.prevent="submitEquipment" class="grid grid-cols-2 gap-4">
-              <!-- Pending Setup notice: auto-enrolled device needs owner/room/status -->
-              <div
-                v-if="modalMode === 'edit' && selectedEquipment?.status === 'Pending Setup'"
-                class="col-span-2 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-700"
-              >
-                <p class="font-semibold mb-1">Auto-enrolled device — complete setup below</p>
-                <p class="text-orange-600">Atlas Sentinel enrolled this device automatically. Assign an owner, room, and status to register it properly.</p>
-                <div v-if="selectedEquipment?.agent_device" class="mt-2 grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs text-orange-700 font-mono">
-                  <span v-if="selectedEquipment.agent_device.hostname"><strong>Hostname:</strong> {{ selectedEquipment.agent_device.hostname }}</span>
-                  <span v-if="selectedEquipment.agent_device.mac_address"><strong>MAC:</strong> {{ selectedEquipment.agent_device.mac_address }}</span>
-                  <span v-if="selectedEquipment.agent_device.os_version"><strong>OS:</strong> {{ selectedEquipment.agent_device.os_version }}</span>
-                  <span v-if="selectedEquipment.agent_device.agent_version"><strong>Agent:</strong> v{{ selectedEquipment.agent_device.agent_version }}</span>
-                </div>
-              </div>
-              <!-- Equipment Category -->
-              <div class="col-span-2">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Equipment Category <span class="text-red-500">*</span></label>
-                <select v-model="form.category" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" required>
-                  <option value="">Please select category</option>
-                  <option value="CPU/System Unit">CPU/System Unit</option>
-                  <option value="Monitor">Monitor</option>
-                  <option value="Mouse">Mouse</option>
-                  <option value="Keyboard">Keyboard</option>
-                  <option value="UPS">UPS</option>
-                  <option value="AVR">AVR</option>
-                  <option value="Printer">Printer</option>
-                  <option value="Laptop">Laptop</option>
-                  <option value="Scanner">Scanner</option>
-                  <option value="Projector">Projector</option>
-                  <option value="Network Devices">Network Devices</option>
-                  <option value="CCTV Camera">CCTV Camera</option>
-                  <option value="CCTV NVR/DVR">CCTV NVR/DVR</option>
-                  <option value="Access Point">Access Point</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <!-- Owner (Dropdown) -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Owner <span class="text-red-500">*</span></label>
-                <select v-model="form.owner_id" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" required>
-                  <option value="">Select Owner</option>
-                  <option v-for="user in props.users" :key="user.id" :value="user.id">
-                    {{ user.name }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Property No -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Property No</label>
-                <input v-model="form.property_no" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-
-              <!-- Serial No -->
-              <div class="col-span-2">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Serial No <span class="text-red-500">*</span></label>
-                <input v-model="form.serial_no" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" required />
-              </div>
-
-              <!-- Device Description -->
-              <div class="col-span-2">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Device Description / Model <span class="text-red-500">*</span></label>
-                <input v-model="form.description" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" required />
-              </div>
-
-              <!-- Date Acquired -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Date Acquired</label>
-                <input v-model="form.date_acquired" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-
-              <!-- Amount -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Amount</label>
-                <input v-model="form.amount" type="number" step="0.01" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-
-              <!-- Equipment Status -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Equipment Status <span class="text-red-500">*</span></label>
-                <select v-model="form.status" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" required>
-                  <option value="">Select Status</option>
-                  <option value="Good Working">Good Working</option>
-                  <option value="For Repair">For Repair</option>
-                  <option value="Disposed">Disposed</option>
-                </select>
-              </div>
-
-              <!-- Location / Room -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">
-                  Location<span class="text-red-500">*</span>
-                </label>
-                <select
-                  v-model="form.room_id"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  required
-                >
-                  <option value="">Select location</option>
-                  <option v-for="room in props.rooms" :key="room.id" :value="room.id">
-                    {{ room.name }}
-                  </option>
-                </select>
-              </div>
-
-
-              <!-- Warranty Expires -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Warranty Expires</label>
-                <input v-model="form.warranty_expires_at" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-
-              <!-- Warranty Provider -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Warranty Provider</label>
-                <input v-model="form.warranty_provider" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-
-              <!-- Decommissioned -->
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Decommissioned On</label>
-                <input v-model="form.decommissioned_at" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-
-              <!-- Remarks -->
-              <div class="col-span-2">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-                <textarea v-model="form.remarks" rows="2" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"></textarea>
-              </div>
-
-              <!-- Buttons -->
-              <div class="col-span-2 flex justify-end gap-2 pt-2">
-                <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-                <button type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Save</button>
-              </div>
-            </form>
           </div>
         </div>
-      </div>
+
+        <!-- CREATE / EDIT FORM -->
+        <form v-else @submit.prevent="submitEquipment" class="grid grid-cols-2 gap-4">
+          <!-- Pending Setup notice: auto-enrolled device needs owner/room/status -->
+          <div
+            v-if="modalMode === 'edit' && selectedEquipment?.status === 'Pending Setup'"
+            class="col-span-2 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-700"
+          >
+            <p class="font-semibold mb-1">Auto-enrolled device — complete setup below</p>
+            <p class="text-orange-600">Atlas Sentinel enrolled this device automatically. Assign an owner, room, and status to register it properly.</p>
+            <div v-if="selectedEquipment?.agent_device" class="mt-2 grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs text-orange-700 font-mono">
+              <span v-if="selectedEquipment.agent_device.hostname"><strong>Hostname:</strong> {{ selectedEquipment.agent_device.hostname }}</span>
+              <span v-if="selectedEquipment.agent_device.mac_address"><strong>MAC:</strong> {{ selectedEquipment.agent_device.mac_address }}</span>
+              <span v-if="selectedEquipment.agent_device.os_version"><strong>OS:</strong> {{ selectedEquipment.agent_device.os_version }}</span>
+              <span v-if="selectedEquipment.agent_device.agent_version"><strong>Agent:</strong> v{{ selectedEquipment.agent_device.agent_version }}</span>
+            </div>
+          </div>
+          <!-- Equipment Category -->
+          <div class="col-span-2">
+            <AppSelect v-model="form.category" label="Equipment Category" required :show-blank="false">
+              <option value="">Please select category</option>
+              <option value="CPU/System Unit">CPU/System Unit</option>
+              <option value="Monitor">Monitor</option>
+              <option value="Mouse">Mouse</option>
+              <option value="Keyboard">Keyboard</option>
+              <option value="UPS">UPS</option>
+              <option value="AVR">AVR</option>
+              <option value="Printer">Printer</option>
+              <option value="Laptop">Laptop</option>
+              <option value="Scanner">Scanner</option>
+              <option value="Projector">Projector</option>
+              <option value="Network Devices">Network Devices</option>
+              <option value="CCTV Camera">CCTV Camera</option>
+              <option value="CCTV NVR/DVR">CCTV NVR/DVR</option>
+              <option value="Access Point">Access Point</option>
+              <option value="Other">Other</option>
+            </AppSelect>
+          </div>
+
+          <!-- Owner (Dropdown) -->
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Owner <span class="text-red-500">*</span></label>
+            <select v-model="form.owner_id" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" required>
+              <option value="">Select Owner</option>
+              <option v-for="user in props.users" :key="user.id" :value="user.id">
+                {{ user.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Property No -->
+          <div>
+            <AppInput v-model="form.property_no" type="text" label="Property No" />
+          </div>
+
+          <!-- Serial No -->
+          <div class="col-span-2">
+            <AppInput v-model="form.serial_no" type="text" label="Serial No" required />
+          </div>
+
+          <!-- Device Description -->
+          <div class="col-span-2">
+            <AppInput v-model="form.description" type="text" label="Device Description / Model" required />
+          </div>
+
+          <!-- Date Acquired -->
+          <div>
+            <AppInput v-model="form.date_acquired" type="date" label="Date Acquired" />
+          </div>
+
+          <!-- Amount -->
+          <div>
+            <AppInput v-model="form.amount" type="number" step="0.01" label="Amount" />
+          </div>
+
+          <!-- Equipment Status -->
+          <div>
+            <AppSelect v-model="form.status" label="Equipment Status" required :show-blank="false">
+              <option value="">Select Status</option>
+              <option value="Good Working">Good Working</option>
+              <option value="For Repair">For Repair</option>
+              <option value="Disposed">Disposed</option>
+            </AppSelect>
+          </div>
+
+          <!-- Location / Room -->
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">
+              Location<span class="text-red-500">*</span>
+            </label>
+            <select
+              v-model="form.room_id"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+              required
+            >
+              <option value="">Select location</option>
+              <option v-for="room in props.rooms" :key="room.id" :value="room.id">
+                {{ room.name }}
+              </option>
+            </select>
+          </div>
+
+
+          <!-- Warranty Expires -->
+          <div>
+            <AppInput v-model="form.warranty_expires_at" type="date" label="Warranty Expires" />
+          </div>
+
+          <!-- Warranty Provider -->
+          <div>
+            <AppInput v-model="form.warranty_provider" type="text" label="Warranty Provider" />
+          </div>
+
+          <!-- Decommissioned -->
+          <div>
+            <AppInput v-model="form.decommissioned_at" type="date" label="Decommissioned On" />
+          </div>
+
+          <!-- Remarks -->
+          <div class="col-span-2">
+            <AppTextarea v-model="form.remarks" :rows="2" label="Remarks" />
+          </div>
+        </form>
+
+        <template #footer>
+          <template v-if="modalMode==='view' && selectedEquipment">
+            <AppIconButton label="Print" variant="ghost" @click="printModal">
+              <PrinterIcon class="w-5 h-5" />
+            </AppIconButton>
+          </template>
+          <template v-else>
+            <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+            <AppButton @click="submitEquipment">Save</AppButton>
+          </template>
+        </template>
+      </AppModal>
 
       <!-- PMS HISTORY MODAL -->
-      <div
-        v-if="showPmsModal"
-        class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      <AppModal
+        :show="showPmsModal"
+        :title="`PMS History for ${selectedEquipment?.description} / ${selectedEquipment?.serial_no}`"
+        size="3xl"
+        @close="showPmsModal = false"
       >
-        <div class="bg-white w-full max-w-3xl rounded-2xl shadow-xl">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">
-              PMS History for {{ selectedEquipment?.description }} / {{ selectedEquipment?.serial_no }}
-            </h2>
-            <button
-              @click="showPmsModal = false"
-              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-
-          <div class="px-6 py-5">
-            <div v-if="selectedPmsHistory.length === 0" class="py-16 text-center text-slate-400 text-sm">
-              No PMS history found.
-            </div>
-
-            <ul v-else class="space-y-3 max-h-96 overflow-y-auto">
-              <li
-                v-for="pms in selectedPmsHistory"
-                :key="pms.id"
-                class="border border-slate-100 p-4 rounded-lg bg-slate-50/50"
-              >
-                <div class="font-semibold text-slate-800 text-sm">{{ formatDate(pms.pms_date) }}</div>
-                <div class="text-sm text-slate-600 mt-1">
-                  <b>Type:</b> {{ pms.type }}
-                </div>
-                <div class="text-sm text-slate-600">
-                  <b>Description:</b> {{ pms.description }}
-                </div>
-                <div class="text-sm text-slate-600">
-                  <b>Cost of Repair:</b> ₱{{ pms.cost_of_repair }}
-                </div>
-                <div class="text-sm text-slate-600">
-                  <b>Remarks:</b> {{ pms.remarks }}
-                </div>
-                <div class="text-sm text-slate-600">
-                  <b>Created By:</b> User ID {{ pms.created_by }}
-                </div>
-              </li>
-            </ul>
-          </div>
-          <!-- Print button -->
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end">
-            <button @click="printPmsHistory" title="Print History" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              <PrinterIcon class="w-4 h-4" /> Print History
-            </button>
-          </div>
+        <div v-if="selectedPmsHistory.length === 0" class="py-16 text-center text-slate-400 text-sm">
+          No PMS history found.
         </div>
-      </div>
+
+        <ul v-else class="space-y-3 max-h-96 overflow-y-auto">
+          <li
+            v-for="pms in selectedPmsHistory"
+            :key="pms.id"
+            class="border border-slate-100 p-4 rounded-lg bg-slate-50/50"
+          >
+            <div class="font-semibold text-slate-800 text-sm">{{ formatDate(pms.pms_date) }}</div>
+            <div class="text-sm text-slate-600 mt-1">
+              <b>Type:</b> {{ pms.type }}
+            </div>
+            <div class="text-sm text-slate-600">
+              <b>Description:</b> {{ pms.description }}
+            </div>
+            <div class="text-sm text-slate-600">
+              <b>Cost of Repair:</b> ₱{{ pms.cost_of_repair }}
+            </div>
+            <div class="text-sm text-slate-600">
+              <b>Remarks:</b> {{ pms.remarks }}
+            </div>
+            <div class="text-sm text-slate-600">
+              <b>Created By:</b> User ID {{ pms.created_by }}
+            </div>
+          </li>
+        </ul>
+
+        <template #footer>
+          <AppButton @click="printPmsHistory">
+            <PrinterIcon class="w-4 h-4" /> Print History
+          </AppButton>
+        </template>
+      </AppModal>
 
       <!-- ADD PMS HISTORY MODAL -->
-      <div
-        v-if="showAddPmsModal"
-        class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      <AppModal
+        :show="showAddPmsModal"
+        :title="`Add PMS History for ${selectedEquipment?.description} / ${selectedEquipment?.serial_no}`"
+        @close="showAddPmsModal = false"
       >
-        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">
-              Add PMS History for {{ selectedEquipment?.description }} / {{ selectedEquipment?.serial_no }}
-            </h2>
-            <button
-              @click="showAddPmsModal = false"
-              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-
-          <div class="px-6 py-5">
-            <form @submit.prevent="submitPmsHistory" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">PMS Date</label>
-                  <input
-                    v-model="pmsForm.pms_date"
-                    type="date"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                    :class="{ 'border-red-500': pmsFormErrors.pms_date }"
-                  />
-                  <div v-if="pmsFormErrors.pms_date" class="text-red-500 text-xs mt-1">{{ pmsFormErrors.pms_date }}</div>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Type</label>
-                  <select
-                    v-model="pmsForm.type"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                    :class="{ 'border-red-500': pmsFormErrors.type }"
-                  >
-                    <option value="PMS">PMS</option>
-                    <option value="Repair">Repair</option>
-                  </select>
-                  <div v-if="pmsFormErrors.type" class="text-red-500 text-xs mt-1">{{ pmsFormErrors.type }}</div>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-                <textarea
-                  v-model="pmsForm.description"
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  placeholder="List of checked items or repair details"
-                  :class="{ 'border-red-500': pmsFormErrors.description }"
-                ></textarea>
-                <div v-if="pmsFormErrors.description" class="text-red-500 text-xs mt-1">{{ pmsFormErrors.description }}</div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Cost of Repair (₱)</label>
-                <input
-                  v-model.number="pmsForm.cost_of_repair"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  :class="{ 'border-red-500': pmsFormErrors.cost_of_repair }"
-                />
-                <div v-if="pmsFormErrors.cost_of_repair" class="text-red-500 text-xs mt-1">{{ pmsFormErrors.cost_of_repair }}</div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-                <textarea
-                  v-model="pmsForm.remarks"
-                  rows="2"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  placeholder="Additional remarks"
-                  :class="{ 'border-red-500': pmsFormErrors.remarks }"
-                ></textarea>
-                <div v-if="pmsFormErrors.remarks" class="text-red-500 text-xs mt-1">{{ pmsFormErrors.remarks }}</div>
-              </div>
-
-              <div class="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  @click="showAddPmsModal = false"
-                  :disabled="isSubmittingPms"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  :disabled="isSubmittingPms"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-                >
-                  {{ isSubmittingPms ? 'Adding...' : 'Add PMS History' }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <!-- REPORT MODAL -->
-      <div
-        v-if="showReportModal"
-        class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
-      >
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">Generate Equipment Report</h2>
-            <button
-              @click="showReportModal = false"
-              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-
-          <div class="px-6 py-5 space-y-4">
+        <form @submit.prevent="submitPmsHistory" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-2">Group By:</label>
-              <div class="space-y-2">
-                <label class="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="radio"
-                    v-model="reportGroupBy"
-                    value="category"
-                    class="text-indigo-600"
-                  />
-                  <span>Category</span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="radio"
-                    v-model="reportGroupBy"
-                    value="location"
-                    class="text-indigo-600"
-                  />
-                  <span>Location / Room</span>
-                </label>
-              </div>
+              <AppInput
+                v-model="pmsForm.pms_date"
+                type="date"
+                label="PMS Date"
+                :error="pmsFormErrors.pms_date"
+              />
+            </div>
+
+            <div>
+              <AppSelect v-model="pmsForm.type" label="Type" :show-blank="false" :error="pmsFormErrors.type">
+                <option value="PMS">PMS</option>
+                <option value="Repair">Repair</option>
+              </AppSelect>
             </div>
           </div>
 
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button
-              @click="showReportModal = false"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            >
-              Cancel
-            </button>
-            <button
-              @click="generateReport(); showReportModal = false"
-              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            >
-              Generate & Print
-            </button>
+          <div>
+            <AppTextarea
+              v-model="pmsForm.description"
+              :rows="3"
+              label="Description"
+              placeholder="List of checked items or repair details"
+              :error="pmsFormErrors.description"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Cost of Repair (₱)</label>
+            <input
+              v-model.number="pmsForm.cost_of_repair"
+              type="number"
+              step="0.01"
+              min="0"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+              :class="{ 'border-red-500': pmsFormErrors.cost_of_repair }"
+            />
+            <div v-if="pmsFormErrors.cost_of_repair" class="text-red-500 text-xs mt-1">{{ pmsFormErrors.cost_of_repair }}</div>
+          </div>
+
+          <div>
+            <AppTextarea
+              v-model="pmsForm.remarks"
+              :rows="2"
+              label="Remarks"
+              placeholder="Additional remarks"
+              :error="pmsFormErrors.remarks"
+            />
+          </div>
+        </form>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="showAddPmsModal = false" :disabled="isSubmittingPms">
+            Cancel
+          </AppButton>
+          <AppButton :loading="isSubmittingPms" :disabled="isSubmittingPms" @click="submitPmsHistory">
+            {{ isSubmittingPms ? 'Adding...' : 'Add PMS History' }}
+          </AppButton>
+        </template>
+      </AppModal>
+
+      <!-- REPORT MODAL -->
+      <AppModal :show="showReportModal" title="Generate Equipment Report" size="sm" @close="showReportModal = false">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-2">Group By:</label>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="radio"
+                v-model="reportGroupBy"
+                value="category"
+                class="text-indigo-600"
+              />
+              <span>Category</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="radio"
+                v-model="reportGroupBy"
+                value="location"
+                class="text-indigo-600"
+              />
+              <span>Location / Room</span>
+            </label>
           </div>
         </div>
-      </div>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="showReportModal = false">Cancel</AppButton>
+          <AppButton @click="generateReport(); showReportModal = false">Generate &amp; Print</AppButton>
+        </template>
+      </AppModal>
 
       <!-- ATLAS SENTINEL ENROLLMENT TOKEN MODAL -->
       <div

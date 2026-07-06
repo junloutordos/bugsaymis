@@ -3,6 +3,13 @@ import { ref, computed, reactive, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import EvaluationSummaryBlock from '@/Components/AMS/EvaluationSummaryBlock.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { confirmAction, confirmDelete as confirmDeleteDialog } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
 import {
   ArrowLeftIcon,
@@ -65,16 +72,12 @@ const generatingCerts  = ref(false)
 const sendingEvalLinks = ref(false)
 
 async function generateCertificates() {
-  const result = await Swal.fire({
-    icon: 'question',
+  const confirmed = await confirmAction({
     title: 'Generate Certificates?',
     text: 'Certificates will be generated for all present and evaluated participants.',
-    showCancelButton: true,
-    confirmButtonColor: '#059669',
-    confirmButtonText: 'Yes, generate',
-    cancelButtonText: 'Cancel',
+    confirmText: 'Yes, generate',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
 
   generatingCerts.value = true
   Swal.fire({
@@ -99,16 +102,12 @@ async function generateCertificates() {
 }
 
 async function sendEvaluationLinks() {
-  const result = await Swal.fire({
-    icon: 'question',
+  const confirmed = await confirmAction({
     title: 'Send Evaluation Links?',
     text: 'An email with a unique evaluation link will be sent to all present participants.',
-    showCancelButton: true,
-    confirmButtonColor: '#7c3aed',
-    confirmButtonText: 'Yes, send',
-    cancelButtonText: 'Cancel',
+    confirmText: 'Yes, send',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
 
   sendingEvalLinks.value = true
   Swal.fire({
@@ -145,17 +144,15 @@ function formatTime(t) {
   return date.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 async function confirmDelete() {
-  const result = await Swal.fire({
-    icon: 'warning',
-    title: 'Delete Activity?',
-    text: `"${props.activity.title}" will be permanently deleted. This cannot be undone.`,
-    showCancelButton: true,
-    confirmButtonColor: '#dc2626',
-    confirmButtonText: 'Yes, delete it',
-    cancelButtonText: 'Cancel',
-  })
-  if (result.isConfirmed) router.delete(route('ams.activities.destroy', props.activity.id))
+  if (await confirmDeleteDialog(`"${props.activity.title}" will be permanently deleted. This cannot be undone.`)) {
+    router.delete(route('ams.activities.destroy', props.activity.id))
+  }
 }
+
+// ── Badge color mapping ───────────────────────────────────────────────────
+function typeColor(isTwsType) { return isTwsType ? 'indigo' : 'amber' }
+function attendanceColor(attended) { return attended === 'yes' ? 'green' : 'red' }
+function evaluatedColor(evaluated) { return evaluated ? 'green' : 'slate' }
 
 // ── Add Participants (multi-select) ────────────────────────────────────────
 
@@ -289,16 +286,13 @@ async function toggleAttendance(p) {
   const row = empAttendance[p.id]
   if (!row) return
   if (row.attended === 'yes') {
-    const result = await Swal.fire({
+    const confirmed = await confirmAction({
       icon: 'warning',
       title: 'Mark as Absent?',
       text: `This will mark "${p.label}" as Absent. Their certificate will not be generated.`,
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      confirmButtonText: 'Yes, mark absent',
-      cancelButtonText: 'Cancel',
+      confirmText: 'Yes, mark absent',
     })
-    if (!result.isConfirmed) return
+    if (!confirmed) return
   }
   row.attended = row.attended === 'yes' ? 'no' : 'yes'
 }
@@ -363,16 +357,13 @@ function saveSectionAttendance(p) {
 // ── Remove participant ─────────────────────────────────────────────────────
 
 async function removeParticipant(p) {
-  const result = await Swal.fire({
+  const confirmed = await confirmAction({
     icon: 'warning',
     title: 'Remove Participant?',
     text: `"${p.label}" will be removed from this activity.`,
-    showCancelButton: true,
-    confirmButtonColor: '#dc2626',
-    confirmButtonText: 'Remove',
-    cancelButtonText: 'Cancel',
+    confirmText: 'Remove',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
   router.delete(
     route('ams.activities.participants.remove', [props.activity.id, p.id]),
     { preserveScroll: true }
@@ -395,16 +386,13 @@ function addCoPro() {
   )
 }
 async function removeCoPro(cp) {
-  const result = await Swal.fire({
+  const confirmed = await confirmAction({
     icon: 'warning',
     title: 'Remove Co-Proponent?',
     text: `${cp.name} will be removed as co-proponent.`,
-    showCancelButton: true,
-    confirmButtonColor: '#dc2626',
-    confirmButtonText: 'Remove',
-    cancelButtonText: 'Cancel',
+    confirmText: 'Remove',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
   router.delete(route('ams.activities.co-proponents.remove', [props.activity.id, cp.id]), { preserveScroll: true })
 }
 </script>
@@ -421,14 +409,12 @@ async function removeCoPro(cp) {
       </a>
       <div class="flex items-center gap-2">
         <template v-if="canEdit">
-          <a :href="route('ams.activities.edit', activity.id)"
-             class="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+          <AppButton as="a" :href="route('ams.activities.edit', activity.id)" variant="warning" size="sm">
             <PencilSquareIcon class="w-4 h-4" /> Edit
-          </a>
-          <button @click="confirmDelete"
-                  class="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+          </AppButton>
+          <AppButton variant="danger" size="sm" @click="confirmDelete">
             <TrashIcon class="w-4 h-4" /> Delete
-          </button>
+          </AppButton>
         </template>
         <span v-else class="text-xs text-slate-400 italic">View only</span>
       </div>
@@ -474,11 +460,10 @@ async function removeCoPro(cp) {
 
           <div class="p-5">
           <div class="flex items-center gap-2 mb-2">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                  :class="isTws ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'">
-              <component :is="isTws ? AcademicCapIcon : BuildingOffice2Icon" class="w-3.5 h-3.5" />
+            <AppBadge :color="typeColor(isTws)">
+              <component :is="isTws ? AcademicCapIcon : BuildingOffice2Icon" class="w-3.5 h-3.5 mr-1" />
               {{ isTws ? 'Training / Workshop / Seminar' : 'In-house Activity' }}
-            </span>
+            </AppBadge>
           </div>
           <h1 class="text-xl font-bold text-slate-800 mb-4">{{ activity.title }}</h1>
           <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
@@ -623,30 +608,22 @@ async function removeCoPro(cp) {
 
       <!-- Toolbar -->
       <div class="flex items-center gap-3 flex-wrap">
-        <button v-if="canManage"
-                @click="generateCertificates"
-                :disabled="generatingCerts"
-                class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <AppButton v-if="canManage" variant="success" :loading="generatingCerts" :disabled="generatingCerts" @click="generateCertificates">
           <DocumentArrowDownIcon class="w-4 h-4" />
           {{ generatingCerts ? 'Generating…' : 'Generate All Certificates' }}
-        </button>
-        <button v-if="canManage"
-                @click="sendEvaluationLinks"
-                :disabled="sendingEvalLinks"
-                class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        </AppButton>
+        <AppButton v-if="canManage" variant="secondary" :loading="sendingEvalLinks" :disabled="sendingEvalLinks" @click="sendEvaluationLinks">
           <EnvelopeIcon class="w-4 h-4" />
           {{ sendingEvalLinks ? 'Sending…' : 'Send Evaluation Links' }}
-        </button>
-        <button v-if="canManage"
-                @click="showAddPanel = !showAddPanel"
-                class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        </AppButton>
+        <AppButton v-if="canManage" @click="showAddPanel = !showAddPanel">
           <PlusIcon class="w-4 h-4" />
-          {{ showAddPanel ? 'Cancel' : 'Add Participants' }}
-        </button>
+          Add Participants
+        </AppButton>
       </div>
 
       <!-- ── Multi-select add panel ─────────────────────────────────────── -->
-      <div v-if="showAddPanel && canManage" class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <AppModal :show="showAddPanel && canManage" title="Add Participants" size="lg" body-class="p-0" @close="showAddPanel = false">
         <div class="flex border-b border-slate-100">
           <button @click="addTab = 'employees'"
                   class="flex-1 py-2.5 text-sm font-medium transition-colors"
@@ -704,14 +681,14 @@ async function removeCoPro(cp) {
           </div>
         </div>
 
-        <div class="border-t border-slate-100 px-4 py-3 flex items-center justify-between bg-slate-50">
-          <span class="text-sm text-slate-500">{{ selectedCount }} selected</span>
-          <button @click="saveParticipants" :disabled="selectedCount === 0 || addSubmitting"
-                  class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <template #footer>
+          <span class="text-sm text-slate-500 mr-auto">{{ selectedCount }} selected</span>
+          <AppButton variant="secondary" @click="showAddPanel = false">Cancel</AppButton>
+          <AppButton :loading="addSubmitting" :disabled="selectedCount === 0 || addSubmitting" @click="saveParticipants">
             {{ addSubmitting ? 'Saving…' : 'Save & Send Invitations' }}
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppModal>
 
       <!-- ── Participants datatable ─────────────────────────────────────── -->
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -756,7 +733,7 @@ async function removeCoPro(cp) {
               <tr v-if="p.type === 'employee'" :ref="() => initEmpRow(p)" class="hover:bg-slate-50">
                 <td class="px-4 py-3 font-medium text-slate-700">{{ p.label }}</td>
                 <td class="px-3 py-3 text-center">
-                  <span class="inline-block px-2 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-600 font-medium">Employee</span>
+                  <AppBadge color="indigo">Employee</AppBadge>
                 </td>
                 <td class="px-3 py-3 text-center">
                   <input v-if="canManage && empAttendance[p.id]"
@@ -766,45 +743,40 @@ async function removeCoPro(cp) {
                   <span v-else class="text-slate-600">{{ p.hours_attended ?? '—' }}</span>
                 </td>
                 <td class="px-3 py-3 text-center">
-                  <button v-if="canManage && empAttendance[p.id]"
-                          @click="toggleAttendance(p)"
-                          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
-                          :class="empAttendance[p.id].attended === 'yes' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'">
-                    <CheckCircleIcon class="w-3.5 h-3.5" />
-                    {{ empAttendance[p.id].attended === 'yes' ? 'Present' : 'Absent' }}
+                  <button v-if="canManage && empAttendance[p.id]" @click="toggleAttendance(p)">
+                    <AppBadge :color="attendanceColor(empAttendance[p.id].attended)">
+                      <CheckCircleIcon class="w-3.5 h-3.5 mr-1" />
+                      {{ empAttendance[p.id].attended === 'yes' ? 'Present' : 'Absent' }}
+                    </AppBadge>
                   </button>
-                  <span v-else class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                        :class="p.attended === 'yes' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'">
-                    <CheckCircleIcon class="w-3.5 h-3.5" />
+                  <AppBadge v-else :color="attendanceColor(p.attended)">
+                    <CheckCircleIcon class="w-3.5 h-3.5 mr-1" />
                     {{ p.attended === 'yes' ? 'Present' : 'Absent' }}
-                  </span>
+                  </AppBadge>
                 </td>
                 <td class="px-3 py-3 text-center">
-                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                        :class="p.evaluated ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'">
-                    <CheckCircleIcon class="w-3.5 h-3.5" />
+                  <AppBadge :color="evaluatedColor(p.evaluated)">
+                    <CheckCircleIcon class="w-3.5 h-3.5 mr-1" />
                     {{ p.evaluated ? 'Evaluated' : 'Pending' }}
-                  </span>
+                  </AppBadge>
                 </td>
                 <td v-if="canManage" class="px-4 py-3 text-right">
                   <div class="inline-flex items-center gap-1">
-                    <button @click="saveEmpAttendance(p)"
-                            class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg font-medium">Save</button>
-                    <button @click="copyEvalLink(p)"
-                            class="p-1 rounded hover:bg-slate-100 transition-colors"
-                            :class="copiedId === p.id ? 'text-green-600' : 'text-slate-400 hover:text-slate-600'"
-                            :title="copiedId === p.id ? 'Copied!' : 'Copy evaluation link'">
+                    <AppButton size="sm" @click="saveEmpAttendance(p)">Save</AppButton>
+                    <AppIconButton :label="copiedId === p.id ? 'Copied!' : 'Copy evaluation link'"
+                                    :variant="copiedId === p.id ? 'success' : 'ghost'" size="sm"
+                                    @click="copyEvalLink(p)">
                       <ClipboardDocumentCheckIcon v-if="copiedId === p.id" class="w-4 h-4" />
                       <LinkIcon v-else class="w-4 h-4" />
-                    </button>
+                    </AppIconButton>
                     <a v-if="empAttendance[p.id]?.attended === 'yes'"
                        :href="route('ams.activities.certificates.download.participant', [activity.id, p.id])"
                        target="_blank" class="text-indigo-500 hover:text-indigo-700 p-1 rounded hover:bg-indigo-50" title="Download certificate">
                       <DocumentArrowDownIcon class="w-4 h-4" />
                     </a>
-                    <button @click="removeParticipant(p)" class="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50">
+                    <AppIconButton label="Remove participant" variant="danger" size="sm" @click="removeParticipant(p)">
                       <XMarkIcon class="w-4 h-4" />
-                    </button>
+                    </AppIconButton>
                   </div>
                 </td>
               </tr>
@@ -819,15 +791,15 @@ async function removeCoPro(cp) {
                     </span>
                   </td>
                   <td class="px-3 py-3 text-center">
-                    <span class="inline-block px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-600 font-medium">Section</span>
+                    <AppBadge color="amber">Section</AppBadge>
                   </td>
                   <td class="px-3 py-3 text-center text-slate-400 text-xs">—</td>
                   <td class="px-3 py-3 text-center text-slate-400 text-xs">—</td>
                   <td class="px-3 py-3 text-center text-slate-400 text-xs">—</td>
                   <td v-if="canManage" class="px-4 py-3 text-right">
-                    <button @click.stop="removeParticipant(p)" class="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50">
+                    <AppIconButton label="Remove participant" variant="danger" size="sm" @click.stop="removeParticipant(p)">
                       <XMarkIcon class="w-4 h-4" />
-                    </button>
+                    </AppIconButton>
                   </td>
                 </tr>
                 <!-- Inline student roster -->
@@ -838,14 +810,11 @@ async function removeCoPro(cp) {
                       <div class="flex items-center justify-between mb-3">
                         <span class="text-xs text-slate-500">{{ secAttendance[p.id].length }} students</span>
                         <div v-if="canManage" class="flex items-center gap-2">
-                          <button @click="markAllSectionStudents(p.id, 'yes')"
-                                  class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">All Present</button>
-                          <button @click="markAllSectionStudents(p.id, 'no')"
-                                  class="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-200">All Absent</button>
-                          <button @click="saveSectionAttendance(p)"
-                                  class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg font-medium">
+                          <AppButton variant="success" size="sm" @click="markAllSectionStudents(p.id, 'yes')">All Present</AppButton>
+                          <AppButton variant="secondary" size="sm" @click="markAllSectionStudents(p.id, 'no')">All Absent</AppButton>
+                          <AppButton size="sm" @click="saveSectionAttendance(p)">
                             Save Attendance &amp; Send Certificates
-                          </button>
+                          </AppButton>
                         </div>
                       </div>
                       <div class="border border-slate-200 rounded-lg overflow-hidden">
@@ -867,18 +836,16 @@ async function removeCoPro(cp) {
                                 <span v-else class="text-slate-600 text-xs">{{ student.hours_attended }}</span>
                               </td>
                               <td class="px-3 py-2 text-center">
-                                <button v-if="canManage"
-                                        @click="student.attended = student.attended === 'yes' ? 'no' : 'yes'"
-                                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
-                                        :class="student.attended === 'yes' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'">
-                                  <CheckCircleIcon class="w-3 h-3" />
-                                  {{ student.attended === 'yes' ? 'Present' : 'Absent' }}
+                                <button v-if="canManage" @click="student.attended = student.attended === 'yes' ? 'no' : 'yes'">
+                                  <AppBadge :color="attendanceColor(student.attended)">
+                                    <CheckCircleIcon class="w-3 h-3 mr-1" />
+                                    {{ student.attended === 'yes' ? 'Present' : 'Absent' }}
+                                  </AppBadge>
                                 </button>
-                                <span v-else class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                                      :class="student.attended === 'yes' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'">
-                                  <CheckCircleIcon class="w-3 h-3" />
+                                <AppBadge v-else :color="attendanceColor(student.attended)">
+                                  <CheckCircleIcon class="w-3 h-3 mr-1" />
                                   {{ student.attended === 'yes' ? 'Present' : 'Absent' }}
-                                </span>
+                                </AppBadge>
                               </td>
                             </tr>
                           </tbody>
@@ -899,80 +866,57 @@ async function removeCoPro(cp) {
         </table>
 
         <!-- Pagination -->
-        <div v-if="ptTotalPages > 1" class="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm">
-          <span class="text-slate-500 text-xs">
-            Page {{ ptPage }} of {{ ptTotalPages }}
-          </span>
-          <div class="flex items-center gap-1">
-            <button @click="ptSetPage(1)" :disabled="ptPage === 1"
-                    class="px-2 py-1 rounded text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-50">«</button>
-            <button @click="ptSetPage(ptPage - 1)" :disabled="ptPage === 1"
-                    class="px-2 py-1 rounded text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-50">‹</button>
-            <template v-for="n in ptTotalPages" :key="n">
-              <button v-if="Math.abs(n - ptPage) <= 2"
-                      @click="ptSetPage(n)"
-                      class="px-2.5 py-1 rounded text-xs border font-medium"
-                      :class="n === ptPage ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 hover:bg-slate-50'">
-                {{ n }}
-              </button>
-            </template>
-            <button @click="ptSetPage(ptPage + 1)" :disabled="ptPage === ptTotalPages"
-                    class="px-2 py-1 rounded text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-50">›</button>
-            <button @click="ptSetPage(ptTotalPages)" :disabled="ptPage === ptTotalPages"
-                    class="px-2 py-1 rounded text-xs border border-slate-200 disabled:opacity-40 hover:bg-slate-50">»</button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="ptPage"
+          :total-pages="ptTotalPages"
+          :total="filteredParticipants.length"
+          @prev="ptSetPage(ptPage - 1)"
+          @next="ptSetPage(ptPage + 1)"
+          @page="ptSetPage($event)"
+        />
       </div>
     </div>
 
     <!-- ── CO-PROPONENTS TAB ────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'coproponents'" class="space-y-5 max-w-xl">
       <div v-if="canManage" class="flex justify-end">
-        <button @click="showAddCoPro = !showAddCoPro"
-                class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <AppButton @click="showAddCoPro = true">
           <PlusIcon class="w-4 h-4" /> Add Co-Proponent
-        </button>
+        </AppButton>
       </div>
 
-      <div v-if="showAddCoPro && canManage" class="bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-sm font-semibold text-slate-700 mb-3">Add Co-Proponent</h3>
-        <div class="flex gap-3 items-end">
-          <div class="flex-1">
-            <select v-model="coproEmployeeId"
-                    class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
-              <option value="">— Select employee —</option>
-              <option v-for="e in availableForCoPro" :key="e.id" :value="e.id">{{ e.name }}</option>
-            </select>
-          </div>
-          <button @click="addCoPro" :disabled="!coproEmployeeId"
-                  class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">Add</button>
-          <button @click="showAddCoPro = false"
-                  class="px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
-        </div>
-      </div>
+      <AppModal :show="showAddCoPro && canManage" title="Add Co-Proponent" size="sm" @close="showAddCoPro = false">
+        <select v-model="coproEmployeeId"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+          <option value="">— Select employee —</option>
+          <option v-for="e in availableForCoPro" :key="e.id" :value="e.id">{{ e.name }}</option>
+        </select>
+        <template #footer>
+          <AppButton variant="secondary" @click="showAddCoPro = false">Cancel</AppButton>
+          <AppButton :disabled="!coproEmployeeId" @click="addCoPro">Add</AppButton>
+        </template>
+      </AppModal>
 
       <div v-if="activity.co_proponents.length" class="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div class="divide-y divide-slate-100">
           <div v-for="cp in activity.co_proponents" :key="cp.id" class="flex items-center gap-3 px-4 py-3">
             <UserIcon class="w-4 h-4 text-slate-400 shrink-0" />
             <span class="flex-1 text-sm text-slate-700">{{ cp.name }}</span>
-            <button v-if="canManage" @click="removeCoPro(cp)" class="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50">
+            <AppIconButton v-if="canManage" label="Remove co-proponent" variant="danger" size="sm" @click="removeCoPro(cp)">
               <XMarkIcon class="w-4 h-4" />
-            </button>
+            </AppIconButton>
           </div>
         </div>
       </div>
-      <p v-else-if="!showAddCoPro" class="text-sm text-slate-400 italic text-center py-8">No co-proponents added yet.</p>
+      <EmptyState v-else-if="!showAddCoPro" title="No co-proponents added yet." />
     </div>
 
     <!-- ── EVALUATIONS TAB ──────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'evaluations'" class="space-y-6">
 
       <!-- No responses yet -->
-      <div v-if="!evaluations || evaluations.count === 0"
-           class="bg-white rounded-xl border border-slate-200 py-16 text-center">
-        <ChartBarIcon class="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <p class="text-sm text-slate-400">No evaluations submitted yet.</p>
+      <div v-if="!evaluations || evaluations.count === 0" class="bg-white rounded-xl border border-slate-200">
+        <EmptyState title="No evaluations submitted yet." :icon="ChartBarIcon" />
       </div>
 
       <template v-else>
@@ -1020,18 +964,13 @@ async function removeCoPro(cp) {
     <!-- ── QUIZZES TAB ─────────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'quizzes'" class="space-y-4">
       <div v-if="canManage" class="flex justify-end">
-        <a
-          :href="route('quiz.create', { source_type: 'activity', source_id: activity.id })"
-          class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-        >
+        <AppButton as="a" :href="route('quiz.create', { source_type: 'activity', source_id: activity.id })">
           <PlusIcon class="w-4 h-4" /> New Quiz
-        </a>
+        </AppButton>
       </div>
 
-      <div v-if="quizzes.length === 0" class="bg-white rounded-xl border border-slate-200 py-16 text-center">
-        <ChartBarIcon class="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <p class="text-sm text-slate-500">No quizzes attached to this activity yet.</p>
-        <p class="text-xs text-slate-400 mt-1">Run a live poll or review game during the session.</p>
+      <div v-if="quizzes.length === 0" class="bg-white rounded-xl border border-slate-200">
+        <EmptyState title="No quizzes attached to this activity yet." subtitle="Run a live poll or review game during the session." :icon="ChartBarIcon" />
       </div>
 
       <div v-else class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
@@ -1041,8 +980,8 @@ async function removeCoPro(cp) {
             <span class="text-xs text-slate-400 capitalize">{{ q.status }} · {{ q.question_count }} question{{ q.question_count === 1 ? '' : 's' }}</span>
           </div>
           <div class="flex items-center gap-3">
-            <button v-if="canManage" type="button" class="text-sm text-emerald-600 hover:underline" @click="hostQuiz(q)">Host</button>
-            <a :href="route('quiz.edit', q.id)" class="text-sm text-indigo-600 hover:underline">Manage</a>
+            <AppButton v-if="canManage" variant="success" size="sm" @click="hostQuiz(q)">Host</AppButton>
+            <AppButton as="a" variant="ghost" size="sm" :href="route('quiz.edit', q.id)">Manage</AppButton>
           </div>
         </div>
       </div>

@@ -1,156 +1,138 @@
 <template>
   <Head title="Work Requests" />
   <AdminLayout title="Work Requests">
-    <div>
+    <div class="space-y-5">
       <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Work Requests</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage building and maintenance work requests</p>
+      <AppPageHeader title="Work Requests" subtitle="Manage building and maintenance work requests">
+        <template #actions>
+          <AppButton v-if="!hasRole('GSU Head')" @click.prevent="handleNewRequest()">
+            + New Request
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
+      <!-- Search -->
+      <AppFilterBar>
+        <div class="relative flex-1 min-w-[180px] sm:w-72 sm:flex-none">
+          <AppInput
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search work requests…"
+            @keydown.enter.prevent="applyFilters"
+          />
         </div>
-        <button
-          v-if="!hasRole('GSU Head')"
-          @click.prevent="handleNewRequest()"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          + New Request
-        </button>
-      </div>
+        <template #actions>
+          <AppButton :disabled="isLoading" @click="applyFilters">Search</AppButton>
+          <AppButton v-if="searchQuery" variant="secondary" :disabled="isLoading" @click="clearFilters">Clear</AppButton>
+          <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
+        </template>
+      </AppFilterBar>
 
       <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-          <input v-model="searchQuery" type="text" placeholder="Search work requests…"
-                 @keydown.enter.prevent="applyFilters"
-                 class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-          <button @click="applyFilters" :disabled="isLoading"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Search
-          </button>
-          <button v-if="searchQuery" @click="clearFilters" :disabled="isLoading"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Clear
-          </button>
-          <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
-        </div>
+      <AppTable :is-empty="filteredWorkRequests.length === 0" :skeleton-cols="tableColCount">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Created</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Issue</th>
+            <th v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Assigned Personnel</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Acted By</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Expected Completion</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action Taken</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Completed</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Inspection</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+          </tr>
+        </template>
 
-        <!-- Desktop table -->
-        <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Created</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Issue</th>
-                <th v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Assigned Personnel</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Acted By</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Expected Completion</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action Taken</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Completed</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Inspection</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="wr in filteredWorkRequests" :key="wr.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.created_at ? new Date(wr.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.issue ?? '—' }}</td>
-                <td v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ wr.requester?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.description ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.assigned_user?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.actedBy?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.action_taken ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusClass(wr.status)]">
-                    {{ wr.status ?? '—' }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', inspectionStatusClass(wr)]">
-                    {{ inspectionStatus(wr) }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-1.5 justify-center">
-                    <button
-                      v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))"
-                      @click.prevent="openModal(wr)"
-                      class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 transition-colors"
-                      title="Assign"
-                    >
-                      <UserPlusIcon class="w-4 h-4" />
-                    </button>
+        <tr v-for="wr in filteredWorkRequests" :key="wr.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.created_at ? new Date(wr.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.issue ?? '—' }}</td>
+          <td v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ wr.requester?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.description ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.assigned_user?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.actedBy?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.action_taken ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <AppBadge :color="statusClass(wr.status)">{{ wr.status ?? '—' }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <AppBadge :color="inspectionStatusClass(wr)">{{ inspectionStatus(wr) }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <div class="flex items-center gap-1.5 justify-center">
+              <AppIconButton
+                v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))"
+                label="Assign"
+                @click.prevent="openModal(wr)"
+              >
+                <UserPlusIcon class="w-4 h-4" />
+              </AppIconButton>
 
-                    <button
-                      v-if="hasRole('Administrator')"
-                      @click.prevent="openModal(wr)"
-                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-                      title="Edit"
-                    >
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
+              <AppIconButton
+                v-if="hasRole('Administrator')"
+                label="Edit"
+                @click.prevent="openModal(wr)"
+              >
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
 
-                    <button
-                      v-if="hasRole('Administrator')"
-                      @click.prevent="destroy(wr)"
-                      class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"
-                      title="Delete"
-                    >
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
+              <AppIconButton
+                v-if="hasRole('Administrator')"
+                label="Delete"
+                variant="danger"
+                @click.prevent="destroy(wr)"
+              >
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
 
-                    <button
-                      v-if="canOpenInspection(wr)"
-                      @click.prevent="openInspectionModal(wr)"
-                      class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-700 transition-colors"
-                      title="Pre-Repair Inspection"
-                    >
-                      <ClipboardDocumentCheckIcon class="w-4 h-4" />
-                    </button>
+              <AppIconButton
+                v-if="canOpenInspection(wr)"
+                label="Pre-Repair Inspection"
+                variant="warning"
+                @click.prevent="openInspectionModal(wr)"
+              >
+                <ClipboardDocumentCheckIcon class="w-4 h-4" />
+              </AppIconButton>
 
-                    <button
-                      v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))"
-                      @click.prevent="openCompleteModal(wr)"
-                      class="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-700 transition-colors"
-                      title="Mark Completed"
-                    >
-                      <CheckCircleIcon class="w-4 h-4" />
-                    </button>
-                    <a
-                      v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))"
-                      :href="`/work-requests/${wr.id}/print`"
-                      target="_blank"
-                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-                      title="Print"
-                    >
-                      <PrinterIcon class="w-4 h-4" />
-                    </a>
-                    <button
-                      v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id"
-                      @click.prevent="openCsmModal(wr)"
-                      class="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors"
-                      title="Confirm & Rate"
-                    >Confirm &amp; Rate</button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredWorkRequests.length === 0">
-                <td :colspan="(hasAnyRole('Administrator','GSU Head','DivisionChief') ? 13 : 12)" class="py-16 text-center text-slate-400 text-sm">No work requests found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+              <AppIconButton
+                v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))"
+                label="Mark Completed"
+                variant="success"
+                @click.prevent="openCompleteModal(wr)"
+              >
+                <CheckCircleIcon class="w-4 h-4" />
+              </AppIconButton>
 
-        <!-- Mobile list -->
-        <div v-else class="p-4 space-y-3">
-          <div v-for="wr in filteredWorkRequests" :key="wr.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+              <AppButton
+                v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))"
+                as="a"
+                :href="`/work-requests/${wr.id}/print`"
+                target="_blank"
+                size="sm"
+                variant="secondary"
+              >
+                <PrinterIcon class="w-3.5 h-3.5" /> Print
+              </AppButton>
+
+              <AppButton
+                v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id"
+                size="sm"
+                variant="success"
+                @click.prevent="openCsmModal(wr)"
+              >Confirm &amp; Rate</AppButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="wr in filteredWorkRequests" :key="wr.id" class="p-4 space-y-3">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <p class="text-xs text-slate-500">Request #{{ wr.id }} &bull; {{ wr.created_at ? new Date(wr.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</p>
@@ -163,334 +145,256 @@
                 <div class="text-slate-400">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</div>
               </div>
             </div>
-            <div class="mt-2 space-y-1 text-xs text-slate-700">
+            <div class="space-y-1 text-xs text-slate-700">
               <div><span class="font-medium text-slate-500">Assigned:</span> {{ wr.assigned_user?.name ?? '—' }}</div>
               <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Status:</span>
-                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusClass(wr.status)]">{{ wr.status }}</span>
+                <AppBadge :color="statusClass(wr.status)">{{ wr.status }}</AppBadge>
               </div>
               <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Inspection:</span>
-                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', inspectionStatusClass(wr)]">{{ inspectionStatus(wr) }}</span>
+                <AppBadge :color="inspectionStatusClass(wr)">{{ inspectionStatus(wr) }}</AppBadge>
               </div>
             </div>
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <button v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))" @click.prevent="openModal(wr)" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Assign</button>
-              <button v-if="hasRole('Administrator')" @click.prevent="openModal(wr)" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Edit</button>
-              <button v-if="hasRole('Administrator')" @click.prevent="destroy(wr)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Delete</button>
-              <button v-if="canOpenInspection(wr)" @click.prevent="openInspectionModal(wr)" class="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Inspection</button>
-              <button v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Mark Completed</button>
-              <a v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Print</a>
-              <button v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" @click.prevent="openCsmModal(wr)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <AppButton v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))" size="sm" @click.prevent="openModal(wr)">Assign</AppButton>
+              <AppButton v-if="hasRole('Administrator')" size="sm" @click.prevent="openModal(wr)">Edit</AppButton>
+              <AppButton v-if="hasRole('Administrator')" size="sm" variant="danger" @click.prevent="destroy(wr)">Delete</AppButton>
+              <AppButton v-if="canOpenInspection(wr)" size="sm" variant="warning" @click.prevent="openInspectionModal(wr)">Inspection</AppButton>
+              <AppButton v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" size="sm" variant="success" @click.prevent="openCompleteModal(wr)">Mark Completed</AppButton>
+              <AppButton v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" as="a" :href="`/work-requests/${wr.id}/print`" target="_blank" size="sm" variant="secondary">Print</AppButton>
+              <AppButton v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" size="sm" variant="success" @click.prevent="openCsmModal(wr)">Confirm &amp; Rate</AppButton>
+            </div>
           </div>
-          <div v-if="filteredWorkRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No work requests found.</div>
-        </div>
+        </template>
 
-        <!-- Pagination -->
-        <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          :total="props.workRequests?.total ?? 0"
-          @prev="goToPage(currentPage - 1)"
-          @next="goToPage(currentPage + 1)"
-          @page="goToPage"
-        />
-      </div>
+        <template #empty>
+          <EmptyState title="No work requests found." />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :total="props.workRequests?.total ?? 0"
+            @prev="goToPage(currentPage - 1)"
+            @next="goToPage(currentPage + 1)"
+            @page="goToPage"
+          />
+        </template>
+      </AppTable>
 
       <!-- Create / Edit Modal -->
-      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl relative">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Work Request' : 'New Work Request' }}</h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
-              <XMarkIcon class="w-4 h-4" />
-            </button>
-          </div>
-          <form @submit.prevent="submitForm" class="px-6 py-5 space-y-4">
+      <AppModal :show="showModal" :title="editingId ? 'Edit Work Request' : 'New Work Request'" size="2xl" @close="closeModal">
+        <form @submit.prevent="submitForm" class="space-y-4">
+          <AppInput v-model="form.issue" label="Issue" required />
+
+          <AppTextarea v-model="form.description" label="Description" :rows="4" />
+
+          <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Issue <span class="text-red-500">*</span></label>
-              <input v-model="form.issue" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" required />
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-              <textarea v-model="form.description" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="4"></textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
-                <select v-model="form.location_division_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                  <option value="">Select building</option>
-                  <option v-for="d in props.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Room</label>
-                <select v-model="form.location_office_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                  <option value="">Select room</option>
-                  <option v-for="o in filteredOffices" :key="o.id" :value="o.id">{{ o.name }}</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Priority</label>
-                <select v-model="form.priority" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                  <option>Low</option>
-                  <option>Normal</option>
-                  <option>High</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Expected Completion</label>
-                <input v-model="form.expected_completion_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              </div>
-            </div>
-
-            <div v-if="editingId && (hasRole('GSU Head') || hasRole('Administrator'))" class="mt-3">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Assign Personnel</label>
-              <select v-model="form.assigned_user_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">Select staff</option>
-                <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
+              <select v-model="form.location_division_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">Select building</option>
+                <option v-for="d in props.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
             </div>
-          </form>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button type="button" @click="editingId ? submitForm() : openPinModal()" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
-              <span v-if="form.processing">Saving…</span>
-              <span v-else>Save</span>
-            </button>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Room</label>
+              <select v-model="form.location_office_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">Select room</option>
+                <option v-for="o in filteredOffices" :key="o.id" :value="o.id">{{ o.name }}</option>
+              </select>
+            </div>
+
+            <AppSelect v-model="form.priority" label="Priority" :show-blank="false">
+              <option>Low</option>
+              <option>Normal</option>
+              <option>High</option>
+            </AppSelect>
+
+            <AppInput v-model="form.expected_completion_date" type="date" label="Expected Completion" />
           </div>
-        </div>
-      </div>
+
+          <div v-if="editingId && (hasRole('GSU Head') || hasRole('Administrator'))" class="mt-3">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Assign Personnel</label>
+            <select v-model="form.assigned_user_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">Select staff</option>
+              <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+        </form>
+        <template #footer>
+          <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+          <AppButton :loading="form.processing" @click="editingId ? submitForm() : openPinModal()">
+            Save
+          </AppButton>
+        </template>
+      </AppModal>
 
       <!-- Completion Modal -->
-      <div v-if="showCompleteModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md relative">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">Mark Work Request Completed</h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeCompleteModal">
-              <XMarkIcon class="w-4 h-4" />
-            </button>
+      <AppModal :show="showCompleteModal" title="Mark Work Request Completed" size="md" @close="closeCompleteModal">
+        <form @submit.prevent="submitCompletion" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Acted By</label>
+            <select v-model="completeForm.acted_by_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">Select staff</option>
+              <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
           </div>
-          <form @submit.prevent="submitCompletion" class="px-6 py-5 space-y-4">
+          <AppTextarea v-model="completeForm.action_taken" label="Action Taken" :rows="4" required />
+          <AppInput v-model="completeForm.date_completed" type="date" label="Date Completed" required />
+        </form>
+        <template #footer>
+          <AppButton variant="secondary" @click="closeCompleteModal">Cancel</AppButton>
+          <AppButton type="submit" :loading="completeForm.processing" @click="submitCompletion">
+            Save
+          </AppButton>
+        </template>
+      </AppModal>
+
+      <!-- Pre-Repair Inspection Modal -->
+      <AppModal
+        :show="showInspectionModal"
+        title="Pre-Repair Inspection Report"
+        :subtitle="`PSHS-00-F-GSM-14-Ver02-Rev1 · Work Request #${inspectionWorkRequest?.id}`"
+        size="4xl"
+        @close="closeInspectionModal"
+      >
+        <div class="space-y-5">
+          <div v-if="inspectionWorkRequest?.pre_repair_inspection?.return_reason" class="rounded-lg border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">
+            Returned for revision: {{ inspectionWorkRequest.pre_repair_inspection.return_reason }}
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Acted By</label>
-              <select v-model="completeForm.acted_by_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">Select staff</option>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Inspector</label>
+              <select v-model="inspectionForm.inspector_id" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50">
+                <option value="">Select inspector</option>
                 <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
               </select>
             </div>
+            <AppSelect v-model="inspectionForm.asset_type" label="Asset Type" :disabled="!canEditInspection(inspectionWorkRequest)" :show-blank="false">
+              <option value="building_facility">Building / Facilities</option>
+              <option value="equipment_machinery">Equipment / Machinery</option>
+            </AppSelect>
+            <AppSelect v-model="inspectionForm.warranty_status" label="Warranty Status" :disabled="!canEditInspection(inspectionWorkRequest)" :show-blank="false">
+              <option value="unknown">Unknown / Not indicated</option>
+              <option value="with_warranty">With Warranty</option>
+              <option value="without_warranty">Without Warranty</option>
+            </AppSelect>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <AppInput v-model="inspectionForm.building_facility" label="Building / Facility" :disabled="!canEditInspection(inspectionWorkRequest)" />
+            <AppInput v-model="inspectionForm.property_no" label="Property No." :disabled="!canEditInspection(inspectionWorkRequest)" />
+            <AppInput v-model="inspectionForm.location" label="Location" :disabled="!canEditInspection(inspectionWorkRequest)" />
+            <AppInput v-model="inspectionForm.serial_no" label="Serial No." :disabled="!canEditInspection(inspectionWorkRequest)" />
+            <AppInput v-model="inspectionForm.date_of_purchase" type="date" label="Date of Purchase" :disabled="!canEditInspection(inspectionWorkRequest)" />
+            <AppInput v-model="inspectionForm.purchase_cost" type="number" min="0" step="0.01" label="Purchase Cost" :disabled="!canEditInspection(inspectionWorkRequest)" />
+          </div>
+
+          <AppTextarea v-model="inspectionForm.description" label="Description" :rows="2" :disabled="!canEditInspection(inspectionWorkRequest)" />
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <AppTextarea v-model="inspectionForm.location_of_defect" label="Location of Defect" :rows="3" :disabled="!canEditInspection(inspectionWorkRequest)" />
+            <AppTextarea v-model="inspectionForm.nature_of_defect" label="Nature of Defect" :rows="3" required :disabled="!canEditInspection(inspectionWorkRequest)" />
+            <AppTextarea v-model="inspectionForm.cause_of_defect" label="Cause of Defect" :rows="3" :disabled="!canEditInspection(inspectionWorkRequest)" />
+          </div>
+
+          <AppTextarea v-model="inspectionForm.recommendations" label="Recommendations" :rows="3" required :disabled="!canEditInspection(inspectionWorkRequest)" />
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-sm font-semibold text-slate-800">Estimated Cost of Repair Materials</h3>
+              <button v-if="canEditInspection(inspectionWorkRequest)" type="button" @click="addMaterialItem" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">Add item</button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-slate-100">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th class="px-3 py-2 text-left">Item Description / Material</th>
+                    <th class="px-3 py-2 text-right w-24">Qty</th>
+                    <th class="px-3 py-2 text-right w-32">Unit Cost</th>
+                    <th class="px-3 py-2 text-right w-32">Total</th>
+                    <th v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 w-12"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(item, idx) in inspectionForm.material_items" :key="idx">
+                    <td class="px-3 py-2"><input v-model="item.item_description" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-sm disabled:bg-slate-50" /></td>
+                    <td class="px-3 py-2"><input v-model="item.qty" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
+                    <td class="px-3 py-2"><input v-model="item.unit_cost" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
+                    <td class="px-3 py-2 text-right text-slate-700">{{ money(rowTotal(item.qty, item.unit_cost)) }}</td>
+                    <td v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 text-right"><button type="button" @click="removeMaterialItem(idx)" class="text-xs text-danger-600">Remove</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-sm font-semibold text-slate-800">Estimated Labor Cost</h3>
+              <button v-if="canEditInspection(inspectionWorkRequest)" type="button" @click="addLaborItem" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">Add labor</button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-slate-100">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th class="px-3 py-2 text-left">Work Description / Scope of Work</th>
+                    <th class="px-3 py-2 text-right w-32">Man-days</th>
+                    <th class="px-3 py-2 text-right w-32">Labor Rate</th>
+                    <th class="px-3 py-2 text-right w-32">Total</th>
+                    <th v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 w-12"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(item, idx) in inspectionForm.labor_items" :key="idx">
+                    <td class="px-3 py-2"><input v-model="item.work_description" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-sm disabled:bg-slate-50" /></td>
+                    <td class="px-3 py-2"><input v-model="item.man_days" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
+                    <td class="px-3 py-2"><input v-model="item.labor_rate" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
+                    <td class="px-3 py-2 text-right text-slate-700">{{ money(rowTotal(item.man_days, item.labor_rate)) }}</td>
+                    <td v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 text-right"><button type="button" @click="removeLaborItem(idx)" class="text-xs text-danger-600">Remove</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Action Taken</label>
-              <textarea v-model="completeForm.action_taken" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="4" required></textarea>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Total Materials</label>
+              <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ money(materialTotal) }}</div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Date Completed</label>
-              <input v-model="completeForm.date_completed" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" required />
+              <label class="block text-xs font-medium text-slate-600 mb-1">Total Labor</label>
+              <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ money(laborTotal) }}</div>
             </div>
-          </form>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button type="button" @click="closeCompleteModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button type="submit" @click="submitCompletion" :disabled="completeForm.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
-              <span v-if="completeForm.processing">Saving…</span>
-              <span v-else>Save</span>
-            </button>
+            <AppInput v-model="inspectionForm.indirect_cost" type="number" min="0" step="0.01" label="Indirect Cost" :disabled="!canEditInspection(inspectionWorkRequest)" />
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
+            Total Estimated Repair Cost: {{ money(materialTotal + laborTotal + Number(inspectionForm.indirect_cost || 0)) }}
           </div>
         </div>
-      </div>
 
-      <!-- Pre-Repair Inspection Modal -->
-      <div v-if="showInspectionModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[92vh] overflow-hidden relative flex flex-col">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-start justify-between gap-4">
-            <div>
-              <h2 class="text-base font-semibold text-slate-800">Pre-Repair Inspection Report</h2>
-              <p class="text-xs text-slate-500 mt-0.5">PSHS-00-F-GSM-14-Ver02-Rev1 · Work Request #{{ inspectionWorkRequest?.id }}</p>
-            </div>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeInspectionModal">
-              <XMarkIcon class="w-4 h-4" />
-            </button>
-          </div>
-
-          <div class="overflow-y-auto px-6 py-5 space-y-5">
-            <div v-if="inspectionWorkRequest?.pre_repair_inspection?.return_reason" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Returned for revision: {{ inspectionWorkRequest.pre_repair_inspection.return_reason }}
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Inspector</label>
-                <select v-model="inspectionForm.inspector_id" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50">
-                  <option value="">Select inspector</option>
-                  <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Asset Type</label>
-                <select v-model="inspectionForm.asset_type" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50">
-                  <option value="building_facility">Building / Facilities</option>
-                  <option value="equipment_machinery">Equipment / Machinery</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Warranty Status</label>
-                <select v-model="inspectionForm.warranty_status" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50">
-                  <option value="unknown">Unknown / Not indicated</option>
-                  <option value="with_warranty">With Warranty</option>
-                  <option value="without_warranty">Without Warranty</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Building / Facility</label>
-                <input v-model="inspectionForm.building_facility" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Property No.</label>
-                <input v-model="inspectionForm.property_no" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Location</label>
-                <input v-model="inspectionForm.location" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Serial No.</label>
-                <input v-model="inspectionForm.serial_no" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Date of Purchase</label>
-                <input v-model="inspectionForm.date_of_purchase" type="date" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Purchase Cost</label>
-                <input v-model="inspectionForm.purchase_cost" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50" />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-              <textarea v-model="inspectionForm.description" rows="2" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50"></textarea>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Location of Defect</label>
-                <textarea v-model="inspectionForm.location_of_defect" rows="3" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Nature of Defect <span class="text-red-500">*</span></label>
-                <textarea v-model="inspectionForm.nature_of_defect" rows="3" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Cause of Defect</label>
-                <textarea v-model="inspectionForm.cause_of_defect" rows="3" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50"></textarea>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Recommendations <span class="text-red-500">*</span></label>
-              <textarea v-model="inspectionForm.recommendations" rows="3" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50"></textarea>
-            </div>
-
-            <div class="space-y-3">
-              <div class="flex items-center justify-between gap-3">
-                <h3 class="text-sm font-semibold text-slate-800">Estimated Cost of Repair Materials</h3>
-                <button v-if="canEditInspection(inspectionWorkRequest)" type="button" @click="addMaterialItem" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">Add item</button>
-              </div>
-              <div class="overflow-x-auto rounded-lg border border-slate-100">
-                <table class="min-w-full text-sm">
-                  <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th class="px-3 py-2 text-left">Item Description / Material</th>
-                      <th class="px-3 py-2 text-right w-24">Qty</th>
-                      <th class="px-3 py-2 text-right w-32">Unit Cost</th>
-                      <th class="px-3 py-2 text-right w-32">Total</th>
-                      <th v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 w-12"></th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    <tr v-for="(item, idx) in inspectionForm.material_items" :key="idx">
-                      <td class="px-3 py-2"><input v-model="item.item_description" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-sm disabled:bg-slate-50" /></td>
-                      <td class="px-3 py-2"><input v-model="item.qty" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
-                      <td class="px-3 py-2"><input v-model="item.unit_cost" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
-                      <td class="px-3 py-2 text-right text-slate-700">{{ money(rowTotal(item.qty, item.unit_cost)) }}</td>
-                      <td v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 text-right"><button type="button" @click="removeMaterialItem(idx)" class="text-xs text-red-600">Remove</button></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="space-y-3">
-              <div class="flex items-center justify-between gap-3">
-                <h3 class="text-sm font-semibold text-slate-800">Estimated Labor Cost</h3>
-                <button v-if="canEditInspection(inspectionWorkRequest)" type="button" @click="addLaborItem" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">Add labor</button>
-              </div>
-              <div class="overflow-x-auto rounded-lg border border-slate-100">
-                <table class="min-w-full text-sm">
-                  <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th class="px-3 py-2 text-left">Work Description / Scope of Work</th>
-                      <th class="px-3 py-2 text-right w-32">Man-days</th>
-                      <th class="px-3 py-2 text-right w-32">Labor Rate</th>
-                      <th class="px-3 py-2 text-right w-32">Total</th>
-                      <th v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 w-12"></th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    <tr v-for="(item, idx) in inspectionForm.labor_items" :key="idx">
-                      <td class="px-3 py-2"><input v-model="item.work_description" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-sm disabled:bg-slate-50" /></td>
-                      <td class="px-3 py-2"><input v-model="item.man_days" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
-                      <td class="px-3 py-2"><input v-model="item.labor_rate" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" /></td>
-                      <td class="px-3 py-2 text-right text-slate-700">{{ money(rowTotal(item.man_days, item.labor_rate)) }}</td>
-                      <td v-if="canEditInspection(inspectionWorkRequest)" class="px-3 py-2 text-right"><button type="button" @click="removeLaborItem(idx)" class="text-xs text-red-600">Remove</button></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Total Materials</label>
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ money(materialTotal) }}</div>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Total Labor</label>
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ money(laborTotal) }}</div>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Indirect Cost</label>
-                <input v-model="inspectionForm.indirect_cost" type="number" min="0" step="0.01" :disabled="!canEditInspection(inspectionWorkRequest)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50" />
-              </div>
-            </div>
-            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
-              Total Estimated Repair Cost: {{ money(materialTotal + laborTotal + Number(inspectionForm.indirect_cost || 0)) }}
-            </div>
-          </div>
-
-          <div class="px-6 py-4 border-t border-slate-100 flex flex-wrap justify-end gap-2">
-            <a v-if="inspectionWorkRequest?.pre_repair_inspection" :href="route('work-requests.pre-repair-inspection.print', inspectionWorkRequest.id)" target="_blank" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              Print Report
-            </a>
-            <button v-if="canNoteInspection(inspectionWorkRequest) && inspectionWorkRequest?.pre_repair_inspection" type="button" @click="returnInspection" class="inline-flex items-center gap-2 bg-white border border-amber-200 hover:bg-amber-50 text-amber-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              Return
-            </button>
-            <button v-if="canNoteInspection(inspectionWorkRequest) && inspectionWorkRequest?.pre_repair_inspection?.status === 'submitted'" type="button" @click="noteInspection" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              Note Inspection
-            </button>
-            <button v-if="canEditInspection(inspectionWorkRequest)" type="button" @click="saveInspection(false)" :disabled="inspectionForm.processing" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
-              Save Draft
-            </button>
-            <button v-if="canEditInspection(inspectionWorkRequest)" type="button" @click="saveInspection(true)" :disabled="inspectionForm.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
-              Submit Inspection
-            </button>
-          </div>
-        </div>
-      </div>
+        <template #footer>
+          <AppButton v-if="inspectionWorkRequest?.pre_repair_inspection" as="a" :href="route('work-requests.pre-repair-inspection.print', inspectionWorkRequest.id)" target="_blank" variant="secondary">
+            Print Report
+          </AppButton>
+          <AppButton v-if="canNoteInspection(inspectionWorkRequest) && inspectionWorkRequest?.pre_repair_inspection" variant="warning" @click="returnInspection">
+            Return
+          </AppButton>
+          <AppButton v-if="canNoteInspection(inspectionWorkRequest) && inspectionWorkRequest?.pre_repair_inspection?.status === 'submitted'" variant="success" @click="noteInspection">
+            Note Inspection
+          </AppButton>
+          <AppButton v-if="canEditInspection(inspectionWorkRequest)" variant="secondary" :loading="inspectionForm.processing" @click="saveInspection(false)">
+            Save Draft
+          </AppButton>
+          <AppButton v-if="canEditInspection(inspectionWorkRequest)" :loading="inspectionForm.processing" @click="saveInspection(true)">
+            Submit Inspection
+          </AppButton>
+        </template>
+      </AppModal>
     </div>
     <DigitalSignaturePin
       :show="showSubmitPin"
@@ -518,12 +422,24 @@
 <script setup>
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, XMarkIcon, PrinterIcon, ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, PrinterIcon, ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 
 const props = defineProps({
   divisions: Array,
@@ -619,6 +535,9 @@ const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
 const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
 const hasRole = (role) => roleNames.value.includes(role);
 const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r));
+
+// Number of visible columns in the desktop table — used for the AppTable skeleton/empty colspan
+const tableColCount = computed(() => (hasAnyRole('Administrator','GSU Head','DivisionChief') ? 13 : 12))
 
 const showModal = ref(false)
 const editingId = ref(null)
@@ -757,14 +676,15 @@ const inspectionStatus = (wr) => {
   return status
 }
 
+// Return AppBadge color keyword for the inspection status (was raw Tailwind classes pre-migration)
 const inspectionStatusClass = (wr) => {
   const status = wr?.pre_repair_inspection?.status
-  if (!wr?.requires_pre_repair_inspection) return 'bg-slate-100 text-slate-600'
-  if (status === 'noted') return 'bg-emerald-50 text-emerald-700'
-  if (status === 'submitted') return 'bg-blue-50 text-blue-700'
-  if (status === 'returned') return 'bg-red-50 text-red-600'
-  if (status === 'draft') return 'bg-amber-50 text-amber-700'
-  return 'bg-orange-50 text-orange-700'
+  if (!wr?.requires_pre_repair_inspection) return 'slate'
+  if (status === 'noted') return 'green'
+  if (status === 'submitted') return 'blue'
+  if (status === 'returned') return 'red'
+  if (status === 'draft') return 'amber'
+  return 'orange'
 }
 
 const canManageInspection = () => hasAnyRole('Administrator', 'GSU Head')
@@ -897,28 +817,25 @@ const submitForm = () => {
   }
 }
 
-const destroy = (wr) => {
-  Swal.fire({ title: 'Delete this work request?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' }).then((res) => {
-    if (!res.isConfirmed) return
-    import('@inertiajs/vue3').then(({ router }) => {
-      router.delete(`/work-requests/${wr.id}`, {
-        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
-        onError: (e) => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
-      })
-    })
+const destroy = async (wr) => {
+  const confirmed = await confirmDelete('This action cannot be undone.')
+  if (!confirmed) return
+  router.delete(`/work-requests/${wr.id}`, {
+    onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
+    onError: (e) => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
   })
 }
 
 
-// Return CSS classes for status badges
+// Return AppBadge color keyword for a status (was raw Tailwind classes pre-migration)
 const statusClass = (s) => {
-  if (!s) return 'bg-slate-100 text-slate-600'
+  if (!s) return 'slate'
   const st = String(s).toLowerCase()
-  if (st.includes('in progress')) return 'bg-orange-50 text-orange-700'
-  if (st.includes('approve')) return 'bg-emerald-50 text-emerald-700'
-  if (st.includes('declin')) return 'bg-red-50 text-red-600'
-  if (st.includes('completed')) return 'bg-blue-50 text-blue-700'
-  if (st.includes('pending')) return 'bg-amber-50 text-amber-700'
-  return 'bg-slate-100 text-slate-600'
+  if (st.includes('in progress')) return 'orange'
+  if (st.includes('approve')) return 'green'
+  if (st.includes('declin')) return 'red'
+  if (st.includes('completed')) return 'blue'
+  if (st.includes('pending')) return 'amber'
+  return 'slate'
 }
 </script>

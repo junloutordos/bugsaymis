@@ -3,190 +3,146 @@
   <AdminLayout title="Academic Units">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Academic Units</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage JHS, SHS, SST and administrative units</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button @click="doSync" :disabled="syncing"
-            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium transition-colors shadow-sm shrink-0 disabled:opacity-50">
+      <AppPageHeader title="Academic Units" subtitle="Manage JHS, SHS, SST and administrative units">
+        <template #actions>
+          <AppButton variant="success" :disabled="syncing" @click="doSync">
             <ArrowPathIcon class="h-4 w-4" /> Sync to Offices
-          </button>
-          <button @click="copyModal = true"
-            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg font-medium transition-colors shadow-sm shrink-0">
+          </AppButton>
+          <AppButton variant="secondary" @click="copyModal = true">
             <DocumentDuplicateIcon class="h-4 w-4" /> Copy from Year
-          </button>
-          <button @click="openForm()"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
+          </AppButton>
+          <AppButton @click="openForm()">
             <PlusIcon class="h-4 w-4" /> New Unit
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.errors?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.errors?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.errors.error }}
       </div>
 
       <!-- School Year picker -->
-      <div class="flex items-center gap-2">
-        <label class="text-xs font-medium text-slate-500 uppercase tracking-wide">School Year</label>
-        <select v-model="selectedSy" @change="switchYear"
-          class="text-sm border border-indigo-300 bg-indigo-50 text-indigo-700 font-medium rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-          <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
-            {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
-          </option>
-        </select>
-      </div>
+      <AppFilterBar>
+        <div class="w-56">
+          <AppSelect v-model="selectedSy" label="School Year" :show-blank="false" @change="switchYear">
+            <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+              {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+            </option>
+          </AppSelect>
+        </div>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-50 border-b border-slate-100">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Code</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Head</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-if="units.length === 0">
-              <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">
-                No academic units for this school year. Use "Copy from Year" to get started.
-              </td>
-            </tr>
-            <tr v-for="u in units" :key="u.id" class="hover:bg-slate-50/50">
-              <td class="px-4 py-3 font-mono text-xs text-indigo-700 font-semibold">{{ u.code }}</td>
-              <td class="px-4 py-3 font-medium text-slate-800">{{ u.name }}</td>
-              <td class="px-4 py-3">
-                <span class="text-xs px-2 py-0.5 rounded-full font-medium"
-                  :class="typeClass(u.unit_type)">
-                  {{ typeLabel(u.unit_type) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-slate-600">{{ u.head_name ?? '—' }}</td>
-              <td class="px-4 py-3">
-                <span :class="u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
-                  class="text-xs px-2 py-0.5 rounded-full font-medium">
-                  {{ u.is_active ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <button @click="openForm(u)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                    <PencilIcon class="h-4 w-4" />
-                  </button>
-                  <button @click="deleteUnit(u)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                    <TrashIcon class="h-4 w-4" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <AppTable :is-empty="!units.length" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Code</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Head</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
+
+        <tr v-for="u in units" :key="u.id" class="hover:bg-slate-50/50">
+          <td class="px-4 py-3 font-mono text-xs text-indigo-700 font-semibold">{{ u.code }}</td>
+          <td class="px-4 py-3 font-medium text-slate-800">{{ u.name }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="typeColor(u.unit_type)">{{ typeLabel(u.unit_type) }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-600">{{ u.head_name ?? '—' }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="u.is_active ? 'green' : 'slate'">{{ u.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <div class="flex items-center justify-end gap-1">
+              <AppIconButton label="Edit" @click="openForm(u)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+              <AppIconButton label="Delete" variant="danger" @click="deleteUnit(u)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="u in units" :key="u.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-mono text-xs text-indigo-700 font-semibold">{{ u.code }}</p>
+                <p class="font-medium text-slate-800">{{ u.name }}</p>
+                <p class="text-xs text-slate-400">{{ u.head_name ?? '—' }}</p>
+              </div>
+              <AppBadge :color="u.is_active ? 'green' : 'slate'">{{ u.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+            </div>
+            <AppBadge :color="typeColor(u.unit_type)">{{ typeLabel(u.unit_type) }}</AppBadge>
+            <div class="flex items-center gap-1 pt-1">
+              <AppIconButton label="Edit" @click="openForm(u)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+              <AppIconButton label="Delete" variant="danger" @click="deleteUnit(u)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No academic units for this school year" subtitle="Use &quot;Copy from Year&quot; to get started." />
+        </template>
+      </AppTable>
 
     </div>
 
     <!-- Edit/Create Modal -->
-    <div v-if="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">{{ form.id ? 'Edit' : 'New' }} Academic Unit</h2>
-        <div class="space-y-3">
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Code <span class="text-red-500">*</span></label>
-              <input v-model="form.code" type="text" placeholder="e.g. JHS"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-              <p v-if="form.errors.code" class="text-red-500 text-xs mt-1">{{ form.errors.code }}</p>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Type <span class="text-red-500">*</span></label>
-              <select v-model="form.unit_type"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                <option value="department">Department</option>
-                <option value="junior_high">Junior High School</option>
-                <option value="senior_high">Senior High School</option>
-                <option value="sst">SST Program</option>
-                <option value="admin">Administrative</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
-            <input v-model="form.name" type="text" placeholder="e.g. Junior High School"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-            <p v-if="form.errors.name" class="text-red-500 text-xs mt-1">{{ form.errors.name }}</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Sort Order</label>
-            <input v-model="form.sort_order" type="number" min="0"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Unit Head</label>
-            <select v-model="form.head_user_id"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-              <option :value="null">— None —</option>
-              <option v-for="f in facultyOptions" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
-          </div>
-          <div class="flex items-center gap-2">
-            <input v-model="form.is_active" type="checkbox" id="unit-active" class="rounded text-indigo-600" />
-            <label for="unit-active" class="text-sm text-slate-600">Active</label>
-          </div>
+    <AppModal :show="modal" :title="`${form.id ? 'Edit' : 'New'} Academic Unit`" size="sm" @close="modal = false">
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model="form.code" label="Code" required placeholder="e.g. JHS" :error="form.errors.code" />
+          <AppSelect v-model="form.unit_type" label="Type" required :show-blank="false">
+            <option value="department">Department</option>
+            <option value="junior_high">Junior High School</option>
+            <option value="senior_high">Senior High School</option>
+            <option value="sst">SST Program</option>
+            <option value="admin">Administrative</option>
+          </AppSelect>
         </div>
-        <div class="flex justify-end gap-3 pt-1">
-          <button @click="modal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="save" :disabled="form.processing"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium">
-            {{ form.id ? 'Update' : 'Create' }}
-          </button>
+        <AppInput v-model="form.name" label="Name" required placeholder="e.g. Junior High School" :error="form.errors.name" />
+        <AppInput v-model.number="form.sort_order" label="Sort Order" type="number" min="0" />
+        <AppSelect v-model="form.head_user_id" label="Unit Head" placeholder="— None —">
+          <option v-for="f in facultyOptions" :key="f.id" :value="f.id">{{ f.name }}</option>
+        </AppSelect>
+        <div class="flex items-center gap-2">
+          <input v-model="form.is_active" type="checkbox" id="unit-active" class="rounded text-indigo-600" />
+          <label for="unit-active" class="text-sm text-slate-600">Active</label>
         </div>
       </div>
-    </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="modal = false">Cancel</AppButton>
+        <AppButton :loading="form.processing" @click="save">{{ form.id ? 'Update' : 'Create' }}</AppButton>
+      </template>
+    </AppModal>
 
     <!-- Copy from Year Modal -->
-    <div v-if="copyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">Copy Academic Units from Another Year</h2>
-        <p class="text-sm text-slate-500">Copies all units from the source year into the target year. AUH designations are preserved. Units with duplicate codes are skipped.</p>
-        <div class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Source Year (copy from)</label>
-            <select v-model="copyForm.source_school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
-                {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Target Year (copy into)</label>
-            <select v-model="copyForm.target_school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
-                {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
-              </option>
-            </select>
-          </div>
-          <p v-if="copyForm.errors.target_school_year_id" class="text-xs text-red-500">{{ copyForm.errors.target_school_year_id }}</p>
-        </div>
-        <div class="flex justify-end gap-3 pt-1">
-          <button @click="copyModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="doCopy" :disabled="copyForm.processing"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
-            Copy Units
-          </button>
-        </div>
+    <AppModal :show="copyModal" title="Copy Academic Units from Another Year" size="sm" @close="copyModal = false">
+      <p class="text-sm text-slate-500 mb-4">Copies all units from the source year into the target year. AUH designations are preserved. Units with duplicate codes are skipped.</p>
+      <div class="space-y-3">
+        <AppSelect v-model="copyForm.source_school_year_id" label="Source Year (copy from)" :show-blank="false">
+          <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+            {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+          </option>
+        </AppSelect>
+        <AppSelect v-model="copyForm.target_school_year_id" label="Target Year (copy into)" :show-blank="false" :error="copyForm.errors.target_school_year_id">
+          <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+            {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+          </option>
+        </AppSelect>
       </div>
-    </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="copyModal = false">Cancel</AppButton>
+        <AppButton :loading="copyForm.processing" @click="doCopy">Copy Units</AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
@@ -195,6 +151,17 @@
 import { ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import {
   ArrowPathIcon, CheckCircleIcon, DocumentDuplicateIcon, ExclamationCircleIcon,
   PencilIcon, PlusIcon, TrashIcon,
@@ -214,8 +181,14 @@ function switchYear() {
 }
 
 const syncing = ref(false)
-function doSync() {
-  if (! confirm('Sync unit heads from academic units to matching offices? This will overwrite the current unit_head values in those offices.')) return
+async function doSync() {
+  const confirmed = await confirmAction({
+    title: 'Sync unit heads to offices?',
+    text: 'Sync unit heads from academic units to matching offices? This will overwrite the current unit_head values in those offices.',
+    confirmText: 'Sync',
+    icon: 'warning',
+  })
+  if (!confirmed) return
   syncing.value = true
   router.post(route('faculty-loading.academic-units.sync-to-offices'), { school_year_id: selectedSy.value }, {
     onFinish: () => { syncing.value = false },
@@ -250,8 +223,9 @@ function save() {
   }
 }
 
-function deleteUnit(u) {
-  if (! confirm(`Delete academic unit "${u.name}"?`)) return
+async function deleteUnit(u) {
+  const confirmed = await confirmDelete(`Delete academic unit "${u.name}"?`)
+  if (!confirmed) return
   useForm({}).delete(route('faculty-loading.academic-units.destroy', u.id))
 }
 
@@ -274,13 +248,13 @@ const TYPE_LABELS = {
   sst:         'SST',
   admin:       'Admin',
 }
-const TYPE_CLASSES = {
-  department:  'bg-indigo-100 text-indigo-700',
-  junior_high: 'bg-blue-100 text-blue-700',
-  senior_high: 'bg-violet-100 text-violet-700',
-  sst:         'bg-amber-100 text-amber-700',
-  admin:       'bg-slate-100 text-slate-600',
+const TYPE_COLORS = {
+  department:  'indigo',
+  junior_high: 'blue',
+  senior_high: 'purple',
+  sst:         'amber',
+  admin:       'slate',
 }
 const typeLabel = (t) => TYPE_LABELS[t] ?? t
-const typeClass = (t) => TYPE_CLASSES[t] ?? 'bg-slate-100 text-slate-600'
+const typeColor = (t) => TYPE_COLORS[t] ?? 'slate'
 </script>

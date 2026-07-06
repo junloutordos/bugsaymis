@@ -16,8 +16,8 @@ import { EyeIcon } from "@heroicons/vue/24/outline"
 import useDivisionChiefIPCR from "@/Composables/useIPCRDC.js"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 import { ref, computed, watch } from "vue"
-import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
+import { confirmAction } from "@/Composables/useConfirm.js"
 
 const props = defineProps({
   ipcrs:             Array,
@@ -112,20 +112,16 @@ const ratedForHRCount  = computed(() =>
   ).length
 )
 
-const submitToHR = () => {
+const submitToHR = async () => {
   if (!submitToHRPeriod.value) return
-  Swal.fire({
+  const confirmed = await confirmAction({
     title: "Submit to HR?",
     text: `Submit all ${ratedForHRCount.value} rated IPCR(s) for "${submitToHRPeriod.value}" to HR?`,
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonColor: "#0891b2",
-    confirmButtonText: "Yes, submit!",
-  }).then(result => {
-    if (result.isConfirmed) {
-      submit.post(route('division-chief-ipcr.submitToHR'), { rating_period: submitToHRPeriod.value })
-    }
+    confirmText: "Yes, submit!",
   })
+  if (confirmed) {
+    submit.post(route('division-chief-ipcr.submitToHR'), { rating_period: submitToHRPeriod.value })
+  }
 }
 
 // ── Memo Report ──────────────────────────────────────────────
@@ -267,14 +263,11 @@ const printMemo = () => {
       <AppPageHeader title="Division IPCR Targets">
         <template #actions>
           <!-- Submit to HR batch action -->
-          <div class="flex items-center gap-2 rounded-lg px-3 py-2 bg-white border border-slate-200 shadow-sm">
-            <select
-              v-model="submitToHRPeriod"
-              class="border-0 bg-transparent text-sm text-slate-700 focus:ring-0 p-0"
-            >
+          <div class="flex items-center gap-2">
+            <AppSelect v-model="submitToHRPeriod" placeholder="— Period —" :show-blank="false" class="min-w-40">
               <option value="" disabled>— Period —</option>
               <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
-            </select>
+            </AppSelect>
             <AppButton
               size="sm"
               :disabled="ratedForHRCount === 0 || !submitToHRPeriod || isSubmitting"

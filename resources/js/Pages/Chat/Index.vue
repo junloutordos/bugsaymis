@@ -2,6 +2,10 @@
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { useChat } from '@/Composables/useChat.js'
 import {
   PaperAirplaneIcon,
@@ -252,12 +256,9 @@ onUnmounted(() => {
               </span>
             </h2>
             <span :title="echoConnected ? 'Connected' : 'Connecting…'"
-                  :class="['inline-block h-2 w-2 rounded-full transition-colors', echoConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse']" />
+                  :class="['inline-block h-2 w-2 rounded-full transition-colors', echoConnected ? 'bg-success-500' : 'bg-warning-500 animate-pulse']" />
           </div>
-          <button @click="showNewChat = true"
-                  class="flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition-colors">
-            <span class="text-base leading-none">+</span> New
-          </button>
+          <AppButton size="sm" @click="showNewChat = true">+ New</AppButton>
         </div>
 
         <!-- Tabs: Chats / Archived -->
@@ -290,9 +291,8 @@ onUnmounted(() => {
             </svg>
           </div>
 
-          <p v-else-if="!filteredConversations.length" class="py-12 text-center text-xs text-slate-400">
-            {{ showArchived ? 'No archived conversations.' : 'No conversations yet.' }}
-          </p>
+          <EmptyState v-else-if="!filteredConversations.length"
+                      :title="showArchived ? 'No archived conversations.' : 'No conversations yet.'" />
 
           <div v-for="conv in filteredConversations" :key="conv.id"
                class="group relative flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 cursor-pointer active:bg-slate-100"
@@ -349,9 +349,8 @@ onUnmounted(() => {
       <div class="flex flex-1 flex-col min-w-0">
 
         <!-- Empty state -->
-        <div v-if="!activeConversation" class="flex flex-1 flex-col items-center justify-center gap-3 text-slate-400">
-          <UserCircleIcon class="h-14 w-14 opacity-20" />
-          <p class="text-sm">Select a conversation or start a new one</p>
+        <div v-if="!activeConversation" class="flex flex-1 items-center justify-center">
+          <EmptyState title="Select a conversation or start a new one" :icon="UserCircleIcon" />
         </div>
 
         <template v-else>
@@ -560,115 +559,85 @@ onUnmounted(() => {
     <!-- ══════════════════════════════════════════════
          NEW CONVERSATION MODAL
     ══════════════════════════════════════════════ -->
-    <Teleport to="body">
-      <Transition enter-active-class="transition-opacity duration-150" leave-active-class="transition-opacity duration-150"
-                  enter-from-class="opacity-0" leave-to-class="opacity-0">
-        <div v-if="showNewChat"
-             class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4"
-             @click.self="showNewChat = false">
+    <AppModal :show="showNewChat" title="New Conversation" body-class="p-0" @close="showNewChat = false">
+      <!-- DM / Group tabs -->
+      <div class="flex border-b border-slate-100 shrink-0">
+        <button @click="newChatMode = 'dm'"
+                :class="['flex-1 py-2.5 text-xs font-medium transition-colors', newChatMode === 'dm' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-600']">
+          Direct Message
+        </button>
+        <button @click="newChatMode = 'group'"
+                :class="['flex-1 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors', newChatMode === 'group' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-600']">
+          <UserGroupIcon class="h-3.5 w-3.5" /> Group Chat
+        </button>
+      </div>
 
-          <div class="flex flex-col w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
-               style="max-height: 90dvh">
+      <!-- Group name (group mode only) -->
+      <div v-if="newChatMode === 'group'" class="px-4 pt-3 pb-0 shrink-0">
+        <AppInput v-model="groupName" placeholder="Group name (required)" />
+        <p v-if="selectedGroupUsers.length > 0" class="mt-1.5 text-xs text-slate-500">
+          {{ selectedGroupUsers.length }} selected: {{ selectedGroupUsers.map(u => u.name.split(' ')[0]).join(', ') }}
+        </p>
+      </div>
 
-            <!-- Modal header -->
-            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-              <h3 class="text-sm font-semibold text-slate-800">New Conversation</h3>
-              <button @click="showNewChat = false"
-                      class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 transition-colors">
-                <XMarkIcon class="h-4 w-4" />
-              </button>
-            </div>
-
-            <!-- DM / Group tabs -->
-            <div class="flex border-b border-slate-100 shrink-0">
-              <button @click="newChatMode = 'dm'"
-                      :class="['flex-1 py-2.5 text-xs font-medium transition-colors', newChatMode === 'dm' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-600']">
-                Direct Message
-              </button>
-              <button @click="newChatMode = 'group'"
-                      :class="['flex-1 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors', newChatMode === 'group' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-600']">
-                <UserGroupIcon class="h-3.5 w-3.5" /> Group Chat
-              </button>
-            </div>
-
-            <!-- Group name (group mode only) -->
-            <div v-if="newChatMode === 'group'" class="px-4 pt-3 pb-0 shrink-0">
-              <input v-model="groupName" type="text" placeholder="Group name (required)"
-                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white" />
-              <p v-if="selectedGroupUsers.length > 0" class="mt-1.5 text-xs text-slate-500">
-                {{ selectedGroupUsers.length }} selected: {{ selectedGroupUsers.map(u => u.name.split(' ')[0]).join(', ') }}
-              </p>
-            </div>
-
-            <!-- Search -->
-            <div class="px-4 pt-3 pb-2 shrink-0">
-              <div class="relative">
-                <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input ref="newChatInput"
-                       :value="userSearchQ"
-                       @input="searchUsers($event.target.value)"
-                       type="text"
-                       placeholder="Search people…"
-                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white" />
-              </div>
-            </div>
-
-            <!-- User list -->
-            <div class="flex-1 overflow-y-auto">
-              <div v-if="searchingUsers" class="flex justify-center py-10">
-                <svg class="animate-spin h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                </svg>
-              </div>
-
-              <ul v-else-if="userSearchResults.length" class="divide-y divide-slate-50 py-1">
-                <li v-for="u in userSearchResults" :key="u.id">
-                  <button @click="newChatMode === 'dm' ? (startDM(u.id), showNewChat = false, showSidebar = false) : toggleGroupUser(u)"
-                          :class="['flex items-center gap-3 w-full px-4 py-3 text-left transition-colors', isGroupSelected(u.id) ? 'bg-indigo-50' : 'hover:bg-indigo-50']">
-                    <div class="relative shrink-0">
-                      <img v-if="u.avatar" :src="u.avatar" class="h-10 w-10 rounded-full object-cover" />
-                      <div v-else class="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 font-bold text-sm">
-                        {{ initials(u.name) }}
-                      </div>
-                      <!-- Checkmark for group selection -->
-                      <div v-if="newChatMode === 'group' && isGroupSelected(u.id)"
-                           class="absolute inset-0 flex items-center justify-center rounded-full bg-indigo-600/80">
-                        <CheckOutline class="h-5 w-5 text-white" />
-                      </div>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-sm font-medium text-slate-800 truncate">{{ u.name }}</p>
-                      <p class="text-xs text-slate-400 truncate">{{ u.position ?? 'Staff' }}</p>
-                    </div>
-                    <span v-if="newChatMode === 'dm'" class="shrink-0 text-indigo-400 text-xs font-medium opacity-0 group-hover:opacity-100">Message →</span>
-                  </button>
-                </li>
-              </ul>
-
-              <div v-else class="flex flex-col items-center justify-center py-10 text-slate-400">
-                <UserCircleIcon class="h-10 w-10 opacity-20 mb-2" />
-                <p class="text-xs">{{ userSearchQ ? 'No users found' : 'No users available' }}</p>
-              </div>
-            </div>
-
-            <!-- Group create footer -->
-            <div v-if="newChatMode === 'group'" class="px-5 py-3 border-t border-slate-100 shrink-0">
-              <button @click="createGroup"
-                      :disabled="!groupName.trim() || selectedGroupUsers.length < 1"
-                      class="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white py-2.5 text-sm font-medium transition-colors">
-                Create Group ({{ selectedGroupUsers.length }} selected)
-              </button>
-            </div>
-
-            <!-- DM footer hint -->
-            <div v-else class="px-5 py-3 border-t border-slate-50 bg-slate-50/60 shrink-0">
-              <p class="text-[11px] text-slate-400">Tap a person to open a direct message.</p>
-            </div>
-          </div>
+      <!-- Search -->
+      <div class="px-4 pt-3 pb-2 shrink-0">
+        <div class="relative">
+          <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input ref="newChatInput"
+                 :value="userSearchQ"
+                 @input="searchUsers($event.target.value)"
+                 type="text"
+                 placeholder="Search people…"
+                 class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white" />
         </div>
-      </Transition>
-    </Teleport>
+      </div>
+
+      <!-- User list -->
+      <div class="max-h-72 overflow-y-auto">
+        <div v-if="searchingUsers" class="flex justify-center py-10">
+          <svg class="animate-spin h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </div>
+
+        <ul v-else-if="userSearchResults.length" class="divide-y divide-slate-50 py-1">
+          <li v-for="u in userSearchResults" :key="u.id">
+            <button @click="newChatMode === 'dm' ? (startDM(u.id), showNewChat = false, showSidebar = false) : toggleGroupUser(u)"
+                    :class="['flex items-center gap-3 w-full px-4 py-3 text-left transition-colors', isGroupSelected(u.id) ? 'bg-indigo-50' : 'hover:bg-indigo-50']">
+              <div class="relative shrink-0">
+                <img v-if="u.avatar" :src="u.avatar" class="h-10 w-10 rounded-full object-cover" />
+                <div v-else class="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 font-bold text-sm">
+                  {{ initials(u.name) }}
+                </div>
+                <!-- Checkmark for group selection -->
+                <div v-if="newChatMode === 'group' && isGroupSelected(u.id)"
+                     class="absolute inset-0 flex items-center justify-center rounded-full bg-indigo-600/80">
+                  <CheckOutline class="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-slate-800 truncate">{{ u.name }}</p>
+                <p class="text-xs text-slate-400 truncate">{{ u.position ?? 'Staff' }}</p>
+              </div>
+              <span v-if="newChatMode === 'dm'" class="shrink-0 text-indigo-400 text-xs font-medium opacity-0 group-hover:opacity-100">Message →</span>
+            </button>
+          </li>
+        </ul>
+
+        <EmptyState v-else :title="userSearchQ ? 'No users found' : 'No users available'" :icon="UserCircleIcon" />
+      </div>
+
+      <template #footer>
+        <AppButton v-if="newChatMode === 'group'" block
+                   :disabled="!groupName.trim() || selectedGroupUsers.length < 1"
+                   @click="createGroup">
+          Create Group ({{ selectedGroupUsers.length }} selected)
+        </AppButton>
+        <p v-else class="w-full text-left text-[11px] text-slate-400">Tap a person to open a direct message.</p>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

@@ -2,6 +2,10 @@
 import { ref, computed, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppInput from '@/Components/AppInput.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { ArrowDownTrayIcon, DocumentArrowUpIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 
@@ -206,7 +210,8 @@ async function submit() {
     <div class="max-w-2xl mx-auto space-y-5">
 
       <!-- Shared header card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
+      <AppCard>
+        <div class="space-y-5">
         <div>
           <h2 class="text-base font-semibold text-slate-800">Upload Payroll CSV</h2>
           <p class="text-sm text-slate-500 mt-1">Select disbursement type(s), then upload the CSV file(s). Non-monthly types support multiple months (accumulated release).</p>
@@ -229,23 +234,16 @@ async function submit() {
 
         <!-- Pay period — only for monthly salary -->
         <div v-if="hasMonthly" class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Period Start <span class="text-red-500">*</span></label>
-            <input v-model="periodStart" type="date"
-                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Period End <span class="text-red-500">*</span></label>
-            <input v-model="periodEnd" type="date"
-                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
+          <AppInput v-model="periodStart" type="date" label="Period Start" required />
+          <AppInput v-model="periodEnd" type="date" label="Period End" required />
         </div>
-      </div>
+        </div>
+      </AppCard>
 
       <!-- Per-type upload cards -->
       <template v-if="selectedTypes.length">
-        <div v-for="type in selectedTypes" :key="type"
-             class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-4">
+        <AppCard v-for="type in selectedTypes" :key="type">
+        <div class="space-y-4">
 
           <!-- Card header -->
           <div class="flex items-center justify-between gap-3">
@@ -261,34 +259,18 @@ async function submit() {
           </div>
 
           <!-- Custom label for "other" -->
-          <div v-if="type === 'other'">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Describe the allowance <span class="text-red-500">*</span></label>
-            <input v-model="typeState[type].customLabel" type="text"
-                   placeholder='e.g. "Year-End Bonus"'
-                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
+          <AppInput v-if="type === 'other'" v-model="typeState[type].customLabel" type="text"
+                    placeholder='e.g. "Year-End Bonus"' label="Describe the allowance" required />
 
           <!-- ── Monthly salary ── -->
           <template v-if="isMonthly(type)">
             <div class="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 space-y-3">
               <p class="text-xs font-semibold text-indigo-700">ATM Credit Dates</p>
               <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">
-                    1st Half Credit Date <span class="text-red-500">*</span>
-                    <span class="text-slate-400 font-normal">(on/before 15th)</span>
-                  </label>
-                  <input v-model="typeState[type].firstHalfCreditDate" type="date"
-                         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">
-                    2nd Half Credit Date
-                    <span class="text-slate-400 font-normal">(optional)</span>
-                  </label>
-                  <input v-model="typeState[type].secondHalfCreditDate" type="date"
-                         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
+                <AppInput v-model="typeState[type].firstHalfCreditDate" type="date" required
+                          label="1st Half Credit Date (on/before 15th)" />
+                <AppInput v-model="typeState[type].secondHalfCreditDate" type="date"
+                          label="2nd Half Credit Date (optional)" />
               </div>
               <p class="text-xs text-indigo-600">Leave 2nd Half blank to set it later from the Preview page.</p>
             </div>
@@ -301,44 +283,23 @@ async function submit() {
               <p v-if="typeState[type].filename" class="mt-1 text-xs text-slate-500">{{ typeState[type].filename }}</p>
             </div>
 
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                Payroll No. <span class="text-slate-400 font-normal">(optional)</span>
-              </label>
-              <input v-model="typeState[type].payrollNo" type="text" placeholder="e.g. 2026-05-001"
-                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
+            <AppInput v-model="typeState[type].payrollNo" type="text" placeholder="e.g. 2026-05-001"
+                      label="Payroll No. (optional)" />
           </template>
 
           <!-- ── Non-monthly: credit date + entries ── -->
           <template v-else>
             <!-- Shared ATM credit date for all entries in this release -->
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">
-                  ATM Credit Date <span class="text-red-500">*</span>
-                </label>
-                <input v-model="typeState[type].creditDate" type="date"
-                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">
-                  Payroll No. <span class="text-slate-400 font-normal">(optional)</span>
-                </label>
-                <input v-model="typeState[type].payrollNo" type="text" placeholder="e.g. 2026-05-001"
-                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
+              <AppInput v-model="typeState[type].creditDate" type="date" label="ATM Credit Date" required />
+              <AppInput v-model="typeState[type].payrollNo" type="text" placeholder="e.g. 2026-05-001"
+                        label="Payroll No. (optional)" />
             </div>
 
             <!-- Purpose — required for Cash Advance and Reimbursement -->
-            <div v-if="needsPurpose(type)">
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                Purpose <span class="text-red-500">*</span>
-              </label>
-              <input v-model="typeState[type].purpose" type="text"
-                     :placeholder="type === 'cash_advance' ? 'e.g. Official Travel to Manila' : 'e.g. Medical Reimbursement — Receipt #12345'"
-                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
+            <AppInput v-if="needsPurpose(type)" v-model="typeState[type].purpose" type="text"
+                      :placeholder="type === 'cash_advance' ? 'e.g. Official Travel to Manila' : 'e.g. Medical Reimbursement — Receipt #12345'"
+                      label="Purpose" required />
 
             <!-- Per-month file entries -->
             <div class="space-y-3">
@@ -396,24 +357,20 @@ async function submit() {
           </template>
 
         </div>
+        </AppCard>
       </template>
 
       <!-- No type selected -->
-      <div v-else class="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center text-sm text-slate-400">
-        Select a disbursement type above to begin.
-      </div>
+      <AppCard v-else>
+        <EmptyState title="Select a disbursement type above to begin." />
+      </AppCard>
 
       <!-- Actions -->
       <div class="flex justify-end gap-2">
-        <a :href="route('payroll.cashier.index')"
-           class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          Cancel
-        </a>
-        <button @click="submit"
-                :disabled="loading || !selectedTypes.length"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+        <AppButton as="link" variant="secondary" :href="route('payroll.cashier.index')">Cancel</AppButton>
+        <AppButton :loading="loading" :disabled="loading || !selectedTypes.length" @click="submit">
           {{ loading ? 'Parsing…' : `Parse & Preview${selectedTypes.length > 1 ? ' (' + selectedTypes.length + ' types)' : ''}` }}
-        </button>
+        </AppButton>
       </div>
 
     </div>

@@ -1,13 +1,19 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm, Link } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
-  ChevronLeftIcon, DocumentArrowDownIcon, QrCodeIcon,
+  ChevronLeftIcon, DocumentArrowDownIcon,
   CheckCircleIcon, UserGroupIcon, ClockIcon, ShieldCheckIcon,
-  PencilSquareIcon, EyeIcon, BuildingLibraryIcon,
+  PencilSquareIcon, EyeIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -82,14 +88,23 @@ function copyVerifyUrl() {
   setTimeout(() => { qrCopied.value = false }, 2000)
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-const typeCls = {
-  SO: 'bg-indigo-100 text-indigo-700', TO: 'bg-blue-100 text-blue-700',
-  MEMO: 'bg-violet-100 text-violet-700', OO: 'bg-cyan-100 text-cyan-700',
-  AO: 'bg-amber-100 text-amber-700', CIRC: 'bg-emerald-100 text-emerald-700',
-  NOTICE: 'bg-rose-100 text-rose-700',
+// ── Helpers — local badge colour mapping (mirrors Issuances/Index.vue) ─────
+function typeColor(type) {
+  const map = {
+    SO:     'indigo',
+    TO:     'blue',
+    MEMO:   'purple',
+    OO:     'blue',
+    AO:     'amber',
+    CIRC:   'green',
+    NOTICE: 'red',
+  }
+  return map[type] ?? 'slate'
 }
-const statusCls = { draft: 'bg-slate-100 text-slate-600', released: 'bg-emerald-100 text-emerald-700' }
+
+function statusColor(status) {
+  return status === 'released' ? 'green' : 'slate'
+}
 
 function fmtDt(d) {
   if (!d) return '—'
@@ -107,13 +122,13 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
     <div class="max-w-4xl space-y-5">
 
       <!-- Back -->
-      <button @click="router.visit(route('issuances.index'))"
-        class="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800">
+      <Link :href="route('issuances.index')"
+        class="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800">
         <ChevronLeftIcon class="h-4 w-4" /> Back to Issuances
-      </button>
+      </Link>
 
       <!-- ── Document Header ─────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <!-- Colour band -->
         <div class="h-1.5 bg-indigo-600"></div>
 
@@ -122,14 +137,8 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
             <div class="flex-1">
               <div class="flex flex-wrap items-center gap-2 mb-2">
                 <span class="font-mono font-bold text-slate-800 text-base">{{ issuance.control_number }}</span>
-                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                  :class="typeCls[issuance.type] ?? 'bg-slate-100 text-slate-600'">
-                  {{ issuance.type_label }}
-                </span>
-                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize"
-                  :class="statusCls[issuance.status] ?? 'bg-slate-100 text-slate-600'">
-                  {{ issuance.status }}
-                </span>
+                <AppBadge :color="typeColor(issuance.type)">{{ issuance.type_label }}</AppBadge>
+                <AppBadge :color="statusColor(issuance.status)" class="capitalize">{{ issuance.status }}</AppBadge>
               </div>
               <h1 class="text-xl font-semibold text-slate-800">{{ issuance.title }}</h1>
               <p class="text-xs text-slate-500 mt-1">
@@ -141,35 +150,30 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
             <!-- Actions -->
             <div class="flex flex-wrap gap-2 shrink-0">
               <!-- Acknowledge (staff) -->
-              <button v-if="!isAdmin && issuance.status === 'released' && !ackDone"
-                @click="acknowledge" :disabled="ackForm.processing"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
+              <AppButton v-if="!isAdmin && issuance.status === 'released' && !ackDone"
+                @click="acknowledge" :disabled="ackForm.processing">
                 <CheckCircleIcon class="h-4 w-4" /> Acknowledge Receipt
-              </button>
+              </AppButton>
               <div v-else-if="!isAdmin && ackDone"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg">
+                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-success-600 bg-success-50 border border-success-100 rounded-lg">
                 <CheckCircleIcon class="h-4 w-4" /> Acknowledged
               </div>
 
               <!-- Release (admin, draft) -->
-              <button v-if="isAdmin && issuance.status === 'draft'"
-                @click="openRelease"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
+              <AppButton v-if="isAdmin && issuance.status === 'draft'" @click="openRelease">
                 Sign & Release
-              </button>
+              </AppButton>
 
               <!-- Download PDF -->
-              <a v-if="issuance.status === 'released'"
-                :href="route('issuances.pdf', issuance.id)" target="_blank"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50">
+              <AppButton v-if="issuance.status === 'released'"
+                as="a" :href="route('issuances.pdf', issuance.id)" target="_blank" variant="secondary">
                 <DocumentArrowDownIcon class="h-4 w-4" /> PDF
-              </a>
+              </AppButton>
 
               <!-- View scan -->
-              <button v-if="issuance.has_attachment" @click="showScanModal = true"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50">
+              <AppButton v-if="issuance.has_attachment" variant="secondary" @click="showScanModal = true">
                 <EyeIcon class="h-4 w-4" /> View Scan
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -181,9 +185,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
         <div class="lg:col-span-2 space-y-5">
 
           <!-- Content -->
-          <div v-if="issuance.content" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h2 class="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4">Content</h2>
-
+          <AppCard v-if="issuance.content" title="Content">
             <!-- Official letterhead preview -->
             <div class="border border-slate-200 rounded-lg p-5">
               <div class="text-center border-b border-slate-200 pb-3 mb-4">
@@ -196,24 +198,23 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               </div>
               <div class="text-sm text-slate-700 leading-relaxed prose prose-sm max-w-none" v-html="DOMPurify.sanitize(issuance.content ?? '')"></div>
             </div>
-          </div>
+          </AppCard>
 
-          <div v-else-if="issuance.has_attachment"
-            class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center">
-            <PencilSquareIcon class="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p class="text-sm text-slate-500">This issuance has an attached scanned document.</p>
-            <p class="text-xs text-slate-400 mt-1">{{ issuance.attachment_filename }}</p>
-            <button @click="showScanModal = true"
-              class="mt-3 px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50">
-              View Scan
-            </button>
-          </div>
+          <AppCard v-else-if="issuance.has_attachment">
+            <EmptyState :icon="PencilSquareIcon" title="This issuance has an attached scanned document." :subtitle="issuance.attachment_filename">
+              <AppButton class="mt-3" variant="secondary" size="sm" @click="showScanModal = true">
+                View Scan
+              </AppButton>
+            </EmptyState>
+          </AppCard>
 
           <!-- Signature block -->
-          <div v-if="issuance.signature" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
-              <ShieldCheckIcon class="h-4 w-4 text-emerald-500" /> Digital Signature
-            </h2>
+          <AppCard v-if="issuance.signature">
+            <template #header>
+              <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <ShieldCheckIcon class="h-4 w-4 text-success-500" /> Digital Signature
+              </h3>
+            </template>
             <div class="flex items-center gap-4">
               <img v-if="issuance.signature.sig_uri" :src="issuance.signature.sig_uri"
                 class="h-12 object-contain" alt="Signature" />
@@ -223,38 +224,37 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                 <p class="text-xs text-slate-400 mt-1">{{ fmtDt(issuance.signature.signed_at) }}</p>
               </div>
             </div>
-          </div>
+          </AppCard>
         </div>
 
         <!-- ── Right panel ────────────────────────────────────────────────── -->
         <div class="space-y-4">
 
           <!-- QR + Verification -->
-          <div v-if="issuance.status === 'released'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Verification QR</h2>
+          <AppCard v-if="issuance.status === 'released'" title="Verification QR">
             <div class="flex justify-center mb-3" v-html="issuance.qr_svg"></div>
-            <button @click="copyVerifyUrl"
-              class="w-full px-3 py-2 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+            <AppButton variant="secondary" size="sm" block @click="copyVerifyUrl">
               {{ qrCopied ? '✓ Copied!' : 'Copy verification link' }}
-            </button>
+            </AppButton>
             <p class="text-[10px] text-slate-400 text-center mt-2">Scan to verify authenticity</p>
-          </div>
+          </AppCard>
 
           <!-- Hash -->
-          <div v-if="issuance.content_hash" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Content Hash</h2>
+          <AppCard v-if="issuance.content_hash" title="Content Hash">
             <p class="font-mono text-[10px] text-slate-500 break-all bg-slate-50 rounded p-2">{{ issuance.content_hash }}</p>
             <p class="text-[10px] text-slate-400 mt-1">SHA-256 tamper detection</p>
-          </div>
+          </AppCard>
 
           <!-- Acknowledgment progress (admin) -->
-          <div v-if="isAdmin && issuance.status === 'released'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-              <UserGroupIcon class="h-3.5 w-3.5" /> Acknowledgments
-            </h2>
+          <AppCard v-if="isAdmin && issuance.status === 'released'">
+            <template #header>
+              <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                <UserGroupIcon class="h-3.5 w-3.5" /> Acknowledgments
+              </h3>
+            </template>
             <div class="flex items-center gap-3 mb-2">
               <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                <div class="bg-emerald-500 h-full rounded-full transition-all" :style="`width:${ackPercent}%`"></div>
+                <div class="bg-success-500 h-full rounded-full transition-all" :style="`width:${ackPercent}%`"></div>
               </div>
               <span class="text-xs font-bold text-slate-700 shrink-0">{{ ackCount }}/{{ totalCount }}</span>
             </div>
@@ -267,59 +267,56 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                   <p class="text-xs font-medium text-slate-700 truncate">{{ r.user?.name ?? r.office?.name ?? '—' }}</p>
                   <p v-if="r.user?.position" class="text-[10px] text-slate-400 truncate">{{ r.user.position }}</p>
                 </div>
-                <span v-if="r.acknowledged_at" class="text-emerald-500 text-xs shrink-0 ml-2" title="Acknowledged">✓</span>
+                <span v-if="r.acknowledged_at" class="text-success-500 text-xs shrink-0 ml-2" title="Acknowledged">✓</span>
                 <ClockIcon v-else class="h-3.5 w-3.5 text-slate-300 shrink-0 ml-2" />
               </div>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Release panel (draft) -->
-          <div v-if="isAdmin && issuance.status === 'draft' && showReleasePanel"
-            class="bg-white rounded-xl border border-indigo-200 shadow-sm p-4 space-y-3">
-            <h2 class="text-sm font-semibold text-slate-700">Release Settings</h2>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5">Recipients</label>
-              <div class="space-y-1.5">
-                <label v-for="opt in [
-                  { key:'all', label:'All Staff' },
-                  { key:'office', label:'By Office (configure on create)' },
-                  { key:'division', label:'By Division' },
-                  { key:'individual', label:'Individual (configure on create)' },
-                ]" :key="opt.key" class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" v-model="recipientType" :value="opt.key" class="text-indigo-600" />
-                  <span class="text-sm text-slate-700">{{ opt.label }}</span>
-                </label>
+          <AppCard v-if="isAdmin && issuance.status === 'draft' && showReleasePanel" title="Release Settings">
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Recipients</label>
+                <div class="space-y-1.5">
+                  <label v-for="opt in [
+                    { key:'all', label:'All Staff' },
+                    { key:'office', label:'By Office (configure on create)' },
+                    { key:'division', label:'By Division' },
+                    { key:'individual', label:'Individual (configure on create)' },
+                  ]" :key="opt.key" class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" v-model="recipientType" :value="opt.key" class="text-indigo-600" />
+                    <span class="text-sm text-slate-700">{{ opt.label }}</span>
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <!-- Division picker (only shown when By Division is selected) -->
-            <div v-if="recipientType === 'division'" class="space-y-2">
-              <input v-model="divisionSearch" type="text" placeholder="Search divisions…"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <div class="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-                <label v-for="d in filteredDivisions" :key="d.id"
-                  class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-                  <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
-                    @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
-                  <div>
-                    <p class="text-sm text-slate-700">{{ d.division_name }}</p>
-                    <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
-                  </div>
-                </label>
+              <!-- Division picker (only shown when By Division is selected) -->
+              <div v-if="recipientType === 'division'" class="space-y-2">
+                <AppInput v-model="divisionSearch" type="text" placeholder="Search divisions…" />
+                <div class="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  <label v-for="d in filteredDivisions" :key="d.id"
+                    class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                    <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
+                      @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
+                    <div>
+                      <p class="text-sm text-slate-700">{{ d.division_name }}</p>
+                      <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
+                    </div>
+                  </label>
+                </div>
+                <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
               </div>
-              <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
+
+              <p class="text-xs text-warning-700 bg-warning-50 rounded-lg px-3 py-2">
+                ⚠ This will sign and release the issuance permanently.
+              </p>
+
+              <AppButton block @click="showPinModal = true">
+                Sign & Release Now
+              </AppButton>
             </div>
-
-            <p class="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-              ⚠ This will sign and release the issuance permanently.
-            </p>
-
-            <button @click="showPinModal = true"
-              class="w-full py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
-              Sign & Release Now
-            </button>
-          </div>
+          </AppCard>
         </div>
       </div>
     </div>
@@ -336,20 +333,10 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
     />
 
     <!-- Scan preview modal -->
-    <Teleport to="body">
-      <div v-if="showScanModal" class="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60">
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-          <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <p class="text-sm font-semibold text-slate-800">{{ issuance.attachment_filename }}</p>
-            <button @click="showScanModal = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-          </div>
-          <div class="flex-1 overflow-auto p-2">
-            <iframe :src="route('issuances.scan', issuance.id)"
-              class="w-full h-[78vh] rounded-lg border border-slate-100" />
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <AppModal :show="showScanModal" :title="issuance.attachment_filename" size="4xl" body-class="p-2" @close="showScanModal = false">
+      <iframe :src="route('issuances.scan', issuance.id)"
+        class="w-full h-[78vh] rounded-lg border border-slate-100" />
+    </AppModal>
 
   </AdminLayout>
 </template>

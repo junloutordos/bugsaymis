@@ -19,9 +19,9 @@
       <!-- Alert -->
       <div v-if="alert.message" :class="[
           'rounded-lg px-4 py-3 text-sm flex items-start gap-2',
-          alert.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-            : alert.type === 'warning' ? 'bg-amber-50 border border-amber-200 text-amber-700'
-            : 'bg-red-50 border border-red-200 text-red-700'
+          alert.type === 'success' ? 'bg-success-50 border border-success-100 text-success-700'
+            : alert.type === 'warning' ? 'bg-warning-50 border border-warning-100 text-warning-700'
+            : 'bg-danger-50 border border-danger-100 text-danger-700'
         ]">
         <CheckCircleIcon v-if="alert.type === 'success'" class="h-4 w-4 mt-0.5 shrink-0" />
         <ExclamationTriangleIcon v-else class="h-4 w-4 mt-0.5 shrink-0" />
@@ -29,7 +29,7 @@
       </div>
 
       <!-- ── Term Selector + Analyse ─────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+      <AppCard>
         <div class="flex flex-col sm:flex-row gap-4 items-end">
           <div class="flex-1">
             <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
@@ -51,15 +51,12 @@
               </option>
             </select>
           </div>
-          <button @click="runAnalysis"
-            :disabled="!form.academic_term_id || analysing"
-            class="inline-flex items-center gap-2 px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-            <ArrowPathIcon v-if="analysing" class="h-4 w-4 animate-spin" />
-            <MagnifyingGlassIcon v-else class="h-4 w-4" />
+          <AppButton :disabled="!form.academic_term_id" :loading="analysing" size="lg" class="shrink-0" @click="runAnalysis">
+            <MagnifyingGlassIcon v-if="!analysing" class="h-4 w-4" />
             {{ analysing ? 'Analysing…' : 'Analyse' }}
-          </button>
+          </AppButton>
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── Analysis Results ──────────────────────────────────────── -->
       <template v-if="analysis">
@@ -71,30 +68,30 @@
 
         <!-- Summary cards -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          <AppCard class="text-center">
             <p class="text-2xl font-bold text-slate-700">{{ analysis.summary.faculty_count }}</p>
             <p class="text-xs text-slate-500 mt-1">Faculty</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          </AppCard>
+          <AppCard class="text-center">
             <p class="text-2xl font-bold text-slate-700">{{ analysis.summary.average_load }}</p>
             <p class="text-xs text-slate-500 mt-1">Avg Units</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          </AppCard>
+          <AppCard class="text-center">
             <p class="text-2xl font-bold text-slate-700">± {{ analysis.summary.std_deviation }}</p>
             <p class="text-xs text-slate-500 mt-1">Std Deviation</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-            <p class="text-2xl font-bold text-red-600">{{ analysis.summary.overloaded }}</p>
+          </AppCard>
+          <AppCard class="text-center">
+            <p class="text-2xl font-bold text-danger-600">{{ analysis.summary.overloaded }}</p>
             <p class="text-xs text-slate-500 mt-1">Overloaded</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-            <p class="text-2xl font-bold text-amber-600">{{ analysis.summary.underloaded }}</p>
+          </AppCard>
+          <AppCard class="text-center">
+            <p class="text-2xl font-bold text-warning-600">{{ analysis.summary.underloaded }}</p>
             <p class="text-xs text-slate-500 mt-1">Underloaded</p>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-            <p class="text-2xl font-bold text-emerald-600">{{ analysis.summary.full_load }}</p>
+          </AppCard>
+          <AppCard class="text-center">
+            <p class="text-2xl font-bold text-success-600">{{ analysis.summary.full_load }}</p>
             <p class="text-xs text-slate-500 mt-1">Full Load</p>
-          </div>
+          </AppCard>
         </div>
 
         <!-- Workload Distribution Chart -->
@@ -222,29 +219,27 @@
         </div>
 
         <!-- ── Suggestions Panel ──────────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <AppCard :padded="false" class="overflow-hidden">
           <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <LightBulbIcon class="h-4 w-4 text-amber-400" />
+              <LightBulbIcon class="h-4 w-4 text-warning-500" />
               Rebalancing Suggestions
             </h2>
-            <button @click="loadSuggestions"
-              :disabled="loadingSuggestions"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-medium transition-colors disabled:opacity-50">
-              <ArrowPathIcon v-if="loadingSuggestions" class="h-3.5 w-3.5 animate-spin" />
-              <SparklesIcon v-else class="h-3.5 w-3.5" />
+            <AppButton variant="secondary" size="sm" :loading="loadingSuggestions" @click="loadSuggestions">
+              <SparklesIcon v-if="!loadingSuggestions" class="h-3.5 w-3.5" />
               {{ loadingSuggestions ? 'Generating…' : 'Generate Suggestions' }}
-            </button>
+            </AppButton>
           </div>
 
           <!-- Not loaded yet -->
-          <div v-if="suggestions === null" class="py-10 text-center text-slate-400 text-sm">
-            Click "Generate Suggestions" to get rebalancing recommendations.
-          </div>
+          <EmptyState v-if="suggestions === null"
+            title="No suggestions yet"
+            subtitle='Click "Generate Suggestions" to get rebalancing recommendations.'
+            :icon="LightBulbIcon" />
 
           <!-- No suggestions -->
           <div v-else-if="suggestions.length === 0" class="py-10 text-center">
-            <CheckCircleIcon class="mx-auto h-10 w-10 text-emerald-300 mb-2" />
+            <CheckCircleIcon class="mx-auto h-10 w-10 text-success-500 mb-2" />
             <p class="text-sm font-medium text-slate-600">Load is well balanced.</p>
             <p class="text-xs text-slate-400 mt-1">No significant rebalancing improvements found.</p>
           </div>
@@ -259,7 +254,7 @@
                 <div class="flex items-start justify-between gap-3">
                   <div class="flex-1">
                     <div class="flex items-center gap-2 mb-1">
-                      <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Transfer</span>
+                      <AppBadge color="blue">Transfer</AppBadge>
                       <span class="text-xs text-slate-400">+{{ s.improvement_score }} unit improvement</span>
                     </div>
                     <p class="text-sm text-slate-700">{{ s.explanation }}</p>
@@ -275,13 +270,10 @@
                       </span>
                     </div>
                   </div>
-                  <button @click="openConfirm(s, idx)"
-                    :disabled="applying === idx"
-                    class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
-                    <ArrowPathIcon v-if="applying === idx" class="h-3 w-3 animate-spin" />
-                    <CheckIcon v-else class="h-3 w-3" />
+                  <AppButton variant="success" size="sm" class="shrink-0" :loading="applying === idx" @click="openConfirm(s, idx)">
+                    <CheckIcon v-if="applying !== idx" class="h-3 w-3" />
                     Apply
-                  </button>
+                  </AppButton>
                 </div>
               </template>
 
@@ -290,7 +282,7 @@
                 <div class="flex items-start justify-between gap-3">
                   <div class="flex-1">
                     <div class="flex items-center gap-2 mb-1">
-                      <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Swap</span>
+                      <AppBadge color="purple">Swap</AppBadge>
                       <span class="text-xs text-slate-400">+{{ s.improvement_score }} unit improvement</span>
                     </div>
                     <p class="text-sm text-slate-700">{{ s.explanation }}</p>
@@ -306,133 +298,106 @@
                       </span>
                     </div>
                   </div>
-                  <button @click="openConfirm(s, idx)"
-                    :disabled="applying === idx"
-                    class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
-                    <ArrowPathIcon v-if="applying === idx" class="h-3 w-3 animate-spin" />
-                    <CheckIcon v-else class="h-3 w-3" />
+                  <AppButton variant="success" size="sm" class="shrink-0" :loading="applying === idx" @click="openConfirm(s, idx)">
+                    <CheckIcon v-if="applying !== idx" class="h-3 w-3" />
                     Apply
-                  </button>
+                  </AppButton>
                 </div>
               </template>
             </div>
           </div>
-        </div>
+        </AppCard>
 
       </template>
 
     </div>
 
     <!-- ── Simulation Confirmation Modal ─────────────────────────────── -->
-    <div v-if="confirm.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+    <AppModal :show="confirm.open" title="Confirm Rebalancing" subtitle="Preview the impact before applying this change."
+      size="lg" body-class="px-6 py-4 space-y-4" @close="confirm.open = false">
 
-        <!-- Modal header -->
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
-            <EyeIcon class="h-5 w-5 text-indigo-500" />
-          </div>
-          <div>
-            <h2 class="text-base font-semibold text-slate-800">Confirm Rebalancing</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Preview the impact before applying this change.</p>
-          </div>
-        </div>
-
-        <!-- Suggestion info -->
-        <div class="px-6 py-4 space-y-4">
-          <div class="flex items-center gap-2">
-            <span v-if="confirm.suggestion?.type === 'transfer'"
-              class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Transfer</span>
-            <span v-else
-              class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Swap</span>
-            <span class="text-xs text-slate-500">+{{ confirm.suggestion?.improvement_score }} unit improvement</span>
-          </div>
-
-          <p class="text-sm text-slate-700">{{ confirm.suggestion?.explanation }}</p>
-
-          <!-- Impact table -->
-          <div class="rounded-xl border border-slate-100 overflow-hidden">
-            <table class="min-w-full text-xs">
-              <thead class="bg-slate-50">
-                <tr>
-                  <th class="px-4 py-2 text-left font-semibold text-slate-500">Faculty</th>
-                  <th class="px-4 py-2 text-center font-semibold text-slate-500">Before</th>
-                  <th class="px-4 py-2 text-center font-semibold text-slate-500"></th>
-                  <th class="px-4 py-2 text-center font-semibold text-slate-500">After</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-50">
-
-                <!-- Transfer rows -->
-                <template v-if="confirm.suggestion?.type === 'transfer'">
-                  <tr>
-                    <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.from_faculty_name }}</td>
-                    <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.from_current_total }} u</td>
-                    <td class="px-4 py-2.5 text-center text-slate-400">→</td>
-                    <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.from_new_status)">
-                      {{ confirm.suggestion.from_new_total }} u
-                      <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.from_new_status) }})</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.to_faculty_name }}</td>
-                    <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.to_current_total }} u</td>
-                    <td class="px-4 py-2.5 text-center text-slate-400">→</td>
-                    <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.to_new_status)">
-                      {{ confirm.suggestion.to_new_total }} u
-                      <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.to_new_status) }})</span>
-                    </td>
-                  </tr>
-                </template>
-
-                <!-- Swap rows -->
-                <template v-else-if="confirm.suggestion?.type === 'swap'">
-                  <tr>
-                    <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.faculty_a_name }}</td>
-                    <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.faculty_a_current_total }} u</td>
-                    <td class="px-4 py-2.5 text-center text-slate-400">⇄</td>
-                    <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.faculty_a_new_status)">
-                      {{ confirm.suggestion.faculty_a_new_total }} u
-                      <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.faculty_a_new_status) }})</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.faculty_b_name }}</td>
-                    <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.faculty_b_current_total }} u</td>
-                    <td class="px-4 py-2.5 text-center text-slate-400">⇄</td>
-                    <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.faculty_b_new_status)">
-                      {{ confirm.suggestion.faculty_b_new_total }} u
-                      <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.faculty_b_new_status) }})</span>
-                    </td>
-                  </tr>
-                </template>
-
-              </tbody>
-            </table>
-          </div>
-
-          <p class="text-xs text-slate-400">
-            This action will permanently reassign the load. The analysis will refresh automatically after applying.
-          </p>
-        </div>
-
-        <!-- Modal actions -->
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
-          <button @click="confirm.open = false"
-            class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium">
-            Cancel
-          </button>
-          <button @click="confirmApply"
-            :disabled="applying !== null"
-            class="inline-flex items-center gap-2 px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
-            <ArrowPathIcon v-if="applying !== null" class="h-4 w-4 animate-spin" />
-            <CheckIcon v-else class="h-4 w-4" />
-            Confirm &amp; Apply
-          </button>
-        </div>
-
+      <!-- Suggestion info -->
+      <div class="flex items-center gap-2">
+        <AppBadge v-if="confirm.suggestion?.type === 'transfer'" color="blue">Transfer</AppBadge>
+        <AppBadge v-else color="purple">Swap</AppBadge>
+        <span class="text-xs text-slate-500">+{{ confirm.suggestion?.improvement_score }} unit improvement</span>
       </div>
-    </div>
+
+      <p class="text-sm text-slate-700">{{ confirm.suggestion?.explanation }}</p>
+
+      <!-- Impact table -->
+      <div class="rounded-xl border border-slate-100 overflow-hidden">
+        <table class="min-w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-4 py-2 text-left font-semibold text-slate-500">Faculty</th>
+              <th class="px-4 py-2 text-center font-semibold text-slate-500">Before</th>
+              <th class="px-4 py-2 text-center font-semibold text-slate-500"></th>
+              <th class="px-4 py-2 text-center font-semibold text-slate-500">After</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-50">
+
+            <!-- Transfer rows -->
+            <template v-if="confirm.suggestion?.type === 'transfer'">
+              <tr>
+                <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.from_faculty_name }}</td>
+                <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.from_current_total }} u</td>
+                <td class="px-4 py-2.5 text-center text-slate-400">→</td>
+                <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.from_new_status)">
+                  {{ confirm.suggestion.from_new_total }} u
+                  <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.from_new_status) }})</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.to_faculty_name }}</td>
+                <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.to_current_total }} u</td>
+                <td class="px-4 py-2.5 text-center text-slate-400">→</td>
+                <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.to_new_status)">
+                  {{ confirm.suggestion.to_new_total }} u
+                  <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.to_new_status) }})</span>
+                </td>
+              </tr>
+            </template>
+
+            <!-- Swap rows -->
+            <template v-else-if="confirm.suggestion?.type === 'swap'">
+              <tr>
+                <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.faculty_a_name }}</td>
+                <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.faculty_a_current_total }} u</td>
+                <td class="px-4 py-2.5 text-center text-slate-400">⇄</td>
+                <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.faculty_a_new_status)">
+                  {{ confirm.suggestion.faculty_a_new_total }} u
+                  <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.faculty_a_new_status) }})</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="px-4 py-2.5 font-medium text-slate-700">{{ confirm.suggestion.faculty_b_name }}</td>
+                <td class="px-4 py-2.5 text-center text-slate-500">{{ confirm.suggestion.faculty_b_current_total }} u</td>
+                <td class="px-4 py-2.5 text-center text-slate-400">⇄</td>
+                <td class="px-4 py-2.5 text-center font-semibold" :class="statusTextClass(confirm.suggestion.faculty_b_new_status)">
+                  {{ confirm.suggestion.faculty_b_new_total }} u
+                  <span class="ml-1 font-normal text-slate-400">({{ statusLabel(confirm.suggestion.faculty_b_new_status) }})</span>
+                </td>
+              </tr>
+            </template>
+
+          </tbody>
+        </table>
+      </div>
+
+      <p class="text-xs text-slate-400">
+        This action will permanently reassign the load. The analysis will refresh automatically after applying.
+      </p>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="confirm.open = false">Cancel</AppButton>
+        <AppButton variant="success" :loading="applying !== null" @click="confirmApply">
+          <CheckIcon v-if="applying === null" class="h-4 w-4" />
+          Confirm &amp; Apply
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
@@ -442,9 +407,13 @@ import { ref, computed, reactive } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   ScaleIcon,
-  ArrowPathIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
@@ -452,7 +421,6 @@ import {
   LightBulbIcon,
   SparklesIcon,
   CheckIcon,
-  EyeIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
