@@ -52,6 +52,10 @@ function logout() {
                         :href="route('student-portal.clearance')"
                         class="text-sm text-slate-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
                     >Clearance</a>
+                    <a
+                        :href="route('student-portal.lost-found')"
+                        class="text-sm text-slate-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                    >Lost &amp; Found</a>
                     <button
                         @click="logout"
                         class="flex items-center gap-1 text-sm text-slate-400 hover:text-red-500 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"

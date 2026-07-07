@@ -920,6 +920,14 @@ export const menuItems = [
         icon: ClipboardDocumentListIcon,
         permissions: ["facilities.view"],
       },
+      // No roles/permissions — every authenticated employee can report and
+      // browse the found-items board; GSU actions are gated in-page.
+      {
+        label: "Lost & Found",
+        routeName: "lost-found.index",
+        href: route("lost-found.index"),
+        icon: ArchiveBoxIcon,
+      },
     ],
   },
   {

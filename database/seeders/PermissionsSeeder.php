@@ -88,6 +88,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Facilities','name' => 'facilities.view',       'description' => 'View facility requests'],
             ['module' => 'Facilities','name' => 'facilities.create',     'description' => 'Submit facility requests'],
             ['module' => 'Facilities','name' => 'facilities.manage',     'description' => 'Manage facility requests (GSU Head / Admin)'],
+            ['module' => 'Facilities','name' => 'lostfound.manage',      'description' => 'Lost & Found: receive turnovers, custody, matching, release (GSU / Admin)'],
             ['module' => 'Facilities','name' => 'facilities.dc-approve', 'description' => 'Division Chief in-app approval of facility, work, and service requests'],
             ['module' => 'Facilities','name' => 'facilities.fad-approve','description' => 'FAD Chief in-app approval of facility, work, and service requests'],
             ['module' => 'Vehicles', 'name' => 'vehicles.view',          'description' => 'View vehicle requests'],

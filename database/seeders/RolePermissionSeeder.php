@@ -359,6 +359,7 @@ class RolePermissionSeeder extends Seeder
         // ── GSU Head ──────────────────────────────────────────────────────────
         $assign('GSU Head', [
             'facilities.view', 'facilities.manage',
+            'lostfound.manage',
             'vehicles.view', 'vehicles.manage',
             'messengerial.view', 'messengerial.create',
             'procurement.view', 'procurement.create', 'procurement.approve',

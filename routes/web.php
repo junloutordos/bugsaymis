@@ -310,6 +310,25 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/general-services/dashboard/events', [\App\Http\Controllers\GeneralServicesDashboardController::class, 'events'])
         ->name('general-services.dashboard.events');
 
+    // ── Lost & Found (GSU custody) ────────────────────────────────────────────
+    // Any authenticated employee can view the board and file reports; custody
+    // actions (receive/store/match/release/dispose) require lostfound.manage.
+    Route::prefix('lost-found')->name('lost-found.')->group(function () {
+        Route::get('/',                    [\App\Http\Controllers\LostFoundController::class, 'index'])->name('index');
+        Route::post('/',                   [\App\Http\Controllers\LostFoundController::class, 'store'])->name('store');
+        Route::post('/{item}/close',       [\App\Http\Controllers\LostFoundController::class, 'close'])->name('close')->whereNumber('item');
+        Route::get('/photo/{item}',        [\App\Http\Controllers\LostFoundController::class, 'photo'])->name('photo')->whereNumber('item');
+
+        Route::middleware('permission:lostfound.manage')->group(function () {
+            Route::post('/walk-in',          [\App\Http\Controllers\LostFoundController::class, 'walkIn'])->name('walk-in');
+            Route::post('/{item}/receive',   [\App\Http\Controllers\LostFoundController::class, 'receive'])->name('receive')->whereNumber('item');
+            Route::post('/{item}/store-at',  [\App\Http\Controllers\LostFoundController::class, 'storeAt'])->name('store-at')->whereNumber('item');
+            Route::post('/{item}/match',     [\App\Http\Controllers\LostFoundController::class, 'match'])->name('match')->whereNumber('item');
+            Route::post('/{item}/release',   [\App\Http\Controllers\LostFoundController::class, 'release'])->name('release')->whereNumber('item');
+            Route::post('/{item}/dispose',   [\App\Http\Controllers\LostFoundController::class, 'dispose'])->name('dispose')->whereNumber('item');
+        });
+    });
+
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
@@ -2233,6 +2252,10 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
 
         Route::get('/leave-passes',  [\App\Http\Controllers\StudentPortal\RhLeavePassController::class, 'index'])->name('rh-leave-passes.index');
         Route::post('/leave-passes', [\App\Http\Controllers\StudentPortal\RhLeavePassController::class, 'store'])->name('rh-leave-passes.store');
+
+        Route::get('/lost-found',               [\App\Http\Controllers\StudentPortal\LostFoundController::class, 'show'])->name('lost-found');
+        Route::post('/lost-found',              [\App\Http\Controllers\StudentPortal\LostFoundController::class, 'store'])->name('lost-found.store');
+        Route::get('/lost-found/photo/{item}',  [\App\Http\Controllers\StudentPortal\LostFoundController::class, 'photo'])->name('lost-found.photo')->whereNumber('item');
     });
 });
 

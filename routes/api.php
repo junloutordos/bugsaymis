@@ -110,6 +110,12 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
 
                 Route::get('/clearance', [StudentPortalApiController::class, 'clearance'])->name('clearance');
                 Route::get('/clearance/pdf', [StudentPortalApiController::class, 'clearancePdf'])->name('clearance.pdf');
+
+                Route::get('/lost-found', [StudentPortalApiController::class, 'lostFound'])->name('lost-found.index');
+                Route::post('/lost-found', [StudentPortalApiController::class, 'storeLostFoundReport'])->name('lost-found.store')
+                    ->middleware('throttle:6,1');
+                Route::get('/lost-found/photo/{item}', [StudentPortalApiController::class, 'lostFoundPhoto'])->name('lost-found.photo')
+                    ->whereNumber('item');
             });
         });
     });

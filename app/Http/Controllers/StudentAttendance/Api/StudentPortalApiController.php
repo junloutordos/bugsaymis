@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\LostFound\LostFoundItem;
 use App\Models\Student;
 use App\Models\StudentMobileLink;
 use App\Services\StudentClearance\StudentClearancePdfService;
@@ -10,6 +11,7 @@ use App\Services\StudentClearance\StudentClearanceService;
 use App\Services\StudentPortal\GradeLevel;
 use App\Services\StudentPortal\GuidanceProfileService;
 use App\Services\StudentPortal\MedicalRecordsService;
+use App\Services\StudentPortal\LostFoundPortalService;
 use App\Services\StudentPortal\PortalDashboardService;
 use App\Services\StudentPortal\RhPortalService;
 use Illuminate\Http\JsonResponse;
@@ -269,5 +271,56 @@ class StudentPortalApiController extends Controller
             'Content-Disposition' => "inline; filename=\"{$filename}\"",
             'Cache-Control'       => 'private, no-cache',
         ]);
+    }
+
+    // ── Lost & Found ──────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/mobile/student/portal/lost-found
+     * Found-items board + the student's reports + honesty points.
+     */
+    public function lostFound(Request $request, LostFoundPortalService $service): JsonResponse
+    {
+        $student = $this->resolveStudent($request);
+        if (! $student) {
+            return $this->notLinked();
+        }
+
+        $data = $service->screenData($student);
+        $data['student'] = $this->basicStudent($student);
+
+        return response()->json($data);
+    }
+
+    /**
+     * POST /api/mobile/student/portal/lost-found
+     * Report a lost or found item (photo as base64 JSON — WAF-safe).
+     */
+    public function storeLostFoundReport(Request $request, LostFoundPortalService $service): JsonResponse
+    {
+        $student = $this->resolveStudent($request);
+        if (! $student) {
+            return $this->notLinked();
+        }
+
+        $item = $service->storeReport($request, $student);
+
+        return response()->json([
+            'message' => $item['type'] === 'found'
+                ? 'Found item reported — please turn it over to the GSU office to earn honesty points.'
+                : 'Lost item reported. Check back for matches with items turned over to GSU.',
+            'item' => $item,
+        ], 201);
+    }
+
+    /**
+     * GET /api/mobile/student/portal/lost-found/photo/{item}
+     */
+    public function lostFoundPhoto(Request $request, LostFoundPortalService $service, LostFoundItem $item): SymfonyResponse
+    {
+        $student = $this->resolveStudent($request);
+        abort_unless($student, 404);
+
+        return $service->photo($student, $item);
     }
 }
