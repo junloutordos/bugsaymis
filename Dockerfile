@@ -97,20 +97,36 @@ RUN echo "[www]" > /usr/local/etc/php-fpm.d/zz-security.conf \
 # The php:8.4-fpm default pool is pm.max_children=5 — a couple of slow
 # requests (large base64 uploads, long streams) starve the whole app and
 # spike ALB p99 latency. Sized for the 2 vCPU / 4GB Fargate task (shared
-# with nginx + soketi + adot); max_requests recycles workers to cap leaks.
+# with nginx + soketi + adot): ~24 workers × ~100MB RSS + siblings fits 4GB
+# with headroom; max_requests recycles workers to cap leaks. listen.backlog
+# matches nginx's listen backlog so bursts queue instead of erroring.
 RUN { \
         echo "[www]"; \
         echo "pm = dynamic"; \
-        echo "pm.max_children = 12"; \
-        echo "pm.start_servers = 4"; \
-        echo "pm.min_spare_servers = 2"; \
-        echo "pm.max_spare_servers = 6"; \
+        echo "pm.max_children = 24"; \
+        echo "pm.start_servers = 8"; \
+        echo "pm.min_spare_servers = 4"; \
+        echo "pm.max_spare_servers = 12"; \
         echo "pm.max_requests = 500"; \
+        echo "listen.backlog = 4096"; \
     } > /usr/local/etc/php-fpm.d/zz-pool-sizing.conf
+
+# OPcache ships enabled but with stock sizing: 10k max files (the app + no-dev
+# vendor tree exceeds this → cache thrash) and 128M memory. validate_timestamps
+# is OFF because containers are immutable and deploys are blue-green — code
+# NEVER changes in a running task. Consequence: hot-patching a file inside a
+# live container will not take effect; a full deploy is required (already the rule).
+RUN { \
+        echo "opcache.memory_consumption = 256"; \
+        echo "opcache.max_accelerated_files = 32531"; \
+        echo "opcache.interned_strings_buffer = 32"; \
+        echo "opcache.validate_timestamps = 0"; \
+    } > /usr/local/etc/php/conf.d/zz-opcache-tuning.ini
 
 RUN echo "* * * * * root . /etc/environment; cd /var/www && php artisan schedule:run >> /var/log/cron.log 2>&1" > /etc/cron.d/laravel-scheduler \
     && chmod 0644 /etc/cron.d/laravel-scheduler
 
+COPY docker/nginx-main.conf /etc/nginx/nginx.conf
 COPY docker/nginx-app.conf /etc/nginx/sites-enabled/default
 RUN rm -f /etc/nginx/sites-enabled/default.conf 2>/dev/null; \
     rm -f /etc/nginx/conf.d/default.conf 2>/dev/null; true
