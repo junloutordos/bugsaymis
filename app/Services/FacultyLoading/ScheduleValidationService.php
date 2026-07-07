@@ -142,6 +142,116 @@ class ScheduleValidationService
         ];
     }
 
+    /**
+     * Validate a proposed NON-TEACHING block (consultation, research, advising,
+     * meeting, …). Runs only the conflict axes for the references that are
+     * actually present (faculty and/or section, optional room) plus the
+     * teacher official-time window. Subject, load-limit, teaching-hours and
+     * break-time checks don't apply — blocks carry no load units.
+     *
+     * @param array $data {
+     *   faculty_id:       int|null,
+     *   section_id:       int|null,
+     *   classroom_id:     int|null,
+     *   academic_term_id: int,
+     *   day_of_week:      string,
+     *   start_time:       string,
+     *   end_time:         string,
+     * }
+     */
+    public function validateNonTeaching(array $data, ?int $excludeScheduleId = null): array
+    {
+        $errors   = [];
+        $warnings = [];
+
+        foreach (['academic_term_id', 'day_of_week', 'start_time', 'end_time'] as $field) {
+            if (empty($data[$field])) {
+                $errors[] = "Missing required field: {$field}.";
+            }
+        }
+        if (empty($data['faculty_id']) && empty($data['section_id'])) {
+            $errors[] = 'A non-teaching block needs a faculty member and/or a section.';
+        }
+        if (! empty($data['start_time']) && ! empty($data['end_time']) && $data['start_time'] >= $data['end_time']) {
+            $errors[] = 'Start time must be earlier than end time.';
+        }
+        $validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        if (! empty($data['day_of_week']) && ! in_array($data['day_of_week'], $validDays)) {
+            $errors[] = "Invalid day_of_week: '{$data['day_of_week']}'.";
+        }
+
+        if (! empty($errors)) {
+            return [
+                'valid'       => false,
+                'errors'      => $errors,
+                'warnings'    => [],
+                'conflicts'   => [],
+                'load_check'  => [],
+                'hours_check' => [],
+            ];
+        }
+
+        $day    = $data['day_of_week'];
+        $start  = $data['start_time'];
+        $end    = $data['end_time'];
+        $termId = (int) $data['academic_term_id'];
+
+        $conflictSets = ['faculty' => collect(), 'room' => collect(), 'section' => collect()];
+
+        if (! empty($data['faculty_id'])) {
+            $conflictSets['faculty'] = $this->conflicts->detectFacultyConflict(
+                (int) $data['faculty_id'], $day, $start, $end, $termId, $excludeScheduleId
+            );
+        }
+        if (! empty($data['classroom_id'])) {
+            $conflictSets['room'] = $this->conflicts->detectRoomConflict(
+                (int) $data['classroom_id'], $day, $start, $end, $termId, $excludeScheduleId
+            );
+        }
+        if (! empty($data['section_id'])) {
+            $conflictSets['section'] = $this->conflicts->detectSectionConflict(
+                (int) $data['section_id'], $day, $start, $end, $termId, $excludeScheduleId
+            );
+        }
+
+        foreach ($conflictSets['faculty'] as $c) {
+            $errors[] = "Faculty conflict: faculty already has '{$this->conflictLabel($c)}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
+        }
+        foreach ($conflictSets['room'] as $c) {
+            $errors[] = "Room conflict: {$c->classroom?->name} is already booked for '{$this->conflictLabel($c)}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
+        }
+        foreach ($conflictSets['section'] as $c) {
+            $errors[] = "Section conflict: section already has '{$this->conflictLabel($c)}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
+        }
+
+        if (! empty($data['faculty_id'])) {
+            $officialTimeError = $this->checkOfficialTime((int) $data['faculty_id'], $day, $start, $end);
+            if ($officialTimeError) {
+                $errors[] = $officialTimeError;
+            }
+        }
+
+        return [
+            'valid'       => empty($errors),
+            'errors'      => $errors,
+            'warnings'    => $warnings,
+            'conflicts'   => [
+                'has_conflicts' => $conflictSets['faculty']->isNotEmpty()
+                                || $conflictSets['room']->isNotEmpty()
+                                || $conflictSets['section']->isNotEmpty(),
+                'conflicts'     => $conflictSets,
+            ],
+            'load_check'  => [],
+            'hours_check' => [],
+        ];
+    }
+
+    /** Display label for a conflicting row — subject for classes, title for blocks. */
+    private function conflictLabel($schedule): string
+    {
+        return $schedule->subject?->name ?? $schedule->title ?? 'another entry';
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     private function validateInputs(array $data): array

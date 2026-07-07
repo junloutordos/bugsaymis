@@ -161,13 +161,13 @@ class ConflictDetectionService
         $messages = [];
 
         foreach ($facultyConflicts as $c) {
-            $messages[] = "Faculty conflict: faculty already has '{$c->subject?->name}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
+            $messages[] = "Faculty conflict: faculty already has '{$this->entryLabel($c)}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
         }
         foreach ($roomConflicts as $c) {
-            $messages[] = "Room conflict: {$c->classroom?->name} is already booked for '{$c->subject?->name}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
+            $messages[] = "Room conflict: {$c->classroom?->name} is already booked for '{$this->entryLabel($c)}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
         }
         foreach ($sectionConflicts as $c) {
-            $messages[] = "Section conflict: section already has '{$c->subject?->name}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
+            $messages[] = "Section conflict: section already has '{$this->entryLabel($c)}' on {$c->day_of_week} {$c->start_time}–{$c->end_time}.";
         }
 
         return [
@@ -183,6 +183,12 @@ class ConflictDetectionService
         ];
     }
 
+    /** Display label for a conflicting row — subject for classes, title for non-teaching blocks. */
+    private function entryLabel(ClassSchedule $c): string
+    {
+        return $c->subject?->name ?? $c->title ?? 'another entry';
+    }
+
     // ── Teaching Hours Per Day ───────────────────────────────────────────────
 
     /**
@@ -196,6 +202,7 @@ class ConflictDetectionService
         ?int   $excludeId = null
     ): float {
         $query = ClassSchedule::occupying()
+            ->classes()
             ->where('user_id', $facultyId)
             ->where('day_of_week', $day)
             ->where('academic_term_id', $termId);

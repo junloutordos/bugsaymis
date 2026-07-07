@@ -103,6 +103,7 @@ class TeacherAttendanceService
 
         // start_time is within [-30 min, +15 min] of now, and class hasn't ended yet
         return ClassSchedule::with(['subject', 'section', 'academicTerm'])
+            ->classes()
             ->where('user_id', $userId)
             ->where('classroom_id', $classroomId)
             ->where('day_of_week', $dayOfWeek)
@@ -139,6 +140,7 @@ class TeacherAttendanceService
             'section:id,name',
             'classroom:id,name,code',
         ])
+        ->where('entry_type', 'class')
         ->where('day_of_week', $dayOfWeek)
         ->where('status', 'active');
 

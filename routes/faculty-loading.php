@@ -63,6 +63,18 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::get('/{facultyLoad}/print',       [FacultyLoadController::class, 'print'])->name('print');
             });
 
+        // Schedules calendar — CID/AUH manage everything; faculty_loading.view_own
+        // holders get self-mode access to add non-teaching blocks to their own
+        // calendar. Per-action capability checks live in ClassScheduleController.
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.view_own')
+            ->prefix('schedules')->name('schedules.')->group(function () {
+                Route::get('/',                   [ClassScheduleController::class, 'index'])->name('index');
+                Route::post('/validate',          [ClassScheduleController::class, 'validateSchedule'])->name('validate');
+                Route::post('/',                  [ClassScheduleController::class, 'store'])->name('store');
+                Route::put('/{classSchedule}',    [ClassScheduleController::class, 'update'])->name('update');
+                Route::delete('/{classSchedule}', [ClassScheduleController::class, 'destroy'])->name('destroy');
+            });
+
         Route::middleware('permission:faculty_loading.manage')
             ->group(function () {
                 // ── Faculty List ────────────────────────────────────────────────
@@ -97,15 +109,6 @@ Route::middleware(['web', 'auth', 'verified'])
                     // ── Deterministic Slot Plan Generator (Phases 7–11) ────────
                     Route::get('/slot-plan',         [SlotPlanController::class, 'index'])->name('slot-plan.index');
                     Route::post('/slot-plan/preview',[SlotPlanController::class, 'preview'])->name('slot-plan.preview');
-                });
-
-                // Schedules
-                Route::prefix('schedules')->name('schedules.')->group(function () {
-                    Route::get('/',                          [ClassScheduleController::class, 'index'])->name('index');
-                    Route::post('/validate',                 [ClassScheduleController::class, 'validateSchedule'])->name('validate');
-                    Route::post('/',                         [ClassScheduleController::class, 'store'])->name('store');
-                    Route::put('/{classSchedule}',           [ClassScheduleController::class, 'update'])->name('update');
-                    Route::delete('/{classSchedule}',        [ClassScheduleController::class, 'destroy'])->name('destroy');
                 });
 
                 // Load Assignments

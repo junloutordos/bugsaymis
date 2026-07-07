@@ -1414,6 +1414,17 @@ export const menuItems = [
         roles: [],
         permissions: ["faculty_loading.manage"],
       },
+      // Self-mode calendar for faculty (view_own) — same page, pinned to own
+      // schedule; lets them add non-teaching blocks to their free time.
+      {
+        label: "My Schedule",
+        routeName: "faculty-loading.schedules.index",
+        href: route("faculty-loading.schedules.index"),
+        icon: CalendarDaysIcon,
+        roles: [],
+        permissions: ["faculty_loading.view_own"],
+        excludePermissions: ["faculty_loading.manage"],
+      },
       {
         label: "Faculty List",
         routeName: "faculty-loading.faculty-list",

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
+use App\Models\Division;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
@@ -11,6 +12,7 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolDayConfig;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\Office;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\FacultyLoading\ScheduleValidationService;
@@ -30,14 +32,71 @@ class ClassScheduleController extends Controller
         private readonly LoadComputationService    $loads,
     ) {}
 
+    /**
+     * Resolve what the current user may do on the schedule calendar.
+     *
+     *   manage — faculty_loading.manage (CID Chief / admin): full teaching +
+     *            non-teaching CRUD for everyone.
+     *   unit   — Academic Unit Head (heads an Office under the CID division):
+     *            non-teaching blocks for their unit's faculty only.
+     *   self   — any other faculty_loading.view_own holder: own non-teaching
+     *            blocks only.
+     *
+     * @return array{level: string, faculty_ids: array<int>|null}
+     */
+    private function scheduleCapability(): array
+    {
+        $user = Auth::user();
+
+        if ($user->isSuperAdmin() || $user->hasPermission('faculty_loading.manage')) {
+            return ['level' => 'manage', 'faculty_ids' => null];
+        }
+
+        $cidDivisionId = Division::where('acronym', 'CID')->value('id');
+        $unitIds = Office::where('unit_head', $user->id)
+            ->when($cidDivisionId, fn ($q) => $q->where('division_id', $cidDivisionId))
+            ->pluck('id');
+
+        if ($unitIds->isNotEmpty()) {
+            $facultyIds = User::whereIn('office_id', $unitIds)
+                ->pluck('id')
+                ->push($user->id)
+                ->unique()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            return ['level' => 'unit', 'faculty_ids' => $facultyIds];
+        }
+
+        return ['level' => 'self', 'faculty_ids' => [(int) $user->id]];
+    }
+
+    /** True if the capability allows creating/editing a non-teaching block for this faculty. */
+    private function canTouchNonTeaching(array $cap, ?int $facultyId): bool
+    {
+        if ($cap['level'] === 'manage') {
+            return true;
+        }
+
+        // Section-only blocks (no faculty) are a manage-level action.
+        return $facultyId !== null && in_array($facultyId, $cap['faculty_ids'], true);
+    }
+
     public function index(Request $request): Response
     {
-        $this->authorize('faculty_loading.manage');
+        $cap = $this->scheduleCapability();
 
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId      = $request->input('term_id', $currentTerm?->id);
         $sectionId   = $request->input('section_id');
         $facultyId   = $request->input('faculty_id');
+
+        // Self mode is pinned to the user's own calendar.
+        if ($cap['level'] === 'self') {
+            $facultyId = Auth::id();
+            $sectionId = null;
+        }
 
         // Faculty whose load is locked for this term — schedules/unplaced loads for
         // them must render as non-draggable on the calendar.
@@ -49,19 +108,23 @@ class ClassScheduleController extends Controller
         $query = ClassSchedule::with(['subject', 'classroom', 'faculty:id,name', 'section:id,sectionname,levelid'])
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId))
-            ->when($facultyId, fn ($q) => $q->where('class_schedules.user_id', $facultyId));
+            ->when($facultyId, fn ($q) => $q->where('class_schedules.user_id', $facultyId))
+            // Unit heads only see their own unit's faculty calendars.
+            ->when($cap['level'] === 'unit', fn ($q) => $q->whereIn('class_schedules.user_id', $cap['faculty_ids']));
 
         // Order by grade level + section name + day + time for clean grouping
         $dayOrder = "FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')";
+        // leftJoin, not join — non-teaching blocks may have no section and must
+        // still appear on the calendar.
         $schedules = $query
-            ->join('sections as sec', 'sec.id', '=', 'class_schedules.section_id')
+            ->leftJoin('sections as sec', 'sec.id', '=', 'class_schedules.section_id')
             ->orderBy('sec.levelid')
             ->orderByRaw('sec.sectionname')
             ->orderByRaw($dayOrder)
             ->orderBy('class_schedules.start_time')
             ->select('class_schedules.*')
             ->get()
-            ->map(fn ($s) => $this->mapSchedule($s, $lockedFacultyIds));
+            ->map(fn ($s) => $this->mapSchedule($s, $lockedFacultyIds, $cap));
 
         $terms = AcademicTerm::with('schoolYear')
             ->orderByDesc('start_date')
@@ -75,6 +138,7 @@ class ClassScheduleController extends Controller
 
         $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
+            ->when($cap['level'] !== 'manage', fn ($q) => $q->whereIn('id', $cap['faculty_ids']))
             ->orderBy('name')
             ->get(['id', 'name', 'position']);
 
@@ -100,7 +164,10 @@ class ClassScheduleController extends Controller
                 ],
             ]);
 
-        $unplacedLoads = $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections);
+        // The unplaced-subjects tray is a teaching-placement tool — manage only.
+        $unplacedLoads = $cap['level'] === 'manage'
+            ? $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections)
+            : [];
 
         return Inertia::render('FacultyLoading/Schedules/Index', [
             'schedules'     => $schedules,
@@ -113,6 +180,7 @@ class ClassScheduleController extends Controller
             'filters'       => $request->only(['term_id', 'section_id', 'faculty_id']),
             'dayConfigs'    => $dayConfigs,
             'unplacedLoads' => $unplacedLoads,
+            'capability'    => ['level' => $cap['level']],
         ]);
     }
 
@@ -194,13 +262,12 @@ class ClassScheduleController extends Controller
      */
     public function validateSchedule(Request $request): JsonResponse
     {
-        $this->authorize('faculty_loading.manage');
-
         $data = $request->validate([
-            'faculty_id'       => 'required|integer',
-            'subject_id'       => 'required|integer',
-            'section_id'       => 'required|integer',
-            'classroom_id'     => 'required|integer',
+            'entry_type'       => 'nullable|in:class,non_teaching',
+            'faculty_id'       => 'nullable|integer',
+            'subject_id'       => 'nullable|integer',
+            'section_id'       => 'nullable|integer',
+            'classroom_id'     => 'nullable|integer',
             'academic_term_id' => 'required|integer',
             'day_of_week'      => 'required|string',
             'start_time'       => 'required|string',
@@ -208,13 +275,19 @@ class ClassScheduleController extends Controller
             'exclude_id'       => 'nullable|integer',
         ]);
 
-        $result = $this->validation->validate($data, $data['exclude_id'] ?? null);
+        $result = ($data['entry_type'] ?? 'class') === 'non_teaching'
+            ? $this->validation->validateNonTeaching($data, $data['exclude_id'] ?? null)
+            : $this->validation->validate($data, $data['exclude_id'] ?? null);
 
         return response()->json($result);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        if ($request->input('entry_type') === 'non_teaching') {
+            return $this->storeNonTeaching($request);
+        }
+
         $this->authorize('faculty_loading.manage');
 
         $data = $request->validate([
@@ -273,8 +346,66 @@ class ClassScheduleController extends Controller
         return back()->with('success', $msg);
     }
 
+    /**
+     * Create a non-teaching block (consultation, research, advising, …).
+     * No load linkage, no subject; the faculty-load lock does not apply
+     * because blocks never change load units.
+     */
+    private function storeNonTeaching(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'title'            => 'required|string|max:120',
+            'category'         => 'nullable|string|max:30',
+            'faculty_id'       => 'nullable|exists:users,id',
+            'section_id'       => 'nullable|integer',
+            'classroom_id'     => 'nullable|exists:classrooms,id',
+            'school_year_id'   => 'required|exists:school_years,id',
+            'academic_term_id' => 'required|exists:academic_terms,id',
+            'day_of_week'      => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'start_time'       => 'required|date_format:H:i',
+            'end_time'         => 'required|date_format:H:i|after:start_time',
+            'status'           => 'in:active,tentative',
+            'remarks'          => 'nullable|string|max:500',
+        ]);
+
+        $cap = $this->scheduleCapability();
+        if (! $this->canTouchNonTeaching($cap, $data['faculty_id'] ?? null)) {
+            return back()->withErrors(['faculty_id' => 'You can only add non-teaching blocks to your own schedule'
+                . ($cap['level'] === 'unit' ? " or your unit's faculty." : '.')]);
+        }
+
+        $validation = $this->validation->validateNonTeaching($data);
+        if (! empty($validation['errors'])) {
+            return back()->withErrors($validation['errors'])->with('validation_result', $validation);
+        }
+
+        ClassSchedule::create([
+            'entry_type'       => 'non_teaching',
+            'title'            => $data['title'],
+            'category'         => $data['category'] ?? null,
+            'user_id'          => $data['faculty_id'] ?? null,
+            'subject_id'       => null,
+            'section_id'       => $data['section_id'] ?? null,
+            'classroom_id'     => $data['classroom_id'] ?? null,
+            'school_year_id'   => $data['school_year_id'],
+            'academic_term_id' => $data['academic_term_id'],
+            'day_of_week'      => $data['day_of_week'],
+            'start_time'       => $data['start_time'],
+            'end_time'         => $data['end_time'],
+            'status'           => $data['status'] ?? 'active',
+            'remarks'          => $data['remarks'] ?? null,
+            'created_by'       => Auth::id(),
+        ]);
+
+        return back()->with('success', 'Non-teaching block added.');
+    }
+
     public function update(Request $request, ClassSchedule $classSchedule): RedirectResponse
     {
+        if ($classSchedule->entry_type === 'non_teaching') {
+            return $this->updateNonTeaching($request, $classSchedule);
+        }
+
         $this->authorize('faculty_loading.manage');
 
         $data = $request->validate([
@@ -322,8 +453,71 @@ class ClassScheduleController extends Controller
         return back()->with('success', 'Schedule updated.');
     }
 
+    /** Update a non-teaching block — capability-checked, lock-exempt. */
+    private function updateNonTeaching(Request $request, ClassSchedule $classSchedule): RedirectResponse
+    {
+        $cap = $this->scheduleCapability();
+        if (! $this->canTouchNonTeaching($cap, $classSchedule->user_id ? (int) $classSchedule->user_id : null)) {
+            return back()->withErrors(['faculty_id' => 'You are not allowed to modify this non-teaching block.']);
+        }
+
+        $data = $request->validate([
+            'title'            => 'required|string|max:120',
+            'category'         => 'nullable|string|max:30',
+            'faculty_id'       => 'nullable|exists:users,id',
+            'section_id'       => 'nullable|integer',
+            'classroom_id'     => 'nullable|exists:classrooms,id',
+            'school_year_id'   => 'required|exists:school_years,id',
+            'academic_term_id' => 'required|exists:academic_terms,id',
+            'day_of_week'      => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'start_time'       => 'required|date_format:H:i',
+            'end_time'         => 'required|date_format:H:i|after:start_time',
+            'status'           => 'in:active,tentative,cancelled',
+            'remarks'          => 'nullable|string|max:500',
+        ]);
+
+        // The reassigned target must also be within reach.
+        if (! $this->canTouchNonTeaching($cap, $data['faculty_id'] ?? null)) {
+            return back()->withErrors(['faculty_id' => 'You cannot move this block to that faculty member.']);
+        }
+
+        $validation = $this->validation->validateNonTeaching($data, $classSchedule->id);
+        if (! empty($validation['errors'])) {
+            return back()->withErrors($validation['errors'])->with('validation_result', $validation);
+        }
+
+        $classSchedule->update([
+            'title'            => $data['title'],
+            'category'         => $data['category'] ?? null,
+            'user_id'          => $data['faculty_id'] ?? null,
+            'section_id'       => $data['section_id'] ?? null,
+            'classroom_id'     => $data['classroom_id'] ?? null,
+            'school_year_id'   => $data['school_year_id'],
+            'academic_term_id' => $data['academic_term_id'],
+            'day_of_week'      => $data['day_of_week'],
+            'start_time'       => $data['start_time'],
+            'end_time'         => $data['end_time'],
+            'status'           => $data['status'] ?? $classSchedule->status,
+            'remarks'          => $data['remarks'] ?? null,
+        ]);
+
+        return back()->with('success', 'Non-teaching block updated.');
+    }
+
     public function destroy(ClassSchedule $classSchedule): RedirectResponse
     {
+        // Non-teaching blocks are hard-deleted (no load/audit linkage to keep).
+        if ($classSchedule->entry_type === 'non_teaching') {
+            $cap = $this->scheduleCapability();
+            if (! $this->canTouchNonTeaching($cap, $classSchedule->user_id ? (int) $classSchedule->user_id : null)) {
+                return back()->withErrors(['faculty_id' => 'You are not allowed to remove this non-teaching block.']);
+            }
+
+            $classSchedule->delete();
+
+            return back()->with('success', 'Non-teaching block removed.');
+        }
+
         $this->authorize('faculty_loading.manage');
 
         $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
@@ -338,12 +532,26 @@ class ClassScheduleController extends Controller
         return back()->with('success', 'Schedule cancelled.');
     }
 
-    private function mapSchedule(ClassSchedule $s, array $lockedFacultyIds = []): array
+    private function mapSchedule(ClassSchedule $s, array $lockedFacultyIds = [], ?array $cap = null): array
     {
+        $isLocked = in_array((int) $s->user_id, $lockedFacultyIds, true);
+
+        // Teaching rows: manage-only, frozen while the load is locked.
+        // Non-teaching rows: capability reach decides; the lock doesn't apply.
+        $canEdit = false;
+        if ($cap !== null) {
+            $canEdit = $s->entry_type === 'non_teaching'
+                ? $this->canTouchNonTeaching($cap, $s->user_id ? (int) $s->user_id : null)
+                : ($cap['level'] === 'manage' && ! $isLocked);
+        }
+
         return [
             'id'                 => $s->id,
             'load_assignment_id' => $s->load_assignment_id,
             'school_year_id'     => $s->school_year_id,
+            'entry_type'         => $s->entry_type,
+            'title'              => $s->title,
+            'category'           => $s->category,
             'day_of_week'        => $s->day_of_week,
             'start_time'         => $s->start_time,
             'end_time'           => $s->end_time,
@@ -365,9 +573,10 @@ class ClassScheduleController extends Controller
                 'name' => $s->faculty->name,
             ] : null,
             'section_id'   => $s->section_id,
-            'section_name' => $s->section?->sectionname ?? "Section {$s->section_id}",
+            'section_name' => $s->section?->sectionname ?? ($s->section_id ? "Section {$s->section_id}" : null),
             'grade_level'  => $s->section?->levelid ?? null,
-            'is_locked'    => in_array((int) $s->user_id, $lockedFacultyIds, true),
+            'is_locked'    => $isLocked,
+            'can_edit'     => $canEdit,
         ];
     }
 }

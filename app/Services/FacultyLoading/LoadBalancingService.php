@@ -569,7 +569,8 @@ class LoadBalancingService
      */
     private function buildDailyHoursMap(int $termId): array
     {
-        $schedules = ClassSchedule::where('academic_term_id', $termId)
+        $schedules = ClassSchedule::classes()
+            ->where('academic_term_id', $termId)
             ->where('status', 'active')
             ->get(['user_id', 'day_of_week', 'start_time', 'end_time']);
 

@@ -18,6 +18,9 @@ class ClassSchedule extends Model
         'classroom_id',
         'school_year_id',
         'academic_term_id',
+        'entry_type',
+        'title',
+        'category',
         'day_of_week',
         'start_time',
         'end_time',
@@ -109,6 +112,18 @@ class ClassSchedule extends Model
     public function scopeOccupying($query)
     {
         return $query->whereIn('status', ['active', 'tentative']);
+    }
+
+    /** Regular teaching sessions only (excludes non-teaching blocks). */
+    public function scopeClasses($query)
+    {
+        return $query->where('entry_type', 'class');
+    }
+
+    /** Non-teaching blocks (consultation, research, advising, meetings, …). */
+    public function scopeNonTeaching($query)
+    {
+        return $query->where('entry_type', 'non_teaching');
     }
 
     public function scopeForTerm($query, int $termId)

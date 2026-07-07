@@ -3,13 +3,19 @@
   <AdminLayout title="Class Schedules">
     <div class="space-y-5">
 
-      <AppPageHeader title="Class Schedules" subtitle="Weekly timetable by section">
+      <AppPageHeader :title="isSelf ? 'My Schedule' : 'Class Schedules'"
+        :subtitle="isSelf ? 'Your weekly timetable — add non-teaching blocks to your free time' : 'Weekly timetable by section'">
         <template #actions>
-          <AppButton variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
-            <SparklesIcon class="h-4 w-4" /> AI Generate
-          </AppButton>
-          <AppButton @click="openForm()">
-            <PlusIcon class="h-4 w-4" /> Assign Schedule
+          <template v-if="isManage">
+            <AppButton variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
+              <SparklesIcon class="h-4 w-4" /> AI Generate
+            </AppButton>
+            <AppButton @click="openForm()">
+              <PlusIcon class="h-4 w-4" /> Assign Schedule
+            </AppButton>
+          </template>
+          <AppButton :variant="isManage ? 'secondary' : 'primary'" @click="openNonTeachingForm()">
+            <ClockIcon class="h-4 w-4" /> Add Non-teaching
           </AppButton>
         </template>
       </AppPageHeader>
@@ -26,7 +32,7 @@
 
       <!-- Filters -->
       <AppFilterBar>
-        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
+        <div v-if="!isSelf" class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
           <button type="button" @click="setViewBy('section')"
             :class="['px-3 py-1.5 font-medium transition-colors', viewBy === 'section' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
             By Section
@@ -46,19 +52,19 @@
             {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
           </option>
         </select>
-        <select v-if="viewBy === 'section'" v-model="filters.section_id" @change="applyFilters"
+        <select v-if="!isSelf && viewBy === 'section'" v-model="filters.section_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option :value="null">All Sections</option>
           <option v-for="sec in sections" :key="sec.id" :value="sec.id">
             Grade {{ sec.levelid }} — {{ sec.sectionname }}
           </option>
         </select>
-        <select v-else-if="viewBy === 'faculty'" v-model="filters.faculty_id" @change="applyFilters"
+        <select v-else-if="!isSelf && viewBy === 'faculty'" v-model="filters.faculty_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option :value="null">All Faculty</option>
           <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
         </select>
-        <select v-else v-model="gradeFilter"
+        <select v-else-if="!isSelf" v-model="gradeFilter"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option :value="null">All Grades</option>
           <option v-for="g in GRADE_LEVELS" :key="g" :value="g">Grade {{ g }}</option>
@@ -95,7 +101,9 @@
 
           <!-- Empty state -->
           <AppCard v-if="groupsWithSchedules.length === 0">
-            <EmptyState title="No schedules found" subtitle="Assign a schedule or use AI Generate to get started." :icon="CalendarIcon" />
+            <EmptyState title="No schedules found"
+              :subtitle="isManage ? 'Assign a schedule or use AI Generate to get started.' : 'No schedule entries for this term yet. Use Add Non-teaching to block time on your calendar.'"
+              :icon="CalendarIcon" />
           </AppCard>
 
           <!-- Calendar cards per section / per faculty -->
@@ -117,7 +125,7 @@
                   </h3>
                   <span class="text-xs text-slate-400">· {{ byGroup[groupId]?.length ?? 0 }} slot(s)</span>
                 </div>
-                <AppButton v-if="viewBy === 'section'" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
+                <AppButton v-if="isManage && viewBy === 'section'" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
                   <PlusIcon class="h-3 w-3" /> Add
                 </AppButton>
               </div>
@@ -206,17 +214,18 @@
 
                         <!-- Schedule event blocks -->
                         <div v-for="s in (byGroupDay[groupId]?.[day] ?? [])" :key="s.id"
-                          :style="[eventStyle(s), subjectColorStyle(s.subject?.id)]"
+                          :style="[eventStyle(s), eventColorStyle(s)]"
                           :draggable="canDrag(s)"
                           :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
-                            canDrag(s) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                            s.entry_type === 'non_teaching' ? 'border-dashed' : '',
+                            canDrag(s) ? 'cursor-grab active:cursor-grabbing' : (s.can_edit ? 'cursor-pointer' : 'cursor-default'),
                             dragPayload?.kind === 'move' && dragPayload.schedule.id === s.id ? 'opacity-30' : '']"
                           @dragstart="onDragStartEvent($event, s)"
                           @dragend="onDragEnd"
-                          @click="openForm(s)">
+                          @click="onEventClick(s)">
                           <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
                             <div class="text-xs font-bold leading-tight truncate">
-                              {{ s.subject?.code }}
+                              {{ s.entry_type === 'non_teaching' ? s.title : s.subject?.code }}
                             </div>
                             <div class="text-xs leading-tight truncate opacity-75">
                               {{ secondaryLabel(s) }}
@@ -291,7 +300,7 @@
     </div>
 
     <!-- Schedule Form Modal -->
-    <AppModal :show="modal" :title="(form.id ? 'Edit' : 'Assign') + ' Schedule'" size="lg"
+    <AppModal :show="modal" :title="modalTitle" size="lg"
       body-class="px-6 py-4 space-y-4" @close="modal = false">
 
       <!-- Validation result banner -->
@@ -307,15 +316,27 @@
       </div>
 
       <div class="grid grid-cols-2 gap-3">
+        <template v-if="form.entry_type === 'non_teaching'">
+          <div class="col-span-2">
+            <AppInput v-model="form.title" label="Title" required placeholder="e.g. Consultation Hours, Research Block" />
+          </div>
+          <div class="col-span-2">
+            <AppSelect v-model="form.category" label="Category" placeholder="Select category...">
+              <option v-for="c in NON_TEACHING_CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+            </AppSelect>
+          </div>
+        </template>
         <div class="col-span-2">
-          <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
-          <select v-model="form.faculty_id"
-            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option :value="null">Select faculty...</option>
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            Faculty {{ form.entry_type === 'non_teaching' ? '' : '*' }}
+          </label>
+          <select v-model="form.faculty_id" :disabled="isSelf"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-500">
+            <option :value="null">{{ form.entry_type === 'non_teaching' ? 'No faculty (section-wide)' : 'Select faculty...' }}</option>
             <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
           </select>
         </div>
-        <div class="col-span-2">
+        <div v-if="form.entry_type !== 'non_teaching'" class="col-span-2">
           <label class="block text-xs font-medium text-slate-600 mb-1">Subject *</label>
           <select v-model="form.subject_id"
             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -324,20 +345,24 @@
           </select>
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Section *</label>
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            Section {{ form.entry_type === 'non_teaching' ? '' : '*' }}
+          </label>
           <select v-model="form.section_id"
             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option :value="null">Select section...</option>
+            <option :value="null">{{ form.entry_type === 'non_teaching' ? 'No section' : 'Select section...' }}</option>
             <option v-for="sec in sections" :key="sec.id" :value="sec.id">
               Grade {{ sec.levelid }} — {{ sec.sectionname }}
             </option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Classroom *</label>
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            Classroom {{ form.entry_type === 'non_teaching' ? '' : '*' }}
+          </label>
           <select v-model="form.classroom_id"
             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option :value="null">Select classroom...</option>
+            <option :value="null">{{ form.entry_type === 'non_teaching' ? 'No room' : 'Select classroom...' }}</option>
             <option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }} ({{ c.code }})</option>
           </select>
         </div>
@@ -365,7 +390,7 @@
         <AppSelect v-model="form.status" label="Status" :show-blank="false">
           <option value="active">Active</option>
           <option value="tentative">Tentative</option>
-          <option v-if="form.id" value="cancelled">Cancelled</option>
+          <option v-if="form.id && form.entry_type !== 'non_teaching'" value="cancelled">Cancelled</option>
         </AppSelect>
         <div class="col-span-2">
           <AppTextarea v-model="form.remarks" label="Remarks" :rows="2" />
@@ -383,9 +408,14 @@
 
       <template #footer>
         <div class="flex justify-between items-center gap-3 w-full">
-          <AppButton variant="secondary" @click="checkConflicts">
-            <MagnifyingGlassIcon class="h-4 w-4" /> Check Conflicts
-          </AppButton>
+          <div class="flex gap-2">
+            <AppButton variant="secondary" @click="checkConflicts">
+              <MagnifyingGlassIcon class="h-4 w-4" /> Check Conflicts
+            </AppButton>
+            <AppButton v-if="form.id && form.entry_type === 'non_teaching'" variant="danger" @click="removeNonTeaching">
+              <TrashIcon class="h-4 w-4" /> Remove
+            </AppButton>
+          </div>
           <div class="flex gap-2">
             <AppButton variant="ghost" @click="modal = false">Cancel</AppButton>
             <AppButton :loading="form.processing" @click="save">{{ form.id ? 'Update' : 'Save' }}</AppButton>
@@ -413,8 +443,8 @@ import EmptyState from '@/Components/EmptyState.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
-  CalendarIcon, CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-  LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon,
+  CalendarIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
+  LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon, TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────
@@ -456,7 +486,22 @@ const props = defineProps({
   filters:     { type: Object, default: () => ({}) },
   dayConfigs:  { type: Object, default: () => ({}) },
   unplacedLoads: { type: Array, default: () => [] },
+  capability:  { type: Object, default: () => ({ level: 'manage' }) },
 })
+
+// ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
+
+const isManage = computed(() => props.capability.level === 'manage')
+const isSelf   = computed(() => props.capability.level === 'self')
+
+const NON_TEACHING_CATEGORIES = [
+  { value: 'consultation', label: 'Consultation Hours' },
+  { value: 'research',     label: 'Research Block' },
+  { value: 'advising',     label: 'Student Advising' },
+  { value: 'office_hours', label: 'Office Hours' },
+  { value: 'meeting',      label: 'Meeting' },
+  { value: 'other',        label: 'Other' },
+]
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 
@@ -472,7 +517,9 @@ function applyFilters() {
 
 // ── View mode (group calendar cards by section or by faculty) ────────────────
 
-const viewBy = ref(props.filters.faculty_id ? 'faculty' : 'section')
+const viewBy = ref(
+  props.capability.level === 'self' || props.filters.faculty_id ? 'faculty' : 'section'
+)
 
 const GRADE_LEVELS = [7, 8, 9, 10, 11, 12]
 const gradeFilter = ref(null)
@@ -597,6 +644,11 @@ function subjectsInGroup(groupId) {
 
 /** Text shown inside an event block for the dimension that ISN'T the grouping axis. */
 function secondaryLabel(s) {
+  if (s.entry_type === 'non_teaching') {
+    const cat = NON_TEACHING_CATEGORIES.find(c => c.value === s.category)?.label ?? 'Non-teaching'
+    if (viewBy.value === 'faculty') return s.section_name ?? cat
+    return s.faculty?.name ? lastNameOf(s.faculty.name) : cat
+  }
   if (viewBy.value === 'grade') return `${s.section_name} · ${s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA'}`
   return viewBy.value === 'faculty'
     ? `G${s.grade_level} ${s.section_name}`
@@ -723,6 +775,15 @@ function subjectColorStyle(subjectId) {
   }
 }
 
+/** Event color — non-teaching blocks get a fixed neutral slate look so they
+ *  read as "reserved time", visually distinct from subject-colored classes. */
+function eventColorStyle(s) {
+  if (s.entry_type === 'non_teaching') {
+    return { backgroundColor: '#f1f5f9', borderColor: '#94a3b8', color: '#334155' }
+  }
+  return subjectColorStyle(s.subject?.id)
+}
+
 // ── Drag and drop ────────────────────────────────────────────────────────────
 
 const DRAG_SNAP_MIN = 5
@@ -734,7 +795,13 @@ const dropTarget  = ref(null)
 const dragBusy     = ref(false)
 
 function canDrag(s) {
-  return viewBy.value !== 'grade' && s.status !== 'cancelled' && !s.is_locked
+  return viewBy.value !== 'grade' && s.status !== 'cancelled' && !!s.can_edit
+}
+
+/** Blocks the modal for rows the user can't touch (e.g. faculty viewing own classes). */
+function onEventClick(s) {
+  if (!s.can_edit) return
+  openForm(s)
 }
 
 function schoolYearIdForTerm(termId) {
@@ -937,6 +1004,7 @@ async function commitMove(schedule, day, startTime, endTime) {
   dragBusy.value = true
   try {
     const { data: result } = await axios.post(route('faculty-loading.schedules.validate'), {
+      entry_type:       schedule.entry_type ?? 'class',
       faculty_id:       schedule.faculty?.id   ?? 0,
       subject_id:       schedule.subject?.id   ?? 0,
       section_id:       schedule.section_id,
@@ -973,6 +1041,8 @@ async function commitMove(schedule, day, startTime, endTime) {
     // browsers re-issue the redirect as PUT against a GET-only route and 405.
     await new Promise((resolve, reject) => {
       router.put(route('faculty-loading.schedules.update', schedule.id), {
+        title:            schedule.title ?? '',
+        category:         schedule.category ?? '',
         faculty_id:       schedule.faculty?.id   ?? null,
         subject_id:       schedule.subject?.id   ?? null,
         section_id:       schedule.section_id,
@@ -1055,9 +1125,15 @@ const modal            = ref(false)
 const validationResult = ref(null)
 
 const form = useForm({
-  id: null, load_assignment_id: null, faculty_id: null, subject_id: null, section_id: null, classroom_id: null,
+  id: null, entry_type: 'class', title: '', category: '',
+  load_assignment_id: null, faculty_id: null, subject_id: null, section_id: null, classroom_id: null,
   school_year_id: null, academic_term_id: null, day_of_week: '',
   start_time: '', end_time: '', status: 'active', remarks: '', force: false,
+})
+
+const modalTitle = computed(() => {
+  const action = form.id ? 'Edit' : (form.entry_type === 'non_teaching' ? 'Add' : 'Assign')
+  return `${action} ${form.entry_type === 'non_teaching' ? 'Non-teaching Block' : 'Schedule'}`
 })
 
 /**
@@ -1071,6 +1147,9 @@ function openForm(s = null) {
   if (s && s.id) {
     Object.assign(form, {
       id:                 s.id,
+      entry_type:         s.entry_type ?? 'class',
+      title:              s.title ?? '',
+      category:           s.category ?? '',
       load_assignment_id: s.load_assignment_id ?? null,
       faculty_id:         s.faculty?.id      ?? null,
       subject_id:         s.subject?.id      ?? null,
@@ -1088,6 +1167,7 @@ function openForm(s = null) {
   } else {
     form.reset()
     form.id               = null
+    form.entry_type       = 'class'
     form.status           = 'active'
     form.force            = false
     form.academic_term_id = filters.term_id    ?? null
@@ -1097,9 +1177,47 @@ function openForm(s = null) {
   modal.value = true
 }
 
+/** Blank form for a new non-teaching block. Self mode pins faculty to the user. */
+function openNonTeachingForm() {
+  validationResult.value = null
+  form.reset()
+  form.id               = null
+  form.entry_type       = 'non_teaching'
+  form.status           = 'active'
+  form.force            = false
+  form.academic_term_id = filters.term_id ?? null
+  form.school_year_id   = schoolYearIdForTerm(filters.term_id)
+  form.faculty_id       = isSelf.value || props.faculty.length === 1
+    ? (props.faculty[0]?.id ?? null)
+    : (filters.faculty_id ?? null)
+  form.section_id       = filters.section_id ?? null
+  modal.value = true
+}
+
+function removeNonTeaching() {
+  if (!form.id) return
+  Swal.fire({
+    icon: 'warning',
+    title: 'Remove this block?',
+    text: 'The non-teaching block will be removed from the calendar.',
+    showCancelButton: true,
+    confirmButtonText: 'Remove',
+    confirmButtonColor: '#dc2626',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.delete(route('faculty-loading.schedules.destroy', form.id), {
+      preserveScroll: true,
+      onSuccess: () => { modal.value = false; validationResult.value = null },
+    })
+  })
+}
+
 async function checkConflicts() {
-  if (!form.faculty_id || !form.academic_term_id || !form.day_of_week || !form.start_time || !form.end_time) return
+  if (!form.academic_term_id || !form.day_of_week || !form.start_time || !form.end_time) return
+  if (form.entry_type !== 'non_teaching' && !form.faculty_id) return
+  if (form.entry_type === 'non_teaching' && !form.faculty_id && !form.section_id) return
   const payload = {
+    entry_type:       form.entry_type,
     faculty_id:       form.faculty_id,
     subject_id:       form.subject_id   ?? 0,
     section_id:       form.section_id   ?? 0,

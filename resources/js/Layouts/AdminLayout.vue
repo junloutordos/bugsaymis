@@ -261,6 +261,11 @@ const generateHealthStats = ({ start, end }) => {
 const filterMenuByRole = (items, userRoleNames) =>
   items
     .filter((item) => {
+      // Hide when the user holds any excluded permission (e.g. show "My
+      // Schedule" only to users who DON'T have the manage-level "Schedules").
+      if (item.excludePermissions?.length && hasPerm(...item.excludePermissions)) {
+        return false;
+      }
       if (item.permissions?.length) {
         return hasPerm(...item.permissions);
       }

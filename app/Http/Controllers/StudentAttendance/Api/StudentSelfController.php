@@ -154,6 +154,7 @@ class StudentSelfController extends Controller
         }
 
         $schedules = ClassSchedule::with(['subject', 'faculty'])
+            ->classes()
             ->where('section_id', $enrollment->section_id)
             ->where('school_year_id', $schoolYear->id)
             ->active()
