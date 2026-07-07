@@ -39,6 +39,9 @@ return [
         'client_id'     => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect'      => env('GOOGLE_REDIRECT_URI'),
+        // ID-token audience for AtlasGo Google sign-in — the Firebase web
+        // client ID the app requests via serverClientId (public, not a secret)
+        'mobile_client_id' => env('GOOGLE_MOBILE_CLIENT_ID', '54745889381-7cn2j3rr588ba5o2fl7fte8gpjl52hmm.apps.googleusercontent.com'),
     ],
 
     'google_drive' => [

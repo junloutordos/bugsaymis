@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\StudentAttendance\Api\AttendanceApiController;
 use App\Http\Controllers\StudentAttendance\Api\AuthController;
+use App\Http\Controllers\StudentAttendance\Api\GoogleAuthController;
 use App\Http\Controllers\StudentAttendance\Api\GradeApiController;
 use App\Http\Controllers\StudentAttendance\Api\LinkRequestController;
 use App\Http\Controllers\StudentAttendance\Api\RegisterController;
@@ -31,6 +32,8 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
 
     // ── Public ────────────────────────────────────────────────────────────────
     Route::post('/login',               [AuthController::class,  'login'])->name('login')->middleware('throttle:10,1');
+    Route::post('/student/google-login',[GoogleAuthController::class, 'login'])->name('student.google-login')->middleware('throttle:10,1');
+    Route::post('/student/google-link', [GoogleAuthController::class, 'link'])->name('student.google-link')->middleware('throttle:10,1');
     Route::post('/register',            [RegisterController::class, 'register'])->name('register')->middleware('throttle:5,1');
     Route::post('/student/register',    [RegisterController::class, 'registerStudent'])->name('student.register')->middleware('throttle:5,1');
     Route::post('/verify-email',        [RegisterController::class, 'verifyEmail'])->name('verify-email')->middleware('throttle:5,1');
