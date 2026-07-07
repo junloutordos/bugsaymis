@@ -33,6 +33,13 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // Prompt digital signature setup once per login until completed
+        // (flag consumed by HandleInertiaRequests on first page render).
+        $user = $request->user();
+        if (empty($user->electronic_signature) || empty($user->signature_pin)) {
+            session(['prompt_signature_setup' => true]);
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

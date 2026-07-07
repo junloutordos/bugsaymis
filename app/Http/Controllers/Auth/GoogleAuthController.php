@@ -68,6 +68,8 @@ class GoogleAuthController extends Controller
         Auth::login($user, true);
         $this->securityLog('info', 'Socialite login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
+        $this->flagSignatureSetupPrompt($user);
+
         $role = $user->role ?? 'staff';
 
         return redirect($this->getRedirectPath($role));
@@ -112,6 +114,8 @@ class GoogleAuthController extends Controller
         Auth::login($user, true);
         $this->securityLog('info', 'Google login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
+        $this->flagSignatureSetupPrompt($user);
+
         $role         = $user->role ?? 'staff';
         $redirectPath = $this->getRedirectPath($role);
 
@@ -119,6 +123,18 @@ class GoogleAuthController extends Controller
             'success'     => true,
             'redirect_to' => $redirectPath,
         ]);
+    }
+
+    /**
+     * Flag the session so the next Inertia page render shows the digital
+     * signature setup prompt — only while the user still has no signature
+     * image or signing PIN. Consumed (pulled) by HandleInertiaRequests.
+     */
+    protected function flagSignatureSetupPrompt(User $user): void
+    {
+        if (empty($user->electronic_signature) || empty($user->signature_pin)) {
+            session(['prompt_signature_setup' => true]);
+        }
     }
 
     /**

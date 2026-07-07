@@ -72,6 +72,7 @@ class HandleInertiaRequests extends Middleware
                         'electronic_signature' => $authUser->electronic_signature
                             ? $this->s3Url($authUser->electronic_signature)
                             : null,
+                        'has_signature_pin' => ! empty($authUser->signature_pin),
                         'permissions' => $authUser->getPermissions(),
                         'primary_unit' => fn () => $authUser->primaryUnitAssignment?->unit
                             ? [
@@ -88,6 +89,10 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
                 'success' => fn () => $request->session()->get('success'),
             ],
+            // One-shot flag set at login when the user has no digital signature
+            // and/or signing PIN — pulled (consumed) on the first Inertia page
+            // render so the setup prompt shows once per login.
+            'promptSignatureSetup' => fn () => (bool) $request->session()->pull('prompt_signature_setup', false),
             // ── Sidebar badge counts — cached 60s to reduce DB queries ────────
             'consultationsNotificationCount' => function () use ($request) {
                 try {

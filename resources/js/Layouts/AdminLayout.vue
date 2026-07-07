@@ -10,6 +10,7 @@ import AdminTopbar from '@/Components/Layout/AdminTopbar.vue';
 import ReportDateRangeModal from '@/Components/Layout/ReportDateRangeModal.vue';
 import SessionExpiredOverlay from '@/Components/Layout/SessionExpiredOverlay.vue';
 import VersionHistoryModal from '@/Components/Layout/VersionHistoryModal.vue';
+import SignatureSetupModal from '@/Components/Layout/SignatureSetupModal.vue';
 import { ChevronDownIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
@@ -22,6 +23,7 @@ const mobileOpen = ref(false);
 const expanded = ref({});
 const showVersionModal = ref(false);
 const showErrorReportModal = ref(false);
+const showSignatureSetupModal = ref(false);
 
 // ─── Chat unread badge (Phase 8) ──────────────────────────────────────────
 const chatUnreadCount = ref(0);
@@ -101,6 +103,17 @@ onMounted(() => {
   // Request browser notification permission (non-blocking)
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
+  }
+
+  // Digital signature setup prompt — one-shot flag set at login (consumed
+  // server-side), shown only while signature image or PIN is still missing.
+  const u = page.props.auth?.user;
+  if (
+    page.props.promptSignatureSetup &&
+    u && (!u.electronic_signature || !u.has_signature_pin) &&
+    !route().current('profile.signature')
+  ) {
+    showSignatureSetupModal.value = true;
   }
 });
 onUnmounted(() => {
@@ -482,6 +495,7 @@ filteredMenu.value.forEach((item) => {
     </div>
   <ProfileEditModal :show="showProfileModal" @close="showProfileModal = false" />
   <ErrorReportModal :open="showErrorReportModal" @close="showErrorReportModal = false" />
+  <SignatureSetupModal :show="showSignatureSetupModal" @close="showSignatureSetupModal = false" />
   <ReportDateRangeModal
     :show="showConsultationLogModal"
     title="Consultation Log Generation"
