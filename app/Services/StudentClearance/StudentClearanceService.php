@@ -46,6 +46,53 @@ class StudentClearanceService
             ->first();
     }
 
+    /**
+     * The student's own clearance for a period, eager-loaded for
+     * student-facing display (web portal and mobile API).
+     */
+    public function clearanceForStudent(StudentClearancePeriod $period, int $studentId): ?StudentClearance
+    {
+        return StudentClearance::with([
+            'period.schoolYear:id,name,is_current',
+            'section:id,sectionname,levelid',
+            'adviser:id,name',
+            'items.assignedUser:id,name',
+            'items.signer:id,name',
+        ])
+            ->where('student_clearance_period_id', $period->id)
+            ->where('student_id', $studentId)
+            ->first();
+    }
+
+    /**
+     * Student-facing serialization of a clearance (shared by the web
+     * portal Clearance page and the mobile API).
+     */
+    public function serializeForStudent(StudentClearance $clearance): array
+    {
+        return [
+            'id'           => $clearance->id,
+            'status'       => $clearance->status,
+            'grade_level'  => $clearance->grade_level,
+            'section_name' => $clearance->section?->sectionname,
+            'adviser_name' => $clearance->adviser?->name,
+            'finalized_at' => $clearance->finalized_at?->format('Y-m-d H:i'),
+            'items'        => $clearance->items->map(fn ($item) => [
+                'id'                => $item->id,
+                'requirement_label' => $item->requirement_label,
+                'requirement_type'  => $item->requirement_type,
+                'requirement_group' => $item->requirement_group,
+                'status'            => $item->status,
+                'remarks'           => $item->remarks,
+                'accountability'    => $item->accountability,
+                'blocker_summary'   => $item->blocker_summary,
+                'assigned_to'       => $item->assignedUser?->name,
+                'signed_by'         => $item->signer?->name,
+                'signed_at'         => $item->signed_at?->format('Y-m-d H:i'),
+            ])->values(),
+        ];
+    }
+
     public function createPeriod(array $data, User $actor): StudentClearancePeriod
     {
         return StudentClearancePeriod::create([

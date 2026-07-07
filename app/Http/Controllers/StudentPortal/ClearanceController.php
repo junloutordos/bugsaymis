@@ -4,7 +4,6 @@ namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
-use App\Models\StudentClearance\StudentClearance;
 use App\Services\StudentClearance\StudentClearancePdfService;
 use App\Services\StudentClearance\StudentClearanceService;
 use Inertia\Inertia;
@@ -18,18 +17,7 @@ class ClearanceController extends Controller
         $student = Student::where('pisaysystemID', session('student_pisaysystemID'))->firstOrFail();
         $period = $service->activeOrLatestPeriod();
 
-        $clearance = $period
-            ? StudentClearance::with([
-                'period.schoolYear:id,name,is_current',
-                'section:id,sectionname,levelid',
-                'adviser:id,name',
-                'items.assignedUser:id,name',
-                'items.signer:id,name',
-            ])
-                ->where('student_clearance_period_id', $period->id)
-                ->where('student_id', $student->id)
-                ->first()
-            : null;
+        $clearance = $period ? $service->clearanceForStudent($period, $student->id) : null;
 
         return Inertia::render('StudentPortal/Clearance/Show', [
             'student' => [
@@ -45,7 +33,7 @@ class ClearanceController extends Controller
                 'opens_at' => $period->opens_at?->format('Y-m-d'),
                 'closes_at'=> $period->closes_at?->format('Y-m-d'),
             ] : null,
-            'clearance' => $clearance ? $this->serializeClearance($clearance) : null,
+            'clearance' => $clearance ? $service->serializeForStudent($clearance) : null,
         ]);
     }
 
@@ -56,7 +44,7 @@ class ClearanceController extends Controller
 
         abort_unless($period, 404);
 
-        $clearance = StudentClearance::where('student_clearance_period_id', $period->id)
+        $clearance = \App\Models\StudentClearance\StudentClearance::where('student_clearance_period_id', $period->id)
             ->where('student_id', $student->id)
             ->firstOrFail();
 
@@ -68,30 +56,5 @@ class ClearanceController extends Controller
             'Content-Disposition' => "inline; filename=\"{$filename}\"",
             'Cache-Control'       => 'private, no-cache',
         ]);
-    }
-
-    private function serializeClearance(StudentClearance $clearance): array
-    {
-        return [
-            'id'           => $clearance->id,
-            'status'       => $clearance->status,
-            'grade_level'  => $clearance->grade_level,
-            'section_name' => $clearance->section?->sectionname,
-            'adviser_name' => $clearance->adviser?->name,
-            'finalized_at' => $clearance->finalized_at?->format('Y-m-d H:i'),
-            'items'        => $clearance->items->map(fn ($item) => [
-                'id'                => $item->id,
-                'requirement_label' => $item->requirement_label,
-                'requirement_type'  => $item->requirement_type,
-                'requirement_group' => $item->requirement_group,
-                'status'            => $item->status,
-                'remarks'           => $item->remarks,
-                'accountability'    => $item->accountability,
-                'blocker_summary'   => $item->blocker_summary,
-                'assigned_to'       => $item->assignedUser?->name,
-                'signed_by'         => $item->signer?->name,
-                'signed_at'         => $item->signed_at?->format('Y-m-d H:i'),
-            ])->values(),
-        ];
     }
 }

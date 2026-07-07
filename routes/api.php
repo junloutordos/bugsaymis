@@ -7,6 +7,7 @@ use App\Http\Controllers\StudentAttendance\Api\LinkRequestController;
 use App\Http\Controllers\StudentAttendance\Api\RegisterController;
 use App\Http\Controllers\StudentAttendance\Api\ScheduleApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentApiController;
+use App\Http\Controllers\StudentAttendance\Api\StudentPortalApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
 use App\Http\Controllers\Api\AtlasSentinelController;
 use App\Http\Controllers\Api\AtlasSentinelRemoteHelpController;
@@ -80,6 +81,33 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
             Route::get('/grades',     [StudentSelfController::class, 'grades'])->name('grades');
             Route::get('/schedule',   [StudentSelfController::class, 'schedule'])->name('schedule');
             Route::get('/attendance', [StudentSelfController::class, 'attendance'])->name('attendance');
+
+            // Student-portal features for the AtlasGo app — mirrors the
+            // /student-portal web routes via shared StudentPortal services.
+            Route::prefix('portal')->name('portal.')->group(function () {
+                Route::get('/dashboard', [StudentPortalApiController::class, 'dashboard'])->name('dashboard');
+
+                Route::get('/profile', [StudentPortalApiController::class, 'profile'])->name('profile');
+                Route::post('/profile/{section}', [StudentPortalApiController::class, 'saveProfileSection'])->name('profile.save')
+                    ->where('section', 'academic|activities|social|career|residence|health')
+                    ->middleware('throttle:30,1');
+
+                Route::get('/medical', [StudentPortalApiController::class, 'medical'])->name('medical');
+                Route::post('/medical/{section}', [StudentPortalApiController::class, 'saveMedicalSection'])->name('medical.save')
+                    ->where('section', 'allergies|immunizations|medical_history|vitamins')
+                    ->middleware('throttle:30,1');
+
+                Route::get('/rh-application', [StudentPortalApiController::class, 'rhApplication'])->name('rh-application.show');
+                Route::post('/rh-application', [StudentPortalApiController::class, 'storeRhApplication'])->name('rh-application.store')
+                    ->middleware('throttle:6,1');
+
+                Route::get('/leave-passes', [StudentPortalApiController::class, 'leavePasses'])->name('leave-passes.index');
+                Route::post('/leave-passes', [StudentPortalApiController::class, 'storeLeavePass'])->name('leave-passes.store')
+                    ->middleware('throttle:6,1');
+
+                Route::get('/clearance', [StudentPortalApiController::class, 'clearance'])->name('clearance');
+                Route::get('/clearance/pdf', [StudentPortalApiController::class, 'clearancePdf'])->name('clearance.pdf');
+            });
         });
     });
 });
