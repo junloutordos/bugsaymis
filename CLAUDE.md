@@ -41,7 +41,7 @@ App URL:       https://mis.crc.pshs.edu.ph
 Cloudflare:    Proxied (orange-cloud) — WAF active
 ALB:           crcmis-alb (HTTPS only, TLS 1.3)
 RDS:           crcmis-db-encrypted.c5i2kaqa8hyl.ap-southeast-1.rds.amazonaws.com (encrypted, single-AZ)
-Redis:         crcmis-redis.d8qigv.0001.apse1.cache.amazonaws.com:6379
+Redis:         crcmis-redis-rg.d8qigv.ng.0001.apse1.cache.amazonaws.com:6379 (replication group primary; SSM /crcmis/prod/REDIS_HOST)
 S3 bucket:     crcmis-mis-storage (ap-southeast-1, Block Public Access ON)
 ```
 
