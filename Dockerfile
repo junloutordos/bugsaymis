@@ -94,6 +94,20 @@ RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini \
 RUN echo "[www]" > /usr/local/etc/php-fpm.d/zz-security.conf \
     && echo "php_admin_value[disable_functions] = system,shell_exec,passthru,proc_open,popen,pcntl_exec" >> /usr/local/etc/php-fpm.d/zz-security.conf
 
+# The php:8.4-fpm default pool is pm.max_children=5 — a couple of slow
+# requests (large base64 uploads, long streams) starve the whole app and
+# spike ALB p99 latency. Sized for the 2 vCPU / 4GB Fargate task (shared
+# with nginx + soketi + adot); max_requests recycles workers to cap leaks.
+RUN { \
+        echo "[www]"; \
+        echo "pm = dynamic"; \
+        echo "pm.max_children = 12"; \
+        echo "pm.start_servers = 4"; \
+        echo "pm.min_spare_servers = 2"; \
+        echo "pm.max_spare_servers = 6"; \
+        echo "pm.max_requests = 500"; \
+    } > /usr/local/etc/php-fpm.d/zz-pool-sizing.conf
+
 RUN echo "* * * * * root . /etc/environment; cd /var/www && php artisan schedule:run >> /var/log/cron.log 2>&1" > /etc/cron.d/laravel-scheduler \
     && chmod 0644 /etc/cron.d/laravel-scheduler
 

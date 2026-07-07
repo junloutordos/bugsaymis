@@ -106,7 +106,7 @@ class WorkRequestController extends Controller
         // details are handled later by GSU Head, so they are not accepted here.
         $data = $request->validate([
             'issue' => 'required|string|max:255',
-            'category' => 'nullable|string|max:255',
+            'category' => 'nullable|string|in:Carpentry,Electrical,Plumbing,Aircon/HVAC,Painting,Welding,Grounds/Landscaping,Other',
             'description' => 'nullable|string',
             'priority' => 'nullable|string|in:Low,Normal,High',
             'location_division_id' => 'nullable|exists:buildings,id',
@@ -661,7 +661,7 @@ class WorkRequestController extends Controller
     {
         $data = $request->validate([
             'issue' => 'required|string|max:255',
-            'category' => 'nullable|string|max:255',
+            'category' => 'nullable|string|in:Carpentry,Electrical,Plumbing,Aircon/HVAC,Painting,Welding,Grounds/Landscaping,Other',
             'description' => 'nullable|string',
             'priority' => 'nullable|string|in:Low,Normal,High',
             'location_division_id' => 'nullable|exists:buildings,id',

@@ -239,9 +239,15 @@ class AtlasWatchTowerController extends Controller
      */
     private function queueThroughput(int $since): array
     {
+        // Pulse stores count-aggregate totals in `value` (`count` is only
+        // populated for avg aggregates) and writes every event into four
+        // period buckets (60/360/1440/10080) — sum a single period matching
+        // the 24h window or the totals quadruple.
         return DB::table('pulse_aggregates')
-            ->select('type', DB::raw('SUM(count) as total'))
+            ->select('type', DB::raw('SUM(value) as total'))
             ->whereIn('type', ['queued', 'processing', 'processed', 'released', 'failed'])
+            ->where('aggregate', 'count')
+            ->where('period', 1440)
             ->where('bucket', '>=', $since)
             ->groupBy('type')
             ->pluck('total', 'type')

@@ -215,12 +215,21 @@
             <AppInput v-model="form.expected_completion_date" type="date" label="Expected Completion" />
           </div>
 
-          <div v-if="editingId && (hasRole('GSU Head') || hasRole('Administrator'))" class="mt-3">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Assign Personnel</label>
-            <select v-model="form.assigned_user_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-              <option value="">Select staff</option>
-              <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
-            </select>
+          <div v-if="editingId && (hasRole('GSU Head') || hasRole('Administrator'))" class="mt-3 grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Assign Personnel</label>
+              <select v-model="form.assigned_user_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">Select staff</option>
+                <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Work Category</label>
+              <select v-model="form.category" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">Select category</option>
+                <option v-for="c in WORK_CATEGORIES" :key="c">{{ c }}</option>
+              </select>
+            </div>
           </div>
         </form>
         <template #footer>
@@ -545,9 +554,14 @@ const editingId = ref(null)
 const showCompleteModal = ref(false)
 const completeEditingId = ref(null)
 
+// Skilled-personnel work categories — mirrors the in: validation list in
+// WorkRequestController; feeds the General Services dashboard doughnut.
+const WORK_CATEGORIES = ['Carpentry', 'Electrical', 'Plumbing', 'Aircon/HVAC', 'Painting', 'Welding', 'Grounds/Landscaping', 'Other']
+
 const form = useForm({
   issue: '',
   description: '',
+  category: '',
   priority: 'Normal',
   location_division_id: '',
   location_office_id: '',
@@ -634,6 +648,7 @@ const openModal = (wr = null) => {
     form.reset()
     form.issue = wr.issue ?? ''
     form.description = wr.description ?? ''
+    form.category = wr.category ?? ''
     form.priority = wr.priority ?? 'Normal'
     form.location_division_id = wr.location_division_id ?? ''
     form.location_office_id = wr.location_office_id ?? ''

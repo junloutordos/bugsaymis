@@ -554,8 +554,26 @@ class AtlasSentinelController extends Controller
         }
 
         $s3Key = $this->decodeS3Key($encodedKey);
-        if (! $s3Key || ! Storage::disk('s3')->exists($s3Key)) {
+        // Device tokens may only fetch release artifacts — the encoded key is
+        // client-supplied, so without the prefix check it could name any
+        // object in the bucket (WFH photos, backups, ...).
+        if (! $s3Key || ! str_starts_with($s3Key, 'atlas-sentinel-releases/') || ! Storage::disk('s3')->exists($s3Key)) {
             abort(404);
+        }
+
+        // Redirect to a presigned S3 URL so the ~140MB transfer bypasses
+        // Cloudflare/ALB/nginx/FPM entirely — fleet-wide updates hold app
+        // connections open 16-65s per device and trip the ALB p99 latency
+        // alarm. Agents follow the redirect with a default HttpClient (the
+        // bearer header is dropped cross-host; the presigned URL needs none)
+        // and verify sha256 locally. 30 min matches the agent's own
+        // download timeout.
+        try {
+            return redirect()->away(
+                Storage::disk('s3')->temporaryUrl($s3Key, now()->addMinutes(30))
+            );
+        } catch (\Throwable $e) {
+            logger()->warning('Presigned release URL failed, falling back to streaming', ['error' => $e->getMessage()]);
         }
 
         // Release zips are ~100MB — stream from S3 instead of buffering the
