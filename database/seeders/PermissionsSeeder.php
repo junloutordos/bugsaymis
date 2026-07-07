@@ -341,6 +341,10 @@ class PermissionsSeeder extends Seeder
             // ── CID Dashboard ─────────────────────────────────────────────
             ['module' => 'CID', 'name' => 'cid.dashboard', 'description' => 'Access the CID Dashboard: assessment calendar, activity scheduling, and CID analytics (CID Chief, AUH, Administrator)'],
 
+            // ── CID Competitions & Winnings ───────────────────────────────
+            ['module' => 'CID', 'name' => 'cid.competitions.view',   'description' => 'View and log competition participation and awards (own records)'],
+            ['module' => 'CID', 'name' => 'cid.competitions.manage', 'description' => 'Edit or delete any competition record (CID Chief, Administrator)'],
+
             // ── Supply & Property ─────────────────────────────────────────────
             ['module' => 'Supply', 'name' => 'supply.view',    'description' => 'View supply items, stock levels, and ledger cards'],
             ['module' => 'Supply', 'name' => 'supply.receive', 'description' => 'Create IARs and accept/post deliveries to stock'],

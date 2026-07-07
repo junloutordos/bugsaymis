@@ -39,6 +39,7 @@ import {
   KeyIcon,
   TableCellsIcon,
   StarIcon,
+  TrophyIcon,
   DocumentChartBarIcon,
   AcademicCapIcon,
   CalendarDaysIcon,
@@ -1171,6 +1172,14 @@ export const menuItems = [
     href: route("cid.dashboard.index"),
     icon: ChartBarIcon,
     permissions: ["cid.dashboard"],
+  },
+
+  {
+    label: "Competitions & Winnings",
+    routeName: "cid.competitions.index",
+    href: route("cid.competitions.index"),
+    icon: TrophyIcon,
+    permissions: ["cid.competitions.view", "cid.competitions.manage"],
   },
 
   {

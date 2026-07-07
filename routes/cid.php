@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CID\CompetitionController;
 use App\Http\Controllers\CidDashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,4 +13,18 @@ Route::middleware(['auth', 'permission:cid.dashboard'])
         Route::post('/dashboard',             [CidDashboardController::class, 'store'])->name('dashboard.store');
         Route::put('/dashboard/{schedule}',   [CidDashboardController::class, 'update'])->name('dashboard.update');
         Route::delete('/dashboard/{schedule}',[CidDashboardController::class, 'destroy'])->name('dashboard.destroy');
+    });
+
+// Competitions & Winnings — employees log competition participation/awards for
+// themselves and for the students they coach. Per-record edit/delete checks
+// (creator or cid.competitions.manage) live in CompetitionController.
+Route::middleware(['auth', 'permission:cid.competitions.view|cid.competitions.manage'])
+    ->prefix('cid/competitions')
+    ->name('cid.competitions.')
+    ->group(function () {
+        Route::get('/',                 [CompetitionController::class, 'index'])->name('index');
+        Route::get('/students/search',  [CompetitionController::class, 'searchStudents'])->name('students.search');
+        Route::post('/',                [CompetitionController::class, 'store'])->name('store');
+        Route::put('/{competition}',    [CompetitionController::class, 'update'])->name('update');
+        Route::delete('/{competition}', [CompetitionController::class, 'destroy'])->name('destroy');
     });

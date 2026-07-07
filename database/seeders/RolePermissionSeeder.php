@@ -421,6 +421,12 @@ class RolePermissionSeeder extends Seeder
         $assign('CID Chief', ['cid.dashboard']);
         $assign('AUH',       ['cid.dashboard']);
 
+        // ── CID Competitions & Winnings ───────────────────────────────────────
+        $assign('CID Chief', ['cid.competitions.view', 'cid.competitions.manage']);
+        $assign('AUH',       ['cid.competitions.view']);
+        $assign('Faculty',   ['cid.competitions.view']);
+        $assign('Staff',     ['cid.competitions.view']);
+
         // ── PPMP ──────────────────────────────────────────────────────────────
         $assign('Faculty', ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
         $assign('Staff',   ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
