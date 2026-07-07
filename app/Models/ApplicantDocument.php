@@ -22,6 +22,17 @@ class ApplicantDocument extends Model
         'remarks',
     ];
 
+    /**
+     * file_path marker for a document whose bytes sit in S3 staging awaiting
+     * the queued Google Drive upload. Doubles as the ownership token that
+     * lets a stale UploadApplicantDocumentsToDrive job detect it was
+     * superseded by a re-submission.
+     */
+    public static function pendingPath(string $s3Key): string
+    {
+        return 's3-pending:' . $s3Key;
+    }
+
     // ── Relationships ──────────────────────────────────────────────────────────
 
     public function applicant()

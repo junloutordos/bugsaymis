@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Recruitment;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\UploadApplicantDocumentsToDrive;
 use App\Models\Applicant;
 use App\Models\ApplicantDocument;
 use App\Models\Application;
@@ -14,6 +15,8 @@ use App\Services\Recruitment\ApplicationWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class PublicVacancyController extends Controller
@@ -154,25 +157,30 @@ class PublicVacancyController extends Controller
 
         $fileName = "[{$driveFolder}] Application Documents.{$ext}";
 
+        // Stage the bytes in S3 (fast, in-region) and let a queued job move
+        // them to Google Drive — the synchronous Drive upload held this
+        // public request open 11-16s and tripped the ALB p99 latency alarm.
+        $s3Key = 'recruitment/pending-uploads/' . Str::uuid() . '.' . $ext;
         try {
-            $result = $this->drive->uploadRaw($raw, $fileName, $mime);
-            $uploadedDoc = [
-                'drive_file_id' => $result['file_id'],
-                'drive_url'     => $result['link'],
-                'original_name' => $filename,
-                'file_size'     => strlen($raw),
-                'mime_type'     => $mime,
-            ];
+            Storage::disk('s3')->put($s3Key, $raw);
         } catch (\Throwable $e) {
-            Log::error('Drive upload failed for application_documents: ' . $e->getMessage());
+            Log::error('S3 staging failed for application_documents: ' . $e->getMessage());
             return response()->json([
                 'errors' => ['documents_base64' => ['Failed to upload your documents. Please try again.']],
             ], 422);
         }
 
+        $uploadedDoc = [
+            'drive_file_id' => null,
+            'drive_url'     => null,
+            'original_name' => $filename,
+            'file_size'     => strlen($raw),
+            'mime_type'     => $mime,
+        ];
+
         // Create applicant + application + document record in one transaction
         try {
-            $application = DB::transaction(function () use ($validated, $vacancy, $uploadedDoc) {
+            [$application, $document] = DB::transaction(function () use ($validated, $vacancy, $uploadedDoc, $s3Key) {
                 $applicant = Applicant::updateOrCreate(
                     ['email' => $validated['email']],
                     array_merge(
@@ -187,23 +195,29 @@ class PublicVacancyController extends Controller
                 );
 
                 // Store the consolidated documents record
-                ApplicantDocument::updateOrCreate(
+                $document = ApplicantDocument::updateOrCreate(
                     ['applicant_id' => $applicant->id, 'document_type' => 'application_documents'],
-                    array_merge($uploadedDoc, ['file_path' => $uploadedDoc['drive_url'], 'status' => 'pending'])
+                    array_merge($uploadedDoc, ['file_path' => ApplicantDocument::pendingPath($s3Key), 'status' => 'pending'])
                 );
 
-                return $this->workflow->apply($applicant, $vacancy, [
+                $application = $this->workflow->apply($applicant, $vacancy, [
                     'is_internal' => $validated['is_internal'] ?? false,
                     'remarks'     => $validated['remarks'] ?? null,
                 ]);
+
+                return [$application, $document];
             });
         } catch (\RuntimeException $e) {
+            // The application was rejected — the staged bytes are orphaned.
+            Storage::disk('s3')->delete($s3Key);
             return response()->json(['errors' => ['_general' => [$e->getMessage()]]], 422);
         }
 
+        UploadApplicantDocumentsToDrive::dispatch($document->id, $s3Key, $fileName, $mime);
+
         return back()->with('success',
             "Application submitted successfully! Your reference number is #{$application->id}. " .
-            "Your documents have been uploaded. You will be notified by email of any updates."
+            "Your documents have been received. You will be notified by email of any updates."
         );
     }
 
