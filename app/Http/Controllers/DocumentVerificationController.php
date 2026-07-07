@@ -7,8 +7,11 @@ use App\Models\FacilityRequest;
 use App\Models\HR\LeaveApplication;
 use App\Models\Issuance;
 use App\Models\ITJobRequest;
+use App\Models\Division;
 use App\Models\MessengerialRequest;
+use App\Models\Office;
 use App\Models\ServiceRequest;
+use App\Models\User;
 use App\Models\VehicleRequest;
 use App\Models\WorkRequest;
 use App\Services\DigitalSignatureService;
@@ -70,6 +73,66 @@ class DocumentVerificationController extends Controller
             'jobRequest' => $jobRequest,
             'entries'    => $entries,
         ]);
+    }
+
+    /**
+     * Employee Digital ID verification — public, no authentication.
+     * Resolves the opaque QR token to LIVE employment status. Shows minimal
+     * PII only: photo, name, position, unit, employee number, status.
+     */
+    public function showEmployee(string $token)
+    {
+        $user = User::where('id_verification_token', $token)->first();
+
+        if (! $user) {
+            return Inertia::render('Verify/Employee', [
+                'valid'    => false,
+                'employee' => null,
+                'photoUri' => null,
+            ]);
+        }
+
+        $division = $user->division_id ? Division::find($user->division_id) : null;
+        $office   = $user->office_id ? Office::find($user->office_id) : null;
+
+        return Inertia::render('Verify/Employee', [
+            'valid'    => true,
+            'employee' => [
+                'name'        => $user->name,
+                'position'    => $user->position,
+                'employee_no' => $user->employee_no,
+                'division'    => $division?->division_name,
+                'office'      => $office?->name,
+                'is_active'   => $user->status === 'active',
+            ],
+            'photoUri'    => $this->photoDataUri($user->profile_picture),
+            'verified_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /** Inline a private-S3 profile photo as a data URI (verify page is public — no /media auth). */
+    private function photoDataUri(?string $path): ?string
+    {
+        if (empty($path)) {
+            return null;
+        }
+
+        try {
+            if (Storage::disk('s3')->exists($path)) {
+                $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                $mime = match ($ext) {
+                    'png'         => 'image/png',
+                    'webp'        => 'image/webp',
+                    'gif'         => 'image/gif',
+                    default       => 'image/jpeg',
+                };
+
+                return "data:{$mime};base64," . base64_encode(Storage::disk('s3')->get($path));
+            }
+        } catch (\Exception) {
+        }
+
+        return null;
     }
 
     /**

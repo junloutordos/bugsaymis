@@ -1393,6 +1393,9 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     Route::get('/profile',   [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
+    // Employee Digital ID — own card, print layout with verify QR
+    Route::get('/profile/id-card', [\App\Http\Controllers\EmployeeIdController::class, 'show'])->name('profile.id-card');
+
     // Digital Signature — profile setup
     Route::get('/profile/signature', [\App\Http\Controllers\UserSignatureController::class, 'show'])->name('profile.signature');
     Route::post('/profile/signature', [\App\Http\Controllers\UserSignatureController::class, 'saveSignature'])->name('profile.signature.save');
@@ -2174,6 +2177,12 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
 | Document Verification — public, no auth required
 |--------------------------------------------------------------------------
 */
+// Employee Digital ID verification (public) — opaque 48-char token from the ID QR
+Route::get('/verify/employee/{token}', [\App\Http\Controllers\DocumentVerificationController::class, 'showEmployee'])
+    ->name('employee.verify')
+    ->middleware('throttle:30,1')
+    ->where('token', '[A-Za-z0-9]{48}');
+
 Route::get('/verify/{token}', [\App\Http\Controllers\DocumentVerificationController::class, 'show'])
     ->name('document.verify')
     ->where('token', '[0-9a-f\-]{36}');

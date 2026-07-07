@@ -7,7 +7,7 @@ import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
 // import UpdateProfileModal from './Partials/UpdateProfileModal.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { FingerPrintIcon } from '@heroicons/vue/24/outline';
+import { FingerPrintIcon, IdentificationIcon } from '@heroicons/vue/24/outline';
 import { ref } from 'vue';
 
 const showProfileModal = ref(false);
@@ -55,6 +55,23 @@ defineProps({
                 <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
                     <DeleteUserForm class="max-w-xl" />
                 </div>
+
+                <!-- Employee Digital ID -->
+                <Link :href="route('profile.id-card')"
+                      class="block bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5 hover:border-indigo-300 hover:shadow-md transition-all group">
+                    <div class="flex items-center justify-between max-w-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                                <IdentificationIcon class="w-5 h-5 text-indigo-600" />
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-800">Employee Digital ID</p>
+                                <p class="text-xs text-slate-500">View and print your ID card with a verifiable QR code</p>
+                            </div>
+                        </div>
+                        <span class="text-slate-400 group-hover:text-indigo-500 text-sm transition-colors">&rarr;</span>
+                    </div>
+                </Link>
 
                 <!-- Digital Signature -->
                 <Link :href="route('profile.signature')"
