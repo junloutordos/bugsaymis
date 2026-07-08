@@ -133,7 +133,10 @@ export default function useEquipments(initialEquipments = [], users = []) {
     errors.value = {}
     showLoadingSwal('Saving equipment...')
     router.post(route("ict-equipments.store"), form.value, {
-      onError: e => { errors.value = e; Swal.close() },
+      onError: e => {
+        errors.value = e
+        Swal.fire({ icon: "error", title: "Not saved", text: "Please review the highlighted fields and try again." })
+      },
       onSuccess: () => {
         closeModal()
         Swal.fire({ icon: "success", title: "Success", text: "New equipment has been added!", timer: 2000, showConfirmButton: false })
@@ -145,7 +148,10 @@ export default function useEquipments(initialEquipments = [], users = []) {
     errors.value = {}
     showLoadingSwal('Updating equipment...')
     router.put(route("ict-equipments.update", id), form.value, {
-      onError: e => { errors.value = e; Swal.close() },
+      onError: e => {
+        errors.value = e
+        Swal.fire({ icon: "error", title: "Not saved", text: "Please review the highlighted fields and try again." })
+      },
       onSuccess: () => {
         closeModal()
         Swal.fire({ icon: "success", title: "Updated", text: "Equipment details have been updated!", timer: 2000, showConfirmButton: false })
@@ -201,6 +207,7 @@ export default function useEquipments(initialEquipments = [], users = []) {
     modalMode.value = mode
     selectedEquipment.value = eq
     form.value = mode === "edit" && eq ? { ...eq } : emptyForm()
+    errors.value = {}
     showModal.value = true
   }
 

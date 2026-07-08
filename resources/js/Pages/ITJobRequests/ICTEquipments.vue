@@ -478,6 +478,11 @@ const applyFilters = () => {
     })
 }
 
+const showPendingSetup = () => {
+  filterStatus.value = 'Pending Setup'
+  applyFilters()
+}
+
 const clearFilters = () => {
   search.value = ''
   filterCategory.value = ''
@@ -586,7 +591,7 @@ const showAllChecked    = computed({
         <AppButton
           v-if="props.pendingSetupCount > 0"
           variant="warning"
-          @click="filterStatus = 'Pending Setup'"
+          @click="showPendingSetup"
           title="Show devices that enrolled automatically and need to be completed"
         >
           <ExclamationTriangleIcon class="w-3.5 h-3.5" />
@@ -623,7 +628,7 @@ const showAllChecked    = computed({
           </span>
         </div>
         <button
-          @click="filterStatus = 'Pending Setup'"
+          @click="showPendingSetup"
           class="flex-shrink-0 text-orange-700 underline hover:no-underline font-medium"
         >
           Review now
@@ -830,7 +835,7 @@ const showAllChecked    = computed({
           </div>
           <!-- Equipment Category -->
           <div class="col-span-2">
-            <AppSelect v-model="form.category" label="Equipment Category" required :show-blank="false">
+            <AppSelect v-model="form.category" label="Equipment Category" required :show-blank="false" :error="errors.category">
               <option value="">Please select category</option>
               <option value="CPU/System Unit">CPU/System Unit</option>
               <option value="Monitor">Monitor</option>
@@ -853,46 +858,55 @@ const showAllChecked    = computed({
           <!-- Owner (Dropdown) -->
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Owner <span class="text-red-500">*</span></label>
-            <select v-model="form.owner_id" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" required>
+            <select
+              v-model="form.owner_id"
+              :class="[
+                'rounded-lg border px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full',
+                errors.owner_id ? 'border-red-400 bg-red-50/30' : 'border-slate-200 bg-white',
+              ]"
+              required
+            >
               <option value="">Select Owner</option>
               <option v-for="user in props.users" :key="user.id" :value="user.id">
                 {{ user.name }}
               </option>
             </select>
+            <p v-if="errors.owner_id" class="mt-1 text-xs text-red-500">{{ errors.owner_id }}</p>
           </div>
 
           <!-- Property No -->
           <div>
-            <AppInput v-model="form.property_no" type="text" label="Property No" />
+            <AppInput v-model="form.property_no" type="text" label="Property No" :error="errors.property_no" />
           </div>
 
           <!-- Serial No -->
           <div class="col-span-2">
-            <AppInput v-model="form.serial_no" type="text" label="Serial No" required />
+            <AppInput v-model="form.serial_no" type="text" label="Serial No" required :error="errors.serial_no" />
           </div>
 
           <!-- Device Description -->
           <div class="col-span-2">
-            <AppInput v-model="form.description" type="text" label="Device Description / Model" required />
+            <AppInput v-model="form.description" type="text" label="Device Description / Model" required :error="errors.description" />
           </div>
 
           <!-- Date Acquired -->
           <div>
-            <AppInput v-model="form.date_acquired" type="date" label="Date Acquired" />
+            <AppInput v-model="form.date_acquired" type="date" label="Date Acquired" :error="errors.date_acquired" />
           </div>
 
           <!-- Amount -->
           <div>
-            <AppInput v-model="form.amount" type="number" step="0.01" label="Amount" />
+            <AppInput v-model="form.amount" type="number" step="0.01" label="Amount" :error="errors.amount" />
           </div>
 
           <!-- Equipment Status -->
           <div>
-            <AppSelect v-model="form.status" label="Equipment Status" required :show-blank="false">
+            <AppSelect v-model="form.status" label="Equipment Status" required :show-blank="false" :error="errors.status">
               <option value="">Select Status</option>
               <option value="Good Working">Good Working</option>
               <option value="For Repair">For Repair</option>
               <option value="Disposed">Disposed</option>
+              <option value="Pending Setup">Pending Setup</option>
             </AppSelect>
           </div>
 
@@ -903,7 +917,10 @@ const showAllChecked    = computed({
             </label>
             <select
               v-model="form.room_id"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+              :class="[
+                'rounded-lg border px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full',
+                errors.room_id ? 'border-red-400 bg-red-50/30' : 'border-slate-200 bg-white',
+              ]"
               required
             >
               <option value="">Select location</option>
@@ -911,27 +928,28 @@ const showAllChecked    = computed({
                 {{ room.name }}
               </option>
             </select>
+            <p v-if="errors.room_id" class="mt-1 text-xs text-red-500">{{ errors.room_id }}</p>
           </div>
 
 
           <!-- Warranty Expires -->
           <div>
-            <AppInput v-model="form.warranty_expires_at" type="date" label="Warranty Expires" />
+            <AppInput v-model="form.warranty_expires_at" type="date" label="Warranty Expires" :error="errors.warranty_expires_at" />
           </div>
 
           <!-- Warranty Provider -->
           <div>
-            <AppInput v-model="form.warranty_provider" type="text" label="Warranty Provider" />
+            <AppInput v-model="form.warranty_provider" type="text" label="Warranty Provider" :error="errors.warranty_provider" />
           </div>
 
           <!-- Decommissioned -->
           <div>
-            <AppInput v-model="form.decommissioned_at" type="date" label="Decommissioned On" />
+            <AppInput v-model="form.decommissioned_at" type="date" label="Decommissioned On" :error="errors.decommissioned_at" />
           </div>
 
           <!-- Remarks -->
           <div class="col-span-2">
-            <AppTextarea v-model="form.remarks" :rows="2" label="Remarks" />
+            <AppTextarea v-model="form.remarks" :rows="2" label="Remarks" :error="errors.remarks" />
           </div>
         </form>
 
