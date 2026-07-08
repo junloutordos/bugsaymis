@@ -26,6 +26,11 @@ class PDSTrainingController extends Controller
         // Excel's "CSV UTF-8" variant prepends a BOM that would corrupt the
         // first header name (and with it every training_title lookup).
         $contents = preg_replace('/^\xEF\xBB\xBF/', '', $contents);
+        // Excel's plain "CSV" variant is Windows-1252, not UTF-8 — en-dashes
+        // and smart quotes otherwise reach the DB as mojibake/"?".
+        if (! mb_check_encoding($contents, 'UTF-8')) {
+            $contents = mb_convert_encoding($contents, 'UTF-8', 'Windows-1252');
+        }
         if (trim($contents) === '') {
             return back()->withErrors(['file' => 'CSV file is empty.']);
         }
@@ -44,12 +49,14 @@ class PDSTrainingController extends Controller
         $rows = [];
         $skippedDates = 0;
         $skippedTitle = 0;
+        $skippedColumns = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             if (count(array_filter($row, fn ($value) => trim((string) $value) !== '')) === 0) {
                 continue;
             }
             if (count($row) !== count($header)) {
+                $skippedColumns++;
                 continue;
             }
 
@@ -81,7 +88,7 @@ class PDSTrainingController extends Controller
 
         fclose($handle);
 
-        $note = $this->skippedNote($skippedDates, $skippedTitle);
+        $note = $this->skippedNote($skippedDates, $skippedTitle, $skippedColumns);
 
         if (count($rows) === 0) {
             return back()->withErrors(['file' => $note
@@ -139,7 +146,7 @@ class PDSTrainingController extends Controller
         return null;
     }
 
-    private function skippedNote(int $badDates, int $missingTitle): ?string
+    private function skippedNote(int $badDates, int $missingTitle, int $badColumns): ?string
     {
         $parts = [];
         if ($badDates > 0) {
@@ -147,6 +154,9 @@ class PDSTrainingController extends Controller
         }
         if ($missingTitle > 0) {
             $parts[] = "{$missingTitle} row(s) skipped — missing training title";
+        }
+        if ($badColumns > 0) {
+            $parts[] = "{$badColumns} row(s) skipped — wrong number of columns; wrap any cell containing a comma in double quotes";
         }
 
         return $parts ? implode('; ', $parts) . '.' : null;

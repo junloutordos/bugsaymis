@@ -458,6 +458,7 @@ const uploadTrainingCSV = async () => {
     csv_mime: csvFile.value.type || 'text/csv',
   }, {
     preserveScroll: true,
+    resetOnSuccess: true,
     onSuccess: (page) => {
       // Show success message from flash
       const successMessage = page.props?.flash?.success || 'CSV uploaded successfully!'

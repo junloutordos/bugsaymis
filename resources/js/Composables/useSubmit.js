@@ -36,13 +36,16 @@ export function useSubmit() {
 
     isSubmitting.value = true
 
-    const { onSuccess, onError, onFinish, ...rest } = options
+    const { onSuccess, onError, onFinish, resetOnSuccess, ...rest } = options
 
     const mergedOptions = {
       ...rest,
       onSuccess: (page) => {
+        // resetOnSuccess: for same-page flows (no navigation after success)
+        // the button must re-enable or it stays stuck on "Submitting…".
+        if (resetOnSuccess) isSubmitting.value = false
         onSuccess?.(page)
-        // keep disabled on success — page navigation / flash handles UX
+        // otherwise keep disabled — page navigation / flash handles UX
       },
       onError: (errors) => {
         isSubmitting.value = false          // re-enable on validation error
