@@ -437,6 +437,7 @@ export default function useEquipments(initialEquipments = [], users = []) {
   return {
     // Data
     equipments,
+    errors,
     filteredEquipments,
     totalPages,
     searchQuery,
