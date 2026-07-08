@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\Pds;
 
 class PDSTrainingController extends Controller
@@ -22,6 +23,9 @@ class PDSTrainingController extends Controller
         }
 
         $contents = $this->csvContents($request, $data);
+        // Excel's "CSV UTF-8" variant prepends a BOM that would corrupt the
+        // first header name (and with it every training_title lookup).
+        $contents = preg_replace('/^\xEF\xBB\xBF/', '', $contents);
         if (trim($contents) === '') {
             return back()->withErrors(['file' => 'CSV file is empty.']);
         }
@@ -36,9 +40,10 @@ class PDSTrainingController extends Controller
             return back()->withErrors(['file' => 'CSV file is empty.']);
         }
 
-        $header = array_map(fn ($value) => trim((string) $value), $header);
-        $count = 0;
-        $skipped = 0;
+        $header = array_map(fn ($value) => strtolower(trim((string) $value)), $header);
+        $rows = [];
+        $skippedDates = 0;
+        $skippedTitle = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             if (count(array_filter($row, fn ($value) => trim((string) $value) !== '')) === 0) {
@@ -50,36 +55,50 @@ class PDSTrainingController extends Controller
 
             $rowData = array_combine($header, $row);
 
-            $dateFrom = $this->parseCsvDate($rowData['date_from'] ?? null);
-            $dateTo   = $this->parseCsvDate($rowData['date_to'] ?? null);
-            if ($dateFrom === false || $dateTo === false) {
-                $skipped++;
+            // training_title is NOT NULL in the schema — skip instead of 500
+            $title = mb_substr(trim((string) ($rowData['training_title'] ?? '')), 0, 255);
+            if ($title === '') {
+                $skippedTitle++;
                 continue;
             }
 
-            $pds->trainings()->create([
-                'training_title' => $rowData['training_title'] ?? null,
+            $dateFrom = $this->parseCsvDate($rowData['date_from'] ?? null);
+            $dateTo   = $this->parseCsvDate($rowData['date_to'] ?? null);
+            if ($dateFrom === false || $dateTo === false) {
+                $skippedDates++;
+                continue;
+            }
+
+            $rows[] = [
+                'training_title' => $title,
                 'date_from'      => $dateFrom,
                 'date_to'        => $dateTo,
-                'hours'          => isset($rowData['hours']) && $rowData['hours'] !== '' ? $rowData['hours'] : null,
-                'training_type'  => $rowData['training_type'] ?? null,
-                'conducted_by'   => $rowData['conducted_by'] ?? null,
-            ]);
-
-            $count++;
+                'hours'          => $this->parseCsvHours($rowData['hours'] ?? null),
+                'training_type'  => mb_substr(trim((string) ($rowData['training_type'] ?? '')), 0, 255) ?: null,
+                'conducted_by'   => mb_substr(trim((string) ($rowData['conducted_by'] ?? '')), 0, 255) ?: null,
+            ];
         }
 
         fclose($handle);
 
-        if ($count === 0) {
-            return back()->withErrors(['file' => $skipped > 0
-                ? "No trainings uploaded — {$skipped} row(s) have unrecognized dates. Use YYYY-MM-DD (e.g. 2026-06-08)."
+        $note = $this->skippedNote($skippedDates, $skippedTitle);
+
+        if (count($rows) === 0) {
+            return back()->withErrors(['file' => $note
+                ? "No trainings uploaded. {$note}"
                 : 'No valid trainings found in CSV.']);
         }
 
-        $message = "{$count} training(s) successfully uploaded!";
-        if ($skipped > 0) {
-            $message .= " {$skipped} row(s) skipped due to unrecognized dates — use YYYY-MM-DD.";
+        // All rows or none — a mid-import failure must not leave partial data
+        DB::transaction(function () use ($pds, $rows) {
+            foreach ($rows as $row) {
+                $pds->trainings()->create($row);
+            }
+        });
+
+        $message = count($rows) . ' training(s) successfully uploaded!';
+        if ($note) {
+            $message .= " {$note}";
         }
 
         return back()->with('success', $message);
@@ -103,6 +122,34 @@ class PDSTrainingController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Extract a usable numeric value from a free-text hours cell
+     * ("24 HOURS" → 24.0). Null when absent or outside decimal(5,2) range.
+     */
+    private function parseCsvHours(mixed $value): ?float
+    {
+        if (preg_match('/\d+(\.\d+)?/', (string) $value, $matches)) {
+            $hours = (float) $matches[0];
+
+            return $hours <= 999.99 ? $hours : null;
+        }
+
+        return null;
+    }
+
+    private function skippedNote(int $badDates, int $missingTitle): ?string
+    {
+        $parts = [];
+        if ($badDates > 0) {
+            $parts[] = "{$badDates} row(s) skipped — unrecognized dates, use YYYY-MM-DD (e.g. 2026-06-08)";
+        }
+        if ($missingTitle > 0) {
+            $parts[] = "{$missingTitle} row(s) skipped — missing training title";
+        }
+
+        return $parts ? implode('; ', $parts) . '.' : null;
     }
 
     private function csvContents(Request $request, array $data): string
