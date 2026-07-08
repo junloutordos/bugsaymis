@@ -18,7 +18,13 @@ class AtlasSentinelNetworkLocationResolver
         $campusSsids = config('atlas_sentinel.campus_ssids');
         $campusIps = config('atlas_sentinel.campus_ips');
 
-        if ($wifiSsid && in_array($wifiSsid, $campusSsids, true)) {
+        // Case-insensitive: the AP broadcasts "PSHS-CRC-Spectra" while config
+        // had "PSHS-CRC-SPECTRA" — casing drift must not flag anyone off-campus.
+        if ($wifiSsid && in_array(
+            mb_strtolower(trim($wifiSsid)),
+            array_map(fn ($ssid) => mb_strtolower($ssid), $campusSsids),
+            true
+        )) {
             return 'on_campus';
         }
 
