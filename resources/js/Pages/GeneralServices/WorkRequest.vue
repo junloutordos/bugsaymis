@@ -224,8 +224,8 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Work Category</label>
-              <select v-model="form.category" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Work Category <span class="text-danger-600">*</span></label>
+              <select v-model="form.category" required class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="">Select category</option>
                 <option v-for="c in WORK_CATEGORIES" :key="c">{{ c }}</option>
               </select>

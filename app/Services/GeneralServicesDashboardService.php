@@ -266,9 +266,7 @@ class GeneralServicesDashboardService
             'unassignedActive' => WorkRequest::whereIn('status', ['Pending', 'Division Approved', 'GSU Approved', 'Pending FAD Approval', 'FAD Approved'])
                 ->whereNull('assigned_user_id')
                 ->count(),
-            'categoryBreakdown' => WorkRequest::select('category', DB::raw('COUNT(*) as total'))
-                ->whereNotNull('category')
-                ->where('category', '<>', '')
+            'categoryBreakdown' => WorkRequest::select(DB::raw("COALESCE(NULLIF(category, ''), 'Uncategorized') as category"), DB::raw('COUNT(*) as total'))
                 ->groupBy('category')
                 ->orderByDesc('total')
                 ->get()

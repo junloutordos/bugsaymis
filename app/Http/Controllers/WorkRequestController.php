@@ -661,7 +661,7 @@ class WorkRequestController extends Controller
     {
         $data = $request->validate([
             'issue' => 'required|string|max:255',
-            'category' => 'nullable|string|in:Carpentry,Electrical,Plumbing,Aircon/HVAC,Painting,Welding,Grounds/Landscaping,Other',
+            'category' => 'required_with:assigned_user_id|nullable|string|in:Carpentry,Electrical,Plumbing,Aircon/HVAC,Painting,Welding,Grounds/Landscaping,Other',
             'description' => 'nullable|string',
             'priority' => 'nullable|string|in:Low,Normal,High',
             'location_division_id' => 'nullable|exists:buildings,id',
@@ -672,6 +672,8 @@ class WorkRequestController extends Controller
             'action_taken' => 'nullable|string',
             'date_completed' => 'nullable|date',
             'status' => 'nullable|string',
+        ], [
+            'category.required_with' => 'Please select a work category when assigning personnel.',
         ]);
 
 
