@@ -649,7 +649,7 @@ const showAllChecked    = computed({
         </div>
 
         <div :class="{ 'opacity-50 pointer-events-none': isLoading }">
-          <AppTable :is-empty="visibleEquipments.length === 0" :skeleton-cols="7">
+          <AppTable :is-empty="visibleEquipments.length === 0" :skeleton-cols="8">
             <template #head>
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ID</th>
@@ -657,6 +657,7 @@ const showAllChecked    = computed({
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Owner</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Agent</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Action</th>
               </tr>
@@ -672,6 +673,7 @@ const showAllChecked    = computed({
               <td class="px-4 py-3">
                 <AppBadge :color="equipmentStatusBadgeColor(eq.status)">{{ eq.status ?? '—' }}</AppBadge>
               </td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ eq.room?.name || '—' }}</td>
               <td class="px-4 py-3 text-xs">
                 <div class="flex items-center gap-2">
                   <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
@@ -722,6 +724,7 @@ const showAllChecked    = computed({
                   <AppBadge :color="equipmentStatusBadgeColor(eq.status)">{{ eq.status ?? '—' }}</AppBadge>
                 </div>
                 <div class="text-xs text-slate-500">Owner: {{ props.users.find(u => u.id === eq.owner_id)?.name || 'N/A' }}</div>
+                <div class="text-xs text-slate-500">Location: {{ eq.room?.name || '—' }}</div>
                 <div class="flex items-center gap-2 text-xs">
                   <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Linked
