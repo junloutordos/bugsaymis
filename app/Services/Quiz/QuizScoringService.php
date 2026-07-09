@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\DB;
 
 class QuizScoringService
 {
+    // Kahoot-style streak bonus: +50 per consecutive correct answer beyond the
+    // first, capped at +250 (i.e. maxes out on the 6th correct in a row).
+    public const STREAK_BONUS_STEP = 50;
+    public const STREAK_BONUS_CAP = 250;
+
     /**
      * First answer wins — a resubmission for an already-answered question is
      * returned as-is rather than rescored, so players can't farm points by
@@ -37,9 +42,23 @@ class QuizScoringService
                 ? $this->isCorrectAnswer($question, $selectedOptionIds)
                 : null;
 
-            $points = $isCorrect === true
-                ? $this->computeSpeedPoints($question->points_base, $responseTimeMs, $question->time_limit_seconds)
-                : 0;
+            // Unscored questions (poll/open-ended) leave the streak untouched.
+            $streak = $player->current_streak;
+            if ($isCorrect === true) {
+                $streak++;
+            } elseif ($isCorrect === false) {
+                $streak = 0;
+            }
+
+            $points = 0;
+            if ($isCorrect === true) {
+                $points = $this->computeSpeedPoints($question->points_base, $responseTimeMs, $question->time_limit_seconds)
+                    + $this->streakBonus($streak);
+
+                if ($question->double_points) {
+                    $points *= 2;
+                }
+            }
 
             $answer = QuizPlayerAnswer::create([
                 'session_id' => $session->id,
@@ -53,12 +72,19 @@ class QuizScoringService
                 'answered_at' => now(),
             ]);
 
-            if ($points > 0) {
-                $player->increment('total_score', $points);
-            }
+            $player->update([
+                'total_score' => $player->total_score + $points,
+                'current_streak' => $streak,
+                'best_streak' => max($player->best_streak, $streak),
+            ]);
 
             return $answer;
         });
+    }
+
+    protected function streakBonus(int $streak): int
+    {
+        return min(max($streak - 1, 0) * self::STREAK_BONUS_STEP, self::STREAK_BONUS_CAP);
     }
 
     protected function isCorrectAnswer(QuizQuestion $question, array $selectedOptionIds): bool

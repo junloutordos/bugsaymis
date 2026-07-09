@@ -16,6 +16,8 @@ class QuizPlayer extends Model
         'user_id',
         'student_id',
         'total_score',
+        'current_streak',
+        'best_streak',
         'joined_at',
     ];
 

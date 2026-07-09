@@ -4,6 +4,7 @@ namespace App\Services\Quiz;
 
 use App\Events\Quiz\QuizLeaderboardUpdated;
 use App\Events\Quiz\QuizPlayerJoined;
+use App\Events\Quiz\QuizPlayerKicked;
 use App\Events\Quiz\QuizQuestionEnded;
 use App\Events\Quiz\QuizQuestionStarted;
 use App\Events\Quiz\QuizSessionEnded;
@@ -63,6 +64,10 @@ class QuizSessionService
         $this->startQuestion($session, 0);
     }
 
+    // "Get ready" intro — the question text shows for this long before the
+    // answer tiles unlock and the clock starts (Kahoot-style reading time).
+    public const GET_READY_SECONDS = 3;
+
     public function startQuestion(QuizSession $session, int $index): void
     {
         $questions = $session->quiz->questions;
@@ -73,10 +78,14 @@ class QuizSessionService
             return;
         }
 
+        // question_started_at is set in the future — the countdown (and the
+        // server-side response-time clock) only starts after the intro.
+        $startsAt = now()->addSeconds(self::GET_READY_SECONDS);
+
         $session->update([
             'current_question_index' => $index,
             'status' => QuizSession::STATUS_QUESTION_ACTIVE,
-            'question_started_at' => now(),
+            'question_started_at' => $startsAt,
         ]);
 
         $shuffleAnswers = (bool) ($session->quiz->settings['shuffle_answers'] ?? false);
@@ -92,23 +101,42 @@ class QuizSessionService
                 'image' => $question->imageUrl(),
                 'time_limit_seconds' => $question->time_limit_seconds,
                 'points_base' => $question->points_base,
+                'double_points' => $question->double_points,
                 'options' => $options->values()->map(fn ($o, $i) => [
                     'id' => $o->id,
                     'option_text' => $o->option_text,
                     'tile_index' => $i,
                 ])->all(),
             ],
-            'server_started_at' => now()->toISOString(),
+            'server_started_at' => $startsAt->toISOString(),
+            'get_ready_seconds' => self::GET_READY_SECONDS,
         ]));
     }
 
     public function endQuestion(QuizSession $session): void
     {
+        // Idempotent — the host's Skip click, the timer expiry, and the
+        // all-players-answered auto-end can race; only the first one wins.
+        if ($session->status !== QuizSession::STATUS_QUESTION_ACTIVE) {
+            return;
+        }
+
         $question = $session->quiz->questions->get($session->current_question_index);
+        if (! $question) {
+            return;
+        }
 
         $session->update(['status' => QuizSession::STATUS_REVEAL]);
 
         $answers = $question->answers()->where('session_id', $session->id)->get();
+
+        // Not answering a scored question breaks the streak, same as a wrong
+        // answer (Kahoot behavior) — otherwise sitting out preserves the bonus.
+        if ($question->isScored()) {
+            $session->players()
+                ->whereNotIn('id', $answers->pluck('player_id'))
+                ->update(['current_streak' => 0]);
+        }
 
         $distribution = [];
         foreach ($question->options as $option) {
@@ -142,6 +170,19 @@ class QuizSessionService
         $this->startQuestion($session, $session->current_question_index + 1);
     }
 
+    public function kickPlayer(QuizSession $session, QuizPlayer $player): void
+    {
+        // Lobby-only — mid-game removal would corrupt scores and distributions.
+        abort_unless($session->status === QuizSession::STATUS_LOBBY, 422, 'Players can only be removed from the lobby.');
+
+        $player->delete();
+
+        broadcast(new QuizPlayerKicked($session->game_pin, [
+            'player_id' => $player->id,
+            'player_count' => $session->players()->count(),
+        ]));
+    }
+
     public function endSession(QuizSession $session): void
     {
         $session->update(['status' => QuizSession::STATUS_ENDED, 'ended_at' => now()]);
@@ -159,6 +200,7 @@ class QuizSessionService
                 'id' => $p->id,
                 'nickname' => $p->nickname,
                 'total_score' => $p->total_score,
+                'current_streak' => $p->current_streak,
                 'rank' => $i + 1,
             ])->all();
     }

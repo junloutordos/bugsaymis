@@ -103,6 +103,7 @@ class QuizController extends Controller
                     'image' => $q->imageUrl(),
                     'time_limit_seconds' => $q->time_limit_seconds,
                     'points_base' => $q->points_base,
+                    'double_points' => $q->double_points,
                     'options' => $q->options->map(fn (QuizQuestionOption $o) => [
                         'id' => $o->id,
                         'option_text' => $o->option_text,
@@ -111,6 +112,20 @@ class QuizController extends Controller
                     ]),
                 ]),
             ],
+            'sessions' => $quiz->sessions()
+                ->withCount('players')
+                ->latest()
+                ->limit(10)
+                ->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'game_pin' => $s->game_pin,
+                    'status' => $s->status,
+                    'player_count' => $s->players_count,
+                    'created_at' => $s->created_at,
+                    'host_url' => route('quiz.sessions.show', $s),
+                    'report_url' => route('quiz.sessions.report', $s),
+                ]),
         ]);
     }
 
@@ -184,6 +199,7 @@ class QuizController extends Controller
                 'question_text' => $data['question_text'],
                 'time_limit_seconds' => $data['time_limit_seconds'],
                 'points_base' => $data['points_base'],
+                'double_points' => (bool) ($data['double_points'] ?? false),
                 'image' => !empty($data['image_base64'])
                     ? $this->storeBase64Image($data['image_base64'], 'quiz-questions')
                     : null,
@@ -207,6 +223,7 @@ class QuizController extends Controller
                 'question_text' => $data['question_text'],
                 'time_limit_seconds' => $data['time_limit_seconds'],
                 'points_base' => $data['points_base'],
+                'double_points' => (bool) ($data['double_points'] ?? false),
             ];
 
             if (!empty($data['image_base64'])) {
@@ -268,6 +285,7 @@ class QuizController extends Controller
             'question_text' => ['required', 'string'],
             'time_limit_seconds' => ['required', 'integer', 'min:5', 'max:120'],
             'points_base' => ['required', 'integer', 'min:0', 'max:2000'],
+            'double_points' => ['sometimes', 'boolean'],
             'image_base64' => ['nullable', 'string'],
             'options' => ['nullable', 'array'],
             'options.*.option_text' => ['required_with:options', 'string', 'max:255'],

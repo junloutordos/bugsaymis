@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Quiz;
 
+use App\Events\Quiz\QuizAnswerSubmitted;
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\Quiz\QuizPlayer;
@@ -110,15 +111,30 @@ class QuizPlayController extends Controller
             ? $player->answers()->where('question_id', $question->id)->exists()
             : false;
 
+        // Note: shuffle_answers order is not reproduced here — a reconnecting
+        // player gets the authored order. Acceptable: the tiles are still the
+        // same answers, and shuffling only matters for the initial broadcast.
         return response()->json([
             'status' => $session->status,
             'total_score' => $player->total_score,
+            'current_streak' => $player->current_streak,
+            'question_index' => $session->current_question_index,
+            'total_questions' => $session->quiz->questions->count(),
             'question' => $question ? [
                 'id' => $question->id,
                 'type' => $question->type,
+                'question_text' => $question->question_text,
+                'image' => $question->imageUrl(),
                 'time_limit_seconds' => $question->time_limit_seconds,
-                'options' => $question->options->map(fn ($o) => ['id' => $o->id, 'option_text' => $o->option_text]),
+                'points_base' => $question->points_base,
+                'double_points' => $question->double_points,
+                'options' => $question->options->values()->map(fn ($o, $i) => [
+                    'id' => $o->id,
+                    'option_text' => $o->option_text,
+                    'tile_index' => $i,
+                ]),
             ] : null,
+            'question_started_at' => $session->question_started_at?->toISOString(),
             'already_answered' => $answered,
         ]);
     }
@@ -138,13 +154,14 @@ class QuizPlayController extends Controller
         abort_unless($question, 404);
 
         // Server-authoritative — never trust a client-reported elapsed time.
-        // absolute: true — diffInMilliseconds() returns a signed value by default
-        // in this Carbon version; an unsigned negative would fail the DB insert.
+        // Signed diff (started_at → now), clamped at 0: question_started_at sits
+        // in the future during the "get ready" intro, and an unsigned negative
+        // would fail the DB insert.
         $responseTimeMs = $session->question_started_at
-            ? (int) now()->diffInMilliseconds($session->question_started_at, true)
+            ? max(0, (int) $session->question_started_at->diffInMilliseconds(now()))
             : 0;
 
-        $answer = $this->scoringService->submitAnswer(
+        $this->scoringService->submitAnswer(
             $session,
             $player,
             $question,
@@ -153,10 +170,50 @@ class QuizPlayController extends Controller
             $responseTimeMs,
         );
 
+        $answeredCount = $question->answers()->where('session_id', $session->id)->count();
+        $totalPlayers = $session->players()->count();
+
+        broadcast(new QuizAnswerSubmitted($session->game_pin, [
+            'answered_count' => $answeredCount,
+            'total_players' => $totalPlayers,
+        ]));
+
+        // Kahoot behavior: once everyone has locked in, don't wait out the clock.
+        if ($answeredCount >= $totalPlayers) {
+            $this->sessionService->endQuestion($session->fresh());
+        }
+
+        // Ack only — correctness and points stay server-side until the host
+        // ends the question; the client then fetches result() on reveal.
+        return response()->json(['answered' => true]);
+    }
+
+    /**
+     * Reveal-gated result for the current question — refuses to answer while
+     * the question is still live so a player cannot learn correctness early
+     * (the pre-reveal leak this replaces returned is_correct at submit time).
+     */
+    public function result(string $playerToken)
+    {
+        $player = QuizPlayer::where('player_token', $playerToken)->firstOrFail();
+        $session = $player->session;
+
+        if ($session->status === QuizSession::STATUS_QUESTION_ACTIVE || $session->status === QuizSession::STATUS_LOBBY) {
+            return response()->json(['message' => 'Results are not available yet.'], 409);
+        }
+
+        $question = $session->quiz->questions()->get()->get($session->current_question_index);
+        abort_unless($question, 404);
+
+        $answer = $player->answers()->where('question_id', $question->id)->first();
+
         return response()->json([
-            'is_correct' => $answer->is_correct,
-            'points_awarded' => $answer->points_awarded,
-            'total_score' => $player->fresh()->total_score,
+            'answered' => (bool) $answer,
+            'is_correct' => $answer?->is_correct,
+            'points_awarded' => $answer?->points_awarded ?? 0,
+            'response_time_ms' => $answer?->response_time_ms,
+            'total_score' => $player->total_score,
+            'current_streak' => $player->current_streak,
         ]);
     }
 

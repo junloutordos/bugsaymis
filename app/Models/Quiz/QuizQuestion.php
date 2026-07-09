@@ -24,6 +24,11 @@ class QuizQuestion extends Model
         'image',
         'time_limit_seconds',
         'points_base',
+        'double_points',
+    ];
+
+    protected $casts = [
+        'double_points' => 'boolean',
     ];
 
     public function quiz(): BelongsTo

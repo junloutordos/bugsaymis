@@ -24,6 +24,7 @@ import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/vue/24/solid'
 
 const props = defineProps({
   quiz: { type: Object, default: null },
+  sessions: { type: Array, default: () => [] },
   source_type: { type: String, default: null },
   source_id: { type: [String, Number], default: null },
 })
@@ -95,6 +96,7 @@ const blankQuestion = () => ({
   question_text: '',
   time_limit_seconds: 20,
   points_base: 1000,
+  double_points: false,
   options: [
     { option_text: '', is_correct: true },
     { option_text: '', is_correct: false },
@@ -110,6 +112,7 @@ function loadQuestionIntoForm(question) {
   editForm.question_text = question.question_text
   editForm.time_limit_seconds = question.time_limit_seconds
   editForm.points_base = question.points_base
+  editForm.double_points = question.double_points ?? false
   editForm.options = question.options.map(o => ({ option_text: o.option_text, is_correct: o.is_correct }))
   editForm.image_base64 = null
   imagePreview.value = question.image
@@ -295,6 +298,7 @@ const showPreview = ref(false)
               >
                 <span class="text-xs text-slate-400 w-4">{{ i + 1 }}</span>
                 <span class="flex-1 truncate">{{ q.question_text || '(untitled)' }}</span>
+                <span v-if="q.double_points" class="text-[10px] font-bold text-amber-500" title="Double points">2×</span>
                 <button type="button" class="text-slate-300 hover:text-slate-600" @click.stop="moveQuestion(i, -1)"><ChevronUpIcon class="h-3.5 w-3.5" /></button>
                 <button type="button" class="text-slate-300 hover:text-slate-600" @click.stop="moveQuestion(i, 1)"><ChevronDownIcon class="h-3.5 w-3.5" /></button>
               </li>
@@ -304,6 +308,27 @@ const showPreview = ref(false)
                 <PlusIcon class="h-4 w-4" /> Add Question
               </AppButton>
             </div>
+          </AppCard>
+
+          <AppCard v-if="sessions.length" title="Recent sessions" :padded="false">
+            <ul class="divide-y divide-slate-100">
+              <li v-for="s in sessions" :key="s.id" class="flex items-center gap-2 px-3 py-2 text-sm">
+                <div class="flex-1 min-w-0">
+                  <p class="text-slate-700 truncate">
+                    PIN {{ s.game_pin }}
+                    <AppBadge :color="s.status === 'ended' ? 'slate' : 'green'" class="ml-1">{{ s.status === 'ended' ? 'ended' : 'live' }}</AppBadge>
+                  </p>
+                  <p class="text-xs text-slate-400">
+                    {{ new Date(s.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) }}
+                    · {{ s.player_count }} player{{ s.player_count === 1 ? '' : 's' }}
+                  </p>
+                </div>
+                <a
+                  :href="s.status === 'ended' ? s.report_url : s.host_url"
+                  class="text-xs text-indigo-600 hover:underline shrink-0"
+                >{{ s.status === 'ended' ? 'Report' : 'Resume' }}</a>
+              </li>
+            </ul>
           </AppCard>
         </div>
 
@@ -317,6 +342,14 @@ const showPreview = ref(false)
               <AppInput v-model.number="editForm.time_limit_seconds" type="number" label="Time limit (sec)" />
               <AppInput v-model.number="editForm.points_base" type="number" label="Points" :disabled="editForm.type === 'poll' || editForm.type === 'open_ended'" />
             </div>
+
+            <label
+              v-if="editForm.type !== 'poll' && editForm.type !== 'open_ended'"
+              class="flex items-center gap-2 text-sm text-slate-600"
+            >
+              <input type="checkbox" v-model="editForm.double_points" />
+              <span><span class="font-semibold text-amber-600">2× Double points</span> — this question is worth twice the score</span>
+            </label>
 
             <AppTextarea v-model="editForm.question_text" label="Question" :rows="2" required />
 

@@ -49,6 +49,7 @@ Route::middleware(['web'])
         Route::post('/players/join', [QuizPlayController::class, 'join'])->name('players.join');
         Route::get('/play/{playerToken}', [QuizPlayController::class, 'play'])->name('play');
         Route::get('/play/{playerToken}/state', [QuizPlayController::class, 'state'])->name('play.state');
+        Route::get('/play/{playerToken}/result', [QuizPlayController::class, 'result'])->name('play.result');
         Route::post('/play/{playerToken}/answer', [QuizPlayController::class, 'submitAnswer'])->name('play.answer');
     });
 
@@ -79,6 +80,8 @@ Route::middleware(['web', 'auth', 'verified', 'permission:quiz.manage|quiz.view_
     ->name('quiz.sessions.')
     ->group(function () {
         Route::get('/{session}', [QuizSessionController::class, 'show'])->name('show');
+        Route::get('/{session}/report', [QuizSessionController::class, 'report'])->name('report');
+        Route::delete('/{session}/players/{player}', [QuizSessionController::class, 'kickPlayer'])->name('players.kick');
         Route::post('/{session}/start', [QuizSessionController::class, 'start'])->name('start');
         Route::post('/{session}/end-question', [QuizSessionController::class, 'endQuestion'])->name('end-question');
         Route::post('/{session}/leaderboard', [QuizSessionController::class, 'leaderboard'])->name('leaderboard');
