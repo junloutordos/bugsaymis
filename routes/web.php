@@ -663,12 +663,6 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
     Route::put('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'update'])->name('service-requests.update');
     Route::delete('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
-    // Assets (General Services)
-    Route::get('/assets', [\App\Http\Controllers\AssetController::class, 'index'])->name('assets.index');
-    Route::post('/assets', [\App\Http\Controllers\AssetController::class, 'store'])->name('assets.store');
-    Route::put('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'update'])->name('assets.update');
-    Route::delete('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'destroy'])->name('assets.destroy');
-
     // Procurement (PR, ORS, DV) — see routes/procurement.php
     // Driver assignment API
     Route::get('/api/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('api.drivers.index');

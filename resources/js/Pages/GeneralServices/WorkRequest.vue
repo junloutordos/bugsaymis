@@ -36,12 +36,6 @@
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Created</th>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Issue</th>
             <th v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Assigned Personnel</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Acted By</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Expected Completion</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action Taken</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Completed</th>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Inspection</th>
             <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
@@ -53,12 +47,6 @@
           <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.created_at ? new Date(wr.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ wr.issue ?? '—' }}</td>
           <td v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ wr.requester?.name ?? '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.description ?? '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.assigned_user?.name ?? '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.actedBy?.name ?? '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ wr.action_taken ?? '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">
             <AppBadge :color="statusClass(wr.status)">{{ wr.status ?? '—' }}</AppBadge>
           </td>
@@ -67,6 +55,13 @@
           </td>
           <td class="px-4 py-3 text-center">
             <div class="flex items-center gap-1.5 justify-center">
+              <AppIconButton
+                label="View Details"
+                @click.prevent="openDetailsModal(wr)"
+              >
+                <EyeIcon class="w-4 h-4" />
+              </AppIconButton>
+
               <AppIconButton
                 v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))"
                 label="Assign"
@@ -138,21 +133,14 @@
                 <p class="text-xs text-slate-500">Request #{{ wr.id }} &bull; {{ wr.created_at ? new Date(wr.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</p>
                 <p class="text-sm font-semibold text-slate-800 mt-0.5 truncate">{{ wr.issue ?? '—' }}</p>
                 <p v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="text-xs text-slate-600 mt-1">Requestor: {{ wr.requester?.name ?? '—' }}</p>
-                <p class="text-xs text-slate-600">{{ wr.description ?? '—' }}</p>
               </div>
-              <div class="shrink-0 text-right text-xs text-slate-600">
-                <div>{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</div>
-                <div class="text-slate-400">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</div>
-              </div>
+              <AppIconButton label="View Details" @click.prevent="openDetailsModal(wr)">
+                <EyeIcon class="w-4 h-4" />
+              </AppIconButton>
             </div>
-            <div class="space-y-1 text-xs text-slate-700">
-              <div><span class="font-medium text-slate-500">Assigned:</span> {{ wr.assigned_user?.name ?? '—' }}</div>
-              <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Status:</span>
-                <AppBadge :color="statusClass(wr.status)">{{ wr.status }}</AppBadge>
-              </div>
-              <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Inspection:</span>
-                <AppBadge :color="inspectionStatusClass(wr)">{{ inspectionStatus(wr) }}</AppBadge>
-              </div>
+            <div class="flex items-center gap-2 text-xs text-slate-700">
+              <AppBadge :color="statusClass(wr.status)">{{ wr.status }}</AppBadge>
+              <AppBadge :color="inspectionStatusClass(wr)">{{ inspectionStatus(wr) }}</AppBadge>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <AppButton v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))" size="sm" @click.prevent="openModal(wr)">Assign</AppButton>
@@ -181,6 +169,26 @@
           />
         </template>
       </AppTable>
+
+      <!-- View Details Modal -->
+      <AppModal :show="showDetailsModal" :title="`Work Request #${detailsWorkRequest?.id ?? ''}`" size="lg" @close="closeDetailsModal">
+        <div class="grid grid-cols-2 gap-3 text-sm text-slate-700">
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Date Created</span><p class="mt-0.5">{{ detailsWorkRequest?.created_at ? new Date(detailsWorkRequest.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</p></div>
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Requestor</span><p class="mt-0.5">{{ detailsWorkRequest?.requester?.name ?? '—' }}</p></div>
+          <div class="col-span-2"><span class="text-xs font-medium text-slate-500 uppercase">Issue</span><p class="mt-0.5">{{ detailsWorkRequest?.issue ?? '—' }}</p></div>
+          <div class="col-span-2"><span class="text-xs font-medium text-slate-500 uppercase">Description</span><p class="mt-0.5">{{ detailsWorkRequest?.description ?? '—' }}</p></div>
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Assigned Personnel</span><p class="mt-0.5">{{ detailsWorkRequest?.assigned_user?.name ?? '—' }}</p></div>
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Acted By</span><p class="mt-0.5">{{ detailsWorkRequest?.actedBy?.name ?? '—' }}</p></div>
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Expected Completion</span><p class="mt-0.5">{{ detailsWorkRequest?.expected_completion_date ? new Date(detailsWorkRequest.expected_completion_date).toLocaleDateString() : '—' }}</p></div>
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Date Completed</span><p class="mt-0.5">{{ detailsWorkRequest?.date_completed ? new Date(detailsWorkRequest.date_completed).toLocaleDateString() : '—' }}</p></div>
+          <div class="col-span-2"><span class="text-xs font-medium text-slate-500 uppercase">Action Taken</span><p class="mt-0.5">{{ detailsWorkRequest?.action_taken ?? '—' }}</p></div>
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Status</span><p class="mt-0.5"><AppBadge :color="statusClass(detailsWorkRequest?.status)">{{ detailsWorkRequest?.status ?? '—' }}</AppBadge></p></div>
+          <div><span class="text-xs font-medium text-slate-500 uppercase">Inspection</span><p class="mt-0.5"><AppBadge :color="inspectionStatusClass(detailsWorkRequest)">{{ inspectionStatus(detailsWorkRequest) }}</AppBadge></p></div>
+        </div>
+        <template #footer>
+          <AppButton variant="secondary" @click="closeDetailsModal">Close</AppButton>
+        </template>
+      </AppModal>
 
       <!-- Create / Edit Modal -->
       <AppModal :show="showModal" :title="editingId ? 'Edit Work Request' : 'New Work Request'" size="2xl" @close="closeModal">
@@ -430,8 +438,8 @@
 
 <script setup>
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, PrinterIcon, ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, watch } from 'vue'
+import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, PrinterIcon, ClipboardDocumentCheckIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import CsmForm from '@/Components/CsmForm.vue'
@@ -531,14 +539,6 @@ const filteredWorkRequests = computed(() => props.workRequests?.data ?? [])
 const currentPage = computed(() => props.workRequests?.current_page ?? 1)
 const totalPages = computed(() => props.workRequests?.last_page ?? 1)
 
-// responsive: track window width to toggle between table and card layouts
-const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
-const isMobile = computed(() => windowWidth.value < 768)
-const handleResize = () => { windowWidth.value = window.innerWidth }
-onMounted(() => { window.addEventListener('resize', handleResize) })
-onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
-
-
 const page = usePage();
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
 const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
@@ -546,7 +546,12 @@ const hasRole = (role) => roleNames.value.includes(role);
 const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r));
 
 // Number of visible columns in the desktop table — used for the AppTable skeleton/empty colspan
-const tableColCount = computed(() => (hasAnyRole('Administrator','GSU Head','DivisionChief') ? 13 : 12))
+const tableColCount = computed(() => (hasAnyRole('Administrator','GSU Head','DivisionChief') ? 7 : 6))
+
+const showDetailsModal = ref(false)
+const detailsWorkRequest = ref(null)
+const openDetailsModal = (wr) => { detailsWorkRequest.value = wr; showDetailsModal.value = true }
+const closeDetailsModal = () => { showDetailsModal.value = false; detailsWorkRequest.value = null }
 
 const showModal = ref(false)
 const editingId = ref(null)

@@ -907,13 +907,6 @@ export const menuItems = [
         permissions: ["facilities.view"],
       },
       {
-        label: "Assets",
-        routeName: "assets.index",
-        href: route('assets.index'),
-        icon: ClipboardDocumentListIcon,
-        permissions: ["facilities.manage"],
-      },
-      {
         label: "Work Request",
         routeName: "work-requests.index",
         href: route('work-requests.index'),
