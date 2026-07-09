@@ -20,7 +20,9 @@ class StorageProxyController extends Controller
             abort(404);
         }
 
-        $mime = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        $mime = match ($ext) {
             'jpg', 'jpeg' => 'image/jpeg',
             'png'         => 'image/png',
             'gif'         => 'image/gif',
@@ -30,13 +32,26 @@ class StorageProxyController extends Controller
             default       => 'application/octet-stream',
         };
 
+        // svg can carry inline <script> — never render it inline. Everything
+        // that isn't a raster image is forced to download, using the caller's
+        // display name (falls back to the storage path's basename).
+        $isRasterImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+        $downloadName  = $request->query('name') ?: basename($path);
+
+        $headers = [
+            'Content-Type'           => $mime,
+            'Cache-Control'          => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        if (! $isRasterImage) {
+            $headers['Content-Disposition'] = 'attachment; filename="' . addslashes($downloadName) . '"';
+        }
+
         return response()->stream(function () use ($path) {
             $stream = Storage::disk('s3')->readStream($path);
             fpassthru($stream);
             fclose($stream);
-        }, 200, [
-            'Content-Type'  => $mime,
-            'Cache-Control' => 'private, max-age=3600',
-        ]);
+        }, 200, $headers);
     }
 }

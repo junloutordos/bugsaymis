@@ -19,6 +19,28 @@ use Illuminate\Validation\ValidationException;
 
 class ChatController extends Controller
 {
+    private const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB
+
+    // Whitelisted attachment MIME types — deliberately excludes svg/html and
+    // any executable type since attachments are re-served through /media/{path}.
+    private const ALLOWED_ATTACHMENT_MIMES = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+        'image/webp' => 'webp',
+        'application/pdf' => 'pdf',
+        'application/msword' => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        'application/vnd.ms-excel' => 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        'application/vnd.ms-powerpoint' => 'ppt',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+        'text/plain' => 'txt',
+        'text/csv' => 'csv',
+        'application/zip' => 'zip',
+        'application/x-zip-compressed' => 'zip',
+    ];
+
     // ─── Inertia page ────────────────────────────────────────────────────────
 
     public function index(): \Inertia\Response
@@ -76,6 +98,8 @@ class ChatController extends Controller
             'is_deleted'      => $msg->deleted_at !== null,
             'attachment_path' => $msg->deleted_at ? null : $this->s3Url($msg->attachment_path),
             'attachment_type' => $msg->deleted_at ? null : $msg->attachment_type,
+            'attachment_name' => $msg->deleted_at ? null : $msg->attachment_name,
+            'attachment_size' => $msg->deleted_at ? null : $msg->attachment_size,
             'read_at'         => $msg->read_at?->toIso8601String(),
             'seen_by_count'   => $seenByCount,
             'created_at'      => $msg->created_at->toIso8601String(),
@@ -265,30 +289,50 @@ class ChatController extends Controller
 
         $attachmentPath = null;
         $attachmentType = null;
+        $attachmentName = null;
+        $attachmentSize = null;
 
         if ($request->filled('attachment_base64')) {
             $dataUri = $request->input('attachment_base64');
-            // Parse data:mime/type;base64,<data>
-            if (preg_match('/^data:([^;]+);base64,(.+)$/', $dataUri, $m)) {
-                $mime     = $m[1];
-                $binary   = base64_decode($m[2]);
-                $ext      = pathinfo($request->input('attachment_name', 'file'), PATHINFO_EXTENSION) ?: 'bin';
-                $filename = 'chat/attachments/' . uniqid() . '.' . $ext;
 
-                Storage::disk('s3')->put($filename, $binary);
-
-                $attachmentPath = $filename;
-                $attachmentType = str_starts_with($mime, 'image/') ? 'image' : 'file';
+            if (! preg_match('/^data:([^;]+);base64,(.+)$/', $dataUri, $m)) {
+                throw ValidationException::withMessages(['attachment_base64' => 'Invalid attachment format.']);
             }
+
+            $mime = strtolower(trim($m[1]));
+            if (! isset(self::ALLOWED_ATTACHMENT_MIMES[$mime])) {
+                throw ValidationException::withMessages(['attachment_base64' => 'That file type is not supported.']);
+            }
+
+            $binary = base64_decode($m[2], true);
+            if ($binary === false) {
+                throw ValidationException::withMessages(['attachment_base64' => 'Invalid attachment data.']);
+            }
+
+            if (strlen($binary) > self::MAX_ATTACHMENT_BYTES) {
+                throw ValidationException::withMessages(['attachment_base64' => 'Attachments must be 10MB or smaller.']);
+            }
+
+            $ext      = self::ALLOWED_ATTACHMENT_MIMES[$mime];
+            $filename = 'chat/attachments/' . uniqid() . '.' . $ext;
+
+            Storage::disk('s3')->put($filename, $binary);
+
+            $attachmentPath = $filename;
+            $attachmentType = str_starts_with($mime, 'image/') ? 'image' : 'file';
+            $attachmentName = $request->input('attachment_name') ?: $filename;
+            $attachmentSize = strlen($binary);
         }
 
-        $message = DB::transaction(function () use ($request, $conversation, $userId, $attachmentPath, $attachmentType) {
+        $message = DB::transaction(function () use ($request, $conversation, $userId, $attachmentPath, $attachmentType, $attachmentName, $attachmentSize) {
             $msg = Message::create([
                 'conversation_id' => $conversation->id,
                 'sender_id'       => $userId,
                 'body'            => $request->input('body', ''),
                 'attachment_path' => $attachmentPath,
                 'attachment_type' => $attachmentType,
+                'attachment_name' => $attachmentName,
+                'attachment_size' => $attachmentSize,
             ]);
             $conversation->touch();
             return $msg;

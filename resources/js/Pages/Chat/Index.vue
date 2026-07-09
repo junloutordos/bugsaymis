@@ -6,7 +6,7 @@ import AppButton from '@/Components/AppButton.vue'
 import AppModal from '@/Components/AppModal.vue'
 import AppInput from '@/Components/AppInput.vue'
 import EmptyState from '@/Components/EmptyState.vue'
-import { useChat } from '@/Composables/useChat.js'
+import { useChat, formatBytes } from '@/Composables/useChat.js'
 import {
   PaperAirplaneIcon,
   PaperClipIcon,
@@ -31,7 +31,7 @@ const {
   conversations, activeConversation, messages, pagination,
   userSearchResults, userSearchQ, showArchived,
   loadingConversations, loadingMessages, sendingMessage, searchingUsers,
-  messageInput, attachmentFile, messagesEl,
+  messageInput, attachmentFile, attachmentError, uploadProgress, messagesEl,
   totalUnread, canSend,
   fetchConversations, openConversation, loadMoreMessages,
   sendMessage, deleteMessage, archiveConversation,
@@ -43,6 +43,39 @@ const {
 // ── Real-time ─────────────────────────────────────────────────────────────
 const echoConnected = ref(false)
 const subscribedIds = new Set()
+
+// ── Typing indicator (Pusher/Soketi client "whisper" events — no backend route) ──
+const typingUsers  = ref({})   // { [conversationId]: { [userId]: name } }
+const typingTimers = {}
+
+function handleTypingWhisper(convId, { user_id, name }) {
+  if (user_id === props.authUser.id) return
+  typingUsers.value = {
+    ...typingUsers.value,
+    [convId]: { ...(typingUsers.value[convId] ?? {}), [user_id]: name },
+  }
+  clearTimeout(typingTimers[`${convId}-${user_id}`])
+  typingTimers[`${convId}-${user_id}`] = setTimeout(() => {
+    const remaining = { ...(typingUsers.value[convId] ?? {}) }
+    delete remaining[user_id]
+    typingUsers.value = { ...typingUsers.value, [convId]: remaining }
+  }, 3000)
+}
+
+const activeTypingNames = computed(() => {
+  const convId = activeConversation.value?.id
+  if (!convId) return []
+  return Object.values(typingUsers.value[convId] ?? {})
+})
+
+let typingWhisperThrottle = null
+function notifyTyping() {
+  if (!activeConversation.value || !window.Echo) return
+  if (typingWhisperThrottle) return
+  window.Echo.private(`conversation.${activeConversation.value.id}`)
+    .whisper('typing', { user_id: props.authUser.id, name: props.authUser.name })
+  typingWhisperThrottle = setTimeout(() => { typingWhisperThrottle = null }, 2000)
+}
 
 function subscribeToConversation(convId) {
   if (subscribedIds.has(convId) || !window.Echo) return
@@ -57,6 +90,7 @@ function subscribeToConversation(convId) {
     .listen('.message.deleted', (payload) => {
       applyMessageDeleted(payload)
     })
+    .listenForWhisper('typing', (payload) => handleTypingWhisper(convId, payload))
 }
 
 function subscribeToPersonalChannel() {
@@ -137,6 +171,34 @@ async function onFileChange(e) {
   await onFileSelected(file)
 }
 
+// ── Drag-and-drop attach ──────────────────────────────────────────────────
+const isDraggingFile = ref(false)
+let dragCounter = 0
+function onDragEnter(e) {
+  if (!activeConversation.value) return
+  dragCounter++
+  isDraggingFile.value = true
+}
+function onDragLeave(e) {
+  dragCounter = Math.max(0, dragCounter - 1)
+  if (dragCounter === 0) isDraggingFile.value = false
+}
+async function onDrop(e) {
+  dragCounter = 0
+  isDraggingFile.value = false
+  if (!activeConversation.value) return
+  const file = e.dataTransfer?.files?.[0]
+  if (file) await onFileSelected(file)
+}
+
+// ── Image lightbox ────────────────────────────────────────────────────────
+const lightboxImage = ref(null)
+function openLightbox(url) { lightboxImage.value = url }
+function closeLightbox() { lightboxImage.value = null }
+function onLightboxKeydown(e) {
+  if (e.key === 'Escape' && lightboxImage.value) closeLightbox()
+}
+
 // ── Open conversation ─────────────────────────────────────────────────────
 async function selectConversation(conv) {
   await openConversation(conv)
@@ -145,7 +207,8 @@ async function selectConversation(conv) {
 
 // ── Send on Enter ─────────────────────────────────────────────────────────
 function handleKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); return }
+  notifyTyping()
 }
 
 // ── Archive ───────────────────────────────────────────────────────────────
@@ -218,10 +281,12 @@ onMounted(() => {
   monitorEchoConnection()
   subscribeToPersonalChannel()
   document.addEventListener('click', onDocClick)
+  document.addEventListener('keydown', onLightboxKeydown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onLightboxKeydown)
 })
 </script>
 
@@ -346,7 +411,17 @@ onUnmounted(() => {
       <!-- ══════════════════════════════════════════════
            MAIN — Chat Window
       ══════════════════════════════════════════════ -->
-      <div class="flex flex-1 flex-col min-w-0">
+      <div class="relative flex flex-1 flex-col min-w-0"
+           @dragenter.prevent="onDragEnter"
+           @dragover.prevent
+           @dragleave.prevent="onDragLeave"
+           @drop.prevent="onDrop">
+
+        <!-- Drag-and-drop overlay -->
+        <div v-if="isDraggingFile && activeConversation"
+             class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-50/90">
+          <p class="text-sm font-medium text-indigo-600">Drop file to attach (max 10MB)</p>
+        </div>
 
         <!-- Empty state -->
         <div v-if="!activeConversation" class="flex flex-1 items-center justify-center">
@@ -452,11 +527,14 @@ onUnmounted(() => {
                         <div v-if="msg.attachment_path" class="mb-1">
                           <img v-if="msg.attachment_type === 'image'"
                                :src="msg.attachment_path"
-                               class="max-w-[200px] rounded-xl object-cover"
-                               loading="lazy" />
-                          <a v-else :href="msg.attachment_path" target="_blank"
+                               class="max-w-[200px] rounded-xl object-cover cursor-zoom-in"
+                               loading="lazy"
+                               @click="openLightbox(msg.attachment_path)" />
+                          <a v-else :href="msg.attachment_path" target="_blank" :download="msg.attachment_name"
                              :class="['flex items-center gap-1.5 text-xs underline underline-offset-2', msg.sender_id === authUser.id ? 'text-indigo-100' : 'text-indigo-600']">
-                            <PaperClipIcon class="h-3.5 w-3.5" /> Attachment
+                            <PaperClipIcon class="h-3.5 w-3.5 shrink-0" />
+                            <span class="truncate max-w-[140px]">{{ msg.attachment_name || 'Attachment' }}</span>
+                            <span v-if="msg.attachment_size" class="shrink-0 opacity-75">({{ formatBytes(msg.attachment_size) }})</span>
                           </a>
                         </div>
                         <span v-if="msg.body" class="whitespace-pre-wrap">{{ msg.body }}</span>
@@ -505,14 +583,28 @@ onUnmounted(() => {
             </p>
           </div>
 
+          <!-- Typing indicator -->
+          <p v-if="activeTypingNames.length" class="px-4 pb-1 text-[11px] italic text-slate-400 shrink-0">
+            {{ activeTypingNames.join(', ') }} {{ activeTypingNames.length > 1 ? 'are' : 'is' }} typing…
+          </p>
+
           <!-- Attachment preview -->
           <div v-if="attachmentFile" class="flex items-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-2 shrink-0">
             <PaperClipIcon class="h-4 w-4 text-slate-400 shrink-0" />
             <span class="truncate text-xs text-slate-600">{{ attachmentFile.name }}</span>
-            <button @click="onFileSelected(null)" class="ml-auto text-slate-400 hover:text-slate-600">
+            <span class="shrink-0 text-[10px] text-slate-400">{{ formatBytes(attachmentFile.size) }}</span>
+            <div v-if="sendingMessage && uploadProgress > 0" class="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-slate-200">
+              <div class="h-full bg-indigo-500 transition-all" :style="{ width: uploadProgress + '%' }"></div>
+            </div>
+            <button @click="onFileSelected(null)" :disabled="sendingMessage" class="ml-auto text-slate-400 hover:text-slate-600 disabled:opacity-40">
               <XMarkIcon class="h-4 w-4" />
             </button>
           </div>
+
+          <!-- Attachment error -->
+          <p v-if="attachmentError" class="border-t border-red-100 bg-red-50 px-4 py-1.5 text-[11px] text-red-600 shrink-0">
+            {{ attachmentError }}
+          </p>
 
           <!-- Input bar — pb-safe for iOS home indicator -->
           <div class="border-t border-slate-100 bg-white px-3 pt-3 shrink-0"
@@ -523,7 +615,7 @@ onUnmounted(() => {
                 <PaperClipIcon class="h-5 w-5" />
               </button>
               <input ref="fileInput" type="file" class="hidden" @change="onFileChange"
-                     accept="image/*,.pdf,.doc,.docx,.xlsx,.zip" />
+                     accept="image/jpeg,image/png,image/gif,image/webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" />
 
               <textarea v-model="messageInput" @keydown="handleKeydown"
                         placeholder="Type a message…" rows="1"
@@ -552,6 +644,21 @@ onUnmounted(() => {
         <button @click="confirmDelete"
                 class="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
           <TrashIcon class="h-4 w-4" /> Delete message
+        </button>
+      </div>
+    </Teleport>
+
+    <!-- ══════════════════════════════════════════════
+         IMAGE LIGHTBOX
+    ══════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <div v-if="lightboxImage"
+           class="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 p-4"
+           @click="closeLightbox">
+        <img :src="lightboxImage" class="max-h-full max-w-full rounded-lg object-contain" @click.stop />
+        <button @click="closeLightbox"
+                class="absolute top-4 right-4 rounded-full bg-black/40 p-1.5 text-white/90 hover:bg-black/60 hover:text-white transition-colors">
+          <XMarkIcon class="h-6 w-6" />
         </button>
       </div>
     </Teleport>

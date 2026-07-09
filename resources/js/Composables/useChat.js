@@ -1,6 +1,27 @@
 import { ref, computed, nextTick } from 'vue'
 import axios from 'axios'
 
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10MB — mirrors ChatController::MAX_ATTACHMENT_BYTES
+const ALLOWED_ATTACHMENT_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv',
+  'application/zip', 'application/x-zip-compressed',
+]
+
+export function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export function useChat(authUser) {
   // ── State ──────────────────────────────────────────────────────────────────
   const conversations      = ref([])
@@ -18,6 +39,8 @@ export function useChat(authUser) {
   const messageInput    = ref('')
   const attachmentFile  = ref(null)
   const attachmentDataUri = ref(null)  // base64 data URI for the attachment
+  const attachmentError = ref(null)
+  const uploadProgress  = ref(0)
   const userSearchQ     = ref('')
   const messagesEl      = ref(null)
 
@@ -111,6 +134,8 @@ export function useChat(authUser) {
     if (!canSend.value || !activeConversation.value) return
 
     sendingMessage.value = true
+    uploadProgress.value = 0
+    attachmentError.value = null
 
     const optimisticId = `tmp-${Date.now()}`
     const optimistic = {
@@ -120,8 +145,10 @@ export function useChat(authUser) {
       sender_name:     authUser.name,
       sender_avatar:   authUser.avatar ?? null,
       body:            messageInput.value.trim(),
-      attachment_path: null,
-      attachment_type: null,
+      attachment_path: attachmentDataUri.value ?? null,
+      attachment_type: attachmentFile.value ? (attachmentFile.value.type.startsWith('image/') ? 'image' : 'file') : null,
+      attachment_name: attachmentFile.value?.name ?? null,
+      attachment_size: attachmentFile.value?.size ?? null,
       is_deleted:      false,
       read_at:         null,
       seen_by_count:   0,
@@ -147,7 +174,12 @@ export function useChat(authUser) {
 
       const { data } = await axios.post(
         `/api/chat/conversations/${activeConversation.value.id}/messages`,
-        payload
+        payload,
+        dataUri ? {
+          onUploadProgress: (evt) => {
+            if (evt.total) uploadProgress.value = Math.round((evt.loaded / evt.total) * 100)
+          },
+        } : undefined
       )
 
       const idx = messages.value.findIndex(m => m.id === optimisticId)
@@ -161,9 +193,13 @@ export function useChat(authUser) {
     } catch (e) {
       const idx = messages.value.findIndex(m => m.id === optimisticId)
       if (idx !== -1) messages.value[idx] = { ...messages.value[idx], _failed: true, _pending: false }
+      attachmentError.value = e.response?.data?.errors
+        ? Object.values(e.response.data.errors).flat().join(' ')
+        : (e.response?.data?.message ?? 'Failed to send message.')
       console.error('Send failed', e)
     } finally {
       sendingMessage.value = false
+      uploadProgress.value = 0
     }
   }
 
@@ -276,13 +312,25 @@ export function useChat(authUser) {
   }
 
   async function onFileSelected(file) {
+    attachmentError.value = null
     if (!file) { attachmentFile.value = null; attachmentDataUri.value = null; return }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      attachmentError.value = `"${file.name}" is ${formatBytes(file.size)} — attachments must be 10MB or smaller.`
+      return
+    }
+    if (file.type && !ALLOWED_ATTACHMENT_TYPES.includes(file.type)) {
+      attachmentError.value = `"${file.name}" is not a supported file type.`
+      return
+    }
+
     attachmentFile.value = file
     try {
       attachmentDataUri.value = await readFileAsDataUri(file)
     } catch (e) {
       attachmentFile.value = null
       attachmentDataUri.value = null
+      attachmentError.value = 'Could not read that file.'
       console.error('File read failed', e)
     }
   }
@@ -351,7 +399,7 @@ export function useChat(authUser) {
     conversations, activeConversation, messages, pagination,
     userSearchResults, userSearchQ, showArchived,
     loadingConversations, loadingMessages, sendingMessage, searchingUsers,
-    messageInput, attachmentFile, attachmentDataUri, messagesEl,
+    messageInput, attachmentFile, attachmentDataUri, attachmentError, uploadProgress, messagesEl,
     // computed
     totalUnread, canSend,
     // methods
