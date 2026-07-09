@@ -489,14 +489,14 @@ const brandPillars = [
 .nav-cta {
   display: flex; align-items: center; gap: 6px;
   padding: 9px 20px;
-  background: linear-gradient(135deg, var(--orange), var(--gold));
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
   color: #fff; border: none; border-radius: 10px;
   font-size: .82rem; font-weight: 700; cursor: pointer;
-  box-shadow: 0 4px 16px rgba(251,144,2,.35);
+  box-shadow: 0 4px 16px rgba(1,159,230,.35);
   transition: opacity .15s, transform .15s, box-shadow .15s;
   flex-shrink: 0;
 }
-.nav-cta:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(251,144,2,.45); }
+.nav-cta:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(1,159,230,.45); }
 .nav-cta-icon { width: 14px; height: 14px; }
 
 /* ════════════════════════════════
@@ -647,9 +647,9 @@ const brandPillars = [
 .lc-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
 .lc-icon-wrap {
   width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--orange), var(--gold));
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 14px rgba(251,144,2,.35);
+  box-shadow: 0 4px 14px rgba(1,159,230,.35);
 }
 .lc-icon  { width: 22px; height: 22px; color: #fff; }
 .lc-title { font-size: .95rem; font-weight: 700; color: #0a1040; }
