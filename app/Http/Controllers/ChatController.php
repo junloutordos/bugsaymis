@@ -328,7 +328,9 @@ class ChatController extends Controller
             $msg = Message::create([
                 'conversation_id' => $conversation->id,
                 'sender_id'       => $userId,
-                'body'            => $request->input('body', ''),
+                // Laravel's ConvertEmptyStringsToNull middleware rewrites "" to null before
+                // this runs, so input('body', '') never falls back — the key still exists.
+                'body'            => $request->input('body') ?? '',
                 'attachment_path' => $attachmentPath,
                 'attachment_type' => $attachmentType,
                 'attachment_name' => $attachmentName,
