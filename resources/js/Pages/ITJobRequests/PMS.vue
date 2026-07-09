@@ -29,12 +29,15 @@ import AppTable from "@/Components/AppTable.vue"
 import AppModal from "@/Components/AppModal.vue"
 import AppBadge from "@/Components/AppBadge.vue"
 import EmptyState from "@/Components/EmptyState.vue"
+import DigitalSignaturePin from "@/Components/DigitalSignaturePin.vue"
 
 const props = defineProps({
   pmsSchedules: Object,
   users: Array,
   equipments: Array,
   filters: Object,
+  hasPin: { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 })
 
 const {
@@ -48,6 +51,10 @@ const {
   openModal,
   closeModal,
   submitSchedule,
+  showPinModal,
+  pinModalLoading,
+  confirmPinAndStore,
+  cancelPinModal,
   formatDateForDisplay,
 } = usePMS(props.pmsSchedules?.data ?? [])
 
@@ -445,6 +452,16 @@ const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
           <AppButton @click="submitSchedule">Save</AppButton>
         </template>
       </AppModal>
+
+      <DigitalSignaturePin
+        :show="showPinModal"
+        :hasPin="hasPin"
+        :signatureUri="signatureUri"
+        :loading="pinModalLoading"
+        confirmLabel="Sign & Save"
+        @confirm="confirmPinAndStore"
+        @cancel="cancelPinModal"
+      />
 
       <!-- ── Assign Equipment Modal ────────────────────────────────────────── -->
       <AppModal

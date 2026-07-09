@@ -1,5 +1,5 @@
 <script setup>
-import { Head, usePage, useForm } from "@inertiajs/vue3"
+import { Head, useForm } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { computed, ref, reactive } from "vue"
 import html2pdf from "html2pdf.js"
@@ -15,13 +15,20 @@ import AppTextarea from "@/Components/AppTextarea.vue"
 
 const props = defineProps({
   pms: Object,
-  equipments: Array // equipments should now include `history_dates` array from backend
+  equipments: Array, // equipments should now include `history_dates` array from backend
+  prepared_by: Object,
+  noted_by: Object,
+  approval_status: String,
+  declined_reason: String,
 })
 
-// ✅ Access logged-in user
-const page = usePage()
-const currentUser = computed(() => page.props.auth.user)
 const { isSubmitting, submit } = useSubmit()
+
+function formatSignedDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return isNaN(d) ? '' : d.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+}
 
 // Months
 const months = [
@@ -360,22 +367,29 @@ const equipmentHistoryMap = computed(() => {
                 <td class="border border-black px-2 py-2 align-top w-1/4">
                   <p class="mb-2">Prepared By:</p><br />
                   <p class="font-semibold underline text-center uppercase">
-                    {{ currentUser?.name || "________________" }}
+                    {{ prepared_by?.name || "________________" }}
                   </p>
                   <p class="text-center">
-                    {{ currentUser?.position || "________________" }}
+                    {{ prepared_by?.position || "________________" }}
                   </p>
                 </td>
                 <td class="border border-black px-2 py-2 w-1/4 align-top">
-                  <p>Date: </p>
+                  <p>Date: {{ formatSignedDate(prepared_by?.signed_at) }}</p>
                 </td>
                 <td class="border border-black px-2 py-2 align-top w-1/4">
                   <p class="mb-2">Noted By:</p><br />
-                  <p class="font-semibold underline text-center">ENGR. RAMIL A. SANCHEZ</p>
-                  <p class="text-center">Campus Director</p>
+                  <template v-if="noted_by">
+                    <p class="font-semibold underline text-center uppercase">{{ noted_by.name }}</p>
+                    <p class="text-center">{{ noted_by.position || "________________" }}</p>
+                  </template>
+                  <template v-else>
+                    <p class="text-center text-slate-500 italic">
+                      {{ approval_status === 'declined' ? `Declined${declined_reason ? ': ' + declined_reason : ''}` : 'Pending OCD Approval' }}
+                    </p>
+                  </template>
                 </td>
                 <td class="border border-black px-2 py-2 w-1/4 align-top">
-                  <p>Date: </p>
+                  <p>Date: {{ formatSignedDate(noted_by?.signed_at) }}</p>
                 </td>
               </tr>
             </tbody>

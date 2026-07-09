@@ -10,6 +10,7 @@ use App\Models\ServiceRequest;
 use App\Models\MessengerialRequest;
 use App\Models\HR\LeaveApplication;
 use App\Models\Division;
+use App\Models\PMS;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -248,6 +249,11 @@ class ApprovalInboxService
                 ->where('status', 'forwarded')->latest()->get()
                 ->map(fn($r) => $this->normaliseLeaveApplication($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'leave_applications', 'Leave Applications', $laOCD);
+
+            $pmsOCD = PMS::with('createdBy:id,name')
+                ->where('approval_status', 'pending')->latest()->get()
+                ->map(fn($r) => $this->normalisePms($r))->values()->all();
+            $this->mergeOrAddTab($tabs, 'pms_schedules', 'PMS Schedules', $pmsOCD);
         }
 
         // ── HR Officer ────────────────────────────────────────────────────────
@@ -315,6 +321,32 @@ class ApprovalInboxService
                         ['label' => 'Division Chief',  'value' => $r->divisionChief?->name ?? '—'],
                         ['label' => 'MIS Assessment',  'value' => $r->mis_assessment ?? '—', 'full' => true],
                         ['label' => 'Recommendation',  'value' => $r->recommendation ?? '—', 'full' => true],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function normalisePms(PMS $r): array
+    {
+        return [
+            'id'             => $r->id,
+            'type'           => 'pms_schedules',
+            'reference_no'   => "PMS-{$r->id}",
+            'requester_name' => $r->createdBy?->name ?? '—',
+            'filed_at'       => $r->created_at?->toISOString(),
+            'status'         => 'Pending OCD Approval',
+            'summary'        => $r->title ?? '—',
+            'sections'       => [
+                [
+                    'title'  => 'Schedule Details',
+                    'fields' => [
+                        ['label' => 'Title',       'value' => $r->title ?? '—'],
+                        ['label' => 'Office/Area', 'value' => $r->office_area ?? '—'],
+                        ['label' => 'School Year', 'value' => $r->school_year ?? '—'],
+                        ['label' => 'Frequency',   'value' => $r->frequency ?? '—'],
+                        ['label' => 'Remarks',     'value' => $r->remarks ?? '—', 'full' => true],
+                        ['label' => 'Filed At',    'value' => $r->created_at?->format('M d, Y h:i A')],
                     ],
                 ],
             ],

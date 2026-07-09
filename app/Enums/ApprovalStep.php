@@ -72,6 +72,10 @@ class ApprovalStep
     const IDP_SUPERVISOR = 'supervisor';
     const IDP_APPROVER   = 'approver';
 
+    // ── ICT Preventive Maintenance Schedule (PMS) ─────────────────────────────
+    const PMS_PREPARED = 'pms_prepared';  // seq 1 — creator signs
+    const PMS_OCD       = 'pms_ocd';      // seq 2 — OCD signs
+
     // ── Student Discipline (SDO) ──────────────────────────────────────────────
     const DISCIPLINE_FILED    = 'discipline_filed';     // seq 1 — filer submits the report
     const DISCIPLINE_RECEIVED = 'discipline_received';  // seq 2 — SDO receives

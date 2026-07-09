@@ -19,6 +19,11 @@ class PMS extends Model
         'status',
         'performed_by',
         'remarks',
+        'created_by',
+        'approval_status',
+        'approved_by',
+        'approved_at',
+        'declined_reason',
     ];
 
     // Remove pms_date here because multiple dates will live in ict_pms_dates
@@ -46,6 +51,22 @@ class PMS extends Model
     public function performedBy()
     {
         return $this->belongsTo(User::class, 'performed_by');
+    }
+
+    /**
+     * The user who originally created this schedule (Prepared By).
+     */
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The OCD-role user who approved this schedule (Noted By).
+     */
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     /**

@@ -996,6 +996,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/ict-pms', [PMSController::class, 'index'])->name('ict-pms.index');
     Route::post('/ict-pms', [PMSController::class, 'store'])->name('ict-pms.store');
     Route::get('/ict-pms/{id}', [PMSController::class, 'show'])->name('ict-pms.show');
+    Route::put('/ict-pms/{pms}', [PMSController::class, 'update'])->name('ict-pms.update');
+    Route::delete('/ict-pms/{pms}', [PMSController::class, 'destroy'])->name('ict-pms.destroy');
 
     // Assign multiple equipment to PMS
     Route::post('/ict-pms/{pmsId}/assign-equipments', [PMSController::class, 'assignEquipments'])->name('ict-pms.assign-equipments');

@@ -8,6 +8,8 @@ export default function usePMS(initialSchedules = []) {
   const showModal = ref(false)
   const modalMode = ref("create")
   const selectedSchedule = ref(null)
+  const showPinModal = ref(false)
+  const pinModalLoading = ref(false)
 
   // Form (added school_year & office_area)
   const form = reactive({
@@ -18,6 +20,7 @@ export default function usePMS(initialSchedules = []) {
     remarks: "",
     school_year: "",
     office_area: "",
+    pin: null,
   })
 
   const scheduleDates = ref([])
@@ -97,12 +100,15 @@ export default function usePMS(initialSchedules = []) {
     Swal.fire({ title, allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
   }
 
-  const storeSchedule = () => {
+  const storeSchedule = (pin = null) => {
     form.schedule_dates = scheduleDates.value.map((d) => ({ date: d.date }))
+    form.pin = pin
     showLoadingSwal('Saving schedule...')
     router.post(route("ict-pms.store"), form, {
       onError: (e) => { errors.value = e; Swal.close() },
       onSuccess: () => {
+        showPinModal.value = false
+        pinModalLoading.value = false
         closeModal()
         Swal.fire({ icon: "success", title: "Schedule Added", timer: 2000, showConfirmButton: false })
       },
@@ -176,8 +182,17 @@ export default function usePMS(initialSchedules = []) {
   }
 
   const submitSchedule = () => {
-    if (modalMode.value === "create") storeSchedule()
+    if (modalMode.value === "create") showPinModal.value = true
     else if (modalMode.value === "edit" && selectedSchedule.value) updateSchedule(selectedSchedule.value.id)
+  }
+
+  const confirmPinAndStore = (pin) => {
+    pinModalLoading.value = true
+    storeSchedule(pin)
+  }
+
+  const cancelPinModal = () => {
+    showPinModal.value = false
   }
 
   const viewSchedule = (s) => openModal("view", s)
@@ -240,6 +255,10 @@ export default function usePMS(initialSchedules = []) {
     openModal,
     closeModal,
     submitSchedule,
+    showPinModal,
+    pinModalLoading,
+    confirmPinAndStore,
+    cancelPinModal,
     viewSchedule,
     exportCSV,
     printTable,

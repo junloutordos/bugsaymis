@@ -11,6 +11,7 @@ use App\Models\WorkRequest;
 use App\Models\ServiceRequest;
 use App\Models\MessengerialRequest;
 use App\Models\HR\LeaveApplication;
+use App\Models\PMS;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -26,6 +27,7 @@ class ApprovalInboxController extends Controller
         'messengerial_requests',
         'gate_passes',
         'leave_applications',
+        'pms_schedules',
     ];
 
     /**
@@ -179,6 +181,11 @@ class ApprovalInboxController extends Controller
                 $record = LeaveApplication::find($id);
                 if (! $record) abort(404);
                 return [LeaveApplication::class, $record];
+
+            case 'pms_schedules':
+                $record = PMS::find($id);
+                if (! $record) abort(404);
+                return [PMS::class, $record];
         }
 
         abort(404);
@@ -278,6 +285,10 @@ class ApprovalInboxController extends Controller
                 }
                 if ($user->isSuperAdmin()) break;
                 abort(403);
+
+            case 'pms_schedules':
+                if ($isOCD) break;
+                abort(403);
         }
     }
 
@@ -295,10 +306,11 @@ class ApprovalInboxController extends Controller
             'messengerial_requests'=> ['Pending Division Chief Approval'],
             'gate_passes'          => ['Pending', 'Division Approved'],
             'leave_applications'   => ['pending', 'hr_verified', 'forwarded'],
+            'pms_schedules'        => ['pending'],
         ];
 
         $allowed = $pendingStatuses[$type] ?? [];
-        $status  = $type === 'gate_passes' ? ($record->status ?? '') : ($record->status ?? '');
+        $status  = $type === 'pms_schedules' ? ($record->approval_status ?? '') : ($record->status ?? '');
 
         if (! in_array($status, $allowed, true)) {
             abort(409, 'This request has already been acted upon.');
@@ -398,6 +410,10 @@ class ApprovalInboxController extends Controller
                 $request->merge(['stage' => $stage, 'action' => $action]);
                 return app(\App\Http\Controllers\HR\LeaveApplicationController::class)
                     ->approve($request, $record);
+
+            case 'pms_schedules':
+                return app(\App\Http\Controllers\PMSController::class)
+                    ->approveByOCD($request, $record);
         }
 
         abort(404);
@@ -410,7 +426,7 @@ class ApprovalInboxController extends Controller
     private function delegateDecline(Request $request, string $type, $record)
     {
         $user   = $request->user();
-        $status = $record->status ?? '';
+        $status = $type === 'pms_schedules' ? ($record->approval_status ?? '') : ($record->status ?? '');
 
         switch ($type) {
             case 'it_job_requests':
@@ -489,6 +505,10 @@ class ApprovalInboxController extends Controller
                 $request->merge(['stage' => $stage, 'action' => 'rejected']);
                 return app(\App\Http\Controllers\HR\LeaveApplicationController::class)
                     ->approve($request, $record);
+
+            case 'pms_schedules':
+                return app(\App\Http\Controllers\PMSController::class)
+                    ->declineByOCD($request, $record);
         }
 
         abort(404);
