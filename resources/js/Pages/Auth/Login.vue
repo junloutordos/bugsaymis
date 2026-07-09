@@ -137,6 +137,23 @@ const brandPillars = [
           <a href="#modules"    class="nav-link">Modules</a>
           <a href="#hero-login" class="nav-link">Access</a>
         </nav>
+        <div class="nav-app-wrap">
+          <button type="button" class="nav-cta" @click="showMobileAppMenu = !showMobileAppMenu">
+            <DevicePhoneMobileIcon class="nav-cta-icon" />
+            Get the App
+          </button>
+          <div v-if="showMobileAppMenu" class="nav-app-menu">
+            <a href="/downloads/atlasgo" class="mobile-app-option">
+              <span class="mobile-app-option-label">Android</span>
+              <span class="mobile-app-option-sub">Direct download · v{{ atlasGoVersion }}</span>
+            </a>
+            <div class="mobile-app-option mobile-app-option-disabled">
+              <span class="mobile-app-option-label">iOS</span>
+              <span class="mobile-app-option-sub">Coming soon to the App Store</span>
+            </div>
+            <p class="mobile-app-note">Not yet on Google Play — you'll see an "Unknown sources" prompt when installing on Android.</p>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -408,23 +425,6 @@ const brandPillars = [
           <p class="footer-copy">© 2026 PSHS-CRC. All rights reserved.</p>
           <p class="footer-ver">v{{ appVersion }}</p>
           <p class="footer-ver"><a href="/developer" class="dev-link">Developers' Information</a></p>
-          <div class="mobile-app-wrap">
-            <button type="button" class="dev-link mobile-app-toggle" @click="showMobileAppMenu = !showMobileAppMenu">
-              <DevicePhoneMobileIcon class="mobile-app-toggle-icon" />
-              Get the AtlasGo App
-            </button>
-            <div v-if="showMobileAppMenu" class="mobile-app-menu">
-              <a href="/downloads/atlasgo" class="mobile-app-option">
-                <span class="mobile-app-option-label">Android</span>
-                <span class="mobile-app-option-sub">Direct download · v{{ atlasGoVersion }}</span>
-              </a>
-              <div class="mobile-app-option mobile-app-option-disabled">
-                <span class="mobile-app-option-label">iOS</span>
-                <span class="mobile-app-option-sub">Coming soon to the App Store</span>
-              </div>
-              <p class="mobile-app-note">Not yet on Google Play — you'll see an "Unknown sources" prompt when installing on Android.</p>
-            </div>
-          </div>
         </div>
       </div>
     </footer>
@@ -699,20 +699,14 @@ const brandPillars = [
 }
 .dev-link:hover { color: var(--cyan-lt); }
 
-/* ── Get the App (footer, subtle) ─────────── */
-.mobile-app-wrap { position: relative; margin-top: 4px; }
-.mobile-app-toggle {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: none; border: none; padding: 0; cursor: pointer;
-  font-family: inherit;
-}
-.mobile-app-toggle-icon { width: 12px; height: 12px; flex-shrink: 0; }
-.mobile-app-menu {
-  position: absolute; bottom: calc(100% + 10px); right: 0;
+/* ── Get the App (navbar CTA) ─────────── */
+.nav-app-wrap { position: relative; flex-shrink: 0; }
+.nav-app-menu {
+  position: absolute; top: calc(100% + 10px); right: 0;
   width: 240px; text-align: left;
   background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px;
   padding: 10px; box-shadow: 0 14px 36px rgba(0,0,0,.18);
-  z-index: 20;
+  z-index: 200;
 }
 .mobile-app-option {
   display: flex; flex-direction: column; gap: 1px;
@@ -976,6 +970,7 @@ a.mobile-app-option:hover { background: #f0f6ff; }
   /* Navbar */
   .nav-inner    { padding: 0 16px; height: 58px; gap: 12px; }
   .nav-links    { display: none; }
+  .nav-app-wrap { margin-left: auto; }
   .nav-cta      { padding: 8px 14px; font-size: .78rem; }
 
   /* Hero */
