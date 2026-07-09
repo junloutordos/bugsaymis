@@ -21,6 +21,17 @@ const initials = computed(() => {
   return words.length >= 2 ? words[0][0] + words[1][0] : (words[0]?.[0] || '')
 })
 
+// Stored name is in filing order ("Lastname, Firstname M.I."). The digital
+// card reads more naturally in reading order — reverse only for display here.
+const displayName = computed(() => {
+  const raw = props.employee.name || ''
+  const commaIndex = raw.indexOf(',')
+  if (commaIndex === -1) return raw
+  const lastName = raw.slice(0, commaIndex).trim()
+  const rest = raw.slice(commaIndex + 1).trim()
+  return `${rest} ${lastName}`.trim()
+})
+
 const idRows = computed(() => [
   { label: 'Employee No.',  value: props.employee.employee_no },
   { label: 'TIN',           value: props.ids.tin },
@@ -89,17 +100,25 @@ onMounted(() => {
       >
         <!-- Front face -->
         <div class="w-full [backface-visibility:hidden]">
-          <div class="relative overflow-hidden rounded-t-3xl bg-gradient-to-r from-indigo-600 to-blue-500 px-6 pb-16 pt-6">
+          <div
+            class="relative overflow-hidden rounded-t-3xl px-6 pb-16 pt-6"
+            style="background: linear-gradient(135deg, #060e50 0%, #1447c0 65%, #0093b8 100%)"
+          >
             <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/5"></div>
             <div class="absolute -bottom-4 -left-8 h-32 w-32 rounded-full bg-white/5"></div>
 
-            <div class="relative z-10 flex items-center justify-between">
-              <div class="flex items-center gap-1.5">
-                <img src="/images/pshslogo.png" class="h-6 w-6 object-contain" alt="" onerror="this.style.display='none'" />
-                <span class="text-[11px] font-semibold uppercase tracking-widest text-indigo-100">PSHS&ndash;CRC</span>
+            <div class="relative z-10 flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <img src="/images/pshslogo.png" class="h-9 w-9 flex-shrink-0 object-contain" alt="" onerror="this.style.display='none'" />
+                <div class="leading-tight">
+                  <p class="text-[8px] font-medium text-indigo-100">Republic of the Philippines</p>
+                  <p class="text-[8px] font-medium text-indigo-100">Department of Science and Technology</p>
+                  <p class="text-[11px] font-bold uppercase tracking-wide text-white">Philippine Science High School</p>
+                  <p class="text-[8px] font-bold uppercase tracking-wide text-indigo-100">Caraga Region Campus in Butuan City</p>
+                </div>
               </div>
               <span
-                class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide backdrop-blur"
+                class="inline-flex flex-shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-wide backdrop-blur"
                 :class="employee.is_active ? 'border-white/30 bg-white/15 text-white' : 'border-white/20 bg-black/20 text-white/70'"
               >
                 <span class="h-1.5 w-1.5 rounded-full" :class="employee.is_active ? 'bg-emerald-300' : 'bg-slate-300'"></span>
@@ -108,16 +127,16 @@ onMounted(() => {
             </div>
 
             <div class="relative z-10 mt-5 flex justify-center">
-              <div class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white/30 bg-white/20 shadow-2xl backdrop-blur">
+              <div class="flex h-32 w-32 items-center justify-center overflow-hidden rounded-2xl border-4 border-white/30 bg-white/20 shadow-2xl backdrop-blur">
                 <img v-if="photoUrl" :src="photoUrl" class="h-full w-full object-cover" style="object-position: center 20%" alt="" />
-                <span v-else class="select-none text-2xl font-bold text-white">{{ initials }}</span>
+                <span v-else class="select-none text-3xl font-bold text-white">{{ initials }}</span>
               </div>
             </div>
           </div>
 
           <div class="-mt-8 rounded-b-3xl bg-white px-6 pb-6 pt-10 shadow-2xl">
             <div class="mb-5 text-center">
-              <h1 class="break-words text-xl font-bold leading-snug tracking-tight text-slate-800">{{ employee.name }}</h1>
+              <h1 class="break-words text-xl font-bold leading-snug tracking-tight text-slate-800">{{ displayName }}</h1>
               <p class="mt-1 text-sm font-semibold text-indigo-600">{{ employee.position || '—' }}</p>
               <p v-if="employee.office || employee.division" class="mt-1 text-xs text-slate-500">
                 {{ employee.office || employee.division }}
@@ -134,6 +153,12 @@ onMounted(() => {
               <p class="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">Scan to verify</p>
             </div>
 
+            <div class="mt-5 flex flex-col items-center border-t border-slate-100 pt-4">
+              <img v-if="ocd.signature_uri" :src="ocd.signature_uri" class="h-8 max-w-[60%] object-contain" alt="" />
+              <p class="mt-1 text-xs font-bold text-slate-800">{{ ocd.name }}</p>
+              <p class="text-[10px] text-slate-500">{{ ocd.position }}</p>
+            </div>
+
             <button type="button" class="mt-5 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-indigo-600" @click.stop="isFlipped = true">
               <ArrowPathIcon class="h-3.5 w-3.5" /> Tap to view ID details
             </button>
@@ -142,7 +167,10 @@ onMounted(() => {
 
         <!-- Back face -->
         <div class="absolute inset-0 flex h-full w-full flex-col [backface-visibility:hidden]" style="transform: rotateY(180deg)">
-          <div class="relative overflow-hidden rounded-t-3xl bg-gradient-to-r from-indigo-600 to-blue-500 px-6 py-4 text-center">
+          <div
+            class="relative overflow-hidden rounded-t-3xl px-6 py-4 text-center"
+            style="background: linear-gradient(135deg, #060e50 0%, #1447c0 65%, #0093b8 100%)"
+          >
             <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/5"></div>
             <span class="relative z-10 text-xs font-semibold uppercase tracking-widest text-white">Government ID Numbers</span>
           </div>
