@@ -57,6 +57,7 @@ class EmployeeIdController extends Controller
                 'division'        => $division?->division_name,
                 'office'          => $office?->name,
                 'profile_picture' => $user->profile_picture,
+                'is_active'       => $user->status !== 'inactive',
             ],
             'ids' => [
                 'blood_type' => $pdsInfo?->blood_type,

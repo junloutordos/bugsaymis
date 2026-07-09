@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, nextTick, ref } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
-import { ArrowLeftIcon, PrinterIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, ArrowPathIcon, IdentificationIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import { storageUrl } from '@/Composables/useStorage.js'
 
 const props = defineProps({
@@ -14,10 +14,30 @@ const props = defineProps({
 
 const photoUrl = computed(() => storageUrl(props.employee.profile_picture))
 
+const initials = computed(() => {
+  const parts = (props.employee.name || '').split(',').map(s => s.trim()).filter(Boolean)
+  if (parts.length >= 2) return (parts[1][0] || '') + (parts[0][0] || '')
+  const words = (parts[0] || '').split(/\s+/).filter(Boolean)
+  return words.length >= 2 ? words[0][0] + words[1][0] : (words[0]?.[0] || '')
+})
+
+const idRows = computed(() => [
+  { label: 'Employee No.',  value: props.employee.employee_no },
+  { label: 'TIN',           value: props.ids.tin },
+  { label: 'PhilHealth',    value: props.ids.philhealth },
+  { label: 'Pag-IBIG',      value: props.ids.pagibig },
+  { label: 'PhilSys',       value: props.ids.philsys },
+  { label: 'Blood Type',    value: props.ids.blood_type },
+].filter(r => r.value))
+
 function printCard() {
   window.print()
 }
 
+// ── Digital (screen) view: tap-to-flip card ────────────────────────────────
+const isFlipped = ref(false)
+
+// ── Print (CR-80) view: fit the name to one line on the fixed-width card ───
 const NAME_BASE_FONT_SIZE = 10
 const NAME_MIN_FONT_SIZE = 6
 const nameEl = ref(null)
@@ -40,15 +60,6 @@ function fitNameToOneLine() {
   }
 }
 
-const idRows = computed(() => [
-  { label: 'Employee No.',  value: props.employee.employee_no },
-  { label: 'TIN',           value: props.ids.tin },
-  { label: 'PhilHealth',    value: props.ids.philhealth },
-  { label: 'Pag-IBIG',      value: props.ids.pagibig },
-  { label: 'PhilSys',       value: props.ids.philsys },
-  { label: 'Blood Type',    value: props.ids.blood_type },
-].filter(r => r.value))
-
 onMounted(() => {
   nextTick(fitNameToOneLine)
 })
@@ -57,23 +68,137 @@ onMounted(() => {
 <template>
   <Head title="Employee Digital ID" />
 
-  <div class="page">
-    <div class="no-print w-full max-w-[480px] text-center">
-      <Link :href="route('profile.edit')" class="mb-2 inline-flex items-center gap-1.5 text-[13px] text-slate-600 no-underline hover:text-indigo-600">
+  <!-- ══════════════════════════════════════════════════════════════════
+       Digital view — mobile wallet-style card, screen only
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="print:hidden min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 px-4 py-8">
+    <div class="mx-auto mb-6 flex w-full max-w-sm items-center justify-between">
+      <Link :href="route('profile.edit')" class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white">
         <ArrowLeftIcon class="h-4 w-4" /> Back to Profile
       </Link>
-      <h1 class="mb-3 text-base font-bold text-slate-800">{{ employee.name }}</h1>
-      <button @click="printCard" class="mb-2.5 inline-flex items-center gap-1.5 rounded-lg border-none bg-indigo-600 px-[18px] py-2.5 text-[13px] font-semibold text-white cursor-pointer hover:bg-indigo-700">
-        <PrinterIcon class="h-4 w-4" /> Print ID Card
-      </button>
-      <p class="text-xs leading-relaxed text-slate-500">
-        Load a blank CR-80 card into the Matica XID8300. This sends both the front and
-        back as a single print job — make sure dual-sided / duplex printing is enabled
-        in the printer driver so both sides print on one card. The QR code links to a
-        live verification page — anyone scanning it sees your current employment status.
-      </p>
+      <span class="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Digital ID</span>
     </div>
 
+    <!-- Flip card -->
+    <div class="mx-auto w-full max-w-sm" style="perspective: 1600px">
+      <div
+        class="relative w-full cursor-pointer transition-transform duration-700 ease-out"
+        style="transform-style: preserve-3d"
+        :style="{ transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }"
+        @click="isFlipped = !isFlipped"
+      >
+        <!-- Front face -->
+        <div class="w-full [backface-visibility:hidden]">
+          <div class="relative overflow-hidden rounded-t-3xl bg-gradient-to-r from-indigo-600 to-blue-500 px-6 pb-16 pt-6">
+            <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/5"></div>
+            <div class="absolute -bottom-4 -left-8 h-32 w-32 rounded-full bg-white/5"></div>
+
+            <div class="relative z-10 flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <img src="/images/pshslogo.png" class="h-6 w-6 object-contain" alt="" onerror="this.style.display='none'" />
+                <span class="text-[11px] font-semibold uppercase tracking-widest text-indigo-100">PSHS&ndash;CRC</span>
+              </div>
+              <span
+                class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide backdrop-blur"
+                :class="employee.is_active ? 'border-white/30 bg-white/15 text-white' : 'border-white/20 bg-black/20 text-white/70'"
+              >
+                <span class="h-1.5 w-1.5 rounded-full" :class="employee.is_active ? 'bg-emerald-300' : 'bg-slate-300'"></span>
+                {{ employee.is_active ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+
+            <div class="relative z-10 mt-5 flex justify-center">
+              <div class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white/30 bg-white/20 shadow-2xl backdrop-blur">
+                <img v-if="photoUrl" :src="photoUrl" class="h-full w-full object-cover" style="object-position: center 20%" alt="" />
+                <span v-else class="select-none text-2xl font-bold text-white">{{ initials }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="-mt-8 rounded-b-3xl bg-white px-6 pb-6 pt-10 shadow-2xl">
+            <div class="mb-5 text-center">
+              <h1 class="break-words text-xl font-bold leading-snug tracking-tight text-slate-800">{{ employee.name }}</h1>
+              <p class="mt-1 text-sm font-semibold text-indigo-600">{{ employee.position || '—' }}</p>
+              <p v-if="employee.office || employee.division" class="mt-1 text-xs text-slate-500">
+                {{ employee.office || employee.division }}
+              </p>
+            </div>
+
+            <div v-if="employee.employee_no" class="mb-5 rounded-xl bg-slate-50 px-4 py-2.5 text-center">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Employee Number</p>
+              <p class="mt-0.5 text-sm font-bold tracking-wider text-slate-800">{{ employee.employee_no }}</p>
+            </div>
+
+            <div class="flex flex-col items-center">
+              <div class="rounded-2xl border border-slate-100 bg-white p-3 [&>svg]:h-32 [&>svg]:w-32" v-html="qr_svg"></div>
+              <p class="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">Scan to verify</p>
+            </div>
+
+            <button type="button" class="mt-5 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-indigo-600" @click.stop="isFlipped = true">
+              <ArrowPathIcon class="h-3.5 w-3.5" /> Tap to view ID details
+            </button>
+          </div>
+        </div>
+
+        <!-- Back face -->
+        <div class="absolute inset-0 flex h-full w-full flex-col [backface-visibility:hidden]" style="transform: rotateY(180deg)">
+          <div class="relative overflow-hidden rounded-t-3xl bg-gradient-to-r from-indigo-600 to-blue-500 px-6 py-4 text-center">
+            <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/5"></div>
+            <span class="relative z-10 text-xs font-semibold uppercase tracking-widest text-white">Government ID Numbers</span>
+          </div>
+
+          <div class="flex flex-1 flex-col rounded-b-3xl bg-white px-6 py-5 shadow-2xl">
+            <div class="space-y-3">
+              <div v-for="row in idRows" :key="row.label" class="flex items-center gap-3">
+                <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50">
+                  <IdentificationIcon class="h-4 w-4 text-indigo-600" />
+                </div>
+                <div class="min-w-0">
+                  <p class="mb-0.5 text-xs leading-none text-slate-400">{{ row.label }}</p>
+                  <p class="truncate text-sm font-medium text-slate-700">{{ row.value }}</p>
+                </div>
+              </div>
+              <p v-if="!idRows.length" class="text-xs text-slate-400">
+                Government ID numbers appear here once encoded in your PDS.
+              </p>
+            </div>
+
+            <div class="my-4 border-t border-slate-100"></div>
+
+            <p class="text-center text-[11px] leading-relaxed text-slate-500">
+              This card identifies the bearer as an employee of the Philippine Science High School – Caraga
+              Region Campus. Non-transferable; must be surrendered upon separation from the service.
+            </p>
+
+            <button type="button" class="mt-auto flex w-full items-center justify-center gap-1.5 pt-4 text-xs font-medium text-indigo-600" @click.stop="isFlipped = false">
+              <ArrowPathIcon class="h-3.5 w-3.5" /> Tap to view front
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="mx-auto mt-6 flex w-full max-w-sm flex-col items-center gap-3 text-center">
+      <button
+        @click="printCard"
+        class="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/15"
+      >
+        <PrinterIcon class="h-4 w-4" /> Print ID Card
+      </button>
+      <p class="max-w-xs text-[11px] leading-relaxed text-slate-400">
+        Load a blank CR-80 card into the Matica XID8300 and enable dual-sided / duplex printing in the printer
+        driver — this sends both the front and back as a single print job onto one physical card. The QR code
+        links to a live verification page showing your current employment status.
+      </p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       Print view — exact CR-80 (54mm × 86mm) layout for the Matica
+       XID8300, unchanged. Never rendered on screen, print output only.
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="print-page">
     <div class="cards">
       <!-- Front -->
       <div class="id-card id-card-front">
@@ -155,17 +280,10 @@ onMounted(() => {
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { background: #f1f5f9; }
+html, body { background: #0f172a; }
 
-.page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  padding: 24px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-}
+/* ── Print-only wrapper: hidden on screen, shown only in @media print ─── */
+.print-page { display: none; }
 
 .cards {
   display: flex;
@@ -389,8 +507,14 @@ html, body { background: #f1f5f9; }
 @media print {
   @page { size: 54mm 86mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #fff; }
-  .no-print { display: none !important; }
-  .page { padding: 0; gap: 0; }
+  .print-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 0;
+    gap: 0;
+  }
   .cards { display: block; }
   .id-card {
     box-shadow: none;
