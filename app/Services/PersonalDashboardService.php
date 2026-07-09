@@ -559,9 +559,9 @@ class PersonalDashboardService
     {
         $links = [
             ['label' => 'My Leave', 'description' => 'Leave applications and credits', 'url' => route('hr.leave.index'), 'tone' => 'indigo'],
-            ['label' => 'My Requests', 'description' => 'IT and service request status', 'url' => route('jobrequests.index'), 'tone' => 'sky'],
-            ['label' => 'Document Tracking', 'description' => 'Routed documents and files', 'url' => route('document-tracking.index'), 'tone' => 'amber'],
-            ['label' => 'My Activities', 'description' => 'Activities, evaluations, certificates', 'url' => route('ams.my-activities.index'), 'tone' => 'emerald'],
+            ['label' => 'My Requests', 'description' => 'IT and service request status', 'url' => route('jobrequests.index'), 'tone' => 'indigo'],
+            ['label' => 'Document Tracking', 'description' => 'Routed documents and files', 'url' => route('document-tracking.index'), 'tone' => 'indigo'],
+            ['label' => 'My Activities', 'description' => 'Activities, evaluations, certificates', 'url' => route('ams.my-activities.index'), 'tone' => 'indigo'],
         ];
 
         if ($approvalCount > 0 || $this->isApprover($user)) {
@@ -569,12 +569,12 @@ class PersonalDashboardService
                 'label' => 'Approval Inbox',
                 'description' => $approvalCount > 0 ? "{$approvalCount} item(s) need action" : 'Review routed approvals',
                 'url' => route('approvals.inbox'),
-                'tone' => 'rose',
+                'tone' => 'indigo',
             ]);
         }
 
         if ($user->hasPermission('ipcr.view')) {
-            $links[] = ['label' => 'IPCR / PMS', 'description' => 'Performance targets and ratings', 'url' => route('employee-ipcr.index'), 'tone' => 'violet'];
+            $links[] = ['label' => 'IPCR / PMS', 'description' => 'Performance targets and ratings', 'url' => route('employee-ipcr.index'), 'tone' => 'indigo'];
         }
 
         return $links;

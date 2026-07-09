@@ -68,7 +68,7 @@ const flattenedActions = computed(() => {
       title: item.summary || item.reference_no || 'Approval item',
       meta: `${item.requester_name || 'Requester'} · ${item.status || 'Pending'}`,
       date: item.filed_at,
-      tone: 'rose',
+      tone: 'warning',
       url: route('approvals.inbox'),
     }))
   )
@@ -79,7 +79,7 @@ const flattenedActions = computed(() => {
     title: item.title,
     meta: [item.reference, item.status, item.due_at ? `Due ${formatDate(item.due_at)}` : null].filter(Boolean).join(' · '),
     date: item.due_at,
-    tone: item.is_overdue ? 'red' : 'amber',
+    tone: item.is_overdue ? 'danger' : 'warning',
     url: item.url,
   }))
 
@@ -99,7 +99,7 @@ const flattenedActions = computed(() => {
     title: item.title,
     meta: item.reference,
     date: item.date,
-    tone: 'emerald',
+    tone: 'success',
     url: item.url,
   }))
 
@@ -138,14 +138,14 @@ const summaryCards = computed(() => [
     value: props.summary?.needs_action ?? 0,
     sub: `${props.summary?.approval_items ?? 0} approval item(s)`,
     icon: InboxStackIcon,
-    tone: 'rose',
+    tone: 'warning',
   },
   {
     label: 'Documents Due',
     value: props.summary?.documents_due ?? 0,
     sub: `${props.summary?.overdue_documents ?? 0} overdue`,
     icon: DocumentTextIcon,
-    tone: (props.summary?.overdue_documents ?? 0) > 0 ? 'red' : 'amber',
+    tone: (props.summary?.overdue_documents ?? 0) > 0 ? 'danger' : 'warning',
   },
   {
     label: 'Unread Alerts',
@@ -159,14 +159,14 @@ const summaryCards = computed(() => [
     value: props.summary?.active_requests ?? 0,
     sub: 'Recent personal requests',
     icon: ClipboardDocumentCheckIcon,
-    tone: 'sky',
+    tone: 'indigo',
   },
   {
     label: 'Upcoming',
     value: props.summary?.upcoming_events ?? 0,
     sub: 'Calendar items',
     icon: CalendarDaysIcon,
-    tone: 'emerald',
+    tone: 'success',
   },
 ])
 
@@ -207,40 +207,25 @@ function timeAgo(value) {
 
 function toneClass(tone, variant = 'soft') {
   const classes = {
-    rose: {
-      soft: 'bg-rose-50 text-rose-700 border-rose-100',
-      icon: 'bg-rose-100 text-rose-700',
-      dot: 'bg-rose-500',
-    },
-    red: {
-      soft: 'bg-red-50 text-red-700 border-red-100',
-      icon: 'bg-red-100 text-red-700',
-      dot: 'bg-red-500',
-    },
-    amber: {
-      soft: 'bg-amber-50 text-amber-700 border-amber-100',
-      icon: 'bg-amber-100 text-amber-700',
-      dot: 'bg-amber-500',
-    },
     indigo: {
       soft: 'bg-indigo-50 text-indigo-700 border-indigo-100',
       icon: 'bg-indigo-100 text-indigo-700',
       dot: 'bg-indigo-500',
     },
-    sky: {
-      soft: 'bg-sky-50 text-sky-700 border-sky-100',
-      icon: 'bg-sky-100 text-sky-700',
-      dot: 'bg-sky-500',
+    warning: {
+      soft: 'bg-warning-50 text-warning-700 border-warning-100',
+      icon: 'bg-warning-100 text-warning-700',
+      dot: 'bg-warning-500',
     },
-    emerald: {
-      soft: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      icon: 'bg-emerald-100 text-emerald-700',
-      dot: 'bg-emerald-500',
+    danger: {
+      soft: 'bg-danger-50 text-danger-700 border-danger-100',
+      icon: 'bg-danger-100 text-danger-700',
+      dot: 'bg-danger-500',
     },
-    violet: {
-      soft: 'bg-violet-50 text-violet-700 border-violet-100',
-      icon: 'bg-violet-100 text-violet-700',
-      dot: 'bg-violet-500',
+    success: {
+      soft: 'bg-success-50 text-success-700 border-success-100',
+      icon: 'bg-success-100 text-success-700',
+      dot: 'bg-success-500',
     },
   }
   return classes[tone]?.[variant] || classes.indigo[variant]
@@ -249,13 +234,13 @@ function toneClass(tone, variant = 'soft') {
 function statusClass(status) {
   const value = String(status || '').toLowerCase()
   if (value.includes('approved') || value.includes('completed') || value.includes('released')) {
-    return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+    return 'bg-success-50 text-success-700 border-success-100'
   }
   if (value.includes('declined') || value.includes('rejected') || value.includes('returned') || value.includes('cancelled')) {
-    return 'bg-red-50 text-red-700 border-red-100'
+    return 'bg-danger-50 text-danger-700 border-danger-100'
   }
   if (value.includes('pending') || value.includes('review') || value.includes('forwarded')) {
-    return 'bg-amber-50 text-amber-700 border-amber-100'
+    return 'bg-warning-50 text-warning-700 border-warning-100'
   }
   return 'bg-slate-50 text-slate-600 border-slate-100'
 }
@@ -420,7 +405,7 @@ function statusClass(status) {
                 :href="event.url"
                 class="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 transition hover:bg-slate-50"
               >
-                <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="toneClass(event.type === 'overdue' ? 'red' : event.type === 'document' ? 'amber' : event.type === 'activity' ? 'emerald' : 'indigo', 'dot')" />
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="toneClass(event.type === 'overdue' ? 'danger' : event.type === 'document' ? 'warning' : event.type === 'activity' ? 'success' : 'indigo', 'dot')" />
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium text-slate-800">{{ event.title }}</p>
                   <p class="text-xs text-slate-400">{{ formatDate(event.start) }}</p>
@@ -492,13 +477,13 @@ function statusClass(status) {
 
           <div
             v-if="(summary.overdue_documents ?? 0) > 0"
-            class="rounded-lg border border-red-100 bg-red-50 p-4 text-red-800"
+            class="rounded-lg border border-danger-100 bg-danger-50 p-4 text-danger-700"
           >
             <div class="flex gap-3">
               <ExclamationTriangleIcon class="h-5 w-5 shrink-0" />
               <div>
                 <p class="text-sm font-semibold">You have overdue routed document(s).</p>
-                <p class="mt-1 text-sm text-red-700">Open the document from Needs Action and record the required action.</p>
+                <p class="mt-1 text-sm text-danger-700">Open the document from Needs Action and record the required action.</p>
               </div>
             </div>
           </div>
@@ -557,12 +542,12 @@ function statusClass(status) {
   font-weight: 600;
 }
 
-.dashboard-calendar :deep(.dash-calendar-leave) { background: #4f46e5; }
-.dashboard-calendar :deep(.dash-calendar-travel) { background: #0284c7; }
-.dashboard-calendar :deep(.dash-calendar-activity) { background: #059669; }
-.dashboard-calendar :deep(.dash-calendar-facility) { background: #7c3aed; }
-.dashboard-calendar :deep(.dash-calendar-vehicle) { background: #0f766e; }
-.dashboard-calendar :deep(.dash-calendar-service) { background: #d97706; }
-.dashboard-calendar :deep(.dash-calendar-document) { background: #f59e0b; color: #422006; }
-.dashboard-calendar :deep(.dash-calendar-overdue) { background: #dc2626; }
+.dashboard-calendar :deep(.dash-calendar-leave),
+.dashboard-calendar :deep(.dash-calendar-travel),
+.dashboard-calendar :deep(.dash-calendar-activity),
+.dashboard-calendar :deep(.dash-calendar-facility),
+.dashboard-calendar :deep(.dash-calendar-vehicle),
+.dashboard-calendar :deep(.dash-calendar-service),
+.dashboard-calendar :deep(.dash-calendar-document) { background: #0867DB; }
+.dashboard-calendar :deep(.dash-calendar-overdue) { background: #DC2626; }
 </style>
