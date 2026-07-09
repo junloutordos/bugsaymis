@@ -253,6 +253,7 @@ class HandleInertiaRequests extends Middleware
                     return ['current' => '1.0.0', 'history' => []];
                 }
             },
+            'atlasGoVersion' => config('atlasgo.mobile_version'),
         ]);
     }
 

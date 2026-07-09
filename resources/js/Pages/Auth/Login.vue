@@ -28,6 +28,7 @@ import {
   SparklesIcon,
   RocketLaunchIcon,
   HandRaisedIcon,
+  DevicePhoneMobileIcon,
 } from '@heroicons/vue/24/outline'
 
 const OFFICIAL_DOMAIN = '@crc.pshs.edu.ph'
@@ -38,6 +39,8 @@ const isAuthorizedEmail = (email) => email?.toLowerCase().endsWith(OFFICIAL_DOMA
 
 const page = usePage()
 const appVersion = computed(() => page.props.appVersion?.current ?? '1.0.0')
+const atlasGoVersion = computed(() => page.props.atlasGoVersion ?? '1.0.0')
+const showMobileAppMenu = ref(false)
 
 watch(() => page.props.errors, (errs) => {
   if (!errs) return
@@ -405,6 +408,23 @@ const brandPillars = [
           <p class="footer-copy">© 2026 PSHS-CRC. All rights reserved.</p>
           <p class="footer-ver">v{{ appVersion }}</p>
           <p class="footer-ver"><a href="/developer" class="dev-link">Developers' Information</a></p>
+          <div class="mobile-app-wrap">
+            <button type="button" class="dev-link mobile-app-toggle" @click="showMobileAppMenu = !showMobileAppMenu">
+              <DevicePhoneMobileIcon class="mobile-app-toggle-icon" />
+              Get the AtlasGo App
+            </button>
+            <div v-if="showMobileAppMenu" class="mobile-app-menu">
+              <a href="/downloads/atlasgo" class="mobile-app-option">
+                <span class="mobile-app-option-label">Android</span>
+                <span class="mobile-app-option-sub">Direct download · v{{ atlasGoVersion }}</span>
+              </a>
+              <div class="mobile-app-option mobile-app-option-disabled">
+                <span class="mobile-app-option-label">iOS</span>
+                <span class="mobile-app-option-sub">Coming soon to the App Store</span>
+              </div>
+              <p class="mobile-app-note">Not yet on Google Play — you'll see an "Unknown sources" prompt when installing on Android.</p>
+            </div>
+          </div>
         </div>
       </div>
     </footer>
@@ -678,6 +698,35 @@ const brandPillars = [
   transition: color .2s;
 }
 .dev-link:hover { color: var(--cyan-lt); }
+
+/* ── Get the App (footer, subtle) ─────────── */
+.mobile-app-wrap { position: relative; margin-top: 4px; }
+.mobile-app-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit;
+}
+.mobile-app-toggle-icon { width: 12px; height: 12px; flex-shrink: 0; }
+.mobile-app-menu {
+  position: absolute; bottom: calc(100% + 10px); right: 0;
+  width: 240px; text-align: left;
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 10px; box-shadow: 0 14px 36px rgba(0,0,0,.18);
+  z-index: 20;
+}
+.mobile-app-option {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 9px 10px; border-radius: 9px;
+  text-decoration: none; transition: background .15s;
+}
+a.mobile-app-option:hover { background: #f0f6ff; }
+.mobile-app-option-disabled { opacity: .55; cursor: default; }
+.mobile-app-option-label { font-size: .78rem; font-weight: 700; color: #0a1040; }
+.mobile-app-option-sub { font-size: .68rem; color: #64748b; }
+.mobile-app-note {
+  font-size: .62rem; color: #94a3b8; line-height: 1.5;
+  padding: 8px 10px 2px; border-top: 1px solid #e2e8f0; margin-top: 6px;
+}
 
 /* ── Hero left (hero text) ─────────── */
 .hero-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }

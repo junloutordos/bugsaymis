@@ -6,6 +6,7 @@ use App\Http\Controllers\ICTEquipmentController;
 use App\Http\Controllers\ComputerLabController;
 use App\Http\Controllers\HR\EmployeeDocumentController;
 use App\Http\Controllers\ApprovalInboxController;
+use App\Http\Controllers\AtlasGoDownloadController;
 
 // ECS container health check — no auth, no session
 Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('health');
@@ -13,6 +14,9 @@ Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('heal
 
 // Developer portfolio — public, no auth
 Route::get('/developer', fn () => inertia('Developer'))->name('developer');
+
+// AtlasGo mobile app — public direct-download (sideload) while Play Store listing is pending
+Route::get('/downloads/atlasgo', [AtlasGoDownloadController::class, 'download'])->name('atlasgo.download');
 
 // Digital calling card — public, no auth
 Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
