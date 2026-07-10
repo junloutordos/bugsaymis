@@ -617,7 +617,6 @@ const approveTargets = () => {
                             <DocumentTextIcon class="w-3 h-3" />
                             {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
                           </button>
-                          <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
                         </td>
 
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
@@ -686,7 +685,6 @@ const approveTargets = () => {
                             <DocumentTextIcon class="w-3 h-3" />
                             {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
                           </button>
-                          <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
                         </td>
                         <td class="px-4 py-3 border border-slate-200 text-sm">
                           <a v-if="plan.pivot?.mov_link" :href="plan.pivot.mov_link" target="_blank"

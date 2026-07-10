@@ -911,7 +911,6 @@ const pullFLAccomplishments = () => {
                             class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100 no-print">
                             {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
                           </button>
-                          <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
                         </td>
 
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
@@ -1001,7 +1000,6 @@ const pullFLAccomplishments = () => {
                             class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100 no-print">
                             {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
                           </button>
-                          <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
                         </td>
 
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">

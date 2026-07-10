@@ -312,7 +312,6 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
                         >
                           📋 {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
                         </button>
-                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
@@ -381,7 +380,6 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
                         >
                           📋 {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
                         </button>
-                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
