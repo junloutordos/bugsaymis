@@ -147,6 +147,7 @@ function saveAccEdit(acc) {
       { ...o, preserveScroll: true }
     ),
     {
+      resetOnSuccess: true,
       onSuccess: () => {
         acc.accomplishment_date = accEditForm.value.accomplishment_date;
         acc.description         = accEditForm.value.description;
@@ -169,6 +170,7 @@ function deleteAcc(acc) {
     submit(
       (o) => router.delete(route("my-accomplishments.destroy", acc.id), { ...o, preserveScroll: true }),
       {
+        resetOnSuccess: true,
         onSuccess: () => {
           accViewerPlan.value.accomplishments = accViewerPlan.value.accomplishments.filter(a => a.id !== acc.id);
           accViewerPlan.value.accomplishments_count = Math.max(0, (accViewerPlan.value.accomplishments_count ?? 1) - 1);
@@ -373,6 +375,7 @@ const saveModal = async () => {
       o
     ),
     {
+      resetOnSuccess: true,
       onSuccess: () => {
         const avg = computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness);
         Object.assign(currentPlan.value.pivot, {
@@ -414,6 +417,7 @@ const submitForReview = () => {
   }).then((result) => {
     if (result.isConfirmed) {
       submit.post(route("employee-ipcr.submitReview", props.ipcr.id), {}, {
+        resetOnSuccess: true,
         onSuccess: () => Swal.fire("Submitted!", "Target submitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit target.", "error")
       });
@@ -431,6 +435,7 @@ const submitForRating = () => {
   }).then((result) => {
     if (result.isConfirmed) {
       submit.post(route("employee-ipcr.submitRating", props.ipcr.id), {}, {
+        resetOnSuccess: true,
         onSuccess: () => Swal.fire("Submitted!", "Accomplishments submitted for rating.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit accomplishments.", "error")
       });
@@ -604,6 +609,7 @@ const submitAddPlans = () => {
     route("employee-ipcr.addPlans", props.ipcr.id),
     { plan_ids: selectedPlans.value },
     {
+      resetOnSuccess: true,
       onSuccess: () => {
         closeAddPlansModal();
         Swal.fire({ icon: "success", title: "Plans Added", timer: 1500, showConfirmButton: false });
@@ -630,6 +636,7 @@ const removePlan = (plan) => {
   }).then((result) => {
     if (result.isConfirmed) {
       submit.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
+        resetOnSuccess: true,
         onSuccess: () => Swal.fire("Removed!", "Plan removed successfully.", "success"),
         onError: () => Swal.fire("Error", "Failed to remove plan.", "error"),
       });
@@ -647,6 +654,7 @@ const resubmit = () => {
   }).then((result) => {
     if (result.isConfirmed) {
       submit.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
+        resetOnSuccess: true,
         onSuccess: () => Swal.fire("Resubmitted!", "IPCR resubmitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to resubmit.", "error"),
       });
@@ -665,6 +673,7 @@ const pullFLAccomplishments = () => {
   }).then((result) => {
     if (result.isConfirmed) {
       submit.post(route("employee-ipcr.pullFL", props.ipcr.id), {}, {
+        resetOnSuccess: true,
         onSuccess: () => Swal.fire({ icon: "success", title: "Synced!", timer: 1500, showConfirmButton: false }),
         onError: () => Swal.fire("Error", "Failed to sync from Faculty Loading.", "error"),
       });

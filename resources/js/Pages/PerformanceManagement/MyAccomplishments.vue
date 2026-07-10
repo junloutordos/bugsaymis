@@ -68,6 +68,7 @@ function closeModal() { showModal.value = false }
 
 function submitForm() {
   const opts = {
+    resetOnSuccess: true,
     onSuccess: () => { closeModal(); flash("Accomplishment saved.") },
     onError:   (e) => { formErrors.value = e },
   }
@@ -82,6 +83,7 @@ function submitForm() {
 async function deleteAccomplishment(id) {
   if (await confirmDelete("This action cannot be undone.")) {
     submit.delete(route("my-accomplishments.destroy", id), {
+      resetOnSuccess: true,
       onSuccess: () => flash("Deleted."),
     })
   }
@@ -154,6 +156,7 @@ function proofIcon(photo) {
 async function deletePhoto(photoId) {
   if (await confirmDelete("This will remove the photo permanently.")) {
     submit.delete(route("my-accomplishments.delete-photo", photoId), {
+      resetOnSuccess: true,
       onSuccess: () => flash("Photo removed."),
     })
   }
