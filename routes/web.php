@@ -18,6 +18,9 @@ Route::get('/developer', fn () => inertia('Developer'))->name('developer');
 // AtlasGo mobile app — public direct-download (sideload) while Play Store listing is pending
 Route::get('/downloads/atlasgo', [AtlasGoDownloadController::class, 'download'])->name('atlasgo.download');
 
+// Data Privacy Policy — public, no auth (required by app store listings)
+Route::get('/privacy-policy', fn () => inertia('Privacy/Public'))->name('privacy.public');
+
 // Digital calling card — public, no auth
 Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
 
