@@ -21,6 +21,9 @@ Route::get('/downloads/atlasgo', [AtlasGoDownloadController::class, 'download'])
 // Data Privacy Policy — public, no auth (required by app store listings)
 Route::get('/privacy-policy', fn () => inertia('Privacy/Public'))->name('privacy.public');
 
+// Account & data deletion instructions — public, no auth (required by Play Store account-deletion policy)
+Route::get('/account-deletion', fn () => inertia('AccountDeletion/Public'))->name('account-deletion.public');
+
 // Digital calling card — public, no auth
 Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
 
