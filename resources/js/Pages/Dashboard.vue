@@ -15,6 +15,8 @@ import {
   DocumentTextIcon,
   ExclamationTriangleIcon,
   InboxStackIcon,
+  MegaphoneIcon,
+  PhotoIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -29,6 +31,7 @@ const props = defineProps({
   notifications: { type: Array, default: () => [] },
   calendarEvents: { type: Array, default: () => [] },
   quickLinks: { type: Array, default: () => [] },
+  announcements: { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -450,6 +453,34 @@ function statusClass(status) {
             </div>
 
             <EmptyState v-else title="No notifications yet." />
+          </div>
+
+          <div v-if="announcements.length" class="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-900">Announcements</h2>
+                <p class="text-xs text-slate-500">Latest campus announcements for you</p>
+              </div>
+              <Link :href="route('announcements.index')" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                View all
+              </Link>
+            </div>
+            <div class="divide-y divide-slate-100">
+              <Link
+                v-for="a in announcements"
+                :key="a.id"
+                :href="route('announcements.index')"
+                class="flex items-start gap-3 px-4 py-3 transition hover:bg-slate-50"
+              >
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50">
+                  <component :is="a.has_poster ? PhotoIcon : MegaphoneIcon" class="h-4 w-4 text-indigo-600" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-semibold text-slate-900">{{ a.title }}</p>
+                  <p class="mt-0.5 text-xs text-slate-500">{{ timeAgo(a.published_at) }}</p>
+                </div>
+              </Link>
+            </div>
           </div>
 
           <div class="rounded-xl border border-slate-200 bg-white shadow-sm">

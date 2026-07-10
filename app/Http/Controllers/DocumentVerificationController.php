@@ -14,6 +14,8 @@ use App\Models\ServiceRequest;
 use App\Models\User;
 use App\Models\VehicleRequest;
 use App\Models\WorkRequest;
+use App\Models\Administration\CoaCertificate;
+use App\Services\CertificateOfAppearanceService;
 use App\Services\DigitalSignatureService;
 use App\Services\IssuanceService;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +25,9 @@ use Inertia\Inertia;
 class DocumentVerificationController extends Controller
 {
     public function __construct(
-        private DigitalSignatureService $svc,
-        private IssuanceService         $issuanceSvc,
+        private DigitalSignatureService        $svc,
+        private IssuanceService                $issuanceSvc,
+        private CertificateOfAppearanceService $coaSvc,
     ) {}
 
     private const STAGE_LABELS = [
@@ -249,6 +252,80 @@ class DocumentVerificationController extends Controller
         return response($content, 200, [
             'Content-Type'        => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $issuance->control_number . '.pdf"',
+            'Cache-Control'       => 'private, max-age=300',
+        ]);
+    }
+
+    /**
+     * Public QR verification page for Certificates of Appearance — no auth required.
+     */
+    public function showCoa(string $token)
+    {
+        $certificate = CoaCertificate::where('qr_token', $token)
+            ->with(['visit', 'signature.signer:id,name,position'])
+            ->first();
+
+        if (! $certificate || $certificate->visit?->status !== 'issued') {
+            return view('coa.verify', [
+                'valid' => false, 'certificate' => null, 'tampered' => false,
+                'reason' => null, 'sig' => null, 'documentUrl' => null,
+            ]);
+        }
+
+        $sig = $certificate->signature;
+
+        if ($sig) {
+            // Recompute the content hash from the LIVE row and compare against the
+            // signed, immutable document_hash frozen at issue time (see showIssuance).
+            $liveHash        = $this->coaSvc->computeHash($certificate);
+            $expectedDocHash = hash('sha256', $liveHash);
+            $contentMatches  = hash_equals($expectedDocHash, $sig->document_hash);
+            $signatureValid  = $this->svc->verify($sig->verification_token) !== null;
+
+            if (! $signatureValid) {
+                $tampered = true;
+                $reason   = 'signature';
+            } elseif (! $contentMatches) {
+                $tampered = true;
+                $reason   = 'content';
+            } else {
+                $tampered = false;
+                $reason   = null;
+            }
+        } else {
+            // Every certificate is signed at issue time — a missing signature is itself suspect
+            $tampered = true;
+            $reason   = 'signature';
+        }
+
+        return view('coa.verify', [
+            'valid'       => true,
+            'tampered'    => $tampered,
+            'reason'      => $reason,
+            'certificate' => $certificate,
+            'sig'         => $sig,
+            'documentUrl' => route('coa.verify.document', $token),
+        ]);
+    }
+
+    /**
+     * Public PDF proxy for the system's canonical copy of an issued certificate.
+     * No authentication required.
+     */
+    public function coaDocument(string $token)
+    {
+        $certificate = CoaCertificate::where('qr_token', $token)->with('visit')->first();
+
+        abort_if(! $certificate || $certificate->visit?->status !== 'issued', 404);
+
+        $pdfPath = 'coa/' . $certificate->control_number . '.pdf';
+        if (! Storage::disk('s3')->exists($pdfPath)) {
+            $pdfPath = $this->coaSvc->generatePdf($certificate);
+        }
+
+        return response(Storage::disk('s3')->get($pdfPath), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $certificate->control_number . '.pdf"',
             'Cache-Control'       => 'private, max-age=300',
         ]);
     }

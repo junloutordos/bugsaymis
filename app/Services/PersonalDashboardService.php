@@ -59,7 +59,24 @@ class PersonalDashboardService
             'notifications' => $notifications,
             'calendarEvents' => $calendarEvents,
             'quickLinks' => $this->rescue('quick links', fn () => $this->quickLinks($user, $approvalCount), []),
+            'announcements' => $this->rescue('announcements', fn () => $this->announcements($user), []),
         ];
+    }
+
+    /** Latest published announcements addressed to this user. */
+    private function announcements(User $user): array
+    {
+        return \App\Models\Administration\Announcement::visibleTo($user)
+            ->orderByDesc('published_at')
+            ->limit(5)
+            ->get(['id', 'title', 'poster_path', 'published_at'])
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'title' => $a->title,
+                'has_poster' => (bool) $a->poster_path,
+                'published_at' => $a->published_at?->toIso8601String(),
+            ])
+            ->all();
     }
 
     private function profile(User $user): array

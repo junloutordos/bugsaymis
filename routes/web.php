@@ -2218,6 +2218,16 @@ Route::get('/verify/issuance/{token}/document', [\App\Http\Controllers\DocumentV
     ->name('issuances.verify.document')
     ->where('token', '[0-9a-f\-]{36}');
 
+Route::get('/verify/coa/{token}', [\App\Http\Controllers\DocumentVerificationController::class, 'showCoa'])
+    ->name('coa.verify')
+    ->middleware('throttle:30,1')
+    ->where('token', '[0-9a-f\-]{36}');
+
+Route::get('/verify/coa/{token}/document', [\App\Http\Controllers\DocumentVerificationController::class, 'coaDocument'])
+    ->name('coa.verify.document')
+    ->middleware('throttle:30,1')
+    ->where('token', '[0-9a-f\-]{36}');
+
 Route::get('/verify/doc/{type}/{id}', [\App\Http\Controllers\DocumentVerificationController::class, 'showDocument'])
     ->name('document.verify.doc')
     ->whereIn('type', ['facility', 'vehicle', 'work-request', 'service', 'gatepass', 'leave', 'messengerial'])
@@ -2287,6 +2297,7 @@ require __DIR__.'/supply.php';
 require __DIR__.'/property.php';
 require __DIR__.'/registrar.php';
 require __DIR__.'/cid.php';
+require __DIR__.'/administration.php';
 require __DIR__.'/science-lab.php';
 require __DIR__.'/discipline.php';
 require __DIR__.'/residence-hall.php';

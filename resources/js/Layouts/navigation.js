@@ -56,6 +56,7 @@ import {
   ArrowUpCircleIcon,
   BugAntIcon,
   PuzzlePieceIcon,
+  MegaphoneIcon,
 } from "@heroicons/vue/24/outline";
 import LighthouseIcon from '@/Components/Icons/LighthouseIcon.vue';
 
@@ -285,7 +286,8 @@ export const menuItems = [
   {
     label: "Administration",
     icon: DocumentTextIcon,
-    permissions: ["issuances.manage", "km.view"],
+    // No group-level permission gate: Announcements is open to every
+    // authenticated user; the other children gate themselves.
     children: [
       {
         label: "Issuances",
@@ -300,6 +302,19 @@ export const menuItems = [
         href: route("km.index"),
         icon: BookOpenIcon,
         permissions: ["km.view"],
+      },
+      {
+        label: "Announcements",
+        routeName: "announcements.index",
+        href: route("announcements.index"),
+        icon: MegaphoneIcon,
+      },
+      {
+        label: "Certificate of Appearance",
+        routeName: "coa.index",
+        href: route("coa.index"),
+        icon: IdentificationIcon,
+        permissions: ["coa.manage"],
       },
     ],
   },
