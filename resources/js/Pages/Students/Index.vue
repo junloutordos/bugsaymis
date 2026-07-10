@@ -86,9 +86,8 @@ const closeView = () => { viewStudent.value = null; showViewModal.value = false 
 // Only show these student fields in the table
 const visibleFields = [
   { label: 'PISAYSYSTEMID', keys: ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id'] },
-  { label: 'Last Name', keys: ['last_name','lastname','lname'] },
-  { label: 'First Name', keys: ['first_name','firstname','fname'] },
-  { label: 'Middle Name', keys: ['middle_name','middlename','mname'] },
+  { label: 'Name', keys: [], type: 'name' },
+  { label: 'Official Email', keys: ['student_email','email'], type: 'email' },
   { label: 'AGE', keys: ['birthday','birthdate','dob'], type: 'age' },
   { label: 'Sex', keys: ['sex','gender'] },
 ]
@@ -98,6 +97,30 @@ const getFieldValue = (student, keys) => {
     if (student && (student[k] !== undefined && student[k] !== null && student[k] !== '')) return student[k]
   }
   return '—'
+}
+
+// LASTNAME, FIRSTNAME M. — same format as the ID card
+const formatName = (student) => {
+  const last = getFieldValue(student, ['lastname','last_name','lname'])
+  const first = getFieldValue(student, ['firstname','first_name','fname'])
+  const middle = getFieldValue(student, ['middlename','middle_name','mname'])
+  const mi = middle !== '—' ? ` ${middle.toString().trim().charAt(0).toUpperCase()}.` : ''
+  if (last === '—' && first === '—') return '—'
+  return `${last === '—' ? '' : last}, ${first === '—' ? '' : first}${mi}`.toUpperCase()
+}
+
+const OFFICIAL_DOMAIN = '@crc.pshs.edu.ph'
+const emailOf = (student) => {
+  const raw = getFieldValue(student, ['student_email','email'])
+  if (raw === '—') return null
+  const email = raw.toString().trim().toLowerCase()
+  // treat junk placeholders as blank
+  if (!email || !email.includes('@') || ['n/a','none','na','-'].includes(email)) return null
+  return email
+}
+const isOfficialEmail = (student) => {
+  const email = emailOf(student)
+  return !!email && email.endsWith(OFFICIAL_DOMAIN)
 }
 
 const getAge = (student, keys) => {
@@ -305,12 +328,13 @@ const confirmCrop = async () => {
           <td class="px-4 py-3 text-sm text-slate-700">{{ student.id }}</td>
           <td v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-sm text-slate-700">
             <span v-if="vf.type === 'age'">{{ getAge(student, vf.keys) }}</span>
-            <span v-else>
-              <span v-if="vf.label === 'Last Name' || vf.label === 'First Name' || vf.label === 'Middle Name'">
-                {{ (getFieldValue(student, vf.keys) ?? '').toString().toUpperCase() }}
-              </span>
-              <span v-else>{{ getFieldValue(student, vf.keys) }}</span>
+            <span v-else-if="vf.type === 'name'" class="font-medium text-slate-800">{{ formatName(student) }}</span>
+            <span v-else-if="vf.type === 'email'">
+              <span v-if="!emailOf(student)" class="text-slate-400">—</span>
+              <span v-else-if="isOfficialEmail(student)">{{ emailOf(student) }}</span>
+              <span v-else class="text-warning-600" title="Not an official @crc.pshs.edu.ph email">{{ emailOf(student) }}</span>
             </span>
+            <span v-else>{{ getFieldValue(student, vf.keys) }}</span>
           </td>
           <td class="px-4 py-3">
             <div class="flex items-center gap-1">
@@ -329,8 +353,9 @@ const confirmCrop = async () => {
             <div class="flex items-start justify-between">
               <div>
                 <div class="text-xs text-slate-500">ID: {{ student.id }}</div>
-                <div class="font-medium text-slate-800 mt-0.5">{{ (getFieldValue(student, ['last_name','lastname','lname']) ?? '').toString().toUpperCase() }}, {{ (getFieldValue(student, ['first_name','firstname','fname']) ?? '').toString().toUpperCase() }}</div>
+                <div class="font-medium text-slate-800 mt-0.5">{{ formatName(student) }}</div>
                 <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ getFieldValue(student, ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id']) }}</div>
+                <div class="text-xs mt-0.5" :class="!emailOf(student) ? 'text-slate-400' : (isOfficialEmail(student) ? 'text-slate-500' : 'text-warning-600')">{{ emailOf(student) ?? 'No email' }}</div>
                 <div class="text-xs text-slate-500">Age: {{ getAge(student, ['birthday','birthdate','dob']) }} · Sex: {{ getFieldValue(student, ['sex','gender']) }}</div>
               </div>
               <div class="flex items-center gap-1">

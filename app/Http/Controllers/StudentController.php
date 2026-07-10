@@ -46,7 +46,8 @@ class StudentController extends Controller
                 'first_name','firstname','fname',
                 'middle_name','middlename','mname',
                 'birthday','birthdate','dob',
-                'sex','gender'
+                'sex','gender',
+                'student_email','email'
             ];
 
             $searchable = array_values(array_intersect($candidates, $cols));
