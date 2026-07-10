@@ -271,6 +271,19 @@ const generateHealthStats = ({ start, end }) => {
 };
 
 // --- Filter Menu by Role ---
+
+// Children render alphabetically, with dashboard entries (any label
+// containing "Dashboard", e.g. "MIS Dashboard") pinned first — several
+// pinned dashboards sort alphabetically among themselves. Applies only to
+// children — the TOP-LEVEL array keeps its curated order (section headers
+// interleave it; sorting would destroy the grouping). navigation.js stays
+// append-friendly: new entries land in the right spot automatically.
+const sortChildren = (items) =>
+  items.sort((a, b) =>
+    (a.label.includes("Dashboard") ? 0 : 1) - (b.label.includes("Dashboard") ? 0 : 1)
+    || a.label.localeCompare(b.label)
+  );
+
 const filterMenuByRole = (items, userRoleNames) =>
   items
     .filter((item) => {
@@ -286,7 +299,7 @@ const filterMenuByRole = (items, userRoleNames) =>
     })
     .map((item) =>
       item.children
-        ? { ...item, icon: item.icon ? markRaw(item.icon) : item.icon, children: filterMenuByRole(item.children, userRoleNames) }
+        ? { ...item, icon: item.icon ? markRaw(item.icon) : item.icon, children: sortChildren(filterMenuByRole(item.children, userRoleNames)) }
         : item
     );
 
