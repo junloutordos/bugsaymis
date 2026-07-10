@@ -25,6 +25,7 @@ class CompetitionController extends Controller
                 'participants.student:id,firstname,lastname,middlename,batch',
                 'schoolYear:id,name',
                 'createdBy:id,name',
+                'itJobRequest:id,itjr_no',
             ])
             ->orderByDesc('date_from')
             ->get()
@@ -74,7 +75,7 @@ class CompetitionController extends Controller
     {
         $data = $this->validateCompetition($request);
 
-        DB::transaction(function () use ($data) {
+        $competition = DB::transaction(function () use ($data) {
             $competition = Competition::create([
                 ...$this->competitionAttributes($data),
                 'school_year_id' => SchoolYear::where('is_current', true)->value('id'),
@@ -82,9 +83,22 @@ class CompetitionController extends Controller
             ]);
 
             $this->syncParticipants($competition, $data, coachId: Auth::id());
+
+            return $competition;
         });
 
-        return back()->with('success', 'Competition record added.');
+        $message = 'Competition record added.';
+
+        // Optional auto-filed ITJR — runs after the competition commits so a
+        // filing failure never rolls back the record itself.
+        if (! empty($data['file_itjr'])) {
+            [$jobRequest, $error] = $this->fileGraphicDesignItjr($competition);
+            $message .= $jobRequest
+                ? " IT Job Request {$jobRequest->itjr_no} filed for Graphic Design."
+                : " However, the Graphic Design ITJR could not be filed: {$error}";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function update(Request $request, Competition $competition): RedirectResponse
@@ -144,6 +158,7 @@ class CompetitionController extends Controller
             'date_to'          => 'nullable|date|after_or_equal:date_from',
             'represents_pshs'  => 'boolean',
             'remarks'          => 'nullable|string|max:1000',
+            'file_itjr'        => 'boolean',
 
             // Employee competitions — employees with their awards
             'employees'            => 'required_if:competition_type,employee|array',
@@ -175,6 +190,70 @@ class CompetitionController extends Controller
             'represents_pshs'  => (bool) ($data['represents_pshs'] ?? false),
             'remarks'          => $data['remarks'] ?? null,
         ];
+    }
+
+    /**
+     * File a Graphic Design ITJR for a freshly created competition via the
+     * shared ITJR creation path (approver resolution, MIS auto-assign,
+     * numbering, notifications).
+     *
+     * @return array{0: ?\App\Models\ITJobRequest, 1: ?string} [jobRequest, error]
+     */
+    private function fileGraphicDesignItjr(Competition $competition): array
+    {
+        $competition->load([
+            'participants.user:id,name',
+            'participants.student:id,firstname,lastname,middlename,batch',
+        ]);
+
+        $lines = [
+            'Requesting a congratulatory graphic (poster / social media card) for the competition below.',
+            '',
+            "Competition: {$competition->title}",
+            "Level: {$competition->level_label}",
+            'Date: ' . $competition->date_from->format('F j, Y')
+                . ($competition->date_to && ! $competition->date_to->equalTo($competition->date_from)
+                    ? ' – ' . $competition->date_to->format('F j, Y') : ''),
+        ];
+
+        if ($competition->organizer) {
+            $lines[] = "Organizer: {$competition->organizer}";
+        }
+        if ($competition->venue) {
+            $lines[] = "Venue: {$competition->venue}";
+        }
+
+        $lines[] = '';
+        $lines[] = 'Participants & Awards:';
+        foreach ($competition->participants->where('role', 'participant') as $p) {
+            $name    = $p->user_id ? $p->user?->name : $p->student?->full_name;
+            $lines[] = '- ' . ($name ?? 'Unknown') . ' — ' . ($p->award ?: 'Participant');
+        }
+
+        $coach = $competition->participants->firstWhere('role', 'coach');
+        if ($coach?->user) {
+            $lines[] = "Coach: {$coach->user->name}";
+        }
+        foreach ($competition->participants->where('role', 'co_coach') as $cc) {
+            if ($cc->user) {
+                $lines[] = "Co-coach: {$cc->user->name}";
+            }
+        }
+
+        try {
+            $jobRequest = app(\App\Http\Controllers\ITJobRequestController::class)->createJobRequest([
+                'category'    => 'Graphic Design',
+                'title'       => 'Graphic design — ' . $competition->title,
+                'description' => implode("\n", $lines),
+                'priority'    => 'normal',
+            ], Auth::user());
+        } catch (\RuntimeException $e) {
+            return [null, $e->getMessage()];
+        }
+
+        $competition->update(['it_job_request_id' => $jobRequest->id]);
+
+        return [$jobRequest, null];
     }
 
     /** Replace all participant rows from the validated payload. */
@@ -231,6 +310,7 @@ class CompetitionController extends Controller
             'remarks'          => $c->remarks,
             'created_by'       => $c->created_by,
             'created_by_name'  => $c->createdBy?->name,
+            'itjr_no'          => $c->itJobRequest?->itjr_no,
             'participants'     => $participants->map(fn ($p) => [
                 'user_id'    => $p->user_id,
                 'student_id' => $p->student_id,

@@ -32,6 +32,7 @@ class Competition extends Model
         'school_year_id',
         'remarks',
         'created_by',
+        'it_job_request_id',
     ];
 
     protected $casts = [
@@ -55,6 +56,11 @@ class Competition extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function itJobRequest(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ITJobRequest::class, 'it_job_request_id');
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

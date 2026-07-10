@@ -84,6 +84,7 @@
                   {{ c.competition_type === 'student' ? 'Student' : 'Employee' }}
                 </AppBadge>
                 <AppBadge v-if="c.represents_pshs" color="amber">PSHS Representation</AppBadge>
+                <AppBadge v-if="c.itjr_no" color="indigo">ITJR {{ c.itjr_no }}</AppBadge>
               </div>
             </td>
             <td class="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
@@ -146,6 +147,7 @@
                 </AppBadge>
                 <AppBadge :color="levelColor(c.level)">{{ c.level_label }}</AppBadge>
                 <AppBadge v-if="c.represents_pshs" color="amber">PSHS</AppBadge>
+                <AppBadge v-if="c.itjr_no" color="indigo">ITJR {{ c.itjr_no }}</AppBadge>
               </div>
               <div>
                 <p v-for="(p, i) in c.participants" :key="i" class="text-sm text-slate-700">
@@ -219,6 +221,13 @@
             class="rounded text-indigo-600 focus:ring-indigo-500" />
           <label for="represents-pshs" class="text-sm text-slate-700">
             This participation represents PSHS
+          </label>
+        </div>
+        <div v-if="!form.id" class="col-span-2 flex items-center gap-2">
+          <input v-model="form.file_itjr" type="checkbox" id="file-itjr"
+            class="rounded text-indigo-600 focus:ring-indigo-500" />
+          <label for="file-itjr" class="text-sm text-slate-700">
+            File an IT Job Request for Graphic Design (congratulatory poster / social media graphic)
           </label>
         </div>
       </div>
@@ -444,6 +453,7 @@ const form = useForm({
   date_from: '',
   date_to: '',
   represents_pshs: false,
+  file_itjr: false,
   remarks: '',
   employees: [{ user_id: null, award: '' }],
   students: [],
