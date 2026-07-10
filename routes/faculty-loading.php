@@ -53,6 +53,11 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::get('/my-load/print', [FacultyLoadController::class, 'printMyLoad'])->name('my-load.print');
             });
 
+        // My Faculty Schedule — everyone's personal calendar, managers included
+        // (managers may not hold view_own, hence the OR).
+        Route::middleware('permission:faculty_loading.view_own|faculty_loading.manage')
+            ->get('/my-schedule', [ClassScheduleController::class, 'mySchedule'])->name('my-schedule');
+
         // ══════════════════════════════════════════════════════════════════════
         // 2. CID/AUH — view all loads + manage schedules, assignments, sections
         // ══════════════════════════════════════════════════════════════════════

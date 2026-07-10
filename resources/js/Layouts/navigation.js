@@ -1424,16 +1424,15 @@ export const menuItems = [
         roles: [],
         permissions: ["faculty_loading.manage"],
       },
-      // Self-mode calendar for faculty (view_own) — same page, pinned to own
-      // schedule; lets them add non-teaching blocks to their free time.
+      // Personal calendar for everyone — faculty AND managers see their own
+      // schedule here; CID-plotted classes are read-only on this page.
       {
-        label: "My Schedule",
-        routeName: "faculty-loading.schedules.index",
-        href: route("faculty-loading.schedules.index"),
+        label: "My Faculty Schedule",
+        routeName: "faculty-loading.my-schedule",
+        href: route("faculty-loading.my-schedule"),
         icon: CalendarDaysIcon,
         roles: [],
-        permissions: ["faculty_loading.view_own"],
-        excludePermissions: ["faculty_loading.manage"],
+        permissions: ["faculty_loading.view_own", "faculty_loading.manage"],
       },
       {
         label: "Faculty List",

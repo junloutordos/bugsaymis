@@ -1,10 +1,9 @@
 <template>
-  <Head title="Class Schedules" />
-  <AdminLayout title="Class Schedules">
+  <Head :title="pageTitle" />
+  <AdminLayout :title="pageTitle">
     <div class="space-y-5">
 
-      <AppPageHeader :title="isSelf ? 'My Schedule' : 'Class Schedules'"
-        :subtitle="isSelf ? 'Your weekly timetable — add non-teaching blocks to your free time' : 'Weekly timetable by section'">
+      <AppPageHeader :title="pageTitle" :subtitle="pageSubtitle">
         <template #actions>
           <template v-if="isManage">
             <AppButton variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
@@ -177,10 +176,21 @@
 
                       <!-- Day columns -->
                       <div v-for="day in WEEKDAYS" :key="day"
-                        v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), dayConfigs[day]]"
-                        class="flex-1 relative border-l border-slate-100 overflow-hidden"
+                        v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), createGhostKey(groupId, day), dayConfigs[day]]"
+                        :class="['flex-1 relative border-l border-slate-100 overflow-hidden',
+                          canQuickCreate(groupId) ? 'cursor-crosshair' : '']"
+                        @mousedown="onColumnMouseDown($event, groupId, day)"
                         @dragover.prevent="onDragOverColumn($event, groupId, day)"
                         @drop.prevent="onDropColumn($event, groupId, day)">
+
+                        <!-- Click/drag-to-create ghost (Google Calendar-style) -->
+                        <div v-if="createDraft && createDraft.groupId === groupId && createDraft.day === day"
+                          :style="createGhostStyle()"
+                          class="absolute inset-x-0.5 rounded-md border-2 border-indigo-400 bg-indigo-100/80 z-20 pointer-events-none flex items-start justify-center px-1 overflow-hidden">
+                          <span class="text-xs font-semibold text-indigo-700 mt-0.5 select-none tabular-nums">
+                            {{ fmtTime(minToTime(createDraft.startMin)) }} – {{ fmtTime(minToTime(createDraft.endMin)) }}
+                          </span>
+                        </div>
 
                         <!-- Drag-and-drop preview -->
                         <div v-if="dropTarget && dropTarget.groupId === groupId && dropTarget.day === day"
@@ -214,6 +224,7 @@
 
                         <!-- Schedule event blocks -->
                         <div v-for="s in (byGroupDay[groupId]?.[day] ?? [])" :key="s.id"
+                          data-evt
                           :style="[eventStyle(s), eventColorStyle(s)]"
                           :draggable="canDrag(s)"
                           :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
@@ -299,6 +310,112 @@
 
     </div>
 
+    <!-- Quick-create popover (Google Calendar-style) -->
+    <div v-if="quickCreate" ref="qcEl"
+      class="fixed z-50 w-[344px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: quickCreate.x + 'px', top: quickCreate.y + 'px' }">
+
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          {{ quickCreate.day }} · {{ fmtTime(qc.start_time) }} – {{ fmtTime(qc.end_time) }}
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeQuickCreate">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+
+      <!-- Entry-type toggle (manage only — faculty always add blocks) -->
+      <div v-if="quickCreate.allowClass" class="px-4 pb-2.5">
+        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs">
+          <button type="button" @click="setQcMode('class')"
+            :class="['px-3 py-1.5 font-medium transition-colors', qc.mode === 'class' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+            Class
+          </button>
+          <button type="button" @click="setQcMode('block')"
+            :class="['px-3 py-1.5 font-medium border-l border-slate-200 transition-colors', qc.mode === 'block' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+            {{ qcBlockLabel }}
+          </button>
+        </div>
+      </div>
+
+      <div class="px-4 space-y-2.5">
+
+        <!-- Pinned context line -->
+        <p v-if="quickCreate.sectionPinned" class="text-xs text-slate-500">
+          Section: <span class="font-medium text-slate-700">{{ sectionLabel(quickCreate.sectionPinned) }}</span>
+        </p>
+
+        <!-- Block (non-teaching / section activity) fields -->
+        <template v-if="qc.mode === 'block'">
+          <input v-model="qc.title" type="text" maxlength="120"
+            :placeholder="viewBy === 'section' ? 'Title — e.g. Quarterly Exam, Assembly' : 'Title — e.g. Consultation Hours'"
+            class="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+          <select v-model="qc.category" @change="runQuickValidate"
+            class="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option value="">Category…</option>
+            <option v-for="c in NON_TEACHING_CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+          </select>
+          <select v-if="isManage && viewBy === 'section'" v-model="qc.faculty_id" @change="runQuickValidate"
+            class="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Section-wide (no faculty)</option>
+            <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </template>
+
+        <!-- Class fields -->
+        <template v-else>
+          <select v-if="!quickCreate.sectionPinned" v-model="qc.section_id" @change="runQuickValidate"
+            class="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Section…</option>
+            <option v-for="sec in sections" :key="sec.id" :value="sec.id">Grade {{ sec.levelid }} — {{ sec.sectionname }}</option>
+          </select>
+          <select v-model="qc.subject_id" @change="runQuickValidate"
+            class="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Subject…</option>
+            <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
+          </select>
+          <select v-model="qc.faculty_id" @change="runQuickValidate"
+            class="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Faculty…</option>
+            <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+          <select v-model="qc.classroom_id" @change="runQuickValidate"
+            class="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Classroom…</option>
+            <option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }} ({{ c.code }})</option>
+          </select>
+        </template>
+
+        <!-- Time range -->
+        <div class="flex items-center gap-2">
+          <input v-model="qc.start_time" type="time"
+            class="flex-1 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+          <span class="text-slate-400 text-sm">–</span>
+          <input v-model="qc.end_time" type="time"
+            class="flex-1 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+
+        <!-- Live conflict feedback -->
+        <div v-if="qcValidation?.errors?.length || qcValidation?.warnings?.length" class="space-y-1">
+          <p v-for="err in qcValidation.errors ?? []" :key="err"
+            class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-2.5 py-1.5 text-xs flex items-start gap-1.5">
+            <ExclamationCircleIcon class="h-3.5 w-3.5 shrink-0 mt-px" /> {{ err }}
+          </p>
+          <p v-for="w in qcValidation.warnings ?? []" :key="w"
+            class="bg-warning-50 border border-warning-100 text-warning-700 rounded-lg px-2.5 py-1.5 text-xs flex items-start gap-1.5">
+            <ExclamationTriangleIcon class="h-3.5 w-3.5 shrink-0 mt-px" /> {{ w }}
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between px-4 py-3">
+        <button type="button" class="text-sm text-indigo-600 hover:underline font-medium" @click="qcMoreOptions">
+          More options
+        </button>
+        <AppButton size="sm" :loading="qc.saving" :disabled="!qcCanSave" @click="saveQuickCreate">Save</AppButton>
+      </div>
+    </div>
+
     <!-- Schedule Form Modal -->
     <AppModal :show="modal" :title="modalTitle" size="lg"
       body-class="px-6 py-4 space-y-4" @close="modal = false">
@@ -374,14 +491,6 @@
             <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
           </select>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">School Year *</label>
-          <select v-model="form.school_year_id"
-            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option :value="null">Select school year...</option>
-            <option v-for="t in terms" :key="'sy-' + t.id" :value="t.id">{{ t.label }}</option>
-          </select>
-        </div>
         <AppSelect v-model="form.day_of_week" label="Day" required placeholder="Select day...">
           <option v-for="d in WEEKDAYS" :key="d" :value="d">{{ d }}</option>
         </AppSelect>
@@ -428,7 +537,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -444,7 +553,7 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
   CalendarIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-  LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon, TrashIcon,
+  LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────
@@ -487,12 +596,23 @@ const props = defineProps({
   dayConfigs:  { type: Object, default: () => ({}) },
   unplacedLoads: { type: Array, default: () => [] },
   capability:  { type: Object, default: () => ({ level: 'manage' }) },
+  pageMode:    { type: String, default: 'admin' }, // 'admin' | 'my'
 })
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
 
 const isManage = computed(() => props.capability.level === 'manage')
 const isSelf   = computed(() => props.capability.level === 'self')
+const isMyPage = computed(() => props.pageMode === 'my')
+
+const pageTitle = computed(() =>
+  isMyPage.value ? 'My Faculty Schedule' : (isSelf.value ? 'My Schedule' : 'Class Schedules'))
+const pageSubtitle = computed(() =>
+  isMyPage.value
+    ? 'Your weekly timetable — plotted classes are view-only; click a free slot to add your own blocks'
+    : (isSelf.value
+        ? 'Your weekly timetable — add non-teaching blocks to your free time'
+        : 'Weekly timetable by section — click any empty slot to add'))
 
 const NON_TEACHING_CATEGORIES = [
   { value: 'consultation', label: 'Consultation Hours' },
@@ -500,6 +620,14 @@ const NON_TEACHING_CATEGORIES = [
   { value: 'advising',     label: 'Student Advising' },
   { value: 'office_hours', label: 'Office Hours' },
   { value: 'meeting',      label: 'Meeting' },
+  // Section-activity vocabulary — non-class entries plotted on a section's
+  // calendar (usually section-wide, i.e. no faculty).
+  { value: 'exam',         label: 'Exam' },
+  { value: 'assembly',     label: 'Assembly' },
+  { value: 'homeroom',     label: 'Homeroom' },
+  { value: 'club_org',     label: 'Club / Org Time' },
+  { value: 'event',        label: 'School Event' },
+  { value: 'activity',     label: 'Activity' },
   { value: 'other',        label: 'Other' },
 ]
 
@@ -512,7 +640,8 @@ const filters = reactive({
 })
 
 function applyFilters() {
-  router.get(route('faculty-loading.schedules.index'), filters, { preserveState: true })
+  const target = isMyPage.value ? 'faculty-loading.my-schedule' : 'faculty-loading.schedules.index'
+  router.get(route(target), filters, { preserveState: true })
 }
 
 // ── View mode (group calendar cards by section or by faculty) ────────────────
@@ -1071,6 +1200,295 @@ async function commitMove(schedule, day, startTime, endTime) {
   }
 }
 
+// ── Click/drag-to-create (Google Calendar-style) ─────────────────────────────
+//
+// Mousedown on an empty slot anchors a ghost event (15-min snap); dragging
+// vertically stretches it; a plain click defaults to one hour. Releasing opens
+// a quick-create popover (Save / More options), Esc or click-away cancels.
+
+const CREATE_SNAP_MIN    = 15
+const DEFAULT_CREATE_MIN = 60
+
+const createDraft = ref(null) // { groupId, day, rect, anchorMin, startMin, endMin, moved, startClientY }
+const quickCreate = ref(null) // { x, y, groupId, day, allowClass, sectionPinned, facultyPinned }
+const qcEl        = ref(null)
+const qcValidation = ref(null)
+const qc = reactive({
+  mode: 'class', // 'class' | 'block' (block = non-teaching / section activity)
+  title: '', category: '',
+  subject_id: null, faculty_id: null, section_id: null, classroom_id: null,
+  start_time: '', end_time: '',
+  saving: false,
+})
+
+// Swallows the column-mousedown that immediately follows a click-away close,
+// so dismissing the popover doesn't instantly start a new ghost.
+let suppressCreateOnce = false
+
+function canQuickCreate(groupId) {
+  if (viewBy.value === 'grade') return false
+  if (isManage.value) return true
+  // unit/self reach: own-calendar columns only (props.faculty is already
+  // server-filtered to the reachable set). Section-wide adds are manage-only.
+  return viewBy.value === 'faculty' && props.faculty.some(f => String(f.id) === String(groupId))
+}
+
+function snapMin(min) {
+  return Math.round(min / CREATE_SNAP_MIN) * CREATE_SNAP_MIN
+}
+
+function columnMinAt(clientY, rect) {
+  const raw = CAL_START + (clientY - rect.top) / SCALE
+  return Math.max(CAL_START, Math.min(CAL_END, snapMin(raw)))
+}
+
+function onColumnMouseDown(e, groupId, day) {
+  if (e.button !== 0 || suppressCreateOnce) return
+  if (quickCreate.value) { closeQuickCreate(); return }
+  if (dragPayload.value || dragBusy.value) return
+  if (!canQuickCreate(groupId)) return
+  if (e.target.closest('[data-evt]')) return // clicking an event edits it instead
+
+  e.preventDefault() // no text selection while stretching the ghost
+  const rect   = e.currentTarget.getBoundingClientRect()
+  const anchor = Math.min(columnMinAt(e.clientY, rect), CAL_END - CREATE_SNAP_MIN)
+  createDraft.value = {
+    groupId, day, rect,
+    anchorMin: anchor,
+    startMin:  anchor,
+    endMin:    anchor + CREATE_SNAP_MIN,
+    moved: false,
+    startClientY: e.clientY,
+  }
+  window.addEventListener('mousemove', onCreateDragMove)
+  window.addEventListener('mouseup', onCreateDragEnd)
+}
+
+function onCreateDragMove(e) {
+  const d = createDraft.value
+  if (!d) return
+  if (!d.moved && Math.abs(e.clientY - d.startClientY) > 6) d.moved = true
+  if (!d.moved) return
+  const cur = columnMinAt(e.clientY, d.rect)
+  if (cur >= d.anchorMin) {
+    d.startMin = d.anchorMin
+    d.endMin   = Math.max(cur, d.anchorMin + CREATE_SNAP_MIN)
+  } else {
+    d.startMin = Math.min(cur, d.anchorMin - CREATE_SNAP_MIN)
+    d.endMin   = d.anchorMin
+  }
+}
+
+function onCreateDragEnd(e) {
+  window.removeEventListener('mousemove', onCreateDragMove)
+  window.removeEventListener('mouseup', onCreateDragEnd)
+  const d = createDraft.value
+  if (!d) return
+  if (!d.moved) {
+    // Plain click — default one hour, clamped to the calendar bottom.
+    d.endMin   = Math.min(d.anchorMin + DEFAULT_CREATE_MIN, CAL_END)
+    d.startMin = Math.min(d.anchorMin, d.endMin - CREATE_SNAP_MIN)
+  }
+  openQuickCreate(e, d)
+}
+
+/** Per-column memo key for v-memo — only the column holding the ghost re-renders. */
+function createGhostKey(groupId, day) {
+  const d = createDraft.value
+  if (!d || d.groupId !== groupId || d.day !== day) return 'none'
+  return `${d.startMin}-${d.endMin}`
+}
+
+function createGhostStyle() {
+  const d = createDraft.value
+  if (!d) return {}
+  return {
+    top:    ((d.startMin - CAL_START) * SCALE) + 'px',
+    height: (Math.max(d.endMin - d.startMin, CREATE_SNAP_MIN) * SCALE) + 'px',
+  }
+}
+
+function openQuickCreate(e, d) {
+  const allowClass    = isManage.value
+  const sectionPinned = viewBy.value === 'section' ? Number(d.groupId) : null
+  const facultyPinned = viewBy.value === 'faculty' && String(d.groupId) !== 'tba' ? Number(d.groupId) : null
+
+  Object.assign(qc, {
+    mode: allowClass ? 'class' : 'block',
+    title: '', category: '',
+    subject_id:   null,
+    faculty_id:   facultyPinned,
+    section_id:   sectionPinned,
+    classroom_id: null,
+    start_time:   minToTime(d.startMin),
+    end_time:     minToTime(d.endMin),
+    saving: false,
+  })
+  qcValidation.value = null
+
+  const W = 344, H = 460
+  quickCreate.value = {
+    x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
+    y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
+    groupId: d.groupId, day: d.day,
+    allowClass, sectionPinned, facultyPinned,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownQc, true)
+  window.addEventListener('keydown', onQcKeydown)
+  nextTick(runQuickValidate)
+}
+
+const qcBlockLabel = computed(() =>
+  viewBy.value === 'section' ? 'Section Activity' : 'Non-teaching')
+
+function setQcMode(mode) {
+  qc.mode = mode
+  qc.faculty_id = mode === 'block' && viewBy.value === 'section'
+    ? null // section-wide by default; assignable in the form below
+    : (quickCreate.value?.facultyPinned ?? qc.faculty_id)
+  runQuickValidate()
+}
+
+function closeQuickCreate() {
+  quickCreate.value  = null
+  createDraft.value  = null
+  qcValidation.value = null
+  clearTimeout(qcValidateTimer)
+  window.removeEventListener('mousedown', onWindowMouseDownQc, true)
+  window.removeEventListener('keydown', onQcKeydown)
+}
+
+function onWindowMouseDownQc(e) {
+  if (qcEl.value && qcEl.value.contains(e.target)) return
+  closeQuickCreate()
+  suppressCreateOnce = true
+  setTimeout(() => { suppressCreateOnce = false }, 0)
+}
+
+function onQcKeydown(e) {
+  if (e.key === 'Escape') closeQuickCreate()
+}
+
+// Ghost tracks manual time edits in the popover.
+watch(() => [qc.start_time, qc.end_time], () => {
+  if (!quickCreate.value || !createDraft.value) return
+  const s = qc.start_time ? timeToMin(qc.start_time) : null
+  const en = qc.end_time  ? timeToMin(qc.end_time)  : null
+  if (s !== null && en !== null && en > s) {
+    createDraft.value.startMin = s
+    createDraft.value.endMin   = en
+  }
+  runQuickValidate()
+})
+
+let qcValidateTimer = null
+function runQuickValidate() {
+  if (!quickCreate.value) return
+  clearTimeout(qcValidateTimer)
+  qcValidateTimer = setTimeout(async () => {
+    if (!quickCreate.value || !filters.term_id || !qc.start_time || !qc.end_time) return
+    const entryType = qc.mode === 'class' ? 'class' : 'non_teaching'
+    if (entryType === 'class' && !qc.faculty_id) { qcValidation.value = null; return }
+    if (entryType === 'non_teaching' && !qc.faculty_id && !qc.section_id) { qcValidation.value = null; return }
+    try {
+      const { data } = await axios.post(route('faculty-loading.schedules.validate'), {
+        entry_type:       entryType,
+        faculty_id:       qc.faculty_id,
+        subject_id:       qc.subject_id   ?? 0,
+        section_id:       qc.section_id   ?? 0,
+        classroom_id:     qc.classroom_id ?? 0,
+        academic_term_id: filters.term_id,
+        day_of_week:      quickCreate.value.day,
+        start_time:       qc.start_time,
+        end_time:         qc.end_time,
+        exclude_id:       null,
+      })
+      qcValidation.value = data
+    } catch { /* validation display is best-effort; store() re-validates */ }
+  }, 250)
+}
+
+const qcCanSave = computed(() => {
+  if (!quickCreate.value || qc.saving) return false
+  if (qcValidation.value?.errors?.length) return false
+  if (!qc.start_time || !qc.end_time || qc.end_time <= qc.start_time) return false
+  if (qc.mode === 'class') {
+    return !!(qc.subject_id && qc.faculty_id && qc.section_id && qc.classroom_id)
+  }
+  return !!qc.title.trim() && !!(qc.faculty_id || qc.section_id)
+})
+
+function saveQuickCreate() {
+  if (!qcCanSave.value) return
+  qc.saving = true
+  const base = {
+    faculty_id:       qc.faculty_id,
+    section_id:       qc.section_id,
+    classroom_id:     qc.classroom_id,
+    school_year_id:   schoolYearIdForTerm(filters.term_id),
+    academic_term_id: filters.term_id,
+    day_of_week:      quickCreate.value.day,
+    start_time:       qc.start_time,
+    end_time:         qc.end_time,
+    status:           'active',
+    remarks:          '',
+  }
+  const payload = qc.mode === 'class'
+    ? { ...base, subject_id: qc.subject_id, force: true }
+    : { ...base, entry_type: 'non_teaching', title: qc.title.trim(), category: qc.category || null }
+
+  router.post(route('faculty-loading.schedules.store'), payload, {
+    preserveScroll: true,
+    onSuccess: () => closeQuickCreate(),
+    onError:   (errors) => {
+      qcValidation.value = { errors: Object.values(errors).flat(), warnings: [] }
+    },
+    onFinish: () => { qc.saving = false },
+  })
+}
+
+/** Hand the popover state to the full modal for the long-form fields. */
+function qcMoreOptions() {
+  const d = quickCreate.value
+  validationResult.value = null
+  form.reset()
+  Object.assign(form, {
+    id: null,
+    entry_type:         qc.mode === 'class' ? 'class' : 'non_teaching',
+    title:              qc.title,
+    category:           qc.category,
+    load_assignment_id: null,
+    faculty_id:         qc.faculty_id,
+    subject_id:         qc.subject_id,
+    section_id:         qc.section_id,
+    classroom_id:       qc.classroom_id,
+    school_year_id:     schoolYearIdForTerm(filters.term_id),
+    academic_term_id:   filters.term_id,
+    day_of_week:        d.day,
+    start_time:         qc.start_time,
+    end_time:           qc.end_time,
+    status:             'active',
+    remarks:            '',
+    force:              false,
+  })
+  closeQuickCreate()
+  modal.value = true
+  checkConflicts()
+}
+
+function sectionLabel(id) {
+  const s = props.sections.find(x => String(x.id) === String(id))
+  return s ? `Grade ${s.levelid} — ${s.sectionname}` : `Section ${id}`
+}
+
+onBeforeUnmount(() => {
+  window.removeEventListener('mousemove', onCreateDragMove)
+  window.removeEventListener('mouseup', onCreateDragEnd)
+  window.removeEventListener('mousedown', onWindowMouseDownQc, true)
+  window.removeEventListener('keydown', onQcKeydown)
+  clearTimeout(qcValidateTimer)
+})
+
 /** Open the edit modal prefilled from a dragged "unplaced subjects" tray chip. */
 function openPlaceForm(load, day, startTime, endTime) {
   validationResult.value = null
@@ -1129,6 +1547,13 @@ const form = useForm({
   load_assignment_id: null, faculty_id: null, subject_id: null, section_id: null, classroom_id: null,
   school_year_id: null, academic_term_id: null, day_of_week: '',
   start_time: '', end_time: '', status: 'active', remarks: '', force: false,
+})
+
+// School year is fully derivable from the term — the old visible dropdown was
+// bound to term ids (a different id-space than school_years) and submitted
+// wrong values when touched. Now auto-derived, no user-facing field.
+watch(() => form.academic_term_id, (termId) => {
+  form.school_year_id = schoolYearIdForTerm(termId)
 })
 
 const modalTitle = computed(() => {

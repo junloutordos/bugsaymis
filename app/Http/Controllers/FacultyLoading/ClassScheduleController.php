@@ -85,8 +85,27 @@ class ClassScheduleController extends Controller
 
     public function index(Request $request): Response
     {
-        $cap = $this->scheduleCapability();
+        return $this->renderCalendar($request, $this->scheduleCapability(), 'admin');
+    }
 
+    /**
+     * My Faculty Schedule — the same calendar pinned to the signed-in user's
+     * own schedule for EVERYONE, including managers. Capability is forced to
+     * self, so mapSchedule() marks CID-plotted teaching rows can_edit=false
+     * and the page is personal-view-only by construction. Mutations still go
+     * through store/update/destroy, which re-resolve the real capability.
+     */
+    public function mySchedule(Request $request): Response
+    {
+        return $this->renderCalendar(
+            $request,
+            ['level' => 'self', 'faculty_ids' => [(int) Auth::id()]],
+            'my',
+        );
+    }
+
+    private function renderCalendar(Request $request, array $cap, string $pageMode): Response
+    {
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId      = $request->input('term_id', $currentTerm?->id);
         $sectionId   = $request->input('section_id');
@@ -181,6 +200,7 @@ class ClassScheduleController extends Controller
             'dayConfigs'    => $dayConfigs,
             'unplacedLoads' => $unplacedLoads,
             'capability'    => ['level' => $cap['level']],
+            'pageMode'      => $pageMode,
         ]);
     }
 
