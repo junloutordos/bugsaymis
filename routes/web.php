@@ -1094,6 +1094,14 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/performance-management/committees/{committee}/members/{member}/accomplishment', [\App\Http\Controllers\CommitteePerformanceController::class, 'saveMemberAccomplishment'])->name('pm-committees.member-accomplishment');
     Route::post('/performance-management/committees/{committee}/members/{member}/rate', [\App\Http\Controllers\CommitteePerformanceController::class, 'rateMember'])->name('pm-committees.rate-member');
 
+    // Committee task board (shared by the PM and Faculty Loading committee pages)
+    Route::post('/committees/{committee}/tasks', [\App\Http\Controllers\CommitteeTaskController::class, 'store'])->name('committee-tasks.store');
+    Route::put('/committees/{committee}/tasks/reorder', [\App\Http\Controllers\CommitteeTaskController::class, 'reorder'])->name('committee-tasks.reorder');
+    Route::put('/committee-tasks/{task}', [\App\Http\Controllers\CommitteeTaskController::class, 'update'])->name('committee-tasks.update');
+    Route::put('/committee-tasks/{task}/status', [\App\Http\Controllers\CommitteeTaskController::class, 'updateStatus'])->name('committee-tasks.status');
+    Route::post('/committee-tasks/{task}/updates', [\App\Http\Controllers\CommitteeTaskController::class, 'storeUpdate'])->name('committee-tasks.updates.store');
+    Route::delete('/committee-tasks/{task}', [\App\Http\Controllers\CommitteeTaskController::class, 'destroy'])->name('committee-tasks.destroy');
+
     Route::get('/performance-management/special-assignments', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'index'])->name('pm-special-assignments.index');
     Route::post('/performance-management/special-assignments', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'store'])->name('pm-special-assignments.store');
     Route::put('/performance-management/special-assignments/{specialAssignment}', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'update'])->name('pm-special-assignments.update');

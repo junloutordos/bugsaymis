@@ -11,7 +11,9 @@ import AppModal from '@/Components/AppModal.vue'
 import AppInput from '@/Components/AppInput.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
-import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
+import AppTabs from '@/Components/AppTabs.vue'
+import TaskBoard from '@/Components/Committee/TaskBoard.vue'
+import { ArrowLeftIcon, ClipboardDocumentListIcon, StarIcon } from '@heroicons/vue/24/outline'
 import { ipcrAdjectivalRating } from '@/Composables/ipcrAdjectivalRating'
 import { useSubmit } from '@/Composables/useSubmit'
 import Swal from 'sweetalert2'
@@ -24,7 +26,19 @@ const props = defineProps({
   authUser:       Object,
   isChairperson:  Boolean,
   canManage:      Boolean,
+  tasks:            { type: Array, default: () => [] },
+  boardMembers:     { type: Array, default: () => [] },
+  ratingPeriods:    { type: Array, default: () => [] },
+  selectedPeriodId: { type: Number, default: null },
+  canManageBoard:   { type: Boolean, default: false },
 })
+
+const activeTab = ref('board')
+const boardTabs = [
+  { key: 'board',   label: 'Task Board',                icon: ClipboardDocumentListIcon },
+  { key: 'ratings', label: 'Accomplishments & Ratings', icon: StarIcon },
+]
+const boardPlans = computed(() => (props.planMemberData ?? []).map(e => ({ id: e.plan.id, success_indicator: e.plan.success_indicator })))
 
 const { isSubmitting, submit } = useSubmit()
 
@@ -32,7 +46,15 @@ const { isSubmitting, submit } = useSubmit()
 function switchTerm(termId) {
   router.get(
     route('faculty-loading.committee-assignments.show', props.committee.id),
-    { term_id: termId },
+    { term_id: termId, rating_period_id: props.selectedPeriodId ?? undefined },
+    { preserveState: false }
+  )
+}
+
+function switchPeriod(periodId) {
+  router.get(
+    route('faculty-loading.committee-assignments.show', props.committee.id),
+    { term_id: props.selectedTermId, rating_period_id: periodId || undefined },
     { preserveState: false }
   )
 }
@@ -99,7 +121,7 @@ function submitModal() {
   if (entry.canRate) {
     submit.post(
       route('faculty-loading.committee-assignments.rate', entry.member.assignment_id),
-      { ...editForm.value },
+      { ...editForm.value, rating_period_id: props.selectedPeriodId },
       { onSuccess, onError }
     )
   } else {
@@ -107,12 +129,27 @@ function submitModal() {
       route('faculty-loading.committee-assignments.accomplishment', entry.member.assignment_id),
       {
         work_distribution_plan_id: editForm.value.work_distribution_plan_id,
+        rating_period_id:          props.selectedPeriodId,
         accomplishment:            editForm.value.accomplishment,
         mov_link:                  editForm.value.mov_link,
       },
       { onSuccess, onError }
     )
   }
+}
+
+// monday-style rollup: pull the member's Done tasks (current period) into the
+// accomplishment text as evidence lines.
+const doneTasksFor = (userId) => props.tasks.filter(t =>
+  t.status === 'done' && (t.assignees ?? []).some(a => a.id === userId)
+)
+function compileDoneTasks() {
+  const member = modalEntry.value?.member
+  if (!member) return
+  const lines = doneTasksFor(member.user_id).map(t => `• ${t.title}`)
+  if (!lines.length) return
+  const existing = editForm.value.accomplishment?.trim()
+  editForm.value.accomplishment = (existing ? existing + '\n' : '') + lines.join('\n')
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -180,8 +217,8 @@ const selectedTerm = computed(() => props.terms.find(t => t.id === props.selecte
         </div>
       </AppCard>
 
-      <!-- Term selector -->
-      <div class="flex items-center gap-3">
+      <!-- Term + rating period selectors -->
+      <div class="flex flex-wrap items-center gap-3">
         <span class="text-sm font-medium text-slate-600">Term:</span>
         <div class="w-64">
           <AppSelect :model-value="selectedTermId" :show-blank="false"
@@ -191,7 +228,34 @@ const selectedTerm = computed(() => props.terms.find(t => t.id === props.selecte
             </option>
           </AppSelect>
         </div>
+        <span class="text-sm font-medium text-slate-600">Rating Period:</span>
+        <div class="w-64">
+          <AppSelect :model-value="selectedPeriodId ? String(selectedPeriodId) : ''"
+            @update:model-value="v => switchPeriod(v ? Number(v) : null)">
+            <option value="">All periods (legacy)</option>
+            <option v-for="p in ratingPeriods" :key="p.id" :value="String(p.id)">
+              {{ p.label }}{{ p.is_current ? ' (current)' : '' }}
+            </option>
+          </AppSelect>
+        </div>
       </div>
+
+      <AppTabs v-model="activeTab" :tabs="boardTabs">
+        <template #tab-board>
+          <TaskBoard
+            :committee="committee"
+            :tasks="tasks"
+            :board-members="boardMembers"
+            :rating-periods="ratingPeriods"
+            :selected-period-id="selectedPeriodId"
+            :can-manage-board="canManageBoard"
+            :current-user-id="authUser.id"
+            :plans="boardPlans"
+          />
+        </template>
+
+        <template #tab-ratings>
+          <div class="space-y-5">
 
       <!-- No tagged plans -->
       <AppCard v-if="!planMemberData?.length">
@@ -283,6 +347,9 @@ const selectedTerm = computed(() => props.terms.find(t => t.id === props.selecte
           </template>
         </AppTable>
       </AppCard>
+          </div>
+        </template>
+      </AppTabs>
     </div>
 
     <!-- Edit / Rate Modal -->
@@ -291,6 +358,11 @@ const selectedTerm = computed(() => props.terms.find(t => t.id === props.selecte
       :subtitle="committee.name" size="lg" @close="closeModal">
       <form @submit.prevent="submitModal" class="space-y-4">
         <AppTextarea v-model="editForm.accomplishment" label="Accomplishment" :rows="3" />
+        <button v-if="modalEntry && doneTasksFor(modalEntry.member.user_id).length" type="button"
+          class="text-xs text-indigo-600 hover:underline -mt-2"
+          @click="compileDoneTasks">
+          + Compile {{ doneTasksFor(modalEntry.member.user_id).length }} done task(s) from the board into the accomplishment
+        </button>
         <AppInput v-model="editForm.mov_link" type="url" label="MOV Link" placeholder="https://…" />
 
         <!-- Rating inputs (chairperson / admin only) -->

@@ -8,8 +8,10 @@ import AppBadge from "@/Components/AppBadge.vue"
 import AppInput from "@/Components/AppInput.vue"
 import AppTextarea from "@/Components/AppTextarea.vue"
 import AppModal from "@/Components/AppModal.vue"
+import AppTabs from "@/Components/AppTabs.vue"
 import EmptyState from "@/Components/EmptyState.vue"
-import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
+import TaskBoard from "@/Components/Committee/TaskBoard.vue"
+import { ArrowLeftIcon, ClipboardDocumentListIcon, StarIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 import { useSubmit } from "@/Composables/useSubmit"
@@ -20,7 +22,19 @@ const props = defineProps({
   authUser: Object,
   isHead: Boolean,
   canManage: Boolean,
+  tasks: { type: Array, default: () => [] },
+  boardMembers: { type: Array, default: () => [] },
+  ratingPeriods: { type: Array, default: () => [] },
+  selectedPeriodId: { type: Number, default: null },
+  canManageBoard: { type: Boolean, default: false },
 })
+
+const activeTab = ref("board")
+const boardTabs = [
+  { key: "board",   label: "Task Board",                icon: ClipboardDocumentListIcon },
+  { key: "ratings", label: "Accomplishments & Ratings", icon: StarIcon },
+]
+const boardPlans = computed(() => (props.planMemberData ?? []).map(e => ({ id: e.plan.id, success_indicator: e.plan.success_indicator })))
 
 const { isSubmitting, submit } = useSubmit()
 
@@ -92,6 +106,20 @@ const submitEdit = () => {
 
 const adjectival = ipcrAdjectivalRating
 
+// monday-style rollup: pull the member's Done board tasks into the
+// accomplishment text as evidence lines.
+const doneTasksFor = (userId) => props.tasks.filter(t =>
+  t.status === "done" && (t.assignees ?? []).some(a => a.id === userId)
+)
+const compileDoneTasks = () => {
+  const member = modalEntry.value?.member
+  if (!member) return
+  const lines = doneTasksFor(member.user_id).map(t => `• ${t.title}`)
+  if (!lines.length) return
+  const existing = editForm.value.accomplishment?.trim()
+  editForm.value.accomplishment = (existing ? existing + "\n" : "") + lines.join("\n")
+}
+
 const computeAvg = (q, e, t) => {
   const vals = [q, e, t].filter(v => v !== null && v !== "" && !isNaN(v)).map(Number)
   if (!vals.length) return null
@@ -142,6 +170,23 @@ const statusColor = (status) => {
           </div>
         </div>
       </AppCard>
+
+      <AppTabs v-model="activeTab" :tabs="boardTabs">
+        <template #tab-board>
+          <TaskBoard
+            :committee="committee"
+            :tasks="tasks"
+            :board-members="boardMembers"
+            :rating-periods="ratingPeriods"
+            :selected-period-id="selectedPeriodId"
+            :can-manage-board="canManageBoard"
+            :current-user-id="authUser.id"
+            :plans="boardPlans"
+          />
+        </template>
+
+        <template #tab-ratings>
+          <div class="space-y-5">
 
       <!-- No tagged plans -->
       <AppCard v-if="!planMemberData?.length">
@@ -231,6 +276,9 @@ const statusColor = (status) => {
               </template>
         </AppTable>
       </AppCard>
+          </div>
+        </template>
+      </AppTabs>
     </div>
 
     <!-- Edit / Rate Modal -->
@@ -241,6 +289,11 @@ const statusColor = (status) => {
         <AppTextarea
           v-model="editForm.accomplishment" label="Accomplishment" :rows="3"
           :readonly="!modalEntry?.isOwn && !modalEntry?.canRate" />
+        <button v-if="modalEntry && (modalEntry.isOwn || modalEntry.canRate) && doneTasksFor(modalEntry.member.user_id).length" type="button"
+          class="text-xs text-indigo-600 hover:underline -mt-2 block"
+          @click="compileDoneTasks">
+          + Compile {{ doneTasksFor(modalEntry.member.user_id).length }} done task(s) from the board into the accomplishment
+        </button>
         <AppInput
           v-model="editForm.mov_link" type="url" label="MOV Link" placeholder="https://..."
           :readonly="!modalEntry?.isOwn && !modalEntry?.canRate" />

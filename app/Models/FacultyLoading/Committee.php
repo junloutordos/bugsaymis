@@ -78,6 +78,11 @@ class Committee extends Model
         return $this->hasMany(Committee::class, 'parent_committee_id');
     }
 
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(\App\Models\CommitteeTask::class, 'committee_id');
+    }
+
     // ── Scopes ─────────────────────────────────────────────────────────────────
 
     public function scopeActive($query)

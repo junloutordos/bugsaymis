@@ -13,6 +13,7 @@ class FacultyCommitteeAccomplishment extends Model
     protected $fillable = [
         'faculty_committee_assignment_id',
         'work_distribution_plan_id',
+        'rating_period_id',
         'accomplishment',
         'mov_link',
         'sup_quality',
@@ -36,5 +37,10 @@ class FacultyCommitteeAccomplishment extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(WorkDistributionPlan::class, 'work_distribution_plan_id');
+    }
+
+    public function period(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\IPCRRatingPeriod::class, 'rating_period_id');
     }
 }

@@ -48,6 +48,11 @@ class Committee extends Model
         return $this->hasMany(Committee::class, 'parent_committee_id');
     }
 
+    public function tasks()
+    {
+        return $this->hasMany(CommitteeTask::class);
+    }
+
     public function isSubCommittee(): bool
     {
         return $this->parent_committee_id !== null;

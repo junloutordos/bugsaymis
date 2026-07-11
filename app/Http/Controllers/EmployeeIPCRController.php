@@ -389,10 +389,19 @@ class EmployeeIPCRController extends Controller
             ->whereNotNull('committee_id')
             ->get();
 
+        // Only pull rows for THIS IPCR's rating period (legacy NULL-period
+        // rows still count, but a period-matching row wins per plan).
+        $ipcrPeriodId = $employeeIPCR->rating_period_id;
+
         $updated = 0;
         foreach ($assignments as $assignment) {
-            foreach ($assignment->accomplishments as $acc) {
-                if (! $ipcrPlanIds->contains($acc->work_distribution_plan_id)) {
+            $accs = $assignment->accomplishments
+                ->filter(fn ($a) => $a->rating_period_id === null || $a->rating_period_id == $ipcrPeriodId)
+                ->groupBy('work_distribution_plan_id')
+                ->map(fn ($group) => $group->firstWhere('rating_period_id', $ipcrPeriodId) ?? $group->firstWhere('rating_period_id', null));
+
+            foreach ($accs as $acc) {
+                if (! $acc || ! $ipcrPlanIds->contains($acc->work_distribution_plan_id)) {
                     continue;
                 }
 

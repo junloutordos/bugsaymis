@@ -58,6 +58,17 @@ Route::middleware(['web', 'auth', 'verified'])
         Route::middleware('permission:faculty_loading.view_own|faculty_loading.manage')
             ->get('/my-schedule', [ClassScheduleController::class, 'mySchedule'])->name('my-schedule');
 
+        // Committee detail + task board + accomplishments/ratings — open to
+        // chairpersons and members, not only admins; the controller enforces
+        // the actor (membership gate in show(), owner check in
+        // saveAccomplishment, hierarchical chair gate in rateAssignment).
+        Route::middleware('permission:faculty_loading.view_own|faculty_loading.manage')
+            ->prefix('committee-assignments')->name('committee-assignments.')->group(function () {
+                Route::get('/committee/{committee}',                 [CommitteeAssignmentController::class, 'show'])->name('show');
+                Route::post('/{committeeAssignment}/accomplishment', [CommitteeAssignmentController::class, 'saveAccomplishment'])->name('accomplishment');
+                Route::post('/{committeeAssignment}/rate',           [CommitteeAssignmentController::class, 'rateAssignment'])->name('rate');
+            });
+
         // ══════════════════════════════════════════════════════════════════════
         // 2. CID/AUH — view all loads + manage schedules, assignments, sections
         // ══════════════════════════════════════════════════════════════════════
@@ -134,16 +145,14 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::delete('/{researchAdvisory}',    [ResearchAdvisoryController::class, 'destroy'])->name('destroy');
                 });
 
-                // Committee Assignments
+                // Committee Assignments (admin CRUD; member-facing routes are
+                // registered below outside the manage group)
                 Route::prefix('committee-assignments')->name('committee-assignments.')->group(function () {
                     Route::get('/',                                         [CommitteeAssignmentController::class, 'index'])->name('index');
                     Route::get('/compliance',                               [CommitteeAssignmentController::class, 'compliance'])->name('compliance');
-                    Route::get('/committee/{committee}',                    [CommitteeAssignmentController::class, 'show'])->name('show');
                     Route::post('/',                                        [CommitteeAssignmentController::class, 'store'])->name('store');
                     Route::put('/{committeeAssignment}',                    [CommitteeAssignmentController::class, 'update'])->name('update');
                     Route::delete('/{committeeAssignment}',                 [CommitteeAssignmentController::class, 'destroy'])->name('destroy');
-                    Route::post('/{committeeAssignment}/accomplishment',    [CommitteeAssignmentController::class, 'saveAccomplishment'])->name('accomplishment');
-                    Route::post('/{committeeAssignment}/rate',              [CommitteeAssignmentController::class, 'rateAssignment'])->name('rate');
                 });
 
                 // Supervisory Positions

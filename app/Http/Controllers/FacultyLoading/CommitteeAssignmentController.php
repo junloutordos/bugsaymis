@@ -90,10 +90,17 @@ class CommitteeAssignmentController extends Controller
 
     public function show(Request $request, Committee $committee): Response
     {
-        $this->authorize('faculty_loading.manage');
-
+        // Admins see everything; chairpersons and members see their own
+        // committee (or its parent/subs). Everyone else is blocked below,
+        // after membership is resolved.
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId      = $request->input('term_id', $currentTerm?->id);
+
+        // Rating period scope (accomplishments + ratings are per semestral period)
+        $currentPeriod = \App\Models\IPCRRatingPeriod::current()->first();
+        $periodId      = (int) $request->input('rating_period_id', $currentPeriod?->id) ?: null;
+        $ratingPeriods = \App\Models\IPCRRatingPeriod::orderByDesc('year')->orderByDesc('semester')
+            ->get(['id', 'label', 'status', 'is_current']);
 
         $terms = AcademicTerm::with('schoolYear')->orderByDesc('start_date')->get()
             ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
@@ -102,7 +109,10 @@ class CommitteeAssignmentController extends Controller
 
         $assignments = FacultyCommitteeAssignment::with([
                 'faculty:id,name,position',
-                'accomplishments',
+                'accomplishments' => fn ($q) => $q->where(fn ($qq) =>
+                    $qq->whereNull('rating_period_id')
+                       ->when($periodId, fn ($qqq) => $qqq->orWhere('rating_period_id', $periodId))
+                ),
             ])
             ->where('committee_id', $committee->id)
             ->where('academic_term_id', $termId)
@@ -128,9 +138,23 @@ class CommitteeAssignmentController extends Controller
                 ->exists();
         }
 
-        $planMemberData = $committee->workDistributionPlans->map(function ($plan) use ($assignments) {
-            $members = $assignments->map(function ($a) use ($plan) {
-                $acc = $a->accomplishments->firstWhere('work_distribution_plan_id', $plan->id);
+        // Membership gate (route is open to view_own holders): admins,
+        // chairpersons, this committee's assignees, and heads always pass.
+        $isMember = $assignments->contains('user_id', $authUser->id)
+            || $committee->head_id === $authUser->id
+            || FacultyCommitteeAssignment::whereIn('committee_id', array_filter([$committee->id, $committee->parent_committee_id]))
+                ->where('user_id', $authUser->id)
+                ->where('status', 'active')
+                ->exists();
+
+        abort_unless($canManage || $isChairperson || $isMember, 403, 'You are not a member of this committee.');
+
+        $planMemberData = $committee->workDistributionPlans->map(function ($plan) use ($assignments, $periodId) {
+            $members = $assignments->map(function ($a) use ($plan, $periodId) {
+                // Prefer the selected period's row; fall back to the legacy NULL-period row
+                $planAccs = $a->accomplishments->where('work_distribution_plan_id', $plan->id);
+                $acc = ($periodId ? $planAccs->firstWhere('rating_period_id', $periodId) : null)
+                    ?? $planAccs->firstWhere('rating_period_id', null);
                 return [
                     'assignment_id'  => $a->id,
                     'user_id'        => $a->faculty->id,
@@ -171,6 +195,16 @@ class CommitteeAssignmentController extends Controller
             'authUser'       => $authUser->only('id', 'name'),
             'isChairperson'  => $isChairperson,
             'canManage'      => $canManage,
+            'ratingPeriods'    => $ratingPeriods,
+            'selectedPeriodId' => $periodId,
+            'tasks'            => \App\Models\CommitteeTask::with(['assignees:id,name', 'plan:id,success_indicator', 'period:id,label', 'updates.user:id,name'])
+                                    ->withCount('updates')
+                                    ->where('committee_id', $committee->id)
+                                    ->forPeriod($periodId)
+                                    ->orderBy('sort_order')
+                                    ->get(),
+            'boardMembers'     => $assignments->map(fn ($a) => $a->faculty->only('id', 'name'))->unique('id')->values(),
+            'canManageBoard'   => app(\App\Services\CommitteeBoardService::class)->canManageBoard($authUser, \App\Models\Committee::find($committee->id)),
         ]);
     }
 
@@ -351,6 +385,7 @@ class CommitteeAssignmentController extends Controller
 
         $data = $request->validate([
             'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
+            'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
             'accomplishment'            => 'nullable|string|max:1000',
             'mov_link'                  => 'nullable|url|max:255',
         ]);
@@ -359,6 +394,7 @@ class CommitteeAssignmentController extends Controller
             [
                 'faculty_committee_assignment_id' => $committeeAssignment->id,
                 'work_distribution_plan_id'       => $data['work_distribution_plan_id'],
+                'rating_period_id'                => $data['rating_period_id'] ?? null,
             ],
             [
                 'accomplishment' => $data['accomplishment'],
@@ -403,6 +439,7 @@ class CommitteeAssignmentController extends Controller
 
         $data = $request->validate([
             'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
+            'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
             'accomplishment'            => 'nullable|string|max:1000',
             'mov_link'                  => 'nullable|url|max:255',
             'sup_quality'               => 'nullable|numeric|min:1|max:5',
@@ -419,6 +456,7 @@ class CommitteeAssignmentController extends Controller
             [
                 'faculty_committee_assignment_id' => $committeeAssignment->id,
                 'work_distribution_plan_id'       => $data['work_distribution_plan_id'],
+                'rating_period_id'                => $data['rating_period_id'] ?? null,
             ],
             [
                 'accomplishment' => $data['accomplishment'] ?? null,
@@ -430,11 +468,14 @@ class CommitteeAssignmentController extends Controller
             ]
         );
 
-        // Mirror the supervisor rating into the teacher's active IPCR plan pivot so
-        // the chairperson only needs to rate once (in Faculty Loading) and it flows into IPCR.
+        // Mirror the supervisor rating into the teacher's IPCR plan pivot so the
+        // chairperson only needs to rate once (in Faculty Loading) and it flows
+        // into IPCR. Target the IPCR of the SAME rating period when one is
+        // selected; fall back to the latest rateable IPCR for legacy rows.
         $activeIpcr = EmployeeIPCR::where('user_id', $committeeAssignment->user_id)
             ->whereIn('status', ['Targets Approved', 'Submitted for Rating'])
             ->whereHas('plans', fn ($q) => $q->where('work_distribution_plans.id', $data['work_distribution_plan_id']))
+            ->when($data['rating_period_id'] ?? null, fn ($q, $pid) => $q->where('rating_period_id', $pid))
             ->latest()
             ->first();
 

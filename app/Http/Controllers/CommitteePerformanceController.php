@@ -194,14 +194,17 @@ class CommitteePerformanceController extends Controller
         return redirect()->back()->with('success', 'Committee deleted.');
     }
 
-    public function show(Committee $committee)
+    public function show(Request $request, Committee $committee)
     {
         $user = auth()->user();
-        $committee->load(['head', 'members', 'workDistributionPlans.performance_indicator']);
+        $committee->load(['head', 'members', 'workDistributionPlans.performance_indicator', 'subCommittees.head', 'subCommittees.members']);
 
         $isHead    = $user->id == $committee->head_id;
+        $isSubHead = $committee->subCommittees->contains(fn ($sub) => $sub->head_id == $user->id);
         $canManage = $user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR']) || $isHead;
-        $isMember  = $committee->members->contains('id', $user->id);
+        $isMember  = $committee->members->contains('id', $user->id)
+            || $isSubHead
+            || $committee->subCommittees->contains(fn ($sub) => $sub->members->contains('id', $user->id));
 
         if (!$canManage && !$isMember) {
             abort(403, 'You are not a member of this committee.');
@@ -247,12 +250,36 @@ class CommitteePerformanceController extends Controller
             ];
         });
 
+        // ── Task board (this committee + its sub-committees) ────────────
+        $currentPeriod = IPCRRatingPeriod::current()->first();
+        $periodId      = (int) $request->input('rating_period_id', $currentPeriod?->id) ?: null;
+
+        $boardCommitteeIds = collect([$committee->id])->merge($committee->subCommittees->pluck('id'));
+
+        $tasks = \App\Models\CommitteeTask::with(['assignees:id,name', 'plan:id,success_indicator', 'period:id,label', 'committee:id,name,parent_committee_id', 'updates.user:id,name'])
+            ->withCount('updates')
+            ->whereIn('committee_id', $boardCommitteeIds)
+            ->forPeriod($periodId)
+            ->orderBy('sort_order')
+            ->get();
+
+        $boardMembers = $committee->members->map(fn ($m) => $m->only('id', 'name'))
+            ->concat($committee->subCommittees->flatMap(fn ($sub) => $sub->members->map(fn ($m) => $m->only('id', 'name'))))
+            ->concat(collect([$committee->head?->only('id', 'name')])->filter())
+            ->unique('id')
+            ->values();
+
         return Inertia::render('PerformanceManagement/Committees/Show', [
             'committee'      => $committee,
             'planMemberData' => $planMemberData,
             'authUser'       => $user->only('id', 'name'),
             'isHead'         => $isHead,
             'canManage'      => $canManage,
+            'tasks'            => $tasks,
+            'boardMembers'     => $boardMembers,
+            'ratingPeriods'    => IPCRRatingPeriod::orderByDesc('year')->orderByDesc('semester')->get(['id', 'label', 'status', 'is_current']),
+            'selectedPeriodId' => $periodId,
+            'canManageBoard'   => app(\App\Services\CommitteeBoardService::class)->canManageBoard($user, $committee) || $isSubHead,
         ]);
     }
 
@@ -297,11 +324,19 @@ class CommitteePerformanceController extends Controller
      */
     public function rateMember(Request $request, Committee $committee, User $member)
     {
-        $user    = auth()->user();
-        $isHead  = $user->id == $committee->head_id;
-        $canRate = $isHead || $user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD']);
+        $user   = auth()->user();
+        $isHead = $user->id == $committee->head_id;
+
+        // Sub-committee head may rate members of their OWN sub-committee
+        // (mirrors the FL hierarchical gate in rateAssignment)
+        $isSubHeadForMember = Committee::where('parent_committee_id', $committee->id)
+            ->where('head_id', $user->id)
+            ->whereHas('members', fn ($q) => $q->where('users.id', $member->id))
+            ->exists();
+
+        $canRate = $isHead || $isSubHeadForMember || $user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD']);
         if (!$canRate) {
-            abort(403, 'Only the committee head can rate members.');
+            abort(403, 'Only the committee head or the member\'s sub-committee head can rate members.');
         }
 
         $request->validate([
