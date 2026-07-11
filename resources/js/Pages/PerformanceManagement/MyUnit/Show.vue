@@ -19,6 +19,8 @@ const props = defineProps({
   plans:    Array,
   employee: Object,
   unitHead: Object,
+  isMutable:    { type: Boolean, default: true },
+  periodClosed: { type: Boolean, default: false },
 });
 
 // ---------- Breadcrumb ----------
@@ -140,6 +142,7 @@ const { isSubmitting, submit } = useSubmit();
 // Unit heads can only rate plans whose rated_by = 'Unit Head'
 // AND one of the plan's offices has unit_head = this user
 const canRatePlan = (plan) => {
+  if (!props.isMutable) return false;
   if (props.ipcr.status !== "Submitted for Rating") return false;
   if (plan.rated_by !== "Unit Head") return false;
   return plan.offices?.some(o => o.unit_head == props.unitHead?.id) ?? false;
@@ -474,9 +477,9 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
         <AppTextarea v-model="form.accomplishment" label="Accomplishment" :rows="2" />
         <AppInput v-model="form.mov_link" label="MOV Link" type="text" />
         <div class="grid grid-cols-4 gap-3">
-          <AppInput v-model="form.quality" label="Q (1–5)" type="number" min="1" max="5" step="0.01" />
-          <AppInput v-model="form.efficiency" label="E (1–5)" type="number" min="1" max="5" step="0.01" />
-          <AppInput v-model="form.timeliness" label="T (1–5)" type="number" min="1" max="5" step="0.01" />
+          <AppInput v-model="form.quality" label="Q (1–5)" type="number" min="1" max="5" step="1" />
+          <AppInput v-model="form.efficiency" label="E (1–5)" type="number" min="1" max="5" step="1" />
+          <AppInput v-model="form.timeliness" label="T (1–5)" type="number" min="1" max="5" step="1" />
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Avg</label>
             <div class="rounded-lg border border-slate-200 px-2 py-2 text-sm bg-slate-50 text-indigo-700 font-semibold text-center">{{ liveAverage }}</div>

@@ -6,12 +6,17 @@ use App\Models\Accomplishment;
 use App\Models\AccomplishmentPhoto;
 use App\Models\EmployeeIPCRPlan;
 use App\Services\GoogleDriveService;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class AccomplishmentController extends Controller
 {
+    public function __construct(private IPCRWorkflowService $workflow)
+    {
+    }
+
     // ───── Page ─────────────────────────────────────────────────────────────
 
     public function index(Request $request)
@@ -70,6 +75,8 @@ class AccomplishmentController extends Controller
             'description'        => 'required|string|max:2000',
         ]);
 
+        $this->assertLinkedIpcrMutable($validated['ipcr_plan_id'] ?? null);
+
         Accomplishment::create([
             ...$validated,
             'user_id' => auth()->id(),
@@ -81,12 +88,15 @@ class AccomplishmentController extends Controller
     public function update(Request $request, Accomplishment $accomplishment)
     {
         $this->authorizeOwner($accomplishment);
+        $this->assertLinkedIpcrMutable($accomplishment->ipcr_plan_id);
 
         $validated = $request->validate([
             'ipcr_plan_id'       => 'nullable|exists:employee_ipcrs_plan,id',
             'accomplishment_date' => 'required|date',
             'description'        => 'required|string|max:2000',
         ]);
+
+        $this->assertLinkedIpcrMutable($validated['ipcr_plan_id'] ?? null);
 
         $accomplishment->update($validated);
 
@@ -96,6 +106,7 @@ class AccomplishmentController extends Controller
     public function destroy(Accomplishment $accomplishment)
     {
         $this->authorizeOwner($accomplishment);
+        $this->assertLinkedIpcrMutable($accomplishment->ipcr_plan_id);
 
         // Delete Drive files before removing DB records
         if (class_exists(GoogleDriveService::class) && config('services.google_drive.credentials')) {
@@ -117,6 +128,7 @@ class AccomplishmentController extends Controller
     public function uploadPhoto(Request $request, Accomplishment $accomplishment)
     {
         $this->authorizeOwner($accomplishment);
+        $this->assertLinkedIpcrMutable($accomplishment->ipcr_plan_id);
 
         $request->validate([
             'photo'      => 'nullable|file|mimes:jpg,jpeg,png,gif|max:5120', // images only, 5 MB max
@@ -167,6 +179,7 @@ class AccomplishmentController extends Controller
     public function deletePhoto(AccomplishmentPhoto $photo)
     {
         $this->authorizeOwner($photo->accomplishment);
+        $this->assertLinkedIpcrMutable($photo->accomplishment->ipcr_plan_id);
 
         if ($photo->local_path) {
             Storage::disk('public')->delete($photo->local_path);
@@ -219,6 +232,23 @@ class AccomplishmentController extends Controller
     {
         if ($accomplishment->user_id !== auth()->id()) {
             abort(403, 'You can only modify your own accomplishments.');
+        }
+    }
+
+    /**
+     * Diary entries linked to an IPCR plan freeze with the IPCR
+     * (Director Signed or closed rating period). Standalone entries stay editable.
+     */
+    private function assertLinkedIpcrMutable(?int $ipcrPlanId): void
+    {
+        if (! $ipcrPlanId) {
+            return;
+        }
+
+        $ipcr = EmployeeIPCRPlan::with('ipcr.period')->find($ipcrPlanId)?->ipcr;
+
+        if ($ipcr) {
+            $this->workflow->assertMutable($ipcr);
         }
     }
 }

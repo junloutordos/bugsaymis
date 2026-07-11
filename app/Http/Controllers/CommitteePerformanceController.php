@@ -4,19 +4,29 @@ namespace App\Http\Controllers;
 
 use App\Models\Committee;
 use App\Models\EmployeeIPCR;
+use App\Models\IPCRRatingPeriod;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class CommitteePerformanceController extends Controller
 {
-    public function index()
+    public function __construct(private IPCRWorkflowService $workflow)
+    {
+    }
+
+    public function index(Request $request)
     {
         $user = auth()->user();
 
+        $currentYear = IPCRRatingPeriod::current()->value('year') ?? (int) now()->format('Y');
+        $selectedFY  = $request->query('fiscal_year', (string) $currentYear);
+
         $query = Committee::with(['head', 'members', 'workDistributionPlans', 'subCommittees.head', 'subCommittees.members'])
-            ->whereNull('parent_committee_id');
+            ->whereNull('parent_committee_id')
+            ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY));
 
         if (!$user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR'])) {
             $query->where(function ($q) use ($user) {
@@ -32,6 +42,7 @@ class CommitteePerformanceController extends Controller
         $committees = $query->orderBy('name')->get()->map(fn($c) => [
             'id'                      => $c->id,
             'name'                    => $c->name,
+            'fiscal_year'             => $c->fiscal_year,
             'head_id'                 => $c->head_id,
             'head'                    => $c->head?->only('id', 'name'),
             'description'             => $c->description,
@@ -55,11 +66,15 @@ class CommitteePerformanceController extends Controller
         ]);
 
         return Inertia::render('PerformanceManagement/Committees/Index', [
-            'committees' => $committees,
-            'users'      => User::select('id', 'name', 'position')->orderBy('name')->get(),
-            'plans'      => WorkDistributionPlan::select('id', 'success_indicator', 'rated_by')
-                               ->orderBy('success_indicator')->get(),
-            'authUser'   => $user->only('id', 'name'),
+            'committees'         => $committees,
+            'users'              => User::select('id', 'name', 'position')->orderBy('name')->get(),
+            'plans'              => WorkDistributionPlan::select('id', 'success_indicator', 'rated_by')
+                                       ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY))
+                                       ->orderBy('success_indicator')->get(),
+            'authUser'           => $user->only('id', 'name'),
+            'fiscalYears'        => IPCRRatingPeriod::query()->distinct()->orderByDesc('year')->pluck('year'),
+            'selectedFiscalYear' => $selectedFY,
+            'currentFiscalYear'  => $currentYear,
         ]);
     }
 
@@ -72,6 +87,7 @@ class CommitteePerformanceController extends Controller
             'name'                          => 'required|string|max:255',
             'head_id'                       => 'nullable|exists:users,id',
             'description'                   => 'nullable|string',
+            'fiscal_year'                   => 'nullable|integer|min:2000|max:2100',
             'has_subcommittees'             => 'boolean',
             'member_ids'                    => 'nullable|array',
             'member_ids.*'                  => 'exists:users,id',
@@ -90,6 +106,7 @@ class CommitteePerformanceController extends Controller
             'name'        => $validated['name'],
             'head_id'     => $validated['head_id'] ?? null,
             'description' => $validated['description'] ?? null,
+            'fiscal_year' => $validated['fiscal_year'] ?? null,
         ]);
 
         $committee->workDistributionPlans()->sync($validated['plan_ids'] ?? []);
@@ -119,6 +136,7 @@ class CommitteePerformanceController extends Controller
             'name'                          => 'required|string|max:255',
             'head_id'                       => 'nullable|exists:users,id',
             'description'                   => 'nullable|string',
+            'fiscal_year'                   => 'nullable|integer|min:2000|max:2100',
             'has_subcommittees'             => 'boolean',
             'member_ids'                    => 'nullable|array',
             'member_ids.*'                  => 'exists:users,id',
@@ -138,6 +156,7 @@ class CommitteePerformanceController extends Controller
             'name'        => $validated['name'],
             'head_id'     => $validated['head_id'] ?? null,
             'description' => $validated['description'] ?? null,
+            'fiscal_year' => $validated['fiscal_year'] ?? null,
         ]);
 
         $committee->workDistributionPlans()->sync($validated['plan_ids'] ?? []);
@@ -258,6 +277,8 @@ class CommitteePerformanceController extends Controller
             ->where('user_id', $member->id)
             ->firstOrFail();
 
+        $this->workflow->assertMutable($ipcr);
+
         if (!$ipcr->plans()->where('work_distribution_plans.id', $request->plan_id)->exists()) {
             abort(404, 'This plan is not in the specified IPCR.');
         }
@@ -288,14 +309,16 @@ class CommitteePerformanceController extends Controller
             'plan_id'        => 'required|exists:work_distribution_plans,id',
             'accomplishment' => 'nullable|string|max:500',
             'mov_link'       => 'nullable|url|max:255',
-            'sup_quality'    => 'nullable|numeric|min:1|max:5',
-            'sup_efficiency' => 'nullable|numeric|min:1|max:5',
-            'sup_timeliness' => 'nullable|numeric|min:1|max:5',
+            'sup_quality'    => 'nullable|integer|min:1|max:5',
+            'sup_efficiency' => 'nullable|integer|min:1|max:5',
+            'sup_timeliness' => 'nullable|integer|min:1|max:5',
         ]);
 
         $ipcr = EmployeeIPCR::where('id', $request->ipcr_id)
             ->where('user_id', $member->id)
             ->firstOrFail();
+
+        $this->workflow->assertMutable($ipcr);
 
         if ($ipcr->status !== 'Submitted for Rating') {
             abort(403, 'Ratings can only be edited while the IPCR is "Submitted for Rating".');

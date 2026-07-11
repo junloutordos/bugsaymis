@@ -58,6 +58,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'IPCR',     'name' => 'ipcr.submit',      'description' => 'Submit IPCR for approval'],
             ['module' => 'IPCR',     'name' => 'ipcr.approve',     'description' => 'Approve IPCR submissions'],
             ['module' => 'IPCR',     'name' => 'ipcr.monitor',     'description' => 'Monitor unit/division IPCR'],
+            ['module' => 'IPCR',     'name' => 'ipcr.admin',       'description' => 'Manage IPCR fiscal years and rating periods'],
 
             // ── Accomplishments ───────────────────────────────────────────────
             ['module' => 'Accomplishments', 'name' => 'accomplishments.view',   'description' => 'View own accomplishments'],

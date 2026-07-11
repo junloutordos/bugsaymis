@@ -14,7 +14,19 @@ class AgencyOutcome extends Model
     protected $fillable = [
         'outcome',
         'sub_outcome',
-        'function_type', // ✅ new field    
+        'function_type', // ✅ new field
+        'fiscal_year',
     ];
-    
+
+    // NULL fiscal_year = applies to all years (legacy rows)
+    public function scopeForFiscalYear($query, ?int $year)
+    {
+        if (! $year) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($year) {
+            $q->whereNull('fiscal_year')->orWhere('fiscal_year', $year);
+        });
+    }
 }

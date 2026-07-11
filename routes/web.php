@@ -65,7 +65,6 @@ use App\Http\Controllers\PMSController;
 use App\Http\Controllers\AgencyOutcomeController;
 use App\Http\Controllers\PerformanceIndicatorController;
 use App\Http\Controllers\WorkDistributionPlanController;
-use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
 use App\Http\Controllers\HRIPCRController;
@@ -1349,30 +1348,44 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
 
         // ── Employee IPCR ───────────────────────────────────────────────────
         Route::get('/employee-ipcr', [EmployeeIPCRController::class, 'index'])->name('employee-ipcr.index');
-        Route::post('/employee-ipcr', [EmployeeIPCRController::class, 'store'])->name('employee-ipcr.store');
-        Route::put('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'update'])->name('employee-ipcr.update');
-        Route::delete('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'destroy'])->name('employee-ipcr.destroy');
-        Route::post('/employee-ipcr/{employeeIPCR}/plans', [EmployeeIPCRController::class, 'addPlans'])->name('employee-ipcr.addPlans');
+        Route::post('/employee-ipcr', [EmployeeIPCRController::class, 'store'])->name('employee-ipcr.store')->middleware('permission:ipcr.create');
+        Route::put('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'update'])->name('employee-ipcr.update')->middleware('permission:ipcr.update');
+        Route::delete('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'destroy'])->name('employee-ipcr.destroy')->middleware('permission:ipcr.update');
+        Route::post('/employee-ipcr/{employeeIPCR}/plans', [EmployeeIPCRController::class, 'addPlans'])->name('employee-ipcr.addPlans')->middleware('permission:ipcr.update');
         Route::get('/employee-ipcr/{id}', [EmployeeIPCRController::class, 'show'])->name('employee-ipcr.show');
-        Route::put('employee-ipcr-plan/{ipcr}/{plan}', [EmployeeIPCRController::class, 'updateSelfRating'])->name('employee-ipcr-plan.updateSelfRating');
-        Route::post('/employee-ipcr/{employeeIPCR}/submit-review', [EmployeeIPCRController::class, 'submitForReview'])->name('employee-ipcr.submitReview');
-        Route::post('/employee-ipcr/{employeeIPCR}/submit-rating', [EmployeeIPCRController::class, 'submitForRating'])->name('employee-ipcr.submitRating');
-        Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])->name('employee-ipcr.removePlan');
-        Route::post('/employee-ipcr/{employeeIPCR}/resubmit', [EmployeeIPCRController::class, 'resubmit'])->name('employee-ipcr.resubmit');
-        Route::post('/employee-ipcr/{employeeIPCR}/pull-fl-accomplishments', [EmployeeIPCRController::class, 'pullFLAccomplishments'])->name('employee-ipcr.pullFL');
+        Route::put('employee-ipcr-plan/{ipcr}/{plan}', [EmployeeIPCRController::class, 'updateSelfRating'])->name('employee-ipcr-plan.updateSelfRating')->middleware('permission:ipcr.update');
+        Route::post('/employee-ipcr/{employeeIPCR}/submit-review', [EmployeeIPCRController::class, 'submitForReview'])->name('employee-ipcr.submitReview')->middleware('permission:ipcr.submit');
+        Route::post('/employee-ipcr/{employeeIPCR}/submit-rating', [EmployeeIPCRController::class, 'submitForRating'])->name('employee-ipcr.submitRating')->middleware('permission:ipcr.submit');
+        Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])->name('employee-ipcr.removePlan')->middleware('permission:ipcr.update');
+        Route::post('/employee-ipcr/{employeeIPCR}/resubmit', [EmployeeIPCRController::class, 'resubmit'])->name('employee-ipcr.resubmit')->middleware('permission:ipcr.submit');
+        Route::post('/employee-ipcr/{employeeIPCR}/pull-fl-accomplishments', [EmployeeIPCRController::class, 'pullFLAccomplishments'])->name('employee-ipcr.pullFL')->middleware('permission:ipcr.update');
 
         // ── Division Chief IPCR ─────────────────────────────────────────────
         Route::get('/division-chief/ipcrs', [DivisionChiefIPCRController::class, 'index'])->name('division-chief-ipcr.index');
         Route::get('/division-chief-employee-ipcr/{id}', [DivisionChiefIPCRController::class, 'show'])->name('division-employee-ipcr.show');
-        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/targetsapproval', [DivisionChiefIPCRController::class, 'approveTargets'])->name('division-chief-employee-ipcr.targetsapproval');
-        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/disapprove', [DivisionChiefIPCRController::class, 'disapproveTargets'])->name('division-chief-employee-ipcr.disapprove');
-        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-accomplishment', [DivisionChiefIPCRController::class, 'returnAccomplishment'])->name('division-chief-employee-ipcr.returnAccomplishment');
+        // savePlanRemark stays at ipcr.view — non-DC raters (unit heads / committee heads) use it; controller enforces the actor
         Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/remark', [DivisionChiefIPCRController::class, 'savePlanRemark'])->name('division-chief-employee-ipcr-plan.remark');
-        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/saveratings', [DivisionChiefIPCRController::class, 'saveRatings'])->name('division-chief-employee-ipcr.saveratings');
-        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])->name('division-chief-employee-ipcr.savecomments');
-        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/submit-to-pmt', [DivisionChiefIPCRController::class, 'submitToPMT'])->name('division-chief-employee-ipcr.submitToPMT');
-        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-from-pmt', [DivisionChiefIPCRController::class, 'returnFromPMT'])->name('division-chief-employee-ipcr.returnFromPMT');
-        Route::post('/division-chief-employee-ipcr/submit-to-hr', [DivisionChiefIPCRController::class, 'submitToHR'])->name('division-chief-ipcr.submitToHR');
+        Route::middleware('permission:ipcr.approve')->group(function () {
+            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/targetsapproval', [DivisionChiefIPCRController::class, 'approveTargets'])->name('division-chief-employee-ipcr.targetsapproval');
+            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/disapprove', [DivisionChiefIPCRController::class, 'disapproveTargets'])->name('division-chief-employee-ipcr.disapprove');
+            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-accomplishment', [DivisionChiefIPCRController::class, 'returnAccomplishment'])->name('division-chief-employee-ipcr.returnAccomplishment');
+            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/saveratings', [DivisionChiefIPCRController::class, 'saveRatings'])->name('division-chief-employee-ipcr.saveratings');
+            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])->name('division-chief-employee-ipcr.savecomments');
+            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/submit-to-pmt', [DivisionChiefIPCRController::class, 'submitToPMT'])->name('division-chief-employee-ipcr.submitToPMT');
+            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-from-pmt', [DivisionChiefIPCRController::class, 'returnFromPMT'])->name('division-chief-employee-ipcr.returnFromPMT');
+            Route::post('/division-chief-employee-ipcr/submit-to-hr', [DivisionChiefIPCRController::class, 'submitToHR'])->name('division-chief-ipcr.submitToHR');
+        });
+
+        // ── Rating Periods / Fiscal Years (requires ipcr.admin) ────────────
+        Route::middleware('permission:ipcr.admin')->group(function () {
+            Route::get('/performance-management/rating-periods', [\App\Http\Controllers\IPCRRatingPeriodController::class, 'index'])->name('ipcr-rating-periods.index');
+            Route::post('/performance-management/rating-periods/fiscal-year', [\App\Http\Controllers\IPCRRatingPeriodController::class, 'storeFiscalYear'])->name('ipcr-rating-periods.storeFiscalYear');
+            Route::put('/performance-management/rating-periods/{period}', [\App\Http\Controllers\IPCRRatingPeriodController::class, 'update'])->name('ipcr-rating-periods.update');
+            Route::post('/performance-management/rating-periods/{period}/close', [\App\Http\Controllers\IPCRRatingPeriodController::class, 'close'])->name('ipcr-rating-periods.close');
+            Route::post('/performance-management/rating-periods/{period}/reopen', [\App\Http\Controllers\IPCRRatingPeriodController::class, 'reopen'])->name('ipcr-rating-periods.reopen');
+            Route::post('/performance-management/rating-periods/{period}/set-current', [\App\Http\Controllers\IPCRRatingPeriodController::class, 'setCurrent'])->name('ipcr-rating-periods.setCurrent');
+            Route::post('/performance-management/rating-periods/copy-framework', [\App\Http\Controllers\IPCRRatingPeriodController::class, 'copyFramework'])->name('ipcr-rating-periods.copyFramework');
+        });
 
         // ── PMT Review (requires ipcr.approve) ─────────────────────────────
         Route::middleware('permission:ipcr.approve')->group(function () {

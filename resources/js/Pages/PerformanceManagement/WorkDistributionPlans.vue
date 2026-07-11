@@ -15,6 +15,7 @@ import AppModal from "@/Components/AppModal.vue"
 import EmptyState from "@/Components/EmptyState.vue"
 import PaginationControl from "@/Components/PaginationControl.vue"
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline"
+import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
 import { useWorkDistributionPlans } from "@/Composables/useWorkDistributionPlans.js"
 
 const props = defineProps({
@@ -23,6 +24,9 @@ const props = defineProps({
   offices: Array,
   committees: Array,
   assignments: Array,
+  fiscalYears: { type: Array, default: () => [] },
+  selectedFiscalYear: { type: [String, Number], default: "" },
+  currentFiscalYear: { type: Number, default: null },
 })
 
 const {
@@ -119,6 +123,7 @@ const modalTitle = computed(() => {
           class="flex-1 min-w-52"
           @keydown.enter.prevent="applyFilters"
         />
+        <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="workdistribution.index" />
         <template #actions>
           <AppButton @click="applyFilters">Search</AppButton>
           <AppButton v-if="searchQuery" variant="secondary" @click="clearFilters">Clear</AppButton>
@@ -204,6 +209,11 @@ const modalTitle = computed(() => {
             <option value="Committee Head">Committee Head</option>
             <option value="Coordinator">Coordinator</option>
             <option value="Others">Others</option>
+          </AppSelect>
+
+          <AppSelect v-model="form.fiscal_year" label="Fiscal Year">
+            <option :value="null">All years (unscoped)</option>
+            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
           </AppSelect>
 
           <!-- Tag-based Office/Unit Involved selector -->

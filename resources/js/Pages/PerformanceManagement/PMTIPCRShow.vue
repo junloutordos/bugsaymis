@@ -16,6 +16,15 @@ const props = defineProps({
   employee:   Object,
   supervisor: Object,
   isOCD:      { type: Boolean, default: false },
+  isMutable:     { type: Boolean, default: true },
+  periodClosed:  { type: Boolean, default: false },
+})
+
+// Read-only banner: Director Signed (final) or rating period closed
+const readOnlyReason = computed(() => {
+  if (props.ipcr?.status === "Director Signed") return "This IPCR has been signed by the Director and is final. The rating below is the immutable official record.";
+  if (props.periodClosed) return "The rating period for this IPCR is closed. This record is read-only.";
+  return null;
 })
 
 // ---------- Status badge ----------
@@ -63,7 +72,7 @@ const formatDateString = (value) => {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 }
 
-const ratingYear                   = computed(() => extractYearFromRatingPeriod(props.ipcr?.rating_period || ""))
+const ratingYear                   = computed(() => props.ipcr?.period?.year ?? extractYearFromRatingPeriod(props.ipcr?.rating_period || ""))
 const formattedSubmittedForReviewAt = computed(() => formatDateString(props.ipcr?.submitted_for_review_at))
 const formattedTargetApprovedAt    = computed(() => formatDateString(props.ipcr?.target_approved_at))
 const formattedSubmittedRatingAt   = computed(() => formatDateString(props.ipcr?.submitted_rating_at))
@@ -273,24 +282,31 @@ const printIPCR = () => window.print()
             <AppBadge :color="statusBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
             <span class="text-xs text-slate-400">Submitted to PMT: {{ ipcr.submitted_for_pmtreview_at ?? '—' }}</span>
             <div class="text-right">
-              <div class="text-2xl font-bold text-slate-800">{{ finalIPCRRating }}</div>
-              <div :class="`inline-flex items-center mt-1 px-3 py-1 rounded-full text-sm font-semibold ${adjectivalColorClass(finalIPCRRating)}`">
-                {{ getAdjectivalRating(finalIPCRRating) }}
+              <div class="text-2xl font-bold text-slate-800">{{ ipcr.final_numeric_rating ?? finalIPCRRating }}</div>
+              <div :class="`inline-flex items-center mt-1 px-3 py-1 rounded-full text-sm font-semibold ${adjectivalColorClass(ipcr.final_numeric_rating ?? finalIPCRRating)}`">
+                {{ ipcr.final_adjectival_rating ?? getAdjectivalRating(finalIPCRRating) }}
               </div>
-              <div class="text-xs text-slate-400 mt-1">Overall Weighted Rating</div>
+              <div class="text-xs text-slate-400 mt-1">
+                {{ ipcr.status === 'Director Signed' ? 'Final Rating (snapshot at Director signing)' : 'Overall Weighted Rating' }}
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- Read-only banner (finalized or closed period) -->
+        <div v-if="readOnlyReason" class="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 no-print">
+          {{ readOnlyReason }}
+        </div>
+
         <!-- Action buttons -->
         <div class="mt-4 flex flex-wrap gap-2">
-          <AppButton v-if="ipcr.status === 'Submitted to PMT'" variant="success" :loading="isSubmitting" :disabled="isSubmitting" @click="approvIPCR">
+          <AppButton v-if="isMutable && ipcr.status === 'Submitted to PMT'" variant="success" :loading="isSubmitting" :disabled="isSubmitting" @click="approvIPCR">
             {{ isSubmitting ? 'Processing…' : 'Approve' }}
           </AppButton>
-          <AppButton v-if="ipcr.status === 'Submitted to PMT'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="returnForRevision">
+          <AppButton v-if="isMutable && ipcr.status === 'Submitted to PMT'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="returnForRevision">
             {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
           </AppButton>
-          <AppButton v-if="isOCD && ipcr.status === 'Approved by PMT'" :loading="isSubmitting" :disabled="isSubmitting" @click="directorSign">
+          <AppButton v-if="isMutable && isOCD && ipcr.status === 'Approved by PMT'" :loading="isSubmitting" :disabled="isSubmitting" @click="directorSign">
             {{ isSubmitting ? 'Processing…' : 'Director Sign' }}
           </AppButton>
           <div v-if="ipcr.status === 'Director Signed' && ipcr.director_signature"

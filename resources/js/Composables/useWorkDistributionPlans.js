@@ -19,6 +19,7 @@ export function useWorkDistributionPlans(props) {
     success_indicator: "",
     involved: [],         // [{ type: 'all'|'office'|'committee'|'assignment'|'text', id?, label }]
     rated_by: "",
+    fiscal_year: props.currentFiscalYear ?? null,
   })
 
   const form = ref(emptyForm())
@@ -82,6 +83,7 @@ export function useWorkDistributionPlans(props) {
         success_indicator: plan.success_indicator ?? "",
         involved: buildInvolvedFromPlan(plan),
         rated_by: plan.rated_by ?? "",
+        fiscal_year: plan.fiscal_year ?? null,
       }
     } else {
       form.value = emptyForm()
@@ -141,6 +143,7 @@ export function useWorkDistributionPlans(props) {
       committee_ids: committeeIds,
       assignment_ids: assignmentIds,
       free_text_involved: freeText,
+      fiscal_year: form.value.fiscal_year ? Number(form.value.fiscal_year) : null,
     }
   }
 

@@ -12,6 +12,7 @@ use App\Models\IPCRRatingPeriod;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
 use App\Services\AuditLogger;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,22 @@ use Inertia\Inertia;
 
 class EmployeeIPCRController extends Controller
 {
+    // Statuses during which the employee may still edit the IPCR shell / plan list
+    private const EDITABLE_STATUSES = [
+        IPCRWorkflowService::STATUS_NEW_TARGET,
+        IPCRWorkflowService::STATUS_RETURNED,
+    ];
+
+    private const PLAN_EDIT_STATUSES = [
+        IPCRWorkflowService::STATUS_NEW_TARGET,
+        IPCRWorkflowService::STATUS_FOR_REVIEW,
+        IPCRWorkflowService::STATUS_RETURNED,
+    ];
+
+    public function __construct(private IPCRWorkflowService $workflow)
+    {
+    }
+
     /**
      * Display the authenticated user's IPCR targets
      */
@@ -27,21 +44,27 @@ class EmployeeIPCRController extends Controller
     {
         $user = auth()->user();
 
-        $ipcrs = EmployeeIPCR::with('plans')
+        $ipcrs = EmployeeIPCR::with(['plans', 'period'])
             ->where('user_id', $user->id)
             ->latest()
-            ->get();
+            ->get()
+            ->each(fn ($ipcr) => $ipcr->setAttribute('is_mutable', $ipcr->isMutable()));
+
+        $currentPeriod = IPCRRatingPeriod::current()->first();
 
         $workPlans = WorkDistributionPlan::with(['performance_indicator'])
+            ->forFiscalYear($currentPeriod?->year)
             ->orderBy('id', 'asc')
             ->get();
 
-        $ratingPeriods = IPCRRatingPeriod::active()->pluck('label');
+        $ratingPeriods = IPCRRatingPeriod::open()
+            ->get(['id', 'label', 'year', 'semester', 'status', 'start_date', 'end_date', 'is_current']);
 
         return Inertia::render('PerformanceManagement/EmployeeIPCR', [
             'ipcrs'         => $ipcrs,
             'workPlans'     => $workPlans,
             'ratingPeriods' => $ratingPeriods,
+            'currentPeriod' => $currentPeriod,
         ]);
     }
 
@@ -52,17 +75,22 @@ class EmployeeIPCRController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'rating_period' => 'required|string|max:255',
-            'title'         => 'required|string|max:255',
-            'remarks'       => 'nullable|string',
+            'rating_period_id' => 'required|exists:ipcr_rating_periods,id',
+            'title'            => 'required|string|max:255',
+            'remarks'          => 'nullable|string',
         ]);
 
+        $period = IPCRRatingPeriod::findOrFail($data['rating_period_id']);
+        $this->workflow->assertPeriodAcceptsNewTargets($period);
+        $this->workflow->assertNoDuplicateForPeriod(auth()->id(), $period->id);
+
         $ipcr = EmployeeIPCR::create([
-            'user_id'       => auth()->id(),
-            'rating_period' => $data['rating_period'],
-            'title'         => $data['title'],
-            'status'        => 'New Target',
-            'remarks'       => $data['remarks'] ?? null,
+            'user_id'          => auth()->id(),
+            'rating_period'    => $period->label, // dual-write during blue-green transition
+            'rating_period_id' => $period->id,
+            'title'            => $data['title'],
+            'status'           => IPCRWorkflowService::STATUS_NEW_TARGET,
+            'remarks'          => $data['remarks'] ?? null,
         ]);
 
         $dc = $this->resolveDivisionChief(auth()->user());
@@ -86,20 +114,31 @@ class EmployeeIPCRController extends Controller
      */
     public function update(Request $request, EmployeeIPCR $employeeIPCR)
     {
+        $this->workflow->assertOwner(auth()->user(), $employeeIPCR);
+        $this->workflow->assertMutable($employeeIPCR);
+        abort_unless(
+            in_array($employeeIPCR->status, self::EDITABLE_STATUSES, true),
+            403,
+            'This IPCR can no longer be edited at its current stage.'
+        );
+
         $data = $request->validate([
-            'rating_period' => 'required|string|max:255',
-            'title'         => 'required|string|max:255',
-            'status'        => 'required|string|max:50',
-            'remarks'       => 'nullable|string',
+            'rating_period_id' => 'required|exists:ipcr_rating_periods,id',
+            'title'            => 'required|string|max:255',
+            'remarks'          => 'nullable|string',
         ]);
 
-        $employeeIPCR->update($data);
+        $update = ['title' => $data['title'], 'remarks' => $data['remarks'] ?? null];
 
-        $dc = $this->resolveDivisionChief(auth()->user());
-        if ($dc) {
-            $employeeIPCR->load('user');
-            Mail::to($dc->email)->send(new IPCRCreatedMail($employeeIPCR, $dc->name));
+        if ((int) $data['rating_period_id'] !== (int) $employeeIPCR->rating_period_id) {
+            $period = IPCRRatingPeriod::findOrFail($data['rating_period_id']);
+            $this->workflow->assertPeriodAcceptsNewTargets($period);
+            $this->workflow->assertNoDuplicateForPeriod(auth()->id(), $period->id, $employeeIPCR->id);
+            $update['rating_period']    = $period->label;
+            $update['rating_period_id'] = $period->id;
         }
+
+        $employeeIPCR->update($update);
 
         AuditLogger::log([
             'action'         => 'ipcr_updated',
@@ -116,7 +155,22 @@ class EmployeeIPCRController extends Controller
      */
     public function destroy(EmployeeIPCR $employeeIPCR)
     {
+        $this->workflow->assertOwner(auth()->user(), $employeeIPCR);
+        $this->workflow->assertMutable($employeeIPCR);
+        abort_unless(
+            in_array($employeeIPCR->status, self::EDITABLE_STATUSES, true),
+            403,
+            'Only IPCRs that are new or returned for revision can be deleted.'
+        );
+
         $employeeIPCR->delete();
+
+        AuditLogger::log([
+            'action'         => 'ipcr_deleted',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['title' => $employeeIPCR->title],
+        ]);
 
         return redirect()->back()->with('success', 'IPCR Target Deleted.');
     }
@@ -126,14 +180,15 @@ class EmployeeIPCRController extends Controller
      */
     public function addPlans(Request $request, $ipcrId)
     {
+        $ipcr = EmployeeIPCR::findOrFail($ipcrId);
+        $this->guardPlanEditing($ipcr);
+
         $data = $request->validate([
             'plan_ids'   => 'required|array',
             'plan_ids.*' => 'exists:work_distribution_plans,id',
         ]);
 
-        $ipcr = EmployeeIPCR::findOrFail($ipcrId);
-
-        $ipcr->plans()->syncWithoutDetaching($data['plan_ids']);
+        $ipcr->plans()->syncWithoutDetaching($this->scopePlanIds($ipcr, $data['plan_ids']));
 
         return redirect()->back()->with('success', 'Plans assigned successfully.');
     }
@@ -143,16 +198,37 @@ class EmployeeIPCRController extends Controller
      */
     public function syncPlans(Request $request, $ipcrId)
     {
+        $ipcr = EmployeeIPCR::findOrFail($ipcrId);
+        $this->guardPlanEditing($ipcr);
+
         $data = $request->validate([
             'plan_ids'   => 'required|array',
             'plan_ids.*' => 'exists:work_distribution_plans,id',
         ]);
 
-        $ipcr = EmployeeIPCR::findOrFail($ipcrId);
-
-        $ipcr->plans()->sync($data['plan_ids']);
+        $ipcr->plans()->sync($this->scopePlanIds($ipcr, $data['plan_ids']));
 
         return redirect()->back()->with('success', 'Plans synced successfully.');
+    }
+
+    private function guardPlanEditing(EmployeeIPCR $ipcr): void
+    {
+        $this->workflow->assertOwner(auth()->user(), $ipcr);
+        $this->workflow->assertMutable($ipcr);
+        abort_unless(
+            in_array($ipcr->status, self::PLAN_EDIT_STATUSES, true),
+            403,
+            'Plans can only be changed before targets are approved.'
+        );
+    }
+
+    /** Keep only plan IDs valid for the IPCR's fiscal year (NULL = all years). */
+    private function scopePlanIds(EmployeeIPCR $ipcr, array $planIds): array
+    {
+        return WorkDistributionPlan::whereIn('id', $planIds)
+            ->forFiscalYear($ipcr->period?->year)
+            ->pluck('id')
+            ->all();
     }
 
     /**
@@ -162,10 +238,12 @@ class EmployeeIPCRController extends Controller
     {
         $ipcr = EmployeeIPCR::with([
             'user.division.divisionchief',
+            'period',
             'plans.performance_indicator.agencyOutcome'
         ])->findOrFail($id);
 
         $workPlans = WorkDistributionPlan::with(['performance_indicator'])
+            ->forFiscalYear($ipcr->period?->year)
             ->orderBy('id', 'asc')
             ->get();
 
@@ -226,6 +304,9 @@ class EmployeeIPCRController extends Controller
             'isFaculty'        => $isFaculty,
             'suggestedPlanIds' => $suggestedPlanIds,
             'isOwner'          => $ipcr->user_id === auth()->id(),
+            'isMutable'        => $ipcr->isMutable(),
+            'periodClosed'     => $ipcr->isPeriodClosed(),
+            'hrDeadline'       => $ipcr->period?->hrDeadline(),
         ]);
     }
 
@@ -237,14 +318,16 @@ class EmployeeIPCRController extends Controller
     public function updateSelfRating(Request $request, EmployeeIPCR $ipcr, $planId)
     {
         abort_if($ipcr->user_id !== auth()->id(), 403);
-        abort_if($ipcr->status !== 'Targets Approved', 403, 'Self-rating is only allowed when targets are approved.');
+        $this->workflow->assertMutable($ipcr);
+        abort_if($ipcr->status !== IPCRWorkflowService::STATUS_TARGETS_APPROVED, 403, 'Self-rating is only allowed when targets are approved.');
 
+        // CSC SPMS 5-point scale
         $request->validate([
             'accomplishment'  => 'nullable|string|max:255',
             'mov_link'        => 'nullable|string|max:500',
-            'self_quality'    => 'nullable|numeric|min:0|max:100',
-            'self_efficiency' => 'nullable|numeric|min:0|max:100',
-            'self_timeliness' => 'nullable|numeric|min:0|max:100',
+            'self_quality'    => 'nullable|integer|min:1|max:5',
+            'self_efficiency' => 'nullable|integer|min:1|max:5',
+            'self_timeliness' => 'nullable|integer|min:1|max:5',
         ]);
 
         // Ensure this plan belongs to THIS IPCR
@@ -285,6 +368,7 @@ class EmployeeIPCRController extends Controller
     public function pullFLAccomplishments(EmployeeIPCR $employeeIPCR): RedirectResponse
     {
         abort_if($employeeIPCR->user_id !== auth()->id(), 403);
+        $this->workflow->assertMutable($employeeIPCR);
         abort_if(
             ! in_array($employeeIPCR->status, ['New Target', 'For Review', 'Targets Approved', 'Returned for Revision']),
             422,
@@ -340,12 +424,11 @@ class EmployeeIPCRController extends Controller
 
     public function submitForReview(EmployeeIPCR $employeeIPCR)
     {
-        abort_if($employeeIPCR->user_id !== auth()->id(), 403);
+        $this->workflow->assertOwner(auth()->user(), $employeeIPCR);
 
-        $employeeIPCR->update([
-            'status' => 'For Review',
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_FOR_REVIEW, [
             'submitted_for_review_at' => now(),
-        ]);
+        ], 'ipcr_submitted_for_review');
 
         $employeeIPCR->load('user');
         $dc = $this->resolveDivisionChief($employeeIPCR->user);
@@ -353,38 +436,23 @@ class EmployeeIPCRController extends Controller
             Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
         }
 
-        AuditLogger::log([
-            'action'         => 'ipcr_submitted_for_review',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'For Review'],
-        ]);
-
         return to_route('employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR submitted for review successfully.');
     }
 
     public function submitForRating(EmployeeIPCR $employeeIPCR)
     {
-        abort_if($employeeIPCR->user_id !== auth()->id(), 403);
+        $this->workflow->assertOwner(auth()->user(), $employeeIPCR);
 
-        $employeeIPCR->update([
-            'status' => 'Submitted for Rating',
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_FOR_RATING, [
             'submitted_for_rating_at' => now(),
-        ]);
+        ], 'ipcr_submitted_for_rating');
 
         $employeeIPCR->load('user');
         $dc = $this->resolveDivisionChief($employeeIPCR->user);
         if ($dc) {
             Mail::to($dc->email)->send(new IPCRSubmittedForRatingMail($employeeIPCR, $dc->name));
         }
-
-        AuditLogger::log([
-            'action'         => 'ipcr_submitted_for_rating',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Submitted for Rating'],
-        ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR submitted for rating successfully.');
@@ -395,11 +463,10 @@ class EmployeeIPCRController extends Controller
      */
     public function removePlan(EmployeeIPCR $employeeIPCR, $planId)
     {
-        if ($employeeIPCR->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->workflow->assertOwner(auth()->user(), $employeeIPCR);
+        $this->workflow->assertMutable($employeeIPCR);
 
-        if ($employeeIPCR->status !== 'Returned for Revision') {
+        if ($employeeIPCR->status !== IPCRWorkflowService::STATUS_RETURNED) {
             abort(403, 'Plans can only be removed when the IPCR is returned for revision.');
         }
 
@@ -413,31 +480,21 @@ class EmployeeIPCRController extends Controller
      */
     public function resubmit(EmployeeIPCR $employeeIPCR)
     {
-        if ($employeeIPCR->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->workflow->assertOwner(auth()->user(), $employeeIPCR);
 
-        if ($employeeIPCR->status !== 'Returned for Revision') {
+        if ($employeeIPCR->status !== IPCRWorkflowService::STATUS_RETURNED) {
             abort(403, 'Only IPCRs returned for revision can be resubmitted.');
         }
 
-        $employeeIPCR->update([
-            'status' => 'For Review',
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_FOR_REVIEW, [
             'submitted_for_review_at' => now(),
-        ]);
+        ], 'ipcr_resubmitted');
 
         $employeeIPCR->load('user');
         $dc = $this->resolveDivisionChief($employeeIPCR->user);
         if ($dc) {
             Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
         }
-
-        AuditLogger::log([
-            'action'         => 'ipcr_resubmitted',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'For Review'],
-        ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR resubmitted for review.');

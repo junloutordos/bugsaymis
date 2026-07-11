@@ -11,11 +11,12 @@ use App\Mail\IPCRTargetsReturnedMail;
 use App\Models\Committee;
 use App\Models\Division;
 use App\Models\EmployeeIPCR;
+use App\Models\IPCRRatingPeriod;
 use App\Models\Office;
 use App\Models\Role;
 use App\Models\SpecialAssignment;
 use App\Models\User;
-use App\Services\AuditLogger;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -23,6 +24,10 @@ use Inertia\Inertia;
 
 class DivisionChiefIPCRController extends Controller
 {
+    public function __construct(private IPCRWorkflowService $workflow)
+    {
+    }
+
     /**
      * Display all IPCRs of subordinates under the division chief's division.
      */
@@ -50,7 +55,7 @@ class DivisionChiefIPCRController extends Controller
 
         // Non-DC rater branch: show IPCRs containing plans they can rate
         if ($isNonDCRater && !$user->hasAnyRole(['OCD', 'DivisionChief'])) {
-            $ipcrs = EmployeeIPCR::with(['user.division'])
+            $ipcrs = EmployeeIPCR::with(['user.division', 'period'])
                 ->addSelect(['overall_average' => $avgSubquery])
                 ->whereHas('plans', fn($q) =>
                     $q->where(function ($q2) use ($unitHeadOfficeIds, $headedCommitteeIds, $coordinatedAssignmentIds) {
@@ -78,13 +83,12 @@ class DivisionChiefIPCRController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->get();
 
-            $ratingPeriods = $ipcrs->pluck('rating_period')->filter()->unique()->sort()->values();
-
             return Inertia::render('PerformanceManagement/DivisionChiefIPCR', [
                 'ipcrs'             => $ipcrs,
                 'divisionEmployees' => collect(),
                 'supervisor'        => $user,
-                'ratingPeriods'     => $ratingPeriods,
+                'ratingPeriods'     => $this->periodOptions($ipcrs),
+                'openPeriods'       => IPCRRatingPeriod::open()->get(['id', 'label', 'year', 'semester', 'is_current']),
             ]);
         }
 
@@ -93,7 +97,7 @@ class DivisionChiefIPCRController extends Controller
             $dcIpcrs = collect();
             if ($user->hasRole('OCD')) {
                 $divisionChiefRoleId = Role::where('name', 'DivisionChief')->value('id');
-                $dcIpcrs = EmployeeIPCR::with(['user.division'])
+                $dcIpcrs = EmployeeIPCR::with(['user.division', 'period'])
                     ->addSelect(['overall_average' => $avgSubquery])
                     ->whereHas('user', fn($q) => $q->whereRaw('FIND_IN_SET(?, role_id)', [$divisionChiefRoleId])
                                                     ->where('id', '!=', $user->id))
@@ -106,7 +110,7 @@ class DivisionChiefIPCRController extends Controller
                         ?? $user->division_id;
 
             if ($divisionId) {
-                $ownDivisionIpcrs = EmployeeIPCR::with(['user.division'])
+                $ownDivisionIpcrs = EmployeeIPCR::with(['user.division', 'period'])
                     ->addSelect(['overall_average' => $avgSubquery])
                     ->whereHas('user', fn($q) => $q->where('division_id', $divisionId)
                                                     ->where('id', '!=', $user->id))
@@ -130,15 +134,30 @@ class DivisionChiefIPCRController extends Controller
             abort(403, "You are not authorized to view this.");
         }
 
-        // Distinct rating periods from the visible IPCRs (for the memo report dropdown)
-        $ratingPeriods = $ipcrs->pluck('rating_period')->filter()->unique()->sort()->values();
-
         return Inertia::render('PerformanceManagement/DivisionChiefIPCR', [
             'ipcrs'             => $ipcrs,
             'divisionEmployees' => $divisionEmployees,
             'supervisor'        => $user->load('division'),
-            'ratingPeriods'     => $ratingPeriods,
+            'ratingPeriods'     => $this->periodOptions($ipcrs),
+            'openPeriods'       => IPCRRatingPeriod::open()->get(['id', 'label', 'year', 'semester', 'is_current']),
         ]);
+    }
+
+    /**
+     * Distinct rating periods present in the visible IPCRs — id + label pairs
+     * (id is null for legacy rows that only carry the free-text label).
+     */
+    private function periodOptions($ipcrs)
+    {
+        return $ipcrs
+            ->map(fn ($ipcr) => [
+                'id'    => $ipcr->rating_period_id,
+                'label' => $ipcr->period?->label ?? $ipcr->rating_period,
+            ])
+            ->filter(fn ($p) => $p['label'])
+            ->unique('label')
+            ->sortBy('label')
+            ->values();
     }
 
     /**
@@ -148,6 +167,7 @@ class DivisionChiefIPCRController extends Controller
     {
         $ipcr = EmployeeIPCR::with([
             'user.division',
+            'period',
             'plans.performance_indicator.agencyOutcome',
             'plans.offices',
             'plans.committees',
@@ -155,8 +175,7 @@ class DivisionChiefIPCRController extends Controller
         ])->findOrFail($id);
 
         $user = auth()->user();
-        $employeeDivisionChiefId = $ipcr->user->division->division_chief_id ?? null;
-        $canManageIpcr = $user->hasRole('OCD') || $user->id == $employeeDivisionChiefId;
+        $canManageIpcr = $this->workflow->canManage($user, $ipcr);
 
         // Bulk-load accomplishments for all plans (2 queries, avoids N+1)
         $ipcrPlanIds = \App\Models\EmployeeIPCRPlan::where('ipcr_id', $ipcr->id)
@@ -183,6 +202,9 @@ class DivisionChiefIPCRController extends Controller
             'employee'      => $ipcr->user,
             'supervisor'    => $user,
             'canManageIpcr' => $canManageIpcr,
+            'isMutable'     => $ipcr->isMutable(),
+            'periodClosed'  => $ipcr->isPeriodClosed(),
+            'hrDeadline'    => $ipcr->period?->hrDeadline(),
         ]);
     }
 
@@ -191,20 +213,14 @@ class DivisionChiefIPCRController extends Controller
      */
     public function approveTargets(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status' => 'Targets Approved',
+        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_TARGETS_APPROVED, [
             'target_approved_at' => now(),
-        ]);
+        ], 'ipcr_targets_approved');
 
         $employeeIPCR->load('user');
         Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsApprovedMail($employeeIPCR, $employeeIPCR->user->name));
-
-        AuditLogger::log([
-            'action'         => 'ipcr_targets_approved',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Targets Approved'],
-        ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Targets approved successfully.');
@@ -215,19 +231,12 @@ class DivisionChiefIPCRController extends Controller
      */
     public function disapproveTargets(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status' => 'Returned for Revision',
-        ]);
+        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_RETURNED, [], 'ipcr_targets_returned');
 
         $employeeIPCR->load('user');
         Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsReturnedMail($employeeIPCR, $employeeIPCR->user->name));
-
-        AuditLogger::log([
-            'action'         => 'ipcr_targets_returned',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Returned for Revision'],
-        ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Targets returned to employee for revision.');
@@ -238,10 +247,11 @@ class DivisionChiefIPCRController extends Controller
      */
     public function submitToPMT(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status' => 'Submitted to PMT',
+        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_SUBMITTED_PMT, [
             'submitted_for_pmtreview_at' => now(),
-        ]);
+        ], 'ipcr_submitted_to_pmt');
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR submitted to PMT for review.');
@@ -253,27 +263,21 @@ class DivisionChiefIPCRController extends Controller
      */
     public function returnFromPMT(Request $request, EmployeeIPCR $employeeIPCR)
     {
+        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+
         $request->validate([
             'remarks' => 'required|string|max:2000',
         ]);
 
-        $employeeIPCR->update([
-            'status'                     => 'Targets Approved',
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_TARGETS_APPROVED, [
             'remarks'                    => $request->remarks,
             'submitted_for_rating_at'    => null,
             'submitted_rating_at'        => null,
             'submitted_for_pmtreview_at' => null,
-        ]);
+        ], 'ipcr_returned_from_pmt');
 
         $employeeIPCR->load('user');
         Mail::to($employeeIPCR->user->email)->send(new IPCRDCReturnedFromPMTMail($employeeIPCR, $employeeIPCR->user->name));
-
-        AuditLogger::log([
-            'action'         => 'ipcr_returned_from_pmt',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Targets Approved'],
-        ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR returned to employee for revision.');
@@ -284,20 +288,14 @@ class DivisionChiefIPCRController extends Controller
      */
     public function returnAccomplishment(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status' => 'Targets Approved',
+        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_TARGETS_APPROVED, [
             'submitted_for_rating_at' => null,
-        ]);
+        ], 'ipcr_accomplishment_returned');
 
         $employeeIPCR->load('user');
         Mail::to($employeeIPCR->user->email)->send(new IPCRAccomplishmentReturnedMail($employeeIPCR, $employeeIPCR->user->name));
-
-        AuditLogger::log([
-            'action'         => 'ipcr_accomplishment_returned',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Targets Approved'],
-        ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Accomplishment returned to employee for revision.');
@@ -308,12 +306,20 @@ class DivisionChiefIPCRController extends Controller
      */
     public function savePlanRemark(Request $request, EmployeeIPCR $ipcr, $planId)
     {
+        $this->workflow->assertMutable($ipcr);
+
         $request->validate([
             'remarks' => 'nullable|string|max:500',
         ]);
 
         if (!$ipcr->plans()->where('work_distribution_plans.id', $planId)->exists()) {
             abort(404, 'This plan is not assigned to this IPCR.');
+        }
+
+        $user = auth()->user();
+        $plan = \App\Models\WorkDistributionPlan::findOrFail($planId);
+        if (! $this->workflow->canManage($user, $ipcr) && ! $this->workflow->canRatePlan($user, $ipcr, $plan)) {
+            abort(403, 'You are not authorized to remark on this plan.');
         }
 
         $ipcr->plans()->updateExistingPivot($planId, [
@@ -328,12 +334,20 @@ class DivisionChiefIPCRController extends Controller
      */
    public function rateIPCRPlan(Request $request, EmployeeIPCR $ipcr, $planId)
     {
+        $this->workflow->assertMutable($ipcr);
+        abort_if(
+            $ipcr->status !== IPCRWorkflowService::STATUS_FOR_RATING,
+            403,
+            'Supervisor rating is only allowed while the IPCR is submitted for rating.'
+        );
+
+        // CSC SPMS 5-point scale
         $request->validate([
             'accomplishment'  => 'nullable|string|max:255',
             'mov_link'        => 'nullable|url|max:255',
-            'sup_quality'     => 'nullable|numeric|min:0|max:100',
-            'sup_efficiency'  => 'nullable|numeric|min:0|max:100',
-            'sup_timeliness'  => 'nullable|numeric|min:0|max:100',
+            'sup_quality'     => 'nullable|integer|min:1|max:5',
+            'sup_efficiency'  => 'nullable|integer|min:1|max:5',
+            'sup_timeliness'  => 'nullable|integer|min:1|max:5',
         ]);
 
         // Ensure this plan belongs to THIS IPCR
@@ -344,17 +358,8 @@ class DivisionChiefIPCRController extends Controller
         // Authorization: check the logged-in user is the correct rater for this plan
         $user = auth()->user();
         $plan = \App\Models\WorkDistributionPlan::with(['offices', 'committees', 'specialAssignments'])->findOrFail($planId);
-        $divisionId = Division::where('division_chief_id', $user->id)->value('id') ?? $user->division_id;
 
-        $isDCForEmployee = $divisionId && $ipcr->user->division_id == $divisionId;
-        $canRate = $user->hasRole('OCD') || $isDCForEmployee || match ($plan->rated_by) {
-            'Unit Head'      => $plan->offices->contains(fn($o) => $o->unit_head == $user->id),
-            'Committee Head' => $plan->committees->contains(fn($c) => $c->head_id == $user->id),
-            'Coordinator'    => $plan->specialAssignments->contains(fn($a) => $a->coordinator_id == $user->id),
-            default          => false,
-        };
-
-        if (!$canRate) {
+        if (! $this->workflow->canRatePlan($user, $ipcr, $plan)) {
             abort(403, 'You are not authorized to rate this plan.');
         }
 
@@ -381,22 +386,17 @@ class DivisionChiefIPCRController extends Controller
             ->back()
             ->with('success', 'Accomplishment and supervisor ratings saved successfully.');
     }
+
     public function saveRatings(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status' => 'Rated & For PMT Review',
+        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_RATED, [
             'submitted_rating_at' => now(),
-        ]);
+        ], 'ipcr_rated');
 
         $employeeIPCR->load('user');
         Mail::to($employeeIPCR->user->email)->send(new IPCRRatedMail($employeeIPCR, $employeeIPCR->user->name));
-
-        AuditLogger::log([
-            'action'         => 'ipcr_rated',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Rated & For PMT Review'],
-        ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Rating recorded successfully.');
@@ -404,33 +404,29 @@ class DivisionChiefIPCRController extends Controller
 
     public function submitToHR(Request $request)
     {
-        $request->validate(['rating_period' => 'required|string']);
+        $request->validate([
+            'rating_period_id' => 'nullable|exists:ipcr_rating_periods,id',
+            'rating_period'    => 'required_without:rating_period_id|nullable|string',
+        ]);
 
         $user = auth()->user();
         $divisionId = Division::where('division_chief_id', $user->id)->value('id') ?? $user->division_id;
 
-        $ipcrs = EmployeeIPCR::where('status', 'Rated & For PMT Review')
-            ->where('rating_period', $request->rating_period)
+        $ipcrs = EmployeeIPCR::where('status', IPCRWorkflowService::STATUS_RATED)
+            ->when($request->rating_period_id,
+                fn($q) => $q->where('rating_period_id', $request->rating_period_id),
+                fn($q) => $q->where('rating_period', $request->rating_period))
             ->when($divisionId, fn($q) => $q->whereHas('user', fn($u) => $u->where('division_id', $divisionId)))
             ->get();
 
-        DB::transaction(function () use ($ipcrs) {
-            foreach ($ipcrs as $ipcr) {
-                $ipcr->update([
-                    'status'            => 'Submitted to HR',
-                    'submitted_to_hr_at' => now(),
-                ]);
+        foreach ($ipcrs as $ipcr) {
+            $this->workflow->assertCanManage($user, $ipcr);
+            $this->workflow->transition($ipcr, IPCRWorkflowService::STATUS_SUBMITTED_HR, [
+                'submitted_to_hr_at' => now(),
+            ], 'ipcr_submitted_to_hr');
+        }
 
-                AuditLogger::log([
-                    'action'         => 'ipcr_submitted_to_hr',
-                    'auditable_type' => EmployeeIPCR::class,
-                    'auditable_id'   => $ipcr->id,
-                    'new_values'     => ['status' => 'Submitted to HR'],
-                ]);
-            }
-        });
-
-        User::havingRole('HR')->each(function ($hr) use ($ipcrs, $request) {
+        User::havingRole('HR')->each(function ($hr) use ($ipcrs) {
             foreach ($ipcrs as $ipcr) {
                 Mail::to($hr->email)->send(new IPCRSubmittedToHRMail($ipcr, $hr->name));
             }
@@ -444,6 +440,9 @@ class DivisionChiefIPCRController extends Controller
      */
     public function saveComments(Request $request, EmployeeIPCR $employeeIPCR)
     {
+        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+        $this->workflow->assertMutable($employeeIPCR);
+
         $data = $request->validate([
             'division_comments' => 'nullable|string|max:2000',
         ]);

@@ -17,6 +17,7 @@ export function useOutcomes(props) {
     outcome: "",
     sub_outcome: "",
     function_type: "",
+    fiscal_year: props.currentFiscalYear ?? null,
   });
 
   const filteredOutcomes = computed(() => {
@@ -39,6 +40,7 @@ export function useOutcomes(props) {
       outcome: outcome.outcome,
       sub_outcome: outcome.sub_outcome ?? "",
       function_type: outcome.function_type ?? "",
+      fiscal_year: outcome.fiscal_year ?? null,
     });
   } else {
     Object.assign(form.value, {
@@ -46,6 +48,7 @@ export function useOutcomes(props) {
       outcome: "",
       sub_outcome: "",
       function_type: "",
+      fiscal_year: props.currentFiscalYear ?? null,
     });
   }
 

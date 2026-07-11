@@ -92,11 +92,6 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    public function ipcrs()
-    {
-        return $this->hasMany(IPCR::class, 'user_id');
-    }
-
     public function digitalSignatures()
     {
         return $this->hasMany(DigitalSignature::class, 'signer_id');

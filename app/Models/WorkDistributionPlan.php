@@ -15,7 +15,20 @@ class WorkDistributionPlan extends Model
         'office_involved',
         'free_text_involved',
         'rated_by',
+        'fiscal_year',
     ];
+
+    // NULL fiscal_year = applies to all years (legacy rows)
+    public function scopeForFiscalYear($query, ?int $year)
+    {
+        if (! $year) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($year) {
+            $q->whereNull('fiscal_year')->orWhere('fiscal_year', $year);
+        });
+    }
 
     // Many offices can be involved in a plan
     public function offices()
@@ -52,11 +65,6 @@ class WorkDistributionPlan extends Model
             ->withTimestamps();
     }
 
-    // Each plan has many IPCR records
-    public function ipcrs()
-    {
-        return $this->hasMany(IPCR::class, 'work_distribution_plan_id');
-    }
     public function employeeipcrs()
     {
         return $this->belongsToMany(EmployeeIPCR::class, 'employee_ipcrs_plan', 'plan_id', 'ipcr_id');

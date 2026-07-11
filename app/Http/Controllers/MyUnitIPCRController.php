@@ -39,14 +39,22 @@ class MyUnitIPCRController extends Controller
             ->whereColumn('ipcr_id', 'employee_ipcrs.id')
             ->whereNotNull('sup_average');
 
-        $ipcrs = EmployeeIPCR::with(['user.office'])
+        $ipcrs = EmployeeIPCR::with(['user.office', 'period'])
             ->addSelect(['overall_average' => $avgSubquery])
             ->whereHas('user', fn($q) => $q->whereIn('office_id', $officeIds))
             ->whereIn('status', self::VIEWABLE_STATUSES)
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $ratingPeriods = $ipcrs->pluck('rating_period')->filter()->unique()->sort()->values();
+        $ratingPeriods = $ipcrs
+            ->map(fn ($ipcr) => [
+                'id'    => $ipcr->rating_period_id,
+                'label' => $ipcr->period?->label ?? $ipcr->rating_period,
+            ])
+            ->filter(fn ($p) => $p['label'])
+            ->unique('label')
+            ->sortBy('label')
+            ->values();
 
         return Inertia::render('PerformanceManagement/MyUnit/Index', [
             'offices'       => $offices,
@@ -70,6 +78,7 @@ class MyUnitIPCRController extends Controller
 
         $ipcr = EmployeeIPCR::with([
             'user.office',
+            'period',
             'plans.performance_indicator.agencyOutcome',
             'plans.offices',
             'plans.committees',
@@ -101,10 +110,12 @@ class MyUnitIPCRController extends Controller
         });
 
         return Inertia::render('PerformanceManagement/MyUnit/Show', [
-            'ipcr'     => $ipcr,
-            'plans'    => $plans,
-            'employee' => $ipcr->user,
-            'unitHead' => $user,
+            'ipcr'         => $ipcr,
+            'plans'        => $plans,
+            'employee'     => $ipcr->user,
+            'unitHead'     => $user,
+            'isMutable'    => $ipcr->isMutable(),
+            'periodClosed' => $ipcr->isPeriodClosed(),
         ]);
     }
 }

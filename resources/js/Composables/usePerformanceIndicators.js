@@ -23,6 +23,7 @@ export function usePerformanceIndicators(props) {
     agency_outcome_id: "",
     divisions: [], // full objects for UI
     budget: "",
+    fiscal_year: props.currentFiscalYear ?? null,
   })
 
   // ✅ Filter + paginate
@@ -51,6 +52,7 @@ export function usePerformanceIndicators(props) {
         agency_outcome_id: indicator.agency_outcome_id ?? "",
         divisions: indicator.divisions ? [...indicator.divisions] : [], // keep objects
         budget: indicator.budget ?? "",
+        fiscal_year: indicator.fiscal_year ?? null,
       }
     } else {
       form.value = {
@@ -60,6 +62,7 @@ export function usePerformanceIndicators(props) {
         agency_outcome_id: "",
         divisions: [],
         budget: "",
+        fiscal_year: props.currentFiscalYear ?? null,
       }
     }
 

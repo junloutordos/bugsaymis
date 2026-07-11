@@ -668,6 +668,13 @@ export const menuItems = [
         icon: ClipboardDocumentListIcon,
         permissions: ["ipcr.approve"],
       },
+      {
+        label: "Rating Periods",
+        routeName: "ipcr-rating-periods.index",
+        href: route("ipcr-rating-periods.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["ipcr.admin"],
+      },
     ],
   },
   {

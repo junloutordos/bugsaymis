@@ -13,6 +13,7 @@ import AppModal from "@/Components/AppModal.vue"
 import EmptyState from "@/Components/EmptyState.vue"
 import PaginationControl from "@/Components/PaginationControl.vue"
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon } from "@heroicons/vue/24/outline"
+import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
 import { usePerformanceIndicators } from "@/Composables/usePerformanceIndicators.js"
 import Multiselect from "vue-multiselect"
 import "vue-multiselect/dist/vue-multiselect.css"
@@ -22,6 +23,9 @@ const props = defineProps({
   indicators: Array,
   divisions: Array,
   outcomes: Array,
+  fiscalYears: { type: Array, default: () => [] },
+  selectedFiscalYear: { type: [String, Number], default: "" },
+  currentFiscalYear: { type: Number, default: null },
 })
 
 const {
@@ -57,6 +61,7 @@ const {
       <!-- Search -->
       <AppFilterBar>
         <AppInput v-model="searchQuery" placeholder="Search indicators..." class="w-full sm:w-72" />
+        <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="performanceindicator.index" />
       </AppFilterBar>
 
       <!-- Table -->
@@ -166,6 +171,11 @@ const {
           </div>
 
           <AppInput v-model="form.budget" label="Budget" type="number" min="0" step="0.01" required />
+
+          <AppSelect v-model="form.fiscal_year" label="Fiscal Year">
+            <option :value="null">All years (unscoped)</option>
+            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+          </AppSelect>
         </form>
 
         <template #footer>

@@ -26,6 +26,9 @@ const props = defineProps({
   isFaculty:        { type: Boolean, default: false },
   suggestedPlanIds: { type: Array,   default: () => [] },
   isOwner:          { type: Boolean, default: false },
+  isMutable:        { type: Boolean, default: true },
+  periodClosed:     { type: Boolean, default: false },
+  hrDeadline:       { type: String,  default: null },
 });
 
 const { isSubmitting, submit } = useSubmit();
@@ -35,7 +38,7 @@ const PRE_RATING_STATUSES = ['New Target', 'Draft', 'For Review', 'For Rating', 
 const showRatings = computed(() => !PRE_RATING_STATUSES.includes(props.ipcr.status));
 
 // Show header block, footer, supervisor ratings, and print button for all post-rating stages
-const PMT_STAGES = ['Rated & For PMT Review', 'Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT'];
+const PMT_STAGES = ['Rated & For PMT Review', 'Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT', 'Submitted to HR', 'Director Signed'];
 const isAtPMTStage = computed(() => PMT_STAGES.includes(props.ipcr.status));
 
 // ---------- Helpers ----------
@@ -192,13 +195,29 @@ const form = ref({
   timeliness: null,
 });
 
-const canEditGlobally = computed(() => props.isOwner && props.ipcr?.status === "Targets Approved");
+const canEditGlobally = computed(() => props.isOwner && props.isMutable && props.ipcr?.status === "Targets Approved");
+
+// Read-only banner: Director Signed (final) or rating period closed
+const readOnlyReason = computed(() => {
+  if (props.ipcr?.status === "Director Signed") return "This IPCR has been signed by the Director and is final.";
+  if (props.periodClosed) return "The rating period for this IPCR is closed. This record is read-only.";
+  return null;
+});
+
+// CSC SPMS: IPCR due to HR within 15 days after the rating period ends
+const hrDeadlineLabel = computed(() => {
+  if (!props.hrDeadline) return null;
+  return new Date(props.hrDeadline).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+});
+const hrDeadlinePast = computed(() => props.hrDeadline && new Date(props.hrDeadline) < new Date());
 const liveAverage = computed(() =>
   computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness)
 );
 
 // ---------- Derived date / year computed props ----------
-const ratingYear = computed(() => extractYearFromRatingPeriod(props.ipcr?.rating_period || ""));
+const ratingYear = computed(() =>
+  props.ipcr?.period?.year ?? extractYearFromRatingPeriod(props.ipcr?.rating_period || "")
+);
 
 // Formatted dates for signature / table (returns '—' if not present/invalid)
 const formattedSubmittedForReviewAt = computed(() => formatDateString(props.ipcr?.submitted_for_review_at));
@@ -695,13 +714,27 @@ const pullFLAccomplishments = () => {
         </template>
       </AppPageHeader>
 
+      <!-- Read-only banner (finalized or closed period) -->
+      <div v-if="readOnlyReason" class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 no-print">
+        {{ readOnlyReason }}
+      </div>
+
+      <!-- CSC SPMS deadline chip -->
+      <div
+        v-else-if="hrDeadlineLabel && !['Submitted to HR', 'Submitted to PMT', 'Approved by PMT', 'Director Signed'].includes(ipcr.status)"
+        :class="['rounded-lg border px-4 py-3 text-sm no-print', hrDeadlinePast ? 'border-danger-200 bg-danger-50 text-danger-700' : 'border-indigo-100 bg-indigo-50 text-indigo-700']"
+      >
+        Per CSC SPMS rules, this IPCR is due to HR by <strong>{{ hrDeadlineLabel }}</strong> (15 days after the rating period ends).
+        <span v-if="hrDeadlinePast" class="font-semibold">This deadline has passed.</span>
+      </div>
+
       <!-- IPCR Details Card -->
       <AppCard :padded="false">
         <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-base font-semibold text-slate-800">IPCR Details</h2>
           <div class="flex flex-wrap items-center gap-2 no-print">
             <AppButton
-              v-if="isOwner && ipcr.status === 'New Target'"
+              v-if="isMutable && isOwner && ipcr.status === 'New Target'"
               @click="submitForReview"
               :loading="isSubmitting"
               :disabled="isSubmitting"
@@ -711,7 +744,7 @@ const pullFLAccomplishments = () => {
             </AppButton>
 
             <AppButton
-              v-if="isOwner && ipcr.status === 'Targets Approved'"
+              v-if="isMutable && isOwner && ipcr.status === 'Targets Approved'"
               @click="submitForRating"
               :loading="isSubmitting"
               :disabled="isSubmitting"
@@ -722,7 +755,7 @@ const pullFLAccomplishments = () => {
 
             <!-- Faculty Loading sync — CID teachers only, available before submission -->
             <AppButton
-              v-if="isFaculty && ['New Target', 'For Review', 'Targets Approved', 'Returned for Revision'].includes(ipcr.status)"
+              v-if="isMutable && isFaculty && ['New Target', 'For Review', 'Targets Approved', 'Returned for Revision'].includes(ipcr.status)"
               variant="success"
               @click="pullFLAccomplishments"
               :loading="isSubmitting"
@@ -734,7 +767,7 @@ const pullFLAccomplishments = () => {
             </AppButton>
 
             <AppButton
-              v-if="isOwner && ipcr.status === 'Returned for Revision'"
+              v-if="isMutable && isOwner && ipcr.status === 'Returned for Revision'"
               @click="showAddPlansModal = true"
             >
               <PlusIcon class="h-4 w-4" />
@@ -742,7 +775,7 @@ const pullFLAccomplishments = () => {
             </AppButton>
 
             <AppButton
-              v-if="isOwner && ipcr.status === 'Returned for Revision'"
+              v-if="isMutable && isOwner && ipcr.status === 'Returned for Revision'"
               variant="secondary"
               @click="resubmit"
               :loading="isSubmitting"
@@ -1207,19 +1240,19 @@ const pullFLAccomplishments = () => {
       <div class="grid grid-cols-3 gap-3">
         <AppInput
           label="Quality"
-          type="number" min="0" max="100"
+          type="number" min="1" max="5" step="1"
           v-model="form.quality"
           :disabled="hasSupervisorRating(currentPlan?.pivot)"
         />
         <AppInput
           label="Efficiency"
-          type="number" min="0" max="100"
+          type="number" min="1" max="5" step="1"
           v-model="form.efficiency"
           :disabled="hasSupervisorRating(currentPlan?.pivot)"
         />
         <AppInput
           label="Timeliness"
-          type="number" min="0" max="100"
+          type="number" min="1" max="5" step="1"
           v-model="form.timeliness"
           :disabled="hasSupervisorRating(currentPlan?.pivot)"
         />

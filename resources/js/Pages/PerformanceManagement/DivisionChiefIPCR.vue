@@ -24,8 +24,11 @@ const props = defineProps({
   divisionEmployees: { type: Array, default: () => [] },
   workPlans:         Array,
   supervisor:        Object,
-  ratingPeriods:     { type: Array, default: () => [] },
+  ratingPeriods:     { type: Array, default: () => [] }, // {id, label} pairs from visible IPCRs (id null on legacy rows)
+  openPeriods:       { type: Array, default: () => [] }, // open IPCRRatingPeriod objects for the create modal
 })
+
+const periodLabels = computed(() => props.ratingPeriods.map(p => p.label))
 
 const {
   workPlans: workPlansList,
@@ -104,7 +107,7 @@ const ipcrBadgeColor = (status) => {
 // ── Submit to HR ─────────────────────────────────────────────
 const { isSubmitting, submit } = useSubmit()
 
-const submitToHRPeriod = ref(props.ratingPeriods[0] ?? "")
+const submitToHRPeriod = ref(props.ratingPeriods[0]?.label ?? "")
 const ratedForHRCount  = computed(() =>
   props.ipcrs.filter(i =>
     i.status === 'Rated & For PMT Review' &&
@@ -120,7 +123,11 @@ const submitToHR = async () => {
     confirmText: "Yes, submit!",
   })
   if (confirmed) {
-    submit.post(route('division-chief-ipcr.submitToHR'), { rating_period: submitToHRPeriod.value })
+    const period = props.ratingPeriods.find(p => p.label === submitToHRPeriod.value)
+    submit.post(route('division-chief-ipcr.submitToHR'), {
+      rating_period_id: period?.id ?? null,
+      rating_period: submitToHRPeriod.value,
+    })
   }
 }
 
@@ -139,7 +146,7 @@ const ratedIPCRs = computed(() =>
 )
 
 const openReportModal = () => {
-  reportPeriod.value = props.ratingPeriods[0] ?? ''
+  reportPeriod.value = props.ratingPeriods[0]?.label ?? ''
   reportTo.value = ''
   showReportModal.value = true
 }
@@ -266,7 +273,7 @@ const printMemo = () => {
           <div class="flex items-center gap-2">
             <AppSelect v-model="submitToHRPeriod" placeholder="— Period —" :show-blank="false" class="min-w-40">
               <option value="" disabled>— Period —</option>
-              <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+              <option v-for="p in periodLabels" :key="p" :value="p">{{ p }}</option>
             </AppSelect>
             <AppButton
               size="sm"
@@ -288,7 +295,7 @@ const printMemo = () => {
           class="flex-1 min-w-52"
         />
         <AppSelect v-model="selectedPeriod" placeholder="All Periods" class="min-w-40">
-          <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+          <option v-for="p in periodLabels" :key="p" :value="p">{{ p }}</option>
         </AppSelect>
       </AppFilterBar>
 
@@ -401,7 +408,11 @@ const printMemo = () => {
     <!-- Add/Edit IPCR Modal -->
     <AppModal :show="showModal" :title="modalMode === 'create' ? 'Add Target' : 'Edit Target'" @close="closeModal">
       <div class="space-y-4">
-        <AppInput v-model="form.rating_period" label="Rating Period" />
+        <AppSelect v-model="form.rating_period_id" label="Rating Period" required placeholder="-- Select Rating Period --">
+          <option v-for="p in openPeriods" :key="p.id" :value="p.id">
+            {{ p.label }}{{ p.is_current ? ' (Current)' : '' }}
+          </option>
+        </AppSelect>
         <AppInput v-model="form.title" label="Title" />
         <AppTextarea v-model="form.remarks" label="Remarks" :rows="3" />
       </div>
@@ -442,7 +453,7 @@ const printMemo = () => {
         <div>
           <AppSelect v-model="reportPeriod" label="Rating Period" :show-blank="false">
             <option value="" disabled>— Select a rating period —</option>
-            <option v-for="period in ratingPeriods" :key="period" :value="period">{{ period }}</option>
+            <option v-for="period in periodLabels" :key="period" :value="period">{{ period }}</option>
           </AppSelect>
           <p v-if="ratingPeriods.length === 0" class="text-xs text-danger-600 mt-1">No rated IPCRs found.</p>
         </div>

@@ -57,7 +57,7 @@ const formatDateString = (value) => {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 }
 
-const ratingYear                    = computed(() => extractYearFromRatingPeriod(props.ipcr?.rating_period || ""))
+const ratingYear                    = computed(() => props.ipcr?.period?.year ?? extractYearFromRatingPeriod(props.ipcr?.rating_period || ""))
 const formattedSubmittedForReviewAt = computed(() => formatDateString(props.ipcr?.submitted_for_review_at))
 const formattedTargetApprovedAt     = computed(() => formatDateString(props.ipcr?.target_approved_at))
 const formattedSubmittedRatingAt    = computed(() => formatDateString(props.ipcr?.submitted_rating_at))

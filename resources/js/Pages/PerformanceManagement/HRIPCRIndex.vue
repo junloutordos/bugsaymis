@@ -15,9 +15,10 @@ import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 
 const props = defineProps({
   ipcrs:         Array,
-  ratingPeriods: { type: Array, default: () => [] },
+  ratingPeriods: { type: Array, default: () => [] }, // {id, label} pairs (id null on legacy rows)
 })
 
+const periodLabels   = computed(() => props.ratingPeriods.map(p => p.label))
 const searchQuery    = ref("")
 const selectedPeriod = ref("")
 const adjectival     = ipcrAdjectivalRating
@@ -34,7 +35,7 @@ const filtered = computed(() => {
 const formatDate = (val) => val ? new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"
 
 // ── Batch Submit to PMT ───────────────────────────────────────
-const submitToPMTPeriod = ref(props.ratingPeriods[0] ?? "")
+const submitToPMTPeriod = ref(props.ratingPeriods[0]?.label ?? "")
 const submittedToHRCount = computed(() =>
   (props.ipcrs || []).filter(i =>
     i.status === 'Submitted to HR' &&
@@ -51,7 +52,11 @@ async function batchSubmitToPMT() {
     text: `Submit all ${submittedToHRCount.value} IPCR(s) for "${submitToPMTPeriod.value}" to PMT?`,
     confirmText: "Yes, submit!",
   })) {
-    submit.post(route('hr-ipcr.batchSubmitToPMT'), { rating_period: submitToPMTPeriod.value })
+    const period = props.ratingPeriods.find(p => p.label === submitToPMTPeriod.value)
+    submit.post(route('hr-ipcr.batchSubmitToPMT'), {
+      rating_period_id: period?.id ?? null,
+      rating_period: submitToPMTPeriod.value,
+    })
   }
 }
 
@@ -90,7 +95,7 @@ function statusBadgeColor(status) {
               class="border-0 bg-transparent text-sm text-slate-700 focus:ring-0 p-0"
             >
               <option value="" disabled>— Period —</option>
-              <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+              <option v-for="p in periodLabels" :key="p" :value="p">{{ p }}</option>
             </select>
             <AppButton
               size="sm"
@@ -117,7 +122,7 @@ function statusBadgeColor(status) {
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         >
           <option value="">All Periods</option>
-          <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+          <option v-for="p in periodLabels" :key="p" :value="p">{{ p }}</option>
         </select>
       </AppFilterBar>
 

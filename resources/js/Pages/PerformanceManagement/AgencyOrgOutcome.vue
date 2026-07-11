@@ -10,10 +10,14 @@ import AppBadge from "@/Components/AppBadge.vue";
 import EmptyState from "@/Components/EmptyState.vue";
 import PaginationControl from "@/Components/PaginationControl.vue";
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import FiscalYearFilter from "@/Components/FiscalYearFilter.vue";
 import { useOutcomes } from "@/Composables/useOutcomes.js";
 
 const props = defineProps({
   outcomes: Array,
+  fiscalYears: { type: Array, default: () => [] },
+  selectedFiscalYear: { type: [String, Number], default: "" },
+  currentFiscalYear: { type: Number, default: null },
 });
 
 const {
@@ -66,6 +70,7 @@ function outcomeTypeColor(type) {
           placeholder="Search outcomes..."
           class="flex-1 min-w-52 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         />
+        <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="outcome.index" />
       </AppFilterBar>
 
       <!-- Table -->
@@ -192,6 +197,13 @@ function outcomeTypeColor(type) {
                 <select v-model="form.function_type" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
                   <option value="" disabled>Select type</option>
                   <option v-for="type in outcomeTypes" :key="type" :value="type">{{ type }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Fiscal Year</label>
+                <select v-model="form.fiscal_year" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option :value="null">All years (unscoped)</option>
+                  <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
                 </select>
               </div>
             </div>

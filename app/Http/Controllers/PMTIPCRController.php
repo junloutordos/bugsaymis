@@ -8,51 +8,14 @@ use App\Mail\IPCRPMTReturnedMail;
 use App\Models\Division;
 use App\Models\EmployeeIPCR;
 use App\Models\User;
-use App\Services\AuditLogger;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class PMTIPCRController extends Controller
 {
-    /**
-     * Normalize function type string to canonical name.
-     */
-    private function normalizeFunctionType(?string $raw): string
+    public function __construct(private IPCRWorkflowService $workflow)
     {
-        if (!$raw) return 'Uncategorized';
-        $t = strtolower(trim($raw));
-        if (in_array($t, ['strategic', 'strategic functions', 'strategic function'])) return 'Strategic Functions';
-        if (in_array($t, ['core', 'core functions', 'core function']))               return 'Core Functions';
-        if (in_array($t, ['support', 'support functions', 'support function']))      return 'Support Functions';
-        return trim($raw);
-    }
-
-    /**
-     * Compute weighted final IPCR rating (Strategic 30%, Core 55%, Support 15%).
-     * Mirrors the formula used in DivisionChiefIPCRShow.vue and PMTIPCRShow.vue.
-     */
-    private function computeWeightedAverage($plans): ?float
-    {
-        $weights = ['Strategic Functions' => 0.30, 'Core Functions' => 0.55, 'Support Functions' => 0.15];
-        $groups  = [];
-
-        foreach ($plans as $plan) {
-            $ft     = $this->normalizeFunctionType($plan->performance_indicator?->agencyOutcome?->function_type);
-            $supAvg = $plan->pivot?->sup_average;
-            if ($supAvg === null || $supAvg === '') continue;
-            $groups[$ft]['total'] = ($groups[$ft]['total'] ?? 0) + (float) $supAvg;
-            $groups[$ft]['count'] = ($groups[$ft]['count'] ?? 0) + 1;
-        }
-
-        $totalWeighted = 0;
-        $hasAny        = false;
-        foreach ($groups as $ft => $data) {
-            $weight         = $weights[$ft] ?? 0;
-            $totalWeighted += ($data['total'] / $data['count']) * $weight;
-            $hasAny         = true;
-        }
-
-        return $hasAny ? round($totalWeighted, 2) : null;
     }
 
     /**
@@ -62,13 +25,15 @@ class PMTIPCRController extends Controller
     {
         $ipcrs = EmployeeIPCR::with([
                 'user.division',
+                'period',
                 'plans.performance_indicator.agencyOutcome',
             ])
             ->whereIn('status', ['Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT', 'Director Signed'])
             ->orderBy('submitted_for_pmtreview_at', 'desc')
             ->get()
             ->map(function ($ipcr) {
-                $ipcr->overall_average = $this->computeWeightedAverage($ipcr->plans);
+                $ipcr->overall_average = $ipcr->final_numeric_rating
+                    ?? $this->workflow->computeWeightedAverage($ipcr->plans);
                 return $ipcr;
             });
 
@@ -84,6 +49,7 @@ class PMTIPCRController extends Controller
     {
         $ipcr = EmployeeIPCR::with([
             'user.division.divisionchief',
+            'period',
             'plans.performance_indicator.agencyOutcome',
         ])->findOrFail($id);
 
@@ -93,6 +59,8 @@ class PMTIPCRController extends Controller
             'employee'   => $ipcr->user,
             'supervisor' => $ipcr->user?->division?->divisionchief,
             'isOCD'      => auth()->user()->hasPermission('ipcr.approve'),
+            'isMutable'  => $ipcr->isMutable(),
+            'periodClosed' => $ipcr->isPeriodClosed(),
         ]);
     }
 
@@ -101,20 +69,11 @@ class PMTIPCRController extends Controller
      */
     public function approve(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status' => 'Approved by PMT',
-        ]);
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_PMT_APPROVED, [], 'ipcr_pmt_approved');
 
         User::havingRole('OCD')->each(function ($ocd) use ($employeeIPCR) {
             Mail::to($ocd->email)->send(new IPCRApprovedByPMTMail($employeeIPCR, $ocd->name));
         });
-
-        AuditLogger::log([
-            'action'         => 'ipcr_pmt_approved',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Approved by PMT'],
-        ]);
 
         return to_route('pmt-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR approved by PMT.');
@@ -125,9 +84,7 @@ class PMTIPCRController extends Controller
      */
     public function returnForRevision(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status' => 'PMT Returned for Revision',
-        ]);
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_PMT_RETURNED, [], 'ipcr_pmt_returned');
 
         $employeeIPCR->load('user.division');
 
@@ -144,13 +101,6 @@ class PMTIPCRController extends Controller
         // Notify Employee
         Mail::to($employeeIPCR->user->email)->send(new IPCRPMTReturnedMail($employeeIPCR, $employeeIPCR->user->name));
 
-        AuditLogger::log([
-            'action'         => 'ipcr_pmt_returned',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'PMT Returned for Revision'],
-        ]);
-
         return to_route('pmt-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR returned for revision. Division Chief and employee have been notified.');
     }
@@ -159,12 +109,8 @@ class PMTIPCRController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('ipcr.approve'), 403);
 
-        $user = auth()->user();
-        $employeeIPCR->update([
-            'status'             => 'Director Signed',
-            'director_signed_at' => now(),
-            'director_signature' => $user->electronic_signature,
-        ]);
+        // Terminal transition: signs, then snapshots the final numeric + adjectival rating
+        $this->workflow->finalize($employeeIPCR, auth()->user());
 
         // Notify DC
         $divisionId = $employeeIPCR->user->division_id;
@@ -178,13 +124,6 @@ class PMTIPCRController extends Controller
 
         // Notify Employee
         Mail::to($employeeIPCR->user->email)->send(new IPCRDirectorSignedMail($employeeIPCR, $employeeIPCR->user->name));
-
-        AuditLogger::log([
-            'action'         => 'ipcr_director_signed',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Director Signed'],
-        ]);
 
         return to_route('pmt-ipcr.show', $employeeIPCR->id)->with('success', 'IPCR signed by Director.');
     }

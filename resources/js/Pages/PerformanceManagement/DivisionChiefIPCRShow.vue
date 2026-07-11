@@ -19,7 +19,24 @@ const props = defineProps({
   employee: Object,
   supervisor: Object,
   canManageIpcr: Boolean,
+  isMutable:     { type: Boolean, default: true },
+  periodClosed:  { type: Boolean, default: false },
+  hrDeadline:    { type: String,  default: null },
 });
+
+// Read-only banner: Director Signed (final) or rating period closed
+const readOnlyReason = computed(() => {
+  if (props.ipcr?.status === "Director Signed") return "This IPCR has been signed by the Director and is final.";
+  if (props.periodClosed) return "The rating period for this IPCR is closed. This record is read-only.";
+  return null;
+});
+
+// CSC SPMS: IPCR due to HR within 15 days after the rating period ends
+const hrDeadlineLabel = computed(() => {
+  if (!props.hrDeadline) return null;
+  return new Date(props.hrDeadline).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+});
+const hrDeadlinePast = computed(() => props.hrDeadline && new Date(props.hrDeadline) < new Date());
 
 const divisionComments = ref(props.ipcr.remarks ?? "");
 const isEditing = ref(!divisionComments.value);
@@ -121,7 +138,7 @@ const isModalOpen = ref(false);
 const currentPlan = ref(null);
 const form = ref({ accomplishment: "", mov_link: "", quality: null, efficiency: null, timeliness: null });
 
-const canEdit = computed(() => props.ipcr.status === "Submitted for Rating")
+const canEdit = computed(() => props.isMutable && props.ipcr.status === "Submitted for Rating")
 
 // Determine whether the logged-in user can rate a specific plan
 const canRatePlan = (plan) => {
@@ -187,7 +204,9 @@ const formatDateString = (value) => {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 };
 
-const ratingYear = computed(() => extractYearFromRatingPeriod(props.ipcr?.rating_period || ""));
+const ratingYear = computed(() =>
+  props.ipcr?.period?.year ?? extractYearFromRatingPeriod(props.ipcr?.rating_period || "")
+);
 const formattedSubmittedForReviewAt = computed(() => formatDateString(props.ipcr?.submitted_for_review_at));
 const formattedTargetApprovedAt = computed(() => formatDateString(props.ipcr?.target_approved_at));
 const formattedSubmittedRatingAt = computed(() => formatDateString(props.ipcr?.submitted_rating_at));
@@ -446,8 +465,22 @@ const approveTargets = () => {
             <AppBadge :color="ipcrBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
           </div>
         </div>
+        <div v-if="readOnlyReason" class="px-5 pt-4">
+          <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 no-print">
+            {{ readOnlyReason }}
+          </div>
+        </div>
+        <div
+          v-else-if="hrDeadlineLabel && !['Submitted to HR', 'Submitted to PMT', 'Approved by PMT', 'Director Signed'].includes(ipcr.status)"
+          class="px-5 pt-4"
+        >
+          <div :class="['rounded-lg border px-4 py-3 text-sm no-print', hrDeadlinePast ? 'border-danger-200 bg-danger-50 text-danger-700' : 'border-indigo-100 bg-indigo-50 text-indigo-700']">
+            Due to HR by <strong>{{ hrDeadlineLabel }}</strong> (CSC SPMS: 15 days after the rating period ends).
+            <span v-if="hrDeadlinePast" class="font-semibold">This deadline has passed.</span>
+          </div>
+        </div>
         <div class="p-5 flex flex-wrap gap-2">
-          <template v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'">
+          <template v-if="isMutable && canManageIpcr && ipcr.status === 'Submitted for Rating'">
             <AppButton :loading="isSubmitting" :disabled="isSubmitting" @click="saveRatings">
               {{ isSubmitting ? 'Processing…' : 'Save Ratings' }}
             </AppButton>
@@ -456,20 +489,20 @@ const approveTargets = () => {
               ⚠ {{ unratedPlans.length }} plan(s) still awaiting rating
             </span>
           </template>
-          <AppButton v-if="canManageIpcr && ipcr.status === 'For Review'" :loading="isSubmitting" :disabled="isSubmitting" @click="approveTargets">
+          <AppButton v-if="isMutable && canManageIpcr && ipcr.status === 'For Review'" :loading="isSubmitting" :disabled="isSubmitting" @click="approveTargets">
             {{ isSubmitting ? 'Processing…' : 'Approve Targets' }}
           </AppButton>
-          <AppButton v-if="canManageIpcr && ipcr.status === 'For Review'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="disapproveTargets">
+          <AppButton v-if="isMutable && canManageIpcr && ipcr.status === 'For Review'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="disapproveTargets">
             {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
           </AppButton>
-          <AppButton v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="returnAccomplishment">
+          <AppButton v-if="isMutable && canManageIpcr && ipcr.status === 'Submitted for Rating'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="returnAccomplishment">
             {{ isSubmitting ? 'Processing…' : 'Return Accomplishment for Revision' }}
           </AppButton>
           <span v-if="canManageIpcr && ipcr.status === 'Rated & For PMT Review'"
             class="inline-flex items-center text-sm text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-2 rounded-lg">
             Rated — use the <strong class="mx-1">Division index page</strong> to batch-submit to HR.
           </span>
-          <AppButton v-if="canManageIpcr && ipcr.status === 'PMT Returned for Revision'" variant="danger" @click="showReturnFromPMTModal = true">
+          <AppButton v-if="isMutable && canManageIpcr && ipcr.status === 'PMT Returned for Revision'" variant="danger" @click="showReturnFromPMTModal = true">
             Return to Employee
           </AppButton>
           <AppButton v-if="isAtRatedStage" variant="secondary" @click="printIPCR">
@@ -861,9 +894,9 @@ const approveTargets = () => {
           <AppTextarea v-model="form.accomplishment" label="Accomplishment" :rows="2" />
           <AppInput v-model="form.mov_link" label="MOV Link" type="text" />
           <div class="grid grid-cols-3 gap-3">
-            <AppInput v-model="form.quality" label="Quality" type="number" min="0" max="5" />
-            <AppInput v-model="form.efficiency" label="Efficiency" type="number" min="0" max="5" />
-            <AppInput v-model="form.timeliness" label="Timeliness" type="number" min="0" max="5" />
+            <AppInput v-model="form.quality" label="Quality (1–5)" type="number" min="1" max="5" step="1" />
+            <AppInput v-model="form.efficiency" label="Efficiency (1–5)" type="number" min="1" max="5" step="1" />
+            <AppInput v-model="form.timeliness" label="Timeliness (1–5)" type="number" min="1" max="5" step="1" />
           </div>
           <div class="text-right text-sm font-semibold text-slate-700">Average: {{ liveAverage }}</div>
         </div>

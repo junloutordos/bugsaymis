@@ -3,19 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmployeeIPCR;
+use App\Models\IPCRRatingPeriod;
 use App\Models\SpecialAssignment;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class SpecialAssignmentPerformanceController extends Controller
 {
-    public function index()
+    public function __construct(private IPCRWorkflowService $workflow)
+    {
+    }
+
+    public function index(Request $request)
     {
         $user = auth()->user();
 
-        $query = SpecialAssignment::with(['coordinator', 'members', 'workDistributionPlans']);
+        $currentYear = IPCRRatingPeriod::current()->value('year') ?? (int) now()->format('Y');
+        $selectedFY  = $request->query('fiscal_year', (string) $currentYear);
+
+        $query = SpecialAssignment::with(['coordinator', 'members', 'workDistributionPlans'])
+            ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY));
 
         // Non-admin/DC/OCD only see assignments they belong to
         if (!$user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR'])) {
@@ -26,11 +36,15 @@ class SpecialAssignmentPerformanceController extends Controller
         }
 
         return Inertia::render('PerformanceManagement/SpecialAssignments/Index', [
-            'assignments' => $query->orderBy('name')->get(),
-            'users'       => User::select('id', 'name', 'position')->orderBy('name')->get(),
-            'plans'       => WorkDistributionPlan::select('id', 'success_indicator', 'rated_by')
-                                ->orderBy('success_indicator')->get(),
-            'authUser'    => $user->only('id', 'name'),
+            'assignments'        => $query->orderBy('name')->get(),
+            'users'              => User::select('id', 'name', 'position')->orderBy('name')->get(),
+            'plans'              => WorkDistributionPlan::select('id', 'success_indicator', 'rated_by')
+                                       ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY))
+                                       ->orderBy('success_indicator')->get(),
+            'authUser'           => $user->only('id', 'name'),
+            'fiscalYears'        => IPCRRatingPeriod::query()->distinct()->orderByDesc('year')->pluck('year'),
+            'selectedFiscalYear' => $selectedFY,
+            'currentFiscalYear'  => $currentYear,
         ]);
     }
 
@@ -45,6 +59,7 @@ class SpecialAssignmentPerformanceController extends Controller
             'name'           => 'required|string|max:255',
             'coordinator_id' => 'nullable|exists:users,id',
             'description'    => 'nullable|string',
+            'fiscal_year'    => 'nullable|integer|min:2000|max:2100',
             'member_ids'     => 'nullable|array',
             'member_ids.*'   => 'exists:users,id',
             'member_tasks'   => 'nullable|array',
@@ -56,6 +71,7 @@ class SpecialAssignmentPerformanceController extends Controller
             'name'           => $validated['name'],
             'coordinator_id' => $validated['coordinator_id'] ?? null,
             'description'    => $validated['description'] ?? null,
+            'fiscal_year'    => $validated['fiscal_year'] ?? null,
         ]);
 
         $this->syncMembers($assignment, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
@@ -75,6 +91,7 @@ class SpecialAssignmentPerformanceController extends Controller
             'name'           => 'required|string|max:255',
             'coordinator_id' => 'nullable|exists:users,id',
             'description'    => 'nullable|string',
+            'fiscal_year'    => 'nullable|integer|min:2000|max:2100',
             'member_ids'     => 'nullable|array',
             'member_ids.*'   => 'exists:users,id',
             'member_tasks'   => 'nullable|array',
@@ -86,6 +103,7 @@ class SpecialAssignmentPerformanceController extends Controller
             'name'           => $validated['name'],
             'coordinator_id' => $validated['coordinator_id'] ?? null,
             'description'    => $validated['description'] ?? null,
+            'fiscal_year'    => $validated['fiscal_year'] ?? null,
         ]);
 
         $this->syncMembers($specialAssignment, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
@@ -188,6 +206,8 @@ class SpecialAssignmentPerformanceController extends Controller
             ->where('user_id', $member->id)
             ->firstOrFail();
 
+        $this->workflow->assertMutable($ipcr);
+
         if (!$ipcr->plans()->where('work_distribution_plans.id', $request->plan_id)->exists()) {
             abort(404, 'This plan is not in the specified IPCR.');
         }
@@ -218,14 +238,16 @@ class SpecialAssignmentPerformanceController extends Controller
             'plan_id'        => 'required|exists:work_distribution_plans,id',
             'accomplishment' => 'nullable|string|max:500',
             'mov_link'       => 'nullable|url|max:255',
-            'sup_quality'    => 'nullable|numeric|min:1|max:5',
-            'sup_efficiency' => 'nullable|numeric|min:1|max:5',
-            'sup_timeliness' => 'nullable|numeric|min:1|max:5',
+            'sup_quality'    => 'nullable|integer|min:1|max:5',
+            'sup_efficiency' => 'nullable|integer|min:1|max:5',
+            'sup_timeliness' => 'nullable|integer|min:1|max:5',
         ]);
 
         $ipcr = EmployeeIPCR::where('id', $request->ipcr_id)
             ->where('user_id', $member->id)
             ->firstOrFail();
+
+        $this->workflow->assertMutable($ipcr);
 
         if ($ipcr->status !== 'Submitted for Rating') {
             abort(403, 'Ratings can only be edited while the IPCR is "Submitted for Rating".');

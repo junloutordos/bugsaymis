@@ -15,6 +15,7 @@ import AppModal from "@/Components/AppModal.vue"
 import EmptyState from "@/Components/EmptyState.vue"
 import PaginationControl from "@/Components/PaginationControl.vue"
 import { PencilSquareIcon, TrashIcon, PlusIcon, ArrowRightIcon } from "@heroicons/vue/24/outline"
+import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
 import { useSubmit } from "@/Composables/useSubmit"
 import { confirmDelete as confirmDeleteDialog } from "@/Composables/useConfirm.js"
 
@@ -23,6 +24,9 @@ const props = defineProps({
   users: Array,
   plans: Array,
   authUser: Object,
+  fiscalYears: { type: Array, default: () => [] },
+  selectedFiscalYear: { type: [String, Number], default: "" },
+  currentFiscalYear: { type: Number, default: null },
 })
 
 const { isSubmitting, submit } = useSubmit()
@@ -55,6 +59,7 @@ const emptyForm = () => ({
   name: "",
   head_id: "",
   description: "",
+  fiscal_year: props.currentFiscalYear ?? null,
   has_subcommittees: false,
   member_ids: [],
   member_tasks: {},
@@ -96,6 +101,7 @@ const openModal = (mode, committee = null) => {
       name: committee.name ?? "",
       head_id: committee.head_id ?? "",
       description: committee.description ?? "",
+      fiscal_year: committee.fiscal_year ?? null,
       has_subcommittees: hasSubs,
       member_ids: hasSubs ? [] : (committee.members?.map(m => m.id) ?? []),
       member_tasks: hasSubs ? {} : memberTasks,
@@ -155,6 +161,7 @@ const submitCommittee = () => {
     name: form.value.name,
     head_id: form.value.head_id || null,
     description: form.value.description,
+    fiscal_year: form.value.fiscal_year ? Number(form.value.fiscal_year) : null,
     has_subcommittees: form.value.has_subcommittees,
     plan_ids: form.value.plan_ids,
   }
@@ -211,6 +218,7 @@ const structureBadge = (committee) => committee.sub_committees?.length ? 'indigo
 
       <AppFilterBar>
         <AppInput v-model="searchQuery" placeholder="Search committees..." class="w-full sm:w-72" />
+        <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="pm-committees.index" />
       </AppFilterBar>
 
       <AppTable :is-empty="paginated.length === 0" :skeleton-cols="6">
@@ -294,6 +302,11 @@ const structureBadge = (committee) => committee.sub_committees?.length ? 'indigo
           </AppSelect>
 
           <AppTextarea v-model="form.description" label="Description" :rows="2" />
+
+          <AppSelect v-model="form.fiscal_year" label="Fiscal Year">
+            <option :value="null">All years (unscoped)</option>
+            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+          </AppSelect>
 
           <!-- Structure Toggle -->
           <div>

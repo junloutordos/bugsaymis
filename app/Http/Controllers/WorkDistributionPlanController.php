@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Committee;
+use App\Models\IPCRRatingPeriod;
 use App\Models\Office;
 use App\Models\SpecialAssignment;
 use App\Models\WorkDistributionPlan;
@@ -13,21 +14,28 @@ use Inertia\Inertia;
 
 class WorkDistributionPlanController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $currentYear = IPCRRatingPeriod::current()->value('year') ?? (int) now()->format('Y');
+        $selectedFY  = $request->query('fiscal_year', (string) $currentYear);
+        $fyFilter    = fn ($q) => $selectedFY !== 'all' ? $q->forFiscalYear((int) $selectedFY) : $q;
+
         return Inertia::render('PerformanceManagement/WorkDistributionPlans', [
-            'plans'       => WorkDistributionPlan::with([
+            'plans'       => $fyFilter(WorkDistributionPlan::with([
                                 'performanceIndicator',
                                 'personnel',
                                 'offices',
                                 'committees.head',
                                 'specialAssignments.coordinator',
-                            ])->latest()->get(),
-            'indicators'  => PerformanceIndicator::all(),
+                            ]))->latest()->get(),
+            'indicators'  => $fyFilter(PerformanceIndicator::query())->get(),
             'users'       => User::select('id', 'name')->get(),
             'offices'     => Office::select('id', 'name', 'unit_head', 'division_id')->orderBy('name')->get(),
             'committees'  => Committee::with('head')->orderBy('name')->get(['id', 'name', 'head_id']),
             'assignments' => SpecialAssignment::with('coordinator')->orderBy('name')->get(['id', 'name', 'coordinator_id']),
+            'fiscalYears'        => IPCRRatingPeriod::query()->distinct()->orderByDesc('year')->pluck('year'),
+            'selectedFiscalYear' => $selectedFY,
+            'currentFiscalYear'  => $currentYear,
         ]);
     }
 
@@ -37,6 +45,7 @@ class WorkDistributionPlanController extends Controller
             'performance_indicator_id' => 'required|exists:performance_indicators,id',
             'success_indicator'        => 'required|string',
             'rated_by'                 => 'nullable|string',
+            'fiscal_year'              => 'nullable|integer|min:2000|max:2100',
             'office_ids'               => 'nullable|array',
             'committee_ids'            => 'nullable|array',
             'assignment_ids'           => 'nullable|array',
@@ -65,6 +74,7 @@ class WorkDistributionPlanController extends Controller
             'performance_indicator_id' => 'required|exists:performance_indicators,id',
             'success_indicator'        => 'required|string',
             'rated_by'                 => 'nullable|string',
+            'fiscal_year'              => 'nullable|integer|min:2000|max:2100',
             'office_ids'               => 'nullable|array',
             'committee_ids'            => 'nullable|array',
             'assignment_ids'           => 'nullable|array',

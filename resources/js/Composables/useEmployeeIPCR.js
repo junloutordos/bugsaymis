@@ -15,9 +15,8 @@ export default function useEmployeeIPCR(initialIPCRs = [], workPlans = []) {
   const planSearch = ref("")
 
   const form = reactive({
-    rating_period: "",
+    rating_period_id: "",
     title: "",
-    status: "New Target",
     remarks: "",
   })
 
@@ -78,8 +77,14 @@ export default function useEmployeeIPCR(initialIPCRs = [], workPlans = []) {
     })
   }
 
+  // AppSelect emits strings — cast the FK before submitting
+  const formPayload = () => ({
+    ...form,
+    rating_period_id: form.rating_period_id ? Number(form.rating_period_id) : null,
+  })
+
   const storeIPCR = () => {
-    router.post(route("employee-ipcr.store"), form, {
+    router.post(route("employee-ipcr.store"), formPayload(), {
       onError: e => errors.value = e,
       onSuccess: () => {
         closeModal()
@@ -90,7 +95,7 @@ export default function useEmployeeIPCR(initialIPCRs = [], workPlans = []) {
   }
 
   const updateIPCR = (id) => {
-    router.put(route("employee-ipcr.update", id), form, {
+    router.put(route("employee-ipcr.update", id), formPayload(), {
       onError: e => errors.value = e,
       onSuccess: () => {
         closeModal()
@@ -125,14 +130,12 @@ export default function useEmployeeIPCR(initialIPCRs = [], workPlans = []) {
     modalMode.value = mode
     selectedIPCR.value = ipcr
     if (mode === "edit" && ipcr) {
-      form.rating_period = ipcr.rating_period
+      form.rating_period_id = ipcr.rating_period_id ?? ""
       form.title = ipcr.title
-      form.status = ipcr.status
       form.remarks = ipcr.remarks
     } else if (mode === "create") {
-      form.rating_period = ""
+      form.rating_period_id = ""
       form.title = ""
-      form.status = "New Target"
       form.remarks = ""
     }
     showModal.value = true

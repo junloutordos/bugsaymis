@@ -20,8 +20,11 @@ import useEmployeeIPCR from "@/Composables/useEmployeeIPCR.js"
 const props = defineProps({
   ipcrs: Array,
   workPlans: Array,
-  ratingPeriods: Array,
+  ratingPeriods: Array, // open IPCRRatingPeriod objects {id, label, year, semester, is_current}
+  currentPeriod: Object,
 })
+
+const hasOpenPeriod = computed(() => (props.ratingPeriods ?? []).length > 0)
 
 const {
   ipcrTargets,
@@ -82,11 +85,15 @@ const addPlansModalTitle = computed(() => `Select Plans for "${selectedIPCR.valu
 
       <AppPageHeader title="My IPCR Targets">
         <template #actions>
-          <AppButton @click="openModal('create')">
+          <AppButton v-if="hasOpenPeriod" @click="openModal('create')">
             <PlusIcon class="w-4 h-4" /> Add Target
           </AppButton>
         </template>
       </AppPageHeader>
+
+      <div v-if="!hasOpenPeriod" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        No rating period is currently open. New IPCR targets can only be created while a semestral rating period is open — please contact HR or the PMT.
+      </div>
 
       <!-- Filter bar -->
       <AppFilterBar>
@@ -125,15 +132,17 @@ const addPlansModalTitle = computed(() => `Select Plans for "${selectedIPCR.valu
               <AppIconButton label="View" @click="viewIPCR(t)">
                 <EyeIcon class="w-4 h-4"/>
               </AppIconButton>
-              <AppIconButton label="Add Plans" variant="success" @click="openAddPlansModal(t)">
-                <PlusIcon class="w-4 h-4"/>
-              </AppIconButton>
-              <AppIconButton label="Edit" variant="warning" @click="openModal('edit', t)">
-                <PencilSquareIcon class="w-4 h-4"/>
-              </AppIconButton>
-              <AppIconButton label="Delete" variant="danger" @click="destroyIPCR(t.id)">
-                <TrashIcon class="w-4 h-4"/>
-              </AppIconButton>
+              <template v-if="t.is_mutable">
+                <AppIconButton label="Add Plans" variant="success" @click="openAddPlansModal(t)">
+                  <PlusIcon class="w-4 h-4"/>
+                </AppIconButton>
+                <AppIconButton label="Edit" variant="warning" @click="openModal('edit', t)">
+                  <PencilSquareIcon class="w-4 h-4"/>
+                </AppIconButton>
+                <AppIconButton label="Delete" variant="danger" @click="destroyIPCR(t.id)">
+                  <TrashIcon class="w-4 h-4"/>
+                </AppIconButton>
+              </template>
             </div>
           </td>
         </tr>
@@ -151,15 +160,17 @@ const addPlansModalTitle = computed(() => `Select Plans for "${selectedIPCR.valu
               <AppIconButton label="View" @click="viewIPCR(t)">
                 <EyeIcon class="w-4 h-4"/>
               </AppIconButton>
-              <AppIconButton label="Add Plans" variant="success" @click="openAddPlansModal(t)">
-                <PlusIcon class="w-4 h-4"/>
-              </AppIconButton>
-              <AppIconButton label="Edit" variant="warning" @click="openModal('edit', t)">
-                <PencilSquareIcon class="w-4 h-4"/>
-              </AppIconButton>
-              <AppIconButton label="Delete" variant="danger" @click="destroyIPCR(t.id)">
-                <TrashIcon class="w-4 h-4"/>
-              </AppIconButton>
+              <template v-if="t.is_mutable">
+                <AppIconButton label="Add Plans" variant="success" @click="openAddPlansModal(t)">
+                  <PlusIcon class="w-4 h-4"/>
+                </AppIconButton>
+                <AppIconButton label="Edit" variant="warning" @click="openModal('edit', t)">
+                  <PencilSquareIcon class="w-4 h-4"/>
+                </AppIconButton>
+                <AppIconButton label="Delete" variant="danger" @click="destroyIPCR(t.id)">
+                  <TrashIcon class="w-4 h-4"/>
+                </AppIconButton>
+              </template>
             </div>
           </div>
         </template>
@@ -183,8 +194,10 @@ const addPlansModalTitle = computed(() => `Select Plans for "${selectedIPCR.valu
     <!-- Add/Edit IPCR Target Modal -->
     <AppModal :show="showModal" :title="modalMode === 'create' ? 'Add Target' : 'Edit Target'" @close="closeModal">
       <div class="space-y-4">
-        <AppSelect v-model="form.rating_period" label="Rating Period" required :error="errors.rating_period" placeholder="-- Select Rating Period --">
-          <option v-for="period in props.ratingPeriods" :key="period" :value="period">{{ period }}</option>
+        <AppSelect v-model="form.rating_period_id" label="Rating Period" required :error="errors.rating_period_id" placeholder="-- Select Rating Period --">
+          <option v-for="period in props.ratingPeriods" :key="period.id" :value="period.id">
+            {{ period.label }}{{ period.is_current ? ' (Current)' : '' }}
+          </option>
         </AppSelect>
         <AppInput v-model="form.title" label="Title" :error="errors.title" />
         <AppTextarea v-model="form.remarks" label="Remarks" :rows="3" />

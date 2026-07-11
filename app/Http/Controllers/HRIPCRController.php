@@ -8,7 +8,7 @@ use App\Models\Division;
 use App\Models\EmployeeIPCR;
 use App\Models\EmployeeIPCRPlan;
 use App\Models\User;
-use App\Services\AuditLogger;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -16,6 +16,10 @@ use Inertia\Inertia;
 
 class HRIPCRController extends Controller
 {
+    public function __construct(private IPCRWorkflowService $workflow)
+    {
+    }
+
     public function index()
     {
         $avgSubquery = DB::table('employee_ipcrs_plan')
@@ -23,13 +27,21 @@ class HRIPCRController extends Controller
             ->whereColumn('ipcr_id', 'employee_ipcrs.id')
             ->whereNotNull('sup_average');
 
-        $ipcrs = EmployeeIPCR::with(['user.division'])
+        $ipcrs = EmployeeIPCR::with(['user.division', 'period'])
             ->addSelect(['overall_average' => $avgSubquery])
             ->whereIn('status', ['Submitted to HR'])
             ->orderBy('submitted_to_hr_at', 'desc')
             ->get();
 
-        $ratingPeriods = $ipcrs->pluck('rating_period')->filter()->unique()->sort()->values();
+        $ratingPeriods = $ipcrs
+            ->map(fn ($ipcr) => [
+                'id'    => $ipcr->rating_period_id,
+                'label' => $ipcr->period?->label ?? $ipcr->rating_period,
+            ])
+            ->filter(fn ($p) => $p['label'])
+            ->unique('label')
+            ->sortBy('label')
+            ->values();
 
         return Inertia::render('PerformanceManagement/HRIPCRIndex', [
             'ipcrs'         => $ipcrs,
@@ -41,6 +53,7 @@ class HRIPCRController extends Controller
     {
         $ipcr = EmployeeIPCR::with([
             'user.division.divisionchief',
+            'period',
             'plans.performance_indicator.agencyOutcome',
             'plans.offices',
             'plans.committees',
@@ -79,45 +92,34 @@ class HRIPCRController extends Controller
 
     public function submitToPMT(EmployeeIPCR $employeeIPCR)
     {
-        $employeeIPCR->update([
-            'status'                     => 'Submitted to PMT',
+        $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_SUBMITTED_PMT, [
             'submitted_for_pmtreview_at' => now(),
-        ]);
+        ], 'ipcr_submitted_to_pmt');
 
         User::havingRole('PMT')->each(function ($pmt) use ($employeeIPCR) {
             Mail::to($pmt->email)->send(new IPCRSubmittedToPMTMail($employeeIPCR, $pmt->name));
         });
-
-        AuditLogger::log([
-            'action'         => 'ipcr_submitted_to_pmt',
-            'auditable_type' => EmployeeIPCR::class,
-            'auditable_id'   => $employeeIPCR->id,
-            'new_values'     => ['status' => 'Submitted to PMT'],
-        ]);
 
         return redirect()->back()->with('success', 'IPCR submitted to PMT for review.');
     }
 
     public function batchSubmitToPMT(Request $request)
     {
-        $request->validate(['rating_period' => 'required|string']);
+        $request->validate([
+            'rating_period_id' => 'nullable|exists:ipcr_rating_periods,id',
+            'rating_period'    => 'required_without:rating_period_id|nullable|string',
+        ]);
 
-        $ipcrs = EmployeeIPCR::where('status', 'Submitted to HR')
-            ->where('rating_period', $request->rating_period)
+        $ipcrs = EmployeeIPCR::where('status', IPCRWorkflowService::STATUS_SUBMITTED_HR)
+            ->when($request->rating_period_id,
+                fn($q) => $q->where('rating_period_id', $request->rating_period_id),
+                fn($q) => $q->where('rating_period', $request->rating_period))
             ->get();
 
         foreach ($ipcrs as $ipcr) {
-            $ipcr->update([
-                'status'                     => 'Submitted to PMT',
+            $this->workflow->transition($ipcr, IPCRWorkflowService::STATUS_SUBMITTED_PMT, [
                 'submitted_for_pmtreview_at' => now(),
-            ]);
-
-            AuditLogger::log([
-                'action'         => 'ipcr_submitted_to_pmt',
-                'auditable_type' => EmployeeIPCR::class,
-                'auditable_id'   => $ipcr->id,
-                'new_values'     => ['status' => 'Submitted to PMT'],
-            ]);
+            ], 'ipcr_submitted_to_pmt');
         }
 
         User::havingRole('PMT')->each(function ($pmt) use ($ipcrs) {

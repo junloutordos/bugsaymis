@@ -9,7 +9,19 @@ class SpecialAssignment extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'coordinator_id', 'description'];
+    protected $fillable = ['name', 'coordinator_id', 'description', 'fiscal_year'];
+
+    // NULL fiscal_year = applies to all years (legacy rows)
+    public function scopeForFiscalYear($query, ?int $year)
+    {
+        if (! $year) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($year) {
+            $q->whereNull('fiscal_year')->orWhere('fiscal_year', $year);
+        });
+    }
 
     public function coordinator()
     {

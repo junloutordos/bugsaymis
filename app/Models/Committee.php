@@ -9,7 +9,19 @@ class Committee extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'head_id', 'description', 'parent_committee_id'];
+    protected $fillable = ['name', 'head_id', 'description', 'parent_committee_id', 'fiscal_year'];
+
+    // NULL fiscal_year = applies to all years (legacy rows; committees are shared with Faculty Loading)
+    public function scopeForFiscalYear($query, ?int $year)
+    {
+        if (! $year) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($year) {
+            $q->whereNull('fiscal_year')->orWhere('fiscal_year', $year);
+        });
+    }
 
     public function head()
     {

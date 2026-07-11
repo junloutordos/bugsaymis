@@ -20,10 +20,15 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
   const sortAsc = ref(true)
 
   const form = reactive({
-    rating_period: "",
+    rating_period_id: "",
     title: "",
-    status: "New Target",
     remarks: "",
+  })
+
+  // AppSelect emits strings — cast the FK before submitting
+  const formPayload = () => ({
+    ...form,
+    rating_period_id: form.rating_period_id ? Number(form.rating_period_id) : null,
   })
 
   // --- Computed: Sorting ---
@@ -80,14 +85,14 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
   })
 
   const storeIPCR = () => {
-    router.post(route("employee-ipcr.store"), form, {
+    router.post(route("employee-ipcr.store"), formPayload(), {
       onError: e => errors.value = e,
       onSuccess: () => { closeModal(); getIPCRs(); Swal.fire({ icon: "success", title: "IPCR Added", timer: 2000, showConfirmButton: false }) }
     })
   }
 
   const updateIPCR = (id) => {
-    router.put(route("employee-ipcr.update", id), form, {
+    router.put(route("employee-ipcr.update", id), formPayload(), {
       onError: e => errors.value = e,
       onSuccess: () => { closeModal(); getIPCRs(); Swal.fire({ icon: "success", title: "IPCR Updated", timer: 2000, showConfirmButton: false }) }
     })
@@ -115,13 +120,12 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
     selectedIPCR.value = ipcr
     if(mode === 'edit' && ipcr){
       Object.assign(form, {
-        rating_period: ipcr.rating_period,
+        rating_period_id: ipcr.rating_period_id ?? "",
         title: ipcr.title,
-        status: ipcr.status,
         remarks: ipcr.remarks
       })
     } else {
-      Object.assign(form, { rating_period: "", title: "", status: "New Target", remarks: "" })
+      Object.assign(form, { rating_period_id: "", title: "", remarks: "" })
     }
     showModal.value = true
   }

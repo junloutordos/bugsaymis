@@ -15,6 +15,7 @@ import EmptyState from "@/Components/EmptyState.vue"
 import PaginationControl from "@/Components/PaginationControl.vue"
 import { PencilSquareIcon, TrashIcon, PlusIcon, ArrowRightIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
+import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
 import { useSubmit } from "@/Composables/useSubmit"
 import { confirmAction } from "@/Composables/useConfirm.js"
 
@@ -23,6 +24,9 @@ const props = defineProps({
   users: Array,
   plans: Array,
   authUser: Object,
+  fiscalYears: { type: Array, default: () => [] },
+  selectedFiscalYear: { type: [String, Number], default: "" },
+  currentFiscalYear: { type: Number, default: null },
 })
 
 const { isSubmitting, submit } = useSubmit()
@@ -51,6 +55,7 @@ const emptyForm = () => ({
   name: "",
   coordinator_id: "",
   description: "",
+  fiscal_year: props.currentFiscalYear ?? null,
   member_ids: [],
   member_tasks: {},
   plan_ids: [],
@@ -69,6 +74,7 @@ const openModal = (mode, assignment = null) => {
       name: assignment.name ?? "",
       coordinator_id: assignment.coordinator_id ?? "",
       description: assignment.description ?? "",
+      fiscal_year: assignment.fiscal_year ?? null,
       member_ids: assignment.members?.map(m => m.id) ?? [],
       member_tasks: memberTasks,
       plan_ids: assignment.work_distribution_plans?.map(p => p.id) ?? [],
@@ -101,13 +107,15 @@ const submitAssignment = () => {
     Swal.fire("Error", Object.values(errors).flat().join("\n") || "Something went wrong.", "error")
   }
 
+  const payload = { ...form.value, fiscal_year: form.value.fiscal_year ? Number(form.value.fiscal_year) : null }
+
   if (modalMode.value === "create") {
-    submit.post(route("pm-special-assignments.store"), { ...form.value }, {
+    submit.post(route("pm-special-assignments.store"), payload, {
       onSuccess: () => { closeModal(); Swal.fire("Created", "Special Assignment created.", "success") },
       onError,
     })
   } else {
-    submit.put(route("pm-special-assignments.update", form.value.id), { ...form.value }, {
+    submit.put(route("pm-special-assignments.update", form.value.id), payload, {
       onSuccess: () => { closeModal(); Swal.fire("Updated", "Special Assignment updated.", "success") },
       onError,
     })
@@ -144,6 +152,7 @@ const deleteAssignment = async (assignment) => {
 
       <AppFilterBar>
         <AppInput v-model="searchQuery" placeholder="Search special assignments..." class="w-full sm:w-72" />
+        <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="pm-special-assignments.index" />
       </AppFilterBar>
 
       <AppTable :is-empty="paginated.length === 0" :skeleton-cols="6">
@@ -203,6 +212,11 @@ const deleteAssignment = async (assignment) => {
           </AppSelect>
 
           <AppTextarea v-model="form.description" label="Description" :rows="2" />
+
+          <AppSelect v-model="form.fiscal_year" label="Fiscal Year">
+            <option :value="null">All years (unscoped)</option>
+            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+          </AppSelect>
 
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>

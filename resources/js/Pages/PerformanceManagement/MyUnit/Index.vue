@@ -17,8 +17,10 @@ const props = defineProps({
   offices:       Array,
   ipcrs:         Array,
   unitHead:      Object,
-  ratingPeriods: { type: Array, default: () => [] },
+  ratingPeriods: { type: Array, default: () => [] }, // {id, label} pairs (id null on legacy rows)
 });
+
+const periodLabels = computed(() => props.ratingPeriods.map(p => p.label));
 
 // ---------- Filters ----------
 const searchQuery       = ref("");
@@ -113,7 +115,7 @@ const formatDate = (val) => {
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         >
           <option value="">All Periods</option>
-          <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+          <option v-for="p in periodLabels" :key="p" :value="p">{{ p }}</option>
         </select>
       </AppFilterBar>
 
