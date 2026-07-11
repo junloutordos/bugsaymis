@@ -57,6 +57,7 @@ import {
   BugAntIcon,
   PuzzlePieceIcon,
   MegaphoneIcon,
+  PresentationChartLineIcon,
 } from "@heroicons/vue/24/outline";
 import LighthouseIcon from '@/Components/Icons/LighthouseIcon.vue';
 
@@ -71,6 +72,13 @@ export const menuItems = [
     routeName: "dashboard",
     href: route("dashboard"),
     icon: HomeIcon,
+  },
+  {
+    label: "Executive Dashboard",
+    routeName: "executive.dashboard",
+    href: route("executive.dashboard"),
+    icon: PresentationChartLineIcon,
+    permissions: ["executive.dashboard.view"],
   },
   {
     label: "Approvals",

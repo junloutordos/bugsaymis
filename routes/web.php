@@ -314,6 +314,14 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware(['verified'])
         ->name('dashboard');
 
+    // Executive Dashboard — cross-system analytics for top management
+    Route::middleware('permission:executive.dashboard.view')->group(function () {
+        Route::get('/executive-dashboard', [\App\Http\Controllers\ExecutiveDashboardController::class, 'index'])
+            ->name('executive.dashboard');
+        Route::post('/executive-dashboard/refresh', [\App\Http\Controllers\ExecutiveDashboardController::class, 'refresh'])
+            ->name('executive.dashboard.refresh');
+    });
+
     Route::get('/general-services/dashboard', [\App\Http\Controllers\GeneralServicesDashboardController::class, 'index'])
         ->name('general-services.dashboard');
     Route::get('/general-services/dashboard/events', [\App\Http\Controllers\GeneralServicesDashboardController::class, 'events'])
