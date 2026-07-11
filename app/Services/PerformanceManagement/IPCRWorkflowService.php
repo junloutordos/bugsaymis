@@ -109,6 +109,12 @@ class IPCRWorkflowService
      */
     public function immediateSupervisorFor(User $employee): ?User
     {
+        // A Division Chief's own IPCR is managed by the Campus Director (OCD)
+        // — without this, the resolver would self-exclude and return null.
+        if (Division::where('division_chief_id', $employee->id)->exists()) {
+            return $this->firstNotSelf($employee, $this->ocdUser());
+        }
+
         if ($this->holdsAcidaaDesignation($employee)) {
             return $this->firstNotSelf($employee, $this->cidChief(), $this->divisionChiefOf($employee));
         }
@@ -232,6 +238,13 @@ class IPCRWorkflowService
     private function cidChief(): ?User
     {
         return $this->memo['cidChief'] ??= User::havingRole('CID Chief')
+            ->where('status', '<>', 'inactive')
+            ->first();
+    }
+
+    private function ocdUser(): ?User
+    {
+        return $this->memo['ocd'] ??= User::havingRole('OCD')
             ->where('status', '<>', 'inactive')
             ->first();
     }

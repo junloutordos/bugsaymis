@@ -53,11 +53,14 @@ class PMTIPCRController extends Controller
             'plans.performance_indicator.agencyOutcome',
         ])->findOrFail($id);
 
+        $ocdUser = User::havingRole('OCD')->first();
+
         return Inertia::render('PerformanceManagement/PMTIPCRShow', [
             'ipcr'       => $ipcr,
             'plans'      => $ipcr->plans,
             'employee'   => $ipcr->user,
             'supervisor' => $ipcr->user?->division?->divisionchief,
+            'ocdUser'    => $ocdUser ? $ocdUser->only('name', 'position') : null,
             'isOCD'      => auth()->user()->hasPermission('ipcr.approve'),
             'isMutable'  => $ipcr->isMutable(),
             'periodClosed' => $ipcr->isPeriodClosed(),

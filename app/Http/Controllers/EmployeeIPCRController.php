@@ -323,9 +323,11 @@ class EmployeeIPCRController extends Controller
         $this->workflow->assertMutable($ipcr);
         abort_if($ipcr->status !== IPCRWorkflowService::STATUS_TARGETS_APPROVED, 403, 'Self-rating is only allowed when targets are approved.');
 
-        // CSC SPMS 5-point scale
+        // CSC SPMS 5-point scale. accomplishment allows 1000 — the FL
+        // committee sync writes up to 1000 chars into this same pivot and a
+        // tighter cap would 422 the employee's own resubmission.
         $request->validate([
-            'accomplishment'  => 'nullable|string|max:255',
+            'accomplishment'  => 'nullable|string|max:1000',
             'mov_link'        => 'nullable|string|max:500',
             'self_quality'    => 'nullable|integer|min:1|max:5',
             'self_efficiency' => 'nullable|integer|min:1|max:5',

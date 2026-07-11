@@ -18,6 +18,7 @@ const props = defineProps({
   plans: Array,
   employee: Object,
   supervisor: Object,
+  ocdUser: { type: Object, default: null },
   canManageIpcr: Boolean,
   canEndorse: Boolean,
   isMutable:     { type: Boolean, default: true },
@@ -340,10 +341,6 @@ const openModal = (plan) => {
 
 const saveModal = async () => {
   if (!currentPlan.value) return;
-  if (!form.value.accomplishment?.trim() || !form.value.mov_link?.trim()) {
-    Swal.fire({ icon: "warning", title: "Missing Required Fields", text: "Please fill in BOTH the Accomplishment and MOV Link before saving.", confirmButtonColor: "#2563eb" });
-    return;
-  }
   submit.put(
     route("division-chief-employee-ipcr-plan.rateIPCRPlan", [props.ipcr.id, currentPlan.value.id]),
     { accomplishment: form.value.accomplishment, mov_link: form.value.mov_link, sup_quality: form.value.quality, sup_efficiency: form.value.efficiency, sup_timeliness: form.value.timeliness },
@@ -359,7 +356,11 @@ const saveModal = async () => {
         isModalOpen.value = false;
         Swal.fire({ icon: "success", title: "Saved!", text: "Accomplishment and supervisor ratings saved successfully.", timer: 2000, showConfirmButton: false });
       },
-      onError: () => Swal.fire({ icon: "error", title: "Error", text: "Failed to save. Please check your input." }),
+      onError: (err) => Swal.fire({
+        icon: "error",
+        title: "Could not save",
+        text: Object.values(err ?? {}).flat().join("\n") || "Failed to save. Please check your input.",
+      }),
     }
   );
 };
@@ -560,8 +561,8 @@ const approveTargets = () => {
               </td>
               <td colspan="4" class="border px-3 py-3 text-center">
                 <br/><br/>
-                <b>ENGR. RAMIL A. SANCHEZ</b><br/>
-                <small class="text-slate-500">Director III</small>
+                <b>{{ ocdUser?.name?.toUpperCase() ?? '—' }}</b><br/>
+                <small class="text-slate-500">{{ ocdUser?.position ?? '' }}</small>
               </td>
               <td colspan="2" class="border px-3 py-3 text-center text-slate-700">
                 <br/>{{ formattedTargetApprovedAt }}
@@ -874,8 +875,8 @@ const approveTargets = () => {
               </td>
               <td colspan="3" class="border border-slate-200 px-3 py-3 text-center">
                 <br/><br/>
-                <b class="text-slate-800">ENGR. RAMIL A. SANCHEZ</b><br/>
-                <small class="text-slate-500">Director III</small>
+                <b class="text-slate-800">{{ ocdUser?.name?.toUpperCase() ?? '—' }}</b><br/>
+                <small class="text-slate-500">{{ ocdUser?.position ?? '' }}</small>
               </td>
               <td colspan="2" class="border border-slate-200 px-3 py-3 text-center text-slate-700">
                 <br/><br/>____________________

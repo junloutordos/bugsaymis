@@ -15,6 +15,7 @@ const props = defineProps({
   plans:      Array,
   employee:   Object,
   supervisor: Object,
+  ocdUser: { type: Object, default: null },
   isOCD:      { type: Boolean, default: false },
   isMutable:     { type: Boolean, default: true },
   periodClosed:  { type: Boolean, default: false },
@@ -371,8 +372,8 @@ const printIPCR = () => window.print()
               </td>
               <td colspan="4" class="border px-3 py-3 text-center">
                 <br/><br/>
-                <b>ENGR. RAMIL A. SANCHEZ</b><br/>
-                <small>Director III</small>
+                <b>{{ ocdUser?.name?.toUpperCase() ?? '—' }}</b><br/>
+                <small>{{ ocdUser?.position ?? '' }}</small>
               </td>
               <td colspan="2" class="border px-3 py-3 text-center">
                 <br/>{{ formattedTargetApprovedAt }}
@@ -554,8 +555,8 @@ const printIPCR = () => window.print()
               </td>
               <td colspan="3" class="border px-3 py-3 text-center">
                 <br/><br/>
-                <b>ENGR. RAMIL A. SANCHEZ</b><br/>
-                <small>Director III</small>
+                <b>{{ ocdUser?.name?.toUpperCase() ?? '—' }}</b><br/>
+                <small>{{ ocdUser?.position ?? '' }}</small>
               </td>
               <td colspan="2" class="border px-3 py-3 text-center">
                 <br/><br/>____________________

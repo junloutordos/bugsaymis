@@ -387,7 +387,7 @@ class CommitteeAssignmentController extends Controller
             'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
             'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
             'accomplishment'            => 'nullable|string|max:1000',
-            'mov_link'                  => 'nullable|url|max:255',
+            'mov_link'                  => 'nullable|string|max:500',
         ]);
 
         FacultyCommitteeAccomplishment::updateOrCreate(
@@ -441,7 +441,7 @@ class CommitteeAssignmentController extends Controller
             'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
             'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
             'accomplishment'            => 'nullable|string|max:1000',
-            'mov_link'                  => 'nullable|url|max:255',
+            'mov_link'                  => 'nullable|string|max:500',
             'sup_quality'               => 'nullable|numeric|min:1|max:5',
             'sup_efficiency'            => 'nullable|numeric|min:1|max:5',
             'sup_timeliness'            => 'nullable|numeric|min:1|max:5',

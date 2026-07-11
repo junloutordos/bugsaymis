@@ -219,11 +219,14 @@ class DivisionChiefIPCRController extends Controller
             return $plan;
         });
 
+        $ocdUser = User::havingRole('OCD')->first();
+
         return Inertia::render('PerformanceManagement/DivisionChiefIPCRShow', [
             'ipcr'          => $ipcr,
             'plans'         => $plans,
             'employee'      => $ipcr->user,
             'supervisor'    => $user,
+            'ocdUser'       => $ocdUser ? $ocdUser->only('name', 'position') : null,
             'canManageIpcr' => $canManageIpcr,
             'canEndorse'    => $canEndorse,
             'isMutable'     => $ipcr->isMutable(),
@@ -365,10 +368,13 @@ class DivisionChiefIPCRController extends Controller
             'Supervisor rating is only allowed while the IPCR is submitted for rating.'
         );
 
-        // CSC SPMS 5-point scale
+        // CSC SPMS 5-point scale. mov_link is deliberately NOT `url` and the
+        // lengths mirror the employee side (updateSelfRating) — the DC modal
+        // resubmits the employee's own saved values ("N/A", folder refs,
+        // FL-synced text up to 1000 chars), which a stricter rule would 422.
         $request->validate([
-            'accomplishment'  => 'nullable|string|max:255',
-            'mov_link'        => 'nullable|url|max:255',
+            'accomplishment'  => 'nullable|string|max:1000',
+            'mov_link'        => 'nullable|string|max:500',
             'sup_quality'     => 'nullable|integer|min:1|max:5',
             'sup_efficiency'  => 'nullable|integer|min:1|max:5',
             'sup_timeliness'  => 'nullable|integer|min:1|max:5',

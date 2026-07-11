@@ -82,11 +82,14 @@ class HRIPCRController extends Controller
             ? User::havingRole('OCD')->first()
             : ($ipcr->user->division->divisionchief ?? null);
 
+        $ocdUser = User::havingRole('OCD')->first();
+
         return Inertia::render('PerformanceManagement/HRIPCRShow', [
             'ipcr'       => $ipcr,
             'plans'      => $plans,
             'employee'   => $ipcr->user,
             'supervisor' => $supervisor,
+            'ocdUser'    => $ocdUser ? $ocdUser->only('name', 'position') : null,
         ]);
     }
 

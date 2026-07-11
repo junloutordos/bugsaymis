@@ -296,8 +296,8 @@ class CommitteePerformanceController extends Controller
         $request->validate([
             'ipcr_id'        => 'required|exists:employee_ipcrs,id',
             'plan_id'        => 'required|exists:work_distribution_plans,id',
-            'accomplishment' => 'nullable|string|max:500',
-            'mov_link'       => 'nullable|url|max:255',
+            'accomplishment' => 'nullable|string|max:1000',
+            'mov_link'       => 'nullable|string|max:500',
         ]);
 
         $ipcr = EmployeeIPCR::where('id', $request->ipcr_id)
@@ -342,8 +342,8 @@ class CommitteePerformanceController extends Controller
         $request->validate([
             'ipcr_id'        => 'required|exists:employee_ipcrs,id',
             'plan_id'        => 'required|exists:work_distribution_plans,id',
-            'accomplishment' => 'nullable|string|max:500',
-            'mov_link'       => 'nullable|url|max:255',
+            'accomplishment' => 'nullable|string|max:1000',
+            'mov_link'       => 'nullable|string|max:500',
             'sup_quality'    => 'nullable|integer|min:1|max:5',
             'sup_efficiency' => 'nullable|integer|min:1|max:5',
             'sup_timeliness' => 'nullable|integer|min:1|max:5',
