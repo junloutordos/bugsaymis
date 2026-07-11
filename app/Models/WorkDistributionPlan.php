@@ -15,6 +15,7 @@ class WorkDistributionPlan extends Model
         'office_involved',
         'free_text_involved',
         'rated_by',
+        'load_source',
         'fiscal_year',
     ];
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\IPCRAccomplishmentReturnedMail;
 use App\Mail\IPCRDCReturnedFromPMTMail;
 use App\Mail\IPCRRatedMail;
+use App\Mail\IPCRReadyForEndorsementMail;
 use App\Mail\IPCRSubmittedToHRMail;
 use App\Mail\IPCRTargetsApprovedMail;
 use App\Mail\IPCRTargetsReturnedMail;
@@ -48,47 +49,67 @@ class DivisionChiefIPCRController extends Controller
                      || $headedCommitteeIds->isNotEmpty()
                      || $coordinatedAssignmentIds->isNotEmpty();
 
+        // Employees the user supervises through the academic chain
+        // (AUH → teachers, ACIDAA → AUHs, CID Chief → ACIDAA)
+        $supervisedUserIds = $this->workflow->supervisedUserIds($user);
+
         // Gate access
-        if (!$user->hasAnyRole(['OCD', 'DivisionChief']) && !$isNonDCRater) {
+        if (!$user->hasAnyRole(['OCD', 'DivisionChief']) && !$isNonDCRater && $supervisedUserIds->isEmpty()) {
             abort(403, "You are not authorized to view this.");
         }
 
-        // Non-DC rater branch: show IPCRs containing plans they can rate
-        if ($isNonDCRater && !$user->hasAnyRole(['OCD', 'DivisionChief'])) {
-            $ipcrs = EmployeeIPCR::with(['user.division', 'period'])
-                ->addSelect(['overall_average' => $avgSubquery])
-                ->whereHas('plans', fn($q) =>
-                    $q->where(function ($q2) use ($unitHeadOfficeIds, $headedCommitteeIds, $coordinatedAssignmentIds) {
-                        $q2->where(fn($q3) =>
-                            $q3->where('rated_by', 'Unit Head')
-                               ->whereHas('offices', fn($oq) => $oq->whereIn('offices.id', $unitHeadOfficeIds))
-                        )
-                        ->orWhere(fn($q3) =>
-                            $q3->where('rated_by', 'Committee Head')
-                               ->whereHas('committees', fn($cq) => $cq->whereIn('committees.id', $headedCommitteeIds))
-                        )
-                        ->orWhere(fn($q3) =>
-                            $q3->where('rated_by', 'Coordinator')
-                               ->whereHas('specialAssignments', fn($aq) => $aq->whereIn('special_assignments.id', $coordinatedAssignmentIds))
-                        );
-                    })
-                )
-                ->whereIn('status', [
-                    'Submitted for Rating',
-                    'Rated & For PMT Review',
-                    'Submitted to PMT',
-                    'PMT Returned for Revision',
-                    'Approved by PMT',
-                ])
-                ->orderBy('created_at', 'desc')
-                ->get();
+        $supervisedIpcrs = $supervisedUserIds->isEmpty() ? collect() : EmployeeIPCR::with(['user.division', 'period'])
+            ->addSelect(['overall_average' => $avgSubquery])
+            ->whereIn('user_id', $supervisedUserIds)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Academic supervisor / non-DC rater branch
+        if (!$user->hasAnyRole(['OCD', 'DivisionChief'])) {
+            $raterIpcrs = collect();
+            if ($isNonDCRater) {
+                $raterIpcrs = EmployeeIPCR::with(['user.division', 'period'])
+                    ->addSelect(['overall_average' => $avgSubquery])
+                    ->whereHas('plans', fn($q) =>
+                        $q->where(function ($q2) use ($unitHeadOfficeIds, $headedCommitteeIds, $coordinatedAssignmentIds) {
+                            $q2->where(fn($q3) =>
+                                $q3->where('rated_by', 'Unit Head')
+                                   ->whereHas('offices', fn($oq) => $oq->whereIn('offices.id', $unitHeadOfficeIds))
+                            )
+                            ->orWhere(fn($q3) =>
+                                $q3->where('rated_by', 'Committee Head')
+                                   ->whereHas('committees', fn($cq) => $cq->whereIn('committees.id', $headedCommitteeIds))
+                            )
+                            ->orWhere(fn($q3) =>
+                                $q3->where('rated_by', 'Coordinator')
+                                   ->whereHas('specialAssignments', fn($aq) => $aq->whereIn('special_assignments.id', $coordinatedAssignmentIds))
+                            );
+                        })
+                    )
+                    ->whereIn('status', [
+                        'Submitted for Rating',
+                        'Rated & For PMT Review',
+                        'Submitted to PMT',
+                        'PMT Returned for Revision',
+                        'Approved by PMT',
+                    ])
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+            }
+
+            $ipcrs = $supervisedIpcrs->merge($raterIpcrs)->unique('id')->values();
+
+            $supervisedEmployees = $supervisedUserIds->isEmpty() ? collect() : User::whereIn('id', $supervisedUserIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'position', 'division_id']);
 
             return Inertia::render('PerformanceManagement/DivisionChiefIPCR', [
                 'ipcrs'             => $ipcrs,
-                'divisionEmployees' => collect(),
+                'divisionEmployees' => $supervisedEmployees,
                 'supervisor'        => $user,
                 'ratingPeriods'     => $this->periodOptions($ipcrs),
                 'openPeriods'       => IPCRRatingPeriod::open()->get(['id', 'label', 'year', 'semester', 'is_current']),
+                'canEndorseAny'     => false,
             ]);
         }
 
@@ -117,17 +138,17 @@ class DivisionChiefIPCRController extends Controller
                     ->orderBy('created_at', 'desc')
                     ->get();
 
-                $ipcrs = $dcIpcrs->merge($ownDivisionIpcrs)->unique('id')->values();
+                $ipcrs = $dcIpcrs->merge($ownDivisionIpcrs)->merge($supervisedIpcrs)->unique('id')->values();
 
                 $divisionEmployees = User::where('division_id', $divisionId)
                     ->where('id', '!=', $user->id)
                     ->orderBy('name')
                     ->get(['id', 'name', 'position', 'division_id']);
             } else {
-                if ($dcIpcrs->isEmpty()) {
+                if ($dcIpcrs->isEmpty() && $supervisedIpcrs->isEmpty()) {
                     abort(403, "You are not assigned to a division.");
                 }
-                $ipcrs             = $dcIpcrs;
+                $ipcrs             = $dcIpcrs->merge($supervisedIpcrs)->unique('id')->values();
                 $divisionEmployees = collect();
             }
         } else {
@@ -140,6 +161,7 @@ class DivisionChiefIPCRController extends Controller
             'supervisor'        => $user->load('division'),
             'ratingPeriods'     => $this->periodOptions($ipcrs),
             'openPeriods'       => IPCRRatingPeriod::open()->get(['id', 'label', 'year', 'semester', 'is_current']),
+            'canEndorseAny'     => true,
         ]);
     }
 
@@ -176,6 +198,7 @@ class DivisionChiefIPCRController extends Controller
 
         $user = auth()->user();
         $canManageIpcr = $this->workflow->canManage($user, $ipcr);
+        $canEndorse    = $this->workflow->canEndorse($user, $ipcr);
 
         // Bulk-load accomplishments for all plans (2 queries, avoids N+1)
         $ipcrPlanIds = \App\Models\EmployeeIPCRPlan::where('ipcr_id', $ipcr->id)
@@ -202,6 +225,7 @@ class DivisionChiefIPCRController extends Controller
             'employee'      => $ipcr->user,
             'supervisor'    => $user,
             'canManageIpcr' => $canManageIpcr,
+            'canEndorse'    => $canEndorse,
             'isMutable'     => $ipcr->isMutable(),
             'periodClosed'  => $ipcr->isPeriodClosed(),
             'hrDeadline'    => $ipcr->period?->hrDeadline(),
@@ -247,7 +271,7 @@ class DivisionChiefIPCRController extends Controller
      */
     public function submitToPMT(EmployeeIPCR $employeeIPCR)
     {
-        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+        $this->workflow->assertCanEndorse(auth()->user(), $employeeIPCR);
 
         $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_SUBMITTED_PMT, [
             'submitted_for_pmtreview_at' => now(),
@@ -263,7 +287,7 @@ class DivisionChiefIPCRController extends Controller
      */
     public function returnFromPMT(Request $request, EmployeeIPCR $employeeIPCR)
     {
-        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+        $this->workflow->assertCanEndorse(auth()->user(), $employeeIPCR);
 
         $request->validate([
             'remarks' => 'required|string|max:2000',
@@ -389,14 +413,25 @@ class DivisionChiefIPCRController extends Controller
 
     public function saveRatings(EmployeeIPCR $employeeIPCR)
     {
-        $this->workflow->assertCanManage(auth()->user(), $employeeIPCR);
+        $user = auth()->user();
+        $this->workflow->assertCanManage($user, $employeeIPCR);
 
         $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_RATED, [
             'submitted_rating_at' => now(),
         ], 'ipcr_rated');
 
         $employeeIPCR->load('user');
-        Mail::to($employeeIPCR->user->email)->send(new IPCRRatedMail($employeeIPCR, $employeeIPCR->user->name));
+        Mail::to($employeeIPCR->user->email)->send(new IPCRRatedMail($employeeIPCR, $employeeIPCR->user->name, $user));
+
+        // Faculty chain: the rater (e.g. AUH) is not the endorser — tell the
+        // Division Chief the IPCR is ready for the ministerial submit to PMT.
+        $endorserId = Division::where('id', $employeeIPCR->user->division_id)->value('division_chief_id');
+        if ($endorserId && $endorserId !== $user->id) {
+            $endorser = User::find($endorserId);
+            if ($endorser) {
+                Mail::to($endorser->email)->send(new IPCRReadyForEndorsementMail($employeeIPCR, $endorser->name, $user));
+            }
+        }
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Rating recorded successfully.');
@@ -420,7 +455,7 @@ class DivisionChiefIPCRController extends Controller
             ->get();
 
         foreach ($ipcrs as $ipcr) {
-            $this->workflow->assertCanManage($user, $ipcr);
+            $this->workflow->assertCanEndorse($user, $ipcr);
             $this->workflow->transition($ipcr, IPCRWorkflowService::STATUS_SUBMITTED_HR, [
                 'submitted_to_hr_at' => now(),
             ], 'ipcr_submitted_to_hr');

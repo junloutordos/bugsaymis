@@ -19,6 +19,7 @@ const props = defineProps({
   employee: Object,
   supervisor: Object,
   canManageIpcr: Boolean,
+  canEndorse: Boolean,
   isMutable:     { type: Boolean, default: true },
   periodClosed:  { type: Boolean, default: false },
   hrDeadline:    { type: String,  default: null },
@@ -498,11 +499,11 @@ const approveTargets = () => {
           <AppButton v-if="isMutable && canManageIpcr && ipcr.status === 'Submitted for Rating'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="returnAccomplishment">
             {{ isSubmitting ? 'Processing…' : 'Return Accomplishment for Revision' }}
           </AppButton>
-          <span v-if="canManageIpcr && ipcr.status === 'Rated & For PMT Review'"
+          <span v-if="(canManageIpcr || canEndorse) && ipcr.status === 'Rated & For PMT Review'"
             class="inline-flex items-center text-sm text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-2 rounded-lg">
-            Rated — use the <strong class="mx-1">Division index page</strong> to batch-submit to HR.
+            Rated — {{ canEndorse ? 'use the' : 'the Division Chief will use the' }} <strong class="mx-1">Division index page</strong> to batch-submit to HR.
           </span>
-          <AppButton v-if="isMutable && canManageIpcr && ipcr.status === 'PMT Returned for Revision'" variant="danger" @click="showReturnFromPMTModal = true">
+          <AppButton v-if="isMutable && canEndorse && ipcr.status === 'PMT Returned for Revision'" variant="danger" @click="showReturnFromPMTModal = true">
             Return to Employee
           </AppButton>
           <AppButton v-if="isAtRatedStage" variant="secondary" @click="printIPCR">
@@ -629,6 +630,7 @@ const approveTargets = () => {
 
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <div>{{ piPlans[0].success_indicator }}</div>
+                          <p v-if="piPlans[0].pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p>
                           <div class="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
                             <span>Rater: {{ piPlans[0].rated_by || 'Division Chief' }}<template v-if="piPlans[0].offices?.length"> — {{ piPlans[0].offices.map(o => o.name).join(', ') }}</template><template v-if="piPlans[0].committees?.length"> — {{ piPlans[0].committees.map(c => c.name).join(', ') }}</template><template v-if="piPlans[0].special_assignments?.length"> — {{ piPlans[0].special_assignments.map(a => a.name).join(', ') }}</template></span>
                             <AppBadge :color="ratingStatusChip(piPlans[0]).rated ? 'green' : 'amber'">
@@ -701,6 +703,7 @@ const approveTargets = () => {
                       <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-slate-50/60">
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <div>{{ plan.success_indicator }}</div>
+                          <p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
                           <div class="text-xs text-slate-400 mt-1">
                             Rater: {{ plan.rated_by || 'Division Chief' }}<template v-if="plan.offices?.length"> — {{ plan.offices.map(o => o.name).join(', ') }}</template><template v-if="plan.committees?.length"> — {{ plan.committees.map(c => c.name).join(', ') }}</template><template v-if="plan.special_assignments?.length"> — {{ plan.special_assignments.map(a => a.name).join(', ') }}</template>
                           </div>

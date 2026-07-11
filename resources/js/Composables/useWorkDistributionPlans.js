@@ -19,6 +19,7 @@ export function useWorkDistributionPlans(props) {
     success_indicator: "",
     involved: [],         // [{ type: 'all'|'office'|'committee'|'assignment'|'text', id?, label }]
     rated_by: "",
+    load_source: "",
     fiscal_year: props.currentFiscalYear ?? null,
   })
 
@@ -83,6 +84,7 @@ export function useWorkDistributionPlans(props) {
         success_indicator: plan.success_indicator ?? "",
         involved: buildInvolvedFromPlan(plan),
         rated_by: plan.rated_by ?? "",
+        load_source: plan.load_source ?? "",
         fiscal_year: plan.fiscal_year ?? null,
       }
     } else {
@@ -139,6 +141,7 @@ export function useWorkDistributionPlans(props) {
       performance_indicator_id: form.value.performance_indicator_id,
       success_indicator: form.value.success_indicator,
       rated_by: form.value.rated_by || null,
+      load_source: form.value.load_source || null,
       office_ids: officeIds,
       committee_ids: committeeIds,
       assignment_ids: assignmentIds,

@@ -26,6 +26,7 @@ const props = defineProps({
   supervisor:        Object,
   ratingPeriods:     { type: Array, default: () => [] }, // {id, label} pairs from visible IPCRs (id null on legacy rows)
   openPeriods:       { type: Array, default: () => [] }, // open IPCRRatingPeriod objects for the create modal
+  canEndorseAny:     { type: Boolean, default: false },  // Division Chiefs only — batch submit to HR
 })
 
 const periodLabels = computed(() => props.ratingPeriods.map(p => p.label))
@@ -269,8 +270,8 @@ const printMemo = () => {
       <!-- Header -->
       <AppPageHeader title="Division IPCR Targets">
         <template #actions>
-          <!-- Submit to HR batch action -->
-          <div class="flex items-center gap-2">
+          <!-- Submit to HR batch action — Division Chiefs (endorsers) only -->
+          <div v-if="canEndorseAny" class="flex items-center gap-2">
             <AppSelect v-model="submitToHRPeriod" placeholder="— Period —" :show-blank="false" class="min-w-40">
               <option value="" disabled>— Period —</option>
               <option v-for="p in periodLabels" :key="p" :value="p">{{ p }}</option>
@@ -283,7 +284,7 @@ const printMemo = () => {
               {{ isSubmitting ? 'Processing…' : `Submit to HR (${ratedForHRCount})` }}
             </AppButton>
           </div>
-          <AppButton variant="secondary" @click="openReportModal">Generate Memo Report</AppButton>
+          <AppButton v-if="canEndorseAny" variant="secondary" @click="openReportModal">Generate Memo Report</AppButton>
         </template>
       </AppPageHeader>
 

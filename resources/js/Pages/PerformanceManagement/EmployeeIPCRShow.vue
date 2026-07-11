@@ -681,6 +681,53 @@ const resubmit = () => {
   });
 };
 
+// ---------- Faculty baseline (CID teachers only) ----------
+// Statuses during which the plan list / individual targets may still change
+const canEditTargets = computed(() =>
+  props.isOwner && props.isMutable &&
+  ["New Target", "For Review", "Returned for Revision"].includes(props.ipcr?.status)
+);
+
+const generateFacultyTargets = () => {
+  Swal.fire({
+    title: "Generate targets from your Faculty Load?",
+    text: "This attaches the faculty plans matching your teaching load, committees, and assignments for this period, and fills in your individual targets. Targets you already wrote are kept.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Yes, generate!",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      submit.post(route("employee-ipcr.generateFacultyTargets", props.ipcr.id), {}, {
+        resetOnSuccess: true,
+        onError: () => Swal.fire("Error", "Failed to generate targets from Faculty Loading.", "error"),
+      });
+    }
+  });
+};
+
+const editIndividualTarget = (plan) => {
+  Swal.fire({
+    title: "Individual Target",
+    input: "textarea",
+    inputValue: plan.pivot?.individual_target || "",
+    inputAttributes: { rows: 6 },
+    inputPlaceholder: "Your personalized target for this plan (e.g. subjects, sections, units)…",
+    showCancelButton: true,
+    confirmButtonText: "Save",
+  }).then((result) => {
+    if (!result.isConfirmed) return;
+    submit.put(
+      route("employee-ipcr.updateIndividualTarget", [props.ipcr.id, plan.id]),
+      { individual_target: result.value || null },
+      {
+        resetOnSuccess: true,
+        onSuccess: () => { if (plan.pivot) plan.pivot.individual_target = result.value || null; },
+        onError: () => Swal.fire("Error", "Failed to save the individual target.", "error"),
+      }
+    );
+  });
+};
+
 // ---------- Faculty Loading sync (CID teachers only) ----------
 const pullFLAccomplishments = () => {
   Swal.fire({
@@ -751,6 +798,18 @@ const pullFLAccomplishments = () => {
             >
               <CheckIcon class="h-4 w-4" />
               {{ isSubmitting ? 'Processing…' : 'Submit for Rating of the Accomplishment' }}
+            </AppButton>
+
+            <!-- Faculty baseline — CID teachers only, while targets are editable -->
+            <AppButton
+              v-if="isFaculty && canEditTargets"
+              @click="generateFacultyTargets"
+              :loading="isSubmitting"
+              :disabled="isSubmitting"
+              title="Attach plans and fill individual targets from your Faculty Load for this period"
+            >
+              <ArrowPathIcon class="h-4 w-4" />
+              {{ isSubmitting ? 'Processing…' : 'Generate from Faculty Load' }}
             </AppButton>
 
             <!-- Faculty Loading sync — CID teachers only, available before submission -->
@@ -931,7 +990,13 @@ const pullFLAccomplishments = () => {
                         </td>
 
                         <!-- FIRST PLAN ROW -->
-                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">{{ piPlans[0].success_indicator }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          {{ piPlans[0].success_indicator }}
+                          <p v-if="piPlans[0].pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p>
+                          <button v-if="canEditTargets" @click="editIndividualTarget(piPlans[0])" class="mt-1 text-xs text-indigo-600 hover:underline no-print block">
+                            {{ piPlans[0].pivot?.individual_target ? 'Edit individual target' : '+ Individual target' }}
+                          </button>
+                        </td>
 
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
                           <p class="cursor-pointer text-indigo-600 hover:underline text-sm"
@@ -1020,7 +1085,13 @@ const pullFLAccomplishments = () => {
                           :key="plan.id"
                           class="hover:bg-slate-50/60">
 
-                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">{{ plan.success_indicator }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          {{ plan.success_indicator }}
+                          <p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
+                          <button v-if="canEditTargets" @click="editIndividualTarget(plan)" class="mt-1 text-xs text-indigo-600 hover:underline no-print block">
+                            {{ plan.pivot?.individual_target ? 'Edit individual target' : '+ Individual target' }}
+                          </button>
+                        </td>
 
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
                           <p class="cursor-pointer text-indigo-600 hover:underline text-sm"

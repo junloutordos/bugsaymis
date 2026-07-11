@@ -4,6 +4,10 @@ namespace App\Services\PerformanceManagement;
 
 use App\Models\Division;
 use App\Models\EmployeeIPCR;
+use App\Models\FacultyLoading\AcademicUnit;
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\LoadAssignment;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\IPCRRatingPeriod;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
@@ -77,16 +81,193 @@ class IPCRWorkflowService
      | Layer 3 — actor authorization
      * ---------------------------------------------------------------- */
 
+    /**
+     * Faculty Loading designation (Supervisory) that marks the ACIDAA.
+     * Prod uses code ACIDAA (id 86); dev fixtures use SUP-ACIDAA. Careful:
+     * prod also has ACIDSA (Student Affairs) — never match on a broad
+     * "Assistant CID Chief%" prefix.
+     */
+    public const ACIDAA_DESIGNATION_CODES = ['ACIDAA', 'SUP-ACIDAA'];
+
+    /** @var array<string, User|null> per-request memo for chain lookups */
+    private array $memo = [];
+
     public function assertOwner(User $user, EmployeeIPCR $ipcr): void
     {
         abort_if($ipcr->user_id !== $user->id, 403, 'You can only modify your own IPCR.');
     }
 
+    /**
+     * SPMS immediate supervisor — the person who approves targets, rates and
+     * marks the IPCR as Rated:
+     *   ACIDAA            → CID Chief
+     *   Academic Unit Head→ ACIDAA
+     *   Faculty in a unit → their Academic Unit Head
+     *   Everyone else     → Division Chief
+     * Every academic lookup falls back to the Division Chief, so divisions
+     * without the CID structures behave exactly as before.
+     */
+    public function immediateSupervisorFor(User $employee): ?User
+    {
+        if ($this->holdsAcidaaDesignation($employee)) {
+            return $this->firstNotSelf($employee, $this->cidChief(), $this->divisionChiefOf($employee));
+        }
+
+        if (AcademicUnit::active()->where('head_user_id', $employee->id)->exists()) {
+            return $this->firstNotSelf($employee, $this->acidaaHolder(), $this->cidChief(), $this->divisionChiefOf($employee));
+        }
+
+        if ($unitId = $this->academicUnitIdFor($employee)) {
+            $headId = AcademicUnit::active()
+                ->where('id', $unitId)
+                ->value('head_user_id');
+            $head = $headId ? User::find($headId) : null;
+
+            return $this->firstNotSelf($employee, $head, $this->divisionChiefOf($employee));
+        }
+
+        return $this->firstNotSelf($employee, $this->divisionChiefOf($employee));
+    }
+
+    /**
+     * The academic unit a teacher belongs to: explicit users.academic_unit_id
+     * wins; otherwise derived from the unit whose subjects dominate their
+     * current-SY teaching load (prod does not populate users.academic_unit_id).
+     */
+    private function academicUnitIdFor(User $employee): ?int
+    {
+        if ($employee->academic_unit_id) {
+            return (int) $employee->academic_unit_id;
+        }
+
+        $currentSyId = SchoolYear::where('is_current', true)->value('id');
+        if (! $currentSyId) {
+            return null;
+        }
+
+        return DB::table('load_assignments')
+            ->join('subjects', 'subjects.id', '=', 'load_assignments.subject_id')
+            ->where('load_assignments.user_id', $employee->id)
+            ->where('load_assignments.school_year_id', $currentSyId)
+            ->whereNotNull('subjects.academic_unit_id')
+            ->selectRaw('subjects.academic_unit_id, COUNT(*) as n')
+            ->groupBy('subjects.academic_unit_id')
+            ->orderByDesc('n')
+            ->value('academic_unit_id');
+    }
+
+    private function firstNotSelf(User $employee, ?User ...$candidates): ?User
+    {
+        foreach ($candidates as $candidate) {
+            if ($candidate && $candidate->id !== $employee->id) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function divisionChiefOf(User $employee): ?User
+    {
+        $chiefId = Division::where('id', $employee->division_id)->value('division_chief_id');
+
+        return $chiefId ? User::find($chiefId) : null;
+    }
+
+    private function cidChief(): ?User
+    {
+        return $this->memo['cidChief'] ??= User::havingRole('CID Chief')
+            ->where('status', '<>', 'inactive')
+            ->first();
+    }
+
+    private function acidaaDesignationIds()
+    {
+        return Designation::whereIn('code', self::ACIDAA_DESIGNATION_CODES)
+            ->orWhere('name', 'like', 'Assistant CID Chief for Academic Affairs%')
+            ->pluck('id');
+    }
+
+    private function acidaaHolder(): ?User
+    {
+        if (array_key_exists('acidaa', $this->memo)) {
+            return $this->memo['acidaa'];
+        }
+
+        $userId = $this->acidaaAssignmentQuery()->latest('id')->value('user_id');
+
+        return $this->memo['acidaa'] = ($userId ? User::find($userId) : null);
+    }
+
+    private function holdsAcidaaDesignation(User $user): bool
+    {
+        return $this->acidaaAssignmentQuery()->where('user_id', $user->id)->exists();
+    }
+
+    private function acidaaAssignmentQuery()
+    {
+        $designationIds = $this->acidaaDesignationIds();
+        $currentSyId    = SchoolYear::where('is_current', true)->value('id');
+
+        return LoadAssignment::whereIn('designation_id', $designationIds)
+            ->when($currentSyId, fn ($q) => $q->where('school_year_id', $currentSyId));
+    }
+
+    /**
+     * IDs of employees whose immediate supervisor is $user through the
+     * academic chain (used for list visibility; per-IPCR actions are still
+     * verified by canManage). Division-chief supervision is handled by the
+     * existing division branch, not here.
+     */
+    public function supervisedUserIds(User $user): \Illuminate\Support\Collection
+    {
+        $ids = collect();
+
+        // Teachers in academic units the user heads — explicitly assigned OR
+        // teaching that unit's subjects this SY (mirrors academicUnitIdFor)
+        $unitIds = AcademicUnit::active()->where('head_user_id', $user->id)->pluck('id');
+        if ($unitIds->isNotEmpty()) {
+            $ids = $ids->merge(User::whereIn('academic_unit_id', $unitIds)->pluck('id'));
+
+            $currentSyId = SchoolYear::where('is_current', true)->value('id');
+            if ($currentSyId) {
+                $ids = $ids->merge(
+                    DB::table('load_assignments')
+                        ->join('subjects', 'subjects.id', '=', 'load_assignments.subject_id')
+                        ->whereIn('subjects.academic_unit_id', $unitIds)
+                        ->where('load_assignments.school_year_id', $currentSyId)
+                        ->distinct()
+                        ->pluck('load_assignments.user_id')
+                );
+            }
+        }
+
+        // Academic Unit Heads, if the user is the ACIDAA
+        if ($this->holdsAcidaaDesignation($user)) {
+            $ids = $ids->merge(AcademicUnit::active()->whereNotNull('head_user_id')->pluck('head_user_id'));
+        }
+
+        // The ACIDAA, if the user is the CID Chief
+        if ($user->hasRole('CID Chief')) {
+            $acidaa = $this->acidaaHolder();
+            if ($acidaa) {
+                $ids->push($acidaa->id);
+            }
+        }
+
+        return $ids->unique()->reject(fn ($id) => $id == $user->id)->values();
+    }
+
     public function canManage(User $user, EmployeeIPCR $ipcr): bool
     {
-        $employeeDivisionChiefId = Division::where('id', $ipcr->user?->division_id)->value('division_chief_id');
+        $ipcr->loadMissing('user');
+        if (! $ipcr->user) {
+            return $user->hasRole('OCD');
+        }
 
-        return $user->hasRole('OCD') || ($employeeDivisionChiefId && $user->id == $employeeDivisionChiefId);
+        $supervisor = $this->immediateSupervisorFor($ipcr->user);
+
+        return $user->hasRole('OCD') || ($supervisor && $supervisor->id === $user->id);
     }
 
     public function assertCanManage(User $user, EmployeeIPCR $ipcr): void
@@ -96,7 +277,30 @@ class IPCRWorkflowService
         abort_unless(
             $this->canManage($user, $ipcr),
             403,
-            "You are not this employee's Division Chief and cannot act on this IPCR."
+            "You are not this employee's immediate supervisor and cannot act on this IPCR."
+        );
+    }
+
+    /**
+     * Ministerial actions (submit to PMT / HR, relay PMT returns) belong to
+     * the Division Chief — for CID faculty this is the CID Chief, who does
+     * not rate or approve targets but endorses the finished IPCR.
+     */
+    public function canEndorse(User $user, EmployeeIPCR $ipcr): bool
+    {
+        $employeeDivisionChiefId = Division::where('id', $ipcr->user?->division_id)->value('division_chief_id');
+
+        return $user->hasRole('OCD') || ($employeeDivisionChiefId && $user->id == $employeeDivisionChiefId);
+    }
+
+    public function assertCanEndorse(User $user, EmployeeIPCR $ipcr): void
+    {
+        $ipcr->loadMissing('user');
+
+        abort_unless(
+            $this->canEndorse($user, $ipcr),
+            403,
+            "You are not this employee's Division Chief and cannot endorse this IPCR."
         );
     }
 
@@ -105,14 +309,12 @@ class IPCRWorkflowService
         $plan->loadMissing(['offices', 'committees', 'specialAssignments']);
         $ipcr->loadMissing('user');
 
-        $divisionId = Division::where('division_chief_id', $user->id)->value('id') ?? $user->division_id;
-        $isDCForEmployee = $divisionId && $ipcr->user->division_id == $divisionId;
-
-        return $user->hasRole('OCD') || $isDCForEmployee || match ($plan->rated_by) {
-            'Unit Head'      => $plan->offices->contains(fn ($o) => $o->unit_head == $user->id),
-            'Committee Head' => $plan->committees->contains(fn ($c) => $c->head_id == $user->id),
-            'Coordinator'    => $plan->specialAssignments->contains(fn ($a) => $a->coordinator_id == $user->id),
-            default          => false,
+        return $this->canManage($user, $ipcr) || match ($plan->rated_by) {
+            'Unit Head'          => $plan->offices->contains(fn ($o) => $o->unit_head == $user->id),
+            'Committee Head'     => $plan->committees->contains(fn ($c) => $c->head_id == $user->id),
+            'Coordinator'        => $plan->specialAssignments->contains(fn ($a) => $a->coordinator_id == $user->id),
+            'Academic Unit Head' => $this->immediateSupervisorFor($ipcr->user)?->id === $user->id,
+            default              => false,
         };
     }
 

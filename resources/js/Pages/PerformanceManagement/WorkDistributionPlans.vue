@@ -193,6 +193,10 @@ const modalTitle = computed(() => {
             <span class="text-slate-500">Rated By</span>
             <span class="text-slate-800">{{ selectedPlan.rated_by ?? "—" }}</span>
           </div>
+          <div v-if="selectedPlan.load_source" class="flex justify-between text-sm">
+            <span class="text-slate-500">Load Source</span>
+            <span class="text-slate-800 capitalize">{{ selectedPlan.load_source }}</span>
+          </div>
         </div>
 
         <!-- FORM -->
@@ -206,9 +210,23 @@ const modalTitle = computed(() => {
           <AppSelect v-model="form.rated_by" label="Rated By" placeholder="-- Select Rater --">
             <option value="Division Chief">Division Chief</option>
             <option value="Unit Head">Unit Head</option>
+            <option value="Academic Unit Head">Academic Unit Head</option>
             <option value="Committee Head">Committee Head</option>
             <option value="Coordinator">Coordinator</option>
             <option value="Others">Others</option>
+          </AppSelect>
+
+          <AppSelect
+            v-if="form.rated_by === 'Academic Unit Head'"
+            v-model="form.load_source"
+            label="Load Source (faculty framework)"
+            placeholder="-- Not linked to Faculty Loading --"
+          >
+            <option value="teaching">Teaching load</option>
+            <option value="research">Research load</option>
+            <option value="admin">Administrative designation</option>
+            <option value="cocurricular">Co-curricular designation</option>
+            <option value="committee">Committee work</option>
           </AppSelect>
 
           <AppSelect v-model="form.fiscal_year" label="Fiscal Year">

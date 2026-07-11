@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Mail\IPCRCreatedMail;
 use App\Mail\IPCRSubmittedForRatingMail;
 use App\Mail\IPCRSubmittedForReviewMail;
-use App\Models\Division;
 use App\Models\EmployeeIPCR;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\IPCRRatingPeriod;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
 use App\Services\AuditLogger;
+use App\Services\PerformanceManagement\FacultyIPCRBaselineService;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +65,7 @@ class EmployeeIPCRController extends Controller
             'workPlans'     => $workPlans,
             'ratingPeriods' => $ratingPeriods,
             'currentPeriod' => $currentPeriod,
+            'isFaculty'     => $user->hasRole('Faculty') || (bool) $user->academic_unit_id,
         ]);
     }
 
@@ -93,10 +94,10 @@ class EmployeeIPCRController extends Controller
             'remarks'          => $data['remarks'] ?? null,
         ]);
 
-        $dc = $this->resolveDivisionChief(auth()->user());
-        if ($dc) {
+        $supervisor = $this->workflow->immediateSupervisorFor(auth()->user());
+        if ($supervisor) {
             $ipcr->load('user');
-            Mail::to($dc->email)->send(new IPCRCreatedMail($ipcr, $dc->name));
+            Mail::to($supervisor->email)->send(new IPCRCreatedMail($ipcr, $supervisor->name));
         }
 
         AuditLogger::log([
@@ -247,10 +248,11 @@ class EmployeeIPCRController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
-        // If the IPCR owner is a Division Chief, their immediate head is the Campus Director (OCD)
-        $supervisor = $ipcr->user->hasRole('DivisionChief')
-            ? \App\Models\User::havingRole('OCD')->first()
-            : ($ipcr->user->division->divisionchief ?? null);
+        // Immediate supervisor per the SPMS chain (AUH/ACIDAA/CID Chief for
+        // faculty, Division Chief otherwise); a Division Chief's head is the
+        // Campus Director (OCD).
+        $supervisor = $this->workflow->immediateSupervisorFor($ipcr->user)
+            ?? ($ipcr->user->hasRole('DivisionChief') ? \App\Models\User::havingRole('OCD')->first() : null);
 
         // Load all pivot IDs for this IPCR (keyed by plan_id)
         $ipcrPlanIds = \App\Models\EmployeeIPCRPlan::where('ipcr_id', $ipcr->id)
@@ -414,12 +416,61 @@ class EmployeeIPCRController extends Controller
             : 'No Faculty Loading accomplishments found to sync. Make sure your committee chairperson has rated your work in the Faculty Loading module.');
     }
 
-    private function resolveDivisionChief(User $employee): ?User
+    /**
+     * Generate the faculty baseline from Faculty Loading: attach framework /
+     * committee / personnel plans and personalize individual targets.
+     */
+    public function generateFacultyTargets(EmployeeIPCR $employeeIPCR, FacultyIPCRBaselineService $baseline)
     {
-        $divisionId = $employee->division_id;
-        if (!$divisionId) return null;
-        $chiefId = Division::where('id', $divisionId)->value('division_chief_id');
-        return $chiefId ? User::find($chiefId) : null;
+        $this->guardPlanEditing($employeeIPCR);
+
+        $user = auth()->user();
+        abort_unless(
+            $user->hasRole('Faculty') || $user->academic_unit_id,
+            403,
+            'The Faculty Loading baseline is only available to faculty members.'
+        );
+
+        $summary = $baseline->generate($employeeIPCR);
+
+        AuditLogger::log([
+            'action'         => 'ipcr_faculty_baseline_generated',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => $summary,
+        ]);
+
+        return back()->with('success', $summary['attached'] || $summary['personalized']
+            ? "Baseline generated from your Faculty Load: {$summary['attached']} plan(s) attached, {$summary['personalized']} individual target(s) filled in."
+            : 'No new plans or targets were generated — check that your faculty load exists for this period and that faculty plans are tagged with a load source.');
+    }
+
+    /**
+     * Owner edits the personalized target of one plan row while drafting.
+     */
+    public function updateIndividualTarget(Request $request, EmployeeIPCR $employeeIPCR, $planId)
+    {
+        $this->workflow->assertOwner(auth()->user(), $employeeIPCR);
+        $this->workflow->assertMutable($employeeIPCR);
+        abort_unless(
+            in_array($employeeIPCR->status, self::PLAN_EDIT_STATUSES, true),
+            403,
+            'Individual targets can only be edited before targets are approved.'
+        );
+
+        $request->validate([
+            'individual_target' => 'nullable|string|max:2000',
+        ]);
+
+        if (!$employeeIPCR->plans()->where('work_distribution_plans.id', $planId)->exists()) {
+            abort(404, 'This plan is not assigned to this IPCR.');
+        }
+
+        $employeeIPCR->plans()->updateExistingPivot($planId, [
+            'individual_target' => $request->individual_target,
+        ]);
+
+        return back()->with('success', 'Individual target saved.');
     }
 
     public function submitForReview(EmployeeIPCR $employeeIPCR)
@@ -431,7 +482,7 @@ class EmployeeIPCRController extends Controller
         ], 'ipcr_submitted_for_review');
 
         $employeeIPCR->load('user');
-        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        $dc = $this->workflow->immediateSupervisorFor($employeeIPCR->user);
         if ($dc) {
             Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
         }
@@ -449,7 +500,7 @@ class EmployeeIPCRController extends Controller
         ], 'ipcr_submitted_for_rating');
 
         $employeeIPCR->load('user');
-        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        $dc = $this->workflow->immediateSupervisorFor($employeeIPCR->user);
         if ($dc) {
             Mail::to($dc->email)->send(new IPCRSubmittedForRatingMail($employeeIPCR, $dc->name));
         }
@@ -491,7 +542,7 @@ class EmployeeIPCRController extends Controller
         ], 'ipcr_resubmitted');
 
         $employeeIPCR->load('user');
-        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        $dc = $this->workflow->immediateSupervisorFor($employeeIPCR->user);
         if ($dc) {
             Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
         }

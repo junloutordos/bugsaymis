@@ -290,6 +290,7 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
 
                       <td class="px-4 py-2 border border-gray-300">
                         <div>{{ piPlans[0].success_indicator }}</div>
+                        <p v-if="piPlans[0].pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p>
                         <div class="text-xs mt-0.5">
                           <span :class="piPlans[0].rated_by === 'Unit Head' ? 'text-blue-600 font-medium' : 'text-gray-400'">
                             Rater: {{ piPlans[0].rated_by || 'Division Chief' }}
@@ -359,6 +360,7 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
                     <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-slate-50/60">
                       <td class="px-4 py-2 border border-gray-300">
                         <div>{{ plan.success_indicator }}</div>
+                        <p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
                         <div class="text-xs mt-0.5">
                           <span :class="plan.rated_by === 'Unit Head' ? 'text-blue-600 font-medium' : 'text-gray-400'">
                             Rater: {{ plan.rated_by || 'Division Chief' }}

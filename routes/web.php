@@ -1359,18 +1359,26 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])->name('employee-ipcr.removePlan')->middleware('permission:ipcr.update');
         Route::post('/employee-ipcr/{employeeIPCR}/resubmit', [EmployeeIPCRController::class, 'resubmit'])->name('employee-ipcr.resubmit')->middleware('permission:ipcr.submit');
         Route::post('/employee-ipcr/{employeeIPCR}/pull-fl-accomplishments', [EmployeeIPCRController::class, 'pullFLAccomplishments'])->name('employee-ipcr.pullFL')->middleware('permission:ipcr.update');
+        Route::post('/employee-ipcr/{employeeIPCR}/generate-faculty-targets', [EmployeeIPCRController::class, 'generateFacultyTargets'])->name('employee-ipcr.generateFacultyTargets')->middleware('permission:ipcr.update');
+        Route::put('/employee-ipcr/{employeeIPCR}/plans/{plan}/individual-target', [EmployeeIPCRController::class, 'updateIndividualTarget'])->name('employee-ipcr.updateIndividualTarget')->middleware('permission:ipcr.update');
 
         // ── Division Chief IPCR ─────────────────────────────────────────────
         Route::get('/division-chief/ipcrs', [DivisionChiefIPCRController::class, 'index'])->name('division-chief-ipcr.index');
         Route::get('/division-chief-employee-ipcr/{id}', [DivisionChiefIPCRController::class, 'show'])->name('division-employee-ipcr.show');
         // savePlanRemark stays at ipcr.view — non-DC raters (unit heads / committee heads) use it; controller enforces the actor
         Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/remark', [DivisionChiefIPCRController::class, 'savePlanRemark'])->name('division-chief-employee-ipcr-plan.remark');
+        // Supervisor-stage actions stay at ipcr.view — Academic Unit Heads and
+        // the ACIDAA (Faculty role, no ipcr.approve) act here for CID faculty;
+        // IPCRWorkflowService::assertCanManage enforces the actual actor
+        // (same precedent as rateIPCRPlan / savePlanRemark above).
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/targetsapproval', [DivisionChiefIPCRController::class, 'approveTargets'])->name('division-chief-employee-ipcr.targetsapproval');
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/disapprove', [DivisionChiefIPCRController::class, 'disapproveTargets'])->name('division-chief-employee-ipcr.disapprove');
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-accomplishment', [DivisionChiefIPCRController::class, 'returnAccomplishment'])->name('division-chief-employee-ipcr.returnAccomplishment');
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/saveratings', [DivisionChiefIPCRController::class, 'saveRatings'])->name('division-chief-employee-ipcr.saveratings');
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])->name('division-chief-employee-ipcr.savecomments');
+
+        // Ministerial / endorsement actions — Division Chiefs only
         Route::middleware('permission:ipcr.approve')->group(function () {
-            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/targetsapproval', [DivisionChiefIPCRController::class, 'approveTargets'])->name('division-chief-employee-ipcr.targetsapproval');
-            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/disapprove', [DivisionChiefIPCRController::class, 'disapproveTargets'])->name('division-chief-employee-ipcr.disapprove');
-            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-accomplishment', [DivisionChiefIPCRController::class, 'returnAccomplishment'])->name('division-chief-employee-ipcr.returnAccomplishment');
-            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/saveratings', [DivisionChiefIPCRController::class, 'saveRatings'])->name('division-chief-employee-ipcr.saveratings');
-            Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])->name('division-chief-employee-ipcr.savecomments');
             Route::post('/division-chief-employee-ipcr/{employeeIPCR}/submit-to-pmt', [DivisionChiefIPCRController::class, 'submitToPMT'])->name('division-chief-employee-ipcr.submitToPMT');
             Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-from-pmt', [DivisionChiefIPCRController::class, 'returnFromPMT'])->name('division-chief-employee-ipcr.returnFromPMT');
             Route::post('/division-chief-employee-ipcr/submit-to-hr', [DivisionChiefIPCRController::class, 'submitToHR'])->name('division-chief-ipcr.submitToHR');

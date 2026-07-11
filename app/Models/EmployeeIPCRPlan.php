@@ -10,7 +10,7 @@ class EmployeeIPCRPlan extends Model
 
     protected $fillable = [
         'ipcr_id', 'plan_id',
-        'accomplishment', 'mov_link',
+        'accomplishment', 'mov_link', 'individual_target',
         'self_quality', 'self_efficiency', 'self_timeliness', 'self_average',
         'sup_quality', 'sup_efficiency', 'sup_timeliness', 'sup_average',
         'remarks',

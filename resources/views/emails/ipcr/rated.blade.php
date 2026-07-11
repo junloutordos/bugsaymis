@@ -18,11 +18,11 @@
             : ($overallAvg >= 2.5 ? 'Satisfactory'
             : ($overallAvg >= 1.5 ? 'Unsatisfactory' : 'Poor')));
     }
-    $dc = $ipcr->user?->division?->divisionchief;
+    $dc = ($rater ?? null) ?? $ipcr->user?->division?->divisionchief;
 @endphp
 
 <p class="greeting">Dear <strong>{{ $recipientName }}</strong>,</p>
-<p class="lead">Your IPCR has been <strong>rated by your Division Chief</strong> and will be forwarded to the PMT for review. Your ratings are shown below.</p>
+<p class="lead">Your IPCR has been <strong>rated by your immediate supervisor</strong> and will be forwarded to the PMT for review. Your ratings are shown below.</p>
 
 <table class="details" role="presentation">
     <tr><td class="lbl">Rating Period</td><td class="val">{{ $ipcr->rating_period }}</td></tr>

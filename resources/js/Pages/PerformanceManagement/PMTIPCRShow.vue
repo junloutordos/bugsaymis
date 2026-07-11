@@ -434,7 +434,7 @@ const printIPCR = () => window.print()
                       <!-- PI description merged cell -->
                       <td :rowspan="piPlans.length" class="px-4 py-2 border font-medium">{{ piDesc }}</td>
 
-                      <td class="px-4 py-2 border">{{ piPlans[0].success_indicator }}</td>
+                      <td class="px-4 py-2 border">{{ piPlans[0].success_indicator }}<p v-if="piPlans[0].pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p></td>
                       <td class="px-4 py-2 border">{{ piPlans[0].pivot?.accomplishment || '—' }}</td>
                       <td class="px-4 py-2 border">
                         <a v-if="piPlans[0].pivot?.mov_link" :href="piPlans[0].pivot.mov_link" target="_blank"
@@ -450,7 +450,7 @@ const printIPCR = () => window.print()
 
                     <!-- Remaining rows -->
                     <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-gray-50">
-                      <td class="px-4 py-2 border">{{ plan.success_indicator }}</td>
+                      <td class="px-4 py-2 border">{{ plan.success_indicator }}<p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p></td>
                       <td class="px-4 py-2 border">{{ plan.pivot?.accomplishment || '—' }}</td>
                       <td class="px-4 py-2 border">
                         <a v-if="plan.pivot?.mov_link" :href="plan.pivot.mov_link" target="_blank"

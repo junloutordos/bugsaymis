@@ -223,6 +223,9 @@ class FacultyLoadingSetupSeeder extends Seeder
             ['SUP-DEAN',           'Dean of Students',                  12, false, 2],
             ['SUP-CID-CHIEF',      'CID Chief',                         12, false, 3],
             ['SUP-ADMIN-OFFICER',  'Administrative Officer',             9, false, 4],
+            // IPCR supervisor chain resolves the ACIDAA holder by this code
+            // (matches the pre-existing prod row, designations.id=86)
+            ['ACIDAA',             'Assistant CID Chief for Academic Affairs', 9, false, 5],
         ]);
 
         // ── Teaching Load ─────────────────────────────────────────────────────

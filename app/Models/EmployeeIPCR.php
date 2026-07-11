@@ -84,6 +84,7 @@ class EmployeeIPCR extends Model
                     ->withPivot([
                         'accomplishment',
                         'mov_link',
+                        'individual_target',
 
                         'self_quality',
                         'self_efficiency',
