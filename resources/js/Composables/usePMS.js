@@ -105,12 +105,15 @@ export default function usePMS(initialSchedules = []) {
     form.pin = pin
     showLoadingSwal('Saving schedule...')
     router.post(route("ict-pms.store"), form, {
-      onError: (e) => { errors.value = e; Swal.close() },
+      onError: (e) => { errors.value = e; showPinModal.value = false },
       onSuccess: () => {
         showPinModal.value = false
-        pinModalLoading.value = false
         closeModal()
         Swal.fire({ icon: "success", title: "Schedule Added", timer: 2000, showConfirmButton: false })
+      },
+      onFinish: () => {
+        pinModalLoading.value = false
+        if (Swal.isLoading()) Swal.close()
       },
     })
   }
@@ -119,10 +122,13 @@ export default function usePMS(initialSchedules = []) {
     form.schedule_dates = scheduleDates.value.map((d) => ({ date: d.date }))
     showLoadingSwal('Updating schedule...')
     router.put(route("ict-pms.update", id), form, {
-      onError: (e) => { errors.value = e; Swal.close() },
+      onError: (e) => { errors.value = e },
       onSuccess: () => {
         closeModal()
         Swal.fire({ icon: "success", title: "Schedule Updated", timer: 2000, showConfirmButton: false })
+      },
+      onFinish: () => {
+        if (Swal.isLoading()) Swal.close()
       },
     })
   }
@@ -151,6 +157,7 @@ export default function usePMS(initialSchedules = []) {
   const openModal = (mode, schedule = null) => {
     modalMode.value = mode
     selectedSchedule.value = schedule
+    errors.value = {}
 
     if (mode === "edit" && schedule) {
       form.title = schedule.title || ""
@@ -181,7 +188,23 @@ export default function usePMS(initialSchedules = []) {
     selectedSchedule.value = null
   }
 
+  // Mirror of the backend `store`/`update` required rules — catches incomplete
+  // forms before the PIN modal opens instead of round-tripping to a 422.
+  const validateForm = () => {
+    const e = {}
+    if (!form.title.trim()) e.title = "Title is required."
+    if (!form.school_year.trim()) e.school_year = "School year is required."
+    if (!form.office_area.trim()) e.office_area = "Office/Area is required."
+    if (!form.frequency) e.frequency = "Frequency is required."
+    if (!scheduleDates.value.length || scheduleDates.value.some((d) => !d.date)) {
+      e.schedule_dates = "Fill in every scheduled date."
+    }
+    errors.value = e
+    return Object.keys(e).length === 0
+  }
+
   const submitSchedule = () => {
+    if (!validateForm()) return
     if (modalMode.value === "create") showPinModal.value = true
     else if (modalMode.value === "edit" && selectedSchedule.value) updateSchedule(selectedSchedule.value.id)
   }

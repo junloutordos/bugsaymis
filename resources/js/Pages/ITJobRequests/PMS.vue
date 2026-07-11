@@ -409,6 +409,9 @@ const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
 
         <!-- CREATE / EDIT FORM -->
         <div v-else class="grid grid-cols-2 gap-4">
+          <div v-if="Object.keys(errors).length" class="col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 space-y-0.5">
+            <p v-for="(msg, key) in errors" :key="key">{{ msg }}</p>
+          </div>
           <div class="col-span-2">
             <AppInput v-model="form.title" type="text" placeholder="Enter schedule title" label="Title" required />
           </div>
