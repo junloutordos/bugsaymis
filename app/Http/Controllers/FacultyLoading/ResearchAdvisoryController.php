@@ -4,8 +4,6 @@ namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
-use App\Models\FacultyLoading\Designation;
-use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\ResearchAdvisory;
@@ -296,55 +294,7 @@ class ResearchAdvisoryController extends Controller
      */
     private function recomputeGradeAssignment(int $userId, int $termId, int $gradeLevel, FacultyLoad $load): ?LoadAssignment
     {
-        $designation = Designation::firstOrCreate(
-            ['code' => "RES-G{$gradeLevel}"],
-            [
-                'designation_category_id' => DesignationCategory::firstOrCreate(
-                    ['code' => 'RESEARCH'],
-                    ['name' => 'Research Advisory', 'description' => 'Research group and thesis advisory roles', 'sort_order' => 8, 'is_active' => true]
-                )->id,
-                'name'            => "Research Advisory — Grade {$gradeLevel}",
-                'assignment_type' => 'research',
-                'load_units'      => 0,
-                'requires_unit'   => false,
-                'is_active'       => true,
-                'sort_order'      => $gradeLevel,
-            ]
-        );
-
-        $total = (float) ResearchAdvisory::where('user_id', $userId)
-            ->where('academic_term_id', $termId)
-            ->where('grade_level', $gradeLevel)
-            ->where('status', 'active')
-            ->sum('load_units');
-
-        $la = LoadAssignment::where('faculty_load_id', $load->id)
-            ->where('designation_id', $designation->id)
-            ->first();
-
-        if ($total <= 0) {
-            $la?->delete();
-            return null;
-        }
-
-        if ($la) {
-            $la->update(['load_units' => $total]);
-        } else {
-            $la = LoadAssignment::create([
-                'faculty_load_id'  => $load->id,
-                'user_id'          => $userId,
-                'school_year_id'   => $load->school_year_id,
-                'academic_term_id' => $termId,
-                'designation_id'   => $designation->id,
-                'assignment_type'  => 'research',
-                'load_units'       => $total,
-                'description'      => "Grade {$gradeLevel} Research Advisory",
-                'is_overridden'    => true,
-                'created_by'       => Auth::id(),
-            ]);
-        }
-
-        return $la;
+        return $this->loads->recomputeResearchGrade($userId, $termId, $gradeLevel, $load, Auth::id());
     }
 
     private function mapAdvisory(ResearchAdvisory $r): array

@@ -2,9 +2,12 @@
 
 namespace App\Services\FacultyLoading;
 
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
+use App\Models\FacultyLoading\ResearchAdvisory;
 use App\Models\FacultyLoading\SstPosition;
 
 /**
@@ -339,5 +342,67 @@ class LoadComputationService
             'message'   => "Committee compliance met: {$count} committee assignment(s)"
                          . ($hasChair ? ', including a chairpersonship.' : '.'),
         ];
+    }
+
+    // ── Research Advisory Grade Recompute ────────────────────────────────────
+
+    /**
+     * Recompute the single RES-G{grade} LoadAssignment for a faculty + term from
+     * the sum of their active research advisories at that grade level.
+     * Auto-creates the RES-G{grade} designation on first use.
+     *
+     * Deletes the LoadAssignment when the total drops to zero.
+     */
+    public function recomputeResearchGrade(int $userId, int $termId, int $gradeLevel, FacultyLoad $load, ?int $createdBy = null): ?LoadAssignment
+    {
+        $designation = Designation::firstOrCreate(
+            ['code' => "RES-G{$gradeLevel}"],
+            [
+                'designation_category_id' => DesignationCategory::firstOrCreate(
+                    ['code' => 'RESEARCH'],
+                    ['name' => 'Research Advisory', 'description' => 'Research group and thesis advisory roles', 'sort_order' => 8, 'is_active' => true]
+                )->id,
+                'name'            => "Research Advisory — Grade {$gradeLevel}",
+                'assignment_type' => 'research',
+                'load_units'      => 0,
+                'requires_unit'   => false,
+                'is_active'       => true,
+                'sort_order'      => $gradeLevel,
+            ]
+        );
+
+        $total = (float) ResearchAdvisory::where('user_id', $userId)
+            ->where('academic_term_id', $termId)
+            ->where('grade_level', $gradeLevel)
+            ->where('status', 'active')
+            ->sum('load_units');
+
+        $la = LoadAssignment::where('faculty_load_id', $load->id)
+            ->where('designation_id', $designation->id)
+            ->first();
+
+        if ($total <= 0) {
+            $la?->delete();
+            return null;
+        }
+
+        if ($la) {
+            $la->update(['load_units' => $total]);
+        } else {
+            $la = LoadAssignment::create([
+                'faculty_load_id'  => $load->id,
+                'user_id'          => $userId,
+                'school_year_id'   => $load->school_year_id,
+                'academic_term_id' => $termId,
+                'designation_id'   => $designation->id,
+                'assignment_type'  => 'research',
+                'load_units'       => $total,
+                'description'      => "Grade {$gradeLevel} Research Advisory",
+                'is_overridden'    => true,
+                'created_by'       => $createdBy,
+            ]);
+        }
+
+        return $la;
     }
 }
