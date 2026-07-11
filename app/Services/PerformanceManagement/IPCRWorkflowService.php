@@ -89,7 +89,7 @@ class IPCRWorkflowService
      */
     public const ACIDAA_DESIGNATION_CODES = ['ACIDAA', 'SUP-ACIDAA'];
 
-    /** @var array<string, User|null> per-request memo for chain lookups */
+    /** @var array<string, mixed> per-request memo for chain lookups */
     private array $memo = [];
 
     public function assertOwner(User $user, EmployeeIPCR $ipcr): void
@@ -113,16 +113,12 @@ class IPCRWorkflowService
             return $this->firstNotSelf($employee, $this->cidChief(), $this->divisionChiefOf($employee));
         }
 
-        if (AcademicUnit::active()->where('head_user_id', $employee->id)->exists()) {
+        if ($this->currentAcademicUnits()->where('head_user_id', $employee->id)->isNotEmpty()) {
             return $this->firstNotSelf($employee, $this->acidaaHolder(), $this->cidChief(), $this->divisionChiefOf($employee));
         }
 
-        if ($unitId = $this->academicUnitIdFor($employee)) {
-            $headId = AcademicUnit::active()
-                ->where('id', $unitId)
-                ->value('head_user_id');
-            $head = $headId ? User::find($headId) : null;
-
+        $head = $this->academicUnitHeadFor($employee);
+        if ($head) {
             return $this->firstNotSelf($employee, $head, $this->divisionChiefOf($employee));
         }
 
@@ -130,22 +126,46 @@ class IPCRWorkflowService
     }
 
     /**
-     * The academic unit a teacher belongs to: explicit users.academic_unit_id
-     * wins; otherwise derived from the unit whose subjects dominate their
-     * current-SY teaching load (prod does not populate users.academic_unit_id).
+     * The AUH supervising a teacher. A faculty member's academic unit is
+     * their office/unit in Data Management (users.office_id) — Faculty
+     * Loading's "Sync to Offices" keeps offices.unit_head aligned with the
+     * unit's head. The office link only counts when the office is in the
+     * CID division AND its unit_head currently heads an active current-SY
+     * academic unit (rejects stale unit heads and CID lab offices).
+     * Explicit users.academic_unit_id wins; current-SY teaching-subject
+     * derivation remains as a last resort.
      */
-    private function academicUnitIdFor(User $employee): ?int
+    private function academicUnitHeadFor(User $employee): ?User
     {
+        $units = $this->currentAcademicUnits();
+
+        // 1. Explicit unit assignment
         if ($employee->academic_unit_id) {
-            return (int) $employee->academic_unit_id;
+            $headId = $units->firstWhere('id', (int) $employee->academic_unit_id)?->head_user_id;
+            if ($headId) {
+                return User::find($headId);
+            }
         }
 
-        $currentSyId = SchoolYear::where('is_current', true)->value('id');
+        // 2. Data Management office link
+        if ($employee->office_id && ($cidDivisionId = $this->cidDivisionId())) {
+            $unitHead = DB::table('offices')
+                ->where('id', $employee->office_id)
+                ->where('division_id', $cidDivisionId)
+                ->value('unit_head');
+
+            if ($unitHead && $units->contains('head_user_id', (int) $unitHead)) {
+                return User::find($unitHead);
+            }
+        }
+
+        // 3. Derive from the unit whose subjects dominate their teaching load
+        $currentSyId = $this->currentSchoolYearId();
         if (! $currentSyId) {
             return null;
         }
 
-        return DB::table('load_assignments')
+        $unitId = DB::table('load_assignments')
             ->join('subjects', 'subjects.id', '=', 'load_assignments.subject_id')
             ->where('load_assignments.user_id', $employee->id)
             ->where('load_assignments.school_year_id', $currentSyId)
@@ -154,6 +174,41 @@ class IPCRWorkflowService
             ->groupBy('subjects.academic_unit_id')
             ->orderByDesc('n')
             ->value('academic_unit_id');
+
+        $headId = $unitId ? $units->firstWhere('id', (int) $unitId)?->head_user_id : null;
+
+        return $headId ? User::find($headId) : null;
+    }
+
+    private function currentSchoolYearId(): ?int
+    {
+        if (! array_key_exists('currentSyId', $this->memo)) {
+            $this->memo['currentSyId'] = SchoolYear::where('is_current', true)->value('id');
+        }
+
+        return $this->memo['currentSyId'];
+    }
+
+    /** Active academic units of the current SY (memoized collection). */
+    private function currentAcademicUnits()
+    {
+        if (! array_key_exists('currentUnits', $this->memo)) {
+            $syId = $this->currentSchoolYearId();
+            $this->memo['currentUnits'] = $syId
+                ? AcademicUnit::active()->where('school_year_id', $syId)->get(['id', 'head_user_id'])
+                : collect();
+        }
+
+        return $this->memo['currentUnits'];
+    }
+
+    private function cidDivisionId(): ?int
+    {
+        if (! array_key_exists('cidDivisionId', $this->memo)) {
+            $this->memo['cidDivisionId'] = Division::where('acronym', 'CID')->value('id');
+        }
+
+        return $this->memo['cidDivisionId'];
     }
 
     private function firstNotSelf(User $employee, ?User ...$candidates): ?User
@@ -207,7 +262,7 @@ class IPCRWorkflowService
     private function acidaaAssignmentQuery()
     {
         $designationIds = $this->acidaaDesignationIds();
-        $currentSyId    = SchoolYear::where('is_current', true)->value('id');
+        $currentSyId    = $this->currentSchoolYearId();
 
         return LoadAssignment::whereIn('designation_id', $designationIds)
             ->when($currentSyId, fn ($q) => $q->where('school_year_id', $currentSyId));
@@ -223,14 +278,25 @@ class IPCRWorkflowService
     {
         $ids = collect();
 
-        // Teachers in academic units the user heads — explicitly assigned OR
-        // teaching that unit's subjects this SY (mirrors academicUnitIdFor)
-        $unitIds = AcademicUnit::active()->where('head_user_id', $user->id)->pluck('id');
+        // Teachers in academic units the user heads (current SY) — via their
+        // Data Management office (offices.unit_head = me, CID division),
+        // explicit assignment, or teaching that unit's subjects this SY
+        // (mirrors academicUnitHeadFor)
+        $unitIds = $this->currentAcademicUnits()->where('head_user_id', $user->id)->pluck('id');
         if ($unitIds->isNotEmpty()) {
             $ids = $ids->merge(User::whereIn('academic_unit_id', $unitIds)->pluck('id'));
 
-            $currentSyId = SchoolYear::where('is_current', true)->value('id');
-            if ($currentSyId) {
+            if ($cidDivisionId = $this->cidDivisionId()) {
+                $officeIds = DB::table('offices')
+                    ->where('division_id', $cidDivisionId)
+                    ->where('unit_head', $user->id)
+                    ->pluck('id');
+                if ($officeIds->isNotEmpty()) {
+                    $ids = $ids->merge(User::whereIn('office_id', $officeIds)->pluck('id'));
+                }
+            }
+
+            if ($currentSyId = $this->currentSchoolYearId()) {
                 $ids = $ids->merge(
                     DB::table('load_assignments')
                         ->join('subjects', 'subjects.id', '=', 'load_assignments.subject_id')
@@ -242,9 +308,9 @@ class IPCRWorkflowService
             }
         }
 
-        // Academic Unit Heads, if the user is the ACIDAA
+        // Academic Unit Heads (current SY), if the user is the ACIDAA
         if ($this->holdsAcidaaDesignation($user)) {
-            $ids = $ids->merge(AcademicUnit::active()->whereNotNull('head_user_id')->pluck('head_user_id'));
+            $ids = $ids->merge($this->currentAcademicUnits()->whereNotNull('head_user_id')->pluck('head_user_id'));
         }
 
         // The ACIDAA, if the user is the CID Chief
