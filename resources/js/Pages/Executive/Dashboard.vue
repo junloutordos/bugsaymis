@@ -171,8 +171,8 @@ const taskProgressPct = computed(() => {
 </script>
 
 <template>
-  <Head title="Executive Dashboard" />
-  <AdminLayout title="Executive Dashboard">
+  <Head title="ManCom Deck" />
+  <AdminLayout title="ManCom Deck">
     <div class="space-y-5 exec-dashboard">
 
       <!-- Header -->
@@ -180,7 +180,7 @@ const taskProgressPct = computed(() => {
         <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-100" aria-hidden="true"></div>
         <div>
           <h1 class="font-heading text-xl font-semibold text-slate-800 flex items-center gap-2">
-            Executive Dashboard
+            ManCom Deck
             <AppBadge :color="lens?.division ? 'blue' : 'purple'">{{ lensLabel }}</AppBadge>
           </h1>
           <p class="text-xs text-slate-400 mt-0.5">Data as of {{ generatedLabel }}</p>

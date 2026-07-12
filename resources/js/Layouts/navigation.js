@@ -74,7 +74,7 @@ export const menuItems = [
     icon: HomeIcon,
   },
   {
-    label: "Executive Dashboard",
+    label: "ManCom Deck",
     routeName: "executive.dashboard",
     href: route("executive.dashboard"),
     icon: PresentationChartLineIcon,
