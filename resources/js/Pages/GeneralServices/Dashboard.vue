@@ -25,6 +25,7 @@ import {
 } from 'chart.js'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
 import { BRAND, STATUS, seriesColor } from '@/Utils/chartTheme'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import {
   CalendarDaysIcon,
   ChartBarIcon,
@@ -191,6 +192,8 @@ const kpiCards = computed(() => [
   },
 ])
 
+const { values: kpiValues } = useCountUp(() => kpiCards.value.map(c => c.value))
+
 const calendarRef = ref(null)
 const selectedEvent = ref(null)
 const loadingEvents = ref(false)
@@ -298,18 +301,18 @@ function statusClass(status) {
   <Head title="General Services Dashboard" />
   <AdminLayout title="General Services Dashboard">
     <div class="space-y-6">
-      <AppPageHeader title="General Services Dashboard" subtitle="Operational analytics for vehicle, facility, work, and service requests.">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="General Services Dashboard" subtitle="Operational analytics for vehicle, facility, work, and service requests.">
         <template #actions>
           <span class="text-xs text-slate-500">Updated {{ generatedAt ? formatDateTime(generatedAt) : '—' }}</span>
         </template>
       </AppPageHeader>
 
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AppCard v-for="card in kpiCards" :key="card.label">
+      <div class="dash-section grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" style="--stagger: 1">
+        <AppCard v-for="(card, i) in kpiCards" :key="card.label">
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ card.label }}</p>
-              <p class="mt-2 text-3xl font-semibold text-slate-900">{{ formatNumber(card.value) }}</p>
+              <p class="mt-2 text-3xl font-semibold text-slate-900 tabular-nums">{{ formatNumber(kpiValues[i] ?? card.value) }}</p>
               <p class="mt-1 text-sm text-slate-500">{{ card.sub }}</p>
             </div>
             <div :class="['rounded-lg p-2.5', card.iconClass]">
@@ -319,7 +322,7 @@ function statusClass(status) {
         </AppCard>
       </div>
 
-      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+      <div class="dash-section grid grid-cols-1 gap-5 xl:grid-cols-3" style="--stagger: 2">
         <AppCard title="Monthly Request Trend" subtitle="Last 12 months by request type" class="xl:col-span-2">
           <div class="h-72">
             <Line :data="monthlyTrendData" :options="lineOptions" />
@@ -334,7 +337,7 @@ function statusClass(status) {
         </AppCard>
       </div>
 
-      <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div class="dash-section grid grid-cols-1 gap-5 xl:grid-cols-2" style="--stagger: 3">
         <AppCard title="Module Workload" subtitle="Active, completed, and declined totals">
           <div class="h-72">
             <Bar :data="moduleChartData" :options="barOptions" />
@@ -349,7 +352,7 @@ function statusClass(status) {
         </AppCard>
       </div>
 
-      <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div class="dash-section grid grid-cols-1 gap-5 xl:grid-cols-2" style="--stagger: 4">
         <AppCard>
           <div class="mb-4 flex items-center justify-between">
             <div>
@@ -427,7 +430,7 @@ function statusClass(status) {
         </AppCard>
       </div>
 
-      <AppCard>
+      <AppCard class="dash-section" style="--stagger: 5">
         <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div class="flex items-center gap-2">
@@ -453,7 +456,7 @@ function statusClass(status) {
         </div>
       </AppCard>
 
-      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+      <div class="dash-section grid grid-cols-1 gap-5 xl:grid-cols-3" style="--stagger: 6">
         <AppCard>
           <div class="mb-4 flex items-center gap-2">
             <ClockIcon class="h-5 w-5 text-slate-600" />

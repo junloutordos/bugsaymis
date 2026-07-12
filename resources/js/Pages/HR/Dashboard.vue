@@ -14,6 +14,7 @@ import {
 } from 'chart.js'
 import { Doughnut, Bar, Line } from 'vue-chartjs'
 import { BRAND, STATUS, OTHER, seriesColor, gradientFill } from '@/Utils/chartTheme'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import {
   UserGroupIcon, ClockIcon, CalendarDaysIcon, TicketIcon,
   BriefcaseIcon, UserPlusIcon, ClipboardDocumentCheckIcon,
@@ -191,16 +192,24 @@ const rewardsByTypeData = computed(() => ({
   labels: (props.rewards?.byType ?? []).map(r => r.name),
   datasets: [{ data: (props.rewards?.byType ?? []).map(r => r.total), backgroundColor: BRAND }],
 }))
+
+// Count-up per section KPI array
+const { values: hrKpiValues } = useCountUp(() => hrKpiCards.value.map(c => c.value))
+const { values: recruitmentKpiValues } = useCountUp(() => recruitmentKpiCards.value.map(c => c.value))
+const { values: pmsKpiValues } = useCountUp(() => pmsKpiCards.value.map(c => c.value))
+const { values: lndKpiValues } = useCountUp(() => lndKpiCards.value.map(c => c.value))
+const { values: salnKpiValues } = useCountUp(() => salnKpiCards.value.map(c => c.value))
+const { values: rewardsKpiValues } = useCountUp(() => rewardsKpiCards.value.map(c => c.value))
 </script>
 
 <template>
   <Head title="HR Dashboard" />
   <AdminLayout title="HR Dashboard">
     <div class="space-y-8">
-      <AppPageHeader title="HR Dashboard" subtitle="Comprehensive overview across HR, Recruitment, Performance Management, Learning & Development, SALN, and Rewards & Recognition" />
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="HR Dashboard" subtitle="Comprehensive overview across HR, Recruitment, Performance Management, Learning & Development, SALN, and Rewards & Recognition" />
 
       <!-- ── 1. HR Core ─────────────────────────────────────────────────────── -->
-      <section v-if="hr" class="space-y-4">
+      <section v-if="hr" class="dash-section space-y-4" style="--stagger: 1">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">HR Core</h2>
           <input v-model="hrMonth" type="month" @change="goHrMonth"
@@ -208,9 +217,9 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div v-for="card in hrKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
+          <div v-for="(card, i) in hrKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
             <component :is="card.icon" class="h-5 w-5 opacity-70" />
-            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-2xl font-bold leading-none tabular-nums">{{ hrKpiValues[i] ?? card.value ?? '—' }}</div>
             <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
             <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
           </div>
@@ -286,7 +295,7 @@ const rewardsByTypeData = computed(() => ({
       </section>
 
       <!-- ── 2. Recruitment ─────────────────────────────────────────────────── -->
-      <section v-if="recruitment" class="space-y-4 border-t border-slate-100 pt-6">
+      <section v-if="recruitment" class="dash-section space-y-4 border-t border-slate-100 pt-6" style="--stagger: 2">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">Recruitment</h2>
           <div class="flex items-center gap-3">
@@ -297,9 +306,9 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div v-for="card in recruitmentKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
+          <div v-for="(card, i) in recruitmentKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
             <component :is="card.icon" class="h-5 w-5 opacity-70" />
-            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-2xl font-bold leading-none tabular-nums">{{ recruitmentKpiValues[i] ?? card.value ?? '—' }}</div>
             <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
             <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
           </div>
@@ -324,7 +333,7 @@ const rewardsByTypeData = computed(() => ({
       </section>
 
       <!-- ── 3. Performance Management ──────────────────────────────────────── -->
-      <section v-if="pms" class="space-y-4 border-t border-slate-100 pt-6">
+      <section v-if="pms" class="dash-section space-y-4 border-t border-slate-100 pt-6" style="--stagger: 3">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">Performance Management (IPCR/PMS)</h2>
           <select v-model="pmsPeriod" @change="goPmsPeriod"
@@ -334,9 +343,9 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div v-for="card in pmsKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
+          <div v-for="(card, i) in pmsKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
             <component :is="card.icon" class="h-5 w-5 opacity-70" />
-            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-2xl font-bold leading-none tabular-nums">{{ pmsKpiValues[i] ?? card.value ?? '—' }}</div>
             <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
             <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
           </div>
@@ -364,7 +373,7 @@ const rewardsByTypeData = computed(() => ({
       </section>
 
       <!-- ── 4. Learning & Development ──────────────────────────────────────── -->
-      <section v-if="lnd" class="space-y-4 border-t border-slate-100 pt-6">
+      <section v-if="lnd" class="dash-section space-y-4 border-t border-slate-100 pt-6" style="--stagger: 4">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">Learning &amp; Development</h2>
           <input v-model="lndYear" type="number" @change="goLndYear"
@@ -372,9 +381,9 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div v-for="card in lndKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
+          <div v-for="(card, i) in lndKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
             <component :is="card.icon" class="h-5 w-5 opacity-70" />
-            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-2xl font-bold leading-none tabular-nums">{{ lndKpiValues[i] ?? card.value ?? '—' }}</div>
             <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
             <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
           </div>
@@ -386,7 +395,7 @@ const rewardsByTypeData = computed(() => ({
       </section>
 
       <!-- ── 5. SALN ─────────────────────────────────────────────────────────── -->
-      <section v-if="saln" class="space-y-4 border-t border-slate-100 pt-6">
+      <section v-if="saln" class="dash-section space-y-4 border-t border-slate-100 pt-6" style="--stagger: 5">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">SALN</h2>
           <div class="flex items-center gap-3">
@@ -397,9 +406,9 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div v-for="card in salnKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
+          <div v-for="(card, i) in salnKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
             <component :is="card.icon" class="h-5 w-5 opacity-70" />
-            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-2xl font-bold leading-none tabular-nums">{{ salnKpiValues[i] ?? card.value ?? '—' }}</div>
             <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
             <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
           </div>
@@ -411,7 +420,7 @@ const rewardsByTypeData = computed(() => ({
       </section>
 
       <!-- ── 6. Rewards & Recognition ───────────────────────────────────────── -->
-      <section v-if="rewards" class="space-y-4 border-t border-slate-100 pt-6">
+      <section v-if="rewards" class="dash-section space-y-4 border-t border-slate-100 pt-6" style="--stagger: 6">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">Rewards &amp; Recognition</h2>
           <div class="flex items-center gap-3">
@@ -422,9 +431,9 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div v-for="card in rewardsKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
+          <div v-for="(card, i) in rewardsKpiCards" :key="card.label" :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
             <component :is="card.icon" class="h-5 w-5 opacity-70" />
-            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-2xl font-bold leading-none tabular-nums">{{ rewardsKpiValues[i] ?? card.value ?? '—' }}</div>
             <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
             <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
           </div>

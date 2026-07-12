@@ -37,7 +37,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
   <AdminLayout title="Residence Hall">
     <div class="space-y-6">
 
-      <AppPageHeader title="Residence Hall Dashboard">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Residence Hall Dashboard">
         <template #actions>
           <span class="text-sm text-slate-500">
             {{ myHall ? hallLabel(myHall) : 'All Halls' }}
@@ -47,7 +47,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
       </AppPageHeader>
 
       <!-- Hall Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="dash-section grid grid-cols-1 md:grid-cols-2 gap-4" style="--stagger: 1">
         <div v-for="hall in stats" :key="hall.hall"
              :class="['bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 border-l-4 p-5', hallColor(hall.hall)]">
           <div class="flex items-center justify-between mb-4">
@@ -94,7 +94,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
       </div>
 
       <!-- Quick Nav -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="dash-section grid grid-cols-2 sm:grid-cols-4 gap-3" style="--stagger: 2">
         <Link :href="route('rh.applications.index')"
               class="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 hover:border-indigo-300 transition-colors">
           <DocumentTextIcon class="w-6 h-6 text-indigo-500" />
@@ -118,7 +118,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
       </div>
 
       <!-- Recent Pending Applications -->
-      <div v-if="recentApplications.length" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
+      <div v-if="recentApplications.length" class="dash-section bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70" style="--stagger: 3">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-slate-700">Pending Applications</h3>
           <Link :href="route('rh.applications.index')" class="text-xs text-indigo-600 hover:underline">View all</Link>

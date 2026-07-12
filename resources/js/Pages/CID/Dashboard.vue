@@ -23,6 +23,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Bar, Line, Doughnut } from 'vue-chartjs'
 import { BRAND, STATUS, gradientFill } from '@/Utils/chartTheme'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -49,6 +50,14 @@ const calMonth = ref(props.currentMonth)
 const calYear  = ref(props.currentYear)
 const events   = ref([...props.calendarEvents])
 const loading  = ref(false)
+
+const { values: kpiValues } = useCountUp(() => [
+  props.cards.assessments_today,
+  props.cards.sections_at_max,
+  props.cards.teachers_present_today,
+  props.cards.class_records_pending,
+  props.cards.activities_this_week,
+])
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -281,7 +290,7 @@ const donutChartOptions = {
   <AdminLayout title="CID Dashboard">
 
     <!-- Header -->
-    <AppPageHeader title="CID Dashboard" :subtitle="schoolYear?.name ?? 'No active school year'">
+    <AppPageHeader hero class="dash-section" style="--stagger: 0" title="CID Dashboard" :subtitle="schoolYear?.name ?? 'No active school year'">
       <template #actions>
         <AppButton @click="openCreate(todayStr)">
           <PlusIcon class="w-4 h-4" />
@@ -291,14 +300,14 @@ const donutChartOptions = {
     </AppPageHeader>
 
     <!-- ── Row 1: Summary Cards ─────────────────────────────────────────── -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+    <div class="dash-section grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" style="--stagger: 1">
 
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center justify-between mb-2">
           <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Assessments Today</span>
           <CalendarDaysIcon class="w-5 h-5 text-red-400" />
         </div>
-        <p class="text-3xl font-bold text-slate-800">{{ cards.assessments_today }}</p>
+        <p class="text-3xl font-bold text-slate-800 tabular-nums">{{ kpiValues[0] ?? cards.assessments_today }}</p>
         <p class="text-xs text-slate-400 mt-0.5">from class records</p>
       </div>
 
@@ -307,7 +316,7 @@ const donutChartOptions = {
           <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sections at Max</span>
           <ExclamationTriangleIcon class="w-5 h-5 text-amber-400" />
         </div>
-        <p class="text-3xl font-bold text-slate-800">{{ cards.sections_at_max }}</p>
+        <p class="text-3xl font-bold text-slate-800 tabular-nums">{{ kpiValues[1] ?? cards.sections_at_max }}</p>
         <p class="text-xs text-slate-400 mt-0.5">3 assessments today</p>
       </div>
 
@@ -316,7 +325,7 @@ const donutChartOptions = {
           <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Teachers Present</span>
           <UserGroupIcon class="w-5 h-5 text-green-400" />
         </div>
-        <p class="text-3xl font-bold text-slate-800">{{ cards.teachers_present_today }}</p>
+        <p class="text-3xl font-bold text-slate-800 tabular-nums">{{ kpiValues[2] ?? cards.teachers_present_today }}</p>
         <p class="text-xs text-slate-400 mt-0.5">today via tap-in</p>
       </div>
 
@@ -325,7 +334,7 @@ const donutChartOptions = {
           <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Class Records</span>
           <ClipboardDocumentCheckIcon class="w-5 h-5 text-indigo-400" />
         </div>
-        <p class="text-3xl font-bold text-slate-800">{{ cards.class_records_pending }}</p>
+        <p class="text-3xl font-bold text-slate-800 tabular-nums">{{ kpiValues[3] ?? cards.class_records_pending }}</p>
         <p class="text-xs text-slate-400 mt-0.5">pending review</p>
       </div>
 
@@ -334,14 +343,14 @@ const donutChartOptions = {
           <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">This Week</span>
           <DocumentTextIcon class="w-5 h-5 text-blue-400" />
         </div>
-        <p class="text-3xl font-bold text-slate-800">{{ cards.activities_this_week }}</p>
+        <p class="text-3xl font-bold text-slate-800 tabular-nums">{{ kpiValues[4] ?? cards.activities_this_week }}</p>
         <p class="text-xs text-slate-400 mt-0.5">CID activities</p>
       </div>
 
     </div>
 
     <!-- ── Row 2: Calendar + Today Panel ────────────────────────────────── -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="dash-section grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6" style="--stagger: 2">
 
       <!-- Calendar (2/3) -->
       <AppCard class="lg:col-span-2">
@@ -478,7 +487,7 @@ const donutChartOptions = {
     </div>
 
     <!-- ── Row 3: Charts ─────────────────────────────────────────────────── -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="dash-section grid grid-cols-1 lg:grid-cols-3 gap-4" style="--stagger: 3">
 
       <AppCard class="lg:col-span-1" title="Assessment Load by Section (This Month)" subtitle="From class records">
         <div class="h-48">

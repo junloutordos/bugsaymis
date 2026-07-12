@@ -7,6 +7,7 @@ import AppCard from '@/Components/AppCard.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import { CalendarDaysIcon, ClipboardDocumentListIcon, BanknotesIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -23,6 +24,8 @@ const cards = computed(() => [
   { label: 'Unliquidated', value: props.stats?.unliquidated ?? 0, icon: BanknotesIcon, tone: 'bg-rose-100 text-rose-700' },
 ])
 
+const { values: kpiValues } = useCountUp(() => cards.value.map(c => c.value))
+
 const statusBadgeColor = (status) => {
   if (['liquidated', 'completed', 'released'].includes(status)) return 'green'
   if (['returned', 'cancelled'].includes(status)) return 'red'
@@ -37,7 +40,7 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
   <Head title="Travel Dashboard" />
   <AdminLayout title="Travel Dashboard">
     <div class="space-y-6">
-      <AppPageHeader title="Travel Dashboard" subtitle="Official travel, itinerary, transport, cash advance, ORS, DV, and liquidation monitoring.">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Travel Dashboard" subtitle="Official travel, itinerary, transport, cash advance, ORS, DV, and liquidation monitoring.">
         <template #actions>
           <AppButton as="link" :href="route('travel.index')">
             Open Travel Requests
@@ -45,12 +48,12 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
         </template>
       </AppPageHeader>
 
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div v-for="card in cards" :key="card.label" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="dash-section grid gap-4 sm:grid-cols-2 xl:grid-cols-4" style="--stagger: 1">
+        <div v-for="(card, i) in cards" :key="card.label" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ card.label }}</p>
-              <p class="mt-2 text-2xl font-semibold text-slate-900">{{ card.value }}</p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 tabular-nums">{{ kpiValues[i] ?? card.value }}</p>
             </div>
             <div :class="['rounded-lg p-3', card.tone]">
               <component :is="card.icon" class="h-5 w-5" />
@@ -59,7 +62,7 @@ const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { mo
         </div>
       </div>
 
-      <div class="grid gap-6 xl:grid-cols-2">
+      <div class="dash-section grid gap-6 xl:grid-cols-2" style="--stagger: 2">
         <AppCard title="Pending My Action" :padded="false">
           <div class="divide-y divide-slate-100">
             <Link v-for="travel in pendingAction" :key="travel.id" :href="route('travel.show', travel.id)" class="block px-5 py-4 hover:bg-slate-50">

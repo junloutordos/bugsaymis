@@ -7,6 +7,7 @@ import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import AppTable from '@/Components/AppTable.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import { useCountUp } from '@/Composables/useCountUp.js'
 
 const props = defineProps({
     fiscalYear: Number,
@@ -37,13 +38,18 @@ const totalPpmps = computed(() => {
     const c = props.metrics.status_counts || {}
     return Object.values(c).reduce((s, v) => s + v, 0)
 })
+
+const approvedCount = computed(() =>
+    (props.metrics.status_counts?.approved || 0) + (props.metrics.status_counts?.consolidated || 0))
+
+const { values: kpiValues } = useCountUp(() => [totalPpmps.value, approvedCount.value])
 </script>
 
 <template>
     <Head title="PPMP Dashboard" />
     <AdminLayout title="PPMP Dashboard">
         <div class="space-y-5">
-            <AppPageHeader title="Procurement Planning Overview">
+            <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Procurement Planning Overview">
                 <template #actions>
                     <select v-model="selectedYear" @change="changeYear"
                             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -53,10 +59,10 @@ const totalPpmps = computed(() => {
             </AppPageHeader>
 
             <!-- Summary cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="dash-section grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" style="--stagger: 1">
                 <AppCard>
                     <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total PPMPs</p>
-                    <p class="text-2xl font-bold text-slate-800 mt-1">{{ totalPpmps }}</p>
+                    <p class="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{{ kpiValues[0] ?? totalPpmps }}</p>
                 </AppCard>
                 <AppCard>
                     <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Budget (Approved)</p>
@@ -69,12 +75,12 @@ const totalPpmps = computed(() => {
                 </AppCard>
                 <AppCard>
                     <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Approved</p>
-                    <p class="text-2xl font-bold text-success-700 mt-1">{{ (metrics.status_counts?.approved || 0) + (metrics.status_counts?.consolidated || 0) }}</p>
+                    <p class="text-2xl font-bold text-success-700 mt-1 tabular-nums">{{ kpiValues[1] ?? approvedCount }}</p>
                 </AppCard>
             </div>
 
             <!-- Status breakdown -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="dash-section grid grid-cols-1 lg:grid-cols-2 gap-4" style="--stagger: 2">
                 <AppCard title="Status Breakdown">
                     <div class="space-y-2">
                         <div v-for="(count, status) in metrics.status_counts" :key="status" class="flex items-center justify-between">
@@ -98,7 +104,8 @@ const totalPpmps = computed(() => {
             </div>
 
             <!-- Unit compliance table -->
-            <h3 class="text-sm font-semibold text-slate-700">Unit Compliance</h3>
+            <div class="dash-section" style="--stagger: 3">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3">Unit Compliance</h3>
             <AppTable :is-empty="!metrics.unit_compliance?.length">
                 <template #head>
                     <tr>
@@ -123,6 +130,7 @@ const totalPpmps = computed(() => {
                     <EmptyState title="No unit compliance data" subtitle="Nothing to show for this fiscal year yet." />
                 </template>
             </AppTable>
+            </div>
         </div>
     </AdminLayout>
 </template>

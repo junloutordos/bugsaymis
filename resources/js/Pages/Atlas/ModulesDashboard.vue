@@ -37,6 +37,7 @@ import {
 } from 'chart.js'
 import { Radar, Bar } from 'vue-chartjs'
 import { BRAND, withAlpha } from '@/Utils/chartTheme'
+import { useCountUp } from '@/Composables/useCountUp.js'
 
 ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler,
@@ -58,6 +59,9 @@ const modules      = ref(props.modules)
 const summary      = ref(props.summary)
 const integrations = ref(props.integrations)
 const cachedAt     = ref(props.cachedAt)
+
+const { values: totalValues } = useCountUp(() => [summary.value.total ?? 0])
+const totalValue = computed(() => totalValues.value[0] ?? summary.value.total)
 
 const refreshing      = ref(false)
 const selectedModule  = ref(null)
@@ -326,7 +330,7 @@ async function saveSettings() {
     <Head title="Atlas Module Monitor" />
 
     <!-- ── Page Header ───────────────────────────────────────────────────── -->
-    <AppPageHeader title="Atlas Module Monitor" subtitle="Atlas health, maturity, and ecosystem status of all software modules" class="mb-6">
+    <AppPageHeader hero title="Atlas Module Monitor" subtitle="Atlas health, maturity, and ecosystem status of all software modules" class="dash-section mb-6" style="--stagger: 0">
       <template #actions>
         <span v-if="cachedAtFormatted" class="text-xs text-slate-400">
           Updated: {{ cachedAtFormatted }}
@@ -339,11 +343,11 @@ async function saveSettings() {
     </AppPageHeader>
 
     <!-- ── System Summary Bar ────────────────────────────────────────────── -->
-    <AppCard :padded="true" class="mb-6">
+    <AppCard :padded="true" class="dash-section mb-6" style="--stagger: 1">
       <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div class="flex items-center gap-2">
           <CpuChipIcon class="h-5 w-5 text-slate-400" />
-          <span class="text-2xl font-bold text-slate-800">{{ summary.total }}</span>
+          <span class="text-2xl font-bold text-slate-800 tabular-nums">{{ totalValue }}</span>
           <span class="text-sm text-slate-500">modules</span>
         </div>
 
@@ -371,7 +375,7 @@ async function saveSettings() {
 
 
     <!-- ── External Integrations Panel ──────────────────────────────────── -->
-    <AppCard :padded="true" class="mb-6">
+    <AppCard :padded="true" class="dash-section mb-6" style="--stagger: 2">
       <template #header>
         <div class="flex items-center gap-2">
           <LinkIcon class="h-4 w-4 text-slate-500" />
@@ -398,7 +402,7 @@ async function saveSettings() {
     </AppCard>
 
     <!-- ── Filter Bar ────────────────────────────────────────────────────── -->
-    <div class="mb-4 flex flex-wrap items-center gap-3">
+    <div class="dash-section mb-4 flex flex-wrap items-center gap-3" style="--stagger: 3">
       <div class="flex flex-wrap gap-1.5">
         <button
           @click="filterCategory = 'all'"
@@ -434,11 +438,11 @@ async function saveSettings() {
     </div>
 
     <!-- ── Module Cards Grid ─────────────────────────────────────────────── -->
-    <div v-if="filteredModules.length === 0" class="py-20 text-center">
+    <div v-if="filteredModules.length === 0" class="dash-section py-20 text-center" style="--stagger: 4">
       <p class="text-sm text-slate-500">No modules match the selected filters.</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div v-else class="dash-section grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" style="--stagger: 4">
       <div
         v-for="mod in filteredModules"
         :key="mod.key"

@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { storageUrl } from '@/Composables/useStorage.js'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import EmptyState from '@/Components/EmptyState.vue'
@@ -180,25 +181,8 @@ const summaryCards = computed(() => [
   },
 ])
 
-// Animated stat values — count up from 0 on mount (rAF, no deps)
-const animatedValues = ref(summaryCards.value.map(() => 0))
-
-onMounted(() => {
-  const targets = summaryCards.value.map(card => Number(card.value) || 0)
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    animatedValues.value = targets
-    return
-  }
-  const duration = 700
-  const start = performance.now()
-  const tick = (now) => {
-    const t = Math.min((now - start) / duration, 1)
-    const ease = 1 - Math.pow(1 - t, 3)
-    animatedValues.value = targets.map(v => Math.round(v * ease))
-    if (t < 1) requestAnimationFrame(tick)
-  }
-  requestAnimationFrame(tick)
-})
+// Animated stat values — count up from 0 on mount
+const { values: animatedValues } = useCountUp(() => summaryCards.value.map(card => Number(card.value) || 0))
 
 function startOfToday() {
   const date = new Date()
@@ -590,28 +574,7 @@ function statusClass(status) {
 </template>
 
 <style scoped>
-/* Staggered entrance — each section fades/slides in, offset by --stagger */
-.dash-section {
-  animation: dash-fade-up 400ms ease both;
-  animation-delay: calc(var(--stagger, 0) * 60ms);
-}
-
-@keyframes dash-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dash-section {
-    animation: none;
-  }
-}
+/* Staggered entrance (.dash-section) is global — see resources/css/app.css */
 
 .dashboard-calendar :deep(.fc) {
   --fc-border-color: #e2e8f0;

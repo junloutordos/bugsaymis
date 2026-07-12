@@ -4,6 +4,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import {
   BeakerIcon, WrenchScrewdriverIcon, ClipboardDocumentCheckIcon,
   ExclamationTriangleIcon, ArchiveBoxIcon, CalendarDaysIcon,
@@ -32,6 +33,8 @@ const tiles = [
   stat('Pending Reservations', props.cards.pendingReservations, CalendarDaysIcon, 'emerald', route('science-lab.reservations.index')),
 ]
 
+const { values: kpiValues } = useCountUp(() => tiles.map(t => t.value))
+
 const toneClass = {
   indigo: 'bg-indigo-50 text-indigo-600',
   slate: 'bg-slate-100 text-slate-600',
@@ -50,26 +53,26 @@ function calibrationBadgeColor(status) {
   <Head title="Science Laboratory Management" />
   <AdminLayout title="Science Laboratory Management">
     <div class="space-y-6">
-      <AppPageHeader title="Science Laboratory Management"
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Science Laboratory Management"
         subtitle="Manage science laboratories, equipment, reagents, maintenance, calibration, safety and waste — CIM 4.4." />
 
       <!-- Stat tiles -->
-      <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <Link v-for="t in tiles" :key="t.label" :href="t.href || '#'"
+      <div class="dash-section grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" style="--stagger: 1">
+        <Link v-for="(t, i) in tiles" :key="t.label" :href="t.href || '#'"
           class="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-md">
           <div class="flex items-center gap-3">
             <span :class="['flex h-10 w-10 items-center justify-center rounded-lg', toneClass[t.tone]]">
               <component :is="t.icon" class="h-5 w-5" />
             </span>
             <div>
-              <div class="text-2xl font-semibold text-slate-800">{{ t.value }}</div>
+              <div class="text-2xl font-semibold text-slate-800 tabular-nums">{{ kpiValues[i] ?? t.value }}</div>
               <div class="text-xs text-slate-500">{{ t.label }}</div>
             </div>
           </div>
         </Link>
       </div>
 
-      <div class="grid gap-6 lg:grid-cols-2">
+      <div class="dash-section grid gap-6 lg:grid-cols-2" style="--stagger: 2">
         <!-- Calibration due -->
         <AppCard title="Calibration Due / Overdue" :padded="false">
           <template #header>

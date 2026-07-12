@@ -15,6 +15,7 @@ import {
 } from 'chart.js'
 import { Doughnut, Bar, Line } from 'vue-chartjs'
 import { BRAND, STATUS, OTHER, seriesColor, gradientFill } from '@/Utils/chartTheme'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import { StarIcon, ChatBubbleLeftRightIcon, UserGroupIcon, ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
 
 ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler)
@@ -119,6 +120,8 @@ const barOpts   = { indexAxis: 'y', plugins: { legend: { display: false } }, sca
 const lineOpts  = { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
 
 const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 10)
+
+const { values: kpiValues } = useCountUp(() => [props.total, props.thisMonth, props.overallAvg, props.byModule.length])
 </script>
 
 <template>
@@ -126,38 +129,38 @@ const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 
   <AdminLayout title="CSM Feedback Dashboard">
     <div class="space-y-6">
 
-      <AppPageHeader title="Client Satisfaction Dashboard" subtitle="Aggregated feedback from all General Services modules">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Client Satisfaction Dashboard" subtitle="Aggregated feedback from all General Services modules">
         <template #actions>
           <AppButton as="link" variant="secondary" :href="route('csm.list')">View All Feedback →</AppButton>
         </template>
       </AppPageHeader>
 
       <!-- KPI Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="dash-section grid grid-cols-2 lg:grid-cols-4 gap-3" style="--stagger: 1">
         <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-center">
           <ClipboardDocumentCheckIcon class="h-5 w-5 text-indigo-500 mx-auto mb-1" />
-          <div class="text-2xl font-bold text-indigo-700">{{ total }}</div>
+          <div class="text-2xl font-bold text-indigo-700 tabular-nums">{{ kpiValues[0] ?? total }}</div>
           <div class="text-xs text-indigo-500 font-semibold">Total Responses</div>
         </div>
         <div class="bg-success-50 border border-success-100 rounded-xl p-4 text-center">
           <ChatBubbleLeftRightIcon class="h-5 w-5 text-success-600 mx-auto mb-1" />
-          <div class="text-2xl font-bold text-success-700">{{ thisMonth }}</div>
+          <div class="text-2xl font-bold text-success-700 tabular-nums">{{ kpiValues[1] ?? thisMonth }}</div>
           <div class="text-xs text-success-600 font-semibold">This Month</div>
         </div>
         <div class="bg-warning-50 border border-warning-100 rounded-xl p-4 text-center">
           <StarIcon class="h-5 w-5 text-warning-600 mx-auto mb-1" />
-          <div class="text-2xl font-bold text-warning-700">{{ overallAvg }} <span class="text-base">/ 5</span></div>
+          <div class="text-2xl font-bold text-warning-700 tabular-nums">{{ kpiValues[2] ?? overallAvg }} <span class="text-base">/ 5</span></div>
           <div class="text-xs text-warning-600 font-semibold">Avg SQD Score</div>
         </div>
         <div class="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center">
           <UserGroupIcon class="h-5 w-5 text-slate-400 mx-auto mb-1" />
-          <div class="text-2xl font-bold text-slate-700">{{ byModule.length }}</div>
+          <div class="text-2xl font-bold text-slate-700 tabular-nums">{{ kpiValues[3] ?? byModule.length }}</div>
           <div class="text-xs text-slate-500 font-semibold">Modules Covered</div>
         </div>
       </div>
 
       <!-- Charts row 1 -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="dash-section grid grid-cols-1 lg:grid-cols-3 gap-4" style="--stagger: 2">
         <!-- Module breakdown -->
         <AppCard title="Responses by Module">
           <div style="height:200px"><Doughnut :data="moduleChart" :options="donutOpts" /></div>
@@ -170,7 +173,7 @@ const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 
       </div>
 
       <!-- Charts row 2 -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="dash-section grid grid-cols-1 lg:grid-cols-2 gap-4" style="--stagger: 3">
         <!-- SQD scores -->
         <AppCard title="SQD Avg Scores per Dimension" subtitle="Scale 1–5 (N/A excluded)">
           <div style="height:260px"><Bar :data="sqdChart" :options="barOpts" /></div>
@@ -188,7 +191,7 @@ const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 
       </div>
 
       <!-- CC1 awareness -->
-      <AppCard title="Citizen's Charter Awareness (CC1)">
+      <AppCard title="Citizen's Charter Awareness (CC1)" class="dash-section" style="--stagger: 4">
         <div style="height:180px"><Doughnut :data="cc1Chart" :options="donutOpts" /></div>
       </AppCard>
 

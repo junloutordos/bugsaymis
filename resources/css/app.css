@@ -191,3 +191,30 @@
 .chart-container.line-chart {
   max-height: 320px;
 }
+
+/* ============================= */
+/* Dashboard staggered entrance  */
+/* ============================= */
+/* Add class="dash-section" + style="--stagger: N" to top-level sections;
+   each fades/slides in offset by 60ms per step. */
+.dash-section {
+  animation: dash-fade-up 400ms ease both;
+  animation-delay: calc(var(--stagger, 0) * 60ms);
+}
+
+@keyframes dash-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-section {
+    animation: none;
+  }
+}

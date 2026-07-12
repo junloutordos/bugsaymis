@@ -17,6 +17,7 @@ import {
 } from 'chart.js'
 import { Doughnut, Bar, Line } from 'vue-chartjs'
 import { BRAND, STATUS, OTHER, gradientFill } from '@/Utils/chartTheme'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import {
   ClipboardDocumentListIcon,
   CheckCircleIcon,
@@ -293,6 +294,9 @@ const fleetKpiCards = computed(() => {
   ]
 })
 
+const { values: kpiValues } = useCountUp(() => kpiCards.value.map(c => c.value))
+const { values: fleetKpiValues } = useCountUp(() => fleetKpiCards.value.map(c => c.value))
+
 const riskTierLabels = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
 const riskTierColors = { critical: STATUS.danger, high: '#f97316', medium: STATUS.warning, low: STATUS.success }
 
@@ -330,7 +334,7 @@ function fmtDateTime(d) {
     <div class="space-y-6">
 
       <!-- Header + month picker -->
-      <AppPageHeader title="MIS Analytics Dashboard" subtitle="IT Job Request performance and client satisfaction metrics">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="MIS Analytics Dashboard" subtitle="IT Job Request performance and client satisfaction metrics">
         <template #actions>
           <label class="text-xs text-slate-500 font-medium">Month</label>
           <input
@@ -353,18 +357,18 @@ function fmtDateTime(d) {
       </div>
 
       <!-- KPI Cards -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div v-for="card in kpiCards" :key="card.label"
+      <div class="dash-section grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" style="--stagger: 1">
+        <div v-for="(card, i) in kpiCards" :key="card.label"
              :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
           <component :is="card.icon" class="h-5 w-5 opacity-70" />
-          <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+          <div class="text-2xl font-bold leading-none tabular-nums">{{ kpiValues[i] ?? card.value ?? '—' }}</div>
           <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
           <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
         </div>
       </div>
 
       <!-- Charts row 1: Status donut + Monthly trend -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="dash-section grid grid-cols-1 lg:grid-cols-2 gap-4" style="--stagger: 2">
 
         <!-- Status Breakdown -->
         <AppCard title="Request Status Breakdown">
@@ -383,7 +387,7 @@ function fmtDateTime(d) {
       </div>
 
       <!-- Charts row 2: Category + SQD -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="dash-section grid grid-cols-1 lg:grid-cols-2 gap-4" style="--stagger: 3">
 
         <!-- Category Breakdown -->
         <AppCard title="Top Request Categories">
@@ -402,7 +406,7 @@ function fmtDateTime(d) {
       </div>
 
       <!-- Personnel Workload table -->
-      <AppCard title="MIS Personnel Workload" :padded="false">
+      <AppCard title="MIS Personnel Workload" :padded="false" class="dash-section" style="--stagger: 4">
         <AppTable :is-empty="!personnelWorkload.length" :card="false" :skeleton-cols="4">
           <template #head>
             <tr>
@@ -431,7 +435,7 @@ function fmtDateTime(d) {
       </AppCard>
 
       <!-- Recent Requests table -->
-      <AppCard title="Recent Requests" :padded="false">
+      <AppCard title="Recent Requests" :padded="false" class="dash-section" style="--stagger: 5">
         <template #header>
           <a :href="route('jobrequests.index')" class="text-xs text-indigo-600 hover:underline">View all →</a>
         </template>
@@ -463,7 +467,7 @@ function fmtDateTime(d) {
       </AppCard>
 
       <!-- Fleet & Infrastructure Health -->
-      <div v-if="canViewFleet && fleet" class="space-y-4 pt-2 border-t border-slate-100">
+      <div v-if="canViewFleet && fleet" class="dash-section space-y-4 pt-2 border-t border-slate-100" style="--stagger: 6">
         <div>
           <h1 class="text-lg font-bold text-slate-800">Fleet &amp; Infrastructure Health</h1>
           <p class="text-sm text-slate-500 mt-0.5">Live Atlas Sentinel fleet snapshot — not scoped to the month above</p>
@@ -471,10 +475,10 @@ function fmtDateTime(d) {
 
         <!-- Fleet KPI Cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div v-for="card in fleetKpiCards" :key="card.label"
+          <div v-for="(card, i) in fleetKpiCards" :key="card.label"
                :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
             <component :is="card.icon" class="h-5 w-5 opacity-70" />
-            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-2xl font-bold leading-none tabular-nums">{{ fleetKpiValues[i] ?? card.value ?? '—' }}</div>
             <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
             <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
           </div>

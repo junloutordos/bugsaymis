@@ -18,6 +18,7 @@ import {
 } from "chart.js"
 import { Doughnut, Bar, Line } from "vue-chartjs"
 import { BRAND, STATUS, seriesColor, gradientFill } from "@/Utils/chartTheme"
+import { useCountUp } from "@/Composables/useCountUp.js"
 
 ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler)
 
@@ -86,6 +87,8 @@ const kpis = computed(() => [
   { label: "Client Satisfaction", value: props.satisfaction?.overall ?? "—", sub: props.satisfaction?.adjectival, icon: StarIcon, color: "text-amber-600 bg-amber-50" },
   { label: "Active Users Now", value: props.operations?.activeUsersNow ?? 0, icon: SignalIcon, color: "text-emerald-600 bg-emerald-50" },
 ])
+
+const { values: kpiValues } = useCountUp(() => kpis.value.map(k => k.value))
 
 // ── Section chart data ──────────────────────────────────────────────────────
 const wfDivisionChart = computed(() => ({
@@ -173,7 +176,8 @@ const taskProgressPct = computed(() => {
     <div class="space-y-5 exec-dashboard">
 
       <!-- Header -->
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="dash-section relative overflow-hidden rounded-2xl bg-white px-4 py-5 shadow-sm ring-1 ring-slate-200/70 sm:px-6 flex flex-wrap items-center gap-3" style="--stagger: 0">
+        <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-100" aria-hidden="true"></div>
         <div>
           <h1 class="font-heading text-xl font-semibold text-slate-800 flex items-center gap-2">
             Executive Dashboard
@@ -196,7 +200,7 @@ const taskProgressPct = computed(() => {
       </div>
 
       <!-- Needs Attention -->
-      <div v-if="attention.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div v-if="attention.length" class="dash-section grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" style="--stagger: 1">
         <Link v-for="(a, i) in attention" :key="i" :href="route(a.route)"
           :class="['flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors',
                    a.severity === 'danger' ? 'border-red-200 bg-red-50/70 hover:bg-red-50' : 'border-amber-200 bg-amber-50/70 hover:bg-amber-50']">
@@ -207,19 +211,19 @@ const taskProgressPct = computed(() => {
           </div>
         </Link>
       </div>
-      <div v-else class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-700">
+      <div v-else class="dash-section flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-700" style="--stagger: 1">
         <ShieldCheckIcon class="w-5 h-5" /> All clear — nothing needs your attention right now.
       </div>
 
       <!-- KPI tiles -->
-      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <AppCard v-for="k in kpis" :key="k.label" class="!p-4">
+      <div class="dash-section grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" style="--stagger: 2">
+        <AppCard v-for="(k, i) in kpis" :key="k.label" class="!p-4">
           <div class="flex items-center gap-3">
             <span :class="['w-9 h-9 rounded-lg flex items-center justify-center shrink-0', k.color]">
               <component :is="k.icon" class="w-5 h-5" />
             </span>
             <div class="min-w-0">
-              <p class="text-xl font-bold text-slate-800 leading-none">{{ k.value }}</p>
+              <p class="text-xl font-bold text-slate-800 leading-none tabular-nums">{{ kpiValues[i] ?? k.value }}</p>
               <p class="text-[11px] text-slate-500 mt-1 truncate">{{ k.label }}<span v-if="k.sub" class="text-slate-400"> · {{ k.sub }}</span></p>
             </div>
           </div>
@@ -227,7 +231,7 @@ const taskProgressPct = computed(() => {
       </div>
 
       <!-- Division scorecard (campus lens) -->
-      <AppCard v-if="scorecard" :padded="false" title="Division Scorecard" subtitle="Click a column to sort">
+      <AppCard v-if="scorecard" :padded="false" title="Division Scorecard" subtitle="Click a column to sort" class="dash-section" style="--stagger: 3">
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -264,7 +268,7 @@ const taskProgressPct = computed(() => {
       </AppCard>
 
       <!-- Sections grid -->
-      <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+      <div class="dash-section grid grid-cols-1 xl:grid-cols-2 gap-5" style="--stagger: 4">
 
         <!-- 1. Workforce & Leave -->
         <AppCard title="Workforce & Leave" subtitle="Headcount, leave activity, today's attendance" class="exec-section">

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AgentSpecsModal from '@/Components/AgentSpecsModal.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
 import {
@@ -247,7 +248,9 @@ function offlineAfterFailedUpdate(device) {
   <Head title="Atlas Sentinel Health Dashboard" />
   <AdminLayout title="Atlas Sentinel Health Dashboard">
     <div class="space-y-4">
-      <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Atlas Sentinel Health Dashboard" :subtitle="`${devices.length} managed device${devices.length === 1 ? '' : 's'} — health, risk, and agent status`" />
+
+      <div class="dash-section bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden" style="--stagger: 1">
         <table class="w-full text-sm">
           <thead class="bg-slate-50 border-b border-slate-200">
             <tr>

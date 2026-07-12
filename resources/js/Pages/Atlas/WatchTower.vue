@@ -27,6 +27,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import { BRAND, gradientFill } from '@/Utils/chartTheme'
+import { useCountUp } from '@/Composables/useCountUp.js'
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend)
 
@@ -84,6 +85,9 @@ function latest(points) {
   return list.length ? list[list.length - 1].value : null
 }
 
+const { values: queueValues } = useCountUp(() =>
+  ['queued', 'processing', 'processed', 'released', 'failed'].map(k => props.queueThroughput[k] ?? 0))
+
 const alb = computed(() => props.infra?.alb ?? null)
 const ecsWeb = computed(() => props.infra?.ecsWeb ?? null)
 const ecsWorker = computed(() => props.infra?.ecsWorker ?? null)
@@ -95,7 +99,7 @@ const traces = computed(() => props.infra?.traces ?? null)
   <Head title="Atlas WatchTower" />
   <AdminLayout title="Atlas WatchTower">
     <div class="space-y-6">
-      <AppPageHeader title="Atlas WatchTower" :subtitle="`App telemetry — last ${windowHours} hours. Powered by Laravel Pulse.`">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Atlas WatchTower" :subtitle="`App telemetry — last ${windowHours} hours. Powered by Laravel Pulse.`">
         <template #actions>
           <AppBadge :color="enabled ? 'green' : 'slate'">
             {{ enabled ? 'Recording' : 'Disabled' }}
@@ -108,19 +112,19 @@ const traces = computed(() => props.infra?.traces ?? null)
       </div>
 
       <!-- Active users -->
-      <ActiveUsersCard />
+      <ActiveUsersCard class="dash-section" style="--stagger: 1" />
 
       <!-- Queue throughput -->
-      <AppCard>
+      <AppCard class="dash-section" style="--stagger: 2">
         <template #header>
           <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <QueueListIcon class="h-4 w-4" /> Queue Throughput
           </div>
         </template>
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
-          <div v-for="key in ['queued', 'processing', 'processed', 'released', 'failed']" :key="key">
-            <div class="text-2xl font-semibold" :class="key === 'failed' ? 'text-danger-600' : 'text-slate-800'">
-              {{ queueThroughput[key] ?? 0 }}
+          <div v-for="(key, i) in ['queued', 'processing', 'processed', 'released', 'failed']" :key="key">
+            <div class="text-2xl font-semibold tabular-nums" :class="key === 'failed' ? 'text-danger-600' : 'text-slate-800'">
+              {{ queueValues[i] ?? queueThroughput[key] ?? 0 }}
             </div>
             <div class="text-xs text-slate-500 capitalize">{{ key }}</div>
           </div>
@@ -128,7 +132,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       </AppCard>
 
       <!-- Slow Requests -->
-      <AppCard>
+      <AppCard class="dash-section" style="--stagger: 3">
         <template #header>
           <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ClockIcon class="h-4 w-4" /> Slow Requests
@@ -156,7 +160,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       </AppCard>
 
       <!-- Exceptions -->
-      <AppCard>
+      <AppCard class="dash-section" style="--stagger: 4">
         <template #header>
           <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ExclamationTriangleIcon class="h-4 w-4" /> Exceptions
@@ -182,7 +186,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       </AppCard>
 
       <!-- Slow Queries -->
-      <AppCard>
+      <AppCard class="dash-section" style="--stagger: 5">
         <template #header>
           <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <CircleStackIcon class="h-4 w-4" /> Slow Queries
@@ -219,7 +223,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       </div>
 
       <!-- Traces (X-Ray) -->
-      <AppCard>
+      <AppCard class="dash-section" style="--stagger: 6">
         <template #header>
           <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ChartBarIcon class="h-4 w-4" /> Traces (last {{ traces?.windowMinutes ?? 60 }} min)
@@ -250,7 +254,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       </AppCard>
 
       <!-- ALB -->
-      <AppCard v-if="alb">
+      <AppCard v-if="alb" class="dash-section" style="--stagger: 6">
         <template #header>
           <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ServerStackIcon class="h-4 w-4" /> Load Balancer (24h)
@@ -275,7 +279,7 @@ const traces = computed(() => props.infra?.traces ?? null)
         </div>
       </AppCard>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="dash-section grid grid-cols-1 lg:grid-cols-2 gap-6" style="--stagger: 6">
         <!-- ECS Web -->
         <AppCard v-if="ecsWeb">
           <template #header>
@@ -322,7 +326,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       </div>
 
       <!-- RDS -->
-      <AppCard v-if="rds">
+      <AppCard v-if="rds" class="dash-section" style="--stagger: 6">
         <template #header>
           <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <CircleStackIcon class="h-4 w-4" /> RDS (24h)

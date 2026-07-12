@@ -1,24 +1,24 @@
 <template>
   <AdminLayout title="Rewards & Recognition Dashboard">
     <div class="space-y-6">
-      <AppPageHeader title="Rewards & Recognition (PRAISE)">
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Rewards & Recognition (PRAISE)">
         <template #actions>
           <AppButton as="link" :href="route('rewards.nominations.create')">+ Nominate Employee</AppButton>
         </template>
       </AppPageHeader>
 
       <!-- Stats Grid -->
-      <div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
-        <StatCard label="Total Nominations" :value="stats.total_nominations" color="indigo" />
-        <StatCard label="Pending" :value="stats.pending" color="amber" />
-        <StatCard label="Screened" :value="stats.screened" color="blue" />
-        <StatCard label="Evaluated" :value="stats.evaluated" color="blue" />
-        <StatCard label="Approved" :value="stats.approved" color="success" />
-        <StatCard label="Rejected" :value="stats.rejected" color="red" />
-        <StatCard label="Awarded" :value="stats.total_awarded" color="success" />
+      <div class="dash-section grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7" style="--stagger: 1">
+        <StatCard label="Total Nominations" :value="kpiValues[0] ?? stats.total_nominations" color="indigo" />
+        <StatCard label="Pending" :value="kpiValues[1] ?? stats.pending" color="amber" />
+        <StatCard label="Screened" :value="kpiValues[2] ?? stats.screened" color="blue" />
+        <StatCard label="Evaluated" :value="kpiValues[3] ?? stats.evaluated" color="blue" />
+        <StatCard label="Approved" :value="kpiValues[4] ?? stats.approved" color="success" />
+        <StatCard label="Rejected" :value="kpiValues[5] ?? stats.rejected" color="red" />
+        <StatCard label="Awarded" :value="kpiValues[6] ?? stats.total_awarded" color="success" />
       </div>
 
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div class="dash-section grid grid-cols-1 gap-6 lg:grid-cols-2" style="--stagger: 2">
         <!-- Nominations by Type -->
         <AppCard title="Nominations by Type" :padded="false">
           <div class="p-5">
@@ -55,7 +55,7 @@
       </div>
 
       <!-- Quick Links -->
-      <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div class="dash-section grid grid-cols-2 gap-4 sm:grid-cols-4" style="--stagger: 3">
         <QuickLink :href="route('rewards.nominations.index')" label="All Nominations" icon="📋" />
         <QuickLink :href="route('rewards.evaluations.panel')" label="Evaluation Panel" icon="📊" />
         <QuickLink :href="route('rewards.approvals.index')" label="Approvals" icon="✅" />
@@ -72,12 +72,19 @@ import AppButton from '@/Components/AppButton.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import { Link } from '@inertiajs/vue3'
+import { computed } from 'vue'
+import { useCountUp } from '@/Composables/useCountUp.js'
 
 const props = defineProps({
   stats: Object,
   byType: Array,
   recentAwards: Array,
 })
+
+const { values: kpiValues } = useCountUp(() => [
+  props.stats.total_nominations, props.stats.pending, props.stats.screened,
+  props.stats.evaluated, props.stats.approved, props.stats.rejected, props.stats.total_awarded,
+])
 
 function formatDate(d) {
   if (!d) return '—'

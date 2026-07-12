@@ -3,10 +3,10 @@
   <AdminLayout title="Work From Home">
     <div class="max-w-2xl mx-auto space-y-6">
 
-      <AppPageHeader title="Work From Home" subtitle="Track your time in/out, breaks, and daily accomplishments." />
+      <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Work From Home" subtitle="Track your time in/out, breaks, and daily accomplishments." />
 
       <!-- Status Card -->
-      <AppCard :padded="false">
+      <AppCard :padded="false" class="dash-section" style="--stagger: 1">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-xl font-semibold text-slate-800">Today's WFH Status</h2>
           <span class="text-sm text-slate-400">{{ today }}</span>
@@ -106,7 +106,7 @@
       </AppCard>
 
       <!-- Camera Card -->
-      <AppCard v-if="showCamera" :padded="false">
+      <AppCard v-if="showCamera" :padded="false" class="dash-section" style="--stagger: 2">
         <div class="px-5 py-4 border-b border-slate-100">
           <h3 class="text-xl font-semibold text-slate-800">
             {{ cameraMode === 'in' ? 'Capture Time-In Photo' : 'Capture Time-Out Photo' }}
@@ -169,7 +169,7 @@
       </div>
 
       <!-- Today's Accomplishments -->
-      <AppCard v-if="attendance" :padded="false">
+      <AppCard v-if="attendance" :padded="false" class="dash-section" style="--stagger: 3">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <p class="font-semibold text-slate-800">Today's Accomplishments</p>
@@ -193,7 +193,7 @@
       </AppCard>
 
       <!-- ── My WFH History ──────────────────────────────────────────────────── -->
-      <AppCard :padded="false">
+      <AppCard :padded="false" class="dash-section" style="--stagger: 4">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
           <h2 class="text-base font-semibold text-slate-800">My WFH History</h2>
           <div class="flex items-center gap-2">
@@ -297,7 +297,7 @@
       </AppCard>
 
       <!-- Print shortcuts -->
-      <AppCard>
+      <AppCard class="dash-section" style="--stagger: 5">
         <div class="flex flex-wrap gap-3 items-center">
           <span class="text-sm font-medium text-slate-600 mr-auto">Print Reports</span>
           <AppButton variant="secondary" @click="showTimeLogPrintModal = true">🖨️ Time Logs</AppButton>

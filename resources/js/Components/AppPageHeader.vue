@@ -5,11 +5,14 @@ defineProps({
   title:      { type: String, required: true },
   subtitle:   { type: String, default: null },
   breadcrumb: { type: Array,  default: null }, // [{ label, href? }]
+  // Dashboard hero treatment: white card with the indigo gradient accent bar
+  hero:       { type: Boolean, default: false },
 })
 </script>
 
 <template>
-  <div class="mb-6">
+  <div :class="hero ? 'relative mb-6 overflow-hidden rounded-2xl bg-white px-4 py-5 shadow-sm ring-1 ring-slate-200/70 sm:px-6' : 'mb-6'">
+    <div v-if="hero" class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-100" aria-hidden="true"></div>
     <AppBreadcrumb v-if="breadcrumb?.length" :items="breadcrumb" />
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>

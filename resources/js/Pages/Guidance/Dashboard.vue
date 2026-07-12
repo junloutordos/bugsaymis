@@ -4,7 +4,7 @@
     <template #default>
       <div class="space-y-6">
 
-        <AppPageHeader title="Guidance Dashboard" subtitle="GAD-ready analytics with sex-disaggregated data" />
+        <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Guidance Dashboard" subtitle="GAD-ready analytics with sex-disaggregated data" />
 
         <!-- sub-nav -->
         <div class="flex items-center gap-2 text-sm flex-wrap">
@@ -24,15 +24,15 @@
         </div>
 
         <!-- ── Summary stat cards ──────────────────────────────────────────── -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <AppCard v-for="card in statCards" :key="card.label">
+        <div class="dash-section grid grid-cols-2 lg:grid-cols-4 gap-4" style="--stagger: 1">
+          <AppCard v-for="(card, i) in statCards" :key="card.label">
             <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">{{ card.label }}</p>
-            <p :class="`text-3xl font-bold mt-1 ${card.color}`">{{ card.value }}</p>
+            <p :class="`text-3xl font-bold mt-1 tabular-nums ${card.color}`">{{ kpiValues[i] ?? card.value }}</p>
           </AppCard>
         </div>
 
         <!-- ── Sex disaggregation highlight ───────────────────────────────── -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="dash-section grid grid-cols-1 lg:grid-cols-2 gap-4" style="--stagger: 2">
 
           <!-- All time sex breakdown -->
           <AppCard>
@@ -136,7 +136,7 @@
         </AppCard>
 
         <!-- ── Status × Sex + Consultation Type × Sex ─────────────────────── -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="dash-section grid grid-cols-1 lg:grid-cols-2 gap-4" style="--stagger: 3">
 
           <!-- Status breakdown -->
           <AppCard :padded="false" title="Status Breakdown (Sex-Disaggregated)">
@@ -267,6 +267,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useCountUp } from '@/Composables/useCountUp.js'
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -289,6 +290,8 @@ const statCards = computed(() => [
   { label: 'Pending',             value: props.stats.pending,   color: 'text-warning-500'  },
   { label: 'Scheduled',           value: props.stats.scheduled, color: 'text-success-600' },
 ])
+
+const { values: kpiValues } = useCountUp(() => statCards.value.map(c => c.value))
 
 const trendMax = computed(() =>
   Math.max(...(props.trend ?? []).map(t => Math.max(t.Male, t.Female, t.Unspecified, 1)))
