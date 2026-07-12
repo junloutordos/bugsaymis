@@ -87,7 +87,7 @@ const quickReject = async (app) => {
     inputPlaceholder: 'Enter reason…',
     inputAttributes: { required: true },
     showCancelButton: true,
-    confirmButtonColor: '#ef4444',
+    confirmButtonColor: '#dc2626',
     confirmButtonText: 'Reject',
     reverseButtons: true,
   })

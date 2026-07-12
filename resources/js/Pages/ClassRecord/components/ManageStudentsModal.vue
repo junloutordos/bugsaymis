@@ -68,7 +68,6 @@ async function autoPopulate() {
     icon:              'question',
     showCancelButton:  true,
     confirmButtonText: 'Yes, populate',
-    confirmButtonColor: '#4f46e5',
   })
   if (!confirm.isConfirmed) return
 

@@ -111,7 +111,7 @@ export default function useEmployeeIPCR(initialIPCRs = [], workPlans = []) {
       text: "This IPCR target will be permanently deleted!",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#d33",
+      confirmButtonColor: "#dc2626",
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Yes, delete it!",
     }).then((result) => {

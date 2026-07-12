@@ -374,7 +374,6 @@ const saveModal = async () => {
       icon: "warning",
       title: "Missing Required Fields",
       text: "Please fill in BOTH the Accomplishment and MOV Link before saving.",
-      confirmButtonColor: "#2563eb"
     });
     return;
   }
@@ -650,7 +649,7 @@ const removePlan = (plan) => {
     text: `Remove "${plan.success_indicator}" from this IPCR?`,
     icon: "warning",
     showCancelButton: true,
-    confirmButtonColor: "#d33",
+    confirmButtonColor: "#dc2626",
     confirmButtonText: "Yes, remove it!",
   }).then((result) => {
     if (result.isConfirmed) {

@@ -5,7 +5,6 @@ import Swal from 'sweetalert2'
  * Both resolve to a boolean — true only if the user pressed the confirm button.
  */
 
-const ATLAS_BLUE = '#0867DB'
 const DANGER = '#DC2626'
 
 export async function confirmAction({ title, text, confirmText = 'Confirm', icon = 'question' } = {}) {
@@ -16,7 +15,6 @@ export async function confirmAction({ title, text, confirmText = 'Confirm', icon
     showCancelButton: true,
     confirmButtonText: confirmText,
     cancelButtonText: 'Cancel',
-    confirmButtonColor: ATLAS_BLUE,
     reverseButtons: true,
   })
   return result.isConfirmed

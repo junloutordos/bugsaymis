@@ -208,7 +208,6 @@ const submitForApproval = (idp) => {
     text: 'This IDP will be sent to your supervisor for review.',
     icon: 'question',
     showCancelButton: true,
-    confirmButtonColor: '#2563eb',
     confirmButtonText: 'Submit',
   }).then(res => {
     if (!res.isConfirmed) return
@@ -226,7 +225,7 @@ const deleteIdp = (idp) => {
     text: `"${idp.competency}" will be removed.`,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: '#d33',
+    confirmButtonColor: '#dc2626',
     confirmButtonText: 'Delete',
   }).then(res => {
     if (!res.isConfirmed) return

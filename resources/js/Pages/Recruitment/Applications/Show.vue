@@ -106,7 +106,7 @@ const rejectApp = async () => {
     title: 'Reject Application',
     input: 'textarea', inputLabel: 'Reason *',
     inputPlaceholder: 'Enter reason for rejection…',
-    showCancelButton: true, confirmButtonColor: '#ef4444',
+    showCancelButton: true, confirmButtonColor: '#dc2626',
     confirmButtonText: 'Reject', reverseButtons: true,
   })
   if (!isConfirmed || !reason?.trim()) return

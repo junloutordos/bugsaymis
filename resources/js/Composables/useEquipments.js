@@ -166,7 +166,7 @@ export default function useEquipments(initialEquipments = [], users = []) {
       text: "This equipment will be permanently deleted!",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#d33",
+      confirmButtonColor: "#dc2626",
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Yes, delete it!",
     }).then(result => {
@@ -274,7 +274,6 @@ export default function useEquipments(initialEquipments = [], users = []) {
           icon: 'success',
           title: 'Success!',
           text: 'PMS history has been added successfully.',
-          confirmButtonColor: '#3B82F6',
         }).then(() => {
           // Refresh the page to show updated data
           window.location.reload()
@@ -289,7 +288,7 @@ export default function useEquipments(initialEquipments = [], users = []) {
           icon: 'error',
           title: 'Error!',
           text: 'Please check the form for errors and try again.',
-          confirmButtonColor: '#EF4444',
+          confirmButtonColor: '#dc2626',
         })
       }
     })

@@ -245,7 +245,7 @@ const returnForRevision = () => {
     text: "This will notify the Division Chief to return the IPCR to the employee for revision.",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonColor: "#e11d48",
+    confirmButtonColor: "#dc2626",
     confirmButtonText: "Yes, return it!",
   }).then(result => {
     if (result.isConfirmed) {

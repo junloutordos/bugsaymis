@@ -171,7 +171,7 @@ const openModal = (plan) => {
 const saveModal = () => {
   if (!currentPlan.value) return;
   if (!form.value.accomplishment?.trim() || !form.value.mov_link?.trim()) {
-    Swal.fire({ icon: "warning", title: "Missing Required Fields", text: "Please fill in BOTH the Accomplishment and MOV Link before saving.", confirmButtonColor: "#2563eb" });
+    Swal.fire({ icon: "warning", title: "Missing Required Fields", text: "Please fill in BOTH the Accomplishment and MOV Link before saving." });
     return;
   }
   submit(

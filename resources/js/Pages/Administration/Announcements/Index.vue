@@ -336,7 +336,6 @@ function confirmPublish(a) {
     text: `"${a.title}" will notify ${audienceLabel}.`,
     showCancelButton: true,
     confirmButtonText: 'Publish',
-    confirmButtonColor: '#4f46e5',
   }).then((res) => {
     if (!res.isConfirmed) return
     router.post(route('announcements.publish', a.id), {}, { preserveScroll: true })

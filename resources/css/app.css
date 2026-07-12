@@ -144,6 +144,96 @@
 }
 
 /* ============================= */
+/* SweetAlert2 — Atlas theme */
+/* Scoped to .swal2-* only. sweetalert2 v11 styles via CSS variables and
+   zero-specificity :where() selectors, so these single-class overrides win
+   even though its stylesheet is JS-injected after this file. */
+/* ============================= */
+
+@keyframes atlas-swal-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes atlas-swal-fade-out {
+  to { opacity: 0; }
+}
+
+:root {
+  --swal2-width: 26em;
+  --swal2-border-radius: 1rem;
+  --swal2-padding: 0 0 1.5em;
+  --swal2-color: #64748b;                        /* slate-500 body text */
+  --swal2-backdrop: rgba(15, 23, 42, 0.5);       /* matches AppModal backdrop */
+  --swal2-show-animation: atlas-swal-pop 180ms ease-out;
+  --swal2-hide-animation: atlas-swal-fade-out 120ms ease-in forwards;
+  --swal2-icon-zoom: 0.7;
+  --swal2-title-padding: 1.1em 1.4em 0;
+  --swal2-html-container-padding: 0.75em 1.6em 0.3em;
+  --swal2-actions-margin: 1.4em auto 0;
+  --swal2-outline: 0 0 0 3px rgba(1, 159, 230, 0.35);
+  --swal2-confirm-button-background-color: #0867DB;   /* Atlas wordmark blue */
+  --swal2-confirm-button-border-radius: 0.5rem;
+  --swal2-confirm-button-box-shadow: 0 1px 2px 0 rgba(8, 103, 219, 0.25);
+  --swal2-cancel-button-background-color: #ffffff;    /* secondary-button look */
+  --swal2-cancel-button-color: #334155;               /* slate-700 */
+  --swal2-cancel-button-border-radius: 0.5rem;
+  --swal2-cancel-button-box-shadow: inset 0 0 0 1px #e2e8f0, 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --swal2-deny-button-border-radius: 0.5rem;
+  --swal2-timer-progress-bar-background: rgba(8, 103, 219, 0.5);
+  --swal2-validation-message-background: #FEF2F2;
+  --swal2-validation-message-color: #B91C1C;
+  --swal2-input-border: 1px solid #e2e8f0;
+  --swal2-input-border-radius: 0.5rem;
+  --swal2-input-focus-border: 1px solid #019FE6;
+  --swal2-input-focus-box-shadow: 0 0 0 3px rgba(1, 159, 230, 0.25);
+}
+
+.swal2-popup {
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1),
+    0 0 0 1px rgba(226, 232, 240, 0.6);           /* shadow-xl + hairline ring */
+}
+.swal2-title {
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+  font-size: 1.125rem;
+  color: #0f172a;                                  /* slate-900 */
+}
+.swal2-html-container {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.swal2-actions {
+  gap: 0.5rem;
+}
+.swal2-styled {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+.swal2-styled:active {
+  transform: scale(0.98);
+}
+
+/* Icon colors → Atlas status tokens (stock pastels are off-palette) */
+.swal2-popup .swal2-icon.swal2-success { border-color: #10B981; color: #10B981; }
+.swal2-popup .swal2-icon.swal2-success [class^=swal2-success-line] { background-color: #10B981; }
+.swal2-popup .swal2-icon.swal2-success .swal2-success-ring { border-color: rgba(16, 185, 129, 0.3); }
+.swal2-popup .swal2-icon.swal2-error { border-color: #EF4444; color: #EF4444; }
+.swal2-popup .swal2-icon.swal2-error [class^=swal2-x-mark-line] { background-color: #EF4444; }
+.swal2-popup .swal2-icon.swal2-warning { border-color: #F59E0B; color: #F59E0B; }
+.swal2-popup .swal2-icon.swal2-question { border-color: #0867DB; color: #0867DB; }
+.swal2-popup .swal2-icon.swal2-info { border-color: #019FE6; color: #019FE6; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --swal2-show-animation: none;
+    --swal2-hide-animation: none;
+  }
+}
+
+/* ============================= */
 /* Chart.js Styling */
 /* ============================= */
 

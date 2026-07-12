@@ -91,7 +91,7 @@ const returnAccomplishment = () => {
     text: "This will return the submitted accomplishment to the employee for revision.",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonColor: "#d33",
+    confirmButtonColor: "#dc2626",
     confirmButtonText: "Yes, return it!",
   }).then((result) => {
     if (result.isConfirmed) {
@@ -109,7 +109,7 @@ const disapproveTargets = () => {
     text: "This will return the IPCR to the employee for revision.",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonColor: "#d33",
+    confirmButtonColor: "#dc2626",
     confirmButtonText: "Yes, return it!",
   }).then((result) => {
     if (result.isConfirmed) {

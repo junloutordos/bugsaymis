@@ -34,7 +34,7 @@ import {
 const OFFICIAL_DOMAIN = '@crc.pshs.edu.ph'
 const isLoading = ref(false)
 
-const showAlert = (options) => Swal.fire({ confirmButtonColor: '#0867DB', ...options })
+const showAlert = (options) => Swal.fire({ ...options })
 const isAuthorizedEmail = (email) => email?.toLowerCase().endsWith(OFFICIAL_DOMAIN)
 
 const page = usePage()

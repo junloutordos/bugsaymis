@@ -104,7 +104,7 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
       text: "This IPCR target will be deleted!",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#d33",
+      confirmButtonColor: "#dc2626",
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Yes, delete it!"
     }).then(result => {

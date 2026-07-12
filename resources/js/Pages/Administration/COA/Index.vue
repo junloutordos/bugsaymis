@@ -387,7 +387,6 @@ async function confirmIssue(v) {
     html: `<p class="text-sm">${v.certificates.length} certificate(s) will be generated, digitally signed, and emailed to the visitor(s).</p>`,
     showCancelButton: true,
     confirmButtonText: 'Issue & Send',
-    confirmButtonColor: '#4f46e5',
   }
 
   const res = props.requiresPin
@@ -419,7 +418,6 @@ function resend(c) {
     text: `${c.control_number} will be re-sent to ${c.email}.`,
     showCancelButton: true,
     confirmButtonText: 'Resend',
-    confirmButtonColor: '#4f46e5',
   }).then((res) => {
     if (!res.isConfirmed) return
     router.post(route('coa.resend', c.id), {}, { preserveScroll: true })

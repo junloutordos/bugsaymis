@@ -37,7 +37,7 @@ const disapprove = async () => {
     input: 'textarea', inputLabel: 'Reason *',
     inputPlaceholder: 'Enter reason for disapproval…',
     showCancelButton: true,
-    confirmButtonColor: '#ef4444',
+    confirmButtonColor: '#dc2626',
     confirmButtonText: 'Disapprove',
     reverseButtons: true,
   })
