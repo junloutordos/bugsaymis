@@ -1,15 +1,6 @@
 @extends('emails.layouts.base')
 
 @php
-    $gradients = [
-        'placement' => 'linear-gradient(90deg,#059669,#10b981)',
-        'ranking'   => 'linear-gradient(90deg,#059669,#10b981)',
-        'selection' => 'linear-gradient(90deg,#059669,#10b981)',
-        'exam'      => 'linear-gradient(90deg,#d97706,#f59e0b)',
-        'interview' => 'linear-gradient(90deg,#d97706,#f59e0b)',
-        'rejected'  => 'linear-gradient(90deg,#dc2626,#ef4444)',
-        'withdrawn' => 'linear-gradient(90deg,#64748b,#94a3b8)',
-    ];
     $badgeMap = [
         'placement' => 'badge-green',  'ranking'   => 'badge-green',
         'selection' => 'badge-cyan',   'exam'      => 'badge-amber',
@@ -18,7 +9,6 @@
     ];
 @endphp
 
-@section('header-gradient'){{ $gradients[$stage] ?? 'linear-gradient(90deg,#3b82f6,#2563eb)' }}@endsection
 @section('header-title'){{ $subject }}@endsection
 @section('header-subtitle','Atlas — Recruitment & Selection')
 

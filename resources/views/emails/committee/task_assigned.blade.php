@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#4f46e5,#6366f1)')
 @section('header-title','Committee Task Assigned')
 @section('header-subtitle','Committee Task Board')
 

@@ -4,9 +4,6 @@
     $approved = $application->status === 'approved';
 @endphp
 
-@section('header-gradient', $approved
-    ? 'linear-gradient(90deg,#15803d,#22c55e)'
-    : 'linear-gradient(90deg,#b91c1c,#ef4444)')
 @section('header-title', $approved ? 'Enrollment Approved' : 'Enrollment Not Approved')
 @section('header-subtitle','PSHS-CRC — SY {{ $application->schoolYear->name ?? "" }}')
 

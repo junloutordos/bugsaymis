@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#1e40af,#3b82f6)')
 @section('header-title','IPCR Signed by the Campus Director ✓')
 @section('header-subtitle','Individual Performance Commitment and Review')
 

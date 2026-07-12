@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#7c3aed,#8b5cf6)')
 @section('header-title','IPCR Submitted to PMT for Review')
 @section('header-subtitle','Individual Performance Commitment and Review')
 

@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient'){{ $headerColor ?? '#6366f1' }}@endsection
 @section('header-title'){{ $headline }}@endsection
 @section('header-subtitle','Atlas — Document Tracking System')
 

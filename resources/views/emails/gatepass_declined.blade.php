@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#dc2626,#ef4444)')
 @section('header-title','Gate Pass Declined')
 @section('header-subtitle','Atlas — Gate Pass System')
 

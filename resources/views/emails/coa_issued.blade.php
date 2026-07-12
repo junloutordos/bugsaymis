@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)')
 @section('header-title')Certificate of Appearance@endsection
 @section('header-subtitle','Philippine Science High School – Caraga Region Campus')
 

@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#6366f1,#8b5cf6)')
 @section('header-title','Messengerial Request — Approval Needed')
 @section('header-subtitle','Atlas — Records & Messengerial Services')
 

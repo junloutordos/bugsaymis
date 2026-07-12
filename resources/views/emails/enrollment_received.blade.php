@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#1d4ed8,#3b82f6)')
 @section('header-title','Enrollment Application Received')
 @section('header-subtitle','PSHS-CRC — SY {{ $application->schoolYear->name ?? "" }}')
 

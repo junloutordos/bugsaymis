@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#dc2626,#f97316)')
 @section('header-title','New Error Report Submitted')
 @section('header-subtitle','Atlas MIS — Error Reporting')
 

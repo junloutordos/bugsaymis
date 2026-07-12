@@ -6,17 +6,17 @@
     <title>@yield('email-title', 'Atlas Notification')</title>
     <style>
         *{box-sizing:border-box}
-        body{background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#334155;margin:0;padding:20px 12px}
+        body{background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#334155;margin:0;padding:24px 12px}
         .wrap{max-width:600px;margin:0 auto}
-        .logo-bar{text-align:center;padding:10px 0 14px}
-        .logo-name{font-size:14px;font-weight:700;color:#1e40af;letter-spacing:.03em}
-        .logo-sub{font-size:11px;color:#64748b;display:block;margin-top:2px}
-        .card{background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(15,23,42,.08);overflow:hidden}
-        .card-header{padding:24px 28px;color:#fff}
-        .card-header h1{font-size:19px;font-weight:700;margin:0 0 4px;line-height:1.3}
+        .logo-bar{text-align:center;padding:8px 0 18px}
+        .logo-img{height:28px;width:auto;display:inline-block}
+        .logo-sub{font-size:11px;color:#64748b;display:block;margin-top:6px;letter-spacing:.02em}
+        .card{background:#fff;border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 10px 32px rgba(10,42,94,.10);overflow:hidden}
+        .card-header{padding:26px 28px;color:#fff;background-color:#0867DB;background-image:linear-gradient(135deg,#0A2A5E,#0867DB)}
+        .card-header h1{font-size:19px;font-weight:700;margin:0 0 4px;line-height:1.3;letter-spacing:-.01em}
         .card-header p{margin:0;font-size:13px;opacity:.85}
-        .card-body{padding:24px 28px}
-        .greeting{font-size:15px;font-weight:500;color:#1e293b;margin:0 0 12px}
+        .card-body{padding:26px 28px}
+        .greeting{font-size:15px;font-weight:600;color:#0f172a;margin:0 0 12px}
         .lead{font-size:14px;color:#475569;margin:0 0 16px;line-height:1.65}
         .details{width:100%;border-collapse:collapse;margin:16px 0}
         .details tr{border-bottom:1px solid #f1f5f9}
@@ -29,7 +29,7 @@
         .badge-green{background:#d1fae5;color:#065f46}
         .badge-amber{background:#fef3c7;color:#92400e}
         .badge-red{background:#fee2e2;color:#991b1b}
-        .badge-blue{background:#dbeafe;color:#1e40af}
+        .badge-blue{background:#DCEEFE;color:#0552B0}
         .badge-cyan{background:#cffafe;color:#155e75}
         .badge-slate{background:#f1f5f9;color:#475569}
         .priority-urgent{background:#fce7f3;color:#9d174d;font-weight:700}
@@ -37,7 +37,7 @@
         .priority-normal{background:#e0f2fe;color:#075985}
         .priority-low{background:#f1f5f9;color:#475569}
         .callout{border-radius:8px;padding:14px 16px;margin:18px 0 4px;font-size:14px;line-height:1.55}
-        .callout-blue{background:#eff6ff;border-left:4px solid #3b82f6;color:#1e3a8a}
+        .callout-blue{background:#EFF6FF;border-left:4px solid #0867DB;color:#0A2A5E}
         .callout-green{background:#f0fdf4;border-left:4px solid #22c55e;color:#14532d}
         .callout-amber{background:#fffbeb;border-left:4px solid #f59e0b;color:#78350f}
         .callout-red{background:#fef2f2;border-left:4px solid #ef4444;color:#7f1d1d}
@@ -48,16 +48,18 @@
         .rating-grid .plan-col{text-align:left;color:#475569;font-size:12px}
         .rating-grid .avg-val{font-weight:700;color:#1e293b}
         .rating-grid .overall-row{background:#f0fdf4;font-weight:700}
-        .card-actions{padding:6px 28px 22px;text-align:center}
-        .btn{display:inline-block;padding:12px 26px;border-radius:8px;text-decoration:none!important;font-weight:700;font-size:14px;margin:5px}
-        .btn-primary{background:#4f46e5;color:#fff!important}
+        .card-actions{padding:6px 28px 24px;text-align:center}
+        .btn{display:inline-block;padding:12px 28px;border-radius:10px;text-decoration:none!important;font-weight:700;font-size:14px;margin:5px}
+        .btn-primary{background:#0867DB;color:#fff!important}
         .btn-green{background:#059669;color:#fff!important}
         .btn-red{background:#dc2626;color:#fff!important}
-        .btn-blue{background:#1447c0;color:#fff!important}
-        .btn-cyan{background:#0891b2;color:#fff!important}
+        .btn-blue{background:#0867DB;color:#fff!important}
+        .btn-cyan{background:#019FE6;color:#fff!important}
         .fallback{padding:0 28px 16px;font-size:12px;color:#94a3b8}
         .fallback a{color:#94a3b8;word-break:break-all}
-        .footer{padding:16px 28px;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9;line-height:1.65}
+        .footer{padding:18px 28px;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9;line-height:1.7}
+        .footer a{color:#64748b;text-decoration:none}
+        .footer-brand{margin-top:6px;color:#94a3b8}
         hr.divider{border:none;border-top:1px solid #f1f5f9;margin:16px 0}
         @media(max-width:480px){
             body{padding:8px}
@@ -68,16 +70,16 @@
 <body>
 <div class="wrap">
 
-    {{-- School identifier --}}
+    {{-- Masthead --}}
     <div class="logo-bar">
-        <span class="logo-name">PSHS–CRC MIS</span>
+        <img src="https://mis.crc.pshs.edu.ph/images/atlas-logo-full.png" alt="Atlas — PSHS-CRC MIS" class="logo-img" height="28">
         <span class="logo-sub">Philippine Science High School – Caraga Region Campus</span>
     </div>
 
     <div class="card">
 
-        {{-- Colored header --}}
-        <div class="card-header" style="background:@yield('header-gradient','linear-gradient(90deg,#4f46e5,#6366f1)')">
+        {{-- Brand header (status is conveyed by badges/callouts in the body) --}}
+        <div class="card-header">
             <h1>@yield('header-title','Notification')</h1>
             <p>@yield('header-subtitle','PSHS-CRC Management Information System')</p>
         </div>
@@ -108,6 +110,7 @@
             @hasSection('footer-note')
             <br>@yield('footer-note')
             @endif
+            <div class="footer-brand">© {{ date('Y') }} PSHS-CRC · <a href="https://mis.crc.pshs.edu.ph">Atlas — mis.crc.pshs.edu.ph</a></div>
         </div>
 
     </div>

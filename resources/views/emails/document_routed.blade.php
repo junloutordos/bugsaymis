@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#6366f1,#3b82f6)')
 @section('header-title', $actionType === 'new' ? 'New Document Routed to You' : 'Document Forwarded to You')
 @section('header-subtitle','Atlas — Document Tracking System')
 

@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Already Processed</title>
     <style>
-        body{background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:16px}
-        .card{background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(15,23,42,.1);max-width:480px;width:100%;overflow:hidden}
+        body{background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:16px}
+        .logo-bar{text-align:center;padding:0 0 18px}
+        .logo-img{height:26px;width:auto}
+        .logo-sub{font-size:11px;color:#64748b;display:block;margin-top:5px;letter-spacing:.02em}
+        .card{background:#fff;border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 10px 32px rgba(10,42,94,.10);max-width:480px;width:100%;overflow:hidden}
         .card-header{background:linear-gradient(90deg,#d97706,#f59e0b);padding:24px;color:#fff;text-align:center}
         .card-header h1{font-size:20px;margin:0 0 4px}
         .card-header p{margin:0;opacity:.85;font-size:13px}
@@ -20,6 +23,10 @@
     </style>
 </head>
 <body>
+<div class="logo-bar">
+    <img src="/images/atlas-logo-full.png" alt="Atlas" class="logo-img" height="26">
+    <span class="logo-sub">Philippine Science High School – Caraga Region Campus</span>
+</div>
 <div class="card">
     <div class="card-header">
         <h1>Already Processed</h1>

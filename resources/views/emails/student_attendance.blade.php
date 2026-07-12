@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient'){{ $scanType === 'in' ? 'linear-gradient(90deg,#059669,#10b981)' : 'linear-gradient(90deg,#d97706,#f59e0b)' }}@endsection
 @section('header-title','Student Attendance Alert')
 @section('header-subtitle','Philippine Science High School – Caraga Region Campus')
 

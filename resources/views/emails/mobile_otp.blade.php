@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#1a3557,#1a4480)')
 @section('header-title','Email Verification')
 @section('header-subtitle','MyPisay — PSHS Caraga Region Campus')
 

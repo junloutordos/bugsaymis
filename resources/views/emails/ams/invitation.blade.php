@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#6366f1,#4f46e5)')
 @section('header-title','You\'re Invited!')
 @section('header-subtitle','Atlas — Activity Management System')
 

@@ -1,6 +1,5 @@
 @extends('emails.layouts.base')
 
-@section('header-gradient','linear-gradient(90deg,#7c3aed,#8b5cf6)')
 @section('header-title','Work Request — Staff Assignment Needed')
 @section('header-subtitle','Atlas — GSU Work Requests')
 
