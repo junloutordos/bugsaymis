@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 import axios from 'axios'
@@ -42,6 +42,38 @@ const appVersion = computed(() => page.props.appVersion?.current ?? '1.0.0')
 const atlasGoVersion = computed(() => page.props.atlasGoVersion ?? '1.0.0')
 const showMobileAppMenu = ref(false)
 
+// ── Scroll-aware navbar + one-time section reveals ──
+const navScrolled = ref(false)
+const onScroll = () => { navScrolled.value = window.scrollY > 8 }
+
+let revealObserver = null
+
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  onScroll()
+
+  const targets = document.querySelectorAll('.reveal')
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (reduced || !('IntersectionObserver' in window)) {
+    targets.forEach(el => el.classList.add('reveal-in'))
+    return
+  }
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('reveal-in')
+        revealObserver.unobserve(entry.target)
+      }
+    })
+  }, { threshold: 0.15 })
+  targets.forEach(el => revealObserver.observe(el))
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  revealObserver?.disconnect()
+})
+
 watch(() => page.props.errors, (errs) => {
   if (!errs) return
   const emailErr = errs.email || (Array.isArray(errs.email) ? errs.email[0] : null)
@@ -75,37 +107,38 @@ const googleLogin = async () => {
 }
 
 
+// Icon tiles cycle the Atlas navy→blue→cyan spectrum so the grid reads as one brand
 const modules = [
-  { icon: UsersIcon,                 bg: '#1447c0', name: 'Human Resources',    desc: 'Leave, DTR, biometric sync, employee schedules, and records management.' },
-  { icon: CalendarDaysIcon,          bg: '#047857', name: 'Activity Management',  desc: 'Campus activity planning, co-proponent coordination, and participant tracking.' },
-  { icon: AcademicCapIcon,           bg: '#6d28d9', name: 'Faculty Loading',     desc: 'AI-assisted schedule generation, overload computation, and teaching assignments.' },
-  { icon: BriefcaseIcon,             bg: '#b45309', name: 'Recruitment',         desc: 'End-to-end recruitment from job postings through interviews to final placement.' },
-  { icon: ChartBarIcon,              bg: '#0369a1', name: 'Performance (IPCR)',  desc: 'IPCR and PMS evaluation system for all employee levels including faculty and staff.' },
-  { icon: DocumentTextIcon,          bg: '#0f766e', name: 'Document Tracking',   desc: 'Official document routing, tracking, and digital signature workflow across offices.' },
-  { icon: BookOpenIcon,              bg: '#be123c', name: 'Library',             desc: 'Collection cataloging, borrowing management, overdue tracking, and library attendance.' },
-  { icon: WrenchScrewdriverIcon,     bg: '#c2410c', name: 'Service Requests',    desc: 'IT, vehicle scheduling, facility booking, work orders, and messengerial services.' },
-  { icon: IdentificationIcon,        bg: '#0e7490', name: 'Student Attendance',  desc: 'Biometric gate attendance with real-time notifications and attendance reports.' },
-  { icon: HeartIcon,                 bg: '#9f1239', name: 'Health & Guidance',   desc: 'Clinic consultations, health records, guidance counseling, and referral tracking.' },
-  { icon: BuildingLibraryIcon,       bg: '#1e40af', name: 'SALN',                desc: 'Statement of Assets, Liabilities, and Net Worth filing per CSC requirements.' },
-  { icon: ClipboardDocumentListIcon, bg: '#7e22ce', name: 'PDS',                 desc: 'Personal Data Sheet (CSC Form 212) management and electronic submission.' },
+  { icon: UsersIcon,                 bg: '#0A2A5E', name: 'Human Resources',    desc: 'Leave, DTR, biometric sync, employee schedules, and records management.' },
+  { icon: CalendarDaysIcon,          bg: '#073E85', name: 'Activity Management',  desc: 'Campus activity planning, co-proponent coordination, and participant tracking.' },
+  { icon: AcademicCapIcon,           bg: '#0552B0', name: 'Faculty Loading',     desc: 'AI-assisted schedule generation, overload computation, and teaching assignments.' },
+  { icon: BriefcaseIcon,             bg: '#0867DB', name: 'Recruitment',         desc: 'End-to-end recruitment from job postings through interviews to final placement.' },
+  { icon: ChartBarIcon,              bg: '#058FE0', name: 'Performance (IPCR)',  desc: 'IPCR and PMS evaluation system for all employee levels including faculty and staff.' },
+  { icon: DocumentTextIcon,          bg: '#019FE6', name: 'Document Tracking',   desc: 'Official document routing, tracking, and digital signature workflow across offices.' },
+  { icon: BookOpenIcon,              bg: '#0A2A5E', name: 'Library',             desc: 'Collection cataloging, borrowing management, overdue tracking, and library attendance.' },
+  { icon: WrenchScrewdriverIcon,     bg: '#073E85', name: 'Service Requests',    desc: 'IT, vehicle scheduling, facility booking, work orders, and messengerial services.' },
+  { icon: IdentificationIcon,        bg: '#0552B0', name: 'Student Attendance',  desc: 'Biometric gate attendance with real-time notifications and attendance reports.' },
+  { icon: HeartIcon,                 bg: '#0867DB', name: 'Health & Guidance',   desc: 'Clinic consultations, health records, guidance counseling, and referral tracking.' },
+  { icon: BuildingLibraryIcon,       bg: '#058FE0', name: 'SALN',                desc: 'Statement of Assets, Liabilities, and Net Worth filing per CSC requirements.' },
+  { icon: ClipboardDocumentListIcon, bg: '#019FE6', name: 'PDS',                 desc: 'Personal Data Sheet (CSC Form 212) management and electronic submission.' },
 ]
 
 const pillars = [
   {
     icon: ShieldCheckIcon,
-    bg: 'linear-gradient(135deg,#1447c0,#00c8e8)',
+    bg: 'linear-gradient(135deg,#073E85,#019FE6)',
     title: 'Secure & Role-Based',
     desc: 'Google SSO restricts access to official PSHS-CRC accounts only. Every user has a fine-grained role — administrators, HR officers, faculty, staff, and students each see exactly what they need.',
   },
   {
     icon: BoltIcon,
-    bg: 'linear-gradient(135deg,#0369a1,#00c8e8)',
+    bg: 'linear-gradient(135deg,#0552B0,#019FE6)',
     title: 'Real-Time & Integrated',
     desc: 'Built on Laravel and Vue 3 with live WebSocket notifications via Soketi. Approvals, alerts, and status changes propagate instantly — no page refreshes, no delays.',
   },
   {
     icon: FlagIcon,
-    bg: 'linear-gradient(135deg,#047857,#0891b2)',
+    bg: 'linear-gradient(135deg,#0A2A5E,#0867DB)',
     title: 'Built for the Philippines',
     desc: 'Fully compliant with CSC leave types, Salary Standardization Law schedules, SALN requirements, and Philippine locale date and currency formatting.',
   },
@@ -127,7 +160,7 @@ const brandPillars = [
     <!-- ════════════════════════════
          NAVBAR
     ═════════════════════════════ -->
-    <header class="navbar">
+    <header class="navbar" :class="{ 'navbar-scrolled': navScrolled }">
       <div class="nav-inner">
         <div class="nav-brand">
           <img src="/images/atlas-logo-full.png" alt="Atlas" class="nav-logo" />
@@ -142,6 +175,7 @@ const brandPillars = [
             <DevicePhoneMobileIcon class="nav-cta-icon" />
             Get the App
           </button>
+          <Transition name="app-menu">
           <div v-if="showMobileAppMenu" class="nav-app-menu">
             <a href="/downloads/atlasgo" class="mobile-app-option">
               <span class="mobile-app-option-label">Android</span>
@@ -153,6 +187,7 @@ const brandPillars = [
             </div>
             <p class="mobile-app-note">Not yet on Google Play — you'll see an "Unknown sources" prompt when installing on Android.</p>
           </div>
+          </Transition>
         </div>
       </div>
     </header>
@@ -242,7 +277,7 @@ const brandPillars = [
          ABOUT / PILLARS
     ═════════════════════════════ -->
     <section id="about" class="section bg-white">
-      <div class="section-inner">
+      <div class="section-inner reveal">
         <div class="section-hd">
           <p class="eyebrow">About Atlas</p>
           <h2 class="section-h2 font-heading">Built for PSHS-CRC.<br>Designed for everyone in it.</h2>
@@ -301,7 +336,7 @@ const brandPillars = [
     <section class="why-section">
       <div class="why-base" />
       <div class="why-deco" />
-      <div class="why-inner">
+      <div class="why-inner reveal">
         <div class="why-mark-wrap">
           <img src="/images/atlas-mark-white.png" alt="Atlas mark" class="why-mark-img" />
         </div>
@@ -358,7 +393,7 @@ const brandPillars = [
          MODULES
     ═════════════════════════════ -->
     <section id="modules" class="section bg-light">
-      <div class="section-inner">
+      <div class="section-inner reveal">
         <div class="section-hd">
           <p class="eyebrow">System Modules</p>
           <h2 class="section-h2 font-heading">Everything campus administration needs, unified.</h2>
@@ -390,7 +425,7 @@ const brandPillars = [
       <div class="cta-deco cta-d1" />
       <div class="cta-deco cta-d2" />
       <div class="cta-deco cta-d3" />
-      <div class="cta-inner">
+      <div class="cta-inner reveal">
         <div class="cta-icon-wrap">
           <ShieldCheckIcon class="cta-icon" />
         </div>
@@ -463,7 +498,12 @@ const brandPillars = [
   z-index: 100;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid transparent;
+  box-shadow: none;
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+.navbar-scrolled {
+  border-bottom-color: #e2e8f0;
   box-shadow: 0 1px 8px rgba(0,0,0,.06);
 }
 .nav-inner {
@@ -567,6 +607,7 @@ const brandPillars = [
   width: 620px; height: 300px;
   opacity: .09;
   pointer-events: none;
+  animation: route-fade 1.2s ease-out .4s both;
 }
 .hero-route path {
   fill: none;
@@ -574,6 +615,11 @@ const brandPillars = [
   stroke-width: 2;
   stroke-dasharray: 6 10;
   stroke-linecap: round;
+  /* Signature: dashes flow in along the path on load, then drift forever.
+     Offsets are multiples of the 16px dash period so the loop is seamless. */
+  animation:
+    route-draw 1.6s ease-out .4s both,
+    route-march 30s linear 2s infinite;
 }
 
 /* Same dashed curve treatment, mirrored full-width along the bottom edge */
@@ -583,6 +629,7 @@ const brandPillars = [
   width: 100%; height: 220px;
   opacity: .09;
   pointer-events: none;
+  animation: route-fade 1.2s ease-out .6s both;
 }
 .hero-route-bottom path {
   fill: none;
@@ -590,6 +637,22 @@ const brandPillars = [
   stroke-width: 2;
   stroke-dasharray: 6 10;
   stroke-linecap: round;
+  animation:
+    route-draw 1.6s ease-out .6s both,
+    route-march 30s linear 2.2s infinite;
+}
+
+@keyframes route-fade {
+  from { opacity: 0; }
+  to   { opacity: .09; }
+}
+@keyframes route-draw {
+  from { stroke-dashoffset: 800; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes route-march {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -256; }
 }
 .hero-inner {
   position: relative; z-index: 2;
@@ -619,18 +682,35 @@ const brandPillars = [
   font-size: 3.6rem; font-weight: 900; color: var(--navy);
   line-height: 1.1; letter-spacing: -.03em; margin-bottom: 22px;
 }
-/* Wordmark gradient accent text (Blue → Cyan, per brand guide) */
+/* Wordmark gradient accent text (Blue → Cyan, per brand guide) —
+   slow back-and-forth shimmer via background-position drift */
 .hero-accent {
-  background: linear-gradient(90deg, var(--blue) 0%, var(--cyan) 100%);
+  background: linear-gradient(90deg, var(--blue) 0%, var(--cyan) 50%, var(--blue) 100%);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: accent-shimmer 8s ease-in-out infinite;
+}
+@keyframes accent-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
 }
 
 .hero-p {
   font-size: .95rem; color: #334155;
   line-height: 1.8; margin-bottom: 40px; max-width: 500px;
 }
+
+/* ── Staged hero entrance ─────────── */
+@keyframes fade-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-badge { animation: fade-rise .5s ease-out 0s both; }
+.hero-h1    { animation: fade-rise .5s ease-out .1s both; }
+.hero-p     { animation: fade-rise .5s ease-out .2s both; }
+.hero-right { animation: fade-rise .55s ease-out .32s both; }
 
 /* Login card */
 .login-card {
@@ -736,7 +816,11 @@ a.mobile-app-option:hover { background: #f0f6ff; }
   padding-bottom: 32px;
 }
 .scroll-text { font-size: .68rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .1em; }
-.scroll-icon { width: 20px; height: 20px; color: var(--blue); }
+.scroll-icon { width: 20px; height: 20px; color: var(--blue); animation: hint-bounce 2s ease-in-out infinite; }
+@keyframes hint-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(5px); }
+}
 
 /* ════════════════════════════════
    SHARED SECTION
@@ -868,7 +952,9 @@ a.mobile-app-option:hover { background: #f0f6ff; }
   width: 48px; height: 48px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 4px 12px rgba(0,0,0,.18); flex-shrink: 0;
+  transition: transform .25s ease;
 }
+.mod-card:hover .mod-icon-wrap { transform: translateY(-2px) scale(1.05); }
 .mod-icon { width: 24px; height: 24px; color: #fff; }
 .mod-name { font-size: .85rem; font-weight: 700; color: #0a1040; margin-bottom: 4px; }
 .mod-desc { font-size: .75rem; color: #334155; line-height: 1.65; }
@@ -932,6 +1018,42 @@ a.mobile-app-option:hover { background: #f0f6ff; }
 .footer-right { text-align: right; }
 .footer-copy  { font-size: .72rem; color: #cbd5e1; }
 .footer-ver   { font-size: .64rem; color: #94a3b8; margin-top: 4px; }
+
+/* ════════════════════════════════
+   MOTION UTILITIES
+════════════════════════════════ */
+
+/* One-time scroll reveals (class added by IntersectionObserver) */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Get-the-App dropdown */
+.app-menu-enter-active { transition: opacity .15s ease, transform .15s ease; }
+.app-menu-leave-active { transition: opacity .12s ease, transform .12s ease; }
+.app-menu-enter-from,
+.app-menu-leave-to { opacity: 0; transform: translateY(-4px) scale(.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-badge, .hero-h1, .hero-p, .hero-right,
+  .hero-route, .hero-route path,
+  .hero-route-bottom, .hero-route-bottom path,
+  .hero-accent, .scroll-icon {
+    animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .mod-icon-wrap { transition: none; }
+}
 
 /* ════════════════════════════════
    RESPONSIVE
