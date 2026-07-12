@@ -507,7 +507,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/job-requests', [ITJobRequestController::class, 'store'])->name('jobrequests.store');
     Route::delete('/job-requests/{jobRequest}', [ITJobRequestController::class, 'destroy'])->name('jobrequests.destroy');
     Route::get('/job-requests/{jobRequest}/print', [ITJobRequestController::class, 'printForm'])->name('jobrequests.print');
-    Route::post('/app-versions', [\App\Http\Controllers\AppVersionController::class, 'store'])->name('app-versions.store');
+    Route::patch('/app-versions/{appVersion}', [\App\Http\Controllers\AppVersionController::class, 'update'])->name('app-versions.update');
     Route::post('/it-job-requests/{jobRequest}/confirm',[ITJobRequestController::class, 'confirmCompletion']);
     Route::post('/it-job-requests/{jobRequest}/sign-completion', [ITJobRequestController::class, 'signCompletion'])->name('jobrequests.sign-completion');
 

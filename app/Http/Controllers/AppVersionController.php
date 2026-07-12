@@ -4,28 +4,36 @@ namespace App\Http\Controllers;
 
 use App\Models\AppVersion;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class AppVersionController extends Controller
 {
-    public function store(Request $request)
+    /**
+     * Versions are created automatically by CI (app:version-sync reading the
+     * baked-in version.json) — admins can only polish the generated text.
+     */
+    public function update(Request $request, AppVersion $appVersion)
     {
         abort_unless($request->user()?->isSuperAdmin(), 403);
 
         $validated = $request->validate([
-            'version'    => 'required|string|max:30|unique:app_versions,version',
-            'date'       => 'required|date',
-            'remarks'    => 'required|string',
-            'is_current' => 'boolean',
+            'remarks'                => 'required|string|max:500',
+            'changes'                => 'nullable|array',
+            'changes.features'       => 'nullable|array',
+            'changes.features.*'     => 'string|max:300',
+            'changes.fixes'          => 'nullable|array',
+            'changes.fixes.*'        => 'string|max:300',
+            'changes.improvements'   => 'nullable|array',
+            'changes.improvements.*' => 'string|max:300',
         ]);
 
-        DB::transaction(function () use ($validated) {
-            if (!empty($validated['is_current'])) {
-                AppVersion::query()->update(['is_current' => false]);
-            }
-            AppVersion::create($validated);
-        });
+        $appVersion->update([
+            'remarks' => $validated['remarks'],
+            'changes' => $validated['changes'] ?? null,
+        ]);
 
-        return back()->with('success', 'Version ' . $validated['version'] . ' added successfully.');
+        Cache::forget('app.version');
+
+        return back()->with('success', 'Version ' . $appVersion->version . ' updated.');
     }
 }

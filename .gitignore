@@ -21,6 +21,7 @@ storage/*-firebase-adminsdk-*.json
 /storage/*.key
 /storage/pail
 /vendor
+/version.json
 Homestead.json
 Homestead.yaml
 Thumbs.db

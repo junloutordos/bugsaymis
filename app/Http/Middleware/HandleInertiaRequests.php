@@ -243,9 +243,11 @@ class HandleInertiaRequests extends Middleware
                         return [
                             'current' => $current?->version ?? '1.0.0',
                             'history' => $versions->map(fn ($v) => [
+                                'id'      => $v->id,
                                 'version' => $v->version,
                                 'date'    => $v->date->format('Y-m-d'),
                                 'remarks' => $v->remarks,
+                                'changes' => $v->changes,
                             ])->values()->toArray(),
                         ];
                     });

@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class AppVersion extends Model
 {
-    protected $fillable = ['version', 'date', 'remarks', 'is_current'];
+    protected $fillable = ['version', 'date', 'remarks', 'changes', 'is_current'];
 
     protected $casts = [
         'is_current' => 'boolean',
         'date'       => 'date:Y-m-d',
+        'changes'    => 'array',
     ];
 
     /**

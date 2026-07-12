@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write # push release tags (vX.Y.Z)
+
 env:
   AWS_REGION: ap-southeast-1
   ECR: 971422671747.dkr.ecr.ap-southeast-1.amazonaws.com
@@ -17,6 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0 # full history + tags for release computation
+
+      - name: Compute release version + changelog
+        run: bash .github/scripts/compute-release.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4.0.2
@@ -233,3 +241,12 @@ jobs:
           done
           echo "::error::Timed out waiting for deployment to reach a terminal state (last status=$STATUS)."
           exit 1
+
+      - name: Push release tag
+        if: env.NEW_RELEASE == 'true'
+        run: |
+          # Only tag after the blue/green rollout confirmed SUCCESSFUL, so the
+          # next release computes its changelog from what actually shipped.
+          git tag "v${RELEASE_VERSION}"
+          git push origin "v${RELEASE_VERSION}"
+          echo "Tagged v${RELEASE_VERSION}"
