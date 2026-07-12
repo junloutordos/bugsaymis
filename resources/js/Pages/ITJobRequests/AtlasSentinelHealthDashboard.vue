@@ -13,6 +13,7 @@ import {
   Filler,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
+import { STATUS, gradientFill } from '@/Utils/chartTheme'
 import {
   ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, CpuChipIcon,
 } from '@heroicons/vue/24/outline'
@@ -151,26 +152,22 @@ function trendChartData(deviceId) {
       {
         label: 'Health Score',
         data: history.map(h => h.health_score),
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderColor: STATUS.success,
+        backgroundColor: gradientFill(STATUS.success, 0.1),
         fill: true,
-        tension: 0.3,
       },
       {
         label: 'Risk Score',
         data: history.map(h => h.risk_score),
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderColor: STATUS.danger,
+        backgroundColor: gradientFill(STATUS.danger, 0.1),
         fill: true,
-        tension: 0.3,
       },
     ],
   }
 }
 
 const trendChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
   scales: { y: { min: 0, max: 100 } },
 }
 

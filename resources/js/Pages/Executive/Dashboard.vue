@@ -17,6 +17,7 @@ import {
   CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler,
 } from "chart.js"
 import { Doughnut, Bar, Line } from "vue-chartjs"
+import { BRAND, STATUS, seriesColor, gradientFill } from "@/Utils/chartTheme"
 
 ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler)
 
@@ -38,16 +39,15 @@ const props = defineProps({
 
 const { isSubmitting, submit } = useSubmit()
 
-// ── Shared chart config (validated palette; fixed assignment order) ────────
-const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#0ea5e9", "#ef4444", "#8b5cf6"]
-const doughnutOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } } }
-const hBarOptions = { indexAxis: "y", responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
-const vBarOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-const lineOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, elements: { line: { tension: 0.3 } } }
+// ── Shared chart config (theme palette; fixed assignment order) ────────────
+const doughnutOptions = { plugins: { legend: { position: "bottom" } } }
+const hBarOptions = { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+const vBarOptions = { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+const lineOptions = { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
 
-const objToChart = (obj, color = 0) => ({
+const objToChart = (obj) => ({
   labels: Object.keys(obj ?? {}),
-  datasets: [{ data: Object.values(obj ?? {}), backgroundColor: PALETTE.slice(color).concat(PALETTE).slice(0, Math.max(1, Object.keys(obj ?? {}).length)) }],
+  datasets: [{ data: Object.values(obj ?? {}), backgroundColor: Object.keys(obj ?? {}).map((_, i) => seriesColor(i)) }],
 })
 
 // ── Lens / header ───────────────────────────────────────────────────────────
@@ -90,31 +90,31 @@ const kpis = computed(() => [
 // ── Section chart data ──────────────────────────────────────────────────────
 const wfDivisionChart = computed(() => ({
   labels: (props.workforce?.byDivision ?? []).map(d => d.label),
-  datasets: [{ data: (props.workforce?.byDivision ?? []).map(d => d.total), backgroundColor: "#6366f1" }],
+  datasets: [{ data: (props.workforce?.byDivision ?? []).map(d => d.total), backgroundColor: BRAND }],
 }))
 const wfCategoryChart = computed(() => objToChart(Object.fromEntries((props.workforce?.byCategory ?? []).map(c => [c.label, c.total]))))
 const leaveTrendChart = computed(() => ({
   labels: (props.workforce?.leaveTrend ?? []).map(m => m.label),
-  datasets: [{ data: (props.workforce?.leaveTrend ?? []).map(m => m.total), borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,.08)", fill: true }],
+  datasets: [{ data: (props.workforce?.leaveTrend ?? []).map(m => m.total), borderColor: BRAND, backgroundColor: gradientFill(BRAND), fill: true }],
 }))
 
 const ipcrFunnelChart = computed(() => objToChart(props.performance?.funnel ?? {}))
 const complianceChart = computed(() => ({
   labels: (props.performance?.complianceByDivision ?? []).map(r => r.label),
-  datasets: [{ data: (props.performance?.complianceByDivision ?? []).map(r => r.rate), backgroundColor: "#8b5cf6" }],
+  datasets: [{ data: (props.performance?.complianceByDivision ?? []).map(r => r.rate), backgroundColor: BRAND }],
 }))
 
 const requestBarChart = computed(() => ({
   labels: (props.requests?.modules ?? []).map(m => m.label),
   datasets: [
-    { label: "Open", data: (props.requests?.modules ?? []).map(m => m.open), backgroundColor: "#f59e0b" },
-    { label: "Completed", data: (props.requests?.modules ?? []).map(m => m.completed), backgroundColor: "#10b981" },
+    { label: "Open", data: (props.requests?.modules ?? []).map(m => m.open), backgroundColor: STATUS.warning },
+    { label: "Completed", data: (props.requests?.modules ?? []).map(m => m.completed), backgroundColor: STATUS.success },
   ],
 }))
-const requestBarOptions = { ...vBarOptions, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } } }
+const requestBarOptions = { ...vBarOptions, plugins: { legend: { position: "bottom" } } }
 const requestTrendChart = computed(() => ({
   labels: props.requests?.trendLabels ?? [],
-  datasets: [{ data: props.requests?.trendTotals ?? [], borderColor: "#0ea5e9", backgroundColor: "rgba(14,165,233,.08)", fill: true }],
+  datasets: [{ data: props.requests?.trendTotals ?? [], borderColor: BRAND, backgroundColor: gradientFill(BRAND), fill: true }],
 }))
 
 const SQD_LABELS = {
@@ -123,20 +123,24 @@ const SQD_LABELS = {
 }
 const sqdChart = computed(() => ({
   labels: Object.keys(props.satisfaction?.dimensions ?? {}).map(k => SQD_LABELS[k] ?? k),
-  datasets: [{ data: Object.values(props.satisfaction?.dimensions ?? {}), backgroundColor: "#f59e0b" }],
+  datasets: [{
+    data: Object.values(props.satisfaction?.dimensions ?? {}),
+    backgroundColor: Object.values(props.satisfaction?.dimensions ?? {}).map(v =>
+      v >= 4.5 ? STATUS.success : v >= 3.5 ? BRAND : v >= 2.5 ? STATUS.warning : STATUS.danger),
+  }],
 }))
 const sqdOptions = { ...hBarOptions, scales: { x: { min: 0, max: 5 } } }
 
 const enrollmentChart = computed(() => ({
   labels: (props.academics?.enrollment ?? []).map(e => `Grade ${e.label}`),
-  datasets: [{ data: (props.academics?.enrollment ?? []).map(e => e.total), backgroundColor: "#0ea5e9" }],
+  datasets: [{ data: (props.academics?.enrollment ?? []).map(e => e.total), backgroundColor: BRAND }],
 }))
-const loadChart = computed(() => objToChart(props.academics?.facultyLoad ?? {}, 1))
+const loadChart = computed(() => objToChart(props.academics?.facultyLoad ?? {}))
 const pipelineChart = computed(() => objToChart(props.recruitment?.pipeline ?? {}))
 
 const netTrendChart = computed(() => ({
   labels: (props.finance?.netTrend ?? []).map(r => `${r.month}/${r.year}`),
-  datasets: [{ data: (props.finance?.netTrend ?? []).map(r => Number(r.total)), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,.08)", fill: true }],
+  datasets: [{ data: (props.finance?.netTrend ?? []).map(r => Number(r.total)), borderColor: BRAND, backgroundColor: gradientFill(BRAND), fill: true }],
 }))
 
 const peso = (v) => v == null ? "—" : `₱${Number(v).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -243,13 +247,13 @@ const taskProgressPct = computed(() => {
                 <td class="px-4 py-2.5 text-right text-slate-600">{{ row.leaveDaysPerEmp }}</td>
                 <td class="px-4 py-2.5">
                   <div class="flex items-center justify-end gap-2">
-                    <div class="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full bg-violet-500" :style="{ width: row.ipcrRate + '%' }" /></div>
+                    <div class="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full bg-indigo-600" :style="{ width: row.ipcrRate + '%' }" /></div>
                     <span class="text-slate-600 w-9 text-right">{{ row.ipcrRate }}%</span>
                   </div>
                 </td>
                 <td class="px-4 py-2.5">
                   <div class="flex items-center justify-end gap-2">
-                    <div class="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full bg-emerald-500" :style="{ width: (row.requestRate ?? 0) + '%' }" /></div>
+                    <div class="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full bg-indigo-600" :style="{ width: (row.requestRate ?? 0) + '%' }" /></div>
                     <span class="text-slate-600 w-9 text-right">{{ row.requestRate ?? '—' }}<template v-if="row.requestRate !== null">%</template></span>
                   </div>
                 </td>
@@ -414,7 +418,7 @@ const taskProgressPct = computed(() => {
             </div>
             <div class="rounded-lg bg-slate-50 p-3 col-span-2">
               <div class="flex items-center gap-2">
-                <div class="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden"><div class="h-full bg-emerald-500" :style="{ width: taskProgressPct + '%' }" /></div>
+                <div class="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden"><div class="h-full bg-indigo-600" :style="{ width: taskProgressPct + '%' }" /></div>
                 <span class="text-xs font-semibold text-slate-600">{{ operations?.committeeTasks?.done ?? 0 }}/{{ operations?.committeeTasks?.total ?? 0 }}</span>
               </div>
               <p class="text-[11px] text-slate-500 mt-1.5">Committee tasks done this period<span v-if="operations?.committeeTasks?.stuck" class="text-red-600 font-medium"> · {{ operations.committeeTasks.stuck }} stuck</span></p>

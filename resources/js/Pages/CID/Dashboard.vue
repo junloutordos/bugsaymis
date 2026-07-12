@@ -22,6 +22,7 @@ import {
   EyeIcon,
 } from '@heroicons/vue/24/outline'
 import { Bar, Line, Doughnut } from 'vue-chartjs'
+import { BRAND, STATUS, gradientFill } from '@/Utils/chartTheme'
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -236,15 +237,12 @@ const barChartData = computed(() => ({
   datasets: [{
     label:           'Assessments',
     data:            props.charts.assessmentLoad.map(r => r.count),
-    backgroundColor: '#ef4444',
-    borderRadius:    4,
+    backgroundColor: BRAND,
   }],
 }))
 
 const barChartOptions = {
   indexAxis: 'y',
-  responsive: true,
-  maintainAspectRatio: false,
   plugins: { legend: { display: false } },
   scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
 }
@@ -254,16 +252,13 @@ const lineChartData = computed(() => ({
   datasets: [{
     label:           'Teachers Present',
     data:            props.charts.teacherAttendance.map(r => r.present),
-    borderColor:     '#10b981',
-    backgroundColor: 'rgba(16,185,129,0.1)',
+    borderColor:     BRAND,
+    backgroundColor: gradientFill(BRAND),
     fill:            true,
-    tension:         0.4,
   }],
 }))
 
 const lineChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
   plugins: { legend: { display: false } },
   scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
 }
@@ -272,15 +267,11 @@ const donutChartData = computed(() => ({
   labels:   props.charts.classRecordStatus.map(r => r.label),
   datasets: [{
     data:            props.charts.classRecordStatus.map(r => r.count),
-    backgroundColor: ['#10b981', '#f59e0b'],
-    borderWidth:     0,
+    backgroundColor: [STATUS.success, STATUS.warning],
   }],
 }))
 
 const donutChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  cutout: '65%',
   plugins: { legend: { position: 'bottom' } },
 }
 </script>

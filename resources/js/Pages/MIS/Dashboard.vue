@@ -16,6 +16,7 @@ import {
   Filler,
 } from 'chart.js'
 import { Doughnut, Bar, Line } from 'vue-chartjs'
+import { BRAND, STATUS, OTHER, gradientFill } from '@/Utils/chartTheme'
 import {
   ClipboardDocumentListIcon,
   CheckCircleIcon,
@@ -122,13 +123,13 @@ const cardColors = {
 // ── Status donut ──────────────────────────────────────────────────────────────
 
 const statusColors = {
-  'Pending Division Chief Approval': '#94a3b8',
+  'Pending Division Chief Approval': OTHER,
   'Pending OCD Approval':            '#64748b',
-  'In Progress':                     '#f97316',
-  'MIS Assessed the Request':        '#8b5cf6',
-  'Acted by MIS':                    '#f59e0b',
-  'Request Completed':               '#10b981',
-  'Rejected by Division Chief':      '#ef4444',
+  'In Progress':                     '#0284C7',
+  'MIS Assessed the Request':        '#7C3AED',
+  'Acted by MIS':                    BRAND,
+  'Request Completed':               STATUS.success,
+  'Rejected by Division Chief':      STATUS.danger,
   'Rejected by OCD':                 '#dc2626',
 }
 
@@ -138,17 +139,14 @@ const donutData = computed(() => {
     labels,
     datasets: [{
       data:            labels.map(l => props.statusBreakdown[l]),
-      backgroundColor: labels.map(l => statusColors[l] ?? '#cbd5e1'),
-      borderWidth:     1,
+      backgroundColor: labels.map(l => statusColors[l] ?? OTHER),
     }],
   }
 })
 
 const donutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+    legend: { position: 'right' },
   },
 }
 
@@ -159,19 +157,15 @@ const categoryData = computed(() => ({
   datasets: [{
     label:           'Requests',
     data:            props.categoryBreakdown.map(r => r.count),
-    backgroundColor: '#6366f1',
-    borderRadius:    4,
+    backgroundColor: BRAND,
   }],
 }))
 
 const barOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
   indexAxis: 'y',
   plugins: { legend: { display: false } },
   scales: {
     x: { beginAtZero: true, ticks: { precision: 0 } },
-    y: { ticks: { font: { size: 11 } } },
   },
 }
 
@@ -183,31 +177,24 @@ const trendData = computed(() => ({
     {
       label:            'Filed',
       data:             props.monthlyTrend.map(r => r.filed),
-      borderColor:      '#6366f1',
-      backgroundColor:  'rgba(99,102,241,0.08)',
+      borderColor:      BRAND,
+      backgroundColor:  gradientFill(BRAND, 0.1),
       fill:             true,
-      tension:          0.3,
-      pointRadius:      3,
     },
     {
       label:            'Completed',
       data:             props.monthlyTrend.map(r => r.completed),
-      borderColor:      '#10b981',
-      backgroundColor:  'rgba(16,185,129,0.08)',
+      borderColor:      STATUS.success,
+      backgroundColor:  gradientFill(STATUS.success, 0.1),
       fill:             true,
-      tension:          0.3,
-      pointRadius:      3,
     },
   ],
 }))
 
 const lineOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+  plugins: { legend: { position: 'top' } },
   scales: {
     y: { beginAtZero: true, ticks: { precision: 0 } },
-    x: { ticks: { font: { size: 11 } } },
   },
 }
 
@@ -219,17 +206,14 @@ const sqdData = computed(() => ({
     label:           'Avg Score (1–5)',
     data:            props.sqdBreakdown.map(r => r.score),
     backgroundColor: props.sqdBreakdown.map(r =>
-      r.score >= 4.5 ? '#10b981' :
-      r.score >= 3.5 ? '#6366f1' :
-      r.score >= 2.5 ? '#f59e0b' : '#ef4444'
+      r.score >= 4.5 ? STATUS.success :
+      r.score >= 3.5 ? BRAND :
+      r.score >= 2.5 ? STATUS.warning : STATUS.danger
     ),
-    borderRadius: 4,
   }],
 }))
 
 const sqdOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
   indexAxis: 'y',
   plugins: { legend: { display: false } },
   scales: {
@@ -310,7 +294,7 @@ const fleetKpiCards = computed(() => {
 })
 
 const riskTierLabels = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
-const riskTierColors = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#10b981' }
+const riskTierColors = { critical: STATUS.danger, high: '#f97316', medium: STATUS.warning, low: STATUS.success }
 
 const riskDonutData = computed(() => {
   const breakdown = props.fleet?.risk_tier_breakdown ?? {}
@@ -319,8 +303,7 @@ const riskDonutData = computed(() => {
     labels: keys.map(k => riskTierLabels[k] ?? 'Not Scored'),
     datasets: [{
       data: keys.map(k => breakdown[k]),
-      backgroundColor: keys.map(k => riskTierColors[k] ?? '#cbd5e1'),
-      borderWidth: 1,
+      backgroundColor: keys.map(k => riskTierColors[k] ?? OTHER),
     }],
   }
 })

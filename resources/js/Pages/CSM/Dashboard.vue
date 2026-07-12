@@ -14,6 +14,7 @@ import {
   Filler,
 } from 'chart.js'
 import { Doughnut, Bar, Line } from 'vue-chartjs'
+import { BRAND, STATUS, OTHER, seriesColor, gradientFill } from '@/Utils/chartTheme'
 import { StarIcon, ChatBubbleLeftRightIcon, UserGroupIcon, ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
 
 ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler)
@@ -34,10 +35,10 @@ const props = defineProps({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function adjectivalColor(adj) {
   const map = {
-    'Excellent': '#10b981', 'Very Good': '#3b82f6',
-    'Satisfactory': '#8b5cf6', 'Fair': '#f59e0b', 'Poor': '#ef4444',
+    'Excellent': STATUS.success, 'Very Good': BRAND,
+    'Satisfactory': '#0284C7', 'Fair': STATUS.warning, 'Poor': STATUS.danger,
   }
-  return map[adj] ?? '#94a3b8'
+  return map[adj] ?? OTHER
 }
 
 function sqdLabel(key) {
@@ -53,10 +54,9 @@ function sqdLabel(key) {
 
 // ── Chart data ─────────────────────────────────────────────────────────────
 
-const moduleColors = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ec4899']
 const moduleChart = computed(() => ({
   labels: props.byModule.map(m => m.label),
-  datasets: [{ data: props.byModule.map(m => m.count), backgroundColor: moduleColors, borderWidth: 1 }],
+  datasets: [{ data: props.byModule.map(m => m.count), backgroundColor: props.byModule.map((_, i) => seriesColor(i)) }],
 }))
 
 const sqdChart = computed(() => ({
@@ -65,9 +65,8 @@ const sqdChart = computed(() => ({
     label: 'Avg Score (1–5)',
     data: Object.values(props.sqdAvgs),
     backgroundColor: Object.values(props.sqdAvgs).map(v =>
-      v >= 4.5 ? '#10b981' : v >= 3.5 ? '#6366f1' : v >= 2.5 ? '#f59e0b' : '#ef4444'
+      v >= 4.5 ? STATUS.success : v >= 3.5 ? BRAND : v >= 2.5 ? STATUS.warning : STATUS.danger
     ),
-    borderRadius: 4,
   }],
 }))
 
@@ -76,11 +75,9 @@ const trendChart = computed(() => ({
   datasets: [{
     label: 'Responses',
     data: props.monthlyTrend.map(m => m.count),
-    borderColor: '#6366f1',
-    backgroundColor: 'rgba(99,102,241,0.1)',
+    borderColor: BRAND,
+    backgroundColor: gradientFill(BRAND),
     fill: true,
-    tension: 0.3,
-    pointRadius: 3,
   }],
 }))
 
@@ -88,7 +85,7 @@ const clientTypeChart = computed(() => {
   const entries = Object.entries(props.byClientType)
   return {
     labels: entries.map(([k]) => k.charAt(0).toUpperCase() + k.slice(1)),
-    datasets: [{ data: entries.map(([,v]) => v), backgroundColor: ['#6366f1','#10b981','#f59e0b'], borderWidth: 1 }],
+    datasets: [{ data: entries.map(([,v]) => v), backgroundColor: entries.map((_, i) => seriesColor(i)) }],
   }
 })
 
@@ -99,7 +96,6 @@ const adjectivalChart = computed(() => {
     datasets: [{
       data: entries.map(([,v]) => v),
       backgroundColor: entries.map(([k]) => adjectivalColor(k)),
-      borderWidth: 1,
     }],
   }
 })
@@ -114,13 +110,13 @@ const cc1Chart = computed(() => {
   const entries = Object.entries(props.cc1Breakdown)
   return {
     labels: entries.map(([k]) => cc1Labels[k] ?? `CC1-${k}`),
-    datasets: [{ data: entries.map(([,v]) => v), backgroundColor: ['#10b981','#6366f1','#f59e0b','#ef4444'], borderWidth: 1 }],
+    datasets: [{ data: entries.map(([,v]) => v), backgroundColor: [STATUS.success, BRAND, STATUS.warning, STATUS.danger] }],
   }
 })
 
-const donutOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } } }
-const barOpts   = { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 5, ticks: { precision: 1 } }, y: { ticks: { font: { size: 10 } } } } }
-const lineOpts  = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+const donutOpts = { plugins: { legend: { position: 'right' } } }
+const barOpts   = { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 5, ticks: { precision: 1 } }, y: { ticks: { font: { size: 10 } } } } }
+const lineOpts  = { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
 
 const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 10)
 </script>

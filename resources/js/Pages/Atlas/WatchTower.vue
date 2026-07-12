@@ -26,6 +26,7 @@ import {
   Legend,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
+import { BRAND, gradientFill } from '@/Utils/chartTheme'
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend)
 
@@ -56,7 +57,7 @@ function hourLabel(unixSeconds) {
   return new Date(unixSeconds * 1000).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
 }
 
-function toChartData(points, label, color) {
+function toChartData(points, label, color = BRAND) {
   const list = points ?? []
   return {
     labels: list.map((p) => hourLabel(p.timestamp)),
@@ -64,18 +65,14 @@ function toChartData(points, label, color) {
       label,
       data: list.map((p) => p.value),
       borderColor: color,
-      backgroundColor: color,
-      tension: 0.3,
-      pointRadius: 0,
-      borderWidth: 2,
+      backgroundColor: gradientFill(color),
+      fill: true,
     }],
   }
 }
 
 const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+  plugins: { legend: { display: false } },
   scales: {
     x: { ticks: { maxTicksLimit: 6, font: { size: 9 } } },
     y: { ticks: { font: { size: 9 } } },
@@ -274,7 +271,7 @@ const traces = computed(() => props.infra?.traces ?? null)
           </div>
         </div>
         <div class="h-40">
-          <Line :data="toChartData(alb.requests, 'Requests', '#6366f1')" :options="chartOptions" />
+          <Line :data="toChartData(alb.requests, 'Requests')" :options="chartOptions" />
         </div>
       </AppCard>
 
@@ -297,7 +294,7 @@ const traces = computed(() => props.infra?.traces ?? null)
             </div>
           </div>
           <div class="h-32">
-            <Line :data="toChartData(ecsWeb.cpu, 'CPU %', '#10b981')" :options="chartOptions" />
+            <Line :data="toChartData(ecsWeb.cpu, 'CPU %')" :options="chartOptions" />
           </div>
         </AppCard>
 
@@ -319,7 +316,7 @@ const traces = computed(() => props.infra?.traces ?? null)
             </div>
           </div>
           <div class="h-32">
-            <Line :data="toChartData(ecsWorker.cpu, 'CPU %', '#10b981')" :options="chartOptions" />
+            <Line :data="toChartData(ecsWorker.cpu, 'CPU %')" :options="chartOptions" />
           </div>
         </AppCard>
       </div>
@@ -350,7 +347,7 @@ const traces = computed(() => props.infra?.traces ?? null)
           </div>
         </div>
         <div class="h-32">
-          <Line :data="toChartData(rds.cpu, 'CPU %', '#f59e0b')" :options="chartOptions" />
+          <Line :data="toChartData(rds.cpu, 'CPU %')" :options="chartOptions" />
         </div>
       </AppCard>
 

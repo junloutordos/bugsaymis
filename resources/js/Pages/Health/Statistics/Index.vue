@@ -95,16 +95,17 @@ export default {
       // Try to dynamically import Chart.js; if not installed, skip rendering.
       try {
         const Chart = (await import('chart.js/auto')).default;
+        const { seriesColor } = await import('@/Utils/chartTheme');
 
         const ctx = chartCanvas.value.getContext('2d');
         const datasets = [
-          { label: 'FACULTY (FEMALE)', backgroundColor: '#ff6384', data: props.facultyFemale || [] },
-          { label: 'FACULTY (MALE)', backgroundColor: '#36a2eb', data: props.facultyMale || [] },
-          { label: 'STAFF (FEMALE)', backgroundColor: '#ff9f40', data: props.staffFemale || [] },
-          { label: 'STAFF (MALE)', backgroundColor: '#4bc0c0', data: props.staffMale || [] },
-          { label: 'STUDENT (FEMALE)', backgroundColor: '#e83e8c', data: props.studentFemale || [] },
-          { label: 'STUDENT (MALE)', backgroundColor: '#2b8aef', data: props.studentMale || [] },
-        ];
+          { label: 'FACULTY (FEMALE)', data: props.facultyFemale || [] },
+          { label: 'FACULTY (MALE)', data: props.facultyMale || [] },
+          { label: 'STAFF (FEMALE)', data: props.staffFemale || [] },
+          { label: 'STAFF (MALE)', data: props.staffMale || [] },
+          { label: 'STUDENT (FEMALE)', data: props.studentFemale || [] },
+          { label: 'STUDENT (MALE)', data: props.studentMale || [] },
+        ].map((d, i) => ({ ...d, backgroundColor: seriesColor(i) }));
 
         chartInstance.value = new Chart(ctx, {
           type: 'bar',
@@ -113,14 +114,12 @@ export default {
             datasets: datasets,
           },
           options: {
-            responsive: true,
-            maintainAspectRatio: false,
             scales: {
-              x: { stacked: false, ticks: { autoSkip: false }, grid: { display: false } },
-              y: { beginAtZero: true, grid: { color: '#e5e7eb' } },
+              x: { stacked: false, ticks: { autoSkip: false } },
+              y: { beginAtZero: true },
             },
             plugins: {
-              legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } },
+              legend: { position: 'bottom' },
               title: { display: false },
             },
           }

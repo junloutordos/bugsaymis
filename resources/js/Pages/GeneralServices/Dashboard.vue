@@ -24,6 +24,7 @@ import {
   Filler,
 } from 'chart.js'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
+import { BRAND, STATUS, seriesColor } from '@/Utils/chartTheme'
 import {
   CalendarDaysIcon,
   ChartBarIcon,
@@ -60,22 +61,19 @@ const props = defineProps({
   upcomingSchedule:   { type: Array,  default: () => [] },
 })
 
-const palette = ['#2563eb', '#059669', '#7c3aed', '#d97706', '#0f766e', '#be123c', '#64748b']
 const sem = {
-  active: '#f59e0b',
-  completed: '#10b981',
-  declined: '#ef4444',
-  vehicle: '#2563eb',
-  facility: '#059669',
-  service: '#7c3aed',
-  work: '#d97706',
+  active: STATUS.warning,
+  completed: STATUS.success,
+  declined: STATUS.danger,
+  vehicle: BRAND,
+  facility: '#0D9488',
+  service: '#7C3AED',
+  work: '#D97706',
 }
 
 const chartBase = {
-  responsive: true,
-  maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'bottom', labels: { usePointStyle: true, pointStyleWidth: 8, padding: 12, font: { size: 10 } } },
+    legend: { position: 'bottom' },
     tooltip: { mode: 'index', intersect: false },
   },
 }
@@ -83,8 +81,7 @@ const chartBase = {
 const barOptions = {
   ...chartBase,
   scales: {
-    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
+    y: { beginAtZero: true, ticks: { precision: 0 } },
   },
 }
 
@@ -92,8 +89,7 @@ const horizontalBarOptions = {
   ...chartBase,
   indexAxis: 'y',
   scales: {
-    x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
-    y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+    x: { beginAtZero: true, ticks: { precision: 0 } },
   },
 }
 
@@ -101,22 +97,20 @@ const lineOptions = {
   ...chartBase,
   interaction: { mode: 'index', intersect: false },
   scales: {
-    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
+    y: { beginAtZero: true, ticks: { precision: 0 } },
   },
 }
 
 const doughnutOptions = {
   ...chartBase,
-  cutout: '66%',
 }
 
 const moduleChartData = computed(() => ({
   labels: props.moduleBreakdown.map(row => row.label),
   datasets: [
-    { label: 'Active', data: props.moduleBreakdown.map(row => row.active), backgroundColor: sem.active + 'cc', borderRadius: 4 },
-    { label: 'Completed', data: props.moduleBreakdown.map(row => row.completed), backgroundColor: sem.completed + 'cc', borderRadius: 4 },
-    { label: 'Declined', data: props.moduleBreakdown.map(row => row.declined), backgroundColor: sem.declined + 'cc', borderRadius: 4 },
+    { label: 'Active', data: props.moduleBreakdown.map(row => row.active), backgroundColor: sem.active },
+    { label: 'Completed', data: props.moduleBreakdown.map(row => row.completed), backgroundColor: sem.completed },
+    { label: 'Declined', data: props.moduleBreakdown.map(row => row.declined), backgroundColor: sem.declined },
   ],
 }))
 
@@ -125,12 +119,8 @@ const monthlyTrendData = computed(() => ({
   datasets: (props.monthlyTrend.datasets ?? []).map((row, index) => ({
     label: row.label,
     data: row.data,
-    borderColor: palette[index % palette.length],
-    backgroundColor: palette[index % palette.length] + '18',
-    tension: 0.35,
-    pointRadius: 2,
-    pointHoverRadius: 5,
-    borderWidth: 2,
+    borderColor: seriesColor(index),
+    backgroundColor: seriesColor(index),
     fill: false,
   })),
 }))
@@ -139,8 +129,8 @@ const topDrivers = computed(() => (props.driverAnalytics.rows ?? []).slice(0, 8)
 const driverChartData = computed(() => ({
   labels: topDrivers.value.map(row => row.name),
   datasets: [
-    { label: 'Assigned', data: topDrivers.value.map(row => row.assigned), backgroundColor: sem.vehicle + 'cc', borderRadius: 4 },
-    { label: 'Upcoming', data: topDrivers.value.map(row => row.upcoming), backgroundColor: '#0891b2cc', borderRadius: 4 },
+    { label: 'Assigned', data: topDrivers.value.map(row => row.assigned), backgroundColor: sem.vehicle },
+    { label: 'Upcoming', data: topDrivers.value.map(row => row.upcoming), backgroundColor: '#0284C7' },
   ],
 }))
 
@@ -148,8 +138,8 @@ const topPersonnel = computed(() => (props.personnelAnalytics.rows ?? []).slice(
 const personnelChartData = computed(() => ({
   labels: topPersonnel.value.map(row => row.name),
   datasets: [
-    { label: 'Active', data: topPersonnel.value.map(row => row.active), backgroundColor: sem.work + 'cc', borderRadius: 4 },
-    { label: 'Completed', data: topPersonnel.value.map(row => row.completed), backgroundColor: sem.completed + 'cc', borderRadius: 4 },
+    { label: 'Active', data: topPersonnel.value.map(row => row.active), backgroundColor: sem.work },
+    { label: 'Completed', data: topPersonnel.value.map(row => row.completed), backgroundColor: sem.completed },
   ],
 }))
 
@@ -157,8 +147,7 @@ const workCategoryData = computed(() => ({
   labels: (props.personnelAnalytics.categoryBreakdown ?? []).map(row => row.category),
   datasets: [{
     data: (props.personnelAnalytics.categoryBreakdown ?? []).map(row => row.total),
-    backgroundColor: palette,
-    borderWidth: 0,
+    backgroundColor: (props.personnelAnalytics.categoryBreakdown ?? []).map((_, i) => seriesColor(i)),
   }],
 }))
 
@@ -167,8 +156,7 @@ const statusChartData = computed(() => ({
   labels: statusChartRows.value.map(row => `${row.module}: ${row.status}`),
   datasets: [{
     data: statusChartRows.value.map(row => row.total),
-    backgroundColor: palette,
-    borderWidth: 0,
+    backgroundColor: statusChartRows.value.map((_, i) => seriesColor(i)),
   }],
 }))
 

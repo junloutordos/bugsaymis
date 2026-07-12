@@ -13,6 +13,7 @@ import {
   Filler,
 } from 'chart.js'
 import { Doughnut, Bar, Line } from 'vue-chartjs'
+import { BRAND, STATUS, OTHER, seriesColor, gradientFill } from '@/Utils/chartTheme'
 import {
   UserGroupIcon, ClockIcon, CalendarDaysIcon, TicketIcon,
   BriefcaseIcon, UserPlusIcon, ClipboardDocumentCheckIcon,
@@ -44,24 +45,20 @@ const cardColors = {
 }
 
 const doughnutOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } },
+  plugins: { legend: { position: 'right' } },
 }
 const hBarOptions = {
-  responsive: true, maintainAspectRatio: false,
   indexAxis: 'y',
   plugins: { legend: { display: false } },
-  scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 11 } } } },
+  scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
 }
 const vBarOptions = {
-  responsive: true, maintainAspectRatio: false,
   plugins: { legend: { display: false } },
-  scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { font: { size: 11 } } } },
+  scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
 }
 const lineOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
-  scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { font: { size: 11 } } } },
+  plugins: { legend: { position: 'top' } },
+  scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
 }
 
 const reload = (params, only) => {
@@ -84,16 +81,16 @@ const hrCategoryData = computed(() => {
   const labels = Object.keys(props.hr?.categoryBreakdown ?? {})
   return {
     labels,
-    datasets: [{ data: labels.map(l => props.hr.categoryBreakdown[l]), backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444', '#8b5cf6'], borderWidth: 1 }],
+    datasets: [{ data: labels.map(l => props.hr.categoryBreakdown[l]), backgroundColor: labels.map((_, i) => seriesColor(i)) }],
   }
 })
 
 const hrAttendanceTrendData = computed(() => ({
   labels: (props.hr?.attendanceTrend ?? []).map(r => r.month),
   datasets: [
-    { label: 'Present', data: (props.hr?.attendanceTrend ?? []).map(r => r.present), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', fill: true, tension: 0.3, pointRadius: 3 },
-    { label: 'Absent', data: (props.hr?.attendanceTrend ?? []).map(r => r.absent), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.3, pointRadius: 3 },
-    { label: 'On Leave', data: (props.hr?.attendanceTrend ?? []).map(r => r.on_leave), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', fill: true, tension: 0.3, pointRadius: 3 },
+    { label: 'Present', data: (props.hr?.attendanceTrend ?? []).map(r => r.present), borderColor: STATUS.success, backgroundColor: gradientFill(STATUS.success, 0.1), fill: true },
+    { label: 'Absent', data: (props.hr?.attendanceTrend ?? []).map(r => r.absent), borderColor: STATUS.danger, backgroundColor: gradientFill(STATUS.danger, 0.1), fill: true },
+    { label: 'On Leave', data: (props.hr?.attendanceTrend ?? []).map(r => r.on_leave), borderColor: STATUS.warning, backgroundColor: gradientFill(STATUS.warning, 0.1), fill: true },
   ],
 }))
 
@@ -113,9 +110,9 @@ const recruitmentKpiCards = computed(() => !props.recruitment ? [] : [
 const recruitmentPipelineData = computed(() => ({
   labels: (props.recruitment?.pipeline ?? []).map(r => r.month),
   datasets: [
-    { label: 'Submitted', data: (props.recruitment?.pipeline ?? []).map(r => r.submitted), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)', fill: true, tension: 0.3, pointRadius: 3 },
-    { label: 'Placed', data: (props.recruitment?.pipeline ?? []).map(r => r.placed), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', fill: true, tension: 0.3, pointRadius: 3 },
-    { label: 'Rejected', data: (props.recruitment?.pipeline ?? []).map(r => r.rejected), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.3, pointRadius: 3 },
+    { label: 'Submitted', data: (props.recruitment?.pipeline ?? []).map(r => r.submitted), borderColor: BRAND, backgroundColor: gradientFill(BRAND, 0.1), fill: true },
+    { label: 'Placed', data: (props.recruitment?.pipeline ?? []).map(r => r.placed), borderColor: STATUS.success, backgroundColor: gradientFill(STATUS.success, 0.1), fill: true },
+    { label: 'Rejected', data: (props.recruitment?.pipeline ?? []).map(r => r.rejected), borderColor: STATUS.danger, backgroundColor: gradientFill(STATUS.danger, 0.1), fill: true },
   ],
 }))
 
@@ -130,15 +127,15 @@ const pmsKpiCards = computed(() => !props.pms ? [] : [
   { label: 'Average Rating', value: props.pms.kpi.average_rating ?? '—', sub: 'Weighted, this period', icon: ClipboardDocumentCheckIcon, color: 'violet' },
 ])
 
-const ratingColors = { Outstanding: '#10b981', 'Very Satisfactory': '#6366f1', Satisfactory: '#0ea5e9', Unsatisfactory: '#f59e0b', Poor: '#ef4444' }
+const ratingColors = { Outstanding: STATUS.success, 'Very Satisfactory': BRAND, Satisfactory: '#0284C7', Unsatisfactory: STATUS.warning, Poor: STATUS.danger }
 const pmsRatingData = computed(() => {
   const labels = Object.keys(props.pms?.ratingDistribution ?? {})
-  return { labels, datasets: [{ data: labels.map(l => props.pms.ratingDistribution[l]), backgroundColor: labels.map(l => ratingColors[l] ?? '#94a3b8'), borderWidth: 1 }] }
+  return { labels, datasets: [{ data: labels.map(l => props.pms.ratingDistribution[l]), backgroundColor: labels.map(l => ratingColors[l] ?? OTHER) }] }
 })
 
 const pmsFunnelData = computed(() => {
   const labels = Object.keys(props.pms?.statusFunnel ?? {})
-  return { labels, datasets: [{ data: labels.map(l => props.pms.statusFunnel[l]), backgroundColor: '#6366f1', borderRadius: 4 }] }
+  return { labels, datasets: [{ data: labels.map(l => props.pms.statusFunnel[l]), backgroundColor: BRAND }] }
 })
 
 // ── 4. Learning & Development ────────────────────────────────────────────────
@@ -156,7 +153,7 @@ const lndKpiCards = computed(() => !props.lnd ? [] : [
 
 const lndSessionsData = computed(() => ({
   labels: (props.lnd?.sessionsPerMonth ?? []).map(r => r.month),
-  datasets: [{ label: 'Sessions', data: (props.lnd?.sessionsPerMonth ?? []).map(r => r.count), backgroundColor: '#8b5cf6', borderRadius: 4 }],
+  datasets: [{ label: 'Sessions', data: (props.lnd?.sessionsPerMonth ?? []).map(r => r.count), backgroundColor: BRAND }],
 }))
 
 // ── 5. SALN ───────────────────────────────────────────────────────────────────
@@ -172,10 +169,10 @@ const salnKpiCards = computed(() => !props.saln ? [] : [
   { label: 'Non-Filers', value: props.saln.kpi.non_filers, sub: salnYear.value, icon: ShieldExclamationIcon, color: props.saln.kpi.non_filers > 0 ? 'rose' : 'slate' },
 ])
 
-const salnStatusColors = { filed: '#10b981', approved: '#0ea5e9', submitted: '#6366f1', under_review: '#8b5cf6', draft: '#94a3b8', returned: '#f59e0b' }
+const salnStatusColors = { filed: STATUS.success, approved: '#0284C7', submitted: BRAND, under_review: '#7C3AED', draft: OTHER, returned: STATUS.warning }
 const salnStatusData = computed(() => {
   const labels = Object.keys(props.saln?.statusCounts ?? {})
-  return { labels, datasets: [{ data: labels.map(l => props.saln.statusCounts[l]), backgroundColor: labels.map(l => salnStatusColors[l] ?? '#cbd5e1'), borderWidth: 1 }] }
+  return { labels, datasets: [{ data: labels.map(l => props.saln.statusCounts[l]), backgroundColor: labels.map(l => salnStatusColors[l] ?? OTHER) }] }
 })
 
 // ── 6. Rewards & Recognition ─────────────────────────────────────────────────
@@ -192,7 +189,7 @@ const rewardsKpiCards = computed(() => !props.rewards ? [] : [
 
 const rewardsByTypeData = computed(() => ({
   labels: (props.rewards?.byType ?? []).map(r => r.name),
-  datasets: [{ data: (props.rewards?.byType ?? []).map(r => r.total), backgroundColor: '#6366f1', borderRadius: 4 }],
+  datasets: [{ data: (props.rewards?.byType ?? []).map(r => r.total), backgroundColor: BRAND }],
 }))
 </script>
 

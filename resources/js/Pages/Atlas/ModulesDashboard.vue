@@ -36,6 +36,7 @@ import {
   Legend,
 } from 'chart.js'
 import { Radar, Bar } from 'vue-chartjs'
+import { BRAND, withAlpha } from '@/Utils/chartTheme'
 
 ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler,
@@ -125,27 +126,23 @@ const radarChartData = computed(() => {
     datasets: [{
       label: selectedModule.value?.name ?? 'Module',
       data: radar.data,
-      backgroundColor: 'rgba(99, 102, 241, 0.15)',
-      borderColor: '#6366f1',
-      pointBackgroundColor: '#6366f1',
+      backgroundColor: withAlpha(BRAND, 0.15),
+      borderColor: BRAND,
+      pointBackgroundColor: BRAND,
       pointBorderColor: '#fff',
       pointHoverBackgroundColor: '#fff',
-      pointHoverBorderColor: '#6366f1',
+      pointHoverBorderColor: BRAND,
     }],
   }
 })
 
 const radarChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
   scales: {
     r: {
       min: 0,
       max: 100,
       ticks: { display: false, stepSize: 20 },
-      grid: { color: '#e2e8f0' },
-      pointLabels: { font: { size: 10 }, color: '#64748b' },
-      angleLines: { color: '#e2e8f0' },
+      pointLabels: { font: { size: 10 } },
     },
   },
   plugins: { legend: { display: false } },
@@ -164,13 +161,11 @@ const peakChartData = computed(() => {
 
   return {
     labels,
-    datasets: [{ data: peak, backgroundColor: '#6366f1', borderRadius: 2, barThickness: 'flex' }],
+    datasets: [{ data: peak, backgroundColor: BRAND, borderRadius: 2, barThickness: 'flex' }],
   }
 })
 
 const peakChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
   plugins: {
     legend: { display: false },
     tooltip: { callbacks: { label: ctx => `${ctx.raw} records at ${ctx.label}` } },
