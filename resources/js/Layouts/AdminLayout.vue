@@ -309,6 +309,9 @@ const filteredMenu = computed(() => filterMenuByRole(menuItems, roleNames));
 // --- Expand logic ---
 const toggleExpand = (label) => (expanded.value[label] = !expanded.value[label]);
 
+// Display-only: does this group contain the currently active route?
+const groupHasActive = (item) => item.children?.some((c) => isActive(c.routeName)) ?? false;
+
 filteredMenu.value.forEach((item) => {
   if (item.children?.some((c) => isActive(c.routeName))) {
     expanded.value[item.label] = true;
@@ -331,17 +334,17 @@ filteredMenu.value.forEach((item) => {
     <aside
       :class="[
         'transition-all duration-300 z-40 flex-shrink-0 flex flex-col bg-white shadow-xl ring-1 ring-slate-200/70 md:border-r md:border-slate-200 md:shadow-sm md:ring-0',
-        'fixed inset-y-0 left-0 md:static md:inset-auto',
+        'fixed inset-y-0 left-0 md:sticky md:top-0 md:h-screen md:inset-auto',
         mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         collapsed ? 'w-72 md:w-[68px]' : 'w-72 md:w-60',
       ]"
     >
       <!-- Logo -->
-      <div class="min-h-16 flex items-center gap-3 border-b border-slate-100 px-4 py-3 shrink-0">
+      <div class="min-h-16 flex items-center gap-3 border-b border-slate-200/70 px-4 py-3.5 shrink-0">
         <img v-if="collapsed" src="/images/atlas-mark.png" alt="Atlas" class="h-8 w-8 shrink-0 object-contain mx-auto" />
         <div v-else class="flex-1 flex flex-col items-center text-center min-w-0">
           <img src="/images/atlas-logo-full.png" alt="Atlas" class="h-7 w-auto object-contain" />
-          <p class="text-[10px] text-slate-500 leading-tight mt-1">Centralized Management Information System</p>
+          <p class="text-[10px] text-slate-400 leading-tight mt-1 tracking-wide">Centralized Management Information System</p>
         </div>
         <!-- Close button (mobile only) -->
         <button
@@ -354,15 +357,16 @@ filteredMenu.value.forEach((item) => {
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5 scrollbar-thin">
+      <nav class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         <template v-for="item in filteredMenu" :key="item.label">
 
           <!-- Section label -->
           <div
             v-if="item.type === 'section' && !collapsed"
-            class="px-3 pt-5 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em]"
+            class="flex items-center gap-2 px-3 pt-5 pb-1.5"
           >
-            {{ item.label }}
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em] shrink-0">{{ item.label }}</span>
+            <span class="h-px flex-1 bg-slate-100"></span>
           </div>
           <div v-else-if="item.type === 'section' && collapsed" class="my-2 mx-3 h-px bg-slate-200" />
 
@@ -382,9 +386,10 @@ filteredMenu.value.forEach((item) => {
           <div v-else>
             <button
               @click="toggleExpand(item.label)"
-              class="group relative flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 border-l-2 border-transparent"
-              :class="expanded[item.label]
-                ? 'bg-blue-50 text-slate-900 border-l-2 border-blue-600'
+              :title="collapsed ? item.label : null"
+              class="group relative flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
+              :class="expanded[item.label] || groupHasActive(item)
+                ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
             >
               <component
@@ -393,7 +398,7 @@ filteredMenu.value.forEach((item) => {
                 class="h-4 w-4 shrink-0 transition-colors"
                 :class="[
                   collapsed ? 'mx-auto' : 'mr-2.5',
-                  expanded[item.label] ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'
+                  expanded[item.label] || groupHasActive(item) ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'
                 ]"
               />
               <span v-if="!collapsed" class="flex-1 truncate text-left">{{ item.label }}</span>
@@ -408,11 +413,15 @@ filteredMenu.value.forEach((item) => {
               <ChevronDownIcon
                 v-if="!collapsed"
                 class="h-3.5 w-3.5 ml-1 shrink-0 text-slate-400 transition-transform duration-200"
-                :class="{ 'rotate-180 text-blue-600': expanded[item.label] }"
+                :class="{ 'rotate-180 text-indigo-600': expanded[item.label] }"
               />
             </button>
 
-            <div v-show="expanded[item.label]" class="mt-0.5 ml-4 pl-3 border-l border-slate-200 space-y-0.5">
+            <div class="sidebar-group" :class="{ 'sidebar-group-open': expanded[item.label] }">
+            <div
+              class="sidebar-group-inner mt-0.5 ml-4 pl-3 border-l space-y-0.5"
+              :class="groupHasActive(item) ? 'border-indigo-100' : 'border-slate-200'"
+            >
               <template v-for="child in item.children" :key="child.label">
                 <SidebarLink
                   v-if="!['consultations.log.print','consultations.employee.log.print','library.statistics.report','health.statistics.report','hr.attendance.index'].includes(child.routeName)"
@@ -428,7 +437,7 @@ filteredMenu.value.forEach((item) => {
                 <button
                   v-else-if="['consultations.log.print','consultations.employee.log.print'].includes(child.routeName)"
                   @click="openConsultationLogModal(child.routeName)"
-                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 pl-[10px]"
+                  class="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900"
                 >
                   <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-400 group-hover:text-slate-600" />
                   <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
@@ -436,7 +445,7 @@ filteredMenu.value.forEach((item) => {
                 <button
                   v-else-if="child.routeName === 'library.statistics.report'"
                   @click="openLibraryStatsModal"
-                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 pl-[10px]"
+                  class="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900"
                 >
                   <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-400 group-hover:text-slate-600" />
                   <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
@@ -444,7 +453,7 @@ filteredMenu.value.forEach((item) => {
                 <button
                   v-else-if="child.routeName === 'health.statistics.report'"
                   @click="openHealthStatsModal"
-                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 pl-[10px]"
+                  class="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900"
                 >
                   <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-400 group-hover:text-slate-600" />
                   <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
@@ -452,22 +461,23 @@ filteredMenu.value.forEach((item) => {
                 <button
                   v-else-if="child.routeName === 'hr.attendance.index'"
                   @click="openAttendanceModal"
-                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 pl-[10px]"
+                  class="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900"
                 >
                   <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-400 group-hover:text-slate-600" />
                   <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
                 </button>
               </template>
             </div>
+            </div>
           </div>
         </template>
       </nav>
 
       <!-- Version footer -->
-      <div class="shrink-0 border-t border-slate-100 px-3 py-3">
+      <div class="shrink-0 border-t border-slate-200/70 px-3 py-3">
         <button
           @click="showVersionModal = true"
-          class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all duration-150"
+          class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-500 ring-1 ring-transparent hover:bg-slate-50 hover:text-slate-700 hover:ring-slate-200 transition-all duration-150"
           :class="collapsed ? 'justify-center' : 'justify-between'"
         >
           <span class="font-mono" :class="collapsed ? 'font-bold text-slate-500' : 'text-slate-500'">
@@ -552,5 +562,43 @@ filteredMenu.value.forEach((item) => {
 .page-fade-enter-from,
 .page-fade-leave-to {
   opacity: 0;
+}
+
+/* Smooth expand/collapse for sidebar groups (grid-rows 0fr -> 1fr) */
+.sidebar-group {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease;
+}
+.sidebar-group-open {
+  grid-template-rows: 1fr;
+}
+.sidebar-group-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Thin scrollbar — transparent until the nav is hovered */
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.sidebar-nav:hover {
+  scrollbar-color: #cbd5e1 transparent; /* slate-300 */
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+.sidebar-nav:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-group {
+    transition: none;
+  }
 }
 </style>

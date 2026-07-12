@@ -1,7 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { storageUrl } from '@/Composables/useStorage.js'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import EmptyState from '@/Components/EmptyState.vue'
@@ -63,6 +64,8 @@ const profileLine = computed(() => {
   return pieces.length ? pieces.join(' · ') : 'Personal workspace'
 })
 
+const photoUrl = computed(() => storageUrl(authUser.value?.profile_picture))
+
 const flattenedActions = computed(() => {
   const approvals = (props.approvalTabs || []).flatMap(tab =>
     (tab.items || []).slice(0, 4).map(item => ({
@@ -72,6 +75,7 @@ const flattenedActions = computed(() => {
       meta: `${item.requester_name || 'Requester'} · ${item.status || 'Pending'}`,
       date: item.filed_at,
       tone: 'warning',
+      icon: InboxStackIcon,
       url: route('approvals.inbox'),
     }))
   )
@@ -83,6 +87,7 @@ const flattenedActions = computed(() => {
     meta: [item.reference, item.status, item.due_at ? `Due ${formatDate(item.due_at)}` : null].filter(Boolean).join(' · '),
     date: item.due_at,
     tone: item.is_overdue ? 'danger' : 'warning',
+    icon: DocumentTextIcon,
     url: item.url,
   }))
 
@@ -93,6 +98,7 @@ const flattenedActions = computed(() => {
     meta: [item.kind, item.reference].filter(Boolean).join(' · '),
     date: item.date,
     tone: 'indigo',
+    icon: CheckCircleIcon,
     url: item.url,
   }))
 
@@ -103,6 +109,7 @@ const flattenedActions = computed(() => {
     meta: item.reference,
     date: item.date,
     tone: 'success',
+    icon: ClipboardDocumentCheckIcon,
     url: item.url,
   }))
 
@@ -172,6 +179,26 @@ const summaryCards = computed(() => [
     tone: 'success',
   },
 ])
+
+// Animated stat values — count up from 0 on mount (rAF, no deps)
+const animatedValues = ref(summaryCards.value.map(() => 0))
+
+onMounted(() => {
+  const targets = summaryCards.value.map(card => Number(card.value) || 0)
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    animatedValues.value = targets
+    return
+  }
+  const duration = 700
+  const start = performance.now()
+  const tick = (now) => {
+    const t = Math.min((now - start) / duration, 1)
+    const ease = 1 - Math.pow(1 - t, 3)
+    animatedValues.value = targets.map(v => Math.round(v * ease))
+    if (t < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+})
 
 function startOfToday() {
   const date = new Date()
@@ -254,15 +281,25 @@ function statusClass(status) {
 
   <AdminLayout title="Dashboard">
     <div class="space-y-5">
-      <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+      <section class="dash-section relative overflow-hidden rounded-2xl bg-white px-4 py-5 shadow-sm ring-1 ring-slate-200/70 sm:px-6" style="--stagger: 0">
+        <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-100" aria-hidden="true"></div>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex min-w-0 items-center gap-3">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-indigo-100 bg-indigo-50 text-sm font-bold text-indigo-700">
+          <div class="flex min-w-0 items-center gap-4">
+            <img
+              v-if="photoUrl"
+              :src="photoUrl"
+              alt=""
+              class="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-indigo-100"
+            />
+            <div
+              v-else
+              class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-indigo-100 bg-indigo-50 text-base font-bold text-indigo-700"
+            >
               {{ initials }}
             </div>
             <div class="min-w-0">
-              <p class="text-sm text-slate-500">{{ today }}</p>
-              <h1 class="mt-0.5 truncate font-heading text-lg font-semibold text-slate-900 sm:text-xl">
+              <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">{{ today }}</span>
+              <h1 class="mt-1.5 truncate font-heading text-xl font-semibold text-slate-900 sm:text-2xl">
                 {{ greeting }}, {{ (profile.name || authUser?.name || 'there').split(' ')[0] }}
               </h1>
               <p class="mt-1 truncate text-sm text-slate-500">{{ profileLine }}</p>
@@ -274,8 +311,7 @@ function statusClass(status) {
               v-for="link in quickLinks.slice(0, 3)"
               :key="link.label"
               :href="link.url"
-              class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition hover:-translate-y-0.5 hover:shadow-sm"
-              :class="toneClass(link.tone)"
+              class="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:bg-indigo-100 hover:shadow-sm"
             >
               {{ link.label }}
               <ChevronRightIcon class="h-4 w-4" />
@@ -284,16 +320,16 @@ function statusClass(status) {
         </div>
       </section>
 
-      <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section class="dash-section grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" style="--stagger: 1">
         <div
-          v-for="card in summaryCards"
+          v-for="(card, index) in summaryCards"
           :key="card.label"
-          class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+          class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
         >
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-xs font-semibold uppercase text-slate-500">{{ card.label }}</p>
-              <p class="mt-2 text-3xl font-bold tracking-normal text-slate-900">{{ Number(card.value).toLocaleString() }}</p>
+              <p class="mt-2 text-3xl font-bold tracking-normal text-slate-900 tabular-nums">{{ Number(animatedValues[index] ?? card.value).toLocaleString() }}</p>
               <p class="mt-1 text-xs text-slate-500">{{ card.sub }}</p>
             </div>
             <div class="rounded-lg p-2" :class="toneClass(card.tone, 'icon')">
@@ -305,13 +341,18 @@ function statusClass(status) {
 
       <section class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
         <div class="space-y-5">
-          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div class="dash-section rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style="--stagger: 2">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <div>
-                <h2 class="text-sm font-semibold text-slate-900">Needs Action</h2>
-                <p class="text-xs text-slate-500">Approvals, routed documents, acknowledgments, and evaluations assigned to you</p>
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                  <InboxStackIcon class="h-4 w-4 text-indigo-600" />
+                </span>
+                <div class="min-w-0">
+                  <h2 class="font-heading text-sm font-semibold text-slate-900">Needs Action</h2>
+                  <p class="truncate text-xs text-slate-500">Approvals, routed documents, acknowledgments, and evaluations assigned to you</p>
+                </div>
               </div>
-              <Link v-if="approvalTabs.length" :href="route('approvals.inbox')" class="hidden text-sm font-medium text-indigo-600 hover:text-indigo-800 sm:inline">
+              <Link v-if="approvalTabs.length" :href="route('approvals.inbox')" class="hidden shrink-0 text-sm font-medium text-indigo-600 hover:text-indigo-800 sm:inline">
                 Open Inbox
               </Link>
             </div>
@@ -321,9 +362,11 @@ function statusClass(status) {
                 v-for="item in flattenedActions"
                 :key="item.id"
                 :href="item.url"
-                class="flex gap-3 px-4 py-3 transition hover:bg-slate-50"
+                class="group flex gap-3 px-4 py-3 transition hover:bg-slate-50"
               >
-                <span class="mt-2 h-2.5 w-2.5 shrink-0 rounded-full" :class="toneClass(item.tone, 'dot')" />
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" :class="toneClass(item.tone, 'icon')">
+                  <component :is="item.icon" class="h-4 w-4" />
+                </span>
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <p class="truncate text-sm font-semibold text-slate-900">{{ item.title }}</p>
@@ -332,7 +375,7 @@ function statusClass(status) {
                   <p class="mt-0.5 text-xs font-medium uppercase text-slate-500">{{ item.label }}</p>
                   <p class="mt-1 truncate text-sm text-slate-500">{{ item.meta }}</p>
                 </div>
-                <ChevronRightIcon class="mt-3 h-4 w-4 shrink-0 text-slate-300" />
+                <ChevronRightIcon class="mt-3 h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-400" />
               </Link>
             </div>
 
@@ -343,13 +386,17 @@ function statusClass(status) {
             </div>
           </div>
 
-          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div class="dash-section rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style="--stagger: 3">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <div>
-                <h2 class="text-sm font-semibold text-slate-900">My Requests</h2>
-                <p class="text-xs text-slate-500">Recent requests you filed or own across modules</p>
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                  <ClockIcon class="h-4 w-4 text-indigo-600" />
+                </span>
+                <div class="min-w-0">
+                  <h2 class="font-heading text-sm font-semibold text-slate-900">My Requests</h2>
+                  <p class="truncate text-xs text-slate-500">Recent requests you filed or own across modules</p>
+                </div>
               </div>
-              <ClockIcon class="h-5 w-5 text-slate-400" />
             </div>
 
             <div v-if="myRequests.length" class="overflow-x-auto">
@@ -388,13 +435,17 @@ function statusClass(status) {
         </div>
 
         <aside class="space-y-5">
-          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div class="dash-section rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70" style="--stagger: 2">
             <div class="mb-3 flex items-center justify-between">
-              <div>
-                <h2 class="text-sm font-semibold text-slate-900">My Calendar</h2>
-                <p class="text-xs text-slate-500">Upcoming personal dates and due items</p>
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                  <CalendarDaysIcon class="h-4 w-4 text-indigo-600" />
+                </span>
+                <div class="min-w-0">
+                  <h2 class="font-heading text-sm font-semibold text-slate-900">My Calendar</h2>
+                  <p class="truncate text-xs text-slate-500">Upcoming personal dates and due items</p>
+                </div>
               </div>
-              <CalendarDaysIcon class="h-5 w-5 text-slate-400" />
             </div>
             <div class="dashboard-calendar rounded-lg border border-slate-100 text-xs">
               <FullCalendar :options="calendarOptions" />
@@ -420,13 +471,17 @@ function statusClass(status) {
             </div>
           </div>
 
-          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div class="dash-section rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style="--stagger: 3">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <div>
-                <h2 class="text-sm font-semibold text-slate-900">Notifications</h2>
-                <p class="text-xs text-slate-500">Latest alerts addressed to you</p>
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                  <BellAlertIcon class="h-4 w-4 text-indigo-600" />
+                </span>
+                <div class="min-w-0">
+                  <h2 class="font-heading text-sm font-semibold text-slate-900">Notifications</h2>
+                  <p class="truncate text-xs text-slate-500">Latest alerts addressed to you</p>
+                </div>
               </div>
-              <BellAlertIcon class="h-5 w-5 text-slate-400" />
             </div>
 
             <div v-if="notifications.length" class="divide-y divide-slate-100">
@@ -455,13 +510,18 @@ function statusClass(status) {
             <EmptyState v-else title="No notifications yet." />
           </div>
 
-          <div v-if="announcements.length" class="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div v-if="announcements.length" class="dash-section rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style="--stagger: 4">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <div>
-                <h2 class="text-sm font-semibold text-slate-900">Announcements</h2>
-                <p class="text-xs text-slate-500">Latest campus announcements for you</p>
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                  <MegaphoneIcon class="h-4 w-4 text-indigo-600" />
+                </span>
+                <div class="min-w-0">
+                  <h2 class="font-heading text-sm font-semibold text-slate-900">Announcements</h2>
+                  <p class="truncate text-xs text-slate-500">Latest campus announcements for you</p>
+                </div>
               </div>
-              <Link :href="route('announcements.index')" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">
+              <Link :href="route('announcements.index')" class="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-700">
                 View all
               </Link>
             </div>
@@ -483,23 +543,27 @@ function statusClass(status) {
             </div>
           </div>
 
-          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-100 px-4 py-3">
-              <h2 class="text-sm font-semibold text-slate-900">Quick Links</h2>
-              <p class="text-xs text-slate-500">Common places based on your role and workload</p>
+          <div class="dash-section rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style="--stagger: 5">
+            <div class="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                <UserCircleIcon class="h-4 w-4 text-indigo-600" />
+              </span>
+              <div class="min-w-0">
+                <h2 class="font-heading text-sm font-semibold text-slate-900">Quick Links</h2>
+                <p class="truncate text-xs text-slate-500">Common places based on your role and workload</p>
+              </div>
             </div>
             <div class="grid grid-cols-1 gap-2 p-4">
               <Link
                 v-for="link in quickLinks"
                 :key="link.label"
                 :href="link.url"
-                class="group flex items-center gap-3 rounded-lg border p-3 transition hover:-translate-y-0.5 hover:shadow-sm"
-                :class="toneClass(link.tone)"
+                class="group flex items-center gap-3 rounded-lg bg-indigo-50/60 p-3 text-indigo-700 transition hover:-translate-y-0.5 hover:bg-indigo-50 hover:shadow-sm"
               >
-                <UserCircleIcon class="h-5 w-5 shrink-0" />
+                <UserCircleIcon class="h-5 w-5 shrink-0 text-indigo-500" />
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-semibold">{{ link.label }}</p>
-                  <p class="truncate text-xs opacity-80">{{ link.description }}</p>
+                  <p class="truncate text-xs text-indigo-700/70">{{ link.description }}</p>
                 </div>
                 <ChevronRightIcon class="h-4 w-4 shrink-0 opacity-60 transition group-hover:translate-x-0.5" />
               </Link>
@@ -508,7 +572,8 @@ function statusClass(status) {
 
           <div
             v-if="(summary.overdue_documents ?? 0) > 0"
-            class="rounded-lg border border-danger-100 bg-danger-50 p-4 text-danger-700"
+            class="dash-section rounded-2xl border border-danger-100 bg-danger-50 p-4 text-danger-700"
+            style="--stagger: 6"
           >
             <div class="flex gap-3">
               <ExclamationTriangleIcon class="h-5 w-5 shrink-0" />
@@ -525,6 +590,29 @@ function statusClass(status) {
 </template>
 
 <style scoped>
+/* Staggered entrance — each section fades/slides in, offset by --stagger */
+.dash-section {
+  animation: dash-fade-up 400ms ease both;
+  animation-delay: calc(var(--stagger, 0) * 60ms);
+}
+
+@keyframes dash-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-section {
+    animation: none;
+  }
+}
+
 .dashboard-calendar :deep(.fc) {
   --fc-border-color: #e2e8f0;
   --fc-today-bg-color: #eef2ff;
