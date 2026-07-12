@@ -14,11 +14,11 @@ defineProps({
 })
 
 const variantMap = {
-  primary:   'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm',
-  secondary: 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm',
-  danger:    'bg-danger-600 hover:bg-danger-700 text-white shadow-sm',
-  success:   'bg-success-600 hover:bg-success-700 text-white shadow-sm',
-  warning:   'bg-warning-500 hover:bg-warning-600 text-white shadow-sm',
+  primary:   'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-600/25',
+  secondary: 'bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 shadow-sm',
+  danger:    'bg-danger-600 hover:bg-danger-700 text-white shadow-sm shadow-danger-600/25',
+  success:   'bg-success-600 hover:bg-success-700 text-white shadow-sm shadow-success-600/25',
+  warning:   'bg-warning-500 hover:bg-warning-600 text-white shadow-sm shadow-warning-500/25',
   ghost:     'text-slate-600 hover:bg-slate-100',
 }
 const sizeMap = {
@@ -38,7 +38,7 @@ const sizeMap = {
     :disabled="as === 'button' ? (disabled || loading) : null"
     :aria-disabled="disabled || loading ? 'true' : null"
     :class="[
-      'inline-flex items-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed',
+      'inline-flex items-center font-medium transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed',
       variantMap[variant] ?? variantMap.primary,
       sizeMap[size] ?? sizeMap.md,
       block ? 'w-full justify-center' : '',

@@ -5,7 +5,7 @@ defineProps({
 </script>
 
 <template>
-  <div class="mb-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+  <div class="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
     <div class="flex flex-wrap items-end gap-3">
       <slot />
       <div v-if="$slots.actions || resultLabel" class="ml-auto flex items-center gap-3 self-end">

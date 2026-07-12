@@ -54,14 +54,14 @@ const widthFor = (i) => skeletonWidths[i % skeletonWidths.length]
 
 <template>
   <!-- Outer card shell (optional) -->
-  <div :class="card ? 'bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden' : ''">
+  <div :class="card ? 'bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden' : ''">
 
     <!-- Horizontal scroll container -->
     <div :class="['overflow-x-auto', $slots.mobileCard ? 'hidden sm:block' : '']">
       <table class="min-w-full divide-y divide-slate-100 text-sm">
 
         <!-- Header -->
-        <thead class="bg-slate-50">
+        <thead class="bg-slate-50/80">
           <slot name="head" />
         </thead>
 
@@ -79,7 +79,9 @@ const widthFor = (i) => skeletonWidths[i % skeletonWidths.length]
           <tr>
             <td :colspan="skeletonCols" class="py-14 text-center">
               <slot name="empty">
-                <InboxIcon class="h-10 w-10 mx-auto mb-3 text-slate-300" />
+                <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-100">
+                  <InboxIcon class="h-7 w-7 text-slate-300" />
+                </span>
                 <p class="text-sm font-medium text-slate-500">No records found</p>
               </slot>
             </td>
@@ -104,7 +106,9 @@ const widthFor = (i) => skeletonWidths[i % skeletonWidths.length]
       </div>
       <div v-else-if="isEmpty" class="py-14 text-center px-4">
         <slot name="empty">
-          <InboxIcon class="h-10 w-10 mx-auto mb-3 text-slate-300" />
+          <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-100">
+            <InboxIcon class="h-7 w-7 text-slate-300" />
+          </span>
           <p class="text-sm font-medium text-slate-500">No records found</p>
         </slot>
       </div>

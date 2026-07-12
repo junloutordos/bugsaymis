@@ -30,7 +30,7 @@ const sizeMap = {
     :aria-label="label"
     :title="label"
     :class="[
-      'inline-flex shrink-0 items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+      'inline-flex shrink-0 items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
       variantMap[variant] ?? variantMap.ghost,
       sizeMap[size] ?? sizeMap.md,
     ]"

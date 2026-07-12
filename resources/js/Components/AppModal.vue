@@ -44,12 +44,12 @@ const sizeMap = {
 
         <!-- Panel -->
         <div
-          :class="['relative w-full bg-white rounded-2xl shadow-xl z-10 flex flex-col max-h-[90vh]', sizeMap[size] ?? sizeMap.md, panelClass]"
+          :class="['app-modal-panel relative w-full bg-white rounded-2xl shadow-xl ring-1 ring-slate-200/60 z-10 flex flex-col max-h-[90vh]', sizeMap[size] ?? sizeMap.md, panelClass]"
         >
           <!-- Header -->
           <div v-if="title || subtitle || $slots.header || showCloseButton" class="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100 shrink-0">
             <div class="min-w-0">
-              <h2 v-if="title" class="text-base font-semibold text-slate-800">{{ title }}</h2>
+              <h2 v-if="title" class="font-heading text-base font-semibold text-slate-900">{{ title }}</h2>
               <p v-if="subtitle" class="mt-0.5 text-sm text-slate-500">{{ subtitle }}</p>
             </div>
             <slot name="header" />
@@ -78,3 +78,25 @@ const sizeMap = {
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+/* Panel entrance: subtle rise + settle (backdrop fades via the Transition) */
+.app-modal-panel {
+  animation: app-modal-pop 180ms ease-out;
+}
+@keyframes app-modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-modal-panel {
+    animation: none;
+  }
+}
+</style>

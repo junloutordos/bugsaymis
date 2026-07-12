@@ -555,13 +555,23 @@ filteredMenu.value.forEach((item) => {
 </template>
 
 <style scoped>
-.page-fade-enter-active,
+.page-fade-enter-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
 .page-fade-leave-active {
   transition: opacity 120ms ease;
 }
-.page-fade-enter-from,
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
 .page-fade-leave-to {
   opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-fade-enter-from {
+    transform: none;
+  }
 }
 
 /* Smooth expand/collapse for sidebar groups (grid-rows 0fr -> 1fr) */
