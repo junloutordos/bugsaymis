@@ -31,6 +31,7 @@ const props = defineProps({
 
 const page = usePage()
 const flash = computed(() => page.props.flash ?? {})
+const errors = computed(() => page.props.errors ?? {})
 
 // ── New quiz — title/description only, then hand off to the full builder ──
 const newQuizForm = reactive({ title: '', description: '' })
@@ -146,15 +147,18 @@ function addQuestion() {
   showExplanationEditor.value = false
 }
 
-function onTypeChange() {
-  if (editForm.type === 'true_false') {
+// AppSelect's @change fires before v-model applies, so editForm.type is
+// still the OLD type here — read the fresh value from the event instead.
+function onTypeChange(e) {
+  const type = e.target.value
+  if (type === 'true_false') {
     editForm.options = [
       { option_text: 'True', is_correct: true },
       { option_text: 'False', is_correct: false },
     ]
-  } else if (editForm.type === 'poll') {
+  } else if (type === 'poll') {
     editForm.options = editForm.options.map(o => ({ ...o, is_correct: false }))
-  } else if (editForm.type === 'open_ended') {
+  } else if (type === 'open_ended') {
     editForm.options = []
   } else if (editForm.options.length === 0) {
     editForm.options = [
@@ -366,6 +370,10 @@ const showPreview = ref(false)
         <!-- Right pane — question editor -->
         <AppCard v-if="isNewQuestion || selectedId" :title="isNewQuestion ? 'New Question' : 'Edit Question'">
           <div class="space-y-4">
+            <div v-if="Object.keys(errors).length" class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600 space-y-0.5">
+              <p v-for="(msg, key) in errors" :key="key">{{ msg }}</p>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <AppSelect v-model="editForm.type" label="Question type" :show-blank="false" class="sm:col-span-1" @change="onTypeChange">
                 <option v-for="(label, key) in TYPE_LABELS" :key="key" :value="key">{{ label }}</option>
@@ -382,7 +390,7 @@ const showPreview = ref(false)
               <span><span class="font-semibold text-amber-600">2× Double points</span> — this question is worth twice the score</span>
             </label>
 
-            <AppTextarea v-model="editForm.question_text" label="Question" :rows="2" required />
+            <AppTextarea v-model="editForm.question_text" label="Question" :rows="2" required :error="errors.question_text" />
 
             <label class="block">
               <span class="block text-xs font-medium text-slate-600 mb-1">Image (optional)</span>

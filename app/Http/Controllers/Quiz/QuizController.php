@@ -298,6 +298,9 @@ class QuizController extends Controller
 
     private function validateQuestion(Request $request): array
     {
+        // Choice types are unplayable without at least two options.
+        $choiceType = in_array($request->input('type'), ['mcq', 'true_false', 'checkbox'], true);
+
         return $request->validate([
             'type' => ['required', 'in:mcq,true_false,checkbox,poll,open_ended'],
             'question_text' => ['required', 'string'],
@@ -308,7 +311,7 @@ class QuizController extends Controller
             'explanation_text' => ['nullable', 'string', 'max:2000'],
             'explanation_image_base64' => ['nullable', 'string'],
             'remove_explanation_image' => ['sometimes', 'boolean'],
-            'options' => ['nullable', 'array'],
+            'options' => $choiceType ? ['required', 'array', 'min:2'] : ['nullable', 'array'],
             'options.*.option_text' => ['required_with:options', 'string', 'max:255'],
             'options.*.is_correct' => ['boolean'],
         ]);
