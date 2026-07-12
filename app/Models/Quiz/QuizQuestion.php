@@ -22,6 +22,8 @@ class QuizQuestion extends Model
         'type',
         'question_text',
         'image',
+        'explanation_text',
+        'explanation_image',
         'time_limit_seconds',
         'points_base',
         'double_points',
@@ -54,5 +56,15 @@ class QuizQuestion extends Model
     public function imageUrl(): ?string
     {
         return $this->image ? route('quiz.questions.image', $this) : null;
+    }
+
+    public function explanationImageUrl(): ?string
+    {
+        return $this->explanation_image ? route('quiz.questions.explanation-image', $this) : null;
+    }
+
+    public function hasExplanation(): bool
+    {
+        return filled($this->explanation_text) || filled($this->explanation_image);
     }
 }

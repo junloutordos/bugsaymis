@@ -31,6 +31,8 @@ const streak = ref(0)
 const feedback = ref(null) // { answered, is_correct, points_awarded, timedOut }
 const displayedPoints = ref(0)
 const correctOptionIds = ref([])
+const explanation = ref(null) // { text, image } — arrives with the reveal
+const showingExplanation = ref(false)
 const myRank = ref(null)
 const rankDelta = ref(0)
 const nemesis = ref(null)
@@ -60,6 +62,8 @@ function beginQuestion(question, serverStartedAt, index, total) {
   answerText.value = ''
   feedback.value = null
   correctOptionIds.value = []
+  explanation.value = null
+  showingExplanation.value = false
   confetti.value = false
 
   // "Get ready" intro — the server sets question_started_at in the future so
@@ -176,7 +180,15 @@ function subscribe() {
     if (['leaderboard', 'ended', 'kicked'].includes(uiState.value)) return
     clearInterval(getReadyTimer)
     correctOptionIds.value = payload.correct_option_ids ?? []
+    explanation.value = payload.explanation ?? null
     await showResult(uiState.value === 'question' || uiState.value === 'getready')
+  })
+
+  channel.listen('.explanation.shown', () => {
+    if (uiState.value === 'feedback' && explanation.value) {
+      showingExplanation.value = true
+      play('reveal')
+    }
   })
 
   channel.listen('.leaderboard.updated', (payload) => {
@@ -354,6 +366,37 @@ async function submitAnswer() {
           <LockClosedIcon class="h-12 w-12 mx-auto mb-3 text-white/70 quiz-getready-pulse" />
           <div class="text-2xl font-heading font-bold mb-2">Answer locked in!</div>
           <p class="text-white/60 text-sm">Waiting for the reveal...</p>
+        </div>
+
+        <!-- EXPLANATION (host chose to show the fun fact after the reveal) -->
+        <div v-else-if="uiState === 'feedback' && showingExplanation && explanation" key="explanation" class="w-full max-w-md">
+          <div class="text-center mb-4">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+              :class="feedback?.is_correct === true ? 'bg-emerald-400/20 text-emerald-300'
+                : feedback?.is_correct === false || !feedback?.answered ? 'bg-red-400/20 text-red-300'
+                : 'bg-blue-400/20 text-blue-300'"
+            >
+              <CheckCircleIcon v-if="feedback?.is_correct === true" class="h-4 w-4" />
+              <XCircleIcon v-else-if="feedback?.is_correct === false || !feedback?.answered" class="h-4 w-4" />
+              <CheckCircleIcon v-else class="h-4 w-4" />
+              {{ feedback?.is_correct === true ? `Correct · +${feedback.points_awarded}`
+                : feedback?.is_correct === false ? 'Not quite'
+                : !feedback?.answered ? 'No answer' : 'Answer recorded' }}
+            </span>
+          </div>
+
+          <p class="text-center text-white/60 text-xs uppercase tracking-widest mb-3">💡 Did you know?</p>
+          <div class="bg-white/10 rounded-2xl p-5 quiz-pop">
+            <img
+              v-if="explanation.image"
+              :src="explanation.image"
+              class="max-h-56 w-auto mx-auto rounded-xl mb-3 object-contain"
+            />
+            <p v-if="explanation.text" class="text-base leading-relaxed text-center whitespace-pre-line">{{ explanation.text }}</p>
+          </div>
+
+          <p class="text-white/60 text-sm mt-4 text-center">Waiting for results...</p>
         </div>
 
         <!-- FEEDBACK (only after the host ends the question) -->

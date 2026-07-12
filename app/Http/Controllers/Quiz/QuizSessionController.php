@@ -77,6 +77,14 @@ class QuizSessionController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function showExplanation(QuizSession $session)
+    {
+        $this->authorizeHost($session->host_user_id);
+        $this->sessionService->showExplanation($session);
+
+        return response()->json(['success' => true]);
+    }
+
     public function leaderboard(QuizSession $session)
     {
         $this->authorizeHost($session->host_user_id);
@@ -127,6 +135,7 @@ class QuizSessionController extends Controller
                 'id' => $q->id,
                 'type' => $q->type,
                 'question_text' => $q->question_text,
+                'explanation_text' => $q->explanation_text,
                 'points_base' => $q->points_base,
                 'double_points' => $q->double_points,
                 'is_scored' => $q->isScored(),

@@ -36,6 +36,7 @@ Route::middleware(['web'])
     ->group(function () {
         Route::get('/{quiz}/cover', [QuizController::class, 'showCoverImage'])->name('cover')->where('quiz', '[0-9]+');
         Route::get('/questions/{question}/image', [QuizController::class, 'showQuestionImage'])->name('questions.image');
+        Route::get('/questions/{question}/explanation-image', [QuizController::class, 'showExplanationImage'])->name('questions.explanation-image');
     });
 
 // ── Public — join & play (no auth, PIN-based, mirrors ams evaluate/verify links)
@@ -84,6 +85,7 @@ Route::middleware(['web', 'auth', 'verified', 'permission:quiz.manage|quiz.view_
         Route::delete('/{session}/players/{player}', [QuizSessionController::class, 'kickPlayer'])->name('players.kick');
         Route::post('/{session}/start', [QuizSessionController::class, 'start'])->name('start');
         Route::post('/{session}/end-question', [QuizSessionController::class, 'endQuestion'])->name('end-question');
+        Route::post('/{session}/show-explanation', [QuizSessionController::class, 'showExplanation'])->name('show-explanation');
         Route::post('/{session}/leaderboard', [QuizSessionController::class, 'leaderboard'])->name('leaderboard');
         Route::post('/{session}/next', [QuizSessionController::class, 'next'])->name('next');
         Route::post('/{session}/end', [QuizSessionController::class, 'end'])->name('end');

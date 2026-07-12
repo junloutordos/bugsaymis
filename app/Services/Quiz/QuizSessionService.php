@@ -2,6 +2,7 @@
 
 namespace App\Services\Quiz;
 
+use App\Events\Quiz\QuizExplanationShown;
 use App\Events\Quiz\QuizLeaderboardUpdated;
 use App\Events\Quiz\QuizPlayerJoined;
 use App\Events\Quiz\QuizPlayerKicked;
@@ -153,6 +154,27 @@ class QuizSessionService
             'distribution' => $distribution,
             'answered_count' => $answers->count(),
             'total_players' => $session->players()->count(),
+            // Correct answers are public on this channel from this moment on,
+            // so shipping the explanation with the reveal leaks nothing early —
+            // clients hold it until the host broadcasts explanation.shown.
+            'explanation' => $question->hasExplanation() ? [
+                'text' => $question->explanation_text,
+                'image' => $question->explanationImageUrl(),
+            ] : null,
+        ]));
+    }
+
+    public function showExplanation(QuizSession $session): void
+    {
+        abort_unless($session->status === QuizSession::STATUS_REVEAL, 422, 'Explanations can only be shown during the reveal.');
+
+        $question = $session->quiz->questions->get($session->current_question_index);
+        abort_unless($question && $question->hasExplanation(), 422, 'This question has no explanation.');
+
+        // Content already arrived with the reveal broadcast — this is just the
+        // host's "flip to the explanation" signal for every connected client.
+        broadcast(new QuizExplanationShown($session->game_pin, [
+            'question_id' => $question->id,
         ]));
     }
 

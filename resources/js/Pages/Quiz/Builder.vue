@@ -102,10 +102,15 @@ const blankQuestion = () => ({
     { option_text: '', is_correct: false },
   ],
   image_base64: null,
+  explanation_text: '',
+  explanation_image_base64: null,
+  remove_explanation_image: false,
 })
 
 const editForm = reactive(blankQuestion())
 const imagePreview = ref(null)
+const explanationImagePreview = ref(null)
+const showExplanationEditor = ref(false)
 
 function loadQuestionIntoForm(question) {
   editForm.type = question.type
@@ -115,7 +120,12 @@ function loadQuestionIntoForm(question) {
   editForm.double_points = question.double_points ?? false
   editForm.options = question.options.map(o => ({ option_text: o.option_text, is_correct: o.is_correct }))
   editForm.image_base64 = null
+  editForm.explanation_text = question.explanation_text ?? ''
+  editForm.explanation_image_base64 = null
+  editForm.remove_explanation_image = false
   imagePreview.value = question.image
+  explanationImagePreview.value = question.explanation_image
+  showExplanationEditor.value = !!(question.explanation_text || question.explanation_image)
 }
 
 watch(selectedId, (id) => {
@@ -132,6 +142,8 @@ function addQuestion() {
   selectedId.value = null
   Object.assign(editForm, blankQuestion())
   imagePreview.value = null
+  explanationImagePreview.value = null
+  showExplanationEditor.value = false
 }
 
 function onTypeChange() {
@@ -177,6 +189,24 @@ function pickQuestionImage(e) {
     imagePreview.value = reader.result
   }
   reader.readAsDataURL(file)
+}
+
+function pickExplanationImage(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    editForm.explanation_image_base64 = reader.result
+    editForm.remove_explanation_image = false
+    explanationImagePreview.value = reader.result
+  }
+  reader.readAsDataURL(file)
+}
+
+function removeExplanationImage() {
+  editForm.explanation_image_base64 = null
+  editForm.remove_explanation_image = true
+  explanationImagePreview.value = null
 }
 
 const saving = ref(false)
@@ -298,6 +328,7 @@ const showPreview = ref(false)
               >
                 <span class="text-xs text-slate-400 w-4">{{ i + 1 }}</span>
                 <span class="flex-1 truncate">{{ q.question_text || '(untitled)' }}</span>
+                <span v-if="q.explanation_text || q.explanation_image" class="text-[10px]" title="Has explanation">💡</span>
                 <span v-if="q.double_points" class="text-[10px] font-bold text-amber-500" title="Double points">2×</span>
                 <button type="button" class="text-slate-300 hover:text-slate-600" @click.stop="moveQuestion(i, -1)"><ChevronUpIcon class="h-3.5 w-3.5" /></button>
                 <button type="button" class="text-slate-300 hover:text-slate-600" @click.stop="moveQuestion(i, 1)"><ChevronDownIcon class="h-3.5 w-3.5" /></button>
@@ -393,6 +424,45 @@ const showPreview = ref(false)
                     type="button" class="text-slate-300 hover:text-red-500" @click="removeOption(i)"
                   ><TrashIcon class="h-4 w-4" /></button>
                 </div>
+              </div>
+            </div>
+
+            <!-- Explanation / fun fact — shown by the host after the reveal -->
+            <div class="border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                class="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700"
+                @click="showExplanationEditor = !showExplanationEditor"
+              >
+                <component :is="showExplanationEditor ? ChevronUpIcon : ChevronDownIcon" class="h-4 w-4" />
+                💡 Explanation / fun fact (optional)
+              </button>
+              <p class="text-xs text-slate-400 mt-0.5 ml-5">Shown after the correct answer is revealed, when you choose to display it while hosting.</p>
+
+              <div v-if="showExplanationEditor" class="mt-3 space-y-3">
+                <AppTextarea
+                  v-model="editForm.explanation_text"
+                  label="Explanation"
+                  :rows="3"
+                  maxlength="2000"
+                  placeholder="e.g. The mitochondria converts nutrients into ATP — that's why it's called the powerhouse of the cell."
+                />
+                <label class="block">
+                  <span class="block text-xs font-medium text-slate-600 mb-1">Photo (optional)</span>
+                  <div class="flex items-center gap-3">
+                    <div v-if="explanationImagePreview" class="h-16 w-24 rounded-lg overflow-hidden bg-slate-100">
+                      <img :src="explanationImagePreview" class="h-full w-full object-cover" />
+                    </div>
+                    <AppButton size="sm" variant="secondary" type="button" @click="$refs.expImageInput.click()">
+                      <PhotoIcon class="h-4 w-4" /> Upload
+                    </AppButton>
+                    <button
+                      v-if="explanationImagePreview"
+                      type="button" class="text-xs text-red-500 hover:underline" @click="removeExplanationImage"
+                    >Remove</button>
+                    <input ref="expImageInput" type="file" accept="image/*" class="hidden" @change="pickExplanationImage" />
+                  </div>
+                </label>
               </div>
             </div>
 

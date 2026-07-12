@@ -101,6 +101,8 @@ class QuizController extends Controller
                     'type' => $q->type,
                     'question_text' => $q->question_text,
                     'image' => $q->imageUrl(),
+                    'explanation_text' => $q->explanation_text,
+                    'explanation_image' => $q->explanationImageUrl(),
                     'time_limit_seconds' => $q->time_limit_seconds,
                     'points_base' => $q->points_base,
                     'double_points' => $q->double_points,
@@ -203,6 +205,10 @@ class QuizController extends Controller
                 'image' => !empty($data['image_base64'])
                     ? $this->storeBase64Image($data['image_base64'], 'quiz-questions')
                     : null,
+                'explanation_text' => $data['explanation_text'] ?? null,
+                'explanation_image' => !empty($data['explanation_image_base64'])
+                    ? $this->storeBase64Image($data['explanation_image_base64'], 'quiz-explanations')
+                    : null,
             ]);
 
             $this->syncOptions($question, $data['options'] ?? []);
@@ -224,10 +230,17 @@ class QuizController extends Controller
                 'time_limit_seconds' => $data['time_limit_seconds'],
                 'points_base' => $data['points_base'],
                 'double_points' => (bool) ($data['double_points'] ?? false),
+                'explanation_text' => $data['explanation_text'] ?? null,
             ];
 
             if (!empty($data['image_base64'])) {
                 $update['image'] = $this->storeBase64Image($data['image_base64'], 'quiz-questions');
+            }
+
+            if (!empty($data['explanation_image_base64'])) {
+                $update['explanation_image'] = $this->storeBase64Image($data['explanation_image_base64'], 'quiz-explanations');
+            } elseif (!empty($data['remove_explanation_image'])) {
+                $update['explanation_image'] = null;
             }
 
             $question->update($update);
@@ -270,6 +283,11 @@ class QuizController extends Controller
         return $this->streamS3($question->image);
     }
 
+    public function showExplanationImage(QuizQuestion $question): Response
+    {
+        return $this->streamS3($question->explanation_image);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private function authorizeOwner(Quiz $quiz): void
@@ -287,6 +305,9 @@ class QuizController extends Controller
             'points_base' => ['required', 'integer', 'min:0', 'max:2000'],
             'double_points' => ['sometimes', 'boolean'],
             'image_base64' => ['nullable', 'string'],
+            'explanation_text' => ['nullable', 'string', 'max:2000'],
+            'explanation_image_base64' => ['nullable', 'string'],
+            'remove_explanation_image' => ['sometimes', 'boolean'],
             'options' => ['nullable', 'array'],
             'options.*.option_text' => ['required_with:options', 'string', 'max:255'],
             'options.*.is_correct' => ['boolean'],

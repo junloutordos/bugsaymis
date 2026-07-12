@@ -154,6 +154,10 @@ function exportCsv() {
               </div>
             </div>
 
+            <div v-if="q.explanation_text" class="mt-2 bg-indigo-50/60 rounded-lg px-3 py-2 text-sm text-slate-600">
+              <span class="font-semibold text-indigo-600">💡</span> {{ q.explanation_text }}
+            </div>
+
             <p class="text-xs text-slate-400 mt-2">
               {{ q.answered_count }} answered{{ q.avg_response_ms !== null ? ` · avg ${(q.avg_response_ms / 1000).toFixed(1)}s` : '' }}
             </p>

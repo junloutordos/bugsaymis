@@ -35,6 +35,8 @@ const answeredCount = ref(0)
 const totalPlayers = ref(players.value.length)
 const distribution = ref({})
 const correctOptionIds = ref([])
+const explanation = ref(null) // { text, image } — arrives with the reveal
+const showingExplanation = ref(false)
 const leaderboard = ref([])
 const podium = ref([])
 const acting = ref(false)
@@ -55,6 +57,8 @@ function beginQuestion(payload) {
   answeredCount.value = 0
   distribution.value = {}
   correctOptionIds.value = []
+  explanation.value = null
+  showingExplanation.value = false
   stopLobbyLoop()
 
   clearInterval(getReadyTimer)
@@ -109,7 +113,13 @@ onMounted(() => {
     correctOptionIds.value = payload.correct_option_ids
     answeredCount.value = payload.answered_count
     totalPlayers.value = payload.total_players
+    explanation.value = payload.explanation ?? null
+    showingExplanation.value = false
     play('reveal')
+  })
+
+  channel.listen('.explanation.shown', () => {
+    showingExplanation.value = true
   })
 
   channel.listen('.leaderboard.updated', (payload) => {
@@ -144,6 +154,7 @@ async function act(url) {
 
 const startSession = () => act(route('quiz.sessions.start', props.session.id))
 const endQuestion = () => act(route('quiz.sessions.end-question', props.session.id))
+const showExplanation = () => act(route('quiz.sessions.show-explanation', props.session.id))
 const showLeaderboard = () => act(route('quiz.sessions.leaderboard', props.session.id))
 const nextQuestion = () => act(route('quiz.sessions.next', props.session.id))
 
@@ -290,35 +301,57 @@ function onWinnerRevealed() {
 
         <!-- REVEAL — answer distribution chart, correct answer highlighted -->
         <div v-else-if="status === 'reveal'" key="reveal" class="w-full max-w-3xl">
-          <h2 class="text-xl font-heading font-semibold text-center mb-2">Results</h2>
-          <p v-if="currentQuestion" class="text-center text-white/70 mb-6">{{ currentQuestion.question_text }}</p>
 
-          <div v-if="currentQuestion?.options?.length" class="space-y-3 mb-8">
-            <div
-              v-for="(opt, i) in currentQuestion.options" :key="opt.id"
-              class="rounded-xl px-4 py-3 transition-all"
-              :class="correctOptionIds.length && !correctOptionIds.includes(opt.id) ? 'bg-white/5 opacity-60' : 'bg-white/10'"
-            >
-              <div class="flex items-center gap-3 mb-2">
-                <span :class="['h-4 w-4 rounded shrink-0', TILE_COLORS[(opt.tile_index ?? i) % 6]]" />
-                <span class="flex-1 truncate font-medium">{{ opt.option_text }}</span>
-                <CheckIcon v-if="correctOptionIds.includes(opt.id)" class="h-5 w-5 text-emerald-400 quiz-pop" />
-                <span class="font-semibold text-sm">{{ distribution[opt.id] ?? 0 }}</span>
-              </div>
-              <div class="h-2.5 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  class="h-full rounded-full quiz-bar"
-                  :class="correctOptionIds.includes(opt.id) ? 'bg-emerald-400' : TILE_COLORS[(opt.tile_index ?? i) % 6]"
-                  :style="{ width: `${((distribution[opt.id] ?? 0) / maxDistribution) * 100}%` }"
-                />
+          <!-- Explanation card — host chose to show the fun fact -->
+          <template v-if="showingExplanation && explanation">
+            <p class="text-center text-white/60 text-sm uppercase tracking-widest mb-2">💡 Did you know?</p>
+            <h2 v-if="currentQuestion" class="text-lg font-heading font-semibold text-center text-white/80 mb-6">{{ currentQuestion.question_text }}</h2>
+            <div class="bg-white/10 rounded-2xl p-6 mb-8 quiz-pop">
+              <img
+                v-if="explanation.image"
+                :src="explanation.image"
+                class="max-h-72 w-auto mx-auto rounded-xl mb-4 object-contain"
+              />
+              <p v-if="explanation.text" class="text-lg leading-relaxed text-center whitespace-pre-line">{{ explanation.text }}</p>
+            </div>
+            <div class="flex items-center justify-center gap-3">
+              <AppButton variant="secondary" @click="showingExplanation = false">Back to Results</AppButton>
+              <AppButton variant="success" size="lg" :loading="acting" @click="showLeaderboard">Show Leaderboard</AppButton>
+            </div>
+          </template>
+
+          <template v-else>
+            <h2 class="text-xl font-heading font-semibold text-center mb-2">Results</h2>
+            <p v-if="currentQuestion" class="text-center text-white/70 mb-6">{{ currentQuestion.question_text }}</p>
+
+            <div v-if="currentQuestion?.options?.length" class="space-y-3 mb-8">
+              <div
+                v-for="(opt, i) in currentQuestion.options" :key="opt.id"
+                class="rounded-xl px-4 py-3 transition-all"
+                :class="correctOptionIds.length && !correctOptionIds.includes(opt.id) ? 'bg-white/5 opacity-60' : 'bg-white/10'"
+              >
+                <div class="flex items-center gap-3 mb-2">
+                  <span :class="['h-4 w-4 rounded shrink-0', TILE_COLORS[(opt.tile_index ?? i) % 6]]" />
+                  <span class="flex-1 truncate font-medium">{{ opt.option_text }}</span>
+                  <CheckIcon v-if="correctOptionIds.includes(opt.id)" class="h-5 w-5 text-emerald-400 quiz-pop" />
+                  <span class="font-semibold text-sm">{{ distribution[opt.id] ?? 0 }}</span>
+                </div>
+                <div class="h-2.5 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    class="h-full rounded-full quiz-bar"
+                    :class="correctOptionIds.includes(opt.id) ? 'bg-emerald-400' : TILE_COLORS[(opt.tile_index ?? i) % 6]"
+                    :style="{ width: `${((distribution[opt.id] ?? 0) / maxDistribution) * 100}%` }"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <p class="text-center text-white/70 mb-6">{{ answeredCount }} / {{ totalPlayers }} answered</p>
-          <div class="text-center">
-            <AppButton variant="success" size="lg" :loading="acting" @click="showLeaderboard">Show Leaderboard</AppButton>
-          </div>
+            <p class="text-center text-white/70 mb-6">{{ answeredCount }} / {{ totalPlayers }} answered</p>
+            <div class="flex items-center justify-center gap-3">
+              <AppButton v-if="explanation" variant="secondary" :loading="acting" @click="showExplanation">💡 Show Explanation</AppButton>
+              <AppButton variant="success" size="lg" :loading="acting" @click="showLeaderboard">Show Leaderboard</AppButton>
+            </div>
+          </template>
         </div>
 
         <!-- LEADERBOARD -->
