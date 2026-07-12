@@ -228,16 +228,16 @@ const taskProgressPct = computed(() => {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-slate-100">
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Division</th>
+                <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Division</th>
                 <th v-for="(col, key) in { headcount: 'Headcount', leaveDaysPerEmp: 'Leave d/emp (YTD)', ipcrRate: 'IPCR %', requestRate: 'Request completion %' }"
-                    :key="key" class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer select-none hover:text-indigo-600"
+                    :key="key" class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-indigo-600"
                     @click="sortBy(key)">
                   {{ col }} <span v-if="sortKey === key">{{ sortDesc ? '▾' : '▴' }}</span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in sortedScorecard" :key="row.division" class="border-b border-slate-50 hover:bg-slate-50/60">
+              <tr v-for="row in sortedScorecard" :key="row.division" class="border-b border-slate-50 hover:bg-indigo-50/40">
                 <td class="px-4 py-2.5 font-medium text-slate-700">{{ row.division }}</td>
                 <td class="px-4 py-2.5 text-right text-slate-600">{{ row.headcount }}</td>
                 <td class="px-4 py-2.5 text-right text-slate-600">{{ row.leaveDaysPerEmp }}</td>
@@ -266,15 +266,15 @@ const taskProgressPct = computed(() => {
         <AppCard title="Workforce & Leave" subtitle="Headcount, leave activity, today's attendance" class="exec-section">
           <div class="grid grid-cols-2 gap-4">
             <div v-if="!lens?.division">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">By division</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">By division</p>
               <div style="height: 200px"><Bar :data="wfDivisionChart" :options="hBarOptions" /></div>
             </div>
             <div v-else>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">By category</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">By category</p>
               <div style="height: 200px"><Doughnut :data="wfCategoryChart" :options="doughnutOptions" /></div>
             </div>
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Leave filed — 12 months</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Leave filed — 12 months</p>
               <div style="height: 200px"><Line :data="leaveTrendChart" :options="lineOptions" /></div>
             </div>
           </div>
@@ -290,14 +290,14 @@ const taskProgressPct = computed(() => {
         <AppCard title="Performance Management" :subtitle="`IPCR — ${performance?.currentPeriod?.label ?? 'no open period'}`" class="exec-section">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Submission funnel</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Submission funnel</p>
               <div style="height: 200px">
                 <Doughnut v-if="Object.keys(performance?.funnel ?? {}).length" :data="ipcrFunnelChart" :options="doughnutOptions" />
                 <EmptyState v-else title="No IPCRs yet for this period" />
               </div>
             </div>
             <div v-if="!lens?.division">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Compliance % by division</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Compliance % by division</p>
               <div style="height: 200px"><Bar :data="complianceChart" :options="{ ...hBarOptions, scales: { x: { min: 0, max: 100 } } }" /></div>
             </div>
             <div v-else class="flex flex-col justify-center items-center text-center">
@@ -315,11 +315,11 @@ const taskProgressPct = computed(() => {
         <AppCard title="Requests & Service Delivery" subtitle="Across IT, Facility, Vehicle, Service, Work, and Travel" class="exec-section">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Open vs completed</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Open vs completed</p>
               <div style="height: 210px"><Bar :data="requestBarChart" :options="requestBarOptions" /></div>
             </div>
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Volume — 6 months</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Volume — 6 months</p>
               <div style="height: 210px"><Line :data="requestTrendChart" :options="lineOptions" /></div>
             </div>
           </div>
@@ -332,7 +332,7 @@ const taskProgressPct = computed(() => {
 
         <!-- 4. Client Satisfaction -->
         <AppCard title="Client Satisfaction (CSM)" :subtitle="`${satisfaction?.responses ?? 0} responses — overall ${satisfaction?.overall ?? '—'} (${satisfaction?.adjectival ?? '—'})`" class="exec-section">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Service quality dimensions (1–5)</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Service quality dimensions (1–5)</p>
           <div style="height: 230px"><Bar :data="sqdChart" :options="sqdOptions" /></div>
           <div v-if="(satisfaction?.byOffice ?? []).length" class="mt-3 flex flex-wrap gap-2">
             <span v-for="o in satisfaction.byOffice" :key="o.label" class="text-[11px] bg-slate-50 border border-slate-100 rounded-full px-2.5 py-1 text-slate-600">
@@ -345,11 +345,11 @@ const taskProgressPct = computed(() => {
         <AppCard title="Academics" subtitle="Enrollment, faculty loading, class records" class="exec-section">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Enrolled by grade ({{ academics?.enrolledTotal ?? 0 }} total)</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Enrolled by grade ({{ academics?.enrolledTotal ?? 0 }} total)</p>
               <div style="height: 200px"><Bar :data="enrollmentChart" :options="vBarOptions" /></div>
             </div>
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Faculty load status</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Faculty load status</p>
               <div style="height: 200px">
                 <Doughnut v-if="Object.keys(academics?.facultyLoad ?? {}).length" :data="loadChart" :options="doughnutOptions" />
                 <EmptyState v-else title="No faculty loads this term" />
@@ -364,7 +364,7 @@ const taskProgressPct = computed(() => {
 
         <!-- 6. Recruitment -->
         <AppCard title="Recruitment" :subtitle="`${recruitment?.openVacancies ?? 0} open vacancies`" class="exec-section">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Application pipeline</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Application pipeline</p>
           <div style="height: 200px">
             <Doughnut v-if="Object.keys(recruitment?.pipeline ?? {}).length" :data="pipelineChart" :options="doughnutOptions" />
             <EmptyState v-else title="No applications in the pipeline" />
@@ -379,7 +379,7 @@ const taskProgressPct = computed(() => {
         <AppCard title="Finance Snapshot" subtitle="Payroll and procurement" class="exec-section">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Latest payroll run</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Latest payroll run</p>
               <template v-if="finance?.latestRun">
                 <p class="text-lg font-bold text-slate-800">{{ peso(finance.latestRun.total_net) }}</p>
                 <p class="text-xs text-slate-500">{{ finance.latestRun.month }}/{{ finance.latestRun.year }} ({{ finance.latestRun.period }}) — {{ finance.latestRun.employee_count }} employees · <AppBadge color="blue">{{ finance.latestRun.status }}</AppBadge></p>
@@ -391,7 +391,7 @@ const taskProgressPct = computed(() => {
               </div>
             </div>
             <div v-if="(finance?.netTrend ?? []).length">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Net payroll — 6 months</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Net payroll — 6 months</p>
               <div style="height: 180px"><Line :data="netTrendChart" :options="lineOptions" /></div>
             </div>
           </div>

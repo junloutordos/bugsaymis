@@ -15,34 +15,34 @@
 
       <!-- Summary cards -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-indigo-600">{{ summary.filed }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Filed</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-success-600">{{ summary.approved }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Approved</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-warning-600">{{ summary.review }}</p>
           <p class="text-xs text-slate-500 mt-0.5">For Review</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-slate-500">{{ summary.draft }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Draft</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-slate-700">{{ summary.filers }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Total Filed</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-danger-500">{{ summary.nonFilers }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Non-Filers</p>
         </div>
       </div>
 
       <!-- Compliance gauge -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
         <div class="flex items-center justify-between mb-2">
           <p class="text-sm font-semibold text-slate-700">Compliance Rate</p>
           <p class="text-sm font-bold"
@@ -67,15 +67,15 @@
       <AppTable :is-empty="detail.length === 0" :skeleton-cols="5">
         <template #head>
           <tr>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Worth</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Filed Date</th>
-            <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Net Worth</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Filed Date</th>
+            <th class="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="row in detail" :key="row.id" class="hover:bg-slate-50/60">
+        <tr v-for="row in detail" :key="row.id" class="hover:bg-indigo-50/40">
           <td class="px-5 py-3">
             <Link :href="route('saln.hr.employee', row.user?.id)"
               class="font-medium text-indigo-600 hover:text-indigo-800">

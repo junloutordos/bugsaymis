@@ -77,16 +77,16 @@ function outcomeTypeColor(type) {
       <AppTable :is-empty="filteredOutcomes.length === 0" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Outcome</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sub-Outcome</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created At</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Outcome</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Sub-Outcome</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Type</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Created At</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Action</th>
           </tr>
         </template>
 
-        <tr v-for="outcome in filteredOutcomes" :key="outcome.id" class="hover:bg-slate-50/60">
+        <tr v-for="outcome in filteredOutcomes" :key="outcome.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.id }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.outcome }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.sub_outcome ?? '—' }}</td>

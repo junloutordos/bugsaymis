@@ -268,7 +268,7 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
         </template>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-slate-100">
-            <thead class="bg-slate-50">
+            <thead class="bg-slate-50/80">
               <tr>
                 <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Date</th>
                 <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Places to be visited</th>

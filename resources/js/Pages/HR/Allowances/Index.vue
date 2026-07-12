@@ -192,7 +192,7 @@ function toggleActive(type) {
           <tr
             v-for="type in filteredTypes"
             :key="type.id"
-            class="hover:bg-slate-50/60 transition"
+            class="hover:bg-indigo-50/40 transition"
           >
             <!-- Code -->
             <td class="px-4 py-3 text-sm font-mono font-medium text-slate-700">

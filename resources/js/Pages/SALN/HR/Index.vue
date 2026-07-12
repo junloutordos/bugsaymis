@@ -43,17 +43,17 @@
       <AppTable :is-empty="records.data.length === 0" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Year</th>
-            <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Assets</th>
-            <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Liabilities</th>
-            <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Worth</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Year</th>
+            <th class="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Assets</th>
+            <th class="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Liabilities</th>
+            <th class="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Net Worth</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="rec in records.data" :key="rec.id" class="hover:bg-slate-50/60">
+        <tr v-for="rec in records.data" :key="rec.id" class="hover:bg-indigo-50/40">
           <td class="px-5 py-3">
             <Link :href="route('saln.hr.employee', rec.user?.id)"
               class="font-medium text-indigo-600 hover:text-indigo-800">

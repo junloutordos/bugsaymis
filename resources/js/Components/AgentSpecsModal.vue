@@ -180,7 +180,7 @@ const checkinStaleBadge = computed(() => {
             <CpuChipIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
               <div class="flex items-center justify-between">
-                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</div>
+                <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">CPU</div>
                 <div v-if="equipment.agent_device.health_snapshot.payload?.cpu_temp_c" class="text-xs text-slate-500 flex items-center gap-1">
                   <FireIcon class="w-3.5 h-3.5 text-slate-400" />
                   {{ equipment.agent_device.health_snapshot.payload.cpu_temp_c }}&deg;C
@@ -208,7 +208,7 @@ const checkinStaleBadge = computed(() => {
             <WifiIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
               <div class="flex items-center justify-between">
-                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Network</div>
+                <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Network</div>
                 <span v-if="equipment.agent_device.health_snapshot.payload.network.link_up === false" class="text-[11px] font-medium text-red-600">Link Down</span>
               </div>
               <div class="mt-0.5 text-sm text-slate-700 space-x-3">
@@ -242,7 +242,7 @@ const checkinStaleBadge = computed(() => {
           >
             <ServerStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
-              <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Services</div>
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Services</div>
               <div class="flex flex-wrap gap-1.5 items-center">
                 <span
                   v-for="svc in equipment.agent_device.health_snapshot.payload.services"
@@ -261,7 +261,7 @@ const checkinStaleBadge = computed(() => {
           >
             <BoltIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
-              <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Battery</div>
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Battery</div>
               <template v-if="batteryWearPct(equipment.agent_device.hardware_inventory.battery) !== null">
                 <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                   <div
@@ -283,7 +283,7 @@ const checkinStaleBadge = computed(() => {
           >
             <ShieldCheckIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
-              <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Security</div>
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Security</div>
               <div class="grid grid-cols-2 gap-1 text-xs">
                 <div :class="securityRowClass(equipment.agent_device.security_status.antivirus_enabled)">
                   Antivirus: {{ equipment.agent_device.security_status.antivirus_enabled === false ? 'Disabled' : equipment.agent_device.security_status.antivirus_enabled === true ? 'Enabled' : '—' }}
@@ -310,7 +310,7 @@ const checkinStaleBadge = computed(() => {
             <Square3Stack3DIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
               <div class="flex items-center justify-between">
-                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">RAM</div>
+                <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">RAM</div>
                 <div class="text-xs text-slate-500">
                   {{ Math.round(equipment.agent_device.health_snapshot.payload.ram_free_mb / 1024) }} GB free of
                   {{ Math.round(equipment.agent_device.health_snapshot.payload.ram_total_mb / 1024) }} GB
@@ -330,7 +330,7 @@ const checkinStaleBadge = computed(() => {
           <div class="border border-slate-100 rounded-lg p-3 flex items-start gap-3">
             <CircleStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
-              <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Disks</div>
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Disks</div>
               <div v-if="!equipment.agent_device.health_snapshot.payload?.disks?.length" class="text-sm text-slate-400">—</div>
               <div v-else class="space-y-2.5">
                 <div v-for="disk in equipment.agent_device.health_snapshot.payload.disks" :key="disk.drive">
@@ -378,7 +378,7 @@ const checkinStaleBadge = computed(() => {
           >
             <ServerStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
-              <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Printers</div>
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Printers</div>
               <div class="space-y-2">
                 <div
                   v-for="printer in equipment.agent_device.health_snapshot.payload.printers"
@@ -405,7 +405,7 @@ const checkinStaleBadge = computed(() => {
           >
             <ArchiveBoxIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
             <div class="flex-1">
-              <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 Installed Software ({{ equipment.agent_device.software_inventory.installed_software.length }})
               </div>
               <div class="relative mb-2">

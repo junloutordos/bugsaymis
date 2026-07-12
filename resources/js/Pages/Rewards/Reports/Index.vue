@@ -26,12 +26,12 @@
           <AppTable v-if="awardsByIncentive.length" :is-empty="false" :card="false">
             <template #head>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Incentive Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Count</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Total Value</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Incentive Type</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Count</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Total Value</th>
               </tr>
             </template>
-            <tr v-for="row in awardsByIncentive" :key="row.incentive_type" class="hover:bg-slate-50/60">
+            <tr v-for="row in awardsByIncentive" :key="row.incentive_type" class="hover:bg-indigo-50/40">
               <td class="px-4 py-3 text-sm text-slate-700 capitalize">{{ row.incentive_type.replace('_', ' ') }}</td>
               <td class="px-4 py-3 text-sm font-medium text-slate-800">{{ row.count }}</td>
               <td class="px-4 py-3 text-sm text-slate-700">
@@ -47,16 +47,16 @@
       <AppTable :is-empty="!nominations.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Nominee</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Award</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Period</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Incentive</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Award Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Nominee</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Award</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Period</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Incentive</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Award Date</th>
           </tr>
         </template>
 
-        <tr v-for="n in nominations" :key="n.id" class="hover:bg-slate-50/60">
+        <tr v-for="n in nominations" :key="n.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm font-medium text-slate-800">{{ n.nominee?.name }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ n.reward_type?.name }}</td>
           <td class="px-4 py-3 text-sm text-slate-500">{{ n.period ?? '—' }}</td>

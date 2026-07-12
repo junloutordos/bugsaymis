@@ -128,17 +128,17 @@ function attendanceColor(attended) {
       <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Venue</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Evaluated</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Certificate</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Activity</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Venue</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Evaluated</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Certificate</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="a in displayed" :key="a.id" class="hover:bg-slate-50/60">
+        <tr v-for="a in displayed" :key="a.id" class="hover:bg-indigo-50/40">
           <!-- Title -->
           <td class="px-4 py-3 font-medium text-slate-800 max-w-xs">
             {{ a.title }}

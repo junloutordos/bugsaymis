@@ -49,10 +49,10 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
       <!-- Hall Stats Cards -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div v-for="hall in stats" :key="hall.hall"
-             :class="['bg-white rounded-xl border border-slate-100 shadow-sm border-l-4 p-5', hallColor(hall.hall)]">
+             :class="['bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 border-l-4 p-5', hallColor(hall.hall)]">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ hall.hall }}</span>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{{ hall.hall }}</span>
               <h2 class="text-base font-semibold text-slate-800">{{ hall.label }}</h2>
             </div>
             <HomeModernIcon class="w-8 h-8 text-slate-300" />
@@ -96,29 +96,29 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
       <!-- Quick Nav -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link :href="route('rh.applications.index')"
-              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 hover:border-indigo-300 transition-colors">
           <DocumentTextIcon class="w-6 h-6 text-indigo-500" />
           <span class="text-xs font-medium text-slate-700">Applications</span>
         </Link>
         <Link :href="route('rh.interns.index')"
-              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 hover:border-indigo-300 transition-colors">
           <UserGroupIcon class="w-6 h-6 text-indigo-500" />
           <span class="text-xs font-medium text-slate-700">Dormers</span>
         </Link>
         <Link :href="route('rh.rooms.index')"
-              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 hover:border-indigo-300 transition-colors">
           <HomeModernIcon class="w-6 h-6 text-indigo-500" />
           <span class="text-xs font-medium text-slate-700">Rooms</span>
         </Link>
         <Link href="#"
-              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm opacity-50 cursor-not-allowed">
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 opacity-50 cursor-not-allowed">
           <ClipboardDocumentListIcon class="w-6 h-6 text-slate-400" />
           <span class="text-xs font-medium text-slate-500">Housekeeping</span>
         </Link>
       </div>
 
       <!-- Recent Pending Applications -->
-      <div v-if="recentApplications.length" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-if="recentApplications.length" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-slate-700">Pending Applications</h3>
           <Link :href="route('rh.applications.index')" class="text-xs text-indigo-600 hover:underline">View all</Link>
@@ -139,7 +139,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
         </div>
       </div>
 
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-else class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState :title="`No pending applications for ${currentSy || 'the current school year'}`" />
       </div>
 

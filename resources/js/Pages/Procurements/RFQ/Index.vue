@@ -73,18 +73,18 @@ const statusColor = (status) => {
             <AppTable :is-empty="!displayed.length" :skeleton-cols="8">
                 <template #head>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">RFQ No.</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PR Reference</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose</th>
-                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Suppliers</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Awarded</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">RFQ No.</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PR Reference</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Purpose</th>
+                        <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Suppliers</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Awarded</th>
                         <th class="px-4 py-3"></th>
                     </tr>
                 </template>
 
-                <tr v-for="rfq in displayed" :key="rfq.id" class="hover:bg-slate-50/60">
+                <tr v-for="rfq in displayed" :key="rfq.id" class="hover:bg-indigo-50/40">
                     <td class="px-4 py-3 font-mono text-sm font-medium text-slate-800">{{ rfq.rfq_number }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600 font-mono">{{ rfq.pr_no || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-700 max-w-xs truncate">{{ rfq.purpose || '—' }}</td>

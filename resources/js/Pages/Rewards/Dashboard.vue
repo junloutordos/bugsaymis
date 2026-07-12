@@ -90,7 +90,7 @@ function formatDate(d) {
 const StatCard = {
   props: ['label', 'value', 'color'],
   template: `
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
       <p class="text-2xl font-bold" :class="'text-' + color + '-600'">{{ value }}</p>
       <p class="mt-1 text-xs text-slate-500">{{ label }}</p>
     </div>
@@ -100,7 +100,7 @@ const QuickLink = {
   props: ['href', 'label', 'icon'],
   template: `
     <a :href="href"
-      class="flex items-center gap-3 bg-white rounded-xl border border-slate-100 shadow-sm p-4 hover:bg-slate-50 transition-colors">
+      class="flex items-center gap-3 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 hover:bg-slate-50 transition-colors">
       <span class="text-2xl">{{ icon }}</span>
       <span class="text-sm font-medium text-slate-700">{{ label }}</span>
     </a>

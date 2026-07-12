@@ -24,19 +24,19 @@
       <AppTable :is-empty="!runs.data?.length" :skeleton-cols="9">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Control No.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Period</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Pay Date</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employees</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Gross Pay</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Deductions</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Net Pay</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Control No.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Period</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Pay Date</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Employees</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Gross Pay</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Deductions</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Net Pay</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="run in runs.data" :key="run.id" class="hover:bg-slate-50/60">
+        <tr v-for="run in runs.data" :key="run.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-mono text-slate-700 font-medium">{{ run.control_no }}</td>
           <td class="px-4 py-3">
             <div class="font-medium text-slate-800">{{ monthName(run.month) }} {{ run.year }}</div>

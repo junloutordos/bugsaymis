@@ -134,7 +134,7 @@ const ratingLabel = (v) => {
                     <template v-if="activeTab === 'academic'">
                         <!-- Academic Standing per year -->
                         <section>
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Academic Standing</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Academic Standing</h3>
                             <div v-if="academicStanding.length === 0" class="text-sm text-slate-400">No data recorded.</div>
                             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <div v-for="r in academicStanding" :key="r.id" class="bg-slate-50 rounded-lg p-3 text-sm">
@@ -148,7 +148,7 @@ const ratingLabel = (v) => {
 
                         <!-- Subject Preferences -->
                         <section v-if="academicPrefs.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Subject Preferences per Year</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Subject Preferences per Year</h3>
                             <div class="space-y-3">
                                 <details v-for="group in academicPrefs" :key="group.level" class="bg-slate-50 rounded-lg">
                                     <summary class="px-4 py-2 text-sm font-medium text-slate-700 cursor-pointer">{{ group.label }}</summary>
@@ -168,7 +168,7 @@ const ratingLabel = (v) => {
                     <!-- ── ACTIVITIES ── -->
                     <template v-if="activeTab === 'activities'">
                         <section v-if="clubs.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Club Memberships</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Club Memberships</h3>
                             <div class="space-y-2">
                                 <details v-for="g in clubs" :key="g.level" class="bg-slate-50 rounded-lg">
                                     <summary class="px-4 py-2 text-sm font-medium text-slate-700 cursor-pointer">{{ g.label }}</summary>
@@ -185,7 +185,7 @@ const ratingLabel = (v) => {
                         </section>
 
                         <section v-if="awards.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Awards & Competitions</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Awards & Competitions</h3>
                             <div class="space-y-2">
                                 <details v-for="g in awards" :key="g.level" class="bg-slate-50 rounded-lg">
                                     <summary class="px-4 py-2 text-sm font-medium text-slate-700 cursor-pointer">{{ g.label }}</summary>
@@ -203,7 +203,7 @@ const ratingLabel = (v) => {
                         </section>
 
                         <section v-if="activities.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Activity Participations</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Activity Participations</h3>
                             <div class="space-y-2">
                                 <details v-for="g in activities" :key="g.level" class="bg-slate-50 rounded-lg">
                                     <summary class="px-4 py-2 text-sm font-medium text-slate-700 cursor-pointer">{{ g.label }}</summary>
@@ -226,7 +226,7 @@ const ratingLabel = (v) => {
                     <!-- ── SOCIAL / PERSONALITY ── -->
                     <template v-if="activeTab === 'social'">
                         <section v-if="personality.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Personality Traits</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Personality Traits</h3>
                             <div class="space-y-2">
                                 <div v-for="g in personality" :key="g.level" class="bg-slate-50 rounded-lg p-3">
                                     <p class="text-xs font-semibold text-slate-500 mb-1">{{ g.label }}</p>
@@ -236,7 +236,7 @@ const ratingLabel = (v) => {
                         </section>
 
                         <section v-if="selfAssessment.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Self-Assessment (1=Excellent, 5=Poor)</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Self-Assessment (1=Excellent, 5=Poor)</h3>
                             <div class="space-y-2">
                                 <details v-for="g in selfAssessment" :key="g.level" class="bg-slate-50 rounded-lg">
                                     <summary class="px-4 py-2 text-sm font-medium text-slate-700 cursor-pointer">{{ g.label }}</summary>
@@ -254,7 +254,7 @@ const ratingLabel = (v) => {
                         </section>
 
                         <section v-if="selfStatements.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Self-Completion Statements</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Self-Completion Statements</h3>
                             <div class="space-y-2">
                                 <details v-for="g in selfStatements" :key="g.level" class="bg-slate-50 rounded-lg">
                                     <summary class="px-4 py-2 text-sm font-medium text-slate-700 cursor-pointer">{{ g.label }}</summary>
@@ -269,7 +269,7 @@ const ratingLabel = (v) => {
                         </section>
 
                         <section v-if="talents.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Talents & Hobbies</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Talents & Hobbies</h3>
                             <div class="space-y-2">
                                 <div v-for="g in talents" :key="g.level" class="bg-slate-50 rounded-lg p-3">
                                     <p class="text-xs font-semibold text-slate-500 mb-1">{{ g.label }}</p>
@@ -281,7 +281,7 @@ const ratingLabel = (v) => {
                         </section>
 
                         <section v-if="bestFriends.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Friends</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Friends</h3>
                             <div class="space-y-2">
                                 <div v-for="g in bestFriends" :key="g.level" class="bg-slate-50 rounded-lg p-3">
                                     <p class="text-xs font-semibold text-slate-500 mb-1">{{ g.label }}</p>
@@ -296,7 +296,7 @@ const ratingLabel = (v) => {
                     <!-- ── CAREER ── -->
                     <template v-if="activeTab === 'career'">
                         <section v-if="vocational.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Vocational / Career Choices</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Vocational / Career Choices</h3>
                             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <div v-for="g in vocational" :key="g.level">
                                     <div v-for="r in g.rows" :key="r.id" class="bg-slate-50 rounded-lg p-3 text-sm">
@@ -313,7 +313,7 @@ const ratingLabel = (v) => {
                     <!-- ── RESIDENCE ── -->
                     <template v-if="activeTab === 'residence'">
                         <section v-if="residence.length">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Residence & Transportation</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Residence & Transportation</h3>
                             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <div v-for="g in residence" :key="g.level">
                                     <div v-for="r in g.rows" :key="r.id" class="bg-slate-50 rounded-lg p-3 text-sm">
@@ -330,7 +330,7 @@ const ratingLabel = (v) => {
                     <!-- ── HEALTH (physical, via egcu_health) ── -->
                     <template v-if="activeTab === 'health'">
                         <div class="flex items-start justify-between">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Physical Health per Year</h3>
+                            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Physical Health per Year</h3>
                             <a :href="route('students.health.show', student.pisaysystemID)" class="text-xs text-rose-600 hover:text-rose-800 font-medium">
                                 Full Medical Records →
                             </a>

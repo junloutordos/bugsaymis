@@ -38,15 +38,15 @@
 
       <!-- Net Worth Summary Bar -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Real Properties</p>
           <p class="text-base font-bold text-slate-800 mt-1">{{ fmtMoney(saln.total_real_properties) }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Personal Properties</p>
           <p class="text-base font-bold text-slate-800 mt-1">{{ fmtMoney(saln.total_personal_properties) }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Total Liabilities</p>
           <p class="text-base font-bold text-danger-600 mt-1">{{ fmtMoney(saln.total_liabilities) }}</p>
         </div>
@@ -61,7 +61,7 @@
       </div>
 
       <!-- Main Tabs -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <!-- Tab nav -->
         <div class="px-4 pt-4 border-b border-slate-100 overflow-x-auto">
           <nav class="flex gap-0.5 min-w-max">
@@ -135,8 +135,8 @@
             <AppTable :card="false" :is-empty="saln.children.length === 0">
               <template #head>
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name of Child</th>
-                  <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Age</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name of Child</th>
+                  <th class="px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-16">Age</th>
                   <th v-if="saln.is_editable" class="px-4 py-2 w-20"></th>
                 </tr>
               </template>

@@ -229,15 +229,15 @@ const monthLabel = computed(() => {
       <AppTable :is-empty="!accomplishments.length" :skeleton-cols="5">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Linked IPCR Plan</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Photo Proofs</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Description</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Linked IPCR Plan</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Photo Proofs</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="acc in accomplishments" :key="acc.id" class="hover:bg-slate-50/60">
+        <tr v-for="acc in accomplishments" :key="acc.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 whitespace-nowrap font-medium text-slate-800 text-sm">
             {{ new Date(acc.accomplishment_date).toLocaleDateString("en-PH", { year:"numeric", month:"short", day:"numeric" }) }}
           </td>
@@ -368,16 +368,16 @@ const monthLabel = computed(() => {
       <!-- Preview table -->
       <div class="overflow-x-auto">
       <table class="w-full text-sm border border-slate-200 min-w-[600px]">
-        <thead class="bg-slate-50">
+        <thead class="bg-slate-50/80">
           <tr>
-            <th class="px-3 py-2 text-left border border-slate-200 w-28 text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-            <th class="px-3 py-2 text-left border border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-            <th class="px-3 py-2 text-left border border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">Linked IPCR Plan</th>
-            <th class="px-3 py-2 text-left border border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">Proof</th>
+            <th class="px-3 py-2 text-left border border-slate-200 w-28 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+            <th class="px-3 py-2 text-left border border-slate-200 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+            <th class="px-3 py-2 text-left border border-slate-200 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Linked IPCR Plan</th>
+            <th class="px-3 py-2 text-left border border-slate-200 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Proof</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="acc in reportData?.accomplishments" :key="acc.id" class="border-t border-slate-100 hover:bg-slate-50/60">
+          <tr v-for="acc in reportData?.accomplishments" :key="acc.id" class="border-t border-slate-100 hover:bg-indigo-50/40">
             <td class="px-3 py-2 border border-slate-200 align-top whitespace-nowrap text-sm text-slate-700">
               {{ new Date(acc.accomplishment_date).toLocaleDateString("en-PH", { month:"short", day:"numeric" }) }}
             </td>

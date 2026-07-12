@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Add Accomplishment</h4>
+    <h4 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Add Accomplishment</h4>
 
     <!-- Time Range -->
     <div class="grid grid-cols-2 gap-3">

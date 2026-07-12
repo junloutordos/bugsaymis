@@ -113,16 +113,16 @@ function printPdf(item) { window.open(route('discipline.confiscated.pdf', item.i
       <AppTable :is-empty="!items.data.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Receipt</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Confiscated</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Receipt</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Item</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Confiscated</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="i in items.data" :key="i.id" class="hover:bg-slate-50/60">
+        <tr v-for="i in items.data" :key="i.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-medium text-slate-700">{{ i.receipt_no }}</td>
           <td class="px-4 py-3 text-slate-600">{{ i.student_name }}</td>
           <td class="px-4 py-3 text-slate-600 max-w-[220px] truncate">{{ i.item_description }}</td>

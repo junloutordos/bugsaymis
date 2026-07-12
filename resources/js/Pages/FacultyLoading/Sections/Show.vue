@@ -40,7 +40,7 @@
 
       <!-- Break Times Card -->
       <AppCard v-if="section.recess_start || section.lunch_start || section.afternoon_break_start">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+        <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
           <ClockIcon class="h-4 w-4" /> Break Times
         </h2>
         <div class="flex flex-wrap gap-6">

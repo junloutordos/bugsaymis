@@ -99,7 +99,7 @@ const modeLabel = { face_to_face: 'Face-to-Face', online: 'Online', blended: 'Bl
       </div>
 
       <!-- Sessions Table Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">Training Sessions</h2>
           <Link :href="route('lnd.sessions.index', { program_id: program.id })" class="text-sm text-indigo-600 hover:underline">View all</Link>
@@ -107,16 +107,16 @@ const modeLabel = { face_to_face: 'Face-to-Face', online: 'Online', blended: 'Bl
         <AppTable :card="false" :is-empty="!program.sessions?.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Venue</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Mode</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Participants</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Venue</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Mode</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Participants</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Action</th>
           </tr>
         </template>
 
-        <tr v-for="s in program.sessions" :key="s.id" class="hover:bg-slate-50/60">
+        <tr v-for="s in program.sessions" :key="s.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ fmt(s.session_date) }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ s.venue ?? '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ modeLabel[s.mode] ?? s.mode }}</td>

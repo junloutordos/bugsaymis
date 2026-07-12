@@ -60,17 +60,17 @@ const typeLabel = { consumable: 'Consumable', semi_expendable: 'Semi-Expendable'
       <!-- Summary cards -->
       <div class="grid grid-cols-3 gap-4">
         <AppCard>
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Active Items</div>
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active Items</div>
           <div class="text-2xl font-bold text-slate-800 mt-1">{{ summary.total_items }}</div>
         </AppCard>
         <AppCard>
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Low Stock Alerts</div>
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Low Stock Alerts</div>
           <div class="text-2xl font-bold mt-1" :class="summary.low_stock_count > 0 ? 'text-danger-600' : 'text-slate-800'">
             {{ summary.low_stock_count }}
           </div>
         </AppCard>
         <AppCard>
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Inventory Value</div>
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Inventory Value</div>
           <div class="text-2xl font-bold text-success-700 mt-1">
             ₱{{ summary.total_value.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}
           </div>
@@ -101,18 +101,18 @@ const typeLabel = { consumable: 'Consumable', semi_expendable: 'Semi-Expendable'
       <AppTable :is-empty="displayed.length === 0" :skeleton-cols="8">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item Code</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Balance</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg Cost</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Value</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Ledger</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Item Code</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Balance</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Avg Cost</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Value</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ledger</th>
           </tr>
         </template>
 
-        <tr v-for="item in displayed" :key="item.id" class="hover:bg-slate-50/60">
+        <tr v-for="item in displayed" :key="item.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm font-mono text-slate-600">{{ item.item_code }}</td>
           <td class="px-4 py-3">
             <div class="text-sm font-medium text-slate-800">{{ item.description }}</div>

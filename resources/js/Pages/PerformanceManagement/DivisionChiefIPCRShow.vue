@@ -514,7 +514,7 @@ const approveTargets = () => {
       </AppCard>
 
       <!-- Plans Section -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm" id="ipcr-printable">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70" id="ipcr-printable">
 
         <!-- Header block (rated stages only) -->
         <div v-if="isAtRatedStage" class="p-5 border-b border-slate-100">
@@ -574,20 +574,20 @@ const approveTargets = () => {
         <!-- Plans Table -->
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-slate-100 text-sm border-collapse border border-slate-200">
-            <thead class="bg-slate-50">
+            <thead class="bg-slate-50/80">
               <tr>
-                <th rowspan="2" colspan="2" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">Output</th>
-                <th rowspan="2" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">Success Indicators</th>
-                <th rowspan="2" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">Actual Accomplishment</th>
-                <th rowspan="2" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">Means of Verification</th>
-                <th colspan="4" class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">Rating</th>
-                <th rowspan="2" class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">Remarks</th>
+                <th rowspan="2" colspan="2" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">Output</th>
+                <th rowspan="2" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">Success Indicators</th>
+                <th rowspan="2" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">Actual Accomplishment</th>
+                <th rowspan="2" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">Means of Verification</th>
+                <th colspan="4" class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">Rating</th>
+                <th rowspan="2" class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">Remarks</th>
               </tr>
               <tr>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">Q</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">E</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">T</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border border-slate-200">A</th>
+                <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">Q</th>
+                <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">E</th>
+                <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">T</th>
+                <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border border-slate-200">A</th>
               </tr>
             </thead>
 
@@ -618,7 +618,7 @@ const approveTargets = () => {
                     <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
 
                       <!-- First row of each PI group -->
-                      <tr class="hover:bg-slate-50/60">
+                      <tr class="hover:bg-indigo-50/40">
                         <td v-if="Object.keys(pis)[0] === piDesc"
                             :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
                             class="px-4 py-3 font-medium text-slate-700 border border-slate-200 text-sm">
@@ -701,7 +701,7 @@ const approveTargets = () => {
                       </tr>
 
                       <!-- Remaining rows in this PI group -->
-                      <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-slate-50/60">
+                      <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-indigo-50/40">
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <div>{{ plan.success_indicator }}</div>
                           <p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
@@ -804,22 +804,22 @@ const approveTargets = () => {
         <div v-if="isAtRatedStage" class="p-5 border-t border-slate-100 space-y-4">
           <div class="overflow-x-auto">
             <table class="min-w-full border text-sm border-collapse">
-              <thead class="bg-slate-50">
+              <thead class="bg-slate-50/80">
                 <tr>
-                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">Output</th>
-                  <th colspan="4" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Rating</th>
-                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-24">% Weight</th>
-                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">Overall Weighted Score</th>
+                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-40">Output</th>
+                  <th colspan="4" class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Rating</th>
+                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-24">% Weight</th>
+                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-40">Overall Weighted Score</th>
                 </tr>
                 <tr>
-                  <th class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Q</th>
-                  <th class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">E</th>
-                  <th class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">T</th>
-                  <th class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">A</th>
+                  <th class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-16">Q</th>
+                  <th class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-16">E</th>
+                  <th class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-16">T</th>
+                  <th class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-16">A</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
-                <tr v-for="(row, type) in summaryByFunctionType" :key="type" class="font-medium hover:bg-slate-50/60">
+                <tr v-for="(row, type) in summaryByFunctionType" :key="type" class="font-medium hover:bg-indigo-50/40">
                   <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">{{ type }}</td>
                   <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">{{ row.countQ ? formatAvg(row.totalQ / row.countQ) : "—" }}</td>
                   <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">{{ row.countE ? formatAvg(row.totalE / row.countE) : "—" }}</td>

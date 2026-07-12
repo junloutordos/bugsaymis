@@ -42,12 +42,12 @@
       <AppTable :is-empty="filteredFaculty.length === 0" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Teaching</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Other</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Faculty</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Position</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Teaching</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Other</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
@@ -127,7 +127,7 @@
             No assignments yet.
           </div>
           <div v-for="a in detail.faculty?.assignments" :key="a.id"
-            class="px-6 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60">
+            class="px-6 py-3 flex items-center justify-between gap-3 hover:bg-indigo-50/40">
             <div class="min-w-0">
               <p class="text-sm font-medium text-slate-800 truncate">{{ assignmentLabel(a) }}</p>
               <div class="flex items-center gap-2 mt-0.5">

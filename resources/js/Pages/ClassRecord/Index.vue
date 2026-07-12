@@ -54,19 +54,19 @@
       <AppTable :is-empty="!filtered.length" :skeleton-cols="isAdmin ? 8 : 7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Subject</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Year Level &amp; Section</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">School Year</th>
-            <th v-if="isAdmin" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Teacher</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Grading Option</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Quarters</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Subject</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Year Level &amp; Section</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">School Year</th>
+            <th v-if="isAdmin" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Teacher</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Grading Option</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Quarters</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
         <tr v-for="r in filtered" :key="r.id"
-          class="hover:bg-slate-50/60 cursor-pointer"
+          class="hover:bg-indigo-50/40 cursor-pointer"
           @click="navigateTo(r)">
           <td class="px-4 py-3 font-medium text-slate-800">{{ r.subject_name }}</td>
           <td class="px-4 py-3 text-slate-600">{{ r.year_level_section }}</td>
@@ -137,7 +137,7 @@
       :subtitle="currentSchoolYear ? `SY ${currentSchoolYear}` : null"
       size="lg" body-class="px-6 py-4" @close="showModal = false">
 
-      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+      <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
         {{ isAdmin ? 'Step 1 — Select a teaching assignment' : 'Select your teaching assignment' }}
       </p>
 
@@ -192,7 +192,7 @@
 
       <!-- Step 2: Grading option (only shown when assignment selected) -->
       <div v-if="selectedLoad" class="mt-5 pt-4 border-t border-slate-100">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
           Step 2 — Grading Option
         </p>
 
@@ -261,7 +261,7 @@
           <p v-if="manageErrors.categories" class="text-xs text-red-500 mb-2">{{ manageErrors.categories[0] }}</p>
 
           <table class="w-full text-sm">
-            <thead class="bg-slate-50">
+            <thead class="bg-slate-50/80">
               <tr>
                 <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-1/3">Name</th>
                 <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-16">Code</th>

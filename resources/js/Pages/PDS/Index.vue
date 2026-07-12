@@ -19,14 +19,14 @@ defineProps({
       <AppTable :is-empty="!pdsList.data || pdsList.data.length === 0" :skeleton-cols="4">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Email</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Created</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Action</th>
           </tr>
         </template>
 
-        <tr v-for="pds in pdsList.data" :key="pds.id" class="hover:bg-slate-50/60">
+        <tr v-for="pds in pdsList.data" :key="pds.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700">{{ pds.user.name }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ pds.user.email }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ pds.created_at }}</td>

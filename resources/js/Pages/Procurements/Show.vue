@@ -323,16 +323,16 @@ const createRfq = () => {
                     <AppTable :is-empty="!(p.items || []).length" :skeleton-cols="6" :card="false">
                         <template #head>
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP No</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Qty</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit Cost</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PPMP No</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                                <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Qty</th>
+                                <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
+                                <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</th>
                             </tr>
                         </template>
 
-                        <tr v-for="it in (p.items || [])" :key="it.id" class="hover:bg-slate-50/60">
+                        <tr v-for="it in (p.items || [])" :key="it.id" class="hover:bg-indigo-50/40">
                             <td class="px-4 py-3 text-sm text-slate-600">{{ it.ppmp_line_item_no || '—' }}</td>
                             <td class="px-4 py-3 text-sm text-slate-700">{{ it.unit }}</td>
                             <td class="px-4 py-3 text-sm text-slate-700">{{ it.description }}</td>

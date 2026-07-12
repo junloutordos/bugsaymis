@@ -91,7 +91,7 @@ onUnmounted(() => {
   <AppCard :padded="false">
     <template #header>
       <div class="flex w-full items-center justify-between">
-        <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+        <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
           <UsersIcon class="h-4 w-4" /> Active Users
           <span v-if="data" class="normal-case font-normal tracking-normal text-slate-400">
             · refreshed {{ timeAgo(data.refreshed_at) }}

@@ -26,7 +26,7 @@ function formatDate(iso) {
         <div class="flex items-center gap-3 mb-8">
             <ShieldCheckIcon class="w-8 h-8 text-indigo-600" />
             <div>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Philippine Science High School</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Philippine Science High School</p>
                 <p class="text-lg font-bold text-slate-800 leading-tight">Atlas Document Verification</p>
             </div>
         </div>
@@ -45,12 +45,12 @@ function formatDate(iso) {
             <!-- Details -->
             <div class="px-6 py-5 space-y-4">
                 <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Document</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Document</p>
                     <p class="text-slate-800 font-semibold">{{ props.record.document_title }}</p>
                 </div>
 
                 <div class="border-t border-slate-100 pt-4">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Signed By</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Signed By</p>
                     <div class="flex items-center gap-4">
                         <div v-if="props.signerSignatureUri"
                              class="border border-slate-200 rounded-lg bg-slate-50 px-4 py-2 flex items-center justify-center min-h-[56px]">
@@ -65,14 +65,14 @@ function formatDate(iso) {
                 </div>
 
                 <div class="border-t border-slate-100 pt-4">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Date Signed</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Date Signed</p>
                     <p class="text-slate-700">{{ formatDate(props.record.signed_at) }}</p>
                 </div>
 
                 <!-- Metadata -->
                 <div v-if="props.record.metadata && Object.keys(props.record.metadata).length"
                      class="border-t border-slate-100 pt-4">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Document Details</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Document Details</p>
                     <dl class="space-y-1">
                         <div v-for="(val, key) in props.record.metadata" :key="key" class="flex gap-2 text-sm">
                             <dt class="text-slate-500 capitalize shrink-0">{{ String(key).replace(/_/g,' ') }}:</dt>
@@ -82,7 +82,7 @@ function formatDate(iso) {
                 </div>
 
                 <div class="border-t border-slate-100 pt-4">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Verification Token</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Verification Token</p>
                     <p class="text-slate-400 text-xs font-mono break-all">{{ props.record.verification_token }}</p>
                 </div>
             </div>

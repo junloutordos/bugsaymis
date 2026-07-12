@@ -283,7 +283,7 @@ function err(field) {
           <h2 class="text-base font-semibold text-slate-800 mb-5">Parent / Guardian Information</h2>
           <div class="space-y-5">
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Father</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Father</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <input v-model="form.father_name" :class="inputCls" placeholder="Full name or N/A *" />
@@ -304,7 +304,7 @@ function err(field) {
               </div>
             </div>
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Mother</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Mother</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <input v-model="form.mother_name" :class="inputCls" placeholder="Full name or N/A *" />
@@ -325,7 +325,7 @@ function err(field) {
               </div>
             </div>
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Guardian <span class="font-normal text-slate-400">(if different from parents)</span></p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Guardian <span class="font-normal text-slate-400">(if different from parents)</span></p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <input v-model="form.guardian_name" :class="inputCls" placeholder="Full name or N/A *" />
@@ -378,16 +378,16 @@ function err(field) {
           <h2 class="text-base font-semibold text-slate-800 mb-5">Review & Submit</h2>
           <div class="space-y-4 text-sm">
             <div class="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Grade Level</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Grade Level</p>
               <p class="font-medium">Grade {{ form.grade_level }} — SY {{ schoolYear?.name }}</p>
             </div>
             <div class="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Student</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Student</p>
               <p class="font-medium">{{ [form.lastname, form.firstname, form.middlename].filter(Boolean).join(', ') }}</p>
               <p class="text-slate-500">{{ form.birthday }} · {{ form.sex }} · LRN: {{ form.lrn || '—' }}</p>
             </div>
             <div class="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Contact</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Contact</p>
               <p>{{ form.email || '—' }} · {{ form.contact_no || '—' }}</p>
             </div>
             <div class="rounded-lg border border-warning-100 bg-warning-50 px-4 py-3 text-xs text-warning-700">

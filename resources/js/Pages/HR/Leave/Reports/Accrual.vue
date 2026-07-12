@@ -90,9 +90,9 @@ const fmtDt = (d) => d ? new Date(d).toLocaleDateString('en-PH', { month:'short'
         <AppTable :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Month</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide" colspan="2">VL</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide" colspan="2">SL</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Month</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider" colspan="2">VL</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider" colspan="2">SL</th>
             </tr>
             <tr class="bg-slate-50/80 border-t border-slate-100">
               <th class="px-4 py-2"></th>
@@ -104,7 +104,7 @@ const fmtDt = (d) => d ? new Date(d).toLocaleDateString('en-PH', { month:'short'
           </template>
 
           <tr v-for="m in summaryMonths" :key="m.num"
-              :class="['hover:bg-slate-50/60', (!m.vl && !m.sl) ? 'opacity-40' : '']">
+              :class="['hover:bg-indigo-50/40', (!m.vl && !m.sl) ? 'opacity-40' : '']">
             <td class="px-4 py-3 font-medium text-slate-700">{{ m.name }}</td>
             <td class="px-4 py-3 text-center text-slate-600">{{ m.vl?.employees ?? '—' }}</td>
             <td class="px-4 py-3 text-center font-semibold text-emerald-600">{{ m.vl ? m.vl.total_days.toFixed(2) + ' d' : '—' }}</td>
@@ -119,15 +119,15 @@ const fmtDt = (d) => d ? new Date(d).toLocaleDateString('en-PH', { month:'short'
         <AppTable :is-empty="!rowData.length" :skeleton-cols="5" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave Type</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Amount</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Balance After</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Leave Type</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Balance After</th>
             </tr>
           </template>
 
-          <tr v-for="row in rowData" :key="row.id" class="hover:bg-slate-50/60">
+          <tr v-for="row in rowData" :key="row.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ fmtDt(row.created_at) }}</td>
             <td class="px-4 py-3">
               <p class="font-medium text-slate-800 text-xs">{{ row.user?.name ?? '—' }}</p>

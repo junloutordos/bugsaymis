@@ -67,22 +67,22 @@
       <AppTable :is-empty="!loads.length" :skeleton-cols="12">
         <template #head>
           <tr>
-            <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-8">#</th>
-            <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
-            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">SG</th>
-            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Teaching</th>
-            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Research</th>
-            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin</th>
-            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Co-Curr.</th>
-            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Cmte.</th>
-            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-            <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Overload</th>
-            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">OL Approved</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-8">#</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Faculty</th>
+            <th class="px-4 py-2.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">SG</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Teaching</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Research</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Admin</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Co-Curr.</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Cmte.</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Overload</th>
+            <th class="px-4 py-2.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">OL Approved</th>
           </tr>
         </template>
 
-        <tr v-for="(l, i) in loads" :key="l.id" class="hover:bg-slate-50/60">
+        <tr v-for="(l, i) in loads" :key="l.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-2.5 text-slate-400 text-xs">{{ i + 1 }}</td>
           <td class="px-4 py-2.5">
             <p class="font-medium text-slate-800">{{ l.faculty_name }}</p>

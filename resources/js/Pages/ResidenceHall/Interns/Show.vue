@@ -193,7 +193,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
           <AppCard>
             <div class="flex items-center gap-2 mb-3">
               <HomeModernIcon class="w-4 h-4 text-indigo-500" />
-              <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contract Details</h2>
+              <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Contract Details</h2>
             </div>
             <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div>
@@ -233,7 +233,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
           <AppCard :padded="false">
             <template #header>
               <div class="flex items-center justify-between gap-3 w-full">
-                <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Recent Leave Passes</h2>
+                <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Recent Leave Passes</h2>
                 <Link :href="route('rh.leave-passes.index')"
                       class="text-xs text-indigo-600 hover:underline">View All</Link>
               </div>
@@ -254,7 +254,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
           <AppCard :padded="false">
             <template #header>
               <div class="flex items-center justify-between gap-3 w-full">
-                <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Health / Behavioral Incidents</h2>
+                <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Health / Behavioral Incidents</h2>
                 <Link :href="route('rh.incidents.index')"
                       class="text-xs text-indigo-600 hover:underline">View All</Link>
               </div>
@@ -282,7 +282,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
           <AppCard>
             <template #header>
               <div class="flex items-center justify-between gap-3 w-full">
-                <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Parent's Waiver (F-RHU-03)</h2>
+                <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Parent's Waiver (F-RHU-03)</h2>
                 <button @click="showWaiverModal = true"
                         class="text-xs text-indigo-600 hover:underline">{{ intern.waiver ? 'Edit' : 'Record' }}</button>
               </div>
@@ -310,7 +310,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
           <AppCard>
             <template #header>
               <div class="flex items-center justify-between gap-3 w-full">
-                <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Appliances (F-RHU-04)</h2>
+                <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Appliances (F-RHU-04)</h2>
                 <button @click="showApplianceModal = true"
                         class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline">
                   <PlusIcon class="w-3 h-3" /> Add
@@ -347,7 +347,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
           <AppCard>
             <template #header>
               <div class="flex items-center justify-between gap-3 w-full">
-                <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Fee Ledger</h2>
+                <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Fee Ledger</h2>
                 <Link :href="route('rh.fees.index')" class="text-xs text-indigo-600 hover:underline">Full Ledger</Link>
               </div>
             </template>

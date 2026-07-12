@@ -36,19 +36,19 @@
 
       <!-- Net Worth Summary Bar -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Real Properties</p>
           <p class="text-base font-semibold text-slate-700 mt-1">{{ fmtMoney(saln.total_real_properties) }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Personal Properties</p>
           <p class="text-base font-semibold text-slate-700 mt-1">{{ fmtMoney(saln.total_personal_properties) }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Total Liabilities</p>
           <p class="text-base font-semibold text-danger-600 mt-1">{{ fmtMoney(saln.total_liabilities) }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Net Worth</p>
           <p class="text-base font-bold mt-1" :class="saln.net_worth >= 0 ? 'text-success-700' : 'text-danger-600'">
             {{ fmtMoney(saln.net_worth) }}
@@ -57,7 +57,7 @@
       </div>
 
       <!-- Tabs -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="flex overflow-x-auto border-b border-slate-100 px-2 pt-2 gap-1">
           <button v-for="tab in tabs" :key="tab.id" type="button" @click="activeTab = tab.id"
             class="shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-transparent transition-colors"
@@ -101,10 +101,10 @@
             <AppTable :card="false" :is-empty="saln.real_properties.length === 0" :skeleton-cols="4">
               <template #head>
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Location</th>
-                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Fair Market Value</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Owner</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Location</th>
+                  <th class="px-4 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Fair Market Value</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Owner</th>
                 </tr>
               </template>
               <tr v-for="p in saln.real_properties" :key="p.id">
@@ -118,7 +118,7 @@
               </template>
               <template #footer>
                 <div class="px-4 py-2.5 flex items-center justify-end gap-3 text-sm">
-                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</span>
+                  <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
                   <span class="font-bold text-slate-800">{{ fmtMoney(saln.total_real_properties) }}</span>
                 </div>
               </template>
@@ -140,10 +140,10 @@
             <AppTable :card="false" :is-empty="saln.personal_properties.length === 0" :skeleton-cols="4">
               <template #head>
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Acquisition Cost</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Owner</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+                  <th class="px-4 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Acquisition Cost</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Owner</th>
                 </tr>
               </template>
               <tr v-for="p in saln.personal_properties" :key="p.id">
@@ -157,7 +157,7 @@
               </template>
               <template #footer>
                 <div class="px-4 py-2.5 flex items-center justify-end gap-3 text-sm">
-                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</span>
+                  <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
                   <span class="font-bold text-slate-800">{{ fmtMoney(saln.total_personal_properties) }}</span>
                 </div>
               </template>
@@ -179,9 +179,9 @@
             <AppTable :card="false" :is-empty="saln.liabilities.length === 0" :skeleton-cols="3">
               <template #head>
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Nature</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Creditor</th>
-                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Outstanding Balance</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Nature</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Creditor</th>
+                  <th class="px-4 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Outstanding Balance</th>
                 </tr>
               </template>
               <tr v-for="l in saln.liabilities" :key="l.id">
@@ -194,7 +194,7 @@
               </template>
               <template #footer>
                 <div class="px-4 py-2.5 flex items-center justify-end gap-3 text-sm">
-                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</span>
+                  <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
                   <span class="font-bold text-danger-700">{{ fmtMoney(saln.total_liabilities) }}</span>
                 </div>
               </template>
@@ -233,10 +233,10 @@
             <AppTable :card="false" :is-empty="saln.relatives.length === 0" :skeleton-cols="4">
               <template #head>
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Relationship</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Agency</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Relationship</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Position</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Agency</th>
                 </tr>
               </template>
               <tr v-for="r in saln.relatives" :key="r.id">

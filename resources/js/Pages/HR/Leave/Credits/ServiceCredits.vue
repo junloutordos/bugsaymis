@@ -167,18 +167,18 @@ const fmtDate = (d) => {
       <AppTable :is-empty="pageData.length === 0" :skeleton-cols="8">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Service Date</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Hours</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Days Equiv.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Expires</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Service Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Hours</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Days Equiv.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Expires</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="rec in pageData" :key="rec.id" class="hover:bg-slate-50/60">
+        <tr v-for="rec in pageData" :key="rec.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-medium text-slate-800">{{ rec.user?.name ?? '—' }}</td>
           <td class="px-4 py-3 text-slate-600">{{ fmtDate(rec.service_date) }}</td>
           <td class="px-4 py-3 text-slate-600">{{ serviceTypeLabel(rec.service_type) }}</td>

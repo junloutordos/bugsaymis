@@ -247,18 +247,18 @@ const needsManualReceiver = computed(() =>
       <AppTable :is-empty="displayed.length === 0" :skeleton-cols="8">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Tracking No.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Subject</th>
-            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Origin / Type</th>
-            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Holder</th>
-            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Tracking No.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Subject</th>
+            <th class="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Origin / Type</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Priority</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Holder</th>
+            <th class="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
             <th class="px-3 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="doc in displayed" :key="doc.id" class="hover:bg-slate-50/60 cursor-pointer"
+        <tr v-for="doc in displayed" :key="doc.id" class="hover:bg-indigo-50/40 cursor-pointer"
           @click="router.visit(route('document-tracking.show', doc.id))">
           <td class="px-4 py-3">
             <span class="font-mono text-xs font-bold text-indigo-600">{{ doc.tracking_no }}</span>

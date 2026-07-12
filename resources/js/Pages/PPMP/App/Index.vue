@@ -114,7 +114,7 @@ const consolidate = async () => {
         <!-- Category totals -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <AppCard v-for="cat in (totals.categories || [])" :key="cat.category">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ cat.label }}</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{{ cat.label }}</p>
                 <p class="text-lg font-bold text-slate-800">₱{{ formatPeso(cat.subtotal) }}</p>
                 <p class="text-xs text-slate-500">{{ cat.item_count }} item(s)</p>
             </AppCard>
@@ -150,7 +150,7 @@ const consolidate = async () => {
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-[1500px] w-full text-sm">
-                        <thead class="bg-slate-50">
+                        <thead class="bg-slate-50/80">
                             <tr>
                                 <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-28">Stock No.</th>
                                 <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
@@ -191,7 +191,7 @@ const consolidate = async () => {
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-[1500px] w-full text-sm">
-                        <thead class="bg-slate-50">
+                        <thead class="bg-slate-50/80">
                             <tr>
                                 <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-28">Stock No.</th>
                                 <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
@@ -242,7 +242,7 @@ const consolidate = async () => {
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-[1500px] w-full text-sm">
-                        <thead class="bg-slate-50">
+                        <thead class="bg-slate-50/80">
                             <tr>
                                 <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Source Unit</th>
                                 <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-16">Code</th>
@@ -262,7 +262,7 @@ const consolidate = async () => {
                                         {{ categories[item.category] || item.category }}
                                     </td>
                                 </tr>
-                                <tr class="hover:bg-slate-50/60">
+                                <tr class="hover:bg-indigo-50/40">
                                     <td class="px-2 py-1.5 text-slate-600 text-xs">{{ item.division_acronym || item.division_name }}</td>
                                     <td class="px-2 py-1.5 text-slate-600 font-mono text-xs">{{ item.code }}</td>
                                     <td class="px-2 py-1.5 text-slate-700">{{ item.description }}</td>

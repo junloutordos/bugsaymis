@@ -9,10 +9,10 @@
       <AppTable :is-empty="reports.length === 0" :skeleton-cols="5">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Report</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Report</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Priority</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Submitted</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
@@ -41,7 +41,7 @@
             <td colspan="5" class="px-4 py-4 bg-slate-50 border-t border-slate-100">
               <div class="space-y-3 max-w-2xl">
                 <div>
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</p>
+                  <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Description</p>
                   <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ r.description }}</p>
                 </div>
 
@@ -59,7 +59,7 @@
                 </div>
 
                 <div v-if="r.has_screenshot">
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Your Screenshot</p>
+                  <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Your Screenshot</p>
                   <img :src="r.screenshot_url" alt="Screenshot"
                     class="rounded-lg border border-slate-200 max-h-64 object-contain bg-slate-50" />
                 </div>
@@ -86,7 +86,7 @@
 
             <div v-if="expanded === r.id" class="pt-2 space-y-3 border-t border-slate-100">
               <div>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Description</p>
                 <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ r.description }}</p>
               </div>
 
@@ -104,7 +104,7 @@
               </div>
 
               <div v-if="r.has_screenshot">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Your Screenshot</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Your Screenshot</p>
                 <img :src="r.screenshot_url" alt="Screenshot"
                   class="rounded-lg border border-slate-200 max-h-64 object-contain bg-slate-50" />
               </div>

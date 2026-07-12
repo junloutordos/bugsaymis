@@ -230,7 +230,7 @@ function typeLabel(type) {
 
         <!-- Advisory / SCALE info -->
         <AppCard>
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Fixed Blocks (not in grid)</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Fixed Blocks (not in grid)</p>
           <div class="flex flex-wrap gap-3 text-sm text-slate-600">
             <span class="inline-flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1 text-xs">
               <span class="font-medium">{{ result.plan.advisory?.type }}</span>
@@ -269,7 +269,7 @@ function typeLabel(type) {
         </div>
 
         <!-- ── Per-section weekly grid ──────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
 
           <!-- Section tabs -->
           <div class="border-b border-slate-100 flex overflow-x-auto">
@@ -327,7 +327,7 @@ function typeLabel(type) {
 
           <!-- Section placement list (compact) -->
           <div v-if="currentSection?.length" class="border-t border-slate-100 px-4 py-3">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
               All Placements — {{ activeSection }}
             </p>
             <div class="flex flex-wrap gap-1.5">

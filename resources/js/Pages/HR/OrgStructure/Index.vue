@@ -337,7 +337,7 @@ function toggleInactive() {
       <div class="flex gap-5 items-start">
 
         <!-- Tree card -->
-        <div class="flex-1 min-w-0 bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="flex-1 min-w-0 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
 
           <!-- Toolbar -->
           <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
@@ -385,7 +385,7 @@ function toggleInactive() {
         <!-- Side panel — selected unit detail -->
         <div
           v-if="selectedNode"
-          class="hidden lg:block w-80 shrink-0 bg-white rounded-xl border border-slate-100 shadow-sm sticky top-4"
+          class="hidden lg:block w-80 shrink-0 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 sticky top-4"
         >
           <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="text-sm font-semibold text-slate-700">Unit Details</h3>

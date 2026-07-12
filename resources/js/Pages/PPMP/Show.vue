@@ -661,7 +661,7 @@ const utilizationRate = computed(() => {
             <!-- Category summary cards -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                 <div v-for="s in summary" :key="s.category" class="bg-slate-50 rounded-lg p-3">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ s.label }}</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{{ s.label }}</p>
                     <p class="text-lg font-bold text-slate-800">₱{{ formatPeso(s.subtotal) }}</p>
                     <p class="text-xs text-slate-500">{{ s.item_count }} item(s)</p>
                 </div>
@@ -674,7 +674,7 @@ const utilizationRate = computed(() => {
 
             <!-- Fund-source breakdown -->
             <div v-if="Object.keys(fundSourceTotals).length" class="mt-3 flex flex-wrap gap-2">
-                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide self-center">By Fund Source:</span>
+                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider self-center">By Fund Source:</span>
                 <span v-for="(amt, fs) in fundSourceTotals" :key="fs"
                       class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                     {{ fs.toUpperCase() }}: ₱{{ formatPeso(amt) }}
@@ -721,7 +721,7 @@ const utilizationRate = computed(() => {
 
         <!-- ══ WORKFLOW TRACKING TIMELINE ══════════════════════════════════════ -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
-            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Approval Workflow</h3>
+            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Approval Workflow</h3>
             <div class="flex flex-col gap-0">
 
                 <!-- Stage 1: Unit Submission (all types) -->
@@ -869,7 +869,7 @@ const utilizationRate = computed(() => {
                         <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
                     </tr>
                 </template>
-                <tr v-for="u in unitPpmps" :key="u.id" class="hover:bg-slate-50/60 cursor-pointer"
+                <tr v-for="u in unitPpmps" :key="u.id" class="hover:bg-indigo-50/40 cursor-pointer"
                     @click="router.visit(route('ppmp.show', u.id))">
                     <td class="px-4 py-2 font-medium text-indigo-600">{{ u.ppmp_number }}</td>
                     <td class="px-4 py-2 text-slate-700">{{ u.title }}</td>
@@ -895,7 +895,7 @@ const utilizationRate = computed(() => {
                         <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
                     </tr>
                 </template>
-                <tr v-for="d in divisionPpmps" :key="d.id" class="hover:bg-slate-50/60 cursor-pointer"
+                <tr v-for="d in divisionPpmps" :key="d.id" class="hover:bg-indigo-50/40 cursor-pointer"
                     @click="router.visit(route('ppmp.show', d.id))">
                     <td class="px-4 py-2 font-medium text-indigo-600">{{ d.ppmp_number }}</td>
                     <td class="px-4 py-2 text-slate-700">{{ d.title }}</td>
@@ -920,7 +920,7 @@ const utilizationRate = computed(() => {
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-[1400px] w-full text-sm">
-                    <thead class="bg-slate-50">
+                    <thead class="bg-slate-50/80">
                         <tr>
                             <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-28">Stock No.</th>
                             <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
@@ -991,7 +991,7 @@ const utilizationRate = computed(() => {
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-[1600px] w-full text-sm">
-                    <thead class="bg-slate-50">
+                    <thead class="bg-slate-50/80">
                         <tr>
                             <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-16">Code</th>
                             <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>

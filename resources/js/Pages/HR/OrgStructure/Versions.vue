@@ -176,11 +176,11 @@ function statusColor(status) {
       <AppTable :is-empty="!versions.length" :skeleton-cols="can.manage ? 6 : 5">
         <template #head>
           <tr>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Version</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Effective</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Summary</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Created by</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Version</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Effective</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Summary</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell">Created by</th>
             <th v-if="can.manage" class="px-4 py-3"></th>
           </tr>
         </template>
@@ -188,7 +188,7 @@ function statusColor(status) {
         <tr
           v-for="v in versions"
           :key="v.id"
-          :class="v.status === 'active' ? 'bg-success-50/40' : 'hover:bg-slate-50/60'"
+          :class="v.status === 'active' ? 'bg-success-50/40' : 'hover:bg-indigo-50/40'"
         >
           <td class="px-5 py-3">
             <p class="font-medium text-slate-800">{{ v.name }}</p>

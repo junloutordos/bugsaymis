@@ -51,17 +51,17 @@
       <AppTable :is-empty="!vacancies.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Term</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Subject</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Filled By</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Term</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Position</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Subject</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Filled By</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="v in vacancies" :key="v.id" class="hover:bg-slate-50/60">
+        <tr v-for="v in vacancies" :key="v.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-medium text-slate-800">{{ v.academic_unit?.name ?? '—' }}</td>
           <td class="px-4 py-3 text-slate-500">{{ v.academic_term?.name ?? 'Full Year' }}</td>
           <td class="px-4 py-3 text-slate-600">{{ v.sst_position?.code ?? '—' }}</td>

@@ -152,12 +152,12 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'purple'
       <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Hall</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Bed</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Check-in</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Hall</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Room</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Bed</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Check-in</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>

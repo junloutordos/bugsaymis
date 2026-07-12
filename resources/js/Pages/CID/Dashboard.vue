@@ -304,7 +304,7 @@ const donutChartOptions = {
 
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assessments Today</span>
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Assessments Today</span>
           <CalendarDaysIcon class="w-5 h-5 text-red-400" />
         </div>
         <p class="text-3xl font-bold text-slate-800">{{ cards.assessments_today }}</p>
@@ -313,7 +313,7 @@ const donutChartOptions = {
 
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Sections at Max</span>
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sections at Max</span>
           <ExclamationTriangleIcon class="w-5 h-5 text-amber-400" />
         </div>
         <p class="text-3xl font-bold text-slate-800">{{ cards.sections_at_max }}</p>
@@ -322,7 +322,7 @@ const donutChartOptions = {
 
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Teachers Present</span>
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Teachers Present</span>
           <UserGroupIcon class="w-5 h-5 text-green-400" />
         </div>
         <p class="text-3xl font-bold text-slate-800">{{ cards.teachers_present_today }}</p>
@@ -331,7 +331,7 @@ const donutChartOptions = {
 
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Class Records</span>
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Class Records</span>
           <ClipboardDocumentCheckIcon class="w-5 h-5 text-indigo-400" />
         </div>
         <p class="text-3xl font-bold text-slate-800">{{ cards.class_records_pending }}</p>
@@ -340,7 +340,7 @@ const donutChartOptions = {
 
       <div class="bg-white rounded-xl border border-slate-200 p-4">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">This Week</span>
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">This Week</span>
           <DocumentTextIcon class="w-5 h-5 text-blue-400" />
         </div>
         <p class="text-3xl font-bold text-slate-800">{{ cards.activities_this_week }}</p>

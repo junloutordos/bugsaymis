@@ -222,7 +222,7 @@ const goToPage = (p) => {
 
           <div class="flex items-start justify-between">
             <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ card.code }}</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{{ card.code }}</p>
               <p class="text-sm text-slate-600 mt-0.5">{{ card.name }}</p>
             </div>
             <AppBadge v-if="card.isService" color="blue">Service Credit</AppBadge>
@@ -270,17 +270,17 @@ const goToPage = (p) => {
         <AppTable :is-empty="!applications.length" :skeleton-cols="7" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Control No.</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Dates</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Applied</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Deducted</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">LWOP</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Control No.</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Leave Type</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Dates</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Applied</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Deducted</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">LWOP</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             </tr>
           </template>
 
-          <tr v-for="app in applications" :key="app.id" class="hover:bg-slate-50/60">
+          <tr v-for="app in applications" :key="app.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ app.control_no ?? '—' }}</td>
             <td class="px-4 py-3 text-slate-700">{{ app.leave_type?.name ?? '—' }}</td>
             <td class="px-4 py-3 text-slate-600 whitespace-nowrap text-xs">
@@ -326,17 +326,17 @@ const goToPage = (p) => {
         <AppTable :is-empty="serviceRecords.length === 0" :skeleton-cols="7" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Service Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Hours</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Days Equiv.</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Expires</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Remarks</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Service Date</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Hours</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Days Equiv.</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Expires</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Remarks</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             </tr>
           </template>
 
-          <tr v-for="rec in serviceRecords" :key="rec.id" class="hover:bg-slate-50/60">
+          <tr v-for="rec in serviceRecords" :key="rec.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 text-slate-700 whitespace-nowrap">{{ fmtDate(rec.service_date) }}</td>
             <td class="px-4 py-3 text-slate-600">{{ scTypeLabel(rec.service_type) }}</td>
             <td class="px-4 py-3 text-right text-slate-600">{{ rec.hours_rendered }}h</td>
@@ -359,17 +359,17 @@ const goToPage = (p) => {
         <AppTable :is-empty="txData.length === 0" :skeleton-cols="7" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave Type</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Amount</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Balance After</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Remarks</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Recorded By</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Leave Type</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Balance After</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Remarks</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Recorded By</th>
             </tr>
           </template>
 
-          <tr v-for="tx in txData" :key="tx.id" class="hover:bg-slate-50/60">
+          <tr v-for="tx in txData" :key="tx.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ fmtDatetime(tx.created_at) }}</td>
             <td class="px-4 py-3">
               <AppBadge :color="txTypeColor(tx.type)">{{ tx.type }}</AppBadge>

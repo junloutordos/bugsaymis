@@ -108,17 +108,17 @@ function studentList(contact) {
       <AppTable :is-empty="!contacts.data.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Mobile</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Linked Students</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Notify</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">FCM</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Email</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Mobile</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Linked Students</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Notify</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">FCM</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="contact in contacts.data" :key="contact.id" class="hover:bg-slate-50/60">
+        <tr v-for="contact in contacts.data" :key="contact.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-medium text-slate-800">{{ contact.name }}</td>
           <td class="px-4 py-3 text-slate-600">{{ contact.email ?? '—' }}</td>
           <td class="px-4 py-3 text-slate-600">{{ contact.mobile_phone ?? '—' }}</td>

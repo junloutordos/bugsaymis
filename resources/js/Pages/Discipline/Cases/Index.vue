@@ -51,17 +51,17 @@
       <AppTable :is-empty="!cases.data.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Case No.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Offense</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Level</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Filed</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Case No.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Offense</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Level</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Filed</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="c in cases.data" :key="c.id" class="hover:bg-slate-50/60">
+        <tr v-for="c in cases.data" :key="c.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-medium text-slate-700">{{ c.case_no }}</td>
           <td class="px-4 py-3 text-slate-600">{{ c.student_name }}</td>
           <td class="px-4 py-3 text-slate-600">{{ c.offense?.title || c.nature_of_offense || '—' }}</td>

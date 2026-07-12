@@ -156,7 +156,7 @@
 
       <!-- Specific targets -->
       <div v-if="form.audience === 'specific'" class="space-y-2">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Recipients</p>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Recipients</p>
         <div class="relative">
           <MagnifyingGlassIcon class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input v-model="targetQuery" type="text" placeholder="Search employee by name..."

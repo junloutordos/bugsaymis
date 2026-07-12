@@ -19,7 +19,7 @@
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         <!-- Upload Panel -->
-        <div class="lg:col-span-1 bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <div class="lg:col-span-1 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
           <h2 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <ArrowUpTrayIcon class="h-4 w-4 text-indigo-500" />
             Upload Biometric File
@@ -59,7 +59,7 @@
 
         <!-- Stats Cards -->
         <div class="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+          <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
             <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Total</p>
             <p class="text-2xl font-bold text-slate-800 mt-1">{{ stats.total.toLocaleString() }}</p>
           </div>
@@ -111,17 +111,17 @@
       <AppTable :is-empty="!logs.data?.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Device Employee ID</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Matched User</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date &amp; Time</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Device</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Device Employee ID</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Matched User</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Date &amp; Time</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Type</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Device</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="log in logs.data" :key="log.id" class="hover:bg-slate-50/60">
+        <tr v-for="log in logs.data" :key="log.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-mono text-slate-700">{{ log.device_employee_id }}</td>
           <td class="px-4 py-3 text-slate-700">{{ log.user?.name ?? '—' }}</td>
           <td class="px-4 py-3 text-slate-700 whitespace-nowrap">{{ log.log_datetime }}</td>

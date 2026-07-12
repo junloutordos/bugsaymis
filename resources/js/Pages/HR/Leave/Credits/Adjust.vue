@@ -177,14 +177,14 @@ const balanceSummary = computed(() => {
           <AppTable :is-empty="pageData.length === 0" :skeleton-cols="3">
             <template #head>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
                 <th class="px-4 py-3"></th>
               </tr>
             </template>
 
             <tr v-for="emp in pageData" :key="emp.id"
-                :class="['hover:bg-slate-50/60 cursor-pointer', selectedUser?.id === emp.id ? 'bg-indigo-50' : '']"
+                :class="['hover:bg-indigo-50/40 cursor-pointer', selectedUser?.id === emp.id ? 'bg-indigo-50' : '']"
                 @click="selectEmployee(emp)">
               <td class="px-4 py-3">
                 <p class="font-medium text-slate-800">{{ emp.name }}</p>

@@ -42,23 +42,23 @@ defineProps({
 
         <div class="py-6">
             <div class="mx-auto max-w-3xl space-y-5">
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
+                <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-6 py-5">
                     <UpdateProfileInformationForm
                         :must-verify-email="mustVerifyEmail"
                         :status="status"
                         class="max-w-xl"
                     />
                 </div>
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
+                <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-6 py-5">
                     <UpdatePasswordForm class="max-w-xl" />
                 </div>
-                <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
+                <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-6 py-5">
                     <DeleteUserForm class="max-w-xl" />
                 </div>
 
                 <!-- Employee Digital ID -->
                 <Link :href="route('profile.id-card')"
-                      class="block bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5 hover:border-indigo-300 hover:shadow-md transition-all group">
+                      class="block bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-6 py-5 hover:border-indigo-300 hover:shadow-md transition-all group">
                     <div class="flex items-center justify-between max-w-xl">
                         <div class="flex items-center gap-3">
                             <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
@@ -75,7 +75,7 @@ defineProps({
 
                 <!-- Digital Signature -->
                 <Link :href="route('profile.signature')"
-                      class="block bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5 hover:border-indigo-300 hover:shadow-md transition-all group">
+                      class="block bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-6 py-5 hover:border-indigo-300 hover:shadow-md transition-all group">
                     <div class="flex items-center justify-between max-w-xl">
                         <div class="flex items-center gap-3">
                             <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">

@@ -214,7 +214,7 @@
 
                 <!-- Alternatives for slot A -->
                 <div v-if="c.alternatives_a.length">
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                  <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                     Move "{{ c.subject_a }}" to:
                   </p>
                   <div class="space-y-1.5">
@@ -235,7 +235,7 @@
 
                 <!-- Alternatives for slot B -->
                 <div v-if="c.alternatives_b.length">
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                  <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                     Move "{{ c.subject_b }}" to:
                   </p>
                   <div class="space-y-1.5">

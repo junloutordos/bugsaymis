@@ -95,8 +95,8 @@ const occupiedCount = computed(() => props.dormers.filter(d => d.bed_number).len
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
 
         <!-- Bed Grid -->
-        <div class="lg:col-span-3 bg-white rounded-xl border border-slate-100 shadow-sm p-6">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Bed Layout</p>
+        <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-6">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Bed Layout</p>
 
           <!-- 2-column bunk grid -->
           <div class="grid grid-cols-2 gap-4">
@@ -138,8 +138,8 @@ const occupiedCount = computed(() => props.dormers.filter(d => d.bed_number).len
         </div>
 
         <!-- Unassigned dormers panel -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 lg:sticky lg:top-4 self-start">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 lg:sticky lg:top-4 self-start">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
             Unassigned in {{ room.residence_hall }} ({{ unassignedList.length }})
           </p>
           <div class="space-y-1.5 max-h-80 overflow-y-auto">

@@ -117,12 +117,12 @@ watch(normalizedCurrentPage, (page) => {
         type="number"
         min="1"
         :max="normalizedTotalPages"
-        class="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        class="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25"
       />
       <span class="text-xs text-slate-400">of {{ normalizedTotalPages }}</span>
       <button
         type="submit"
-        class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+        class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors">
         Go
       </button>
     </form>
@@ -134,9 +134,9 @@ watch(normalizedCurrentPage, (page) => {
         :class="[
           'inline-flex items-center justify-center min-w-[32px] px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors',
           link.active
-            ? 'bg-indigo-600 text-white border-indigo-600 pointer-events-none'
+            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/25 pointer-events-none'
             : link.url
-              ? 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
               : 'border-slate-100 text-slate-300 pointer-events-none',
         ]"
       />
@@ -154,7 +154,7 @@ watch(normalizedCurrentPage, (page) => {
       <button
         @click="emit('prev')"
         :disabled="normalizedCurrentPage === 1"
-        class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors">
+        class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 transition-colors">
         ← Prev
       </button>
       <form class="flex items-center gap-1.5" @submit.prevent="submitJump">
@@ -165,18 +165,18 @@ watch(normalizedCurrentPage, (page) => {
           type="number"
           min="1"
           :max="normalizedTotalPages"
-          class="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25"
         />
         <button
           type="submit"
-          class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors">
+          class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors">
           Go
         </button>
       </form>
       <button
         @click="emit('next')"
         :disabled="normalizedCurrentPage === normalizedTotalPages"
-        class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors">
+        class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 transition-colors">
         Next →
       </button>
     </div>

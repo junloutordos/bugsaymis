@@ -364,18 +364,18 @@ const regenerateArtCard = (item) => {
       <AppTable :is-empty="!items.data?.length" :skeleton-cols="8">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Position</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Engagement Type</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">SG / Salary</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Office</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Req.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Position</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Engagement Type</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">SG / Salary</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Office</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Req.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="item in items.data" :key="item.id" class="hover:bg-slate-50/60">
+        <tr v-for="item in items.data" :key="item.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700">{{ item.id }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">
             <div class="font-medium text-slate-800">{{ item.position_title }}</div>
@@ -487,7 +487,7 @@ const regenerateArtCard = (item) => {
 
         <!-- Section 1: Classification -->
         <fieldset class="border border-slate-200 rounded-xl p-4">
-          <legend class="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">Classification</legend>
+          <legend class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1">Classification</legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
 
             <div class="sm:col-span-2">
@@ -552,7 +552,7 @@ const regenerateArtCard = (item) => {
 
         <!-- Section 2: Compensation -->
         <fieldset class="border border-slate-200 rounded-xl p-4">
-          <legend class="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">Compensation</legend>
+          <legend class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1">Compensation</legend>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
 
             <template v-if="isPlantilla">
@@ -600,7 +600,7 @@ const regenerateArtCard = (item) => {
 
         <!-- Section 3: Qualifications -->
         <fieldset class="border border-slate-200 rounded-xl p-4">
-          <legend class="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">Qualifications</legend>
+          <legend class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1">Qualifications</legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
             <div class="sm:col-span-2">
               <label class="block text-xs font-medium text-slate-600 mb-1">Education</label>
@@ -681,7 +681,7 @@ const regenerateArtCard = (item) => {
 
         <!-- Section 3c: Posting / Art Card Details -->
         <fieldset class="border border-slate-200 rounded-xl p-4">
-          <legend class="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">Posting Card Details</legend>
+          <legend class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1">Posting Card Details</legend>
           <p class="text-xs text-slate-400 mt-2 mb-3">Used on the auto-generated art card (downloadable for social media / website posting).</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

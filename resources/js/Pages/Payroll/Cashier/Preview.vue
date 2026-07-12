@@ -246,7 +246,7 @@ function sendAll() {
       </div>
 
       <!-- Tabs -->
-      <div class="flex gap-1 mb-4 bg-white rounded-xl border border-slate-100 shadow-sm p-1 w-fit">
+      <div class="flex gap-1 mb-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-1 w-fit">
         <button v-for="tab in tabs" :key="tab.key"
                 @click="activeTab = tab.key"
                 :class="['flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -271,18 +271,18 @@ function sendAll() {
       <AppTable :is-empty="!currentItems.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Excel Name</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Matched User</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Basic</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Pay</th>
-            <th v-if="activeTab !== 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign to</th>
-            <th v-if="activeTab === 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">#</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Excel Name</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Matched User</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Position</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Basic</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Net Pay</th>
+            <th v-if="activeTab !== 'matched'" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Assign to</th>
+            <th v-if="activeTab === 'matched'" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Action</th>
           </tr>
         </template>
 
-        <tr v-for="item in currentItems" :key="item.id" class="hover:bg-slate-50/60">
+        <tr v-for="item in currentItems" :key="item.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-slate-500 text-xs">{{ item.excel_row_number }}</td>
           <td class="px-4 py-3 font-medium text-slate-800">{{ item.employee_name_raw }}</td>
           <td class="px-4 py-3 text-slate-600 text-xs">

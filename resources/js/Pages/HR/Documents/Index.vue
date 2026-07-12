@@ -28,7 +28,7 @@
       </div>
 
       <!-- Completeness Summary -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
           <!-- Overall Progress -->
           <div class="shrink-0 text-center sm:text-left">
@@ -155,7 +155,7 @@
       </div>
 
       <!-- Folder Tabs -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="px-4 pt-4 pb-0 border-b border-slate-100 overflow-x-auto">
           <nav class="flex gap-0.5 min-w-max">
             <button @click="activeTab = 'all'"

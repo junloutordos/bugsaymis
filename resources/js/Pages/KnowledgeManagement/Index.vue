@@ -48,18 +48,18 @@
       <AppTable :is-empty="displayed.length === 0" :skeleton-cols="canManage ? 7 : 5">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Reference No.</th>
-            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Issued</th>
-            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Read</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Title</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Reference No.</th>
+            <th class="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Issued</th>
+            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Read</th>
             <th class="px-3 py-3"></th>
           </tr>
         </template>
 
         <tr v-for="i in displayed" :key="i.id"
-          class="hover:bg-slate-50/60 cursor-pointer"
+          class="hover:bg-indigo-50/40 cursor-pointer"
           @click="router.visit(route('km.show', i.id))">
           <td class="px-4 py-3">
             <AppBadge :color="categoryBadgeColor(i.category_code)">{{ i.category?.label ?? i.category_code }}</AppBadge>
@@ -175,7 +175,7 @@
 
           <!-- Add new category -->
           <div class="border-t border-slate-200 px-5 py-4">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Add New Category</p>
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Add New Category</p>
             <div class="flex gap-2 mb-2">
               <input v-model="addForm.code" type="text" placeholder="Code (e.g. MC2)"
                 maxlength="10"

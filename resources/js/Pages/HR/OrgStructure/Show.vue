@@ -303,7 +303,7 @@ function categoryColor(c) {
                 No child units.
               </div>
               <ul v-else class="divide-y divide-slate-100">
-                <li v-for="child in unit.active_children" :key="child.id" class="px-5 py-3 flex items-center justify-between hover:bg-slate-50/60">
+                <li v-for="child in unit.active_children" :key="child.id" class="px-5 py-3 flex items-center justify-between hover:bg-indigo-50/40">
                   <div>
                     <a :href="route('hr.org.units.show', child.id)" class="text-sm font-medium text-slate-800 hover:text-indigo-600">
                       {{ child.name }}
@@ -319,22 +319,22 @@ function categoryColor(c) {
 
         <!-- ── Tab: Employees ──────────────────────────────────────────────────── -->
         <div v-if="activeTab === 'assignments'">
-          <div v-if="!unit.division_id && !unit.office_id" class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-10 text-center text-sm text-slate-400">
+          <div v-if="!unit.division_id && !unit.office_id" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-5 py-10 text-center text-sm text-slate-400">
             This unit is not linked to a Division or Office. Run a sync to link it.
           </div>
           <AppTable v-else :is-empty="!employees.length" :skeleton-cols="unit.office_id ? 5 : 6">
             <template #head>
               <tr>
-                <th class="px-5 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Badge ID</th>
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Position</th>
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Sex</th>
-                <th v-if="!unit.office_id" class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Office/Unit</th>
+                <th class="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Badge ID</th>
+                <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Position</th>
+                <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+                <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Sex</th>
+                <th v-if="!unit.office_id" class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell">Office/Unit</th>
               </tr>
             </template>
 
-            <tr v-for="emp in employees" :key="emp.id" class="hover:bg-slate-50/60 transition-colors">
+            <tr v-for="emp in employees" :key="emp.id" class="hover:bg-indigo-50/40 transition-colors">
               <td class="px-5 py-2.5 font-medium text-slate-800">{{ emp.name }}</td>
               <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ emp.badge_id ?? '—' }}</td>
               <td class="px-4 py-2.5 text-slate-600 text-xs hidden sm:table-cell">{{ emp.position ?? '—' }}</td>

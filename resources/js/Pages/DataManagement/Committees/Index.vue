@@ -97,17 +97,17 @@ function doSync(committee) {
       <AppTable :is-empty="!filteredCommittees.length" :skeleton-cols="5">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Structure</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Head</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Members</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Structure</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Head</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Members</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
           </tr>
         </template>
 
         <template v-for="committee in filteredCommittees" :key="committee.id">
           <!-- Main row -->
-          <tr class="hover:bg-slate-50/60">
+          <tr class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 font-medium text-slate-800">{{ committee.name }}</td>
             <td class="px-4 py-3">
               <AppBadge v-if="committee.sub_committees?.length" color="indigo">Main ({{ committee.sub_committees.length }} sub)</AppBadge>
@@ -314,7 +314,7 @@ function doSync(committee) {
               <div v-for="(sub, idx) in form.sub_committees" :key="idx"
                 class="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50/50">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Sub-committee {{ idx + 1 }}</span>
+                  <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sub-committee {{ idx + 1 }}</span>
                   <button type="button" @click="removeSubCommittee(idx)"
                     class="text-xs text-danger-600 hover:text-danger-700">Remove</button>
                 </div>

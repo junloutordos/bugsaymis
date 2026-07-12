@@ -32,23 +32,23 @@
       <AppTable :is-empty="filtered.length === 0" :skeleton-cols="5 + requiredCategories.length">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Position / Division</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Completeness</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Position / Division</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Completeness</th>
             <th
               v-for="cat in requiredCategories"
               :key="cat.value"
-              class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell"
+              class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell"
               :title="cat.label"
             >
               Folder {{ cat.folder }}
             </th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Docs</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Docs</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="emp in filtered" :key="emp.id" class="hover:bg-slate-50/60 transition-colors">
+        <tr v-for="emp in filtered" :key="emp.id" class="hover:bg-indigo-50/40 transition-colors">
           <!-- Employee Name -->
           <td class="px-4 py-3">
             <div class="flex items-center gap-2.5">
@@ -145,7 +145,7 @@
       </AppTable>
 
       <!-- CSC PRIME-HRM Folder Reference -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="px-5 py-4 border-b border-slate-100">
           <h2 class="text-sm font-semibold text-slate-700">CSC PRIME-HRM 201 File Folder Reference</h2>
           <p class="text-xs text-slate-400 mt-0.5">Based on CSC Memorandum Circular No. 3, s. 2001</p>

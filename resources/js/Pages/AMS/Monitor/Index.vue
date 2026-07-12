@@ -179,16 +179,16 @@ const maxTrendCount = computed(() => Math.max(1, ...props.trend.map(t => t.count
       <AppTable :is-empty="!filtered.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-            <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-            <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Dates</th>
-            <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Participants</th>
-            <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Evaluation Completion</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Title</th>
+            <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+            <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Dates</th>
+            <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Participants</th>
+            <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Evaluation Completion</th>
           </tr>
         </template>
 
-        <tr v-for="a in displayed" :key="a.id" class="hover:bg-slate-50/60">
+        <tr v-for="a in displayed" :key="a.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3">
             <a :href="a.show_url" class="font-medium text-indigo-600 hover:underline">{{ a.title }}</a>
             <p class="text-xs text-slate-400">{{ a.creator ?? '—' }} &middot; {{ a.venue ?? '—' }}</p>

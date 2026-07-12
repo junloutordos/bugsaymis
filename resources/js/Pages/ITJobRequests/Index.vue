@@ -319,7 +319,7 @@ function handleSigCancel() {
       </AppFilterBar>
 
       <!-- Main card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <!-- Loading overlay -->
         <div v-if="isLoading" class="relative">
           <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-xl">
@@ -336,21 +336,21 @@ function handleSigCancel() {
         <!-- Desktop table -->
         <div class="hidden sm:block overflow-x-auto" :class="{ 'opacity-50 pointer-events-none': isLoading }">
           <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
+            <thead class="bg-slate-50/80">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ITJR #</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Category</th>
-                <th v-if="userRole === 'Administrator'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted By</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Filed</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Priority</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Action</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">ITJR #</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Title</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Category</th>
+                <th v-if="userRole === 'Administrator'" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Submitted By</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Date Filed</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Priority</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap text-center">Action</th>
               </tr>
             </thead>
 
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="req in visibleRequests" :key="req.id" class="hover:bg-slate-50/60">
+              <tr v-for="req in visibleRequests" :key="req.id" class="hover:bg-indigo-50/40">
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.itjr_no }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.title }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.category }}</td>
@@ -513,7 +513,7 @@ function handleSigCancel() {
               class="space-y-6"
             >
               <!-- Request Summary Card -->
-              <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+              <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-6">
                 <div class="flex items-start justify-between mb-4">
                   <div>
                     <h2 class="text-xl font-semibold text-slate-800">
@@ -571,7 +571,7 @@ function handleSigCancel() {
               <!-- Progress Tracking -->
               <div
                 v-if="selectedRequest.tracking_logs?.length"
-                class="bg-white rounded-xl border border-slate-100 shadow-sm p-6"
+                class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-6"
               >
                 <h3 class="text-base font-semibold text-slate-800 mb-5">
                   Progress Tracking

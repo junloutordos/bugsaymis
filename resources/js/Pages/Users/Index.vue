@@ -317,7 +317,7 @@ function formatSg(user) {
         <!-- Desktop Table -->
         <div class="hidden sm:block overflow-x-auto">
           <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
+            <thead class="bg-slate-50/80">
               <tr>
                 <th :class="TH">#</th>
                 <th :class="TH">Name</th>

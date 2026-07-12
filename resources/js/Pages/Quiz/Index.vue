@@ -94,7 +94,7 @@ function deleteQuiz(quiz) {
       <div
         v-for="quiz in filtered"
         :key="quiz.id"
-        class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col"
+        class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden flex flex-col"
       >
         <div
           class="h-28 flex items-center justify-center"

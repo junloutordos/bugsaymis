@@ -76,7 +76,7 @@ const successMsg = computed(() => page.props.flash?.success)
       </div>
 
       <!-- Current members card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-slate-700">Current HRMPSB Members</h3>
           <AppBadge color="slate">{{ members.length }} member{{ members.length !== 1 ? 's' : '' }}</AppBadge>
@@ -104,7 +104,7 @@ const successMsg = computed(() => page.props.flash?.success)
       </div>
 
       <!-- Add new member card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="px-5 py-4 border-b border-slate-100">
           <h3 class="text-sm font-semibold text-slate-700">Add Member</h3>
         </div>
@@ -118,7 +118,7 @@ const successMsg = computed(() => page.props.flash?.success)
 
           <div v-if="results.length" class="mt-4 divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
             <div v-for="u in results" :key="u.id"
-                 class="flex items-center justify-between p-3 bg-white hover:bg-slate-50/60">
+                 class="flex items-center justify-between p-3 bg-white hover:bg-indigo-50/40">
               <div class="flex items-center gap-3">
                 <div class="w-8 h-8 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
                   {{ u.name?.charAt(0)?.toUpperCase() }}
@@ -140,7 +140,7 @@ const successMsg = computed(() => page.props.flash?.success)
       </div>
 
       <!-- Access summary card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
         <h3 class="text-sm font-semibold text-slate-700 mb-3">HRMPSB Access Summary</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-600">
           <div class="flex items-center gap-2"><span class="text-success-600 font-bold">✓</span> View all job vacancies and applicant profiles</div>

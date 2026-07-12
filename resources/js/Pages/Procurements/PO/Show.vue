@@ -187,7 +187,7 @@ const removeItem = async (itemId) => {
 
                 <!-- PO Details -->
                 <AppCard>
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Purchase Order Details</h3>
+                    <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Purchase Order Details</h3>
                     <dl class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                         <div>
                             <dt class="text-slate-500">PO Number</dt>
@@ -210,7 +210,7 @@ const removeItem = async (itemId) => {
 
                 <!-- Supplier Info -->
                 <AppCard>
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Supplier Information</h3>
+                    <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Supplier Information</h3>
                     <dl class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                         <div class="col-span-2">
                             <dt class="text-slate-500">Supplier Name</dt>
@@ -257,7 +257,7 @@ const removeItem = async (itemId) => {
 
                     <table class="w-full text-sm">
                         <thead>
-                            <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                            <tr class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                                 <th class="text-center py-2.5 px-3 w-12">#</th>
                                 <th class="text-left py-2.5 px-3 w-16">Unit</th>
                                 <th class="text-left py-2.5 px-3">Description</th>
@@ -358,7 +358,7 @@ const removeItem = async (itemId) => {
             <div class="space-y-5">
 
                 <AppCard>
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Approval Timeline</h3>
+                    <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Approval Timeline</h3>
                     <ol class="space-y-4">
                         <li v-for="(step, i) in timelineSteps" :key="i" class="flex gap-3">
                             <div class="flex flex-col items-center">

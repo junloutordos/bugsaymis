@@ -115,7 +115,7 @@ function fmtDate(d) {
                         <div v-if="!health.immunizations.length" class="text-sm text-slate-400">No immunization records.</div>
                         <table v-else class="min-w-full text-sm">
                             <thead>
-                                <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                                <tr class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                                     <th class="text-left pb-2">Vaccine</th>
                                     <th class="text-left pb-2">Date Administered</th>
                                 </tr>
@@ -155,7 +155,7 @@ function fmtDate(d) {
                         <div v-if="!health.vitamins.length" class="text-sm text-slate-400">No vitamins/supplements recorded.</div>
                         <table v-else class="min-w-full text-sm">
                             <thead>
-                                <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                                <tr class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                                     <th class="text-left pb-2">Supplement</th>
                                     <th class="text-left pb-2">Date Taken</th>
                                 </tr>

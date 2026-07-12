@@ -116,7 +116,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       <!-- Queue throughput -->
       <AppCard>
         <template #header>
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <QueueListIcon class="h-4 w-4" /> Queue Throughput
           </div>
         </template>
@@ -133,7 +133,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       <!-- Slow Requests -->
       <AppCard>
         <template #header>
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ClockIcon class="h-4 w-4" /> Slow Requests
           </div>
         </template>
@@ -161,7 +161,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       <!-- Exceptions -->
       <AppCard>
         <template #header>
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ExclamationTriangleIcon class="h-4 w-4" /> Exceptions
           </div>
         </template>
@@ -187,7 +187,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       <!-- Slow Queries -->
       <AppCard>
         <template #header>
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <CircleStackIcon class="h-4 w-4" /> Slow Queries
           </div>
         </template>
@@ -211,7 +211,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       </AppCard>
 
       <div class="flex items-center justify-between pt-2">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Infrastructure (AWS)</h2>
+        <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Infrastructure (AWS)</h2>
         <a
           href="https://ap-southeast-1.console.aws.amazon.com/cloudwatch/home?region=ap-southeast-1#dashboards:name=AtlasWatchTower"
           target="_blank"
@@ -224,7 +224,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       <!-- Traces (X-Ray) -->
       <AppCard>
         <template #header>
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ChartBarIcon class="h-4 w-4" /> Traces (last {{ traces?.windowMinutes ?? 60 }} min)
           </div>
         </template>
@@ -255,7 +255,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       <!-- ALB -->
       <AppCard v-if="alb">
         <template #header>
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <ServerStackIcon class="h-4 w-4" /> Load Balancer (24h)
           </div>
         </template>
@@ -282,7 +282,7 @@ const traces = computed(() => props.infra?.traces ?? null)
         <!-- ECS Web -->
         <AppCard v-if="ecsWeb">
           <template #header>
-            <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               <CpuChipIcon class="h-4 w-4" /> ECS — Web service (24h)
             </div>
           </template>
@@ -304,7 +304,7 @@ const traces = computed(() => props.infra?.traces ?? null)
         <!-- ECS Worker -->
         <AppCard v-if="ecsWorker">
           <template #header>
-            <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               <CpuChipIcon class="h-4 w-4" /> ECS — Worker service (24h)
             </div>
           </template>
@@ -327,7 +327,7 @@ const traces = computed(() => props.infra?.traces ?? null)
       <!-- RDS -->
       <AppCard v-if="rds">
         <template #header>
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             <CircleStackIcon class="h-4 w-4" /> RDS (24h)
           </div>
         </template>

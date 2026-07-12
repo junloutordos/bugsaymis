@@ -8,7 +8,7 @@
       <div class="text-base text-slate-500 mt-1">For the period: {{ periodLabel }}</div>
     </div>
 
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
       <canvas ref="chartCanvas" id="healthStatsChart" style="width:100%;height:420px"></canvas>
     </div>
 

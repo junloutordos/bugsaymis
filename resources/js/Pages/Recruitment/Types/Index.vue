@@ -183,12 +183,12 @@ function statusColor(isActive) {
 
         <!-- ── Right: Detail Panel ────────────────────────────────────────── -->
         <div class="lg:col-span-2">
-          <div v-if="!selectedType" class="bg-white rounded-xl border border-slate-100 shadow-sm p-12 text-center text-slate-400 text-sm">
+          <div v-if="!selectedType" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-12 text-center text-slate-400 text-sm">
             Select a recruitment type on the left to configure it.
           </div>
 
           <!-- Settings Panel -->
-          <div v-else-if="activePanel === 'flags'" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+          <div v-else-if="activePanel === 'flags'" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
             <div class="px-5 py-4 border-b border-slate-100">
               <h2 class="text-sm font-semibold text-slate-800">{{ selectedType.name }} — Settings</h2>
             </div>
@@ -201,7 +201,7 @@ function statusColor(isActive) {
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label v-for="flag in flagFields" :key="flag.key"
-                      class="flex items-start gap-3 p-3 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-50/60 transition-colors">
+                      class="flex items-start gap-3 p-3 rounded-lg border border-slate-100 cursor-pointer hover:bg-indigo-50/40 transition-colors">
                   <input type="checkbox" v-model="flagForm[flag.key]"
                          class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                   <div>
@@ -218,7 +218,7 @@ function statusColor(isActive) {
           </div>
 
           <!-- Criteria Panel -->
-          <div v-else-if="activePanel === 'criteria'" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+          <div v-else-if="activePanel === 'criteria'" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h2 class="text-sm font-semibold text-slate-800">{{ selectedType.name }} — Evaluation Criteria</h2>
               <span class="text-sm font-semibold" :class="weightColor">
@@ -272,7 +272,7 @@ function statusColor(isActive) {
           </div>
 
           <!-- Onboarding Panel -->
-          <div v-else-if="activePanel === 'onboarding'" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+          <div v-else-if="activePanel === 'onboarding'" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
             <div class="px-5 py-4 border-b border-slate-100">
               <h2 class="text-sm font-semibold text-slate-800">{{ selectedType.name }} — Onboarding Requirements</h2>
             </div>

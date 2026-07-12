@@ -222,7 +222,7 @@ onUnmounted(() => {
             </div>
 
             <div class="min-w-0 flex-1">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                 {{ n.request_type }}
               </p>
               <p class="text-sm font-medium text-slate-800 leading-snug truncate">

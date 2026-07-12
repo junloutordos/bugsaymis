@@ -166,7 +166,7 @@ function openSpecs(eq) {
           @dragover.prevent
           @drop="onDropTray"
         >
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
             Unassigned ({{ unassigned.length }})
           </div>
           <p v-if="canManage" class="text-[11px] text-slate-400 mb-3">Drag a unit onto the grid to place it, or drag a placed unit back here to unassign it.</p>

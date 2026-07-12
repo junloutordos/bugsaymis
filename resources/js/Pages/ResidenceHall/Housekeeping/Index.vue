@@ -90,7 +90,7 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
       </AppPageHeader>
 
       <!-- Empty state -->
-      <div v-if="!rooms.length" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-if="!rooms.length" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState :icon="ClipboardDocumentCheckIcon" title="No active rooms configured" subtitle="Set up rooms first before running inspections.">
           <a href="/rh/rooms" class="mt-4 inline-block text-sm text-indigo-600 hover:underline font-medium">Go to Rooms →</a>
         </EmptyState>
@@ -99,7 +99,7 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
       <!-- Room Grid by Hall -->
       <div v-for="hall in ['BRH', 'GRH']" :key="hall">
         <div v-if="rooms.some(r => r.residence_hall === hall)">
-          <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
             {{ hall === 'BRH' ? 'Boy\'s Residence Hall (BRH)' : 'Girl\'s Residence Hall (GRH)' }}
           </h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
@@ -170,7 +170,7 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
 
         <!-- Conforme section (if check already saved) -->
         <div v-if="showModal.check" class="border-t border-slate-100 pt-4 mb-4">
-          <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Intern Conforme</h4>
+          <h4 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Intern Conforme</h4>
           <div v-if="roomInterns.length" class="space-y-1">
             <div v-for="dormer in roomInterns" :key="dormer.id" class="flex items-center justify-between">
               <span class="text-sm text-slate-700">{{ dormer.name }}</span>

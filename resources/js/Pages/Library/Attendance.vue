@@ -27,14 +27,14 @@
       <AppTable :is-empty="!attendances.data?.length" :skeleton-cols="4">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PISAY ID</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Student Name</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Scan Time</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">PISAY ID</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Student Name</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Scan Time</th>
           </tr>
         </template>
 
-        <tr v-for="att in attendances.data" :key="att.id" class="hover:bg-slate-50/60">
+        <tr v-for="att in attendances.data" :key="att.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700">{{ att.id }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ att.pisay_systemid || '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ (att.student_name ?? '—').toUpperCase() }}</td>

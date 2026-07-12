@@ -159,7 +159,7 @@ function categoryColor(c) {
         <div
           v-for="div in filtered"
           :key="div.id"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden"
+          class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden"
         >
           <!-- Division header -->
           <button
@@ -205,11 +205,11 @@ function categoryColor(c) {
               <AppTable v-if="office.employees.length" :card="false">
                 <template #head>
                   <tr>
-                    <th class="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Badge ID</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Sex</th>
+                    <th class="px-5 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                    <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Badge ID</th>
+                    <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Position</th>
+                    <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+                    <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sex</th>
                   </tr>
                 </template>
                 <tr

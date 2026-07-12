@@ -9,7 +9,7 @@
 
       <div v-if="nominations.length" class="space-y-4">
         <div v-for="n in nominations" :key="n.id"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
           <div class="flex items-start justify-between gap-4">
             <div>
               <div class="flex items-center gap-2">
@@ -34,7 +34,7 @@
         </div>
       </div>
 
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-else class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState title="No nominations yet">
           <Link :href="route('rewards.nominations.create')"
             class="mt-3 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium">

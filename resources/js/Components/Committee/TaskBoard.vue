@@ -436,7 +436,7 @@ const postUpdate = () => {
 
         <!-- Updates feed -->
         <div class="border-t border-slate-100 pt-3">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Updates</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Updates</p>
           <div v-if="canWorkTask(drawerTask)" class="flex gap-2 mb-3">
             <AppInput v-model="updateBody" placeholder="Write an update…" class="flex-1" @keydown.enter.prevent="postUpdate" />
             <AppButton :disabled="isSubmitting || !updateBody.trim()" @click="postUpdate">Post</AppButton>

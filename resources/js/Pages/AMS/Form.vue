@@ -284,7 +284,7 @@ function submit() {
           <div v-if="provideMeals && mealDays.length" class="overflow-x-auto mt-4">
             <table class="min-w-full text-sm">
               <thead>
-                <tr class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <tr class="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                   <th class="py-2 pr-4">Day</th>
                   <th class="py-2 px-2 text-center">AM Snacks</th>
                   <th class="py-2 px-2 text-center">Lunch</th>

@@ -33,7 +33,7 @@
       </div>
 
       <!-- Empty -->
-      <div v-if="records.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-if="records.length === 0" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState
           title="No SALN records found"
           subtitle="This employee has not filed any SALN yet."
@@ -43,7 +43,7 @@
       <!-- Timeline -->
       <div v-else class="space-y-3">
         <div v-for="rec in records" :key="rec.id"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
 
           <!-- Year + status -->
           <div class="shrink-0 text-center sm:text-left sm:w-20">

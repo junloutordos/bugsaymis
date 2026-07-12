@@ -379,7 +379,7 @@ async function checkRecord() {
       </div>
 
       <!-- Quarter tabs -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <!-- Quarter tab bar -->
         <div class="flex border-b border-slate-100">
           <button v-for="q in [1,2,3,4]" :key="q"
@@ -516,7 +516,7 @@ async function checkRecord() {
 
               <div class="overflow-x-auto rounded-lg border border-slate-100">
                 <table class="min-w-full text-sm">
-                  <thead class="bg-slate-50">
+                  <thead class="bg-slate-50/80">
                     <tr>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-16">#</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description</th>
@@ -631,7 +631,7 @@ async function checkRecord() {
             </p>
             <div class="overflow-x-auto rounded-xl border border-slate-100">
               <table class="min-w-full text-sm">
-                <thead class="bg-slate-50">
+                <thead class="bg-slate-50/80">
                   <tr>
                     <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 w-10">#</th>
                     <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Student</th>

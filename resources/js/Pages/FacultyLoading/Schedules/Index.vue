@@ -72,8 +72,8 @@
 
       <!-- Unplaced subjects tray (mobile/tablet — full-width horizontal bar) -->
       <div v-if="unplacedLoads.length"
-        class="lg:hidden bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-2">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+        class="lg:hidden bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 space-y-2">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
           Unplaced Subjects — drag onto a slot below
         </p>
         <div class="flex flex-wrap gap-2">
@@ -108,7 +108,7 @@
           <!-- Calendar cards per section / per faculty -->
           <template v-else>
             <div v-for="groupId in groupsWithSchedules" :key="groupId"
-              class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
 
               <!-- Group header -->
               <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
@@ -138,7 +138,7 @@
                     <div class="shrink-0 border-r border-slate-100" :style="{ width: GUTTER + 'px' }" />
                     <div v-for="day in WEEKDAYS" :key="day"
                       class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0">
-                      <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                         {{ day.slice(0, 3) }}
                       </span>
                       <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
@@ -279,9 +279,9 @@
 
         <!-- Unplaced subjects panel (desktop — sticky right rail) -->
         <div v-if="unplacedLoads.length"
-          class="hidden lg:block w-80 shrink-0 bg-white rounded-xl border border-slate-100 shadow-sm sticky top-4">
+          class="hidden lg:block w-80 shrink-0 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 sticky top-4">
           <div class="px-4 py-3 border-b border-slate-100">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               Unplaced Subjects ({{ unplacedLoads.length }})
             </p>
             <p class="text-xs text-slate-400 mt-0.5">Drag onto a slot in the calendar</p>

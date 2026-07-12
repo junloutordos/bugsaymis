@@ -326,7 +326,7 @@ initAwardSelections()
             <AppCard :padded="false">
                 <template #header>
                     <div class="flex items-center justify-between gap-3 w-full">
-                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                             {{ isClosed || isAwarded ? 'Abstract of Quotations' : 'Items' }}
                         </h3>
                         <div class="flex gap-2 text-xs text-slate-500">
@@ -343,18 +343,18 @@ initAwardSelections()
                     <table class="min-w-full text-sm">
                         <thead class="bg-slate-50 border-b border-slate-100">
                             <tr>
-                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-8">#</th>
-                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Unit</th>
-                                <th class="px-3 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide w-12">Qty</th>
-                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-                                <th class="px-3 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide w-24">ABC/unit</th>
+                                <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-8">#</th>
+                                <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-16">Unit</th>
+                                <th class="px-3 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-12">Qty</th>
+                                <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                                <th class="px-3 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-24">ABC/unit</th>
                                 <template v-for="sup in (r.suppliers || [])" :key="sup.id">
-                                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide" colspan="2">
+                                    <th class="px-3 py-2.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider" colspan="2">
                                         {{ sup.supplier_name }}
                                     </th>
                                 </template>
-                                <th v-if="isClosed && perms.canAward" class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-32">Award To</th>
-                                <th v-else-if="isAwarded" class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-32">Awarded To</th>
+                                <th v-if="isClosed && perms.canAward" class="px-3 py-2.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-32">Award To</th>
+                                <th v-else-if="isAwarded" class="px-3 py-2.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-32">Awarded To</th>
                             </tr>
                             <tr v-if="(r.suppliers || []).length" class="border-b border-slate-100 bg-slate-50/60">
                                 <th colspan="5"></th>
@@ -434,7 +434,7 @@ initAwardSelections()
             <AppCard :padded="false">
                 <template #header>
                     <div class="flex items-center justify-between gap-3 w-full">
-                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                             Suppliers ({{ (r.suppliers || []).length }})
                         </h3>
                         <AppButton v-if="isDraft && perms.canCreate" size="sm" @click="showAddSupplier = true">

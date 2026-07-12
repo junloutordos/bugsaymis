@@ -195,7 +195,7 @@ function storageUrl(path) {
       <div v-if="activity.special_order || activity.activity_report || activity.official_documentation"
            class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-6 py-3 bg-slate-50 border-b border-slate-100">
-          <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Attachments</h2>
+          <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Attachments</h2>
         </div>
         <div class="divide-y divide-slate-50">
           <div v-if="activity.special_order" class="flex items-center gap-3 px-6 py-3">

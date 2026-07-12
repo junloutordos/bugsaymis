@@ -25,9 +25,9 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 
 
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div v-for="p in payslips.data" :key="p.id"
-             class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3">
+             class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5 flex flex-col gap-3">
           <div>
-            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               {{ monthName(p.month) }} {{ p.year }}
             </div>
             <div class="text-sm text-slate-500 mt-0.5">

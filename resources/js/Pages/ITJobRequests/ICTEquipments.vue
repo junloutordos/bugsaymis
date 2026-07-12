@@ -652,18 +652,18 @@ const showAllChecked    = computed({
           <AppTable :is-empty="visibleEquipments.length === 0" :skeleton-cols="8">
             <template #head>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ID</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Serial No</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Owner</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Agent</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Action</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">ID</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Serial No</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Description</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Owner</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Location</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Agent</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap text-center">Action</th>
               </tr>
             </template>
 
-            <tr v-for="eq in visibleEquipments" :key="eq.id" class="hover:bg-slate-50/60">
+            <tr v-for="eq in visibleEquipments" :key="eq.id" class="hover:bg-indigo-50/40">
               <td class="px-4 py-3 text-sm text-slate-700">{{ eq.id }}</td>
               <td class="px-4 py-3 text-sm text-slate-700">{{ eq.serial_no }}</td>
               <td class="px-4 py-3 text-sm text-slate-700">{{ eq.description }}</td>
@@ -1153,7 +1153,7 @@ const showAllChecked    = computed({
                 Generates one token you can paste into the installer on every machine in this batch — no need to generate a fresh one per device.
               </p>
               <div>
-                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Label (optional)</label>
+                <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Label (optional)</label>
                 <input
                   v-model="bulkLabel"
                   type="text"
@@ -1166,7 +1166,7 @@ const showAllChecked    = computed({
                 <label for="bulk-unlimited" class="text-sm text-slate-600">Unlimited devices (until it expires)</label>
               </div>
               <div v-if="!bulkUnlimited">
-                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Number of devices</label>
+                <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Number of devices</label>
                 <input
                   v-model.number="bulkQuantity"
                   type="number"
@@ -1175,7 +1175,7 @@ const showAllChecked    = computed({
                 />
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Expires in</label>
+                <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Expires in</label>
                 <select v-model.number="bulkExpiryHours" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full mt-1">
                   <option :value="24">24 hours</option>
                   <option :value="72">3 days</option>
@@ -1228,7 +1228,7 @@ const showAllChecked    = computed({
 
             <!-- Outstanding tokens -->
             <div class="pt-2 border-t border-slate-100">
-              <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Outstanding Tokens</h3>
+              <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Outstanding Tokens</h3>
               <div v-if="loadingTokens" class="text-xs text-slate-400">Loading…</div>
               <div v-else-if="!outstandingTokens.length" class="text-xs text-slate-400">No active tokens.</div>
               <ul v-else class="space-y-2 max-h-40 overflow-y-auto">
@@ -1369,7 +1369,7 @@ const showAllChecked    = computed({
                 <CpuChipIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
                   <div class="flex items-center justify-between">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</div>
+                    <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">CPU</div>
                     <div v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu_temp_c" class="text-xs text-slate-500 flex items-center gap-1">
                       <FireIcon class="w-3.5 h-3.5 text-slate-400" />
                       {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.cpu_temp_c }}&deg;C
@@ -1397,7 +1397,7 @@ const showAllChecked    = computed({
                 <WifiIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
                   <div class="flex items-center justify-between">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Network</div>
+                    <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Network</div>
                     <span v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.link_up === false" class="text-[11px] font-medium text-red-600">Link Down</span>
                   </div>
                   <div class="mt-0.5 text-sm text-slate-700 space-x-3">
@@ -1431,7 +1431,7 @@ const showAllChecked    = computed({
               >
                 <ServerStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Services</div>
+                  <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Services</div>
                   <div class="flex flex-wrap gap-1.5 items-center">
                     <span
                       v-for="svc in selectedSpecsEquipment.agent_device.health_snapshot.payload.services"
@@ -1460,7 +1460,7 @@ const showAllChecked    = computed({
               >
                 <BoltIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Battery</div>
+                  <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Battery</div>
                   <template v-if="batteryWearPct(selectedSpecsEquipment.agent_device.hardware_inventory.battery) !== null">
                     <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                       <div
@@ -1482,7 +1482,7 @@ const showAllChecked    = computed({
               >
                 <ShieldCheckIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Security</div>
+                  <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Security</div>
                   <div class="grid grid-cols-2 gap-1 text-xs">
                     <div :class="securityRowClass(selectedSpecsEquipment.agent_device.security_status.antivirus_enabled)">
                       Antivirus: {{ selectedSpecsEquipment.agent_device.security_status.antivirus_enabled === false ? 'Disabled' : selectedSpecsEquipment.agent_device.security_status.antivirus_enabled === true ? 'Enabled' : '—' }}
@@ -1509,7 +1509,7 @@ const showAllChecked    = computed({
                 <Square3Stack3DIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
                   <div class="flex items-center justify-between">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">RAM</div>
+                    <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">RAM</div>
                     <div class="text-xs text-slate-500">
                       {{ Math.round(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb / 1024) }} GB free of
                       {{ Math.round(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb / 1024) }} GB
@@ -1529,7 +1529,7 @@ const showAllChecked    = computed({
               <div class="border border-slate-100 rounded-lg p-3 flex items-start gap-3">
                 <CircleStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Disks</div>
+                  <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Disks</div>
                   <div v-if="!selectedSpecsEquipment.agent_device.health_snapshot.payload?.disks?.length" class="text-sm text-slate-400">—</div>
                   <div v-else class="space-y-2.5">
                     <div v-for="disk in selectedSpecsEquipment.agent_device.health_snapshot.payload.disks" :key="disk.drive">
@@ -1580,7 +1580,7 @@ const showAllChecked    = computed({
               >
                 <PrinterIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Printers</div>
+                  <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Printers</div>
                   <div class="space-y-2">
                     <div
                       v-for="printer in selectedSpecsEquipment.agent_device.health_snapshot.payload.printers"
@@ -1611,7 +1611,7 @@ const showAllChecked    = computed({
               <div class="border border-slate-100 rounded-lg p-3 flex items-start gap-3">
                 <WrenchScrewdriverIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Quick Fixes</div>
+                  <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Quick Fixes</div>
                   <div class="grid grid-cols-2 gap-2">
                     <div v-for="qf in QUICK_FIX_ACTIONS" :key="qf.action">
                       <button
@@ -1645,7 +1645,7 @@ const showAllChecked    = computed({
                 <ArchiveBoxIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
                   <div class="flex items-center justify-between mb-2">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                       Installed Software ({{ selectedSpecsEquipment.agent_device.software_inventory.installed_software.length }})
                     </div>
                   </div>

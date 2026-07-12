@@ -14,11 +14,11 @@
 
 // ── Header cells ──────────────────────────────────────────────────────────────
 /** Standard left-aligned header */
-export const TH = 'px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap'
+export const TH = 'px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap'
 /** Centre-aligned header (numeric / status columns) */
-export const TH_C = 'px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap'
+export const TH_C = 'px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap'
 /** Right-aligned header (actions column) */
-export const TH_END = 'px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide'
+export const TH_END = 'px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider'
 
 // ── Body cells ────────────────────────────────────────────────────────────────
 /** Standard data cell */
@@ -32,10 +32,10 @@ export const TD_END = 'px-4 py-3 text-right'
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 /** Standard interactive row */
-export const TR = 'hover:bg-slate-50/60 transition-colors'
+export const TR = 'hover:bg-indigo-50/40 transition-colors'
 /** Clickable row — add cursor-pointer */
-export const TR_CLICK = 'hover:bg-slate-50/60 transition-colors cursor-pointer'
+export const TR_CLICK = 'hover:bg-indigo-50/40 transition-colors cursor-pointer'
 
 // ── Card wrapper (outer shell) ────────────────────────────────────────────────
 /** The standard card that wraps every table */
-export const TABLE_CARD = 'bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden'
+export const TABLE_CARD = 'bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden'

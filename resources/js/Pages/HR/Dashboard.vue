@@ -230,7 +230,7 @@ const rewardsByTypeData = computed(() => ({
 
         <AppCard v-if="hr.leaveTypeBreakdown?.length" title="Leave Type Breakdown (this year)">
           <table class="w-full text-sm">
-            <thead><tr class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"><th class="py-1">Leave Type</th><th class="py-1 text-right">Applications</th><th class="py-1 text-right">Days</th></tr></thead>
+            <thead><tr class="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider"><th class="py-1">Leave Type</th><th class="py-1 text-right">Applications</th><th class="py-1 text-right">Days</th></tr></thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-for="row in hr.leaveTypeBreakdown" :key="row.name">
                 <td class="py-1.5 text-slate-700">{{ row.name }}</td>
@@ -439,7 +439,7 @@ const rewardsByTypeData = computed(() => ({
           </AppCard>
           <AppCard title="Awards by Incentive Type">
             <table v-if="rewards.awardsByIncentive?.length" class="w-full text-sm">
-              <thead><tr class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"><th class="py-1">Type</th><th class="py-1 text-right">Count</th><th class="py-1 text-right">Total Value</th></tr></thead>
+              <thead><tr class="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider"><th class="py-1">Type</th><th class="py-1 text-right">Count</th><th class="py-1 text-right">Total Value</th></tr></thead>
               <tbody class="divide-y divide-slate-100">
                 <tr v-for="row in rewards.awardsByIncentive" :key="row.incentive_type">
                   <td class="py-1.5 text-slate-700 capitalize">{{ row.incentive_type?.replace('_', ' ') }}</td>

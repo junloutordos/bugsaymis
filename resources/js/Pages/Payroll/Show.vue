@@ -4,7 +4,7 @@
     <div class="space-y-5">
 
       <!-- Run Header Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div class="space-y-1">
             <div class="flex items-center gap-3">
@@ -96,15 +96,15 @@
 
       <!-- Summary Strip -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
           <p class="text-xs text-slate-500 font-medium uppercase">Employees</p>
           <p class="text-2xl font-bold text-slate-800 mt-1">{{ run.employee_count }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
           <p class="text-xs text-slate-500 font-medium uppercase">Gross Pay</p>
           <p class="text-lg font-bold text-slate-800 mt-1">{{ fmt(run.total_gross) }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
           <p class="text-xs text-slate-500 font-medium uppercase">Deductions</p>
           <p class="text-lg font-bold text-danger-600 mt-1">{{ fmt(run.total_deductions) }}</p>
         </div>
@@ -123,20 +123,20 @@
         <AppTable :is-empty="!records.data?.length" :skeleton-cols="10">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">SG / Step</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Monthly Salary</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Basic Pay</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Gross Pay</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Deductions</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">WHT</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Net Pay</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Details</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Employee</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">SG / Step</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Monthly Salary</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Basic Pay</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Gross Pay</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Deductions</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">WHT</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Net Pay</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Details</th>
             </tr>
           </template>
 
-          <tr v-for="rec in records.data" :key="rec.id" class="hover:bg-slate-50/60">
+          <tr v-for="rec in records.data" :key="rec.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3">
               <div class="font-medium text-slate-800">{{ rec.user?.name }}</div>
               <div class="text-xs text-slate-400">{{ rec.user?.badge_id }}</div>
@@ -216,7 +216,7 @@
       </div>
 
       <div v-if="breakdown.record?.allowances?.length" class="mb-4">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Allowances</p>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Allowances</p>
         <div v-for="a in breakdown.record.allowances" :key="a.id" class="flex justify-between text-sm py-0.5">
           <span class="text-slate-600">{{ a.allowance_type?.name }}</span>
           <span class="text-success-600 font-medium">+{{ fmt(a.amount) }}</span>
@@ -228,7 +228,7 @@
       </div>
 
       <div v-if="breakdown.record?.deductions?.length" class="mb-4">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Deductions</p>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Deductions</p>
         <div v-for="d in breakdown.record.deductions" :key="d.id" class="flex justify-between text-sm py-0.5">
           <span class="text-slate-600">{{ d.allowance_type?.name }}</span>
           <span class="text-danger-600 font-medium">-{{ fmt(d.amount) }}</span>

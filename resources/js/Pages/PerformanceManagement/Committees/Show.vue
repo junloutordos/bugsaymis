@@ -203,17 +203,17 @@ const statusColor = (status) => {
         <AppTable v-else :card="false">
           <template #head>
             <tr>
-              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Member</th>
-              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Task / Role</th>
-              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
-              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">IPCR Status</th>
-              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Accomplishment</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Q</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">E</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">T</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Member</th>
+              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Task / Role</th>
+              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Rating Period</th>
+              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">IPCR Status</th>
+              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Accomplishment</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Q</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">E</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">T</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Avg</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Rating</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Action</th>
             </tr>
           </template>
 
@@ -222,7 +222,7 @@ const statusColor = (status) => {
               <tr
                     v-for="(period, pIdx) in member.periods"
                     :key="`${member.user_id}-${period.ipcr_id}`"
-                    :class="pIdx === 0 ? 'border-t-2 border-slate-200 hover:bg-slate-50/60' : 'hover:bg-slate-50/60'"
+                    :class="pIdx === 0 ? 'border-t-2 border-slate-200 hover:bg-indigo-50/40' : 'hover:bg-indigo-50/40'"
                   >
                     <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top border-r border-slate-100">
                       <p class="font-medium text-slate-800">{{ member.user_name }}</p>
@@ -265,7 +265,7 @@ const statusColor = (status) => {
                   </tr>
                 </template>
 
-                <tr v-else :key="`${member.user_id}-no-ipcr`" class="border-t-2 border-slate-200 hover:bg-slate-50/60">
+                <tr v-else :key="`${member.user_id}-no-ipcr`" class="border-t-2 border-slate-200 hover:bg-indigo-50/40">
                   <td class="px-3 py-2 text-sm">
                     <p class="font-medium text-slate-800">{{ member.user_name }}</p>
                     <p class="text-xs text-slate-400">{{ member.user_position }}</p>

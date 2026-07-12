@@ -147,7 +147,7 @@ function sumMF(obj) {
         <div class="grid md:grid-cols-2 gap-6">
           <!-- By Division -->
           <AppCard>
-            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Division</h3>
+            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">By Division</h3>
             <div v-if="!employees.byDivision?.length" class="text-sm text-slate-400 italic">No data available.</div>
             <div v-else class="space-y-3">
               <div v-for="row in employees.byDivision" :key="row.name">
@@ -173,7 +173,7 @@ function sumMF(obj) {
           </AppCard>
           <!-- By Salary Band -->
           <AppCard>
-            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Salary Band</h3>
+            <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">By Salary Band</h3>
             <div v-if="!employees.bySalaryBand?.length" class="text-sm text-slate-400 italic">No data available.</div>
             <div v-else class="space-y-3">
               <div v-for="row in employees.bySalaryBand" :key="row.name">
@@ -224,7 +224,7 @@ function sumMF(obj) {
         </div>
 
         <AppCard>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Grade Level</h3>
+          <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">By Grade Level</h3>
           <div v-if="!students.byGrade?.length" class="text-sm text-slate-400 italic">No enrollment data available.</div>
           <div v-else class="space-y-3">
             <div v-for="row in students.byGrade" :key="row.name">
@@ -278,7 +278,7 @@ function sumMF(obj) {
         </div>
 
         <AppCard>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Leave Type</h3>
+          <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">By Leave Type</h3>
           <div v-if="!leave.byType?.length" class="text-sm text-slate-400 italic">No data available.</div>
           <div v-else class="space-y-3">
             <div v-for="row in leave.byType" :key="row.name">
@@ -328,7 +328,7 @@ function sumMF(obj) {
         </div>
 
         <AppCard>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Training Participants by Year</h3>
+          <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Training Participants by Year</h3>
           <div v-if="!training.byYear?.length" class="text-sm text-slate-400 italic">No training records found.</div>
           <div v-else class="space-y-3">
             <div v-for="row in training.byYear" :key="row.name">
@@ -378,7 +378,7 @@ function sumMF(obj) {
         </div>
 
         <AppCard>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Nomination Status</h3>
+          <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">By Nomination Status</h3>
           <div v-if="!rewards.byStatus?.length" class="text-sm text-slate-400 italic">No nomination data available.</div>
           <div v-else class="space-y-3">
             <div v-for="row in rewards.byStatus" :key="row.name">
@@ -428,7 +428,7 @@ function sumMF(obj) {
         </div>
 
         <AppCard>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Sessions by School Year</h3>
+          <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Sessions by School Year</h3>
           <div v-if="!guidance.byYear?.length" class="text-sm text-slate-400 italic">No guidance session data available.</div>
           <div v-else class="space-y-3">
             <div v-for="row in guidance.byYear" :key="row.name">
@@ -512,7 +512,7 @@ function sumMF(obj) {
         </div>
 
         <AppCard>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">By Client Type</h3>
+          <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">By Client Type</h3>
           <div v-if="!csm.byClientType?.length" class="text-sm text-slate-400 italic">No CSM data available.</div>
           <div v-else class="space-y-3">
             <div v-for="row in csm.byClientType" :key="row.name">

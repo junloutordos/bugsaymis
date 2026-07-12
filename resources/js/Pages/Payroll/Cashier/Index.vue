@@ -38,7 +38,7 @@ function statusBadgeColor (s) {
 
       <!-- One card per pay period -->
       <div v-for="period in periods" :key="period.year + '-' + period.month"
-           class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+           class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
 
         <!-- Period header -->
         <div class="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">

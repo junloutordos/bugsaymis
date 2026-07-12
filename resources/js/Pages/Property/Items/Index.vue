@@ -140,10 +140,10 @@ const importValidRows = computed(() => importPreview.value.filter(r => r.errors.
 
       <!-- Summary -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Items</div><div class="text-2xl font-bold mt-1">{{ summary.total }}</div></div>
-        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Serviceable</div><div class="text-2xl font-bold text-success-700 mt-1">{{ summary.serviceable }}</div></div>
-        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Cost</div><div class="text-xl font-bold mt-1">₱{{ summary.total_cost.toLocaleString('en-PH',{minimumFractionDigits:2}) }}</div></div>
-        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Book Value</div><div class="text-xl font-bold text-indigo-700 mt-1">₱{{ summary.book_value.toLocaleString('en-PH',{minimumFractionDigits:2}) }}</div></div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Items</div><div class="text-2xl font-bold mt-1">{{ summary.total }}</div></div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Serviceable</div><div class="text-2xl font-bold text-success-700 mt-1">{{ summary.serviceable }}</div></div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Cost</div><div class="text-xl font-bold mt-1">₱{{ summary.total_cost.toLocaleString('en-PH',{minimumFractionDigits:2}) }}</div></div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Book Value</div><div class="text-xl font-bold text-indigo-700 mt-1">₱{{ summary.book_value.toLocaleString('en-PH',{minimumFractionDigits:2}) }}</div></div>
       </div>
 
       <!-- Filters -->
@@ -172,18 +172,18 @@ const importValidRows = computed(() => importPreview.value.filter(r => r.errors.
       <AppTable :is-empty="!displayed.length" :skeleton-cols="canManage ? 8 : 7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Property No.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Cost</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Book Value</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Officer</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Property No.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Cost</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Book Value</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Officer</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             <th v-if="canManage" class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="item in displayed" :key="item.id" class="hover:bg-slate-50/60">
+        <tr v-for="item in displayed" :key="item.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm font-mono text-indigo-700"><Link :href="route('property.items.show',item.id)" class="hover:underline">{{ item.property_number }}</Link></td>
           <td class="px-4 py-3">
             <div class="text-sm font-medium text-slate-800">{{ item.description }}</div>

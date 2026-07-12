@@ -10,7 +10,7 @@
 
       <div v-if="nominations.length" class="space-y-4">
         <div v-for="n in nominations" :key="n.id"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p class="font-semibold text-slate-800">{{ n.nominee?.name }}</p>
@@ -42,7 +42,7 @@
           </div>
         </div>
       </div>
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-else class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState title="No nominations pending evaluation for this stage" />
       </div>
     </div>

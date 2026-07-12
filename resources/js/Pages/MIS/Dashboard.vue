@@ -423,13 +423,13 @@ function fmtDateTime(d) {
         <AppTable :is-empty="!personnelWorkload.length" :card="false" :skeleton-cols="4">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Staff</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Handled</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Pending Confirmation</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Staff</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Handled</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pending Confirmation</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide">Avg Rating</th>
             </tr>
           </template>
-          <tr v-for="p in personnelWorkload" :key="p.attendedby" class="hover:bg-slate-50/60">
+          <tr v-for="p in personnelWorkload" :key="p.attendedby" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 font-medium text-slate-700">{{ p.attendedby }}</td>
             <td class="px-4 py-3 text-center text-slate-700 tabular-nums">{{ p.total }}</td>
             <td class="px-4 py-3 text-center tabular-nums"
@@ -455,15 +455,15 @@ function fmtDateTime(d) {
         <AppTable :is-empty="!recentRequests.length" :card="false" :skeleton-cols="6">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ITJR #</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted By</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date Filed</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">ITJR #</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Title</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Submitted By</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date Filed</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             </tr>
           </template>
-          <tr v-for="r in recentRequests" :key="r.id" class="hover:bg-slate-50/60">
+          <tr v-for="r in recentRequests" :key="r.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-2.5 text-xs font-mono text-slate-600">{{ r.itjr_no }}</td>
             <td class="px-4 py-2.5 text-slate-700 max-w-xs truncate">{{ r.title }}</td>
             <td class="px-4 py-2.5 text-slate-500 text-xs">{{ r.category }}</td>
@@ -546,14 +546,14 @@ function fmtDateTime(d) {
           <AppTable :is-empty="!fleet.top_at_risk_devices.length" :card="false" :skeleton-cols="5">
             <template #head>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Device</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Risk</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Open Alerts</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Check-in</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Device</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Room</th>
+                <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Risk</th>
+                <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Open Alerts</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Last Check-in</th>
               </tr>
             </template>
-            <tr v-for="d in fleet.top_at_risk_devices" :key="d.id" class="hover:bg-slate-50/60">
+            <tr v-for="d in fleet.top_at_risk_devices" :key="d.id" class="hover:bg-indigo-50/40">
               <td class="px-4 py-3 font-medium text-slate-700">{{ d.hostname || '—' }}</td>
               <td class="px-4 py-3 text-slate-500 text-xs">{{ d.equipment?.room?.name || '—' }}</td>
               <td class="px-4 py-3 text-center">

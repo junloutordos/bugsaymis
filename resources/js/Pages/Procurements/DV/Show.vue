@@ -212,7 +212,7 @@ const canOcdPayment = computed(() => perms.value.canOcdSign && d.value.status ==
 
                 <!-- Financial details -->
                 <AppCard>
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Financial Details</h3>
+                    <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Financial Details</h3>
                     <dl class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                         <div>
                             <dt class="text-slate-500">PO Number</dt>
@@ -255,7 +255,7 @@ const canOcdPayment = computed(() => perms.value.canOcdSign && d.value.status ==
 
                 <!-- Delivery details -->
                 <AppCard v-if="d.delivery_accepted_at">
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Delivery &amp; Inspection (Phase A)</h3>
+                    <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Delivery &amp; Inspection (Phase A)</h3>
                     <dl class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                         <div>
                             <dt class="text-slate-500">IAR Number</dt>
@@ -304,7 +304,7 @@ const canOcdPayment = computed(() => perms.value.canOcdSign && d.value.status ==
             <!-- Right: Timeline -->
             <div>
                 <AppCard>
-                    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Processing Timeline</h3>
+                    <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Processing Timeline</h3>
                     <ol class="space-y-4">
                         <li v-for="(step, i) in timelineSteps" :key="i" class="flex gap-3">
                             <div class="flex flex-col items-center">

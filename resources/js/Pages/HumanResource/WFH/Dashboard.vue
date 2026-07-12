@@ -266,7 +266,7 @@
             <div v-if="expandedHistoryId === record.id" class="px-5 pb-5 space-y-4 bg-slate-50/60">
               <!-- Accomplishments for this day -->
               <div class="pt-4">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Accomplishments</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Accomplishments</p>
                 <AccomplishmentList
                   :items="historyAccomplishments[record.id] ?? record.accomplishments ?? []"
                   @deleted="(id) => onHistoryAccomplishmentDeleted(record.id, id)"
@@ -276,7 +276,7 @@
 
               <!-- Add accomplishment for this past day -->
               <div class="border-t border-slate-200 pt-4">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Add Accomplishment</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Add Accomplishment</p>
                 <AccomplishmentForm
                   :attendance-id="record.id"
                   @saved="(item) => onHistoryAccomplishmentSaved(record.id, item)"

@@ -41,18 +41,18 @@
             <AppTable :is-empty="!displayed.length" :skeleton-cols="8">
                 <template #head>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ORS No</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Supplier</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Amount</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Created By</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">ORS No</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Activity</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Supplier</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Created By</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
                         <th class="px-4 py-3"></th>
                     </tr>
                 </template>
 
-                <tr v-for="o in displayed" :key="o.id" class="hover:bg-slate-50/60">
+                <tr v-for="o in displayed" :key="o.id" class="hover:bg-indigo-50/40">
                     <td class="px-4 py-3 text-sm font-mono text-slate-700 whitespace-nowrap">{{ o.ors_number || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-700 max-w-xs truncate">{{ o.activity_title || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ o.supplier_name || '—' }}</td>

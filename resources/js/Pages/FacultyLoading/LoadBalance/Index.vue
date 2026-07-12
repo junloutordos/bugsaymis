@@ -95,7 +95,7 @@
         </div>
 
         <!-- Workload Distribution Chart -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
           <h2 class="text-sm font-semibold text-slate-700 mb-4">Workload Distribution</h2>
           <div class="space-y-2.5">
             <div v-for="f in sortedFaculty" :key="f.user_id" class="flex items-center gap-3">
@@ -328,7 +328,7 @@
       <!-- Impact table -->
       <div class="rounded-xl border border-slate-100 overflow-hidden">
         <table class="min-w-full text-xs">
-          <thead class="bg-slate-50">
+          <thead class="bg-slate-50/80">
             <tr>
               <th class="px-4 py-2 text-left font-semibold text-slate-500">Faculty</th>
               <th class="px-4 py-2 text-center font-semibold text-slate-500">Before</th>

@@ -39,17 +39,17 @@
       <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PO Number</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Supplier</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PR Ref</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Amount</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PO Number</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Supplier</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PR Ref</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="po in displayed" :key="po.id" class="hover:bg-slate-50/60">
+        <tr v-for="po in displayed" :key="po.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 font-mono text-xs font-medium text-slate-800">{{ po.po_number || '(Draft)' }}</td>
           <td class="px-4 py-3 text-slate-700">{{ po.supplier_name }}</td>
           <td class="px-4 py-3 text-slate-500 text-xs">{{ po.pr?.pr_no ?? '—' }}</td>

@@ -51,34 +51,34 @@
       <AppTable :is-empty="!(collections.data || []).length" :skeleton-cols="12">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Accession #</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Accession #</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
               <button @click.prevent="sortBy('call_number')" class="flex items-center gap-1">Call # <span v-if="sort==='call_number'">{{ direction==='asc' ? '▲' : '▼' }}</span></button>
             </th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Author</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Author</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
               <button @click.prevent="sortBy('title')" class="flex items-center gap-1">Title <span v-if="sort==='title'">{{ direction==='asc' ? '▲' : '▼' }}</span></button>
             </th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
               <button @click.prevent="sortBy('collection_type')" class="flex items-center gap-1">Collection Type <span v-if="sort==='collection_type'">{{ direction==='asc' ? '▲' : '▼' }}</span></button>
             </th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
               <button @click.prevent="sortBy('edition')" class="flex items-center gap-1">Edition <span v-if="sort==='edition'">{{ direction==='asc' ? '▲' : '▼' }}</span></button>
             </th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
               <button @click.prevent="sortBy('publisher')" class="flex items-center gap-1">Publisher <span v-if="sort==='publisher'">{{ direction==='asc' ? '▲' : '▼' }}</span></button>
             </th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
               <button @click.prevent="sortBy('year')" class="flex items-center gap-1">Year <span v-if="sort==='year'">{{ direction==='asc' ? '▲' : '▼' }}</span></button>
             </th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ISBN</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Subject</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Category</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">ISBN</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Subject</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Category</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="c in collections.data" :key="c.id" class="hover:bg-slate-50/60">
+        <tr v-for="c in collections.data" :key="c.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-slate-700">{{ c.id }}</td>
           <td class="px-4 py-3 text-slate-700">{{ c.call_number || '—' }}</td>
           <td class="px-4 py-3 text-slate-700">{{ c.author_publisher || '—' }}</td>

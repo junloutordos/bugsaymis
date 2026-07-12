@@ -54,11 +54,11 @@
             <AppTable :card="false">
               <template #head>
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Step</th>
-                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Monthly Rate</th>
-                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Annual Rate</th>
-                  <th class="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">PHTR</th>
-                  <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Current</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Step</th>
+                  <th class="px-4 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Monthly Rate</th>
+                  <th class="px-4 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Annual Rate</th>
+                  <th class="px-4 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PHTR</th>
+                  <th class="px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Current</th>
                   <th class="px-4 py-2"></th>
                 </tr>
               </template>

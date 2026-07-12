@@ -256,17 +256,17 @@ const removeItem = async (item, idx) => {
             <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
                 <template #head>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PR No</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Requested By</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Items</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PR No</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Requested By</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Purpose</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Items</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
                 </template>
 
-                <tr v-for="p in displayed" :key="p.id" class="hover:bg-slate-50/60">
+                <tr v-for="p in displayed" :key="p.id" class="hover:bg-indigo-50/40">
                     <td class="px-4 py-3 text-sm font-mono text-slate-700 whitespace-nowrap">
                         {{ p.assigned_pr_number || p.pr_no }}
                     </td>
@@ -429,7 +429,7 @@ const removeItem = async (item, idx) => {
             <div class="space-y-4">
                 <!-- Add row -->
                 <div class="bg-slate-50 rounded-xl p-4">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Add Item</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Add Item</p>
                     <div class="grid grid-cols-12 gap-2 items-end">
                         <div class="col-span-2">
                             <label class="block text-xs font-medium text-slate-600 mb-1">PPMP No</label>
@@ -468,16 +468,16 @@ const removeItem = async (item, idx) => {
                 <AppTable :is-empty="!itemsList.length" :skeleton-cols="6" :card="false">
                     <template #head>
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP No</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Qty</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit Cost</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PPMP No</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Qty</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
                             <th class="px-4 py-3"></th>
                         </tr>
                     </template>
 
-                    <tr v-for="(it, idx) in itemsList" :key="idx" class="hover:bg-slate-50/60">
+                    <tr v-for="(it, idx) in itemsList" :key="idx" class="hover:bg-indigo-50/40">
                         <td class="px-4 py-3 text-sm text-slate-700">{{ it.ppmp_line_item_no || '—' }}</td>
                         <td class="px-4 py-3 text-sm text-slate-700">{{ it.unit }}</td>
                         <td class="px-4 py-3 text-sm text-slate-700">{{ it.description }}</td>

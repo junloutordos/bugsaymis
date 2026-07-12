@@ -274,19 +274,19 @@ const selectedTerm = computed(() => props.terms.find(t => t.id === props.selecte
         <AppTable v-else :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Member</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Role</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide max-w-xs">Accomplishment / MOV</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">Q</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">E</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">T</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-14">Avg</th>
-              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Rating</th>
-              <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-24">Action</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Member</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Role</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider max-w-xs">Accomplishment / MOV</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-10">Q</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-10">E</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-10">T</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-14">Avg</th>
+              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Rating</th>
+              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-24">Action</th>
             </tr>
           </template>
 
-          <tr v-for="member in entry.members" :key="member.user_id" class="hover:bg-slate-50/60">
+          <tr v-for="member in entry.members" :key="member.user_id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3">
               <p class="font-medium text-slate-800">{{ member.user_name }}</p>
               <p v-if="member.user_position" class="text-xs text-slate-400">{{ member.user_position }}</p>

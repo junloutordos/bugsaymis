@@ -142,13 +142,13 @@ const mapCardClass = (room) => {
       <!-- ═══ MAP VIEW ════════════════════════════════════════════════════════ -->
       <template v-if="viewMode === 'map'">
         <div v-for="hall in (!myHall ? ['BRH','GRH'] : [myHall])" :key="'map-' + hall">
-          <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
             {{ hall === 'BRH' ? "Boys Residence Hall (BRH)" : "Girls Residence Hall (GRH)" }}
           </h2>
           <div class="space-y-4 mb-6">
             <div v-for="{ floor, rooms: floorRooms } in (hall === 'BRH' ? brhByFloor : grhByFloor)"
                  :key="floor"
-                 class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+                 class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                 {{ floor > 0 ? 'Floor ' + floor : 'Unspecified Floor' }}
               </p>
@@ -178,10 +178,10 @@ const mapCardClass = (room) => {
 
       <!-- BRH -->
       <div v-if="!myHall || myHall === 'BRH'">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Boys Residence Hall (BRH)</h2>
+        <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Boys Residence Hall (BRH)</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <div v-for="room in brhRooms" :key="room.id"
-               class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+               class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
             <div class="flex items-start justify-between mb-3">
               <div>
                 <div class="text-lg font-bold text-slate-800">{{ room.room_number }}</div>
@@ -218,10 +218,10 @@ const mapCardClass = (room) => {
 
       <!-- GRH -->
       <div v-if="!myHall || myHall === 'GRH'">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Girls Residence Hall (GRH)</h2>
+        <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Girls Residence Hall (GRH)</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <div v-for="room in grhRooms" :key="room.id"
-               class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+               class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
             <div class="flex items-start justify-between mb-3">
               <div>
                 <div class="text-lg font-bold text-slate-800">{{ room.room_number }}</div>

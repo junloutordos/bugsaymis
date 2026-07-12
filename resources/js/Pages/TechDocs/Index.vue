@@ -650,11 +650,11 @@ function fmtType(t) {
           <AppTable :is-empty="!pagedRoutes.length" :skeleton-cols="5">
             <template #head>
               <tr>
-                <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Method</th>
-                <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">URI</th>
-                <th class="hidden md:table-cell px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                <th class="hidden lg:table-cell px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Controller</th>
-                <th class="hidden xl:table-cell px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Middleware</th>
+                <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Method</th>
+                <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">URI</th>
+                <th class="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                <th class="hidden lg:table-cell px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Controller</th>
+                <th class="hidden xl:table-cell px-3 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Middleware</th>
               </tr>
             </template>
 

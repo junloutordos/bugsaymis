@@ -16,16 +16,16 @@
       <AppTable :is-empty="!offenses.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Level</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Code</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Active</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Level</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Code</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Title</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="o in offenses" :key="o.id" class="hover:bg-slate-50/60">
+        <tr v-for="o in offenses" :key="o.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3"><AppBadge :color="levelColor(o.level)">L{{ o.level }}</AppBadge></td>
           <td class="px-4 py-3 text-slate-500">{{ o.code || '—' }}</td>
           <td class="px-4 py-3 text-slate-700">{{ o.title }}</td>

@@ -238,15 +238,15 @@ const lowStockCount = computed(() => props.items.filter(i => i.is_low_stock).len
       <!-- Stats -->
       <div class="grid grid-cols-3 gap-4">
         <AppCard>
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Items</div>
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Items</div>
           <div class="text-2xl font-bold text-slate-800 mt-1">{{ items.length }}</div>
         </AppCard>
         <AppCard>
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Low Stock</div>
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Low Stock</div>
           <div class="text-2xl font-bold mt-1" :class="lowStockCount > 0 ? 'text-danger-600' : 'text-slate-800'">{{ lowStockCount }}</div>
         </AppCard>
         <AppCard>
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Stock Value</div>
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Stock Value</div>
           <div class="text-2xl font-bold text-success-700 mt-1">₱{{ totalStockValue.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</div>
         </AppCard>
       </div>
@@ -280,18 +280,18 @@ const lowStockCount = computed(() => props.items.filter(i => i.is_low_stock).len
       <AppTable :is-empty="displayed.length === 0" :skeleton-cols="perms.canManage ? 8 : 7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item Code</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Balance</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg Cost</th>
-            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Value</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Item Code</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Balance</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Avg Cost</th>
+            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Value</th>
             <th v-if="perms.canManage" class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="item in displayed" :key="item.id" :class="!item.is_active ? 'opacity-50' : ''" class="hover:bg-slate-50/60">
+        <tr v-for="item in displayed" :key="item.id" :class="!item.is_active ? 'opacity-50' : ''" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm font-mono text-slate-600">{{ item.item_code }}</td>
           <td class="px-4 py-3">
             <div class="text-sm font-medium text-slate-800">{{ item.description }}</div>

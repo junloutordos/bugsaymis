@@ -17,7 +17,7 @@ defineProps({
     <div class="space-y-4">
       <AppPageHeader title="Computer Laboratories" subtitle="Visual map of each computer laboratory. Click a lab to see its seating layout and click any unit to view its live Atlas Sentinel specs." />
 
-      <div v-if="!labs.length" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-if="!labs.length" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState title="No computer laboratories yet" subtitle="Set a room's type in Data Management → Rooms." />
       </div>
 

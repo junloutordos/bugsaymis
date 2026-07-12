@@ -318,13 +318,13 @@ const confirmCrop = async () => {
       <AppTable :is-empty="filteredStudents.length === 0" :skeleton-cols="visibleFields.length + 2">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-            <th v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{{ vf.label }}</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">#</th>
+            <th v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">{{ vf.label }}</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
           </tr>
         </template>
 
-        <tr v-for="student in filteredStudents" :key="student.id" class="hover:bg-slate-50/60">
+        <tr v-for="student in filteredStudents" :key="student.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700">{{ student.id }}</td>
           <td v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-sm text-slate-700">
             <span v-if="vf.type === 'age'">{{ getAge(student, vf.keys) }}</span>

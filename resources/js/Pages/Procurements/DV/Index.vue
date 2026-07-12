@@ -140,19 +140,19 @@ const submitForm = () => {
             <AppTable :is-empty="!displayed.length" :skeleton-cols="9">
                 <template #head>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">DV No</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ORS No</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Gross</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Payment</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Created</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">DV No</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Activity</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">ORS No</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Gross</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Net</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Payment</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Created</th>
                         <th class="px-4 py-3"></th>
                     </tr>
                 </template>
 
-                <tr v-for="d in displayed" :key="d.id" class="hover:bg-slate-50/60">
+                <tr v-for="d in displayed" :key="d.id" class="hover:bg-indigo-50/40">
                     <td class="px-4 py-3 text-sm font-mono text-slate-700 whitespace-nowrap">{{ d.dv_number || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-700 max-w-xs truncate">{{ d.activity_title || '—' }}</td>
                     <td class="px-4 py-3 text-sm font-mono text-slate-600">{{ d.ors?.ors_number || '—' }}</td>

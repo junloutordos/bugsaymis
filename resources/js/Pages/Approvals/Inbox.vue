@@ -56,17 +56,17 @@
         <AppTable :is-empty="filteredItems.length === 0" :skeleton-cols="7">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Requestor</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Reference No.</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Summary</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Filed At</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Review</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">#</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Requestor</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Reference No.</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Summary</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Filed At</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Review</th>
             </tr>
           </template>
 
-          <tr v-for="(item, idx) in filteredItems" :key="item.id" class="hover:bg-slate-50/60">
+          <tr v-for="(item, idx) in filteredItems" :key="item.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 text-slate-500 text-xs">{{ idx + 1 }}</td>
             <td class="px-4 py-3 text-slate-700">{{ item.requester_name }}</td>
             <td class="px-4 py-3 text-slate-700 font-mono text-xs">{{ item.reference_no }}</td>
@@ -152,7 +152,7 @@
             <!-- Dynamic sections per request type -->
             <template v-for="section in (selectedItem.sections ?? [])" :key="section.title">
               <div class="border-t border-slate-100 pt-4 mb-4">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{{ section.title }}</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">{{ section.title }}</p>
                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <template v-for="field in section.fields" :key="field.label">
                     <div :class="field.full ? 'col-span-2' : 'col-span-1'">

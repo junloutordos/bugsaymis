@@ -42,13 +42,13 @@
       <AppTable :skeleton-cols="steps.length + 1">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border-r border-slate-100 w-16 sticky left-0 bg-slate-50">
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border-r border-slate-100 w-16 sticky left-0 bg-slate-50">
               SG
             </th>
             <th
               v-for="step in steps"
               :key="step"
-              class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border-r border-slate-100 min-w-[130px]"
+              class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap border-r border-slate-100 min-w-[130px]"
             >
               Step {{ step }}
             </th>
@@ -58,7 +58,7 @@
         <tr
           v-for="grade in grades"
           :key="grade"
-          class="hover:bg-slate-50/60 transition-colors"
+          class="hover:bg-indigo-50/40 transition-colors"
         >
           <td class="px-4 py-2 font-bold text-center text-slate-700 border-r border-slate-100 bg-slate-50/80 sticky left-0">
             {{ grade }}

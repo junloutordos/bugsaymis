@@ -108,7 +108,7 @@
             <!-- Description + screenshot -->
             <div class="px-5 py-4 space-y-3">
               <div>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Description</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Description</p>
                 <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ r.description }}</p>
               </div>
               <div v-if="r.page_url" class="text-xs text-slate-400">
@@ -121,7 +121,7 @@
                 <span v-if="r.browser_info.viewport" class="ml-1">({{ r.browser_info.viewport }})</span>
               </div>
               <div v-if="r.has_screenshot">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Screenshot</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Screenshot</p>
                 <img :src="r.screenshot_url" alt="Error screenshot"
                   class="rounded-lg border border-slate-200 max-h-72 object-contain bg-slate-50 w-full" />
               </div>
@@ -129,7 +129,7 @@
 
             <!-- MIS action panel -->
             <div class="border-t border-slate-100 bg-slate-50/60 px-5 py-4 space-y-3">
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">MIS Response</p>
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">MIS Response</p>
 
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>

@@ -217,16 +217,16 @@ const GRADE_LABELS = { 7:'Grade 7',8:'Grade 8',9:'Grade 9',10:'Grade 10',11:'Gra
       <AppTable :is-empty="!displayedRows.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade / Section</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Subjects</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">GWA</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Standing</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Grade / Section</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Subjects</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">GWA</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Standing</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>
 
-        <tr v-for="row in displayedRows" :key="row.id" class="hover:bg-slate-50/60">
+        <tr v-for="row in displayedRows" :key="row.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3">
             <p class="font-medium text-slate-800">{{ row.full_name }}</p>
             <p class="text-xs text-slate-400">{{ row.pisays_id ?? '—' }}</p>

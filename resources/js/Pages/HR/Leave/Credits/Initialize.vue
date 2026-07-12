@@ -194,14 +194,14 @@ const categoryBadgeColor = (cat) => {
       <AppTable :is-empty="pageData.length === 0" :skeleton-cols="4">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Position</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Action</th>
           </tr>
         </template>
 
-        <tr v-for="emp in pageData" :key="emp.id" class="hover:bg-slate-50/60">
+        <tr v-for="emp in pageData" :key="emp.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3">
             <p class="font-medium text-slate-800">{{ emp.name }}</p>
             <p class="text-xs text-slate-400">{{ emp.badge_id ?? '—' }}</p>
@@ -254,7 +254,7 @@ const categoryBadgeColor = (cat) => {
 
           <!-- ── Leave Credit Balances ───────────────────────────────────────── -->
           <div>
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Leave Credit Balances</p>
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Leave Credit Balances</p>
             <div class="space-y-2">
               <div v-for="(b, i) in form.balances" :key="b.leave_type_code"
                    class="flex items-center gap-3">

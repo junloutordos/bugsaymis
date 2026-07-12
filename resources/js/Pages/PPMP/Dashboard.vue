@@ -55,20 +55,20 @@ const totalPpmps = computed(() => {
             <!-- Summary cards -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <AppCard>
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total PPMPs</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total PPMPs</p>
                     <p class="text-2xl font-bold text-slate-800 mt-1">{{ totalPpmps }}</p>
                 </AppCard>
                 <AppCard>
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Budget (Approved)</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Budget (Approved)</p>
                     <p class="text-2xl font-bold text-indigo-700 mt-1">₱{{ formatPeso(metrics.budget_by_category?.grand_total) }}</p>
                 </AppCard>
                 <AppCard>
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Submission Rate</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Submission Rate</p>
                     <p class="text-2xl font-bold text-slate-800 mt-1">{{ metrics.submission_rate?.rate_percent || 0 }}%</p>
                     <p class="text-xs text-slate-500">{{ metrics.submission_rate?.submitted_units || 0 }} / {{ metrics.submission_rate?.total_units || 0 }} units</p>
                 </AppCard>
                 <AppCard>
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Approved</p>
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Approved</p>
                     <p class="text-2xl font-bold text-success-700 mt-1">{{ (metrics.status_counts?.approved || 0) + (metrics.status_counts?.consolidated || 0) }}</p>
                 </AppCard>
             </div>
@@ -102,14 +102,14 @@ const totalPpmps = computed(() => {
             <AppTable :is-empty="!metrics.unit_compliance?.length">
                 <template #head>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Division / Office</th>
-                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP Status</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Budget</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Division / Office</th>
+                        <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PPMP Status</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Budget</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Submitted</th>
                     </tr>
                 </template>
 
-                <tr v-for="u in metrics.unit_compliance" :key="u.division_id" class="hover:bg-slate-50/60">
+                <tr v-for="u in metrics.unit_compliance" :key="u.division_id" class="hover:bg-indigo-50/40">
                     <td class="px-4 py-3 text-slate-700">{{ u.division_name }}</td>
                     <td class="px-4 py-3 text-center">
                         <AppBadge v-if="u.ppmp_status" :color="statusBadgeColor(u.ppmp_status)" class="capitalize">{{ u.ppmp_status }}</AppBadge>

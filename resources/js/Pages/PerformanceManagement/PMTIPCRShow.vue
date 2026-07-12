@@ -271,7 +271,7 @@ const printIPCR = () => window.print()
       </AppButton>
 
       <!-- IPCR Details Card (retained outside printable area) -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4 no-print">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5 mb-4 no-print">
         <div class="flex flex-wrap justify-between items-start gap-4">
           <div>
             <h2 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h2>

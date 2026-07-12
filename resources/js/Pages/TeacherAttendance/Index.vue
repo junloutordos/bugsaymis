@@ -151,7 +151,7 @@ function exportHistory() {
         <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
+              <tr class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                 <th class="text-left py-3 px-4">Time</th>
                 <th class="text-left py-3 px-4">Teacher</th>
                 <th class="text-left py-3 px-4">Subject</th>
@@ -277,7 +277,7 @@ function exportHistory() {
         <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
+              <tr class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                 <th class="text-left py-3 px-4">Tapped At</th>
                 <th class="text-left py-3 px-4">Teacher</th>
                 <th class="text-left py-3 px-4">Room</th>

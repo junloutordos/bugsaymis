@@ -65,7 +65,7 @@
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
         <!-- ── Schedule Presets ─────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
           <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
               <ClockIcon class="h-4 w-4 text-indigo-500" /> Schedule Presets
@@ -76,7 +76,7 @@
           <EmptyState v-if="!presets.length" title="No presets yet" subtitle="Create one to get started." />
 
           <ul v-else class="divide-y divide-slate-100">
-            <li v-for="p in presets" :key="p.id" class="px-5 py-4 flex items-start justify-between gap-3 hover:bg-slate-50/60">
+            <li v-for="p in presets" :key="p.id" class="px-5 py-4 flex items-start justify-between gap-3 hover:bg-indigo-50/40">
               <div class="min-w-0">
                 <p class="font-medium text-slate-800 text-sm">{{ p.name }}</p>
                 <p class="text-xs text-slate-500 mt-0.5">
@@ -98,7 +98,7 @@
         </div>
 
         <!-- ── Assign Schedule ──────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
           <div class="px-5 py-4 border-b border-slate-100">
             <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
               <UserGroupIcon class="h-4 w-4 text-indigo-500" /> Assign Schedule to Employees
@@ -190,7 +190,7 @@
       </div>
 
       <!-- Current Assignments Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <div class="px-5 py-4 border-b border-slate-100">
           <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <TableCellsIcon class="h-4 w-4 text-indigo-500" /> Current Assignments
@@ -200,15 +200,15 @@
         <AppTable :card="false" :is-empty="!assignments.length" :skeleton-cols="5">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Schedule</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Work Days / Times</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Effective</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Schedule</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Work Days / Times</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Effective</th>
             </tr>
           </template>
 
-          <tr v-for="a in assignments" :key="a.id" class="hover:bg-slate-50/60">
+          <tr v-for="a in assignments" :key="a.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 font-medium text-slate-800">{{ a.user?.name ?? '—' }}</td>
             <td class="px-4 py-3 text-slate-500 text-xs">{{ a.user?.emp_category ?? '—' }}</td>
             <td class="px-4 py-3 text-slate-700">{{ a.name }}</td>

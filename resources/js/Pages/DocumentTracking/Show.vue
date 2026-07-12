@@ -594,7 +594,7 @@ const overallBadgeCls = computed(() => {
         <!-- Return tab -->
         <template v-if="reviewTab === 'return'">
           <div>
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Return to</p>
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Return to</p>
             <div class="space-y-2">
               <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
                 :class="reviewForm.return_target === 'original' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">

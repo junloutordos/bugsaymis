@@ -104,14 +104,14 @@
         <AppTable :card="false" :is-empty="!filteredSummaries.length" :skeleton-cols="12">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">#</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Employee</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wide whitespace-nowrap">Present</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-red-500 uppercase tracking-wide whitespace-nowrap">Absent</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-amber-600 uppercase tracking-wide whitespace-nowrap">Half Day</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-blue-600 uppercase tracking-wide whitespace-nowrap">Leave</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-purple-600 uppercase tracking-wide whitespace-nowrap">Holiday</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Hrs Worked</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Hrs Worked</th>
               <th class="px-4 py-3 text-right text-xs font-semibold text-amber-600 uppercase tracking-wide whitespace-nowrap">Late</th>
               <th class="px-4 py-3 text-right text-xs font-semibold text-orange-600 uppercase tracking-wide whitespace-nowrap">Undertime</th>
               <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wide whitespace-nowrap">Overtime</th>

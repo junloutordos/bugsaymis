@@ -278,7 +278,7 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
                   <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
 
                     <!-- First row of PI group -->
-                    <tr class="hover:bg-slate-50/60">
+                    <tr class="hover:bg-indigo-50/40">
                       <td v-if="Object.keys(pis)[0] === piDesc"
                           :rowspan="Object.values(pis).reduce((t, a) => t + a.length, 0)"
                           class="px-4 py-2 font-medium text-slate-600 border border-gray-300 text-xs">
@@ -357,7 +357,7 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
                     </tr>
 
                     <!-- Remaining rows -->
-                    <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-slate-50/60">
+                    <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-indigo-50/40">
                       <td class="px-4 py-2 border border-gray-300">
                         <div>{{ plan.success_indicator }}</div>
                         <p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>

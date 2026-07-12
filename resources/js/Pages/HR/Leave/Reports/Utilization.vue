@@ -107,7 +107,7 @@ const balanceColor = (bal) => {
       <!-- Aggregate summary cards -->
       <div v-if="aggregates.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AppCard v-for="agg in aggregates" :key="agg.leave_type_id">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ agg.leave_type?.code }} — {{ agg.leave_type?.name }}</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{{ agg.leave_type?.code }} — {{ agg.leave_type?.name }}</p>
           <p class="text-xs text-slate-400 mt-0.5">{{ agg.employee_count }} employee(s)</p>
           <div class="mt-3 space-y-1.5 text-xs">
             <div class="flex justify-between">
@@ -148,19 +148,19 @@ const balanceColor = (bal) => {
         <AppTable :is-empty="!creditData.length" :skeleton-cols="9" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave Type</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Earned</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Carried Over</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Used</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Balance</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-32">Utilization</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Leave Type</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Earned</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Carried Over</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Used</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Balance</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-32">Utilization</th>
               <th class="px-4 py-3"></th>
             </tr>
           </template>
 
-          <tr v-for="row in creditData" :key="row.id" class="hover:bg-slate-50/60">
+          <tr v-for="row in creditData" :key="row.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3">
               <p class="font-medium text-slate-800 text-xs">{{ row.user?.name ?? '—' }}</p>
               <p class="text-xs text-slate-400">{{ row.user?.badge_id ?? '' }}</p>

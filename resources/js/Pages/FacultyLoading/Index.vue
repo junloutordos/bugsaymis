@@ -70,19 +70,19 @@
 
       <!-- Load stats -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-slate-800">{{ loads.length }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Total Faculty</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-success-600">{{ fullLoadCount }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Full Load</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-warning-600">{{ underloadCount }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Underload</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-danger-600">{{ overloadCount }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Overload</p>
         </div>
@@ -92,17 +92,17 @@
       <AppTable :is-empty="loads.length === 0" :skeleton-cols="canApprove ? 11 : 10">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Teaching</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Research</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Co-curr</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Committee</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Overload</th>
-            <th v-if="canApprove" class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Lock</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Print</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Faculty</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Teaching</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Research</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Admin</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Co-curr</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Committee</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Overload</th>
+            <th v-if="canApprove" class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Lock</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Print</th>
           </tr>
         </template>
 

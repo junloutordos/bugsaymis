@@ -209,7 +209,7 @@ const filterOptions = [
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
+              <tr class="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                 <th class="px-4 py-3">Device</th>
                 <th class="px-4 py-3">Request</th>
                 <th class="px-4 py-3">Ticket</th>
@@ -301,7 +301,7 @@ const filterOptions = [
 
         <template v-else>
           <div>
-            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">AnyDesk ID</label>
+            <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">AnyDesk ID</label>
             <div class="mt-1 flex items-center gap-2">
               <code class="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-base font-mono text-slate-800">{{ revealModal.anydesk_id || '—' }}</code>
               <AppButton size="sm" variant="ghost" @click="copy(revealModal.anydesk_id, 'id')">

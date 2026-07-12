@@ -28,16 +28,16 @@
       <AppTable :is-empty="!displayed.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">ICS No.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Issued By</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Received By</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Division</th>
-            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">ICS No.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Issued By</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Received By</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Division</th>
+            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
           </tr>
         </template>
 
-        <tr v-for="ics in displayed" :key="ics.id" class="hover:bg-slate-50/60 cursor-pointer" @click="router.visit(route('property.ics.show', ics.id))">
+        <tr v-for="ics in displayed" :key="ics.id" class="hover:bg-indigo-50/40 cursor-pointer" @click="router.visit(route('property.ics.show', ics.id))">
           <td class="px-4 py-3 text-sm font-medium text-indigo-700">{{ ics.ics_number }}</td>
           <td class="px-4 py-3 text-sm text-slate-600">{{ fmtDate(ics.issue_date) }}</td>
           <td class="px-4 py-3 text-sm text-slate-600">{{ ics.issued_by ?? '—' }}</td>

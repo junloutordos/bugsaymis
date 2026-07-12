@@ -85,11 +85,11 @@ const currentYears = computed(() => {
 
       <!-- Summary Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
           <p class="text-xs text-slate-500 mb-1">Total Dormers</p>
           <p class="text-2xl font-bold text-slate-800">{{ summary.total_interns }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
           <p class="text-xs text-slate-500 mb-1">Total Billed</p>
           <p class="text-lg font-bold text-slate-800">₱{{ fmt(summary.total_amount) }}</p>
         </div>
@@ -142,12 +142,12 @@ const currentYears = computed(() => {
       <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
         <template #head>
           <tr>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Hall / Room</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lodging</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Appliance</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Hall / Room</th>
+            <th class="text-right px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Lodging</th>
+            <th class="text-right px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell">Appliance</th>
+            <th class="text-right px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+            <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
             <th class="px-4 py-3"></th>
           </tr>
         </template>

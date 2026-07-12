@@ -6,7 +6,7 @@ import EmptyState from '@/Components/EmptyState.vue'
 <template>
   <div class="p-6">
     <AppPageHeader title="Reports" subtitle="View and generate system reports" />
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
       <EmptyState title="Select a report type from the navigation to get started" />
     </div>
   </div>

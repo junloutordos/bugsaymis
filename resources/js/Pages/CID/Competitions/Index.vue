@@ -65,16 +65,16 @@
         <AppTable :is-empty="displayed.length === 0" :skeleton-cols="6" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Competition</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Level</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Participants & Awards</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Coach</th>
-              <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Competition</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Level</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Participants & Awards</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Coach</th>
+              <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </template>
 
-          <tr v-for="c in displayed" :key="c.id" class="hover:bg-slate-50/60 align-top">
+          <tr v-for="c in displayed" :key="c.id" class="hover:bg-indigo-50/40 align-top">
             <td class="px-4 py-3">
               <p class="text-sm font-medium text-slate-800">{{ c.title }}</p>
               <p v-if="c.organizer" class="text-xs text-slate-500">{{ c.organizer }}</p>
@@ -234,7 +234,7 @@
 
       <!-- Employee participants -->
       <div v-if="form.competition_type === 'employee'" class="space-y-2">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee Participants & Awards</p>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee Participants & Awards</p>
         <div v-for="(row, i) in form.employees" :key="i" class="flex items-center gap-2">
           <select v-model="row.user_id"
             class="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -256,7 +256,7 @@
       <!-- Student participants + coaches -->
       <template v-else>
         <div class="space-y-2">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Student Participants & Awards</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student Participants & Awards</p>
 
           <!-- Student search -->
           <div class="relative">
@@ -288,7 +288,7 @@
         </div>
 
         <div class="space-y-2">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Coaching</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Coaching</p>
           <p class="text-sm text-slate-600">
             Coach: <span class="font-medium text-slate-800">{{ coachName }}</span>
           </p>

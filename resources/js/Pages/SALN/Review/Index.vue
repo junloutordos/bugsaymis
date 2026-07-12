@@ -14,7 +14,7 @@
       <!-- Stats bar -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div v-for="stat in stats" :key="stat.label"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+          class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold" :class="stat.color">{{ stat.value }}</p>
           <p class="text-xs text-slate-500 mt-0.5">{{ stat.label }}</p>
         </div>
@@ -24,16 +24,16 @@
       <AppTable :is-empty="!records.data?.length" :skeleton-cols="6">
         <template #head>
           <tr>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Year</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Worth</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted</th>
-            <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Year</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Net Worth</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Submitted</th>
+            <th class="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Action</th>
           </tr>
         </template>
 
-        <tr v-for="rec in records.data" :key="rec.id" class="hover:bg-slate-50/60">
+        <tr v-for="rec in records.data" :key="rec.id" class="hover:bg-indigo-50/40">
           <td class="px-5 py-3">
             <div>
               <p class="font-medium text-slate-800">{{ rec.user?.name }}</p>

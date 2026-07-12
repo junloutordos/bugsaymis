@@ -209,7 +209,7 @@ const docTypes = [
 
           <div v-if="applicant.documents?.length" class="divide-y divide-slate-100">
             <div v-for="doc in applicant.documents" :key="doc.id"
-                 class="flex items-center justify-between p-4 hover:bg-slate-50/60">
+                 class="flex items-center justify-between p-4 hover:bg-indigo-50/40">
               <div>
                 <div class="text-sm font-medium text-slate-800">{{ doc.document_type }}</div>
                 <div class="text-xs text-slate-400 mt-0.5">Uploaded {{ formatDate(doc.created_at) }}</div>
@@ -234,7 +234,7 @@ const docTypes = [
         <AppCard v-if="activeTab === 'applications'" :padded="false" title="Application History">
           <div v-if="applicant.applications?.length" class="divide-y divide-slate-100">
             <div v-for="app in applicant.applications" :key="app.id"
-                 class="flex items-start justify-between p-4 hover:bg-slate-50/60">
+                 class="flex items-start justify-between p-4 hover:bg-indigo-50/40">
               <div class="flex-1">
                 <div class="font-medium text-slate-800 text-sm">
                   {{ app.job_vacancy?.job_item?.position_title ?? '—' }}

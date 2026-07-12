@@ -53,16 +53,16 @@
         <AppTable :is-empty="displayed.length === 0" :skeleton-cols="6" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date of Appearance</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Visitors</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Encoded By</th>
-              <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Purpose</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date of Appearance</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Visitors</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Encoded By</th>
+              <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </template>
 
-          <tr v-for="v in displayed" :key="v.id" class="hover:bg-slate-50/60 align-top">
+          <tr v-for="v in displayed" :key="v.id" class="hover:bg-indigo-50/40 align-top">
             <td class="px-4 py-3">
               <p class="text-sm font-medium text-slate-800">{{ v.purpose }}</p>
               <p v-if="v.office_visited" class="text-xs text-slate-500">{{ v.office_visited }}</p>
@@ -134,27 +134,27 @@
       <template v-if="detail">
         <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div class="col-span-2">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose</p>
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Purpose</p>
             <p class="text-slate-800">{{ detail.purpose }}</p>
           </div>
           <div v-if="detail.office_visited">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Office Visited</p>
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Office Visited</p>
             <p class="text-slate-800">{{ detail.office_visited }}</p>
           </div>
           <div>
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Date of Appearance</p>
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date of Appearance</p>
             <p class="text-slate-800">
               {{ fmtDate(detail.date_from) }}<template v-if="detail.date_to && detail.date_to !== detail.date_from"> – {{ fmtDate(detail.date_to) }}</template>
             </p>
           </div>
           <div v-if="detail.remarks" class="col-span-2">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Remarks</p>
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Remarks</p>
             <p class="text-slate-800">{{ detail.remarks }}</p>
           </div>
         </div>
 
         <div class="space-y-2">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             Visitors ({{ detail.certificates.length }})
           </p>
           <div v-for="c in detail.certificates" :key="c.id"
@@ -215,7 +215,7 @@
 
       <!-- Visitors -->
       <div class="space-y-2">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Visitors — each receives their own certificate</p>
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Visitors — each receives their own certificate</p>
         <div v-for="(row, i) in form.visitors" :key="i"
           class="border border-slate-100 rounded-lg p-3 space-y-2 relative">
           <button type="button" @click="form.visitors.splice(i, 1)" :disabled="form.visitors.length === 1"

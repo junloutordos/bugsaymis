@@ -24,7 +24,7 @@
       </div>
 
       <!-- Empty state -->
-      <div v-if="records.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-if="records.length === 0" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState title="No SALN records yet" subtitle="File your first SALN to get started." :icon="DocumentTextIcon">
           <AppButton v-if="!viewedUser" as="link" :href="route('saln.create')" class="mt-4">
             <PlusIcon class="h-4 w-4" /> File SALN
@@ -35,7 +35,7 @@
       <!-- Records grid -->
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div v-for="rec in records" :key="rec.id"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
+          class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
 
           <!-- Year + status -->
           <div class="flex items-start justify-between">

@@ -237,16 +237,16 @@ const GRADE_LABELS = { 7:'Gr.7',8:'Gr.8',9:'Gr.9',10:'Gr.10',11:'Gr.11',12:'Gr.1
         <AppTable :is-empty="!filteredRows.length" :skeleton-cols="6">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student ID</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade / Section</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Subjects</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Failed</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">GWA</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Standing</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student ID</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Grade / Section</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Subjects</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Failed</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">GWA</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Standing</th>
             </tr>
           </template>
 
-          <tr v-for="row in filteredRows" :key="row.student_id" class="hover:bg-slate-50/60">
+          <tr v-for="row in filteredRows" :key="row.student_id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 tabular-nums text-slate-600">{{ row.student_id }}</td>
             <td class="px-4 py-3">
               {{ GRADE_LABELS[row.grade_level] ?? '—' }}
@@ -318,7 +318,7 @@ const GRADE_LABELS = { 7:'Gr.7',8:'Gr.8',9:'Gr.9',10:'Gr.10',11:'Gr.11',12:'Gr.1
       </div>
 
       <!-- Empty state (no preview loaded yet) -->
-      <div v-else-if="!loadingPreview" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div v-else-if="!loadingPreview" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
         <EmptyState title="No preview loaded" subtitle="Click &quot;Load Preview&quot; to see the promotion results for the selected school year." />
       </div>
 

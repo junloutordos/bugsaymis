@@ -102,7 +102,7 @@
         </AppCard>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <div v-for="item in board" :key="item.id"
-            class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+            class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden flex flex-col">
             <div class="h-36 bg-slate-100 flex items-center justify-center overflow-hidden">
               <img v-if="item.has_photo" :src="route('lost-found.photo', item.id)"
                 class="w-full h-full object-cover" loading="lazy" alt="" />
@@ -133,14 +133,14 @@
         <AppTable :is-empty="myReports.length === 0" :skeleton-cols="5" :card="false">
           <template #head>
             <tr>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Where is it?</th>
-              <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Item</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Where is it?</th>
+              <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </template>
-          <tr v-for="r in myReports" :key="r.id" class="hover:bg-slate-50/60">
+          <tr v-for="r in myReports" :key="r.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3">
               <p class="text-sm font-medium text-slate-800">{{ r.item_name }}</p>
               <p v-if="r.category_label" class="text-xs text-slate-500">{{ r.category_label }}</p>
@@ -327,7 +327,7 @@
           <AppTextarea v-model="walkInForm.description" label="Description" :rows="2" />
         </div>
         <div class="col-span-2 border-t border-slate-100 pt-3">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Finder (for honesty points)</p>
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Finder (for honesty points)</p>
           <div class="grid grid-cols-2 gap-3">
             <AppInput v-model="walkInForm.finder_name" label="Finder Name (visitor / unknown)" placeholder="Walk-in name" />
             <AppInput v-model="walkInForm.finder_student_id" type="number" label="Student ID (if student)" placeholder="students.id" />

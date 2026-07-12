@@ -192,7 +192,7 @@ async function savePin() {
 
             <!-- Current Signature Preview -->
             <AppCard v-if="props.signatureUri">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Current Signature</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Current Signature</p>
                 <div class="bg-slate-50 rounded-lg border border-slate-200 p-4 flex items-center justify-center min-h-[80px]">
                     <img :src="props.signatureUri" alt="Your signature" class="max-h-20 max-w-xs object-contain" />
                 </div>
@@ -206,7 +206,7 @@ async function savePin() {
 
             <!-- Signature Setup Card -->
             <AppCard>
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">
                     {{ props.hasSignature ? 'Update Signature' : 'Set Up Signature' }}
                 </p>
 
@@ -268,7 +268,7 @@ async function savePin() {
             <AppCard>
                 <div class="flex items-center gap-2 mb-4">
                     <KeyIcon class="w-4 h-4 text-slate-500" />
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                         {{ props.hasPin ? 'Change Signature PIN' : 'Set Signature PIN' }}
                     </p>
                 </div>

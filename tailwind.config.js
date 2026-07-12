@@ -78,9 +78,4 @@ export default {
   },
 
   plugins: [forms, typography],
-  safelist: [
-  'dataTable-selector',
-  'dataTable-input',
-  'dataTable-pagination',
-],
 }

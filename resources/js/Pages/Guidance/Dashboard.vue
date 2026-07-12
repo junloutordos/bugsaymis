@@ -102,7 +102,7 @@
         <AppCard :padded="false" title="Consultations by Concern (Sex-Disaggregated)">
           <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
-              <thead class="bg-slate-50">
+              <thead class="bg-slate-50/80">
                 <tr>
                   <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Concern</th>
                   <th class="px-4 py-3 text-center text-xs font-semibold text-blue-600 uppercase">Male</th>
@@ -141,7 +141,7 @@
           <!-- Status breakdown -->
           <AppCard :padded="false" title="Status Breakdown (Sex-Disaggregated)">
             <table class="min-w-full text-xs">
-              <thead class="bg-slate-50">
+              <thead class="bg-slate-50/80">
                 <tr>
                   <th class="px-4 py-2.5 text-left font-semibold text-slate-500 uppercase">Status</th>
                   <th class="px-3 py-2.5 text-center font-semibold text-blue-600 uppercase">M</th>
@@ -171,7 +171,7 @@
           <!-- Consultation type breakdown -->
           <AppCard :padded="false" title="Consultation Type (Sex-Disaggregated)">
             <table class="min-w-full text-xs">
-              <thead class="bg-slate-50">
+              <thead class="bg-slate-50/80">
                 <tr>
                   <th class="px-4 py-2.5 text-left font-semibold text-slate-500 uppercase">Type</th>
                   <th class="px-3 py-2.5 text-center font-semibold text-blue-600 uppercase">M</th>
@@ -204,7 +204,7 @@
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
-              <thead class="bg-slate-50">
+              <thead class="bg-slate-50/80">
                 <tr>
                   <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Indicator</th>
                   <th class="px-4 py-3 text-center text-xs font-semibold text-blue-600 uppercase">Male</th>

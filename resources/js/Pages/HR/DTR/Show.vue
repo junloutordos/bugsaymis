@@ -107,19 +107,19 @@
           <p class="text-[10px] text-rose-600 font-semibold uppercase tracking-wide">WFH</p>
           <p class="text-xl font-bold text-rose-700 mt-0.5">{{ summary.wfh ?? 0 }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-3 text-center">
           <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Total Hrs</p>
           <p class="text-xl font-bold text-slate-800 mt-0.5">{{ summary.total_hours }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-3 text-center">
           <p class="text-[10px] text-amber-500 font-semibold uppercase tracking-wide">Late (m)</p>
           <p class="text-xl font-bold text-amber-600 mt-0.5">{{ summary.total_late }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-3 text-center">
           <p class="text-[10px] text-orange-500 font-semibold uppercase tracking-wide">Undertime</p>
           <p class="text-xl font-bold text-orange-600 mt-0.5">{{ summary.total_ut }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-3 text-center">
           <p class="text-[10px] text-emerald-500 font-semibold uppercase tracking-wide">Overtime</p>
           <p class="text-xl font-bold text-emerald-600 mt-0.5">{{ summary.total_ot }}</p>
         </div>
@@ -214,24 +214,24 @@
         <AppTable :card="false" :is-empty="!records.length" :skeleton-cols="14">
           <template #head>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Day</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">AM In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">AM Out</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PM In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PM Out</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Date</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Day</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">AM In</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">AM Out</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">PM In</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">PM Out</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-400 uppercase tracking-wide whitespace-nowrap">Sched. In</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-400 uppercase tracking-wide whitespace-nowrap">Sched. Out</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Hrs</th>
+                <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Hrs</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-amber-500 uppercase tracking-wide">Late</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-orange-500 uppercase tracking-wide">UT</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-500 uppercase tracking-wide">OT</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                 <th class="px-4 py-3 print:hidden"></th>
               </tr>
           </template>
 
-              <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : (r.wfh_attendance_id && r.wfh_overridden ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50/60')">
+              <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : (r.wfh_attendance_id && r.wfh_overridden ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-indigo-50/40')">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <template v-if="r.is_advance && (isAdmin || canManageDtr)">

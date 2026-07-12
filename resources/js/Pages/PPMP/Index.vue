@@ -261,19 +261,19 @@ const deadlinePassed = computed(() => {
         <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
             <template #head>
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PPMP No.</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit / Division</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Items</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Budget</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Prepared By</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PPMP No.</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Title</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Unit / Division</th>
+                    <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Items</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Budget</th>
+                    <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Prepared By</th>
                 </tr>
             </template>
 
             <tr v-for="p in displayed" :key="p.id"
                 class="cursor-pointer"
-                :class="(canDivisionReview && p.status === 'pending_division') ? 'bg-orange-50/60 hover:bg-orange-50' : (canPropertyOfficerReview && p.status === 'pending_property_officer') ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'"
+                :class="(canDivisionReview && p.status === 'pending_division') ? 'bg-orange-50/60 hover:bg-orange-50' : (canPropertyOfficerReview && p.status === 'pending_property_officer') ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-indigo-50/40'"
                 @click="router.visit(route('ppmp.show', p.id))">
                 <td class="px-4 py-3 font-medium text-indigo-600">
                     {{ p.ppmp_number }}

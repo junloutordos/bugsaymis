@@ -62,23 +62,23 @@ const fillText = (rate) => {
 
       <!-- KPI Cards -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-indigo-600">{{ kpis.total_applications?.toLocaleString() ?? 0 }}</p>
           <p class="text-xs text-slate-500 mt-1">Applications ({{ year }})</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-emerald-600">{{ kpis.total_placements?.toLocaleString() ?? 0 }}</p>
           <p class="text-xs text-slate-500 mt-1">Placements ({{ year }})</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-indigo-600">{{ kpis.total_applicants?.toLocaleString() ?? 0 }}</p>
           <p class="text-xs text-slate-500 mt-1">Total Applicants (all-time)</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-amber-600">{{ kpis.active_vacancies?.toLocaleString() ?? 0 }}</p>
           <p class="text-xs text-slate-500 mt-1">Active Vacancies</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 text-center">
           <p class="text-2xl font-bold text-slate-700">{{ kpis.open_positions?.toLocaleString() ?? 0 }}</p>
           <p class="text-xs text-slate-500 mt-1">Open Positions</p>
         </div>
@@ -88,7 +88,7 @@ const fillText = (rate) => {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <!-- Monthly Pipeline -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-6">
           <h3 class="text-sm font-semibold text-slate-700 mb-4">Monthly Application Pipeline — {{ year }}</h3>
           <div class="space-y-3">
             <div v-for="m in pipeline" :key="m.month">
@@ -114,7 +114,7 @@ const fillText = (rate) => {
         </div>
 
         <!-- Vacancy Fill Rate -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-6">
           <h3 class="text-sm font-semibold text-slate-700 mb-4">Vacancy Fill Rate by Type — {{ year }}</h3>
           <div v-if="fill_rate.length" class="space-y-4">
             <div v-for="r in fill_rate" :key="r.type">
@@ -143,21 +143,21 @@ const fillText = (rate) => {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <!-- Plantilla Utilization -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-6">
           <h3 class="text-sm font-semibold text-slate-700 mb-4">Plantilla Utilization</h3>
           <div v-if="utilization.length" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-100 text-sm">
-              <thead class="bg-slate-50">
+              <thead class="bg-slate-50/80">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Filled</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Vacant</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Fill %</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Filled</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Vacant</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Fill %</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
-                <tr v-for="u in utilization" :key="u.name" class="hover:bg-slate-50/60">
+                <tr v-for="u in utilization" :key="u.name" class="hover:bg-indigo-50/40">
                   <td class="px-4 py-3 text-sm font-medium text-slate-700">{{ u.name }}</td>
                   <td class="px-4 py-3 text-sm text-right text-slate-600">{{ u.total }}</td>
                   <td class="px-4 py-3 text-sm text-right text-emerald-700 font-semibold">{{ u.filled }}</td>
@@ -188,21 +188,21 @@ const fillText = (rate) => {
         </div>
 
         <!-- Time to Hire -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-6">
           <h3 class="text-sm font-semibold text-slate-700 mb-4">Time-to-Hire (Days) — {{ year }}</h3>
           <div v-if="time_to_hire.length" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-100 text-sm">
-              <thead class="bg-slate-50">
+              <thead class="bg-slate-50/80">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Placements</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg Days</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Min</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Max</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Placements</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Avg Days</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Min</th>
+                  <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Max</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
-                <tr v-for="t in time_to_hire" :key="t.type" class="hover:bg-slate-50/60">
+                <tr v-for="t in time_to_hire" :key="t.type" class="hover:bg-indigo-50/40">
                   <td class="px-4 py-3 text-sm font-medium text-slate-700">{{ t.type }}</td>
                   <td class="px-4 py-3 text-sm text-right text-slate-600">{{ t.placements }}</td>
                   <td class="px-4 py-3 text-sm text-right font-bold"

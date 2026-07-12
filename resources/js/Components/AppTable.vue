@@ -61,7 +61,7 @@ const widthFor = (i) => skeletonWidths[i % skeletonWidths.length]
       <table class="min-w-full divide-y divide-slate-100 text-sm">
 
         <!-- Header -->
-        <thead class="bg-slate-50/80">
+        <thead class="bg-slate-50/80 border-b border-slate-200/60">
           <slot name="head" />
         </thead>
 

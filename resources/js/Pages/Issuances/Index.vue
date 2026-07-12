@@ -179,19 +179,19 @@ const showSettings = ref(false)
       <AppTable :is-empty="displayed.length === 0" :skeleton-cols="isAdmin ? 8 : 7">
         <template #head>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Control No.</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Issued By</th>
-            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th v-if="isAdmin" class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Ack.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Control No.</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Title</th>
+            <th class="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Issued By</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th v-if="isAdmin" class="hidden md:table-cell px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ack.</th>
             <th class="px-3 py-3"></th>
           </tr>
         </template>
 
         <tr v-for="i in displayed" :key="i.id"
-          class="hover:bg-slate-50/60 cursor-pointer"
+          class="hover:bg-indigo-50/40 cursor-pointer"
           @click="router.visit(route('issuances.show', i.id))">
           <td class="px-4 py-3">
             <span class="font-mono text-xs font-bold text-indigo-700">{{ i.control_number }}</span>

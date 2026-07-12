@@ -158,15 +158,15 @@ async function completeDisposal(id) {
         <AppTable :is-empty="!displayedBsrs.length" :skeleton-cols="5">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">BSR No.</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Items</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">BSR No.</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Items</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </template>
 
-          <tr v-for="b in displayedBsrs" :key="b.id" class="hover:bg-slate-50/60">
+          <tr v-for="b in displayedBsrs" :key="b.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 text-sm font-medium text-indigo-700">{{ b.bsr_number }}</td>
             <td class="px-4 py-3 text-sm text-slate-600">{{ fmtDate(b.bsr_date) }}</td>
             <td class="px-4 py-3 text-center text-sm text-slate-600">{{ b.items_count }}</td>
@@ -226,17 +226,17 @@ async function completeDisposal(id) {
         <AppTable :is-empty="!displayedDisposals.length" :skeleton-cols="7">
           <template #head>
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Disposal No.</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">BSR</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Method</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Proceeds</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Disposal No.</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">BSR</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Method</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Net Proceeds</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </template>
 
-          <tr v-for="d in displayedDisposals" :key="d.id" class="hover:bg-slate-50/60">
+          <tr v-for="d in displayedDisposals" :key="d.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-3 text-sm font-medium text-indigo-700">{{ d.disposal_number }}</td>
             <td class="px-4 py-3 text-sm text-slate-600">{{ fmtDate(d.disposal_date) }}</td>
             <td class="px-4 py-3 text-sm text-slate-600">{{ d.bsr_number ?? '—' }}</td>
