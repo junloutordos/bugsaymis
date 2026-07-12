@@ -1,12 +1,12 @@
 @extends('emails.layouts.base')
 
 @section('header-title','Parent Link Request')
-@section('header-subtitle','MyPisay — PSHS Caraga Region Campus')
+@section('header-subtitle','AtlasGo — PSHS Caraga Region Campus')
 
 @section('content')
 <p class="greeting">Hello,</p>
 <p class="lead">
-    A parent or guardian is requesting to be linked to your MyPisay account so they can monitor your gate attendance. Please review this request carefully.
+    A parent or guardian is requesting to be linked to your AtlasGo account so they can monitor your gate attendance. Please review this request carefully.
 </p>
 
 <table class="details" role="presentation">

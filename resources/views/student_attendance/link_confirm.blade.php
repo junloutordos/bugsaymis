@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MyPisay — Parent Link Request</title>
+<title>AtlasGo — Parent Link Request</title>
 <style>
 *{box-sizing:border-box}
 body{background:#f0f4f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#334155;margin:0;padding:20px 12px;min-height:100vh;display:flex;align-items:center;justify-content:center}
@@ -34,7 +34,7 @@ p{font-size:14px;color:#475569;line-height:1.6;margin:0 0 12px;text-align:center
 <body>
 <div class="card">
     <div class="header">
-        <h1>MyPisay</h1>
+        <h1>AtlasGo</h1>
         <p>PSHS – Caraga Region Campus</p>
     </div>
     <div class="body">
@@ -42,7 +42,7 @@ p{font-size:14px;color:#475569;line-height:1.6;margin:0 0 12px;text-align:center
     @if($state === 'pending')
         <div class="icon icon-pending">👨‍👩‍👧</div>
         <h2>Parent Link Request</h2>
-        <p>Someone is requesting to be linked to your MyPisay account to monitor your gate attendance.</p>
+        <p>Someone is requesting to be linked to your AtlasGo account to monitor your gate attendance.</p>
         <div class="detail">
             <div class="detail-row"><span class="lbl">Name</span><span class="val">{{ $parentName }}</span></div>
             <div class="detail-row"><span class="lbl">Relationship</span><span class="val">{{ $relationship }}</span></div>
@@ -74,11 +74,11 @@ p{font-size:14px;color:#475569;line-height:1.6;margin:0 0 12px;text-align:center
     @else
         <div class="icon icon-invalid">⏱</div>
         <h2>Link Expired or Invalid</h2>
-        <p>This link has expired or has already been used. If you need to re-link, ask the parent to send a new request through the MyPisay app.</p>
+        <p>This link has expired or has already been used. If you need to re-link, ask the parent to send a new request through the AtlasGo app.</p>
     @endif
 
     </div>
-    <div class="footer">Philippine Science High School – Caraga Region Campus &nbsp;·&nbsp; MyPisay</div>
+    <div class="footer">Philippine Science High School – Caraga Region Campus &nbsp;·&nbsp; AtlasGo</div>
 </div>
 </body>
 </html>

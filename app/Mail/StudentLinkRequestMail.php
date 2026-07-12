@@ -21,7 +21,7 @@ class StudentLinkRequestMail extends Mailable
         $confirmUrl = url("/student-attendance/link/{$this->linkRequest->token}/confirm");
         $denyUrl    = url("/student-attendance/link/{$this->linkRequest->token}/deny");
 
-        return $this->subject("MyPisay: A parent requests to be linked to your account")
+        return $this->subject("AtlasGo: A parent requests to be linked to your account")
                     ->view('emails.student_link_request')
                     ->with([
                         'parentName'   => $this->parentName,

@@ -17,7 +17,7 @@ class MobileEmailVerificationMail extends Mailable
 
     public function build(): static
     {
-        return $this->subject('Your MyPisay Verification Code')
+        return $this->subject('Your AtlasGo Verification Code')
                     ->view('emails.mobile_otp')
                     ->with(['name' => $this->name, 'otp' => $this->otp]);
     }
