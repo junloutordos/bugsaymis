@@ -11,15 +11,15 @@ export default function usePMS(initialSchedules = []) {
   const showPinModal = ref(false)
   const pinModalLoading = ref(false)
 
-  // Form (added school_year & office_area)
+  // Form — school_year is server-derived (current Faculty Loading school year on
+  // create, left untouched on edit) and no longer submitted from here.
   const form = reactive({
     title: "",
     frequency: "",
     schedule_dates: [],
     status: "Pending",
     remarks: "",
-    school_year: "",
-    office_area: "",
+    room_id: "",
     pin: null,
   })
 
@@ -169,8 +169,7 @@ export default function usePMS(initialSchedules = []) {
       form.frequency = schedule.frequency || ""
       form.status = schedule.status || "Pending"
       form.remarks = schedule.remarks || ""
-      form.school_year = schedule.school_year || ""
-      form.office_area = schedule.office_area || ""
+      form.room_id = schedule.room_id || ""
       // index sends the raw `dates` relation; showEquipments sends a mapped
       // `schedule_dates` — accept either shape
       scheduleDates.value = (schedule.schedule_dates || schedule.dates || []).map((d, i) => ({
@@ -183,8 +182,7 @@ export default function usePMS(initialSchedules = []) {
       form.frequency = ""
       form.status = "Pending"
       form.remarks = ""
-      form.school_year = ""
-      form.office_area = ""
+      form.room_id = ""
       scheduleDates.value = []
     }
 
@@ -201,8 +199,7 @@ export default function usePMS(initialSchedules = []) {
   const validateForm = () => {
     const e = {}
     if (!form.title.trim()) e.title = "Title is required."
-    if (!form.school_year.trim()) e.school_year = "School year is required."
-    if (!form.office_area.trim()) e.office_area = "Office/Area is required."
+    if (!form.room_id) e.room_id = "Office/Area is required."
     if (!form.frequency) e.frequency = "Frequency is required."
     if (!scheduleDates.value.length || scheduleDates.value.some((d) => !d.date)) {
       e.schedule_dates = "Fill in every scheduled date."

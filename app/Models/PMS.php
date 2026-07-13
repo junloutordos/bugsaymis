@@ -14,7 +14,9 @@ class PMS extends Model
     protected $fillable = [
         'title',
         'school_year',
+        'school_year_id',
         'office_area',
+        'room_id',
         'frequency',
         'status',
         'performed_by',
@@ -75,5 +77,21 @@ class PMS extends Model
     public function dates()
     {
         return $this->hasMany(PMSDate::class, 'ict_pms_id');
+    }
+
+    /**
+     * The Room (Data Management) this schedule's Office/Area refers to.
+     */
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
+    }
+
+    /**
+     * The Faculty Loading school year this schedule was created under.
+     */
+    public function schoolYear()
+    {
+        return $this->belongsTo(\App\Models\FacultyLoading\SchoolYear::class);
     }
 }

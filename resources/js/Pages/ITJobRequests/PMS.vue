@@ -35,6 +35,8 @@ const props = defineProps({
   pmsSchedules: Object,
   users: Array,
   equipments: Array,
+  rooms: Array,
+  currentSchoolYear: Object,
   filters: Object,
   hasPin: { type: Boolean, default: false },
   signatureUri: { type: String, default: null },
@@ -422,10 +424,16 @@ const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
             <AppInput v-model="form.title" type="text" placeholder="Enter schedule title" label="Title" required />
           </div>
           <div>
-            <AppInput v-model="form.school_year" type="text" placeholder="e.g. 2025-2026" label="School Year" />
+            <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
+            <p class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {{ modalMode === 'edit' ? (selectedSchedule?.school_year || '—') : (currentSchoolYear?.name || 'No active school year set') }}
+            </p>
           </div>
           <div>
-            <AppInput v-model="form.office_area" type="text" placeholder="Enter office/area" label="Office/Area" />
+            <AppSelect v-model="form.room_id" label="Office/Area" required :show-blank="false">
+              <option disabled value="">Select office/area</option>
+              <option v-for="room in rooms" :key="room.id" :value="room.id">{{ room.code || room.name }}</option>
+            </AppSelect>
           </div>
           <div>
             <AppSelect v-model="form.frequency" label="Frequency" required :show-blank="false">

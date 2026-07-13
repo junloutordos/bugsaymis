@@ -7,6 +7,8 @@ use App\Http\Traits\SignsDocuments;
 use App\Models\PMS;
 use App\Models\User;
 use App\Models\ICTEquipment;
+use App\Models\Room;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Services\DigitalSignatureService;
 use App\Services\SnapshotService;
 use Illuminate\Http\Request;
@@ -75,12 +77,14 @@ class PMSController extends Controller
         $user = $request->user();
 
         return Inertia::render('ITJobRequests/PMS', [
-            'pmsSchedules' => $pmsSchedules,
-            'users'        => $users,
-            'equipments'   => $equipments,
-            'filters'      => $request->only('search', 'status', 'frequency'),
-            'hasPin'       => ! empty($user->signature_pin),
-            'signatureUri' => $this->sigService->getSignatureDataUri($user),
+            'pmsSchedules'      => $pmsSchedules,
+            'users'             => $users,
+            'equipments'        => $equipments,
+            'rooms'             => Room::orderBy('name')->get(['id', 'name', 'code']),
+            'currentSchoolYear' => SchoolYear::where('is_current', true)->first(['id', 'name']),
+            'filters'           => $request->only('search', 'status', 'frequency'),
+            'hasPin'            => ! empty($user->signature_pin),
+            'signatureUri'      => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -91,8 +95,7 @@ class PMSController extends Controller
         $data = $request->validate([
             'title'                  => 'required|string|max:255',
             'frequency'              => 'required|string|max:255',
-            'school_year'            => 'required|string|max:20',   // ✅ new
-            'office_area'            => 'required|string|max:255',  // ✅ new
+            'room_id'                => 'required|integer|exists:rooms,id',
             'status'                 => 'required|string|max:255',
             'remarks'                => 'nullable|string',
             'schedule_dates'         => 'required|array',
@@ -100,12 +103,23 @@ class PMSController extends Controller
             'pin'                    => 'nullable|string',
         ]);
 
+        $room           = Room::findOrFail($data['room_id']);
+        $currentSchoolYear = SchoolYear::where('is_current', true)->first();
+
+        if (! $currentSchoolYear) {
+            return back()->withErrors([
+                'school_year' => 'No active school year is set in Faculty Loading. Set one before creating a PMS schedule.',
+            ]);
+        }
+
         // Create PMS
         $pms = PMS::create([
             'title'           => $data['title'],
             'frequency'       => $data['frequency'],
-            'school_year'     => $data['school_year'], // ✅
-            'office_area'     => $data['office_area'],      // ✅
+            'room_id'         => $room->id,
+            'office_area'     => $room->code ?: $room->name,
+            'school_year_id'  => $currentSchoolYear->id,
+            'school_year'     => $currentSchoolYear->name,
             'status'          => $data['status'],
             'remarks'         => $data['remarks'] ?? null,
             'performed_by'    => Auth::id(),
@@ -148,20 +162,23 @@ class PMSController extends Controller
         $data = $request->validate([
             'title'                  => 'required|string|max:255',
             'frequency'              => 'required|string|max:255',
-            'school_year'            => 'required|string|max:20',   // ✅ new
-            'office_area'            => 'required|string|max:255',  // ✅ new
+            'room_id'                => 'required|integer|exists:rooms,id',
             'status'                 => 'required|string|max:255',
             'remarks'                => 'nullable|string',
             'schedule_dates'         => 'required|array',
             'schedule_dates.*.date'  => 'required|date',
         ]);
 
-        // Update PMS
+        $room = Room::findOrFail($data['room_id']);
+
+        // Update PMS — school_year/school_year_id are intentionally left untouched:
+        // they're fixed at creation time and must not silently jump to "current"
+        // just because an old schedule's frequency/dates/remarks are being edited.
         $pms->update([
             'title'        => $data['title'],
             'frequency'    => $data['frequency'],
-            'school_year'  => $data['school_year'], // ✅
-            'office_area'  => $data['office_area'],      // ✅
+            'room_id'      => $room->id,
+            'office_area'  => $room->code ?: $room->name,
             'status'       => $data['status'],
             'remarks'      => $data['remarks'] ?? null,
             'performed_by' => Auth::id(),
