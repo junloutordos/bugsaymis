@@ -93,6 +93,23 @@ class Ppmp extends Model
     public const PPMP_TYPE_DIVISION = 'division';
     public const PPMP_TYPE_PROPERTY = 'property';
 
+    public const STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_PENDING_DIVISION,
+        self::STATUS_DIVISION_APPROVED,
+        self::STATUS_PENDING_PROPERTY_OFFICER,
+        self::STATUS_PROPERTY_OFFICER_APPROVED,
+        self::STATUS_PENDING_BUDGET_OFFICER,
+        self::STATUS_PENDING_OCD,
+        self::STATUS_APPROVED,
+        self::STATUS_SUBMITTED_TO_DBM,
+        self::STATUS_RETURNED,
+        self::STATUS_CONSOLIDATED,
+        self::STATUS_PENDING_HEAD,
+        self::STATUS_PENDING_BAC,
+        self::STATUS_SUBMITTED,
+    ];
+
     // ─── Relationships ────────────────────────────────────────────────────────
 
     public function items()
