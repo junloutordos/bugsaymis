@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Activity extends Model
 {
@@ -27,7 +28,17 @@ class Activity extends Model
         'special_order',
         'activity_report',
         'official_documentation',
+        'qr_token',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Activity $model) {
+            if (empty($model->qr_token)) {
+                $model->qr_token = (string) Str::uuid();
+            }
+        });
+    }
 
     protected $casts = [
         'start_date' => 'date:Y-m-d',

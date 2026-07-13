@@ -403,6 +403,8 @@ class RolePermissionSeeder extends Seeder
         $assign('HR', ['activities.manage', 'activities.view_all']);
         // HR also monitors the evaluation analytics dashboard (Administrator bypasses via isSuperAdmin())
         $assign('HR', ['activities.monitor']);
+        // Dedicated cross-cutting role for individually-assigned evaluation committee members
+        $assign('Evaluation Committee', ['activities.evaluation_committee']);
 
         // ── Student / Parent — very limited read-only ─────────────────────────
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);

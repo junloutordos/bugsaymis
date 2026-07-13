@@ -59,7 +59,7 @@ class ActivityFileController extends Controller
     private function authorizeView(Activity $activity): void
     {
         $user = Auth::user();
-        if ($user->isSuperAdmin() || $user->hasAnyPermission(['activities.view_all', 'activities.monitor'])) return;
+        if ($user->isSuperAdmin() || $user->hasAnyPermission(['activities.view_all', 'activities.monitor', 'activities.evaluation_committee'])) return;
 
         $isOwner = $activity->user_id === $user->id;
         $isCo    = ActivityCoProponent::where('activity_id', $activity->id)->where('employee_id', $user->id)->exists();

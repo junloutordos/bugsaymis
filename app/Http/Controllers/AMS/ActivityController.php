@@ -45,7 +45,7 @@ class ActivityController extends Controller
         $user  = Auth::user();
         $query = Activity::with('creator')->orderByDesc('start_date');
 
-        if (!$user->isSuperAdmin() && !$user->hasAnyPermission(['activities.view_all', 'activities.monitor'])) {
+        if (!$user->isSuperAdmin() && !$user->hasAnyPermission(['activities.view_all', 'activities.monitor', 'activities.evaluation_committee'])) {
             $coProponentIds = ActivityCoProponent::where('employee_id', $user->id)->pluck('activity_id');
             $query->where(function ($q) use ($user, $coProponentIds) {
                 $q->where('user_id', $user->id)->orWhereIn('id', $coProponentIds);
@@ -147,6 +147,7 @@ class ActivityController extends Controller
             'canEdit'      => $canEdit,
             'canManage'    => $canManage,
             'evaluations'  => $this->buildEvaluationSummary($activity),
+            'walkinEvalQr' => $this->buildWalkinEvalQr($activity),
             'quizzes'      => \App\Models\Quiz\Quiz::where('source_type', 'activity')
                 ->where('source_id', $activity->id)
                 ->withCount('questions')
@@ -503,7 +504,7 @@ class ActivityController extends Controller
     private function authorizeView(Activity $activity): void
     {
         $user = Auth::user();
-        if ($user->isSuperAdmin() || $user->hasAnyPermission(['activities.view_all', 'activities.monitor'])) return;
+        if ($user->isSuperAdmin() || $user->hasAnyPermission(['activities.view_all', 'activities.monitor', 'activities.evaluation_committee'])) return;
 
         $isOwner = $activity->user_id === $user->id;
         $isCo    = ActivityCoProponent::where('activity_id', $activity->id)->where('employee_id', $user->id)->exists();
@@ -697,6 +698,18 @@ class ActivityController extends Controller
     private function buildEvaluationSummary(Activity $activity): array
     {
         return $this->evalSummaryService->build($activity);
+    }
+
+    /** QR code + URL letting walk-in (non-participant) attendees submit an evaluation. */
+    private function buildWalkinEvalQr(Activity $activity): array
+    {
+        $url   = url(route('ams.activities.evaluate.walkin.show', [$activity->id, $activity->qr_token]));
+        $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(150)->generate($url);
+
+        return [
+            'url'    => $url,
+            'qrData' => 'data:image/svg+xml;base64,' . base64_encode($qrSvg),
+        ];
     }
 
     private function employeeList(): array

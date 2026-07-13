@@ -45,6 +45,7 @@ const props = defineProps({
   canEdit:      Boolean,
   canManage:    Boolean,
   evaluations:  Object,
+  walkinEvalQr: Object,
   quizzes:      { type: Array, default: () => [] },
 })
 
@@ -913,6 +914,18 @@ async function removeCoPro(cp) {
 
     <!-- ── EVALUATIONS TAB ──────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'evaluations'" class="space-y-6">
+
+      <!-- Walk-in (QR) evaluation -->
+      <div v-if="walkinEvalQr" class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4">
+        <img :src="walkinEvalQr.qrData" alt="Walk-in evaluation QR code" class="w-28 h-28 shrink-0" />
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-slate-700">Scan to evaluate (walk-in / guest)</p>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Attendees who aren't tagged as participants can scan this to submit their own evaluation — no account or invite needed.
+          </p>
+          <p class="text-xs font-mono text-indigo-600 mt-1 break-all">{{ walkinEvalQr.url }}</p>
+        </div>
+      </div>
 
       <!-- No responses yet -->
       <div v-if="!evaluations || evaluations.count === 0" class="bg-white rounded-xl border border-slate-200">

@@ -56,6 +56,9 @@ class RolesSeeder extends Seeder
             // ── Non-staff ─────────────────────────────────────────────────────
             ['name' => 'Student',            'description' => 'Student with limited read-only access.'],
             ['name' => 'Parent',             'description' => 'Parent/Guardian with limited access to student information.'],
+
+            // ── Cross-cutting ─────────────────────────────────────────────────
+            ['name' => 'Evaluation Committee', 'description' => 'Cross-cutting role for individually-assigned evaluation committee members who monitor activity evaluations.'],
         ];
 
         foreach ($roles as $data) {

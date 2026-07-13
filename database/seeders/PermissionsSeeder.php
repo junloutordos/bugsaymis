@@ -269,6 +269,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'AMS', 'name' => 'activities.manage',  'description' => 'Create and manage own activities, participants, and certificates'],
             ['module' => 'AMS', 'name' => 'activities.view_all','description' => 'View all activities read-only (HR Office)'],
             ['module' => 'AMS', 'name' => 'activities.monitor', 'description' => 'Monitor all activities and evaluation analytics (Evaluation Committee/Management)'],
+            ['module' => 'AMS', 'name' => 'activities.evaluation_committee', 'description' => 'Monitor evaluation results and analytics for activities (assignable to individual evaluation committee members)'],
 
             // ── Chat ──────────────────────────────────────────────────────────
             ['module' => 'Chat',   'name' => 'chat.access',            'description' => 'Access the real-time messaging module'],

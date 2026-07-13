@@ -1133,7 +1133,7 @@ export const menuItems = [
         routeName: "ams.monitor.index",
         href: route("ams.monitor.index"),
         icon: ChartBarIcon,
-        permissions: ["activities.monitor"],
+        permissions: ["activities.monitor", "activities.evaluation_committee"],
       },
     ],
   },

@@ -57,85 +57,110 @@ class EvaluationController extends Controller
         return null;
     }
 
-    // ── Show evaluation form ──────────────────────────────────────────────────
+    // ── Walk-in (QR, no pre-registered participant) ───────────────────────────
 
-    public function show(Activity $activity, string $hash)
+    public function showWalkin(Activity $activity, string $qrToken)
     {
-        $resolved = $this->resolveParticipant($activity, $hash);
-        if (!$resolved) abort(404, 'Evaluation link is invalid or has expired.');
+        abort_if($activity->qr_token !== $qrToken, 404);
+
+        $resolved = ['type' => 'walkin', 'id' => null, 'name' => 'Walk-in Guest'];
 
         if ($activity->isTrainingWorkshopSeminar()) {
-            return $this->showTws($activity, $hash, $resolved);
-        }
+            $speakers = $activity->speakers()->orderBy('sort_order')->get(['id', 'name', 'designation', 'topic']);
 
-        $alreadyEvaluated = ActivityEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', $resolved['type'])
-            ->where('participant_id', $resolved['id'])
-            ->exists();
+            return Inertia::render('AMS/EvaluateTWS', [
+                'activity'         => $this->activityPayload($activity),
+                'speakers'         => $speakers,
+                'participant'      => $resolved,
+                'qrToken'          => $qrToken,
+                'walkin'           => true,
+                'alreadyEvaluated' => false,
+            ]);
+        }
 
         return Inertia::render('AMS/Evaluate', [
-            'activity' => [
-                'id'         => $activity->id,
-                'title'      => $activity->title,
-                'start_date' => $activity->start_date?->toDateString(),
-                'end_date'   => $activity->end_date?->toDateString(),
-                'venue'      => $activity->venue,
-            ],
+            'activity'         => $this->activityPayload($activity),
             'participant'      => $resolved,
-            'hash'             => $hash,
-            'alreadyEvaluated' => $alreadyEvaluated,
+            'qrToken'          => $qrToken,
+            'walkin'           => true,
+            'alreadyEvaluated' => false,
         ]);
     }
 
-    private function showTws(Activity $activity, string $hash, array $resolved)
+    public function storeWalkin(Request $request, Activity $activity, string $qrToken)
     {
-        $alreadyEvaluated = ActivityTwsEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', $resolved['type'])
-            ->where('participant_id', $resolved['id'])
-            ->exists();
+        abort_if($activity->qr_token !== $qrToken, 404);
 
-        $speakers = $activity->speakers()->orderBy('sort_order')->get(['id', 'name', 'designation', 'topic']);
-
-        return Inertia::render('AMS/EvaluateTWS', [
-            'activity' => [
-                'id'         => $activity->id,
-                'title'      => $activity->title,
-                'start_date' => $activity->start_date?->toDateString(),
-                'end_date'   => $activity->end_date?->toDateString(),
-                'venue'      => $activity->venue,
-            ],
-            'speakers'         => $speakers,
-            'participant'      => $resolved,
-            'hash'             => $hash,
-            'alreadyEvaluated' => $alreadyEvaluated,
-        ]);
-    }
-
-    // ── Store evaluation ──────────────────────────────────────────────────────
-
-    public function store(Request $request, Activity $activity, string $hash)
-    {
-        $resolved = $this->resolveParticipant($activity, $hash);
-        if (!$resolved) abort(404, 'Evaluation link is invalid or has expired.');
-
+        // No duplicate check for walk-ins — there's no stable identity to key
+        // it on, and each QR scan is meant to behave like a paper form (any
+        // number of walk-in attendees can submit their own evaluation).
         if ($activity->isTrainingWorkshopSeminar()) {
-            return $this->storeTws($request, $activity, $hash, $resolved);
+            return $this->storeWalkinTws($request, $activity, $qrToken);
         }
 
-        // Prevent duplicate submissions
-        $exists = ActivityEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', $resolved['type'])
-            ->where('participant_id', $resolved['id'])
-            ->exists();
+        $data = $request->validate($this->inHouseRules());
 
-        if ($exists) {
-            return back()->with('info', 'You have already submitted an evaluation for this activity.');
-        }
+        ActivityEvaluation::create(array_merge($data, [
+            'activity_id'      => $activity->id,
+            'participant_type' => 'walkin',
+            'participant_id'   => null,
+        ]));
 
+        return redirect()->route('ams.activities.evaluate.walkin.show', [$activity->id, $qrToken])
+            ->with('success', 'Thank you! Your evaluation has been submitted.');
+    }
+
+    private function storeWalkinTws(Request $request, Activity $activity, string $qrToken)
+    {
+        $speakerIds = $activity->speakers()->pluck('id')->all();
+        $data = $request->validate($this->twsRules($speakerIds));
+
+        DB::transaction(function () use ($data, $activity) {
+            $speakerRows = $data['speakers'];
+            unset($data['speakers']);
+
+            ActivityTwsEvaluation::create(array_merge($data, [
+                'activity_id'      => $activity->id,
+                'participant_type' => 'walkin',
+                'participant_id'   => null,
+            ]));
+
+            foreach ($speakerRows as $row) {
+                $speakerId = $row['speaker_id'];
+                unset($row['speaker_id']);
+
+                ActivitySpeakerEvaluation::create(array_merge($row, [
+                    'activity_id'      => $activity->id,
+                    'speaker_id'       => $speakerId,
+                    'participant_type' => 'walkin',
+                    'participant_id'   => null,
+                    'evaluator_name'   => $data['evaluator_name'] ?? null,
+                ]));
+            }
+        });
+
+        return redirect()->route('ams.activities.evaluate.walkin.show', [$activity->id, $qrToken])
+            ->with('success', 'Thank you! Your evaluation has been submitted.');
+    }
+
+    private function activityPayload(Activity $activity): array
+    {
+        return [
+            'id'         => $activity->id,
+            'title'      => $activity->title,
+            'start_date' => $activity->start_date?->toDateString(),
+            'end_date'   => $activity->end_date?->toDateString(),
+            'venue'      => $activity->venue,
+        ];
+    }
+
+    /** Shared by store() (hash flow) and storeWalkin() (QR flow). */
+    private function inHouseRules(): array
+    {
         $likertFull = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
         $likertBase = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree'];
 
-        $data = $request->validate([
+        return [
             'evaluator_name' => 'nullable|string|max:255',
             // Section A
             'obj_1'  => 'required|in:' . implode(',', $likertFull),
@@ -156,38 +181,19 @@ class EvaluationController extends Controller
             // Open-ended
             'suggestions'    => 'nullable|string|max:2000',
             'other_comments' => 'nullable|string|max:2000',
-        ]);
-
-        ActivityEvaluation::create(array_merge($data, [
-            'activity_id'      => $activity->id,
-            'participant_type' => $resolved['type'],
-            'participant_id'   => $resolved['id'],
-        ]));
-
-        return redirect()->route('ams.activities.evaluate.show', [$activity->id, $hash])
-            ->with('success', 'Thank you! Your evaluation has been submitted.');
+        ];
     }
 
-    private function storeTws(Request $request, Activity $activity, string $hash, array $resolved)
+    /** Shared by storeTws() (hash flow) and storeWalkinTws() (QR flow). */
+    private function twsRules(array $speakerIds): array
     {
-        $exists = ActivityTwsEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', $resolved['type'])
-            ->where('participant_id', $resolved['id'])
-            ->exists();
-
-        if ($exists) {
-            return back()->with('info', 'You have already submitted an evaluation for this activity.');
-        }
-
-        $agree       = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
+        $agree        = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
         $satisfaction = ['very_satisfied', 'satisfied', 'neutral', 'dissatisfied', 'very_dissatisfied', 'not_applicable'];
-        $overall     = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree'];
-        $topicScale  = ['low', 'satisfactory', 'excellent'];
+        $overall      = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree'];
+        $topicScale   = ['low', 'satisfactory', 'excellent'];
         $speakerScale = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
 
-        $speakerIds = $activity->speakers()->pluck('id')->all();
-
-        $rules = [
+        return [
             'evaluator_name'     => 'nullable|string|max:255',
             'position_function'  => 'nullable|string|max:255',
             'content_1'          => 'required|in:' . implode(',', $agree),
@@ -225,8 +231,96 @@ class EvaluationController extends Controller
             'speakers.*.improvement_suggestions'                  => 'nullable|string|max:2000',
             'speakers.*.other_topics_wanted'                       => 'nullable|string|max:2000',
         ];
+    }
 
-        $data = $request->validate($rules);
+    // ── Show evaluation form ──────────────────────────────────────────────────
+
+    public function show(Activity $activity, string $hash)
+    {
+        $resolved = $this->resolveParticipant($activity, $hash);
+        if (!$resolved) abort(404, 'Evaluation link is invalid or has expired.');
+
+        if ($activity->isTrainingWorkshopSeminar()) {
+            return $this->showTws($activity, $hash, $resolved);
+        }
+
+        $alreadyEvaluated = ActivityEvaluation::where('activity_id', $activity->id)
+            ->where('participant_type', $resolved['type'])
+            ->where('participant_id', $resolved['id'])
+            ->exists();
+
+        return Inertia::render('AMS/Evaluate', [
+            'activity'         => $this->activityPayload($activity),
+            'participant'      => $resolved,
+            'hash'             => $hash,
+            'alreadyEvaluated' => $alreadyEvaluated,
+        ]);
+    }
+
+    private function showTws(Activity $activity, string $hash, array $resolved)
+    {
+        $alreadyEvaluated = ActivityTwsEvaluation::where('activity_id', $activity->id)
+            ->where('participant_type', $resolved['type'])
+            ->where('participant_id', $resolved['id'])
+            ->exists();
+
+        $speakers = $activity->speakers()->orderBy('sort_order')->get(['id', 'name', 'designation', 'topic']);
+
+        return Inertia::render('AMS/EvaluateTWS', [
+            'activity'         => $this->activityPayload($activity),
+            'speakers'         => $speakers,
+            'participant'      => $resolved,
+            'hash'             => $hash,
+            'alreadyEvaluated' => $alreadyEvaluated,
+        ]);
+    }
+
+    // ── Store evaluation ──────────────────────────────────────────────────────
+
+    public function store(Request $request, Activity $activity, string $hash)
+    {
+        $resolved = $this->resolveParticipant($activity, $hash);
+        if (!$resolved) abort(404, 'Evaluation link is invalid or has expired.');
+
+        if ($activity->isTrainingWorkshopSeminar()) {
+            return $this->storeTws($request, $activity, $hash, $resolved);
+        }
+
+        // Prevent duplicate submissions
+        $exists = ActivityEvaluation::where('activity_id', $activity->id)
+            ->where('participant_type', $resolved['type'])
+            ->where('participant_id', $resolved['id'])
+            ->exists();
+
+        if ($exists) {
+            return back()->with('info', 'You have already submitted an evaluation for this activity.');
+        }
+
+        $data = $request->validate($this->inHouseRules());
+
+        ActivityEvaluation::create(array_merge($data, [
+            'activity_id'      => $activity->id,
+            'participant_type' => $resolved['type'],
+            'participant_id'   => $resolved['id'],
+        ]));
+
+        return redirect()->route('ams.activities.evaluate.show', [$activity->id, $hash])
+            ->with('success', 'Thank you! Your evaluation has been submitted.');
+    }
+
+    private function storeTws(Request $request, Activity $activity, string $hash, array $resolved)
+    {
+        $exists = ActivityTwsEvaluation::where('activity_id', $activity->id)
+            ->where('participant_type', $resolved['type'])
+            ->where('participant_id', $resolved['id'])
+            ->exists();
+
+        if ($exists) {
+            return back()->with('info', 'You have already submitted an evaluation for this activity.');
+        }
+
+        $speakerIds = $activity->speakers()->pluck('id')->all();
+        $data = $request->validate($this->twsRules($speakerIds));
 
         DB::transaction(function () use ($data, $activity, $resolved) {
             $speakerRows = $data['speakers'];

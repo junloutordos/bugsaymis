@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|activities.view_all|activities.monitor'])
+Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|activities.view_all|activities.monitor|activities.evaluation_committee'])
     ->prefix('ams/activities')
     ->name('ams.activities.')
     ->group(function () {
@@ -79,7 +79,7 @@ Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|acti
     });
 
 // ── Monitoring dashboard (evaluation committee/management/administrator) ──────
-Route::middleware(['web', 'auth', 'verified', 'permission:activities.monitor'])
+Route::middleware(['web', 'auth', 'verified', 'permission:activities.monitor|activities.evaluation_committee'])
     ->prefix('ams/monitor')
     ->name('ams.monitor.')
     ->group(function () {
@@ -112,4 +112,8 @@ Route::middleware(['web'])
     ->group(function () {
         Route::get('/{activity}/evaluate/{hash}',  [EvaluationController::class, 'show'])->name('evaluate.show');
         Route::post('/{activity}/evaluate/{hash}', [EvaluationController::class, 'store'])->name('evaluate.store');
+
+        // ── Walk-in (QR, no pre-registered participant) ─────────────────────
+        Route::get('/{activity}/evaluate-walkin/{qrToken}',  [EvaluationController::class, 'showWalkin'])->name('evaluate.walkin.show');
+        Route::post('/{activity}/evaluate-walkin/{qrToken}', [EvaluationController::class, 'storeWalkin'])->name('evaluate.walkin.store');
     });

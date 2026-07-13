@@ -10,7 +10,9 @@ const props = defineProps({
   activity:         Object,
   speakers:         Array,
   participant:      Object,
-  hash:             String,
+  hash:             { type: String, default: null },
+  qrToken:          { type: String, default: null },
+  walkin:           { type: Boolean, default: false },
   alreadyEvaluated: Boolean,
 })
 
@@ -119,9 +121,10 @@ const form = useForm({
 })
 
 function submit() {
-  form.post(route('ams.activities.evaluate.store', [props.activity.id, props.hash]), {
-    preserveScroll: true,
-  })
+  const url = props.walkin
+    ? route('ams.activities.evaluate.walkin.store', [props.activity.id, props.qrToken])
+    : route('ams.activities.evaluate.store', [props.activity.id, props.hash])
+  form.post(url, { preserveScroll: true })
 }
 </script>
 
