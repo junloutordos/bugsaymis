@@ -267,9 +267,12 @@ class PMSController extends Controller
 
     public function showEquipments(PMS $pms)
     {
-        // Load equipments with histories and related room + owner, also PMS dates
+        // Load equipments with histories and related room + owner, also PMS dates.
+        // Histories must be scoped to THIS schedule — equipment gets reassigned to a
+        // new PMS schedule every school year/quarter, and an unscoped hasMany would
+        // otherwise pull in completion records logged under a previous schedule.
         $pms->load([
-            'equipments.histories',
+            'equipments.histories' => fn ($q) => $q->where('ict_pms_id', $pms->id),
             'equipments.room:id,name,code',   // room for location
             'equipments.owner:id,name',       // optional, if needed
             'dates',
