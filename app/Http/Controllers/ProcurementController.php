@@ -242,6 +242,7 @@ class ProcurementController extends Controller
                 Mail::to($bu->email)->send(new ProcurementApprovalMail($procurement, $approveUrl, $declineUrl));
             } catch (\Throwable $e) {
                 logger()->error('Failed to send procurement approval email', ['to' => $bu->email, 'error' => $e->getMessage()]);
+                report($e);
             }
         }
 

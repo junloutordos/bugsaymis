@@ -109,6 +109,7 @@ class DocumentTrackingController extends Controller
     {
         try { $fn(); } catch (\Throwable $e) {
             logger()->warning('DTS mail failed: ' . $e->getMessage());
+            report($e);
         }
     }
 

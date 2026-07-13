@@ -58,8 +58,12 @@ class LinkRequestController extends Controller
             'expires_at'        => now()->addHours(72),
         ]);
 
-        Mail::to($student->student_email)
-            ->send(new StudentLinkRequestMail($linkRequest, $request->user()->name));
+        try {
+            Mail::to($student->student_email)
+                ->send(new StudentLinkRequestMail($linkRequest, $request->user()->name));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['message' => $genericMessage]);
     }

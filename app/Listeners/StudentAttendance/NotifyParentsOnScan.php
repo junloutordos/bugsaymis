@@ -71,6 +71,7 @@ class NotifyParentsOnScan
                         'parent_id' => $parent->id,
                         'error'     => $e->getMessage(),
                     ]);
+                    report($e);
                 }
             }
 

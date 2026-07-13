@@ -97,7 +97,11 @@ class EmployeeIPCRController extends Controller
         $supervisor = $this->workflow->immediateSupervisorFor(auth()->user());
         if ($supervisor) {
             $ipcr->load('user');
-            Mail::to($supervisor->email)->send(new IPCRCreatedMail($ipcr, $supervisor->name));
+            try {
+                Mail::to($supervisor->email)->send(new IPCRCreatedMail($ipcr, $supervisor->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         AuditLogger::log([
@@ -495,7 +499,11 @@ class EmployeeIPCRController extends Controller
         $employeeIPCR->load('user');
         $dc = $this->workflow->immediateSupervisorFor($employeeIPCR->user);
         if ($dc) {
-            Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+            try {
+                Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
@@ -513,7 +521,11 @@ class EmployeeIPCRController extends Controller
         $employeeIPCR->load('user');
         $dc = $this->workflow->immediateSupervisorFor($employeeIPCR->user);
         if ($dc) {
-            Mail::to($dc->email)->send(new IPCRSubmittedForRatingMail($employeeIPCR, $dc->name));
+            try {
+                Mail::to($dc->email)->send(new IPCRSubmittedForRatingMail($employeeIPCR, $dc->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
@@ -555,7 +567,11 @@ class EmployeeIPCRController extends Controller
         $employeeIPCR->load('user');
         $dc = $this->workflow->immediateSupervisorFor($employeeIPCR->user);
         if ($dc) {
-            Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+            try {
+                Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)

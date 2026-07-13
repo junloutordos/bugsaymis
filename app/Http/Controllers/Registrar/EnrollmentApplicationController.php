@@ -108,6 +108,7 @@ class EnrollmentApplicationController extends Controller
                     'ref'   => $application->reference_no,
                     'error' => $e->getMessage(),
                 ]);
+                report($e);
             }
         }
 
@@ -293,6 +294,7 @@ class EnrollmentApplicationController extends Controller
                     'ref'   => $enrollmentApplication->reference_no,
                     'error' => $e->getMessage(),
                 ]);
+                report($e);
             }
         }
 
@@ -327,6 +329,7 @@ class EnrollmentApplicationController extends Controller
                     'ref'   => $enrollmentApplication->reference_no,
                     'error' => $e->getMessage(),
                 ]);
+                report($e);
             }
         }
 

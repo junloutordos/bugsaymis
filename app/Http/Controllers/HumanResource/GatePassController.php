@@ -270,6 +270,7 @@ class GatePassController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send gatepass notification', ['error' => $e->getMessage()]);
+            report($e);
         }
 
         $this->performSign($request, 'App\Models\GatePass', (int) $id,
@@ -420,6 +421,7 @@ class GatePassController extends Controller
                                 Mail::to($u->email)->send(new GatePassStatusMail($row, 'Division Approved', null, 'Division Chief', $approveUrl, $declineUrl));
                             } catch (\Throwable $e) {
                                 logger()->error('Failed to send gatepass notification to role_id=7 (in-app)', ['error' => $e->getMessage(), 'user_id' => $u->id]);
+                                report($e);
                             }
                         }
                     }
@@ -429,6 +431,7 @@ class GatePassController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send gatepass declined notification (in-app)', ['error' => $e->getMessage(), 'id' => $id]);
+            report($e);
         }
 
         return response()->json(['row' => $row]);
@@ -544,6 +547,7 @@ class GatePassController extends Controller
                         Mail::to($u->email)->send(new GatePassStatusMail($row, 'Division Approved', null, 'Division Chief', $approveUrl, $declineUrl));
                     } catch (\Throwable $e) {
                         logger()->error('Failed to send gatepass notification to role_id=7', ['error' => $e->getMessage(), 'user_id' => $u->id]);
+                        report($e);
                     }
                 }
             }
@@ -617,6 +621,7 @@ class GatePassController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to notify gatepass requester after decline', ['error' => $e->getMessage(), 'id' => $id]);
+            report($e);
         }
 
         return view('gatepass_declined', ['gatepass' => $row, 'reason' => $request->input('reason')]);
@@ -675,6 +680,7 @@ class GatePassController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send OCD-approved notification to requester', ['error' => $e->getMessage(), 'id' => $id]);
+            report($e);
         }
 
         return view('gatepass_approved', ['gatepass' => $row, 'already' => false]);
@@ -722,6 +728,7 @@ class GatePassController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to notify requester after OCD decline', ['error' => $e->getMessage(), 'id' => $id]);
+            report($e);
         }
 
         return view('gatepass_declined', ['gatepass' => $row, 'reason' => $request->input('reason')]);
@@ -784,6 +791,7 @@ class GatePassController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('GatePass OCD in-app action email failed', ['error' => $e->getMessage()]);
+            report($e);
         }
 
         return back()->with('success', 'OCD action recorded.');

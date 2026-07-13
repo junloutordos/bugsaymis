@@ -29,10 +29,15 @@ class IssuanceReleasedMail extends Mailable
                 'verifyUrl'     => route('issuances.verify', $this->issuance->qr_token),
             ]);
 
-        // Attach the generated PDF (generated in doRelease() before emails are sent)
+        // Attach the generated PDF (generated in doRelease() before emails are sent).
+        // Storage::get() returns null (rather than throwing) for a missing file on
+        // some disk drivers, so check for that explicitly — attachData(null, ...)
+        // crashes the mail body build instead of just skipping the attachment.
         try {
             $pdf = Storage::disk('s3')->get('issuances/' . $this->issuance->control_number . '.pdf');
-            $mail->attachData($pdf, $this->issuance->control_number . '.pdf', ['mime' => 'application/pdf']);
+            if ($pdf !== null) {
+                $mail->attachData($pdf, $this->issuance->control_number . '.pdf', ['mime' => 'application/pdf']);
+            }
         } catch (\Throwable) {
             // PDF not ready or unavailable — email sent without attachment; user can download from app
         }

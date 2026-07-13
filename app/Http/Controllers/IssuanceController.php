@@ -240,6 +240,9 @@ class IssuanceController extends Controller
                 'office'          => $r->office?->only('id', 'name'),
                 'acknowledged_at' => $r->acknowledged_at?->toISOString(),
                 'notified_at'     => $r->notified_at?->toISOString(),
+                'email_status'    => $r->email_status,
+                'emailed_at'      => $r->emailed_at?->toISOString(),
+                'email_error'     => $r->email_error,
                 'is_me'           => $r->user_id === $user->id,
             ]);
 
@@ -376,5 +379,40 @@ class IssuanceController extends Controller
             'Content-Disposition' => 'inline; filename="' . $issuance->attachment_filename . '"',
             'Cache-Control'       => 'private, max-age=300',
         ]);
+    }
+
+    // ── Resend recipient email ───────────────────────────────────────────────
+
+    /** Re-send one recipient's issuance email (e.g. after fixing their email on file). */
+    public function resendRecipientEmail(Issuance $issuance, IssuanceRecipient $recipient)
+    {
+        abort_if($recipient->issuance_id !== $issuance->id, 404);
+        abort_if(! $issuance->isReleased(), 422, 'Issuance has not been released yet.');
+
+        $u = $recipient->user;
+        if (! $u || empty($u->email)) {
+            $recipient->update([
+                'email_status' => 'skipped',
+                'email_error'  => 'No email on file for this recipient.',
+            ]);
+
+            return back()->withErrors(['email' => 'This recipient has no email on file.']);
+        }
+
+        try {
+            Mail::to($u->email)->send(new IssuanceReleasedMail($issuance, $u->name));
+            $recipient->update(['email_status' => 'sent', 'emailed_at' => now(), 'email_error' => null]);
+
+            return back()->with('success', "Issuance re-sent to {$u->email}.");
+        } catch (\Throwable $e) {
+            $recipient->update(['email_status' => 'failed', 'email_error' => $e->getMessage()]);
+            logger()->warning('Issuance resend failed', [
+                'issuance_id'  => $issuance->id,
+                'recipient_id' => $recipient->id,
+                'error'        => $e->getMessage(),
+            ]);
+
+            return back()->withErrors(['email' => 'Sending failed: ' . $e->getMessage()]);
+        }
     }
 }

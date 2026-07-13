@@ -247,7 +247,11 @@ class DivisionChiefIPCRController extends Controller
         ], 'ipcr_targets_approved');
 
         $employeeIPCR->load('user');
-        Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsApprovedMail($employeeIPCR, $employeeIPCR->user->name));
+        try {
+            Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsApprovedMail($employeeIPCR, $employeeIPCR->user->name));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Targets approved successfully.');
@@ -263,7 +267,11 @@ class DivisionChiefIPCRController extends Controller
         $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_RETURNED, [], 'ipcr_targets_returned');
 
         $employeeIPCR->load('user');
-        Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+        try {
+            Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Targets returned to employee for revision.');
@@ -304,7 +312,11 @@ class DivisionChiefIPCRController extends Controller
         ], 'ipcr_returned_from_pmt');
 
         $employeeIPCR->load('user');
-        Mail::to($employeeIPCR->user->email)->send(new IPCRDCReturnedFromPMTMail($employeeIPCR, $employeeIPCR->user->name));
+        try {
+            Mail::to($employeeIPCR->user->email)->send(new IPCRDCReturnedFromPMTMail($employeeIPCR, $employeeIPCR->user->name));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR returned to employee for revision.');
@@ -322,7 +334,11 @@ class DivisionChiefIPCRController extends Controller
         ], 'ipcr_accomplishment_returned');
 
         $employeeIPCR->load('user');
-        Mail::to($employeeIPCR->user->email)->send(new IPCRAccomplishmentReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+        try {
+            Mail::to($employeeIPCR->user->email)->send(new IPCRAccomplishmentReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Accomplishment returned to employee for revision.');
@@ -427,7 +443,11 @@ class DivisionChiefIPCRController extends Controller
         ], 'ipcr_rated');
 
         $employeeIPCR->load('user');
-        Mail::to($employeeIPCR->user->email)->send(new IPCRRatedMail($employeeIPCR, $employeeIPCR->user->name, $user));
+        try {
+            Mail::to($employeeIPCR->user->email)->send(new IPCRRatedMail($employeeIPCR, $employeeIPCR->user->name, $user));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         // Faculty chain: the rater (e.g. AUH) is not the endorser — tell the
         // Division Chief the IPCR is ready for the ministerial submit to PMT.
@@ -435,7 +455,11 @@ class DivisionChiefIPCRController extends Controller
         if ($endorserId && $endorserId !== $user->id) {
             $endorser = User::find($endorserId);
             if ($endorser) {
-                Mail::to($endorser->email)->send(new IPCRReadyForEndorsementMail($employeeIPCR, $endorser->name, $user));
+                try {
+                    Mail::to($endorser->email)->send(new IPCRReadyForEndorsementMail($employeeIPCR, $endorser->name, $user));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         }
 
@@ -469,7 +493,11 @@ class DivisionChiefIPCRController extends Controller
 
         User::havingRole('HR')->each(function ($hr) use ($ipcrs) {
             foreach ($ipcrs as $ipcr) {
-                Mail::to($hr->email)->send(new IPCRSubmittedToHRMail($ipcr, $hr->name));
+                try {
+                    Mail::to($hr->email)->send(new IPCRSubmittedToHRMail($ipcr, $hr->name));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         });
 

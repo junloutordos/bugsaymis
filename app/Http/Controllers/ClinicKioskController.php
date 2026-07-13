@@ -211,10 +211,12 @@ class ClinicKioskController extends Controller
                         Log::info('Sent clinic consultation email to: '.$email);
                     } catch (\Throwable $e) {
                         Log::error('Failed to send clinic consultation email to '.$email.': '.$e->getMessage());
+                        report($e);
                     }
                 }
             } catch (\Throwable $e) {
                 Log::error('Failed to prepare/send clinic consultation emails: '.$e->getMessage());
+                report($e);
             }
 
             DB::commit();

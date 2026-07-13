@@ -258,6 +258,7 @@ class ActivityController extends Controller
                         );
                     } catch (\Throwable $e) {
                         \Log::warning("AMS invite email failed for {$user->email}: " . $e->getMessage());
+                        report($e);
                     }
                 }
             }
@@ -323,6 +324,7 @@ class ActivityController extends Controller
             } catch (\Throwable $e) {
                 $failed++;
                 \Log::warning("AMS: evaluation invite failed for {$user->email}: " . $e->getMessage());
+                report($e);
             }
         }
 

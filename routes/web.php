@@ -350,7 +350,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
     // ── Issuances ─────────────────────────────────────────────────────────────
-    Route::prefix('issuances')->name('issuances.')->middleware('permission:issuances.view')->group(function () {
+    // No group-level permission gate: any tagged recipient must be able to
+    // reach these routes, and every method below already enforces its own
+    // correct admin-or-recipient check (see IssuanceController).
+    Route::prefix('issuances')->name('issuances.')->group(function () {
         Route::get('/',                       [\App\Http\Controllers\IssuanceController::class, 'index'])->name('index');
         Route::get('/create',                 [\App\Http\Controllers\IssuanceController::class, 'create'])->name('create')->middleware('permission:issuances.manage');
         Route::post('/',                      [\App\Http\Controllers\IssuanceController::class, 'store'])->name('store')->middleware('permission:issuances.manage');
@@ -369,6 +372,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('/{issuance}/acknowledge',[\App\Http\Controllers\IssuanceController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/{issuance}/pdf',         [\App\Http\Controllers\IssuanceController::class, 'downloadPdf'])->name('pdf');
         Route::get('/{issuance}/scan',        [\App\Http\Controllers\IssuanceController::class, 'viewScan'])->name('scan');
+        Route::post('/{issuance}/recipients/{recipient}/resend', [\App\Http\Controllers\IssuanceController::class, 'resendRecipientEmail'])
+            ->name('recipients.resend')->middleware('permission:issuances.manage');
     });
 
     // ── Knowledge Management — OED Issuances ─────────────────────────────────

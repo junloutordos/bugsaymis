@@ -8,11 +8,13 @@ class IssuanceRecipient extends Model
 {
     protected $fillable = [
         'issuance_id', 'user_id', 'office_id', 'notified_at', 'acknowledged_at',
+        'email_status', 'emailed_at', 'email_error',
     ];
 
     protected $casts = [
         'notified_at'    => 'datetime',
         'acknowledged_at'=> 'datetime',
+        'emailed_at'     => 'datetime',
     ];
 
     public function issuance()

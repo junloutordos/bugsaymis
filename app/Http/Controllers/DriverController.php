@@ -159,6 +159,7 @@ class DriverController extends Controller
                     Mail::to($ocdUser->email)->send(new \App\Mail\VehicleRequestOCDMail($vehicleRequest, $approveUrl, $declineUrl));
                 } catch (\Throwable $e) {
                     \Log::error('Failed to send OCD notification after driver assignment', ['error' => $e->getMessage()]);
+                    report($e);
                 }
             }
         }

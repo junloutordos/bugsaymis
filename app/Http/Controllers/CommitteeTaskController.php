@@ -130,7 +130,11 @@ class CommitteeTaskController extends Controller
                     $this->boardUrl($task),
                     "{$task->committee->name} — updated by {$user->name}"
                 );
-                Mail::to($manager->email)->send(new CommitteeTaskStatusMail($task, $manager->name, $user));
+                try {
+                    Mail::to($manager->email)->send(new CommitteeTaskStatusMail($task, $manager->name, $user));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         }
 
@@ -222,7 +226,11 @@ class CommitteeTaskController extends Controller
                 $this->boardUrl($task),
                 $task->committee->name
             );
-            Mail::to($assignee->email)->send(new CommitteeTaskAssignedMail($task, $assignee->name));
+            try {
+                Mail::to($assignee->email)->send(new CommitteeTaskAssignedMail($task, $assignee->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
     }
 

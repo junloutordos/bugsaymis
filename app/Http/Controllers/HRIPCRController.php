@@ -100,7 +100,11 @@ class HRIPCRController extends Controller
         ], 'ipcr_submitted_to_pmt');
 
         User::havingRole('PMT')->each(function ($pmt) use ($employeeIPCR) {
-            Mail::to($pmt->email)->send(new IPCRSubmittedToPMTMail($employeeIPCR, $pmt->name));
+            try {
+                Mail::to($pmt->email)->send(new IPCRSubmittedToPMTMail($employeeIPCR, $pmt->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         });
 
         return redirect()->back()->with('success', 'IPCR submitted to PMT for review.');
@@ -127,7 +131,11 @@ class HRIPCRController extends Controller
 
         User::havingRole('PMT')->each(function ($pmt) use ($ipcrs) {
             foreach ($ipcrs as $ipcr) {
-                Mail::to($pmt->email)->send(new IPCRSubmittedToPMTMail($ipcr, $pmt->name));
+                try {
+                    Mail::to($pmt->email)->send(new IPCRSubmittedToPMTMail($ipcr, $pmt->name));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         });
 

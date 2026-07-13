@@ -489,10 +489,12 @@ class ConsultationController extends Controller
                     });
                 } catch (\Throwable $e) {
                     logger()->error('Failed to send clinic consultation email to '.$email.': '.$e->getMessage());
+                    report($e);
                 }
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to prepare/send clinic consultation emails: '.$e->getMessage());
+            report($e);
         }
 
         return redirect()->route('consultations.index')->with('success','Consultation requested');
@@ -617,6 +619,7 @@ class ConsultationController extends Controller
                 }
             } catch (\Throwable $e) {
                 logger()->error('Failed to send consultation scheduled email: '.$e->getMessage());
+                report($e);
             }
 
             return redirect()->route('consultations.index')->with('success','Consultation scheduled');

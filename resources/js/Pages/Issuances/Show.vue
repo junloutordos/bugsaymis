@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm, Link } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
+import Swal from 'sweetalert2'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import AppCard from '@/Components/AppCard.vue'
@@ -13,7 +14,7 @@ import EmptyState from '@/Components/EmptyState.vue'
 import {
   ChevronLeftIcon, DocumentArrowDownIcon,
   CheckCircleIcon, UserGroupIcon, ClockIcon, ShieldCheckIcon,
-  PencilSquareIcon, EyeIcon,
+  PencilSquareIcon, EyeIcon, ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -104,6 +105,22 @@ function typeColor(type) {
 
 function statusColor(status) {
   return status === 'released' ? 'green' : 'slate'
+}
+
+const EMAIL_STATUS_COLOR = { sent: 'green', failed: 'red', pending: 'amber', skipped: 'slate' }
+const EMAIL_STATUS_LABEL = { sent: 'Emailed', failed: 'Email failed', pending: 'Email pending', skipped: 'No email on file' }
+
+function resendEmail(recipient) {
+  Swal.fire({
+    icon: 'question',
+    title: 'Resend issuance email?',
+    text: `${props.issuance.control_number} will be re-sent to ${recipient.user?.name ?? 'this recipient'}.`,
+    showCancelButton: true,
+    confirmButtonText: 'Resend',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.post(route('issuances.recipients.resend', [props.issuance.id, recipient.id]), {}, { preserveScroll: true })
+  })
 }
 
 function fmtDt(d) {
@@ -260,15 +277,26 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
             </div>
             <p class="text-xs text-slate-500">{{ ackPercent }}% acknowledged</p>
 
-            <div class="mt-3 max-h-48 overflow-y-auto space-y-1">
+            <div class="mt-3 max-h-64 overflow-y-auto space-y-1">
               <div v-for="r in recipients" :key="r.id"
-                class="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
+                class="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0 gap-2">
                 <div class="min-w-0 flex-1">
                   <p class="text-xs font-medium text-slate-700 truncate">{{ r.user?.name ?? r.office?.name ?? '—' }}</p>
                   <p v-if="r.user?.position" class="text-[10px] text-slate-400 truncate">{{ r.user.position }}</p>
+                  <p v-if="r.email_status === 'failed' && r.email_error" class="text-[10px] text-red-500 truncate" :title="r.email_error">{{ r.email_error }}</p>
                 </div>
-                <span v-if="r.acknowledged_at" class="text-success-500 text-xs shrink-0 ml-2" title="Acknowledged">✓</span>
-                <ClockIcon v-else class="h-3.5 w-3.5 text-slate-300 shrink-0 ml-2" />
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <AppBadge :color="EMAIL_STATUS_COLOR[r.email_status] ?? 'slate'">
+                    {{ EMAIL_STATUS_LABEL[r.email_status] ?? r.email_status }}
+                  </AppBadge>
+                  <button v-if="r.email_status === 'failed' || r.email_status === 'skipped'" type="button"
+                    @click="resendEmail(r)"
+                    class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Resend email">
+                    <ArrowPathIcon class="h-3.5 w-3.5" />
+                  </button>
+                  <span v-if="r.acknowledged_at" class="text-success-500 text-xs" title="Acknowledged">✓</span>
+                  <ClockIcon v-else class="h-3.5 w-3.5 text-slate-300" />
+                </div>
               </div>
             </div>
           </AppCard>

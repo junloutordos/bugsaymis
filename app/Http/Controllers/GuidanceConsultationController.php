@@ -268,6 +268,7 @@ class GuidanceConsultationController extends Controller
                 }
             } catch (\Throwable $e) {
                 logger()->error('Failed to send appointment email', ['error' => $e->getMessage(), 'consultation_id' => $consult->id]);
+                report($e);
                 if ($request->wantsJson()) {
                     return response()->json(['message' => 'Appointment assigned but failed to send email.'], 500);
                 }
@@ -307,6 +308,7 @@ class GuidanceConsultationController extends Controller
                     }
                 } catch (\Throwable $e) {
                     logger()->error('Failed to send adviser notification', ['error' => $e->getMessage(), 'consultation_id' => $consult->id, 'adviser_id' => $data['adviser_id']]);
+                    report($e);
                 }
             }
         }
@@ -450,6 +452,7 @@ class GuidanceConsultationController extends Controller
                 });
             } catch (\Throwable $e) {
                 logger()->error('Failed to send follow-up email', ['error' => $e->getMessage(), 'consultation_id' => $consult->id]);
+                report($e);
             }
         }
 

@@ -75,7 +75,11 @@ class PMTIPCRController extends Controller
         $this->workflow->transition($employeeIPCR, IPCRWorkflowService::STATUS_PMT_APPROVED, [], 'ipcr_pmt_approved');
 
         User::havingRole('OCD')->each(function ($ocd) use ($employeeIPCR) {
-            Mail::to($ocd->email)->send(new IPCRApprovedByPMTMail($employeeIPCR, $ocd->name));
+            try {
+                Mail::to($ocd->email)->send(new IPCRApprovedByPMTMail($employeeIPCR, $ocd->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         });
 
         return to_route('pmt-ipcr.show', $employeeIPCR->id)
@@ -97,12 +101,20 @@ class PMTIPCRController extends Controller
             $chiefId = Division::where('id', $divisionId)->value('division_chief_id');
             $dc = $chiefId ? User::find($chiefId) : null;
             if ($dc) {
-                Mail::to($dc->email)->send(new IPCRPMTReturnedMail($employeeIPCR, $dc->name));
+                try {
+                    Mail::to($dc->email)->send(new IPCRPMTReturnedMail($employeeIPCR, $dc->name));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         }
 
         // Notify Employee
-        Mail::to($employeeIPCR->user->email)->send(new IPCRPMTReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+        try {
+            Mail::to($employeeIPCR->user->email)->send(new IPCRPMTReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return to_route('pmt-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR returned for revision. Division Chief and employee have been notified.');
@@ -121,12 +133,20 @@ class PMTIPCRController extends Controller
             $chiefId = Division::where('id', $divisionId)->value('division_chief_id');
             $dc = $chiefId ? User::find($chiefId) : null;
             if ($dc) {
-                Mail::to($dc->email)->send(new IPCRDirectorSignedMail($employeeIPCR, $dc->name));
+                try {
+                    Mail::to($dc->email)->send(new IPCRDirectorSignedMail($employeeIPCR, $dc->name));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         }
 
         // Notify Employee
-        Mail::to($employeeIPCR->user->email)->send(new IPCRDirectorSignedMail($employeeIPCR, $employeeIPCR->user->name));
+        try {
+            Mail::to($employeeIPCR->user->email)->send(new IPCRDirectorSignedMail($employeeIPCR, $employeeIPCR->user->name));
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return to_route('pmt-ipcr.show', $employeeIPCR->id)->with('success', 'IPCR signed by Director.');
     }

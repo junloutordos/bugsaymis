@@ -103,6 +103,7 @@ class CertificateService
             );
         } catch (\Throwable $e) {
             \Log::warning("AMS: certificate email failed for {$email}: " . $e->getMessage());
+            report($e);
         }
     }
 

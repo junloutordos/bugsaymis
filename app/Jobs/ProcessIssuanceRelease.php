@@ -85,14 +85,20 @@ class ProcessIssuanceRelease implements ShouldQueue
             $u = $recipient->user;
             if (! $u || empty($u->email)) {
                 $skipped++;
+                $recipient->update([
+                    'email_status' => 'skipped',
+                    'email_error'  => 'No email on file for this recipient.',
+                ]);
                 continue;
             }
 
             try {
                 Mail::to($u->email)->send(new IssuanceReleasedMail($issuance, $u->name));
                 $sent++;
+                $recipient->update(['email_status' => 'sent', 'emailed_at' => now(), 'email_error' => null]);
             } catch (\Throwable $e) {
                 $failed++;
+                $recipient->update(['email_status' => 'failed', 'email_error' => $e->getMessage()]);
                 logger()->warning('ProcessIssuanceRelease: email failed', [
                     'issuance_id' => $issuance->id,
                     'user_id'     => $u->id,
