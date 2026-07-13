@@ -27,16 +27,24 @@ class OnlineTimePunch extends Model
         'ip_address',
         'latitude',
         'longitude',
+        'geofence_status',
+        'distance_meters',
+        'network_status',
+        'liveness_status',
+        'liveness_challenge_type',
+        'challenge_frames_s3_keys',
         'user_agent',
     ];
 
     protected $casts = [
-        'work_date'           => 'date:Y-m-d',
-        'punched_at'           => 'datetime',
-        'liveness_confidence'  => 'decimal:2',
-        'match_score'          => 'decimal:2',
-        'latitude'             => 'decimal:7',
-        'longitude'            => 'decimal:7',
+        'work_date'                => 'date:Y-m-d',
+        'punched_at'                => 'datetime',
+        'liveness_confidence'       => 'decimal:2',
+        'match_score'               => 'decimal:2',
+        'latitude'                  => 'decimal:7',
+        'longitude'                 => 'decimal:7',
+        'distance_meters'           => 'decimal:2',
+        'challenge_frames_s3_keys'  => 'array',
     ];
 
     public function user(): BelongsTo

@@ -14,10 +14,14 @@ class OnlineTimePunchRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'punch_type'  => ['required', 'string', 'in:time_in_am,time_out_am,time_in_pm,time_out_pm'],
-            'photo'       => ['required', 'string'], // base64 data URI
-            'latitude'    => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude'   => ['nullable', 'numeric', 'between:-180,180'],
+            'punch_type'               => ['required', 'string', 'in:time_in_am,time_out_am,time_in_pm,time_out_pm'],
+            'challenge_token'          => ['required', 'string'],
+            'frames'                   => ['required', 'array', 'min:4', 'max:6'],
+            'frames.*.data'            => ['required', 'string'], // base64 data URI
+            'frames.*.capturedAtMs'    => ['required', 'integer', 'min:0'],
+            'latitude'                 => ['required', 'numeric', 'between:-90,90'],
+            'longitude'                => ['required', 'numeric', 'between:-180,180'],
+            'accuracy'                 => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }

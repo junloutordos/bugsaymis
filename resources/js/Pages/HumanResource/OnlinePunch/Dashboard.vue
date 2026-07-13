@@ -56,26 +56,57 @@
         @close="cancelCamera"
       >
         <div class="space-y-3">
-          <div v-if="!capturedImage" class="relative">
-            <video ref="videoEl" autoplay playsinline class="w-full rounded-lg bg-black" style="max-height:280px;" />
-            <AppButton block class="mt-3" @click="capture">
-              📸 Capture Photo
-            </AppButton>
+
+          <!-- Locating -->
+          <div v-if="stage === 'locating'" class="py-10 text-center text-slate-500">
+            <p>Getting your location…</p>
+            <p class="text-xs text-slate-400 mt-1">You must be on campus to punch.</p>
           </div>
 
-          <div v-else class="space-y-3">
-            <img :src="capturedImage" class="w-full rounded-lg border border-slate-200" style="max-height:280px;object-fit:cover;" alt="Captured photo" />
-            <div class="flex gap-3">
-              <AppButton variant="secondary" block @click="retake">Retake</AppButton>
-              <AppButton block :loading="loading" @click="confirmPunch">
-                {{ loading ? 'Verifying…' : 'Confirm Punch' }}
-              </AppButton>
+          <!-- Location denied / failed -->
+          <div v-else-if="stage === 'location_denied'" class="py-8 text-center space-y-3">
+            <p class="text-rose-700 font-medium">Location access is required to punch.</p>
+            <p class="text-sm text-slate-500">Please allow location access — you must be on campus to use Online Time Punches.</p>
+            <AppButton block @click="startLocating">Retry</AppButton>
+          </div>
+
+          <!-- Loading detection model -->
+          <div v-else-if="stage === 'loading_model'" class="py-10 text-center text-slate-500">
+            Preparing camera…
+          </div>
+
+          <!-- Live camera + guide -->
+          <div v-else class="relative">
+            <div class="relative rounded-lg overflow-hidden bg-black" style="max-height:280px;">
+              <video ref="videoEl" autoplay playsinline muted class="w-full block" style="max-height:280px;object-fit:cover;" />
+
+              <!-- Oval face guide -->
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="rounded-full border-4 transition-colors duration-150"
+                     :class="guideReady ? 'border-emerald-400' : 'border-white/60'"
+                     style="width:60%;height:80%;" />
+              </div>
+
+              <!-- Capturing progress -->
+              <div v-if="stage === 'capturing'" class="absolute top-2 left-2 right-2">
+                <div class="h-1.5 bg-white/30 rounded-full overflow-hidden">
+                  <div class="h-full bg-emerald-400 transition-all" :style="{ width: captureProgress + '%' }" />
+                </div>
+              </div>
+
+              <!-- Guidance text -->
+              <div class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs text-center py-2 px-2">
+                {{ guidanceMessage }}
+              </div>
             </div>
-          </div>
 
-          <AppButton variant="ghost" block @click="cancelCamera">Cancel</AppButton>
+            <div v-if="stage === 'verifying'" class="text-center text-sm text-slate-500 mt-3">Verifying…</div>
+
+            <AppButton variant="ghost" block class="mt-3" @click="cancelCamera">Cancel</AppButton>
+          </div>
 
           <canvas ref="canvasEl" class="hidden" />
+          <canvas ref="sampleCanvasEl" width="32" height="32" class="hidden" />
         </div>
       </AppModal>
 
@@ -138,12 +169,6 @@ function slotLabelClass(type) {
   return 'text-rose-700'
 }
 
-function statusTextClass(status) {
-  if (status === 'verified') return 'text-emerald-500'
-  if (status === 'manual_review') return 'text-amber-500'
-  return 'text-rose-500'
-}
-
 function statusBadgeColor(status) {
   if (status === 'verified') return 'green'
   if (status === 'manual_review') return 'amber'
@@ -163,23 +188,63 @@ function fmtTime(val) {
   return d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
 }
 
-// ── Camera ────────────────────────────────────────────────────────────────────
+// ── Camera + Liveness Flow ───────────────────────────────────────────────────
+// stage: locating -> location_denied | loading_model -> positioning -> challenge -> capturing -> verifying
 const showCamera     = ref(false)
 const activeSlotType = ref(null)
-const capturedImage  = ref(null)
-const loading        = ref(false)
+const stage          = ref('locating')
+const guideReady     = ref(false)
+const guidanceMessage = ref('')
+const captureProgress = ref(0)
 const videoEl        = ref(null)
 const canvasEl       = ref(null)
+const sampleCanvasEl = ref(null)
+
 let mediaStream = null
+let rafId = null
+let faceLandmarker = null
+let readyStreak = 0
+let brightnessTick = 0
+let lastBrightness = 128
+let geo = { latitude: null, longitude: null, accuracy: null }
+
+const READY_STREAK_REQUIRED = 8
+const FRAME_COUNT = 5
+const FRAME_INTERVAL_MS = 400
+const MIN_BRIGHTNESS = 55
+const MAX_BRIGHTNESS = 235
+const MIN_FACE_WIDTH_RATIO = 0.28
+const MAX_FACE_WIDTH_RATIO = 0.6
+const MAX_CENTER_OFFSET = 0.14
 
 const activeSlotLabel = computed(() => punchSlots.find(s => s.type === activeSlotType.value)?.label ?? '')
 
 async function openCamera(type) {
   activeSlotType.value = type
-  capturedImage.value  = null
   showCamera.value     = true
+  await startLocating()
+}
 
-  await new Promise(resolve => setTimeout(resolve, 0)) // wait for v-if DOM mount
+async function startLocating() {
+  stage.value = 'locating'
+  try {
+    const pos = await getPosition()
+    geo = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }
+    await startCamera()
+  } catch {
+    stage.value = 'location_denied'
+  }
+}
+
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('No geolocation'))
+    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 })
+  })
+}
+
+async function startCamera() {
+  stage.value = 'loading_model'
 
   try {
     try {
@@ -187,57 +252,186 @@ async function openCamera(type) {
     } catch {
       mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     }
-    if (videoEl.value) videoEl.value.srcObject = mediaStream
-  } catch (err) {
+  } catch {
     Swal.fire('Camera Error', 'Could not access your camera. Please allow camera access and try again.', 'error')
-    showCamera.value = false
+    cancelCamera()
+    return
+  }
+
+  await ensureFaceLandmarker()
+
+  await new Promise(resolve => setTimeout(resolve, 0)) // wait for v-if DOM mount
+  if (videoEl.value) {
+    videoEl.value.srcObject = mediaStream
+    await new Promise(resolve => { videoEl.value.onloadedmetadata = resolve })
+  }
+
+  stage.value = 'positioning'
+  guidanceMessage.value = 'Center your face in the oval'
+  readyStreak = 0
+  detectionLoop()
+}
+
+async function ensureFaceLandmarker() {
+  if (faceLandmarker) return
+
+  const { FaceLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision')
+  const vision = await FilesetResolver.forVisionTasks('/vendor/mediapipe/wasm')
+
+  try {
+    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: '/vendor/mediapipe/models/face_landmarker.task', delegate: 'GPU' },
+      runningMode: 'VIDEO',
+      numFaces: 1,
+    })
+  } catch {
+    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: '/vendor/mediapipe/models/face_landmarker.task', delegate: 'CPU' },
+      runningMode: 'VIDEO',
+      numFaces: 1,
+    })
   }
 }
 
-function capture() {
-  if (!videoEl.value || !canvasEl.value) return
+function detectionLoop() {
+  if (stage.value !== 'positioning' || !videoEl.value || !faceLandmarker) return
+
+  if (videoEl.value.readyState >= 2) {
+    const result = faceLandmarker.detectForVideo(videoEl.value, performance.now())
+    evaluateReadiness(result)
+  }
+
+  rafId = requestAnimationFrame(detectionLoop)
+}
+
+function evaluateReadiness(result) {
+  const landmarks = result?.faceLandmarks?.[0]
+
+  if (!landmarks) {
+    guideReady.value = false
+    guidanceMessage.value = 'No face detected — center your face in the oval'
+    readyStreak = 0
+    return
+  }
+
+  let minX = 1, maxX = 0, minY = 1, maxY = 0
+  for (const p of landmarks) {
+    if (p.x < minX) minX = p.x
+    if (p.x > maxX) maxX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.y > maxY) maxY = p.y
+  }
+  const widthRatio = maxX - minX
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const offset = Math.max(Math.abs(centerX - 0.5), Math.abs(centerY - 0.5))
+
+  brightnessTick++
+  if (brightnessTick % 5 === 0) lastBrightness = sampleBrightness()
+
+  let msg = null
+  if (widthRatio < MIN_FACE_WIDTH_RATIO) msg = 'Move closer'
+  else if (widthRatio > MAX_FACE_WIDTH_RATIO) msg = 'Move back a little'
+  else if (offset > MAX_CENTER_OFFSET) msg = 'Center your face in the oval'
+  else if (lastBrightness < MIN_BRIGHTNESS) msg = 'Too dark — face a light source'
+  else if (lastBrightness > MAX_BRIGHTNESS) msg = 'Too bright — avoid direct glare'
+
+  if (msg) {
+    guideReady.value = false
+    guidanceMessage.value = msg
+    readyStreak = 0
+    return
+  }
+
+  readyStreak++
+  guidanceMessage.value = 'Hold still…'
+
+  if (readyStreak >= READY_STREAK_REQUIRED) {
+    guideReady.value = true
+    beginChallenge()
+  }
+}
+
+function sampleBrightness() {
+  const video = videoEl.value, canvas = sampleCanvasEl.value
+  if (!video || !canvas) return lastBrightness
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+  let sum = 0
+  for (let i = 0; i < data.length; i += 4) {
+    sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+  }
+  return sum / (data.length / 4)
+}
+
+let challengeInFlight = false
+
+async function beginChallenge() {
+  if (challengeInFlight || stage.value !== 'positioning') return
+  challengeInFlight = true
+
+  try {
+    const { data } = await axios.post(route('hr.online-punch.challenge.start'))
+    stopDetectionLoop()
+    stage.value = 'challenge'
+    guidanceMessage.value = data.instruction
+
+    await new Promise(resolve => setTimeout(resolve, 1200))
+    await captureBurst(data.challenge_token)
+  } catch {
+    challengeInFlight = false
+    guidanceMessage.value = 'Something went wrong — hold still and try again'
+    readyStreak = 0
+    detectionLoop()
+  }
+}
+
+function stopDetectionLoop() {
+  if (rafId) cancelAnimationFrame(rafId)
+  rafId = null
+}
+
+async function captureBurst(challengeToken) {
+  stage.value = 'capturing'
+  guidanceMessage.value = 'Recording…'
+  captureProgress.value = 0
+
+  const frames = []
+  const start = performance.now()
+
+  for (let i = 0; i < FRAME_COUNT; i++) {
+    frames.push({
+      data: snapshotFrame(),
+      capturedAtMs: Math.round(performance.now() - start),
+    })
+    captureProgress.value = Math.round(((i + 1) / FRAME_COUNT) * 100)
+    if (i < FRAME_COUNT - 1) await new Promise(resolve => setTimeout(resolve, FRAME_INTERVAL_MS))
+  }
+
+  await submitPunch(frames, challengeToken)
+}
+
+function snapshotFrame() {
   const video = videoEl.value, canvas = canvasEl.value
   canvas.width = video.videoWidth
   canvas.height = video.videoHeight
   canvas.getContext('2d').drawImage(video, 0, 0)
-  capturedImage.value = canvas.toDataURL('image/jpeg', 0.9)
+  return canvas.toDataURL('image/jpeg', 0.9)
+}
+
+async function submitPunch(frames, challengeToken) {
+  stage.value = 'verifying'
   stopStream()
-}
-
-function retake() {
-  capturedImage.value = null
-  openCamera(activeSlotType.value)
-}
-
-function cancelCamera() {
-  stopStream()
-  capturedImage.value = null
-  showCamera.value = false
-  activeSlotType.value = null
-}
-
-function stopStream() {
-  mediaStream?.getTracks().forEach(t => t.stop())
-  mediaStream = null
-}
-
-async function confirmPunch() {
-  if (!capturedImage.value || loading.value) return
-  loading.value = true
-
-  let latitude = null, longitude = null
-  try {
-    const pos = await getPosition()
-    latitude = pos.coords.latitude
-    longitude = pos.coords.longitude
-  } catch { /* geolocation optional */ }
 
   try {
     const { data } = await axios.post(route('hr.online-punch.punch'), {
-      punch_type: activeSlotType.value,
-      photo: capturedImage.value,
-      latitude,
-      longitude,
+      punch_type:      activeSlotType.value,
+      frames,
+      challenge_token: challengeToken,
+      latitude:        geo.latitude,
+      longitude:       geo.longitude,
+      accuracy:        geo.accuracy,
     })
 
     const idx = punches.value.findIndex(p => p.punch_type === activeSlotType.value)
@@ -252,18 +446,32 @@ async function confirmPunch() {
     const msg = err.response?.data?.message
       ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
       ?? 'Something went wrong.'
-    Swal.fire('Error', msg, 'error')
+    await Swal.fire('Error', msg, 'error')
+    cancelCamera()
   } finally {
-    loading.value = false
+    challengeInFlight = false
   }
 }
 
-function getPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('No geolocation'))
-    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
-  })
+function cancelCamera() {
+  stopDetectionLoop()
+  stopStream()
+  showCamera.value = false
+  activeSlotType.value = null
+  stage.value = 'locating'
+  guideReady.value = false
+  readyStreak = 0
+  challengeInFlight = false
 }
 
-onUnmounted(stopStream)
+function stopStream() {
+  mediaStream?.getTracks().forEach(t => t.stop())
+  mediaStream = null
+}
+
+onUnmounted(() => {
+  stopDetectionLoop()
+  stopStream()
+  faceLandmarker?.close()
+})
 </script>

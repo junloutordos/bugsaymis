@@ -7,7 +7,9 @@ use App\Models\HR\OnlineTimePunch;
 use App\Models\User;
 use Aws\Rekognition\RekognitionClient;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class FaceRecognitionService
@@ -20,7 +22,29 @@ class FaceRecognitionService
     private const LOCKOUT_WINDOW_MINUTES = 5;
     private const LOCKOUT_FAILURE_COUNT = 5;
 
-    public function __construct(private readonly DTRService $dtrService) {}
+    private const CHALLENGE_TYPES = ['turn_head', 'blink'];
+    private const CHALLENGE_TTL_SECONDS = 30;
+    private const CHALLENGE_MIN_FRAMES = 4;
+    private const CHALLENGE_MAX_FRAMES = 6;
+    private const CHALLENGE_MAX_WINDOW_MS = 4000;
+    private const CHALLENGE_TURN_HEAD_MIN_YAW_RANGE = 20.0;
+    private const QUALITY_MIN_BRIGHTNESS = 35.0;
+    private const QUALITY_MIN_SHARPNESS = 35.0;
+    private const MAX_BBOX_AREA_RATIO = 1.6;
+
+    /**
+     * Set once per verifyPunch() call and read by savePunch() — informational
+     * network-trust signal, never used to gate anything, so it's threaded
+     * through as instance state rather than adding a parameter to every one
+     * of savePunch()'s call sites.
+     */
+    private ?string $currentNetworkStatus = null;
+
+    public function __construct(
+        private readonly DTRService $dtrService,
+        private readonly GeofenceService $geofenceService,
+        private readonly NetworkTrustService $networkTrustService,
+    ) {}
 
     // ─── Enrollment ───────────────────────────────────────────────────────────
 
@@ -91,22 +115,55 @@ class FaceRecognitionService
         ]);
     }
 
+    // ─── Liveness Challenge ─────────────────────────────────────────────────────
+
+    /**
+     * Issue a random challenge (head turn or blink) as a short-lived signed
+     * token. The token carries its own state (user, type, issue time) so no
+     * extra table is needed for this ephemeral session — it's validated on
+     * submission and expires quickly to prevent pre-recorded replay.
+     */
+    public function issueChallenge(User $user): array
+    {
+        $type = self::CHALLENGE_TYPES[array_rand(self::CHALLENGE_TYPES)];
+
+        $payload = [
+            'session_id'     => (string) Str::uuid(),
+            'user_id'        => $user->id,
+            'challenge_type' => $type,
+            'issued_at'      => now()->timestamp,
+        ];
+
+        return [
+            'challenge_token' => Crypt::encryptString(json_encode($payload)),
+            'challenge_type'  => $type,
+            'instruction'     => $type === 'turn_head'
+                ? 'Slowly turn your head to one side, then back to center.'
+                : 'Blink your eyes naturally while looking at the camera.',
+        ];
+    }
+
     // ─── Punch Verification ───────────────────────────────────────────────────
 
     /**
-     * Verify a punch photo against the employee's enrolled reference face.
+     * Verify a punch against the employee's enrolled reference face.
      *
-     * No liveness/anti-spoofing step — that requires AWS Rekognition Face
-     * Liveness, which is blocked account-wide by an AWS Organizations
-     * Service Control Policy outside our control. This is the "practical
-     * baseline": live camera capture only (no file upload, enforced
-     * client-side) + DetectFaces quality gate + CompareFaces identity match
-     * + failed-attempt lockout, with a full audit trail. Same trust level
-     * as the existing WFH selfie punch, not a hard anti-fraud guarantee.
+     * There is no real AWS Rekognition Face Liveness here — CreateFaceLivenessSession
+     * is blocked account-wide by an AWS Organizations Service Control Policy outside
+     * our control. Instead this runs a DIY challenge-response check: the client
+     * captures a short burst of frames while performing a randomly-issued challenge
+     * (head turn or blink), and this method verifies the Pose/EyesOpen sequence
+     * actually moved the way the challenge demanded, on top of the existing
+     * DetectFaces quality gate + CompareFaces identity match. This is meaningfully
+     * harder to spoof than a single static photo, but is not depth-sensor-grade
+     * liveness — a well-produced real-time video of the actual person could still
+     * theoretically pass. Campus geofencing is enforced first, before any
+     * Rekognition calls, since a location failure isn't a face-match failure.
      */
     public function verifyPunch(
         User $user,
-        string $photoBase64,
+        array $frames,
+        string $challengeToken,
         string $punchType,
         ?string $ip,
         ?float $lat,
@@ -150,43 +207,183 @@ class FaceRecognitionService
             ]);
         }
 
+        // Geofence check first — cheap, and keeps the audit trail honest (a
+        // location failure is recorded as a location failure, not a face failure).
+        $geofence = $this->geofenceService->resolve($lat, $lng);
+
+        // Network-trust is informational only (several campus ISPs are dynamic/
+        // CGNAT, so a non-match is inconclusive, never grounds to block or
+        // downgrade a punch) — resolved once here, applied to every outcome below.
+        $this->currentNetworkStatus = $this->networkTrustService->resolve($ip)['status'];
+
+        if (in_array($geofence['status'], ['outside', 'no_permission'], true)) {
+            return $this->savePunch($user, $enrollment, $punchType, $today, [
+                'match_status'    => 'rejected',
+                'failure_reason'  => $geofence['status'] === 'outside' ? 'outside_geofence' : 'no_location_permission',
+                'geofence_status' => $geofence['status'],
+                'distance_meters' => $geofence['distanceMeters'],
+            ], $ip, $lat, $lng, $userAgent);
+        }
+
         if ($this->isLockedOut($user->id)) {
             return $this->savePunch($user, $enrollment, $punchType, $today, [
-                'match_status'   => 'manual_review',
-                'failure_reason' => 'repeated_failures',
+                'match_status'    => 'manual_review',
+                'failure_reason'  => 'repeated_failures',
+                'geofence_status' => $geofence['status'],
+                'distance_meters' => $geofence['distanceMeters'],
             ], $ip, $lat, $lng, $userAgent);
         }
 
-        $capturedBytes = $this->decodeBase64Image($photoBase64);
-
-        $faces = $this->rekognition()->detectFaces([
-            'Image'      => ['Bytes' => $capturedBytes],
-            'Attributes' => ['DEFAULT'],
-        ]);
-        $faceCount = count($faces['FaceDetails'] ?? []);
-
-        $photoS3Key = "online_punches/{$user->id}/{$today}/{$punchType}.jpg";
-        Storage::disk('s3')->put($photoS3Key, $capturedBytes);
-
-        if ($faceCount === 0) {
+        try {
+            $challenge = $this->decodeChallengeToken($challengeToken, $user);
+        } catch (ValidationException $e) {
             return $this->savePunch($user, $enrollment, $punchType, $today, [
-                'photo_s3_key'   => $photoS3Key,
-                'match_status'   => 'rejected',
-                'failure_reason' => 'no_face_detected',
+                'match_status'    => 'rejected',
+                'failure_reason'  => 'challenge_invalid_or_expired',
+                'geofence_status' => $geofence['status'],
+                'distance_meters' => $geofence['distanceMeters'],
             ], $ip, $lat, $lng, $userAgent);
         }
-        if ($faceCount > 1) {
+
+        if (count($frames) < self::CHALLENGE_MIN_FRAMES || count($frames) > self::CHALLENGE_MAX_FRAMES) {
             return $this->savePunch($user, $enrollment, $punchType, $today, [
-                'photo_s3_key'   => $photoS3Key,
-                'match_status'   => 'rejected',
-                'failure_reason' => 'multiple_faces',
+                'match_status'            => 'rejected',
+                'failure_reason'          => 'invalid_frame_sequence',
+                'geofence_status'         => $geofence['status'],
+                'distance_meters'         => $geofence['distanceMeters'],
+                'liveness_status'         => 'failed',
+                'liveness_challenge_type' => $challenge['challenge_type'],
+                'liveness_session_id'     => $challenge['session_id'],
+            ], $ip, $lat, $lng, $userAgent);
+        }
+
+        usort($frames, fn ($a, $b) => $a['capturedAtMs'] <=> $b['capturedAtMs']);
+        $windowMs = end($frames)['capturedAtMs'] - $frames[0]['capturedAtMs'];
+
+        if ($windowMs < 0 || $windowMs > self::CHALLENGE_MAX_WINDOW_MS) {
+            return $this->savePunch($user, $enrollment, $punchType, $today, [
+                'match_status'            => 'rejected',
+                'failure_reason'          => 'challenge_timeout',
+                'geofence_status'         => $geofence['status'],
+                'distance_meters'         => $geofence['distanceMeters'],
+                'liveness_status'         => 'failed',
+                'liveness_challenge_type' => $challenge['challenge_type'],
+                'liveness_session_id'     => $challenge['session_id'],
+            ], $ip, $lat, $lng, $userAgent);
+        }
+
+        $decodedFrames = array_map(fn ($f) => $this->decodeBase64Image($f['data']), $frames);
+
+        $frameS3Keys = [];
+        foreach ($decodedFrames as $i => $bytes) {
+            $key = "online_punches/{$user->id}/{$today}/{$punchType}_frame{$i}.jpg";
+            Storage::disk('s3')->put($key, $bytes);
+            $frameS3Keys[] = $key;
+        }
+
+        $faceDetails = [];
+        foreach ($decodedFrames as $i => $bytes) {
+            $result = $this->rekognition()->detectFaces([
+                'Image'      => ['Bytes' => $bytes],
+                'Attributes' => ['ALL'],
+            ]);
+
+            $count = count($result['FaceDetails'] ?? []);
+
+            if ($count === 0) {
+                return $this->savePunch($user, $enrollment, $punchType, $today, [
+                    'photo_s3_key'            => $frameS3Keys[$i],
+                    'challenge_frames_s3_keys' => $frameS3Keys,
+                    'match_status'            => 'rejected',
+                    'failure_reason'          => 'no_face_detected',
+                    'geofence_status'         => $geofence['status'],
+                    'distance_meters'         => $geofence['distanceMeters'],
+                    'liveness_status'         => 'failed',
+                    'liveness_challenge_type' => $challenge['challenge_type'],
+                    'liveness_session_id'     => $challenge['session_id'],
+                ], $ip, $lat, $lng, $userAgent);
+            }
+            if ($count > 1) {
+                return $this->savePunch($user, $enrollment, $punchType, $today, [
+                    'photo_s3_key'            => $frameS3Keys[$i],
+                    'challenge_frames_s3_keys' => $frameS3Keys,
+                    'match_status'            => 'rejected',
+                    'failure_reason'          => 'multiple_faces',
+                    'geofence_status'         => $geofence['status'],
+                    'distance_meters'         => $geofence['distanceMeters'],
+                    'liveness_status'         => 'failed',
+                    'liveness_challenge_type' => $challenge['challenge_type'],
+                    'liveness_session_id'     => $challenge['session_id'],
+                ], $ip, $lat, $lng, $userAgent);
+            }
+
+            $faceDetails[] = $result['FaceDetails'][0];
+        }
+
+        // Bounding-box consistency — guards against swapping in a different
+        // photo mid-sequence rather than genuinely moving one face.
+        $areas = array_map(fn ($f) => $f['BoundingBox']['Width'] * $f['BoundingBox']['Height'], $faceDetails);
+        if (max($areas) / max(min($areas), 0.0001) > self::MAX_BBOX_AREA_RATIO) {
+            return $this->savePunch($user, $enrollment, $punchType, $today, [
+                'photo_s3_key'            => $frameS3Keys[0],
+                'challenge_frames_s3_keys' => $frameS3Keys,
+                'match_status'            => 'rejected',
+                'failure_reason'          => 'inconsistent_face_frames',
+                'geofence_status'         => $geofence['status'],
+                'distance_meters'         => $geofence['distanceMeters'],
+                'liveness_status'         => 'failed',
+                'liveness_challenge_type' => $challenge['challenge_type'],
+                'liveness_session_id'     => $challenge['session_id'],
+            ], $ip, $lat, $lng, $userAgent);
+        }
+
+        // Pick the sharpest, best-lit frame as the reference for identity match.
+        $bestIndex = 0;
+        $bestScore = -1;
+        foreach ($faceDetails as $i => $face) {
+            $score = ($face['Quality']['Brightness'] ?? 0) + ($face['Quality']['Sharpness'] ?? 0);
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestIndex = $i;
+            }
+        }
+
+        $bestQuality = $faceDetails[$bestIndex]['Quality'] ?? [];
+        if (($bestQuality['Brightness'] ?? 0) < self::QUALITY_MIN_BRIGHTNESS || ($bestQuality['Sharpness'] ?? 0) < self::QUALITY_MIN_SHARPNESS) {
+            return $this->savePunch($user, $enrollment, $punchType, $today, [
+                'photo_s3_key'            => $frameS3Keys[$bestIndex],
+                'challenge_frames_s3_keys' => $frameS3Keys,
+                'match_status'            => 'rejected',
+                'failure_reason'          => 'poor_image_quality',
+                'geofence_status'         => $geofence['status'],
+                'distance_meters'         => $geofence['distanceMeters'],
+                'liveness_status'         => 'failed',
+                'liveness_challenge_type' => $challenge['challenge_type'],
+                'liveness_session_id'     => $challenge['session_id'],
+            ], $ip, $lat, $lng, $userAgent);
+        }
+
+        $liveness = $this->evaluateChallenge($challenge['challenge_type'], $faceDetails);
+
+        if (! $liveness['pass']) {
+            return $this->savePunch($user, $enrollment, $punchType, $today, [
+                'photo_s3_key'            => $frameS3Keys[$bestIndex],
+                'challenge_frames_s3_keys' => $frameS3Keys,
+                'match_status'            => 'rejected',
+                'failure_reason'          => 'liveness_challenge_failed',
+                'geofence_status'         => $geofence['status'],
+                'distance_meters'         => $geofence['distanceMeters'],
+                'liveness_status'         => 'failed',
+                'liveness_challenge_type' => $challenge['challenge_type'],
+                'liveness_session_id'     => $challenge['session_id'],
+                'liveness_confidence'     => $liveness['confidence'],
             ], $ip, $lat, $lng, $userAgent);
         }
 
         $enrolledBytes = Storage::disk('s3')->get($enrollment->s3_key);
 
         $compare = $this->rekognition()->compareFaces([
-            'SourceImage'         => ['Bytes' => $capturedBytes],
+            'SourceImage'         => ['Bytes' => $decodedFrames[$bestIndex]],
             'TargetImage'         => ['Bytes' => $enrolledBytes],
             'SimilarityThreshold' => 0,
         ]);
@@ -200,10 +397,17 @@ class FaceRecognitionService
         };
 
         $punch = $this->savePunch($user, $enrollment, $punchType, $today, [
-            'photo_s3_key' => $photoS3Key,
-            'match_score'  => $similarity,
-            'match_status' => $matchStatus,
-            'failure_reason' => $failureReason,
+            'photo_s3_key'             => $frameS3Keys[$bestIndex],
+            'challenge_frames_s3_keys' => $frameS3Keys,
+            'match_score'              => $similarity,
+            'match_status'             => $matchStatus,
+            'failure_reason'           => $failureReason,
+            'geofence_status'          => $geofence['status'],
+            'distance_meters'          => $geofence['distanceMeters'],
+            'liveness_status'          => 'passed',
+            'liveness_challenge_type'  => $challenge['challenge_type'],
+            'liveness_session_id'      => $challenge['session_id'],
+            'liveness_confidence'      => $liveness['confidence'],
         ], $ip, $lat, $lng, $userAgent);
 
         if ($matchStatus === 'verified') {
@@ -234,6 +438,60 @@ class FaceRecognitionService
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
 
+    /**
+     * @param array<int, array{data: string, capturedAtMs: int}> $frames
+     */
+    private function decodeChallengeToken(string $token, User $user): array
+    {
+        try {
+            $payload = json_decode(Crypt::decryptString($token), true);
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages(['challenge_token' => 'Invalid challenge token.']);
+        }
+
+        if (! is_array($payload) || ($payload['user_id'] ?? null) !== $user->id) {
+            throw ValidationException::withMessages(['challenge_token' => 'Invalid challenge token.']);
+        }
+
+        if (! in_array($payload['challenge_type'] ?? null, self::CHALLENGE_TYPES, true)) {
+            throw ValidationException::withMessages(['challenge_token' => 'Invalid challenge token.']);
+        }
+
+        if (now()->timestamp - (int) ($payload['issued_at'] ?? 0) > self::CHALLENGE_TTL_SECONDS) {
+            throw ValidationException::withMessages(['challenge_token' => 'Challenge expired, please try again.']);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Check the Pose/EyesOpen sequence against what the issued challenge demands.
+     * A static photo cannot produce either pattern, unlike genuine low-confidence
+     * identity matches where some leniency makes sense.
+     */
+    private function evaluateChallenge(string $challengeType, array $faceDetails): array
+    {
+        if ($challengeType === 'turn_head') {
+            $yaws = array_map(fn ($f) => $f['Pose']['Yaw'] ?? 0.0, $faceDetails);
+            $range = max($yaws) - min($yaws);
+
+            return ['pass' => $range >= self::CHALLENGE_TURN_HEAD_MIN_YAW_RANGE, 'confidence' => round($range, 2)];
+        }
+
+        // blink: look for a closed-eye frame with open frames on both sides.
+        $eyesOpen = array_map(fn ($f) => (bool) ($f['EyesOpen']['Value'] ?? true), $faceDetails);
+        $count = count($eyesOpen);
+
+        for ($i = 1; $i < $count - 1; $i++) {
+            if ($eyesOpen[$i - 1] === true && $eyesOpen[$i] === false && $eyesOpen[$i + 1] === true) {
+                $closedConfidence = $faceDetails[$i]['EyesOpen']['Confidence'] ?? 0.0;
+                return ['pass' => true, 'confidence' => round($closedConfidence, 2)];
+            }
+        }
+
+        return ['pass' => false, 'confidence' => 0.0];
+    }
+
     private function savePunch(
         User $user,
         FaceEnrollment $enrollment,
@@ -254,6 +512,7 @@ class FaceRecognitionService
             'ip_address'          => $ip,
             'latitude'            => $lat,
             'longitude'           => $lng,
+            'network_status'      => $this->currentNetworkStatus,
             'user_agent'          => $userAgent,
         ], $attributes));
     }

@@ -1256,6 +1256,9 @@ Route::middleware(['auth', 'permission:hr.online-punch.record'])->prefix('hr/onl
     Route::get('/', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'index'])
         ->name('index');
 
+    Route::post('/challenge/start', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'challengeStart'])
+        ->name('challenge.start');
+
     Route::post('/punch', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'punch'])
         ->name('punch');
 
@@ -1269,6 +1272,34 @@ Route::middleware(['auth', 'permission:hr.online-punch.record'])->prefix('hr/onl
     Route::get('/monitor/data', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'monitor'])
         ->middleware('permission:hr.online-punch.monitor')
         ->name('monitor');
+
+    // Geofence zones — users with hr.online-punch.manage-geofence permission only
+    Route::get('/geofence-zones', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'geofenceZones'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('geofence-zones.index');
+    Route::post('/geofence-zones', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'storeGeofenceZone'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('geofence-zones.store');
+    Route::put('/geofence-zones/{zone}', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'updateGeofenceZone'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('geofence-zones.update');
+    Route::delete('/geofence-zones/{zone}', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'destroyGeofenceZone'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('geofence-zones.destroy');
+
+    // Trusted networks — users with hr.online-punch.manage-geofence permission only
+    Route::get('/network-rules', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'networkRules'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('network-rules.index');
+    Route::post('/network-rules', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'storeNetworkRule'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('network-rules.store');
+    Route::put('/network-rules/{rule}', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'updateNetworkRule'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('network-rules.update');
+    Route::delete('/network-rules/{rule}', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'destroyNetworkRule'])
+        ->middleware('permission:hr.online-punch.manage-geofence')
+        ->name('network-rules.destroy');
 
     // Image proxy
     Route::get('/photo/{fileId}', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'photo'])

@@ -68,7 +68,7 @@ class RolePermissionSeeder extends Seeder
             'hr.schedule.view', 'hr.schedule.manage',
             'hr.gatepass.view', 'hr.gatepass.approve',
             'wfh.view', 'wfh.monitor',
-            'hr.online-punch.record', 'hr.online-punch.monitor',
+            'hr.online-punch.record', 'hr.online-punch.monitor', 'hr.online-punch.manage-geofence',
             'hr.face-enrollment.self', 'hr.face-enrollment.manage',
             'ipcr.view', 'ipcr.approve', 'ipcr.monitor', 'ipcr.admin',
             'accomplishments.view',

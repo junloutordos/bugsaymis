@@ -50,6 +50,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'OnlinePunch', 'name' => 'hr.online-punch.monitor', 'description' => 'Monitor online time punches of subordinates'],
             ['module' => 'OnlinePunch', 'name' => 'hr.face-enrollment.self', 'description' => 'Self-enroll own face for Online Time Punches'],
             ['module' => 'OnlinePunch', 'name' => 'hr.face-enrollment.manage', 'description' => 'Review and approve/reject face enrollments'],
+            ['module' => 'OnlinePunch', 'name' => 'hr.online-punch.manage-geofence', 'description' => 'Manage campus geofence zones for Online Time Punches'],
 
             // ── Performance / IPCR ────────────────────────────────────────────
             ['module' => 'IPCR',     'name' => 'ipcr.view',        'description' => 'View own IPCR'],
