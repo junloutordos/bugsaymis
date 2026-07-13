@@ -189,9 +189,15 @@ function assignEquipment() {
 
 // ── Frequency / date helpers ──────────────────────────────────────────────────
 
+function scheduleDatesOf(schedule) {
+  // index sends the raw `dates` relation; showEquipments sends `schedule_dates`
+  return (schedule.schedule_dates || schedule.dates || []).map(d => d.date ?? d.schedule_date ?? d)
+}
+
 function formatFrequencyAndDates(schedule) {
-  if (!schedule.schedule_dates?.length) return schedule.frequency || "N/A"
-  return `${schedule.frequency} - ${schedule.schedule_dates
+  const dates = scheduleDatesOf(schedule)
+  if (!dates.length) return schedule.frequency || "N/A"
+  return `${schedule.frequency} - ${dates
     .map(d => formatDateForDisplay(d))
     .join(", ")}`
 }
@@ -400,7 +406,7 @@ const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
           <div>
             <p class="font-medium text-slate-600 mb-1">Scheduled Dates:</p>
             <ul class="list-disc pl-5 space-y-0.5">
-              <li v-for="(d, i) in selectedSchedule.schedule_dates" :key="i">{{ formatDateForDisplay(d) }}</li>
+              <li v-for="(d, i) in scheduleDatesOf(selectedSchedule)" :key="i">{{ formatDateForDisplay(d) }}</li>
             </ul>
           </div>
           <p><span class="font-medium text-slate-600">Status:</span> {{ selectedSchedule.status }}</p>

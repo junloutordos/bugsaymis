@@ -1,4 +1,4 @@
-import { ref, reactive, computed, watch } from "vue"
+import { ref, reactive, computed, watch, nextTick } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 
@@ -24,11 +24,15 @@ export default function usePMS(initialSchedules = []) {
   })
 
   const scheduleDates = ref([])
+  // openModal sets frequency + dates programmatically; the watcher must not
+  // wipe the prefilled dates in that case — only on real user changes.
+  let suppressFrequencyWatch = false
 
   // Update dates based on frequency
   watch(
     () => form.frequency,
     (newFreq) => {
+      if (suppressFrequencyWatch) return
       scheduleDates.value = []
       if (!newFreq) return
       let count = { Monthly: 12, Quarterly: 4, "Bi-Annual": 2, Annually: 1 }[newFreq] || 1
@@ -160,16 +164,20 @@ export default function usePMS(initialSchedules = []) {
     errors.value = {}
 
     if (mode === "edit" && schedule) {
+      suppressFrequencyWatch = true
       form.title = schedule.title || ""
       form.frequency = schedule.frequency || ""
       form.status = schedule.status || "Pending"
       form.remarks = schedule.remarks || ""
       form.school_year = schedule.school_year || ""
       form.office_area = schedule.office_area || ""
-      scheduleDates.value = (schedule.schedule_dates || []).map((d, i) => ({
+      // index sends the raw `dates` relation; showEquipments sends a mapped
+      // `schedule_dates` — accept either shape
+      scheduleDates.value = (schedule.schedule_dates || schedule.dates || []).map((d, i) => ({
         id: i,
-        date: formatDateForInput(d.date || d),
+        date: formatDateForInput(d.date ?? d.schedule_date ?? d),
       }))
+      nextTick(() => { suppressFrequencyWatch = false })
     } else if (mode === "create") {
       form.title = ""
       form.frequency = ""
@@ -220,10 +228,13 @@ export default function usePMS(initialSchedules = []) {
 
   const viewSchedule = (s) => openModal("view", s)
 
+  // index sends the raw `dates` relation; showEquipments sends `schedule_dates`
+  const datesOf = (s) => (s.schedule_dates || s.dates || []).map((d) => d.date ?? d.schedule_date ?? d)
+
   // Export & Print (added school_year & office_area)
   const exportCSV = () => {
     const csv = schedules.value.map((s) =>
-      `${s.id},"${s.title}",${s.frequency},"${(s.schedule_dates || []).map((d) => d.date || d).join(" | ")}",${s.status},${s.remarks},"${s.school_year}","${s.office_area}"`
+      `${s.id},"${s.title}",${s.frequency},"${datesOf(s).join(" | ")}",${s.status},${s.remarks},"${s.school_year}","${s.office_area}"`
     )
     const blob = new Blob(
       [["ID,Title,Frequency,Dates,Status,Remarks,School Year,Office/Area\n", ...csv].join("\n")],
@@ -246,7 +257,7 @@ export default function usePMS(initialSchedules = []) {
         <td>${s.id}</td>
         <td>${s.title}</td>
         <td>${s.frequency}</td>
-        <td>${(s.schedule_dates || []).map((d) => d.date || d).join(", ")}</td>
+        <td>${datesOf(s).join(", ")}</td>
         <td>${s.status}</td>
         <td>${s.remarks}</td>
         <td>${s.school_year || ""}</td>
