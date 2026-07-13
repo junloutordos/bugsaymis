@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppFilterBar from '@/Components/AppFilterBar.vue'
 import AppTable from '@/Components/AppTable.vue'
@@ -16,6 +17,7 @@ import {
   AcademicCapIcon,
   BuildingOffice2Icon,
   MagnifyingGlassIcon,
+  DocumentArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -71,6 +73,14 @@ function typeLabel(type) {
   return type === 'training_workshop_seminar' ? 'T/W/S' : 'In-house'
 }
 
+function exportSummary() {
+  const params = new URLSearchParams()
+  if (search.value) params.set('search', search.value)
+  if (typeFilter.value !== 'all') params.set('type', typeFilter.value)
+  if (statusFilter.value !== 'all') params.set('status', statusFilter.value)
+  window.location.href = route('ams.monitor.export') + '?' + params.toString()
+}
+
 function formatTrendMonth(ym) {
   const [y, m] = ym.split('-')
   return new Date(+y, +m - 1, 1).toLocaleDateString('en-PH', { month: 'short', year: '2-digit' })
@@ -84,7 +94,14 @@ const maxTrendCount = computed(() => Math.max(1, ...props.trend.map(t => t.count
   <AdminLayout title="Activity Monitoring">
     <div class="space-y-5">
 
-      <AppPageHeader title="Activity Monitoring" subtitle="All activities across the system and their evaluation analytics." />
+      <AppPageHeader title="Activity Monitoring" subtitle="All activities across the system and their evaluation analytics.">
+        <template #actions>
+          <AppButton size="sm" variant="secondary" @click="exportSummary">
+            <DocumentArrowDownIcon class="w-4 h-4" />
+            Download Excel
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Stat tiles -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">

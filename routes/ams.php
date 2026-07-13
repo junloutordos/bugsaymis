@@ -69,6 +69,10 @@ Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|acti
             ->name('file')
             ->where('field', '[a-z_]+');
 
+        // ── Evaluation Excel export (evaluation committee/owner/co-proponent) ──
+        Route::get('/{activity}/evaluations/export',
+            [ActivityController::class, 'exportEvaluations'])->name('evaluations.export');
+
         // ── Show (registered last so /{activity} never shadows specific routes)
         Route::get('/{activity}',   [ActivityController::class, 'show'])->name('show');
 
@@ -80,6 +84,7 @@ Route::middleware(['web', 'auth', 'verified', 'permission:activities.monitor'])
     ->name('ams.monitor.')
     ->group(function () {
         Route::get('/', [ActivityMonitorController::class, 'index'])->name('index');
+        Route::get('/export', [ActivityMonitorController::class, 'export'])->name('export');
     });
 
 // ── My Activities (authenticated, any user) ───────────────────────────────────

@@ -921,6 +921,14 @@ async function removeCoPro(cp) {
 
       <template v-else>
 
+        <div class="flex justify-end">
+          <AppButton as="a" size="sm" variant="secondary"
+                     :href="route('ams.activities.evaluations.export', activity.id)">
+            <DocumentArrowDownIcon class="w-4 h-4" />
+            Download Excel
+          </AppButton>
+        </div>
+
         <!-- In-house: single 13-question survey -->
         <EvaluationSummaryBlock
           v-if="evaluations.type === 'in_house'"

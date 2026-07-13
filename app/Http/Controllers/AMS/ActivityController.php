@@ -13,6 +13,8 @@ use App\Models\AMS\ActivityStudentAttendance;
 use App\Models\FacultyLoading\Section;
 use App\Models\Student;
 use App\Models\User;
+use App\Exports\AMS\ActivityEvaluationExport;
+use App\Services\AMS\ActivityEvaluationExportService;
 use App\Services\AMS\ActivityEvaluationSummaryService;
 use App\Services\AMS\ActivityFileService;
 use App\Services\AMS\CertificateService;
@@ -21,7 +23,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ActivityController extends Controller
 {
@@ -31,6 +35,7 @@ class ActivityController extends Controller
         private CertificateService $certService,
         private ActivityFileService $fileService,
         private ActivityEvaluationSummaryService $evalSummaryService,
+        private ActivityEvaluationExportService $evalExportService,
     ) {}
 
     // ── CRUD ─────────────────────────────────────────────────────────────────
@@ -148,6 +153,16 @@ class ActivityController extends Controller
                 ->get()
                 ->map(fn ($q) => ['id' => $q->id, 'title' => $q->title, 'status' => $q->status, 'question_count' => $q->questions_count]),
         ]);
+    }
+
+    public function exportEvaluations(Activity $activity)
+    {
+        $this->authorizeView($activity);
+
+        $data     = $this->evalExportService->perActivityData($activity);
+        $filename = Str::slug($activity->title) . '-evaluations-' . now()->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new ActivityEvaluationExport($activity, $data), $filename);
     }
 
     public function edit(Activity $activity)

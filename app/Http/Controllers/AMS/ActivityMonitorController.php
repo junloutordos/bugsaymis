@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\AMS;
 
 use App\Http\Controllers\Controller;
+use App\Exports\AMS\MonitorEvaluationExport;
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityEvaluation;
 use App\Models\AMS\ActivityParticipant;
 use App\Models\AMS\ActivityTwsEvaluation;
+use App\Services\AMS\ActivityEvaluationExportService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * Aggregate monitoring dashboard for the evaluation committee/management/
@@ -17,6 +22,8 @@ use Inertia\Inertia;
  */
 class ActivityMonitorController extends Controller
 {
+    public function __construct(private ActivityEvaluationExportService $evalExportService) {}
+
     public function index()
     {
         $activities = Activity::with('creator')->orderByDesc('start_date')->get();
@@ -34,14 +41,7 @@ class ActivityMonitorController extends Controller
         $today = now()->toDateString();
 
         $rows = $activities->map(function ($a) use ($participantStats, $inHouseEvalCounts, $twsEvalCounts, $today) {
-            $startDate = $a->start_date?->toDateString();
-            $endDate   = $a->end_date?->toDateString();
-
-            $status = match (true) {
-                $endDate && $endDate < $today     => 'completed',
-                $startDate && $startDate > $today => 'upcoming',
-                default                            => 'ongoing',
-            };
+            $status = $this->statusFor($a, $today);
 
             $pStats          = $participantStats[$a->id] ?? null;
             $participantCount = $pStats->total ?? 0;
@@ -54,8 +54,8 @@ class ActivityMonitorController extends Controller
                 'id'                         => $a->id,
                 'title'                      => $a->title,
                 'activity_type'              => $a->activity_type,
-                'start_date'                 => $startDate,
-                'end_date'                   => $endDate,
+                'start_date'                 => $a->start_date?->toDateString(),
+                'end_date'                   => $a->end_date?->toDateString(),
                 'venue'                      => $a->venue,
                 'creator'                    => $a->creator?->name,
                 'status'                     => $status,
@@ -99,6 +99,55 @@ class ActivityMonitorController extends Controller
             'trend'      => $trend,
             'activities' => $rows->all(),
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $activities = Activity::with('creator')->orderByDesc('start_date')->get();
+        $filtered   = $this->applyFilters($activities, $request);
+
+        $data     = $this->evalExportService->bulkData($filtered);
+        $filename = 'ams-evaluation-summary-' . now()->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new MonitorEvaluationExport($data), $filename);
+    }
+
+    private function statusFor(Activity $a, string $today): string
+    {
+        $startDate = $a->start_date?->toDateString();
+        $endDate   = $a->end_date?->toDateString();
+
+        return match (true) {
+            $endDate && $endDate < $today     => 'completed',
+            $startDate && $startDate > $today => 'upcoming',
+            default                            => 'ongoing',
+        };
+    }
+
+    /**
+     * Mirrors Monitor/Index.vue's client-side search/type/status filters, so
+     * the bulk export respects whatever the dashboard currently shows.
+     */
+    private function applyFilters(Collection $activities, Request $request): Collection
+    {
+        $search = trim((string) $request->query('search', ''));
+        $type   = $request->query('type');
+        $status = $request->query('status');
+        $today  = now()->toDateString();
+
+        return $activities->filter(function (Activity $a) use ($search, $type, $status, $today) {
+            if ($search !== '' && !str_contains(strtolower($a->title), strtolower($search))) {
+                return false;
+            }
+            if ($type && $a->activity_type !== $type) {
+                return false;
+            }
+            if ($status && $this->statusFor($a, $today) !== $status) {
+                return false;
+            }
+
+            return true;
+        })->values();
     }
 
     private function avgRounded($values): ?float

@@ -26,23 +26,26 @@ class ActivityEvaluationSummaryService
             : $this->buildInHouse($activity);
     }
 
+    /**
+     * Public accessor for the raw section/question label definitions (no data attached) —
+     * used by exports so question-label text lives in exactly one place.
+     */
+    public function sectionDefinitions(Activity $activity): array
+    {
+        return $activity->isTrainingWorkshopSeminar()
+            ? $this->twsSectionDefinitions()
+            : $this->inHouseSectionDefinitions();
+    }
+
     // ── In-house (existing 13-question survey) ─────────────────────────────────
 
-    private function buildInHouse(Activity $activity): array
+    private function inHouseSectionDefinitions(): array
     {
-        $rows = ActivityEvaluation::where('activity_id', $activity->id)
-            ->orderByDesc('created_at')
-            ->get();
-
-        if ($rows->isEmpty()) {
-            return ['type' => 'in_house', 'count' => 0, 'sections' => [], 'responses' => []];
-        }
-
-        $weights = ActivityEvaluation::WEIGHTS;
-
-        $sections = [
+        return [
             'A' => [
                 'label'     => 'Objectives',
+                'options'   => ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'],
+                'weights'   => ActivityEvaluation::WEIGHTS,
                 'questions' => [
                     'obj_1' => 'The activity was aligned with the school\'s vision and mission.',
                     'obj_2' => 'The objectives were relevant to the needs of the participants.',
@@ -52,6 +55,8 @@ class ActivityEvaluationSummaryService
             ],
             'B' => [
                 'label'     => 'Management',
+                'options'   => ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'],
+                'weights'   => ActivityEvaluation::WEIGHTS,
                 'questions' => [
                     'mgmt_1' => 'Organizers and staff were visible and responsive.',
                     'mgmt_2' => 'Coordination and flow of the program were clear.',
@@ -63,6 +68,8 @@ class ActivityEvaluationSummaryService
             ],
             'C' => [
                 'label'     => 'Physical Arrangements',
+                'options'   => ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'],
+                'weights'   => ActivityEvaluation::WEIGHTS,
                 'questions' => [
                     'phys_1' => 'Venue and materials were ready and adequate.',
                     'phys_2' => 'The sound system and equipment functioned properly.',
@@ -70,10 +77,19 @@ class ActivityEvaluationSummaryService
                 ],
             ],
         ];
+    }
 
-        $allOptions = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
+    private function buildInHouse(Activity $activity): array
+    {
+        $rows = ActivityEvaluation::where('activity_id', $activity->id)
+            ->orderByDesc('created_at')
+            ->get();
 
-        $builtSections = $this->buildLikertSections($sections, $rows, $weights, $allOptions);
+        if ($rows->isEmpty()) {
+            return ['type' => 'in_house', 'count' => 0, 'sections' => [], 'responses' => []];
+        }
+
+        $builtSections = $this->buildWeightedSections($this->inHouseSectionDefinitions(), $rows);
 
         $responses = $rows->map(fn ($r) => [
             'id'               => $r->id,
@@ -94,17 +110,13 @@ class ActivityEvaluationSummaryService
 
     // ── Training/Workshop/Seminar (HRU-13 + HRU-31) ─────────────────────────────
 
-    private function buildTws(Activity $activity): array
+    private function twsSectionDefinitions(): array
     {
-        $rows = ActivityTwsEvaluation::where('activity_id', $activity->id)
-            ->orderByDesc('created_at')
-            ->get();
-
-        $agreeOptions       = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
+        $agreeOptions        = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
         $satisfactionOptions = ['very_satisfied', 'satisfied', 'neutral', 'dissatisfied', 'very_dissatisfied', 'not_applicable'];
-        $overallOptions     = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree'];
+        $overallOptions      = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree'];
 
-        $sections = [
+        return [
             'A' => [
                 'label'     => 'Training/Workshop/Activity Content',
                 'options'   => $agreeOptions,
@@ -140,8 +152,15 @@ class ActivityEvaluationSummaryService
                 ],
             ],
         ];
+    }
 
-        $twsSections = $this->buildWeightedSections($sections, $rows);
+    private function buildTws(Activity $activity): array
+    {
+        $rows = ActivityTwsEvaluation::where('activity_id', $activity->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $twsSections = $this->buildWeightedSections($this->twsSectionDefinitions(), $rows);
 
         $responses = $rows->map(fn ($r) => [
             'id'                 => $r->id,
@@ -274,20 +293,5 @@ class ActivityEvaluationSummaryService
         }
 
         return $built;
-    }
-
-    /**
-     * In-house sections all share the same options/weight map — thin wrapper
-     * over buildWeightedSections() to keep buildInHouse() readable.
-     */
-    private function buildLikertSections(array $sections, $rows, array $weights, array $options): array
-    {
-        foreach ($sections as $key => &$section) {
-            $section['weights'] = $weights;
-            $section['options'] = $options;
-        }
-        unset($section);
-
-        return $this->buildWeightedSections($sections, $rows);
     }
 }
