@@ -1,4 +1,8 @@
 {
+  "skillOverrides": {
+    "process-audit": "off",
+    "make-controller": "off"
+  },
   "permissions": {
     "allow": [
       "Bash(npm --version)",
@@ -26,7 +30,47 @@
       "Bash(git checkout *)",
       "Bash(npm show *)",
       "Bash(curl -sv https://mis.crc.pshs.edu.ph/ -H 'User-Agent: Mozilla/5.0 Chrome/125.0')",
-      "Bash(identify /Users/junlou/bugsaymis-docker/src/bugsaymis/public/images/report_header.jpeg)"
+      "Bash(identify /Users/junlou/bugsaymis-docker/src/bugsaymis/public/images/report_header.jpeg)",
+      "WebFetch(domain:www.cloudflare.com)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(aws savingsplans *)",
+      "Bash(rsync -a --exclude=.git --exclude=vendor/ --exclude=node_modules/ --exclude=storage/logs/*.log --exclude=storage/framework/cache/data/* --exclude=.env /Users/junlou/bugsaymis-docker/src/bugsaymis/ /Users/junlou/navishr-docker/src/navishr/)",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(git init *)",
+      "Bash(git -C /Users/junlou/navishr-docker/src/navishr log --oneline)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis log --oneline -3)",
+      "Bash(git -C /Users/junlou/navishr-docker/src/navishr add app/Models/AgencySetting.php app/Http/Middleware/EnsureAppInstalled.php app/Http/Controllers/AgencySetupController.php app/Providers/AppServiceProvider.php bootstrap/app.php database/migrations/2026_05_26_000001_create_agency_settings_table.php resources/js/Pages/Setup/Wizard.vue routes/web.php .env.example)",
+      "Bash(git -C /Users/junlou/navishr-docker/src/navishr commit -m ' *)",
+      "Bash(grep -v \"import\\\\|//\\\\|^\\\\s*$\")",
+      "Bash(php --version)",
+      "Bash(grep -A 12 'protected $fillable' /Users/junlou/navishr-docker/src/navishr/app/Models/User.php)",
+      "Bash(grep -A 8 'protected $fillable' /Users/junlou/navishr-docker/src/navishr/app/Models/Division.php)",
+      "Bash(composer --version)",
+      "Bash(composer install *)",
+      "Bash(curl *)",
+      "Bash(grep *)",
+      "Bash(gh auth *)",
+      "Bash(git *)",
+      "Bash(ssh *)",
+      "Bash(perl *)",
+      "Bash(aws sts get-caller-identity *)",
+      "Bash(aws lightsail *)",
+      "Bash(ssh-keygen -t ed25519 -f ~/.ssh/yourhr -N \"\" -C \"yourhr-lightsail\")",
+      "Bash(chmod 600 ~/.ssh/yourhr)",
+      "Bash(ssh-keyscan -H 54.151.185.22)",
+      "Bash(rsync -az --progress -e \"ssh -i ~/.ssh/yourhr -o StrictHostKeyChecking=no\" /Users/junlou/navishr-docker/src/navishr/public/build/ ubuntu@54.151.185.22:/var/www/yourhr/public/build/)",
+      "Bash(rsync -az -e \"ssh -i ~/.ssh/yourhr -o StrictHostKeyChecking=no\" /Users/junlou/navishr-docker/src/navishr/public/images/ ubuntu@54.151.185.22:/var/www/yourhr/public/images/)",
+      "Bash(xargs -I{} curl -sI \"http://54.151.185.22/{}\")",
+      "Bash(xargs -I{} curl -s \"http://54.151.185.22/{}\")",
+      "Bash(dig +short your-hr.net)",
+      "Bash(dig +short www.your-hr.net)",
+      "Bash(xargs basename -a)",
+      "Bash(awk '{print $NF}')",
+      "Bash(aws ce get-cost-and-usage *)",
+      "Bash(sed -n '155,175p' app/Http/Controllers/Payroll/PayrollRunController.php)",
+      "Bash(sed -n '145,215p' app/Http/Controllers/HR/EmployeeScheduleController.php)",
+      "mcp__claude_ai_Google_Drive__search_files",
+      "mcp__claude-in-chrome__tabs_context_mcp"
     ]
   }
 }

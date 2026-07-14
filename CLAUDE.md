@@ -91,38 +91,7 @@ aws ecs execute-command --cluster crcmis-prod --task $TASK --container nginx --i
 - S3 key encoding: `'s3.' . rtrim(strtr(base64_encode($s3Key), '+/', '-_'), '=')`
 
 ### PHP Security Config (production)
-- `open_basedir = /var/www:/tmp:/usr/local/etc/php` — PHP cannot read outside these paths
-- `max_execution_time = 120` — scripts time out after 2 minutes
-- `allow_url_fopen = Off` — no remote URL fetching via file functions
-- `disable_functions` includes: system, shell_exec, passthru, proc_open, popen, pcntl_exec
-- `exec()` is **allowed** (needed for DB backup cron via mysqldump)
-
----
-
-## Directory Structure
-```
-app/
-  Http/Controllers/         # Root + namespaced: HR/, Payroll/, Recruitment/, FacultyLoading/, SALN/, ClassRecord/
-  Models/                   # Eloquent models + namespaced: HR/, Payroll/, FacultyLoading/, SALN/, ClassRecord/
-  Services/                 # Business logic: WFHService, ClassRecord/GradeComputationService, etc.
-  Http/Requests/            # Form Request classes
-  Console/Commands/         # BackupDatabase (uses exec + gzip → uploads to Google Drive)
-resources/js/
-  Pages/                    # Inertia Vue pages
-  Components/               # Reusable components (AppTable, AppModal, AppCard, etc.)
-  Composables/              # useUsers.js, useIPCR.js, useSubmit.js, etc.
-  Layouts/                  # AdminLayout.vue (primary)
-  Utils/ClassRecord/        # gradeUtils.js — JS mirror of GradeComputationService
-database/migrations/        # 300+ migrations — format: YYYY_MM_DD_HHMMSS_description.php
-docker/
-  nginx-app.conf            # Production nginx (security headers, rate limiting)
-  supervisord.conf          # nginx + php-fpm + cron + queue-worker
-docker-entrypoint.sh        # Fetches Google creds from Secrets Manager, runs migrations
-Dockerfile                  # Production image (php:8.4-fpm + nginx + awscli)
-routes/
-  web.php                   # Main routes (~950+ lines)
-  auth.php, chat.php, faculty-loading.php, saln.php
-```
+See `Dockerfile` and `scripts/php-fpm-bugsaymis.conf` for the live hardening values (open_basedir, max_execution_time, disable_functions, etc.).
 
 ---
 
@@ -270,51 +239,7 @@ const displayed = computed(() => {
 ---
 
 ## Module Deep Notes
-
-### WFH Module
-- Time-in/out photos: captured as base64 data URI from camera → sent as JSON → decoded and stored in S3
-- Accomplishment photos: same base64 pattern (Cloudflare blocks multipart)
-- Photo proxy: `GET /hr/wfh/photo/{fileId}` — authenticates to S3 via SDK, serves privately
-- File ID format: `s3.<base64url-encoded-s3-key>` — distinguished from legacy Google Drive IDs
-- Route regex: `[a-zA-Z0-9_.=-]+` — the dot is required for the `s3.` prefix
-
-### Class Record Module
-- `GradeComputationService` — pure PHP, no DB calls; JS mirror in `resources/js/Utils/ClassRecord/gradeUtils.js`
-- Running grade: Q2–Q4 uses `floor((current × 2/3) + (previous × 1/3))` — floor, not round
-- School year lock: records from past `SchoolYear` are fully read-only; guard on all editing endpoints
-- CSV import: parsed client-side via FileReader → JSON POST → `students/import` endpoint; avoids Cloudflare WAF
-- `school_year_id` FK on `class_records` → `school_years.id`; backfilled by matching `school_years.name`
-- At-risk row highlights (red/orange/amber) in `ScoreGrid.vue` based on running grade
-- Final annual grades tab: `ClassRecordFinalGradeController` — per-student Q1–Q4 GEs + annual average
-- Copy assessments from previous quarter: `ClassRecordAssessmentController` copy endpoint
-- PDF export: `ClassRecordPdfService` — A3 landscape via mPDF, stanine legend footer
-- Teacher notified (bell + email via `ClassRecordCheckedMail`) when admin marks record checked
-
-### Profile Module
-- Route: `GET /profile` → `profile.edit`, `PATCH /profile` → `profile.update`
-- Editable fields: `name`, `specialization`, `profile_photo_base64` / `profile_photo_mime`
-- Photo stored at S3 `profile_pictures/{user_id}_{time}.{ext}`; old photo deleted on update
-- Email/password not user-editable (email = HR-managed; password = Google OAuth)
-- Profile panel: slide-in `ProfileEditModal.vue` triggered by avatar click
-- **Gotcha:** `$user->division` returns a legacy string column — use `Division::find($user->division_id)` explicitly, NOT `$user->load(['division'])` (FK vs legacy column conflict)
-- **Gotcha:** `divisions` table uses `division_name` column, NOT `name`
-- **Gotcha:** `Storage::disk('s3')->temporaryUrl()` fails in production — use `storageUrl()` composable (serves via `/media/` proxy)
-
-### Mail
-- Provider: Gmail SMTP (`smtp.gmail.com:587`, TLS)
-- From: `portal@crc.pshs.edu.ph` / `PSHS-CRC MIS`
-- Credentials stored in SSM Parameter Store (`/crcmis/prod/MAIL_*`)
-- App password (not Google account password) — 16-character app-specific password
-
-### DB Backup (Cron)
-- Runs via cron inside the container (supervisord manages cron service)
-- `exec()` calls `mysqldump` then `gzip -f` — do NOT disable `exec` in PHP
-- Dumps to `sys_get_temp_dir()` temp file (cleaned in `finally`) — no `storage_path` local copy
-- Compressed backup (~3-5MB) uploaded to Google Drive using service account
-- Google credentials fetched from Secrets Manager at container startup
-- `BackupVerify` command checks Google Drive for a backup within the last 25h (no local files to check)
-- Schedule lives in `routes/console.php` (canonical); `app/Console/Kernel.php` must not duplicate entries
-- Windows: 06:00 PHT (backup), 06:30 PHT (verify) — added May 2026
+Per-module gotchas (WFH, Class Record, Profile, Mail, DB Backup) live in lazy-loaded skills — see `.claude/skills/wfh-module-notes/`, `class-record-module-notes/`, `profile-module-notes/`, `backend-ops-notes/`. They load automatically when you're working on that module.
 
 ---
 
@@ -358,6 +283,7 @@ const displayed = computed(() => {
 - Never create README/doc files unless explicitly asked
 - Never use `git add -A` or `git add .` — stage files by name
 - Never force push to `main`
+- Never use `--no-verify`
 - Don't add error handling for impossible scenarios
 - Don't design for hypothetical future requirements
 - Don't upgrade to Laravel 13 yet — wait until Laravel 12 nears EOL (~early 2027); `maatwebsite/excel` and other packages may not be compatible
