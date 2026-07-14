@@ -108,7 +108,7 @@ class AtlasSentinelController extends Controller
             $matchSource = 'serial';
             $existingDevice = IctEquipmentDevice::where('equipment_id', $equipment->id)->latest('id')->first();
 
-            if ($this->isIdentityConflict($existingDevice, $hostname, $mac)) {
+            if ($this->isIdentityConflict($existingDevice, $mac)) {
                 $cloneCollision = true;
                 logger()->warning('Atlas Sentinel: serial match looked like a cloned/generic desktop; creating Pending Setup equipment instead of reclaiming existing row.', [
                     'matched_equipment_id' => $equipment->id,
@@ -123,23 +123,14 @@ class AtlasSentinelController extends Controller
             }
         }
 
+        // A MAC-address match is, by construction, always the same MAC — the
+        // agent's hostname is expected to change across a reformat/reimage,
+        // so it's not treated as a collision signal here.
         if (! $equipment && $mac && ! $cloneCollision) {
             $deviceByMac = IctEquipmentDevice::where('mac_address', $mac)->latest('id')->first();
             if ($deviceByMac) {
-                if ($this->isIdentityConflict($deviceByMac, $hostname, $mac)) {
-                    $cloneCollision = true;
-                    logger()->warning('Atlas Sentinel: MAC match looked like a cloned desktop; creating Pending Setup equipment instead of reclaiming existing row.', [
-                        'matched_equipment_id' => $deviceByMac->equipment_id,
-                        'matched_device_id' => $deviceByMac->id,
-                        'previous_hostname' => $deviceByMac->hostname,
-                        'new_hostname' => $hostname,
-                        'serial_no' => $serial,
-                        'mac_address' => $mac,
-                    ]);
-                } else {
-                    $equipment = ICTEquipment::find($deviceByMac->equipment_id);
-                    $matchSource = 'mac';
-                }
+                $equipment = ICTEquipment::find($deviceByMac->equipment_id);
+                $matchSource = 'mac';
             }
         }
 
@@ -216,23 +207,23 @@ class AtlasSentinelController extends Controller
         ]);
     }
 
-    private function isIdentityConflict(?IctEquipmentDevice $existingDevice, ?string $newHostname, ?string $newMac): bool
+    private function isIdentityConflict(?IctEquipmentDevice $existingDevice, ?string $newMac): bool
     {
         if (! $existingDevice) {
             return false;
         }
 
-        $existingHostname = trim((string) $existingDevice->hostname);
-        $hostnameDiffers = $newHostname
-            && $existingHostname !== ''
-            && strcasecmp($existingHostname, $newHostname) !== 0;
-
+        // Hostname is deliberately not part of this check — a reformat/reimage
+        // routinely assigns a new hostname to the same physical machine, so
+        // treating that alone as a collision forked a duplicate equipment
+        // record on every legitimate reformat + re-enroll. MAC address is a
+        // hardware property of the NIC and doesn't legitimately change here,
+        // so it remains the sole signal for a genuine identity conflict
+        // (e.g. a shared/generic serial number reused across two different
+        // physical units).
         $existingMac = $this->normalizeMac($existingDevice->mac_address);
-        $macDiffers = $newMac
-            && $existingMac
-            && $existingMac !== $newMac;
 
-        return $hostnameDiffers || $macDiffers;
+        return (bool) ($newMac && $existingMac && $existingMac !== $newMac);
     }
 
     private function normalizeMac(?string $mac): ?string

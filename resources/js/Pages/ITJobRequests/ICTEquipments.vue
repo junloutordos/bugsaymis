@@ -27,6 +27,7 @@ import {
   CheckBadgeIcon,
   ArchiveBoxIcon,
   MagnifyingGlassIcon,
+  ArrowsRightLeftIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
@@ -74,6 +75,13 @@ const {
   isSubmittingPms,
   openAddPmsHistory,
   submitPmsHistory,
+  showMergeModal,
+  mergeTargetId,
+  mergeErrors,
+  isSubmittingMerge,
+  openMergeModal,
+  closeMergeModal,
+  submitMerge,
 } = useEquipments(props.equipments?.data ?? [], props.users)
 
 const page = usePage()
@@ -698,6 +706,9 @@ const showAllChecked    = computed({
                   <AppIconButton v-if="eq.agent_device" label="Agent Specs" variant="ghost" @click="openSpecs(eq)">
                     <ChartBarIcon class="w-4 h-4"/>
                   </AppIconButton>
+                  <AppIconButton v-if="eq.status === 'Pending Setup'" label="Merge Into…" variant="ghost" @click="openMergeModal(eq)">
+                    <ArrowsRightLeftIcon class="w-4 h-4"/>
+                  </AppIconButton>
                   <AppIconButton label="Edit" variant="ghost" @click="openModal('edit', eq)">
                     <PencilSquareIcon class="w-4 h-4"/>
                   </AppIconButton>
@@ -745,6 +756,9 @@ const showAllChecked    = computed({
                   </AppIconButton>
                   <AppIconButton v-if="eq.agent_device" label="Agent Specs" variant="ghost" @click="openSpecs(eq)">
                     <ChartBarIcon class="w-4 h-4"/>
+                  </AppIconButton>
+                  <AppIconButton v-if="eq.status === 'Pending Setup'" label="Merge Into…" variant="ghost" @click="openMergeModal(eq)">
+                    <ArrowsRightLeftIcon class="w-4 h-4"/>
                   </AppIconButton>
                   <AppIconButton label="Edit" variant="ghost" @click="openModal('edit', eq)">
                     <PencilSquareIcon class="w-4 h-4"/>
@@ -1077,6 +1091,51 @@ const showAllChecked    = computed({
           </AppButton>
           <AppButton :loading="isSubmittingPms" :disabled="isSubmittingPms" @click="submitPmsHistory">
             {{ isSubmittingPms ? 'Adding...' : 'Add PMS History' }}
+          </AppButton>
+        </template>
+      </AppModal>
+
+      <!-- MERGE MODAL -->
+      <AppModal
+        :show="showMergeModal"
+        :title="`Merge ${selectedEquipment?.description} / ${selectedEquipment?.serial_no}`"
+        size="sm"
+        @close="closeMergeModal"
+      >
+        <div class="space-y-3">
+          <p class="text-sm text-slate-600">
+            This will move this record's device history into the equipment you pick below, then delete this duplicate record.
+            If the original record isn't listed, search for it first so it's on this page, then reopen this dialog.
+          </p>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Merge Into <span class="text-red-500">*</span></label>
+            <select
+              v-model="mergeTargetId"
+              :class="[
+                'rounded-lg border px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full',
+                mergeErrors.target_equipment_id ? 'border-red-400 bg-red-50/30' : 'border-slate-200 bg-white',
+              ]"
+              required
+            >
+              <option value="">Select equipment record</option>
+              <option
+                v-for="eq in visibleEquipments.filter(e => e.id !== selectedEquipment?.id)"
+                :key="eq.id"
+                :value="eq.id"
+              >
+                #{{ eq.id }} — {{ eq.description }} ({{ eq.serial_no }})
+              </option>
+            </select>
+            <p v-if="mergeErrors.target_equipment_id" class="mt-1 text-xs text-red-500">{{ mergeErrors.target_equipment_id }}</p>
+          </div>
+        </div>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="closeMergeModal" :disabled="isSubmittingMerge">
+            Cancel
+          </AppButton>
+          <AppButton variant="danger" :loading="isSubmittingMerge" :disabled="isSubmittingMerge" @click="submitMerge">
+            {{ isSubmittingMerge ? 'Merging...' : 'Merge' }}
           </AppButton>
         </template>
       </AppModal>

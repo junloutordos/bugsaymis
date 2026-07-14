@@ -77,7 +77,7 @@ class AtlasSentinelEnrollmentTest extends TestCase
         ]);
     }
 
-    public function test_duplicate_mac_with_different_hostname_creates_pending_setup_equipment(): void
+    public function test_reformatted_machine_with_unreliable_serial_reenrolls_into_existing_equipment_despite_hostname_change(): void
     {
         $existingEquipment = ICTEquipment::create([
             'category' => 'CPU/System Unit',
@@ -93,33 +93,75 @@ class AtlasSentinelEnrollmentTest extends TestCase
             'last_checkin_at' => now(),
         ]);
 
+        // Same physical machine, reformatted: the BIOS reports one of the
+        // generic placeholder strings (so the serial itself is untrusted and
+        // falls back to MAC matching), and re-imaging assigned a new
+        // hostname — but the NIC's MAC address is unchanged.
         $response = $this->postJson('/api/ict-agent/enroll', [
             'enrollment_token' => $this->validEnrollmentToken(),
             'serial_no' => 'UNKNOWN-SERIAL',
             'hostname' => 'CRC-LAB-02',
             'mac_address' => '00:11:22:33:44:55',
-            'model' => 'Cloned Desktop',
+            'model' => 'Original Desktop',
         ]);
 
         $response->assertCreated()
             ->assertJson([
-                'linked' => false,
-                'match_source' => 'clone_collision_pending_setup',
+                'equipment_id' => $existingEquipment->id,
+                'linked' => true,
+                'match_source' => 'mac',
             ]);
 
-        $this->assertDatabaseHas('ict_equipments', [
-            'serial_no' => 'UNKNOWN-SERIAL',
-            'description' => 'Cloned Desktop (MAC 00:11:22:33:44:55)',
-            'status' => 'Pending Setup',
-        ]);
+        $this->assertSame(1, ICTEquipment::count());
+        $this->assertSame(1, IctEquipmentDevice::count());
 
         $this->assertDatabaseHas('ict_equipment_devices', [
-            'hostname' => 'CRC-LAB-01',
+            'equipment_id' => $existingEquipment->id,
+            'hostname' => 'CRC-LAB-02',
             'mac_address' => '00:11:22:33:44:55',
         ]);
+    }
+
+    public function test_reformatted_machine_with_reliable_serial_reenrolls_despite_hostname_change(): void
+    {
+        $existingEquipment = ICTEquipment::create([
+            'category' => 'CPU/System Unit',
+            'serial_no' => 'REAL-SERIAL-001',
+            'description' => 'Original desktop',
+            'status' => 'Good Working',
+        ]);
+
+        IctEquipmentDevice::create([
+            'equipment_id' => $existingEquipment->id,
+            'hostname' => 'CRC-LAB-01',
+            'mac_address' => '00:11:22:33:44:55',
+            'last_checkin_at' => now(),
+        ]);
+
+        // Same reliable serial, same MAC — only the hostname changed, which
+        // is the routine/expected result of a reformat + reimage. This must
+        // not fork a duplicate equipment record.
+        $response = $this->postJson('/api/ict-agent/enroll', [
+            'enrollment_token' => $this->validEnrollmentToken(),
+            'serial_no' => 'REAL-SERIAL-001',
+            'hostname' => 'CRC-LAB-REIMAGED',
+            'mac_address' => '00:11:22:33:44:55',
+            'model' => 'Original Desktop',
+        ]);
+
+        $response->assertCreated()
+            ->assertJson([
+                'equipment_id' => $existingEquipment->id,
+                'linked' => true,
+                'match_source' => 'serial',
+            ]);
+
+        $this->assertSame(1, ICTEquipment::count());
+        $this->assertSame(1, IctEquipmentDevice::count());
 
         $this->assertDatabaseHas('ict_equipment_devices', [
-            'hostname' => 'CRC-LAB-02',
+            'equipment_id' => $existingEquipment->id,
+            'hostname' => 'CRC-LAB-REIMAGED',
             'mac_address' => '00:11:22:33:44:55',
         ]);
     }

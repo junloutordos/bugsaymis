@@ -14,6 +14,12 @@ export default function useEquipments(initialEquipments = [], users = []) {
   const modalMode = ref("create")
   const selectedEquipment = ref(null)
 
+  // MERGE MODAL (Pending Setup duplicates → an existing equipment record)
+  const showMergeModal = ref(false)
+  const mergeTargetId = ref("")
+  const mergeErrors = ref({})
+  const isSubmittingMerge = ref(false)
+
   // PMS HISTORY MODAL
   const showPmsModal = ref(false)
   const selectedPmsHistory = ref([])
@@ -186,6 +192,56 @@ export default function useEquipments(initialEquipments = [], users = []) {
             timer: 2000,
             showConfirmButton: false,
           })
+        }
+      })
+    })
+  }
+
+  // ---------------------------------------------------------------------------
+  // MERGE (Pending Setup duplicate → existing equipment)
+  // ---------------------------------------------------------------------------
+  const openMergeModal = (eq) => {
+    selectedEquipment.value = eq
+    mergeTargetId.value = ""
+    mergeErrors.value = {}
+    showMergeModal.value = true
+  }
+
+  const closeMergeModal = () => {
+    showMergeModal.value = false
+    selectedEquipment.value = null
+  }
+
+  const submitMerge = () => {
+    if (!mergeTargetId.value) {
+      mergeErrors.value = { target_equipment_id: "Choose the equipment record to merge into." }
+      return
+    }
+
+    Swal.fire({
+      title: "Merge this duplicate?",
+      text: "All of its device history will move to the selected equipment record, and this duplicate record will be deleted.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, merge it",
+    }).then(result => {
+      if (!result.isConfirmed) return
+
+      isSubmittingMerge.value = true
+      router.post(route("ict-equipments.merge", selectedEquipment.value.id), {
+        target_equipment_id: mergeTargetId.value,
+      }, {
+        onError: e => {
+          isSubmittingMerge.value = false
+          mergeErrors.value = e
+          Swal.fire({ icon: "error", title: "Not merged", text: "Please review the highlighted fields and try again." })
+        },
+        onSuccess: () => {
+          isSubmittingMerge.value = false
+          closeMergeModal()
+          Swal.fire({ icon: "success", title: "Merged", text: "The duplicate has been merged.", timer: 2000, showConfirmButton: false })
         }
       })
     })
@@ -451,6 +507,15 @@ export default function useEquipments(initialEquipments = [], users = []) {
     closeModal,
     submitEquipment,
     viewEquipment,
+
+    // Merge
+    showMergeModal,
+    mergeTargetId,
+    mergeErrors,
+    isSubmittingMerge,
+    openMergeModal,
+    closeMergeModal,
+    submitMerge,
 
     // PMS
     showPmsModal,

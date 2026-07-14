@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\AtlasSentinelRelease;
 use App\Models\ICTEquipment;
+use App\Models\IctEquipmentAlert;
 use App\Models\IctEquipmentAssignmentHistory;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
 use App\Models\IctEquipmentHealthHistory;
 use App\Models\IctEquipmentManualRemediationRequest;
+use App\Models\IctPmsHistory;
+use App\Models\IctRemoteHelpRequest;
+use App\Models\ITJobRequest;
 use App\Models\User;
 use App\Models\Room;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -249,6 +254,48 @@ class ICTEquipmentController extends Controller
         $ictEquipment->delete();
 
         return redirect()->back()->with('success', 'Equipment deleted successfully.');
+    }
+
+    /**
+     * Merge a duplicate equipment record (typically an Atlas Sentinel
+     * "Pending Setup" row created when enrollment couldn't confidently match
+     * an existing device) into another equipment record. Reassigns every
+     * device row — which carries health/hardware/software/security history,
+     * remediation log, and backups with it since those key off device_id —
+     * plus the handful of tables that key directly off equipment_id instead
+     * of device_id, then deletes the now-empty duplicate.
+     */
+    public function merge(Request $request, ICTEquipment $ictEquipment)
+    {
+        $data = $request->validate([
+            'target_equipment_id' => ['required', 'integer', Rule::exists('ict_equipments', 'id')],
+        ]);
+
+        abort_if((int) $data['target_equipment_id'] === $ictEquipment->id, 422, 'Choose a different equipment record to merge into.');
+
+        $target = ICTEquipment::findOrFail($data['target_equipment_id']);
+        $source = $ictEquipment;
+
+        DB::transaction(function () use ($source, $target) {
+            IctEquipmentDevice::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+
+            IctEquipmentAlert::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+            IctEquipmentAssignmentHistory::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+            IctPmsHistory::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+            IctEquipmentManualRemediationRequest::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+            IctRemoteHelpRequest::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+            ITJobRequest::where('ict_equipment_id', $source->id)->update(['ict_equipment_id' => $target->id]);
+            DB::table('ict_pms_equipment')->where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+
+            if ($source->qr_code_path) {
+                $path = ltrim(str_replace('storage/', '', $source->qr_code_path), '/');
+                Storage::disk('public')->delete($path);
+            }
+
+            $source->delete();
+        });
+
+        return redirect()->back()->with('success', "Merged into equipment #{$target->id}.");
     }
 
     /**

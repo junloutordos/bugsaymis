@@ -996,6 +996,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware('permission:it.equipment.manage')
         ->name('ict-equipments.remediate');
 
+    Route::post('/ict-equipments/{ictEquipment}/merge', [ICTEquipmentController::class, 'merge'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('ict-equipments.merge');
+
     Route::get('/computer-labs', [ComputerLabController::class, 'index'])
         ->middleware('permission:it.equipment.view')
         ->name('computer-labs.index');
