@@ -222,7 +222,7 @@ let lastBrightness = 128
 let geo = { latitude: null, longitude: null, accuracy: null }
 
 const READY_STREAK_REQUIRED = 8
-const FRAME_COUNT = 6
+const FRAME_COUNT = 7
 const FRAME_INTERVAL_MS = 450
 const MIN_BRIGHTNESS = 55
 const MAX_BRIGHTNESS = 235
@@ -397,9 +397,9 @@ async function beginChallenge() {
     challengeType.value = data.challenge_type
     challengeInstruction.value = data.instruction
 
-    countdown.value = 3
+    countdown.value = 5
     while (countdown.value > 0) {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 800))
       countdown.value--
     }
 

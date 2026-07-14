@@ -16,7 +16,7 @@ class OnlineTimePunchRequest extends FormRequest
         return [
             'punch_type'               => ['required', 'string', 'in:time_in_am,time_out_am,time_in_pm,time_out_pm'],
             'challenge_token'          => ['required', 'string'],
-            'frames'                   => ['required', 'array', 'min:4', 'max:6'],
+            'frames'                   => ['required', 'array', 'min:4', 'max:7'],
             'frames.*.data'            => ['required', 'string'], // base64 data URI
             'frames.*.capturedAtMs'    => ['required', 'integer', 'min:0'],
             'latitude'                 => ['required', 'numeric', 'between:-90,90'],
