@@ -107,8 +107,15 @@
 
           <!-- Calendar cards per section / per faculty -->
           <template v-else>
-            <div v-for="groupId in groupsWithSchedules" :key="groupId"
-              class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+            <template v-for="groupId in groupsWithSchedules" :key="groupId">
+
+              <!-- Division/Office divider (By Faculty view only) -->
+              <div v-if="shouldShowUnitHeader(groupId)"
+                class="pt-2 first:pt-0 px-1 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                {{ facultyUnitLabel(groupId) }}
+              </div>
+
+            <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
 
               <!-- Group header -->
               <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
@@ -274,6 +281,7 @@
               </div>
 
             </div>
+            </template>
           </template>
 
         </div>
@@ -713,11 +721,47 @@ const groupsWithSchedules = computed(() => {
       const k = viewBy.value === 'faculty' ? (load.faculty?.id ?? 'unassigned') : load.section_id
       if (!seen.includes(k)) seen.push(k)
     }
-  } else {
+  }
+  if (viewBy.value === 'grade') {
     seen.sort((a, b) => a - b)
+  } else if (viewBy.value === 'faculty') {
+    // Group by Division/Office (the live Data Management assignment) instead
+    // of leaving faculty in whatever order their first schedule row happened
+    // to appear — unassigned faculty sort last.
+    seen.sort((a, b) => {
+      const ka = facultySortKey(a)
+      const kb = facultySortKey(b)
+      return ka < kb ? -1 : (ka > kb ? 1 : 0)
+    })
   }
   return seen
 })
+
+/** Division/Office lookup key for a faculty id — missing division/office
+ *  sorts after any real name so "Unassigned" naturally lands last. */
+function facultySortKey(facultyId) {
+  const unassignedSentinel = String.fromCharCode(0xFFFF)
+  const info     = props.faculty.find(f => String(f.id) === String(facultyId))
+  const division = info?.division_name || unassignedSentinel
+  const office   = info?.office_name || unassignedSentinel
+  const name     = info?.name ?? groupHeaderInfo(facultyId).faculty_name ?? ''
+  return `${division} ${office} ${name}`
+}
+
+/** Division/Office label shown as a section divider above a faculty card. */
+function facultyUnitLabel(facultyId) {
+  const info  = props.faculty.find(f => String(f.id) === String(facultyId))
+  const parts = [info?.division_name, info?.office_name].filter(Boolean)
+  return parts.length ? parts.join(' — ') : 'Unassigned'
+}
+
+/** True when this is the first card of a new Division/Office group (faculty view only). */
+function shouldShowUnitHeader(facultyId) {
+  if (viewBy.value !== 'faculty') return false
+  const list = groupsWithSchedules.value
+  const idx  = list.indexOf(facultyId)
+  return idx === 0 || facultyUnitLabel(list[idx - 1]) !== facultyUnitLabel(facultyId)
+}
 
 /** Header info for a group card — falls back to an unplaced-load entry when
  *  the group has no schedules yet (brand-new section/faculty with no slots). */

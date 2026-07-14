@@ -155,11 +155,22 @@ class ClassScheduleController extends Controller
                 'school_year_id' => $t->school_year_id,
             ]);
 
+        // Division/Office are the live Data Management assignment (kept current
+        // by UserController whenever an admin edits a faculty member's unit) —
+        // used to group the "By Faculty" calendar view by org unit.
         $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
             ->when($cap['level'] !== 'manage', fn ($q) => $q->whereIn('id', $cap['faculty_ids']))
+            ->with(['division:id,division_name', 'office:id,name'])
             ->orderBy('name')
-            ->get(['id', 'name', 'position']);
+            ->get(['id', 'name', 'position', 'division_id', 'office_id'])
+            ->map(fn ($u) => [
+                'id'            => $u->id,
+                'name'          => $u->name,
+                'position'      => $u->position,
+                'division_name' => $u->division?->division_name,
+                'office_name'   => $u->office?->name,
+            ]);
 
         $subjects   = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);
         $classrooms = Classroom::available()->orderBy('name')->get(['id', 'name', 'code', 'classroom_type', 'capacity']);
