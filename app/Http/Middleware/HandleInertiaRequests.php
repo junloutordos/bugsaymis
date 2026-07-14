@@ -238,7 +238,7 @@ class HandleInertiaRequests extends Middleware
             'appVersion' => function () {
                 try {
                     return Cache::remember('app.version', 3600, function () {
-                        $versions = \App\Models\AppVersion::orderBy('date', 'desc')->get();
+                        $versions = \App\Models\AppVersion::orderBy('date', 'desc')->orderBy('id', 'desc')->get();
                         $current  = $versions->firstWhere('is_current', true) ?? $versions->first();
                         return [
                             'current' => $current?->version ?? '1.0.0',
