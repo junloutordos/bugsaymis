@@ -10,7 +10,7 @@ use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
 use App\Models\IctEquipmentHealthHistory;
 use App\Models\IctEquipmentManualRemediationRequest;
-use App\Models\IctPmsHistory;
+use App\Models\ICTPMSHistory;
 use App\Models\IctRemoteHelpRequest;
 use App\Models\ITJobRequest;
 use App\Models\User;
@@ -281,7 +281,7 @@ class ICTEquipmentController extends Controller
 
             IctEquipmentAlert::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
             IctEquipmentAssignmentHistory::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
-            IctPmsHistory::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
+            ICTPMSHistory::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
             IctEquipmentManualRemediationRequest::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
             IctRemoteHelpRequest::where('equipment_id', $source->id)->update(['equipment_id' => $target->id]);
             ITJobRequest::where('ict_equipment_id', $source->id)->update(['ict_equipment_id' => $target->id]);
