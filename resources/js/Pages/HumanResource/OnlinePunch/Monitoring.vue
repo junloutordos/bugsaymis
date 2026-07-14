@@ -66,6 +66,7 @@
           </td>
           <td class="px-4 py-3 text-center">
             <AppBadge :color="networkBadgeColor(row.network_status)">{{ networkLabel(row.network_status) }}</AppBadge>
+            <p v-if="row.ip_address" class="text-[11px] text-slate-400 mt-1">{{ row.ip_address }}</p>
           </td>
           <td class="px-4 py-3 text-center">
             <AppBadge :color="statusBadgeColor(row.match_status)">{{ statusLabel(row.match_status) }}</AppBadge>
@@ -93,6 +94,7 @@
             <div class="flex items-center gap-2">
               <AppBadge :color="geofenceBadgeColor(row.geofence_status)">{{ geofenceLabel(row.geofence_status, row.distance_meters) }}</AppBadge>
               <AppBadge :color="networkBadgeColor(row.network_status)">{{ networkLabel(row.network_status) }}</AppBadge>
+              <span v-if="row.ip_address" class="text-[11px] text-slate-400">{{ row.ip_address }}</span>
             </div>
           </div>
         </template>
