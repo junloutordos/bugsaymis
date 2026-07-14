@@ -359,6 +359,33 @@ class SchedulingConstantsTest extends TestCase
         }
     }
 
+    public function test_friday_flag_retreat_block_defined(): void
+    {
+        $this->assertSame('16:00', SC::FRIDAY_FLAG_RETREAT['start']);
+        $this->assertSame('17:00', SC::FRIDAY_FLAG_RETREAT['end']);
+    }
+
+    public function test_get_blocked_slots_includes_flag_retreat_on_friday(): void
+    {
+        foreach ([7, 8, 9, 10, 11, 12] as $grade) {
+            $blocked = SC::getBlockedSlots($grade, 'Friday');
+            $types   = array_column($blocked, 'type');
+            $this->assertContains('FLAG_RETREAT', $types, "G{$grade} Friday must include a FLAG_RETREAT block");
+        }
+    }
+
+    public function test_no_class_slots_overlap_friday_flag_retreat(): void
+    {
+        foreach ([7, 8, 9, 10, 11, 12] as $grade) {
+            $window = SC::getEffectiveClassWindow($grade, 'Friday');
+            $this->assertNotNull($window, "G{$grade} must have an effective Friday class window");
+            $this->assertLessThanOrEqual(
+                SC::FRIDAY_FLAG_RETREAT['start'], $window['end'],
+                "G{$grade} Friday effective class end must not reach into the Flag Retreat block"
+            );
+        }
+    }
+
     // ── Science Core ─────────────────────────────────────────────────────────
 
     public function test_science_core_g11_covers_all_sections(): void

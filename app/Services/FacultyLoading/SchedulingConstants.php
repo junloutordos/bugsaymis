@@ -304,6 +304,14 @@ class SchedulingConstants
      */
     public const FRIDAY_ILA_GRADES = [];
 
+    /**
+     * Fixed Flag Retreat Ceremony block — every Friday, 16:00 onward, for ALL
+     * grades and sections. No class may be scheduled here. No grade's Friday
+     * timetable currently runs a CLASS period past 15:50, so this is purely
+     * defensive/explicit — it doesn't remove any existing capacity today.
+     */
+    public const FRIDAY_FLAG_RETREAT = ['start' => '16:00', 'end' => '17:00'];
+
     // ── Over-subscribed-grade exceptions ───────────────────────────────────────
     // G8 carries the heaviest weekly load (39h). Its load only fits when the
     // full Wednesday is opened for teaching.
@@ -464,11 +472,12 @@ class SchedulingConstants
      * rendering. These are time windows where no teaching class may be placed.
      *
      * Wednesday additionally gets synthetic Wellness / Activity-Proper-ALP
-     * entries injected — those aren't literal timetable rows, they're overlay
-     * rules applied during placement (see DeterministicSchedulingService::
-     * buildSlotGrid()). Injecting them here keeps the calendar's rendering in
-     * lockstep with what the generator actually treats as blocked, instead of
-     * drifting out of sync with a separately-maintained schedule.
+     * entries injected, and Friday gets a synthetic Flag Retreat entry —
+     * those aren't literal timetable rows, they're overlay rules applied
+     * during placement (see DeterministicSchedulingService::buildSlotGrid()).
+     * Injecting them here keeps the calendar's rendering in lockstep with
+     * what the generator actually treats as blocked, instead of drifting out
+     * of sync with a separately-maintained schedule.
      */
     public static function getBlockedSlots(int $grade, string $day): array
     {
@@ -506,6 +515,13 @@ class SchedulingConstants
             ];
         }
 
+        if ($day === 'Friday') {
+            $blocked[] = array_merge(self::FRIDAY_FLAG_RETREAT, [
+                'type'  => 'FLAG_RETREAT',
+                'label' => 'Flag Retreat Ceremony',
+            ]);
+        }
+
         usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
 
         return array_values($blocked);
@@ -513,8 +529,9 @@ class SchedulingConstants
 
     /**
      * The actual first-class-start / last-class-end for a grade+day, after
-     * applying Wednesday's cutoff/wellness/ALP exclusions (via getBlockedSlots)
-     * and the Friday ILA day-skip. Null if the grade has no classes that day.
+     * applying Wednesday's cutoff/wellness/ALP exclusions and Friday's Flag
+     * Retreat exclusion (via getBlockedSlots), and the Friday ILA day-skip.
+     * Null if the grade has no classes that day.
      *
      * @return array{start:string,end:string}|null
      */
@@ -529,7 +546,7 @@ class SchedulingConstants
             return null;
         }
 
-        if ($day === 'Wednesday') {
+        if ($day === 'Wednesday' || $day === 'Friday') {
             $blocked = self::getBlockedSlots($grade, $day);
             $classSlots = array_values(array_filter($classSlots, static function ($slot) use ($blocked) {
                 foreach ($blocked as $b) {

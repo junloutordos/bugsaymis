@@ -400,8 +400,9 @@ class DeterministicSchedulingService
 
     /**
      * Build the available CLASS period slots for a grade across the week,
-     * applying the Wednesday activity cutoff, the Wednesday wellness block, and
-     * Friday ILA (no in-person) for the lower grades.
+     * applying the Wednesday activity cutoff, the Wednesday wellness block,
+     * the fixed Friday Flag Retreat block (16:00 onward, all grades), and
+     * Friday ILA (no in-person) for any grade still listed.
      *
      * @return array<int,array{day:string,start:string,end:string,start_min:int,end_min:int}>
      */
@@ -450,6 +451,15 @@ class DeterministicSchedulingService
                     )) {
                         continue;
                     }
+                }
+
+                // Fixed Flag Retreat Ceremony block — every Friday, all grades.
+                if ($day === 'Friday' && SchedulingConstants::timesOverlap(
+                    $row['start'], $row['end'],
+                    SchedulingConstants::FRIDAY_FLAG_RETREAT['start'],
+                    SchedulingConstants::FRIDAY_FLAG_RETREAT['end'],
+                )) {
+                    continue;
                 }
 
                 $slots[] = [
