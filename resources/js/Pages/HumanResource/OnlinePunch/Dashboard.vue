@@ -77,14 +77,14 @@
 
           <!-- Live camera + guide -->
           <div v-else class="relative">
-            <div class="relative rounded-lg overflow-hidden bg-black" style="max-height:280px;">
-              <video ref="videoEl" autoplay playsinline muted class="w-full block" style="max-height:280px;object-fit:cover;" />
+            <div class="relative rounded-lg overflow-hidden bg-black aspect-[3/4]">
+              <video ref="videoEl" autoplay playsinline muted class="w-full h-full object-cover" />
 
               <!-- Oval face guide -->
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div class="rounded-full border-4 transition-colors duration-150"
                      :class="guideReady ? 'border-emerald-400' : 'border-white/60'"
-                     style="width:60%;height:80%;" />
+                     style="width:65%;aspect-ratio:3/4;" />
               </div>
 
               <!-- Capturing progress -->
@@ -248,7 +248,10 @@ async function startCamera() {
 
   try {
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
+        audio: false,
+      })
     } catch {
       mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     }
@@ -260,13 +263,16 @@ async function startCamera() {
 
   await ensureFaceLandmarker()
 
-  await new Promise(resolve => setTimeout(resolve, 0)) // wait for v-if DOM mount
+  // The <video> element only exists in the DOM once stage leaves 'loading_model'
+  // (see the v-else branch below) — flip the stage first so it mounts, then wait
+  // a tick for Vue to render it before touching videoEl.
+  stage.value = 'positioning'
+  await new Promise(resolve => setTimeout(resolve, 0))
   if (videoEl.value) {
     videoEl.value.srcObject = mediaStream
     await new Promise(resolve => { videoEl.value.onloadedmetadata = resolve })
   }
 
-  stage.value = 'positioning'
   guidanceMessage.value = 'Center your face in the oval'
   readyStreak = 0
   detectionLoop()
