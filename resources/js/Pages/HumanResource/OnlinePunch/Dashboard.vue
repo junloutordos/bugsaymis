@@ -87,15 +87,25 @@
                      style="width:65%;aspect-ratio:3/4;" />
               </div>
 
-              <!-- Capturing progress -->
-              <div v-if="stage === 'capturing'" class="absolute top-2 left-2 right-2">
-                <div class="h-1.5 bg-white/30 rounded-full overflow-hidden">
+              <!-- Challenge overlay: big, hard-to-miss instruction + countdown -->
+              <div v-if="stage === 'challenge' || stage === 'capturing'"
+                   class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 text-white text-center px-6 gap-3">
+                <div class="text-5xl" :class="{ 'animate-bounce': stage === 'challenge' }">
+                  {{ challengeType === 'blink' ? '👁️' : '↔️' }}
+                </div>
+                <p class="text-base font-semibold leading-snug">{{ challengeInstruction }}</p>
+                <p v-if="stage === 'challenge'" class="text-4xl font-bold tabular-nums">
+                  {{ countdown > 0 ? countdown : 'Now!' }}
+                </p>
+                <p v-else class="text-sm text-emerald-300 font-semibold animate-pulse">Keep going…</p>
+
+                <div v-if="stage === 'capturing'" class="w-full max-w-[200px] h-1.5 bg-white/30 rounded-full overflow-hidden mt-1">
                   <div class="h-full bg-emerald-400 transition-all" :style="{ width: captureProgress + '%' }" />
                 </div>
               </div>
 
-              <!-- Guidance text -->
-              <div class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs text-center py-2 px-2">
+              <!-- Guidance text (positioning stage only) -->
+              <div v-if="stage === 'positioning'" class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs text-center py-2 px-2">
                 {{ guidanceMessage }}
               </div>
             </div>
@@ -196,6 +206,9 @@ const stage          = ref('locating')
 const guideReady     = ref(false)
 const guidanceMessage = ref('')
 const captureProgress = ref(0)
+const challengeType        = ref(null)
+const challengeInstruction = ref('')
+const countdown             = ref(0)
 const videoEl        = ref(null)
 const canvasEl       = ref(null)
 const sampleCanvasEl = ref(null)
@@ -381,9 +394,15 @@ async function beginChallenge() {
     const { data } = await axios.post(route('hr.online-punch.challenge.start'))
     stopDetectionLoop()
     stage.value = 'challenge'
-    guidanceMessage.value = data.instruction
+    challengeType.value = data.challenge_type
+    challengeInstruction.value = data.instruction
 
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    countdown.value = 3
+    while (countdown.value > 0) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      countdown.value--
+    }
+
     await captureBurst(data.challenge_token)
   } catch {
     challengeInFlight = false
@@ -400,7 +419,6 @@ function stopDetectionLoop() {
 
 async function captureBurst(challengeToken) {
   stage.value = 'capturing'
-  guidanceMessage.value = 'Recording…'
   captureProgress.value = 0
 
   const frames = []
