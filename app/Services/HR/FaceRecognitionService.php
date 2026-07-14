@@ -21,6 +21,7 @@ class FaceRecognitionService
     private const MATCH_REVIEW_THRESHOLD = 80.0;
     private const LOCKOUT_WINDOW_MINUTES = 5;
     private const LOCKOUT_FAILURE_COUNT = 5;
+    public const MAX_PUNCH_ATTEMPTS = 3;
 
     private const CHALLENGE_TYPES = ['turn_head', 'blink'];
     private const CHALLENGE_TTL_SECONDS = 30;
@@ -39,6 +40,9 @@ class FaceRecognitionService
      * of savePunch()'s call sites.
      */
     private ?string $currentNetworkStatus = null;
+
+    /** Set once per verifyPunch() call and read by savePunch() — same reasoning as above. */
+    private int $currentAttemptNumber = 1;
 
     public function __construct(
         private readonly DTRService $dtrService,
@@ -176,9 +180,26 @@ class FaceRecognitionService
             throw ValidationException::withMessages(['punch_type' => 'Invalid punch type.']);
         }
 
-        if (OnlineTimePunch::where('user_id', $user->id)->where('work_date', $today)->where('punch_type', $punchType)->exists()) {
+        $existingForSlot = OnlineTimePunch::where('user_id', $user->id)
+            ->where('work_date', $today)
+            ->where('punch_type', $punchType)
+            ->get();
+
+        // verified/manual_review means the punch WAS recorded (the latter just
+        // pending HR's confirmation) — no further attempts needed or allowed.
+        if ($existingForSlot->whereIn('match_status', ['verified', 'manual_review'])->isNotEmpty()) {
             throw ValidationException::withMessages(['punch_type' => 'You have already recorded this punch today.']);
         }
+
+        // Only genuine rejections count toward the retry cap.
+        $rejectedCount = $existingForSlot->where('match_status', 'rejected')->count();
+        if ($rejectedCount >= self::MAX_PUNCH_ATTEMPTS) {
+            throw ValidationException::withMessages([
+                'max_attempts' => "You've reached the maximum number of attempts. Please proceed to the fingerprint biometric device to record your attendance.",
+            ]);
+        }
+
+        $this->currentAttemptNumber = $existingForSlot->count() + 1;
 
         $sequenceIndex = array_search($punchType, self::PUNCH_SEQUENCE, true);
         if ($sequenceIndex > 0) {
@@ -508,6 +529,7 @@ class FaceRecognitionService
             'face_enrollment_id'  => $enrollment->id,
             'work_date'           => $workDate,
             'punch_type'          => $punchType,
+            'attempt_number'      => $this->currentAttemptNumber,
             'punched_at'          => now(),
             'ip_address'          => $ip,
             'latitude'            => $lat,

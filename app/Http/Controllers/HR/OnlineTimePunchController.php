@@ -8,6 +8,7 @@ use App\Models\HR\FaceEnrollment;
 use App\Models\HR\OnlinePunchGeofenceZone;
 use App\Models\HR\OnlinePunchNetworkRule;
 use App\Models\HR\OnlineTimePunch;
+use App\Services\HR\DTRService;
 use App\Services\HR\FaceRecognitionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -18,7 +19,10 @@ use Inertia\Inertia;
 
 class OnlineTimePunchController extends Controller
 {
-    public function __construct(private readonly FaceRecognitionService $faceService) {}
+    public function __construct(
+        private readonly FaceRecognitionService $faceService,
+        private readonly DTRService $dtrService,
+    ) {}
 
     // ─── Inertia Page ─────────────────────────────────────────────────────────
 
@@ -55,8 +59,10 @@ class OnlineTimePunchController extends Controller
 
     public function punch(OnlineTimePunchRequest $request)
     {
+        $user = Auth::user();
+
         $punch = $this->faceService->verifyPunch(
-            user:           Auth::user(),
+            user:           $user,
             frames:         $request->validated('frames'),
             challengeToken: $request->validated('challenge_token'),
             punchType:      $request->validated('punch_type'),
@@ -72,9 +78,22 @@ class OnlineTimePunchController extends Controller
             'rejected'      => 'Punch was rejected — face match failed. Please try again or use another method.',
         ];
 
+        $attemptsUsed = OnlineTimePunch::where('user_id', $user->id)
+            ->where('work_date', $punch->work_date)
+            ->where('punch_type', $punch->punch_type)
+            ->where('match_status', 'rejected')
+            ->count();
+
+        $dtrSummary = $punch->match_status === 'verified'
+            ? $this->dtrService->summaryForPunch($user->id, $punch->work_date->toDateString(), $punch->punch_type)
+            : null;
+
         return response()->json([
-            'message' => $messages[$punch->match_status] ?? 'Punch recorded.',
-            'punch'   => $punch,
+            'message'       => $messages[$punch->match_status] ?? 'Punch recorded.',
+            'punch'         => $punch,
+            'attempts_used' => $attemptsUsed,
+            'max_attempts'  => FaceRecognitionService::MAX_PUNCH_ATTEMPTS,
+            'dtr_summary'   => $dtrSummary,
         ]);
     }
 

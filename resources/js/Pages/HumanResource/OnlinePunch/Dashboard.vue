@@ -39,9 +39,15 @@
             <AppBadge v-if="punchFor(slot.type)" :color="statusBadgeColor(punchFor(slot.type).match_status)">
               {{ statusLabel(punchFor(slot.type).match_status) }}
             </AppBadge>
+            <span v-if="attemptsUsed(slot.type) > 0 && canPunch(slot.type)" class="text-[11px] text-slate-400">
+              Attempt {{ attemptsUsed(slot.type) + 1 }} of {{ maxAttempts }}
+            </span>
             <AppButton v-if="canPunch(slot.type)" size="sm" block class="mt-1" @click="openCamera(slot.type)">
-              Punch
+              {{ attemptsUsed(slot.type) > 0 ? 'Retry' : 'Punch' }}
             </AppButton>
+            <p v-else-if="attemptsExhausted(slot.type)" class="text-[11px] text-rose-500 text-center leading-snug mt-1">
+              Max attempts reached — use the fingerprint biometric device.
+            </p>
           </div>
         </div>
       </AppCard>
@@ -151,12 +157,30 @@ const punchSlots = [
   { type: 'time_out_pm', label: 'Time Out PM' },
 ]
 
+const maxAttempts = ref(3)
+
+// Retries create additional rows per slot (up to maxAttempts) instead of
+// overwriting — the most recent one (by punched_at) is what the UI reflects.
 function punchFor(type) {
-  return punches.value.find(p => p.punch_type === type) || null
+  const matches = punches.value.filter(p => p.punch_type === type)
+  if (!matches.length) return null
+  return matches.reduce((latest, p) => (p.punched_at > latest.punched_at ? p : latest))
+}
+
+function attemptsUsed(type) {
+  return punches.value.filter(p => p.punch_type === type && p.match_status === 'rejected').length
+}
+
+function attemptsExhausted(type) {
+  const latest = punchFor(type)
+  if (latest && ['verified', 'manual_review'].includes(latest.match_status)) return false
+  return attemptsUsed(type) >= maxAttempts.value
 }
 
 function canPunch(type) {
-  if (punchFor(type)) return false
+  const latest = punchFor(type)
+  if (latest && ['verified', 'manual_review'].includes(latest.match_status)) return false
+  if (attemptsExhausted(type)) return false
   const idx = punchSlots.findIndex(s => s.type === type)
   if (idx === 0) return true
   const prev = punchSlots[idx - 1]
@@ -444,13 +468,27 @@ function snapshotFrame() {
   return canvas.toDataURL('image/jpeg', 0.9)
 }
 
+function dtrSummaryMessage(baseMessage, summary) {
+  if (!summary) return baseMessage
+  const m = summary.minutes
+  const phrase = {
+    early:     `You're ${m} minute${m === 1 ? '' : 's'} early.`,
+    on_time:   'Right on schedule!',
+    late:      `You're ${m} minute${m === 1 ? '' : 's'} late.`,
+    undertime: `${m} minute${m === 1 ? '' : 's'} undertime.`,
+    overtime:  `${m} minute${m === 1 ? '' : 's'} overtime.`,
+  }[summary.status]
+  return phrase ? `${baseMessage} ${phrase}` : baseMessage
+}
+
 async function submitPunch(frames, challengeToken) {
   stage.value = 'verifying'
   stopStream()
+  const slotType = activeSlotType.value
 
   try {
     const { data } = await axios.post(route('hr.online-punch.punch'), {
-      punch_type:      activeSlotType.value,
+      punch_type:      slotType,
       frames,
       challenge_token: challengeToken,
       latitude:        geo.latitude,
@@ -458,15 +496,52 @@ async function submitPunch(frames, challengeToken) {
       accuracy:        geo.accuracy,
     })
 
-    const idx = punches.value.findIndex(p => p.punch_type === activeSlotType.value)
-    if (idx !== -1) punches.value[idx] = data.punch
-    else punches.value.push(data.punch)
-
+    punches.value.push(data.punch)
+    maxAttempts.value = data.max_attempts ?? maxAttempts.value
     cancelCamera()
 
-    const icon = data.punch.match_status === 'verified' ? 'success' : 'warning'
-    await Swal.fire({ icon, title: data.message, timer: 2500, showConfirmButton: false })
+    if (data.punch.match_status === 'verified') {
+      await Swal.fire({ icon: 'success', title: dtrSummaryMessage(data.message, data.dtr_summary), timer: 3000, showConfirmButton: false })
+      return
+    }
+
+    if (data.punch.match_status === 'manual_review') {
+      await Swal.fire({ icon: 'warning', title: data.message, timer: 3000, showConfirmButton: false })
+      return
+    }
+
+    // rejected — offer a retry if attempts remain, otherwise redirect to the fingerprint device.
+    if (data.attempts_used >= data.max_attempts) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Maximum attempts reached',
+        text: `You've used all ${data.max_attempts} attempts for this punch. Please proceed to the fingerprint biometric device to record your attendance.`,
+        confirmButtonText: 'OK',
+      })
+      return
+    }
+
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: data.message,
+      text: `${data.attempts_used} of ${data.max_attempts} attempts used.`,
+      showCancelButton: true,
+      confirmButtonText: 'Retry',
+      cancelButtonText: 'Cancel',
+    })
+    if (result.isConfirmed) openCamera(slotType)
   } catch (err) {
+    if (err.response?.data?.errors?.max_attempts) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Maximum attempts reached',
+        text: err.response.data.errors.max_attempts[0],
+        confirmButtonText: 'OK',
+      })
+      cancelCamera()
+      return
+    }
+
     const msg = err.response?.data?.message
       ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
       ?? 'Something went wrong.'

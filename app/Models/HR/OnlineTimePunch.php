@@ -17,6 +17,7 @@ class OnlineTimePunch extends Model
         'face_enrollment_id',
         'work_date',
         'punch_type',
+        'attempt_number',
         'punched_at',
         'photo_s3_key',
         'liveness_session_id',

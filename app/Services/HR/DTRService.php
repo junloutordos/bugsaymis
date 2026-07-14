@@ -238,6 +238,140 @@ class DTRService
     }
 
     /**
+     * Human-friendly early/on-time/late/undertime/overtime summary for a single
+     * punch, for immediate employee-facing feedback. Unlike generate()'s
+     * late_minutes/undertime_minutes (cumulative day totals that floor early
+     * arrivals to 0), this reports the early case too and is scoped to just
+     * the one punch just submitted. Returns null when there's no schedule to
+     * compare against or the DTR record hasn't been generated yet.
+     */
+    public function summaryForPunch(int $userId, string $date, string $punchType): ?array
+    {
+        $schedule = EmployeeSchedule::where('user_id', $userId)
+            ->activeOnDate($date)
+            ->orderByDesc('effective_date')
+            ->first();
+
+        if (! $schedule) {
+            $schedule = EmployeeSchedule::where('user_id', $userId)
+                ->where('is_default', true)
+                ->first();
+        }
+
+        if (! $schedule) {
+            return null;
+        }
+
+        $record = DtrRecord::where('user_id', $userId)->where('work_date', $date)->first();
+
+        $actualTime = match ($punchType) {
+            'time_in_am'  => $record?->time_in_am,
+            'time_out_am' => $record?->time_out_am,
+            'time_in_pm'  => $record?->time_in_pm,
+            'time_out_pm' => $record?->time_out_pm,
+            default       => null,
+        };
+
+        if (! $actualTime) {
+            return null;
+        }
+
+        $actual       = Carbon::parse($date . ' ' . $this->floorToMinute($actualTime));
+        $breakMinutes = $this->getBreakMinutes($date, $schedule);
+        $grace        = max(0, (int) ($schedule->grace_period_minutes ?? 15));
+
+        return match ($punchType) {
+            'time_in_am' => $this->arrivalSummary(
+                $actual,
+                $schedule->getTimeIn($date) ? Carbon::parse($date . ' ' . $schedule->getTimeIn($date)) : null,
+                $grace
+            ),
+            'time_in_pm' => $this->arrivalSummary(
+                $actual,
+                $schedule->getLunchEnd($date)
+                    ? Carbon::parse($date . ' ' . $schedule->getLunchEnd($date))
+                    : Carbon::parse($date)->startOfDay()->addMinutes($breakMinutes + 30),
+                0 // no grace on returning from lunch
+            ),
+            'time_out_am' => $this->departureSummary(
+                $actual,
+                $schedule->getLunchStart($date)
+                    ? Carbon::parse($date . ' ' . $schedule->getLunchStart($date))
+                    : Carbon::parse($date)->startOfDay()->addMinutes($breakMinutes - 30)
+            ),
+            'time_out_pm' => $this->departureSummary(
+                $this->actualTimeOutPm($date, $actual, $schedule),
+                $this->scheduledTimeOut($date, $schedule)
+            ),
+            default => null,
+        };
+    }
+
+    private function scheduledTimeOut(string $date, EmployeeSchedule $schedule): ?Carbon
+    {
+        $timeOut = $schedule->getTimeOut($date);
+        if (! $timeOut) {
+            return null;
+        }
+
+        $scheduled = Carbon::parse($date . ' ' . $timeOut);
+        if ($schedule->isOvernightShift($date)) {
+            $scheduled->addDay();
+        }
+
+        return $scheduled;
+    }
+
+    /**
+     * time_out_pm is stored as a TIME column against the shift's start
+     * work_date even for overnight shifts, where the actual departure is
+     * really early-morning hours of the NEXT calendar day — mirrors the same
+     * adjustment in computeOvertimeMinutes()/computeUndertimeMinutes().
+     */
+    private function actualTimeOutPm(string $date, Carbon $actual, EmployeeSchedule $schedule): Carbon
+    {
+        if ($schedule->isOvernightShift($date) && $actual->lt(Carbon::parse($date . ' 12:00:00'))) {
+            return $actual->copy()->addDay();
+        }
+
+        return $actual;
+    }
+
+    private function arrivalSummary(Carbon $actual, ?Carbon $scheduled, int $graceMinutes): ?array
+    {
+        if (! $scheduled) {
+            return null;
+        }
+
+        $diffMinutes = (int) round(($actual->getTimestamp() - $scheduled->getTimestamp()) / 60);
+
+        if ($diffMinutes < 0) {
+            return ['status' => 'early', 'minutes' => abs($diffMinutes)];
+        }
+        if ($diffMinutes <= $graceMinutes) {
+            return ['status' => 'on_time', 'minutes' => 0];
+        }
+        return ['status' => 'late', 'minutes' => $diffMinutes];
+    }
+
+    private function departureSummary(Carbon $actual, ?Carbon $scheduled): ?array
+    {
+        if (! $scheduled) {
+            return null;
+        }
+
+        $diffMinutes = (int) round(($actual->getTimestamp() - $scheduled->getTimestamp()) / 60);
+
+        if ($diffMinutes < 0) {
+            return ['status' => 'undertime', 'minutes' => abs($diffMinutes)];
+        }
+        if ($diffMinutes > 0) {
+            return ['status' => 'overtime', 'minutes' => $diffMinutes];
+        }
+        return ['status' => 'on_time', 'minutes' => 0];
+    }
+
+    /**
      * Re-apply gate pass deductions to the employee's DTR record for the given date.
      * Called when actual_timeout/actual_timein are recorded or corrected on an
      * approved gate pass. Delegates to recompute(), which derives the deduction
