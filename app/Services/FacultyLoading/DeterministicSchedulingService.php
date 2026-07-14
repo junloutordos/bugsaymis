@@ -43,8 +43,15 @@ class DeterministicSchedulingService
      */
     private const MAX_RESTARTS = 150;
 
+    /** Minutes an Independent Learning Period session occupies within its period. */
+    private const ILP_MINUTES = 30;
+
     /** @var array<int,array<int,array<string,mixed>>> available slots per grade */
     private array $gridByGrade = [];
+    /** @var array<int,array<string,int>> earliest start_min per grade+day (the day's first period) */
+    private array $firstPeriodByGrade = [];
+    /** @var array<int,array<string,int>> ILP placements so far per section+day (for even weekly spread) */
+    private array $sectionIlpDayCount = [];
     /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> */
     private array $sectionBusy = [];
     /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> */
@@ -86,15 +93,29 @@ class DeterministicSchedulingService
         // Pre-compute the available period grid per grade level (shared by all
         // sections of that grade).
         $this->gridByGrade = [];
+        $this->firstPeriodByGrade = [];
         foreach (array_unique(array_column($requirements, 'grade')) as $grade) {
             $this->gridByGrade[$grade] = $this->buildSlotGrid((int) $grade);
+            foreach ($this->gridByGrade[$grade] as $slot) {
+                $day = $slot['day'];
+                if (! isset($this->firstPeriodByGrade[$grade][$day])
+                    || $slot['start_min'] < $this->firstPeriodByGrade[$grade][$day]) {
+                    $this->firstPeriodByGrade[$grade][$day] = $slot['start_min'];
+                }
+            }
         }
 
-        // Flatten requirements into individual session instances.
+        // Flatten requirements into individual session instances. A subject
+        // with has_ilp reserves its LAST weekly session as the Independent
+        // Learning Period — only when it has at least 2 sessions, otherwise
+        // its only session stays a regular class.
         $baseSessions = [];
         foreach ($requirements as $req) {
+            $ilpEligible = ($req['has_ilp'] ?? false) && $req['sessions_needed'] >= 2;
             for ($i = 0; $i < $req['sessions_needed']; $i++) {
-                $baseSessions[] = $req;
+                $session = $req;
+                $session['session_type'] = ($ilpEligible && $i === $req['sessions_needed'] - 1) ? 'ilp' : 'regular';
+                $baseSessions[] = $session;
             }
         }
 
@@ -152,11 +173,12 @@ class DeterministicSchedulingService
      */
     private function runPlacement(array $sessions, int $schoolYearId, int $termId): array
     {
-        $this->sectionBusy     = [];
-        $this->facultyBusy     = [];
-        $this->sectionDayCount = [];
-        $this->sectionSubjDays = [];
-        $this->placements      = [];
+        $this->sectionBusy       = [];
+        $this->facultyBusy       = [];
+        $this->sectionDayCount   = [];
+        $this->sectionSubjDays   = [];
+        $this->sectionIlpDayCount = [];
+        $this->placements        = [];
 
         // Pass 1 — greedy placement.
         $deferred = [];
@@ -270,6 +292,7 @@ class DeterministicSchedulingService
                 'faculty_name'       => $facultyName,
                 'sessions_needed'    => $sessions,
                 'is_elective'        => $isElectiveSection || $la->subject->subject_type === 'elective',
+                'has_ilp'            => (bool) ($la->subject->has_ilp ?? false),
             ];
         }
 
@@ -383,6 +406,7 @@ class DeterministicSchedulingService
     {
         $best      = null;
         $bestScore = PHP_INT_MAX;
+        $isIlp     = ($s['session_type'] ?? 'regular') === 'ilp';
 
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
             $day = $slot['day'];
@@ -392,6 +416,11 @@ class DeterministicSchedulingService
                 continue;
             }
             if ($this->overlapsReserved($slot, $reserved)) {
+                continue;
+            }
+            // ILP sessions must never land on the day's first period — students
+            // should start the day with a real class, not independent study.
+            if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$s['grade']][$day] ?? null)) {
                 continue;
             }
 
@@ -407,6 +436,11 @@ class DeterministicSchedulingService
             $score = 0;
             // Strongly avoid the same subject twice on the same day for a section.
             $score += ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) * 10000;
+            if ($isIlp) {
+                // Spread a section's ILP sessions evenly across the week — this
+                // outweighs the generic day-spread preference below.
+                $score += ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) * 1000;
+            }
             // Spread a section's classes evenly across the week.
             $score += ($this->sectionDayCount[$s['section_id']][$day] ?? 0) * 100;
             // Slight preference for earlier days/times for determinism + compactness.
@@ -445,12 +479,17 @@ class DeterministicSchedulingService
             return false;
         }
 
+        $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
+
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
             // Electives only use elective windows; core subjects only use the rest.
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
                 continue;
             }
             if ($this->overlapsReserved($slot, $reserved)) {
+                continue;
+            }
+            if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$s['grade']][$slot['day']] ?? null)) {
                 continue;
             }
             // Section must be free here; only the faculty is (singly) blocked.
@@ -510,12 +549,20 @@ class DeterministicSchedulingService
         $idx = $reuseIdx ?? count($this->placements);
         $this->placements[$idx] = ['s' => $s, 'slot' => $slot];
 
-        $day = $slot['day'];
-        $this->sectionBusy[$s['section_id']][$day][] = [$slot['start_min'], $slot['end_min'], $idx];
-        $this->facultyBusy[$s['faculty_id']][$day][] = [$slot['start_min'], $slot['end_min'], $idx];
+        $day   = $slot['day'];
+        $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
+        // An ILP session only occupies the first 30 minutes of its period —
+        // the remaining time is freed up for other bookings.
+        $busyEndMin = $isIlp ? min($slot['end_min'], $slot['start_min'] + self::ILP_MINUTES) : $slot['end_min'];
+
+        $this->sectionBusy[$s['section_id']][$day][] = [$slot['start_min'], $busyEndMin, $idx];
+        $this->facultyBusy[$s['faculty_id']][$day][] = [$slot['start_min'], $busyEndMin, $idx];
         $this->sectionDayCount[$s['section_id']][$day] = ($this->sectionDayCount[$s['section_id']][$day] ?? 0) + 1;
         $this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] =
             ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) + 1;
+        if ($isIlp) {
+            $this->sectionIlpDayCount[$s['section_id']][$day] = ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) + 1;
+        }
 
         return $idx;
     }
@@ -531,6 +578,9 @@ class DeterministicSchedulingService
         $this->facultyBusy[$s['faculty_id']][$day] = $this->dropByIdx($this->facultyBusy[$s['faculty_id']][$day], $idx);
         $this->sectionDayCount[$s['section_id']][$day]--;
         $this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day]--;
+        if (($s['session_type'] ?? 'regular') === 'ilp') {
+            $this->sectionIlpDayCount[$s['section_id']][$day]--;
+        }
 
         $this->placements[$idx] = null;
     }
@@ -589,6 +639,10 @@ class DeterministicSchedulingService
      */
     private function toScheduleRow(array $s, array $slot, int $schoolYearId, int $termId): array
     {
+        $sessionType = $s['session_type'] ?? 'regular';
+        $isIlp       = $sessionType === 'ilp';
+        $endMin      = $isIlp ? min($slot['end_min'], $slot['start_min'] + self::ILP_MINUTES) : $slot['end_min'];
+
         return [
             'load_assignment_id' => $s['load_assignment_id'],
             'user_id'            => $s['real_user_id'],
@@ -597,9 +651,10 @@ class DeterministicSchedulingService
             'classroom_id'       => $s['classroom_id'],
             'school_year_id'     => $schoolYearId,
             'academic_term_id'   => $termId,
+            'session_type'       => $sessionType,
             'day_of_week'        => $slot['day'],
             'start_time'         => $slot['start'] . ':00',
-            'end_time'           => $slot['end'] . ':00',
+            'end_time'           => SchedulingConstants::fromMinutes($endMin) . ':00',
             'status'             => 'tentative',
             'remarks'            => 'AI-generated schedule',
             // Display-only metadata (underscore-prefixed; ignored by the

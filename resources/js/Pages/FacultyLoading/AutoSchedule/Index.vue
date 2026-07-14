@@ -317,7 +317,7 @@
                     {{ fmtTime(s.start_time) }} – {{ fmtTime(s.end_time) }}
                   </td>
                   <td class="px-4 py-2.5 text-slate-700">{{ s._faculty_name }}</td>
-                  <td class="px-4 py-2.5 text-slate-700">{{ s._subject_name }}</td>
+                  <td class="px-4 py-2.5 text-slate-700">{{ s._subject_name }}{{ s.session_type === 'ilp' ? ' (ILP)' : '' }}</td>
                   <td class="px-4 py-2.5 text-slate-500">{{ s._section_name }}</td>
                   <td class="px-4 py-2.5 text-slate-500">{{ s._classroom_name }}</td>
                   <td class="px-4 py-2.5 text-center">

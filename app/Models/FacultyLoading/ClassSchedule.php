@@ -19,6 +19,7 @@ class ClassSchedule extends Model
         'school_year_id',
         'academic_term_id',
         'entry_type',
+        'session_type',
         'title',
         'category',
         'day_of_week',
@@ -124,6 +125,12 @@ class ClassSchedule extends Model
     public function scopeNonTeaching($query)
     {
         return $query->where('entry_type', 'non_teaching');
+    }
+
+    /** Independent Learning Period sessions (30-min sub-slot of a subject's period). */
+    public function scopeIlp($query)
+    {
+        return $query->where('session_type', 'ilp');
     }
 
     public function scopeForTerm($query, int $termId)

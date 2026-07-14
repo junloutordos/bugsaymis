@@ -53,7 +53,7 @@ const form  = useForm({
   code: '', name: '', description: '', specialization_tags: '',
   credit_units: 3, load_units: 3,
   lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', grade_level: 7,
-  semester: null, sessions_per_week: 5, minutes_per_session: 60, is_active: true,
+  semester: null, sessions_per_week: 5, minutes_per_session: 60, is_active: true, has_ilp: false,
 })
 
 function openForm(s = null) {
@@ -64,7 +64,7 @@ function openForm(s = null) {
       credit_units: s.credit_units, load_units: s.load_units, lecture_hours: s.lecture_hours,
       lab_hours: s.lab_hours ?? 0, subject_type: s.subject_type, grade_level: s.grade_level,
       semester: s.semester, sessions_per_week: s.sessions_per_week,
-      minutes_per_session: s.minutes_per_session, is_active: s.is_active })
+      minutes_per_session: s.minutes_per_session, is_active: s.is_active, has_ilp: s.has_ilp })
   } else {
     form.reset()
     form.id = null
@@ -72,6 +72,7 @@ function openForm(s = null) {
     form.grade_level = 7; form.subject_type = 'lecture'
     form.credit_units = 3; form.load_units = 3; form.lecture_hours = 3
     form.sessions_per_week = 5; form.minutes_per_session = 60; form.is_active = true
+    form.has_ilp = false
   }
   modal.value = true
 }
@@ -282,6 +283,17 @@ function doCopy() {
           <div class="flex items-center gap-2 pt-6">
             <input v-model="form.is_active" type="checkbox" id="sub-active" class="rounded text-indigo-600" />
             <label for="sub-active" class="text-sm text-slate-600">Active</label>
+          </div>
+          <div class="col-span-2">
+            <div class="flex items-center gap-2">
+              <input v-model="form.has_ilp" type="checkbox" id="sub-ilp"
+                :disabled="Math.round(form.load_units) < 2" class="rounded text-indigo-600" />
+              <label for="sub-ilp" class="text-sm text-slate-600">Has Independent Learning Period (30 min/week)</label>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">
+              One of the subject's weekly sessions is reserved as an ILP session instead of a regular class.
+              <span v-if="Math.round(form.load_units) < 2">Requires at least 2 load units/sessions.</span>
+            </p>
           </div>
         </div>
 

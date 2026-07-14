@@ -229,6 +229,7 @@
                           :draggable="canDrag(s)"
                           :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
                             s.entry_type === 'non_teaching' ? 'border-dashed' : '',
+                            s.session_type === 'ilp' ? 'border-dotted' : '',
                             canDrag(s) ? 'cursor-grab active:cursor-grabbing' : (s.can_edit ? 'cursor-pointer' : 'cursor-default'),
                             dragPayload?.kind === 'move' && dragPayload.schedule.id === s.id ? 'opacity-30' : '']"
                           @dragstart="onDragStartEvent($event, s)"
@@ -236,7 +237,7 @@
                           @click="onEventClick(s)">
                           <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
                             <div class="text-xs font-bold leading-tight truncate">
-                              {{ s.entry_type === 'non_teaching' ? s.title : s.subject?.code }}
+                              {{ s.entry_type === 'non_teaching' ? s.title : s.subject?.code }}{{ s.session_type === 'ilp' ? '(ILP)' : '' }}
                             </div>
                             <div class="text-xs leading-tight truncate opacity-75">
                               {{ secondaryLabel(s) }}

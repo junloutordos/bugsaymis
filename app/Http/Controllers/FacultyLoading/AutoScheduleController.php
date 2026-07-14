@@ -181,6 +181,7 @@ class AutoScheduleController extends Controller
                     'classroom_id'       => $s['classroom_id'],
                     'school_year_id'     => $s['school_year_id'],
                     'academic_term_id'   => $s['academic_term_id'],
+                    'session_type'       => $s['session_type'] ?? 'regular',
                     'day_of_week'        => $s['day_of_week'],
                     'start_time'         => $s['start_time'],
                     'end_time'           => $s['end_time'],

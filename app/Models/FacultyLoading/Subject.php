@@ -27,6 +27,7 @@ class Subject extends Model
         'minutes_per_session',
         'academic_unit_id',
         'is_active',
+        'has_ilp',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class Subject extends Model
         'sessions_per_week'   => 'integer',
         'minutes_per_session' => 'integer',
         'is_active'           => 'boolean',
+        'has_ilp'             => 'boolean',
     ];
 
     public function schoolYear(): BelongsTo

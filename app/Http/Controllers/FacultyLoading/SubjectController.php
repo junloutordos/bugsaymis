@@ -87,6 +87,7 @@ class SubjectController extends Controller
             'sessions_per_week'   => $s->sessions_per_week,
             'minutes_per_session' => $s->minutes_per_session,
             'is_active'           => $s->is_active,
+            'has_ilp'             => $s->has_ilp,
             'faculty'             => $assignmentsBySubject->get($s->id, collect())->all(),
         ]);
 
@@ -126,6 +127,7 @@ class SubjectController extends Controller
             'sessions_per_week'    => 'required|integer|min:1',
             'minutes_per_session'  => 'required|integer|min:1',
             'is_active'            => 'boolean',
+            'has_ilp'              => 'boolean',
         ]);
 
         Subject::create($data);
@@ -154,6 +156,7 @@ class SubjectController extends Controller
             'sessions_per_week'    => 'required|integer|min:1',
             'minutes_per_session'  => 'required|integer|min:1',
             'is_active'            => 'boolean',
+            'has_ilp'              => 'boolean',
         ]);
 
         $subject->update($data);
@@ -216,6 +219,7 @@ class SubjectController extends Controller
                 'minutes_per_session' => $s->minutes_per_session,
                 'academic_unit_id'    => $s->academic_unit_id,
                 'is_active'           => $s->is_active,
+                'has_ilp'             => $s->has_ilp,
             ]);
             $copied++;
         }

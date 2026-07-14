@@ -570,6 +570,7 @@ class ClassScheduleController extends Controller
             'load_assignment_id' => $s->load_assignment_id,
             'school_year_id'     => $s->school_year_id,
             'entry_type'         => $s->entry_type,
+            'session_type'       => $s->session_type,
             'title'              => $s->title,
             'category'           => $s->category,
             'day_of_week'        => $s->day_of_week,
