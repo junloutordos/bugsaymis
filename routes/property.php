@@ -63,7 +63,7 @@ Route::middleware(['auth', 'permission:property.view'])->prefix('property')->nam
     });
 
     // Work Orders
-    Route::get('/work-orders', [WorkOrderController::class, 'index'])->name('work-orders.index');
+    Route::get('/work-orders', [WorkOrderController::class, 'index'])->name('work-orders.index')->middleware('permission:work-orders.view');
 
     Route::middleware('permission:work-orders.manage')->group(function () {
         Route::post('/work-orders', [WorkOrderController::class, 'store'])->name('work-orders.store');

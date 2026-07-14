@@ -1078,19 +1078,31 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('users/{user}/upload-signature', [UserController::class, 'uploadSignature'])->name('users.upload_signature');
         Route::get('/users/inactive', [UserController::class, 'inactiveIndex'])->name('users.inactive')->middleware('permission:hr.employees.manage');
         Route::post('/users/{id}/activate', [UserController::class, 'activate'])->name('users.activate')->middleware('permission:hr.employees.manage');
+        Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
+    });
+
+    // Roles & Divisions — was nested inside the users.view group above (wrong
+    // permission inherited); split out so it's gated on its own permission.
+    Route::middleware('permission:roles.assign')->group(function () {
         Route::get('/users-roles', [RolesController::class, 'index'])->name('roles.index');
         Route::post('users-roles', [RolesController::class, 'store'])->name('roles.store');
         Route::put('users-roles/{id}', [RolesController::class, 'update'])->name('roles.update');
         Route::delete('users-roles/{id}', [RolesController::class, 'destroy'])->name('roles.destroy');
-        Route::get('/reports', fn () => Inertia::render('Reports/Index'))->name('reports.index');
-        Route::get('/reports/audit-logs', [\App\Http\Controllers\Reports\AuditLogController::class, 'index'])->name('reports.audit_logs')->middleware('permission:roles.assign');
-        Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
 
         Route::get('/users-division', [RolesController::class, 'showDivisions'])->name('roles.divisions');
         Route::post('users-divisions', [RolesController::class, 'storeDivision'])->name('roles.divisions_store');
         Route::put('users-divisions/{id}', [RolesController::class, 'updateDivision'])->name('roles.division_update');
         Route::post('users-divisions/{division}/upload-signature', [RolesController::class, 'uploadSignature'])->name('roles.divisions.upload_signature');
-        
+    });
+
+    // Reports — same reason, split out of the users.view group.
+    Route::middleware('permission:reports.view')->group(function () {
+        Route::get('/reports', fn () => Inertia::render('Reports/Index'))->name('reports.index');
+    });
+    Route::get('/reports/audit-logs', [\App\Http\Controllers\Reports\AuditLogController::class, 'index'])->name('reports.audit_logs')->middleware('permission:roles.assign');
+
+    // Agency Org Outcome — same reason, split out of the users.view group.
+    Route::middleware('permission:ipcr.view')->group(function () {
         Route::get('/agency-outcomes', [AgencyOutcomeController::class, 'index'])->name('outcome.index');
         Route::post('agency-outcomes', [AgencyOutcomeController::class, 'store'])->name('outcome.store');
         Route::put('agency-outcomes/{id}', [AgencyOutcomeController::class, 'update'])->name('outcome.update');
