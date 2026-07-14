@@ -23,7 +23,7 @@ class CoreSubjectPlacementServiceTest extends TestCase
 {
     private CoreSubjectPlacementService $service;
 
-    /** Typical G7 core subject load (total sessions = 28 = exactly T) */
+    /** Typical G7 core subject load (total sessions = 28, comfortably under T=36) */
     private array $g7Subjects = [
         ['name' => 'Filipino',       'sessions_per_week' => 5],
         ['name' => 'English',        'sessions_per_week' => 5],
@@ -291,16 +291,12 @@ class CoreSubjectPlacementServiceTest extends TestCase
         );
     }
 
-    public function test_no_friday_slots_in_g7_plan(): void
+    public function test_g7_plan_can_include_friday_slots(): void
     {
-        $plan = $this->service->buildGradePlan(7, $this->g7Subjects);
-
-        foreach ($plan['sections'] as $sectionName => $placements) {
-            $fridays = array_filter($placements, fn ($p) => $p['day'] === 'Friday');
-            $this->assertEmpty($fridays,
-                "{$sectionName}: G7 must have no Friday placements (ILA day)"
-            );
-        }
+        // FRIDAY_ILA_GRADES is now empty — G7 has in-person Friday classes
+        // like every other grade, so Friday slots are valid placements.
+        $this->assertEmpty(SC::FRIDAY_ILA_GRADES);
+        $this->assertNotEmpty(SC::getClassSlots(7, 'Friday'));
     }
 
     public function test_no_monday_dead_zone_in_g7_plan(): void
@@ -344,24 +340,24 @@ class CoreSubjectPlacementServiceTest extends TestCase
 
     public function test_unfilled_is_empty_when_sessions_fit_in_capacity(): void
     {
-        // 28 sessions = exactly T for G7 — should fill perfectly
+        // 28 sessions comfortably fits under G7's capacity (T=36)
         $plan = $this->service->buildGradePlan(7, $this->g7Subjects);
         $this->assertEmpty($plan['unfilled'],
-            'G7: 28 sessions should fit exactly into T=28 slots, unfilled must be empty'
+            'G7: 28 sessions should fit within T=36 slots, unfilled must be empty'
         );
     }
 
     public function test_unfilled_is_populated_when_sessions_exceed_capacity(): void
     {
-        // Request more sessions than available slots (T=28 for G7)
+        // Request more sessions than available slots (T=36 for G7)
         $subjects = [
-            ['name' => 'Overflow', 'sessions_per_week' => 30],
+            ['name' => 'Overflow', 'sessions_per_week' => 38],
         ];
         $plan = $this->service->buildGradePlan(7, $subjects);
 
-        // 2 sessions per section cannot fit (28 slots fully used for first 28 sessions)
+        // 2 sessions per section cannot fit (36 slots fully used for first 36 sessions)
         $this->assertNotEmpty($plan['unfilled'],
-            'G7: 30 sessions should overflow T=28 capacity'
+            'G7: 38 sessions should overflow T=36 capacity'
         );
 
         // Each section contributes 2 overflow entries
@@ -370,33 +366,35 @@ class CoreSubjectPlacementServiceTest extends TestCase
 
     public function test_unfilled_contains_correct_subject_and_session(): void
     {
-        $subjects = [['name' => 'TooMany', 'sessions_per_week' => 29]];
+        $subjects = [['name' => 'TooMany', 'sessions_per_week' => 37]];
         $plan     = $this->service->buildGradePlan(7, $subjects);
 
-        // First unfilled for any section should be session 29
+        // First unfilled for any section should be session 37 (T=36 for G7)
         $this->assertNotEmpty($plan['unfilled']);
         $first = $plan['unfilled'][0];
         $this->assertSame('TooMany', $first['subject']);
-        $this->assertSame(29,        $first['session']);
+        $this->assertSame(37,        $first['session']);
     }
 
     // =========================================================================
     // getCapacity
     // =========================================================================
 
-    public function test_get_capacity_returns_28_for_g7(): void
+    public function test_get_capacity_returns_36_for_g7(): void
     {
-        $this->assertSame(28, $this->service->getCapacity(7));
+        // G7 now includes Friday classes (FRIDAY_ILA_GRADES emptied)
+        $this->assertSame(36, $this->service->getCapacity(7));
     }
 
-    public function test_get_capacity_returns_28_for_g8(): void
+    public function test_get_capacity_returns_36_for_g8(): void
     {
-        $this->assertSame(28, $this->service->getCapacity(8));
+        $this->assertSame(36, $this->service->getCapacity(8));
     }
 
-    public function test_get_capacity_returns_36_for_g9(): void
+    public function test_get_capacity_returns_35_for_g9(): void
     {
-        $this->assertSame(36, $this->service->getCapacity(9));
+        // G9's Homeroom now extends to 9:40, removing its old Monday Period 1
+        $this->assertSame(35, $this->service->getCapacity(9));
     }
 
     public function test_get_capacity_returns_37_for_g10(): void

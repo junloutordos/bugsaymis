@@ -14,16 +14,24 @@ namespace App\Services\FacultyLoading;
  *
  * Slot types:
  *   FLAG       — Flag Ceremony (Monday 7:30–8:00, all)
- *   HOMEROOM   — Homeroom Class (G7–G10, Monday 8:00–8:50)
- *   ADVISING   — Academic Advising (G11–G12, Monday 8:00–8:50)
- *   DEAD       — Dead zone / no classes (G7–G8 Monday 8:50–9:40)
+ *   HOMEROOM   — Homeroom Class. G7, G10: Monday 8:00–8:50. G8, G9: Monday
+ *                8:00–9:40 (extended — absorbs what used to be a separate
+ *                first period / reclaimed gap).
+ *   ADVISING   — Homeroom Class for G11–G12 (Monday 8:00–8:50) — kept as its
+ *                own type for historical reasons, functionally identical to HOMEROOM.
+ *   DEAD       — Dead zone / no classes (G7 Monday 8:50–9:40, labeled "Free Time")
  *   RECESS     — Recess break
  *   LUNCH      — Lunch break
  *   CLASS      — Schedulable class period
  *   CONSULT    — Consultation / Home Bound (end of day)
- *   WELLNESS   — 30-Wellness block (Wednesday ~9:50–10:20)
- *   ACTIVITY   — Activity Proper / ALP (Wednesday afternoon)
- *   ILA        — Independent Learning Activities (G7–G8 Friday)
+ *   WELLNESS   — Wellness block (Wednesday ~9:50–10:20, all grades except
+ *                full-Wednesday grades)
+ *   ACTIVITY   — Activity Proper / ALP. Fixed 15:10–17:00 window on Wednesday,
+ *                applied to every grade (see WEDNESDAY_ALP); grades with an
+ *                earlier activity cutoff (WEDNESDAY_ACTIVITY_START) are
+ *                blocked from that cutoff onward instead.
+ *   ILA        — Independent Learning Activities (Friday) — currently unused;
+ *                see FRIDAY_ILA_GRADES
  *   SCALE      — SCALE Advising block (Tuesday G11–G12)
  *   ELECTIVE   — Elective block window
  */
@@ -109,10 +117,30 @@ class SchedulingConstants
 
     // ── Monday Timetables ─────────────────────────────────────────────────────
 
+    // Grade 7 only (Grade 8 has its own extended-homeroom table, MONDAY_G8).
     public const MONDAY_G7G8 = [
         ['start' => '07:30', 'end' => '08:00', 'type' => 'FLAG',     'label' => 'Flag Ceremony'],
         ['start' => '08:00', 'end' => '08:50', 'type' => 'HOMEROOM', 'label' => 'Homeroom Class'],
-        ['start' => '08:50', 'end' => '09:40', 'type' => 'DEAD',     'label' => ''],
+        ['start' => '08:50', 'end' => '09:40', 'type' => 'DEAD',     'label' => 'Free Time'],
+        ['start' => '09:40', 'end' => '10:00', 'type' => 'RECESS',   'label' => 'Recess'],
+        ['start' => '10:00', 'end' => '10:50', 'type' => 'CLASS',    'label' => 'Period 1'],
+        ['start' => '10:50', 'end' => '11:40', 'type' => 'CLASS',    'label' => 'Period 2'],
+        ['start' => '11:40', 'end' => '12:40', 'type' => 'LUNCH',    'label' => 'Lunch Break'],
+        ['start' => '12:40', 'end' => '13:30', 'type' => 'CLASS',    'label' => 'Period 3'],
+        ['start' => '13:30', 'end' => '14:20', 'type' => 'CLASS',    'label' => 'Period 4'],
+        ['start' => '14:20', 'end' => '15:10', 'type' => 'CLASS',    'label' => 'Period 5'],
+        ['start' => '15:10', 'end' => '16:00', 'type' => 'CLASS',    'label' => 'Period 6'],
+        ['start' => '16:00', 'end' => '16:30', 'type' => 'CONSULT',  'label' => 'Consultation / Home Bound'],
+    ];
+
+    /**
+     * Grade 8 — Homeroom extended to 8:00–9:40 (was Homeroom 8:00–8:50 +
+     * a reclaimed teaching period 8:50–9:40). This removes that reclaimed
+     * period; G8's periods below are otherwise identical to Grade 7's.
+     */
+    public const MONDAY_G8 = [
+        ['start' => '07:30', 'end' => '08:00', 'type' => 'FLAG',     'label' => 'Flag Ceremony'],
+        ['start' => '08:00', 'end' => '09:40', 'type' => 'HOMEROOM', 'label' => 'Homeroom Class'],
         ['start' => '09:40', 'end' => '10:00', 'type' => 'RECESS',   'label' => 'Recess'],
         ['start' => '10:00', 'end' => '10:50', 'type' => 'CLASS',    'label' => 'Period 1'],
         ['start' => '10:50', 'end' => '11:40', 'type' => 'CLASS',    'label' => 'Period 2'],
@@ -142,24 +170,27 @@ class SchedulingConstants
         ['start' => '16:20', 'end' => '17:00', 'type' => 'CONSULT',  'label' => 'Consultation / Home Bound'],
     ];
 
-    // G9 variant (no second recess / no Period 7)
+    /**
+     * G9 variant — Homeroom extended to 8:00–9:40 (was Homeroom 8:00–8:50 +
+     * Period 1 8:50–9:40 as a real class). This removes that Monday period;
+     * remaining periods are renumbered starting from 1.
+     */
     public const MONDAY_G9 = [
         ['start' => '07:30', 'end' => '08:00', 'type' => 'FLAG',     'label' => 'Flag Ceremony'],
-        ['start' => '08:00', 'end' => '08:50', 'type' => 'HOMEROOM', 'label' => 'Homeroom Class'],
-        ['start' => '08:50', 'end' => '09:40', 'type' => 'CLASS',    'label' => 'Period 1'],
+        ['start' => '08:00', 'end' => '09:40', 'type' => 'HOMEROOM', 'label' => 'Homeroom Class'],
         ['start' => '09:40', 'end' => '10:00', 'type' => 'RECESS',   'label' => 'Recess'],
-        ['start' => '10:00', 'end' => '10:50', 'type' => 'CLASS',    'label' => 'Period 2'],
+        ['start' => '10:00', 'end' => '10:50', 'type' => 'CLASS',    'label' => 'Period 1'],
         ['start' => '10:50', 'end' => '11:50', 'type' => 'LUNCH',    'label' => 'Lunch Break'],
-        ['start' => '11:50', 'end' => '12:40', 'type' => 'CLASS',    'label' => 'Period 3'],
-        ['start' => '12:40', 'end' => '13:30', 'type' => 'CLASS',    'label' => 'Period 4'],
-        ['start' => '13:30', 'end' => '14:20', 'type' => 'CLASS',    'label' => 'Period 5'],
-        ['start' => '14:20', 'end' => '15:10', 'type' => 'CLASS',    'label' => 'Period 6'],
+        ['start' => '11:50', 'end' => '12:40', 'type' => 'CLASS',    'label' => 'Period 2'],
+        ['start' => '12:40', 'end' => '13:30', 'type' => 'CLASS',    'label' => 'Period 3'],
+        ['start' => '13:30', 'end' => '14:20', 'type' => 'CLASS',    'label' => 'Period 4'],
+        ['start' => '14:20', 'end' => '15:10', 'type' => 'CLASS',    'label' => 'Period 5'],
         ['start' => '15:10', 'end' => '16:20', 'type' => 'CONSULT',  'label' => 'Consultation / Home Bound'],
     ];
 
     public const MONDAY_G11G12 = [
         ['start' => '07:30', 'end' => '08:00', 'type' => 'FLAG',     'label' => 'Flag Ceremony'],
-        ['start' => '08:00', 'end' => '08:50', 'type' => 'ADVISING', 'label' => 'Academic Advising'],
+        ['start' => '08:00', 'end' => '08:50', 'type' => 'ADVISING', 'label' => 'Homeroom Class'],
         ['start' => '08:50', 'end' => '09:40', 'type' => 'CLASS',    'label' => 'Period 1'],
         ['start' => '09:40', 'end' => '10:30', 'type' => 'CLASS',    'label' => 'Period 2'],
         ['start' => '10:30', 'end' => '10:50', 'type' => 'RECESS',   'label' => 'Recess'],
@@ -244,7 +275,7 @@ class SchedulingConstants
 
     // ── Wednesday Special ────────────────────────────────────────────────────
 
-    /** Wellness block (all grades, Wednesday only) */
+    /** Wellness block (all grades except full-Wednesday grades, Wednesday only) */
     public const WEDNESDAY_WELLNESS = ['start' => '09:50', 'end' => '10:20'];
 
     /**
@@ -257,30 +288,32 @@ class SchedulingConstants
         'G11G12' => '12:20',
     ];
 
+    /**
+     * Fixed Activity Learning Program (ALP) block — every Wednesday, 15:10–17:00,
+     * for ALL grades and sections (including full-Wednesday grades). Grades whose
+     * own WEDNESDAY_ACTIVITY_START cutoff is earlier are already blocked from that
+     * cutoff onward, so this window sits within (or extends) their existing block.
+     */
+    public const WEDNESDAY_ALP = ['start' => '15:10', 'end' => '17:00'];
+
     // ── Friday Special ────────────────────────────────────────────────────────
 
     /**
-     * Grades locked for ILA (no in-person teaching on Fridays).
-     * G8 retains in-person Friday classes — its weekly load does not fit within
-     * a Friday-ILA week.
+     * Grades locked for ILA (no in-person teaching on Fridays). Empty — every
+     * grade now has in-person Friday classes.
      */
-    public const FRIDAY_ILA_GRADES = [7];
+    public const FRIDAY_ILA_GRADES = [];
 
     // ── Over-subscribed-grade exceptions ───────────────────────────────────────
     // G8 carries the heaviest weekly load (39h). Its load only fits when the
-    // full Wednesday and the otherwise-idle Monday gap are opened for teaching.
+    // full Wednesday is opened for teaching.
 
     /**
      * Grades that hold regular classes through the FULL Wednesday — the activity
-     * cutoff and the Wednesday wellness block do not apply to these grades.
+     * cutoff and the Wednesday wellness block do not apply to these grades (the
+     * fixed Wednesday ALP block still does — see WEDNESDAY_ALP).
      */
     public const WEDNESDAY_FULL_GRADES = [8];
-
-    /**
-     * Grades that reclaim the Monday 08:50–09:40 gap (the "DEAD" slot between
-     * homeroom and recess) as a teaching period.
-     */
-    public const MONDAY_RECLAIM_GAP_GRADES = [8];
 
     // ── Official Time Shifts ──────────────────────────────────────────────────
 
@@ -395,8 +428,9 @@ class SchedulingConstants
      */
     public static function getMondayTimetable(int $grade): array
     {
-        if ($grade <= 8)  return self::MONDAY_G7G8;
-        if ($grade === 9) return self::MONDAY_G9;
+        if ($grade === 7)  return self::MONDAY_G7G8;
+        if ($grade === 8)  return self::MONDAY_G8;
+        if ($grade === 9)  return self::MONDAY_G9;
         if ($grade === 10) return self::MONDAY_G9G10;
         return self::MONDAY_G11G12;
     }
@@ -426,8 +460,15 @@ class SchedulingConstants
     }
 
     /**
-     * Return all non-CLASS (blocked) slots for a grade + day.
-     * These are time windows where no teaching class may be placed.
+     * Return all non-CLASS (blocked) slots for a grade + day, for calendar
+     * rendering. These are time windows where no teaching class may be placed.
+     *
+     * Wednesday additionally gets synthetic Wellness / Activity-Proper-ALP
+     * entries injected — those aren't literal timetable rows, they're overlay
+     * rules applied during placement (see DeterministicSchedulingService::
+     * buildSlotGrid()). Injecting them here keeps the calendar's rendering in
+     * lockstep with what the generator actually treats as blocked, instead of
+     * drifting out of sync with a separately-maintained schedule.
      */
     public static function getBlockedSlots(int $grade, string $day): array
     {
@@ -435,9 +476,79 @@ class SchedulingConstants
             ? self::getMondayTimetable($grade)
             : self::getTueFriTimetable($grade);
 
-        return array_values(
+        $blocked = array_values(
             array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
         );
+
+        if ($day === 'Wednesday') {
+            $fullWed = in_array($grade, self::WEDNESDAY_FULL_GRADES, true);
+
+            // Full-Wednesday grades are not excluded from the Wellness window
+            // during placement, so it isn't shown as blocked for them either.
+            if (! $fullWed) {
+                $blocked[] = array_merge(self::WEDNESDAY_WELLNESS, [
+                    'type'  => 'WELLNESS',
+                    'label' => 'Wellness Break',
+                ]);
+            }
+
+            $group        = self::getGradeGroup($grade);
+            $cutoffStart  = $fullWed
+                ? self::WEDNESDAY_ALP['start']
+                : (self::WEDNESDAY_ACTIVITY_START[$group] ?? self::WEDNESDAY_ALP['start']);
+            $activityStart = min($cutoffStart, self::WEDNESDAY_ALP['start']);
+
+            $blocked[] = [
+                'start' => $activityStart,
+                'end'   => self::WEDNESDAY_ALP['end'],
+                'type'  => 'ACTIVITY',
+                'label' => 'Activity Proper / ALP',
+            ];
+        }
+
+        usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
+
+        return array_values($blocked);
+    }
+
+    /**
+     * The actual first-class-start / last-class-end for a grade+day, after
+     * applying Wednesday's cutoff/wellness/ALP exclusions (via getBlockedSlots)
+     * and the Friday ILA day-skip. Null if the grade has no classes that day.
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public static function getEffectiveClassWindow(int $grade, string $day): ?array
+    {
+        if ($day === 'Friday' && in_array($grade, self::FRIDAY_ILA_GRADES, true)) {
+            return null;
+        }
+
+        $classSlots = self::getClassSlots($grade, $day);
+        if (empty($classSlots)) {
+            return null;
+        }
+
+        if ($day === 'Wednesday') {
+            $blocked = self::getBlockedSlots($grade, $day);
+            $classSlots = array_values(array_filter($classSlots, static function ($slot) use ($blocked) {
+                foreach ($blocked as $b) {
+                    if (self::timesOverlap($slot['start'], $slot['end'], $b['start'], $b['end'])) {
+                        return false;
+                    }
+                }
+                return true;
+            }));
+        }
+
+        if (empty($classSlots)) {
+            return null;
+        }
+
+        return [
+            'start' => min(array_column($classSlots, 'start')),
+            'end'   => max(array_column($classSlots, 'end')),
+        ];
     }
 
     /**

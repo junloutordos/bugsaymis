@@ -105,6 +105,13 @@ class DeterministicSchedulingService
             }
         }
 
+        // Same-weekday-across-sections: for each grade+subject, decide which
+        // weekday each session index lands on — shared by every section of
+        // that grade offering the subject (e.g. "Math G7 session 1" is
+        // Monday for every G7 section). Electives are exempt — they already
+        // use their own cross-section elective windows.
+        $subjectDayAssignment = $this->assignSubjectDays($requirements);
+
         // Flatten requirements into individual session instances. A subject
         // with has_ilp reserves its LAST weekly session as the Independent
         // Learning Period — only when it has at least 2 sessions, otherwise
@@ -112,9 +119,13 @@ class DeterministicSchedulingService
         $baseSessions = [];
         foreach ($requirements as $req) {
             $ilpEligible = ($req['has_ilp'] ?? false) && $req['sessions_needed'] >= 2;
+            $forcedDays  = $subjectDayAssignment[$req['grade']][$req['subject_id']] ?? null;
             for ($i = 0; $i < $req['sessions_needed']; $i++) {
                 $session = $req;
                 $session['session_type'] = ($ilpEligible && $i === $req['sessions_needed'] - 1) ? 'ilp' : 'regular';
+                if ($forcedDays !== null && isset($forcedDays[$i])) {
+                    $session['forced_day'] = $forcedDays[$i];
+                }
                 $baseSessions[] = $session;
             }
         }
@@ -325,6 +336,66 @@ class DeterministicSchedulingService
         return $grades;
     }
 
+    /**
+     * Assign each (grade, subject)'s weekly session indices to a shared
+     * weekday, so every section of that grade offering the subject lands on
+     * the same day for a given session index. Runs before per-section period
+     * placement, which still independently picks the period/room/faculty
+     * slot within the assigned day.
+     *
+     * Days are chosen greedily, least-used-day-first per grade, so a grade's
+     * subjects spread across the week rather than piling onto one day. If a
+     * subject needs more sessions than there are available weekdays, later
+     * sessions reuse the least-loaded day rather than being left unassigned
+     * (every session index still needs a consistent day across sections).
+     *
+     * @param array<int,array<string,mixed>> $requirements
+     * @return array<int,array<int,array<int,string>>> [grade][subject_id][sessionIndex] => day
+     */
+    private function assignSubjectDays(array $requirements): array
+    {
+        $groups = [];
+        foreach ($requirements as $req) {
+            if ($req['is_elective']) {
+                continue;
+            }
+            $grade     = $req['grade'];
+            $subjectId = $req['subject_id'];
+            $groups[$grade][$subjectId] = max($groups[$grade][$subjectId] ?? 0, $req['sessions_needed']);
+        }
+
+        $dayLoad    = [];
+        $assignment = [];
+
+        foreach ($groups as $grade => $subjects) {
+            $availableDays = array_values(array_unique(array_column($this->gridByGrade[$grade] ?? [], 'day')));
+            if (empty($availableDays)) {
+                continue;
+            }
+
+            // Most-constrained-first: subjects needing the most sessions pick
+            // days while the week still has the most room.
+            arsort($subjects);
+
+            foreach ($subjects as $subjectId => $sessionsNeeded) {
+                $chosenDays = [];
+                $usedDays   = [];
+                for ($i = 0; $i < $sessionsNeeded; $i++) {
+                    $candidates = array_values(array_diff($availableDays, $usedDays)) ?: $availableDays;
+                    usort($candidates, fn ($a, $b) => ($dayLoad[$grade][$a] ?? 0) <=> ($dayLoad[$grade][$b] ?? 0));
+                    $day = $candidates[0];
+
+                    $chosenDays[] = $day;
+                    $usedDays[]   = $day;
+                    $dayLoad[$grade][$day] = ($dayLoad[$grade][$day] ?? 0) + 1;
+                }
+                $assignment[$grade][$subjectId] = $chosenDays;
+            }
+        }
+
+        return $assignment;
+    }
+
     // ── Slot grid ─────────────────────────────────────────────────────────
 
     /**
@@ -336,14 +407,13 @@ class DeterministicSchedulingService
      */
     private function buildSlotGrid(int $grade): array
     {
-        $group     = SchedulingConstants::getGradeGroup($grade);
-        $wedCut    = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$group] ?? '23:59';
-        $fullWed   = in_array($grade, SchedulingConstants::WEDNESDAY_FULL_GRADES, true);
-        $reclaimMon = in_array($grade, SchedulingConstants::MONDAY_RECLAIM_GAP_GRADES, true);
+        $group   = SchedulingConstants::getGradeGroup($grade);
+        $wedCut  = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$group] ?? '23:59';
+        $fullWed = in_array($grade, SchedulingConstants::WEDNESDAY_FULL_GRADES, true);
 
         $slots = [];
         foreach (self::DAYS as $day) {
-            // Friday ILA: lower grades have no in-person classes on Friday.
+            // Friday ILA: any grade still listed has no in-person classes on Friday.
             if ($day === 'Friday' && in_array($grade, SchedulingConstants::FRIDAY_ILA_GRADES, true)) {
                 continue;
             }
@@ -353,23 +423,30 @@ class DeterministicSchedulingService
                 : SchedulingConstants::getTueFriTimetable($grade);
 
             foreach ($timetable as $row) {
-                // Usable teaching rows: CLASS periods, plus the Monday DEAD gap for
-                // grades that reclaim it.
-                $isClass = ($row['type'] ?? '') === 'CLASS';
-                $isReclaimedGap = $reclaimMon && $day === 'Monday' && ($row['type'] ?? '') === 'DEAD';
-                if (! $isClass && ! $isReclaimedGap) {
+                if (($row['type'] ?? '') !== 'CLASS') {
                     continue;
                 }
 
-                // Wednesday restrictions do not apply to "full Wednesday" grades.
-                if ($day === 'Wednesday' && ! $fullWed) {
-                    if ($row['start'] >= $wedCut) {
-                        continue;
+                if ($day === 'Wednesday') {
+                    // Wednesday restrictions do not apply to "full Wednesday" grades.
+                    if (! $fullWed) {
+                        if ($row['start'] >= $wedCut) {
+                            continue;
+                        }
+                        if (SchedulingConstants::timesOverlap(
+                            $row['start'], $row['end'],
+                            SchedulingConstants::WEDNESDAY_WELLNESS['start'],
+                            SchedulingConstants::WEDNESDAY_WELLNESS['end'],
+                        )) {
+                            continue;
+                        }
                     }
+                    // The fixed Activity Learning Program (ALP) block is universal —
+                    // it applies even to "full Wednesday" grades.
                     if (SchedulingConstants::timesOverlap(
                         $row['start'], $row['end'],
-                        SchedulingConstants::WEDNESDAY_WELLNESS['start'],
-                        SchedulingConstants::WEDNESDAY_WELLNESS['end'],
+                        SchedulingConstants::WEDNESDAY_ALP['start'],
+                        SchedulingConstants::WEDNESDAY_ALP['end'],
                     )) {
                         continue;
                     }
@@ -407,9 +484,16 @@ class DeterministicSchedulingService
         $best      = null;
         $bestScore = PHP_INT_MAX;
         $isIlp     = ($s['session_type'] ?? 'regular') === 'ilp';
+        $forcedDay = $s['forced_day'] ?? null;
 
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
             $day = $slot['day'];
+
+            // Same-weekday-across-sections: this subject's session index is
+            // fixed to one shared weekday for every section of this grade.
+            if ($forcedDay !== null && $day !== $forcedDay) {
+                continue;
+            }
 
             // Electives only use elective windows; core subjects only use the rest.
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
@@ -479,9 +563,13 @@ class DeterministicSchedulingService
             return false;
         }
 
-        $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
+        $isIlp     = ($s['session_type'] ?? 'regular') === 'ilp';
+        $forcedDay = $s['forced_day'] ?? null;
 
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
+            if ($forcedDay !== null && $slot['day'] !== $forcedDay) {
+                continue;
+            }
             // Electives only use elective windows; core subjects only use the rest.
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
                 continue;

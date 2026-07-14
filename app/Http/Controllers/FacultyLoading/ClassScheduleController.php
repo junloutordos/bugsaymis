@@ -9,13 +9,13 @@ use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
-use App\Models\FacultyLoading\SchoolDayConfig;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\Office;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\FacultyLoading\ScheduleValidationService;
+use App\Services\FacultyLoading\SchedulingConstants;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -172,16 +172,22 @@ class ClassScheduleController extends Controller
             ->orderBy('sectionname')
             ->get(['id', 'sectionname', 'levelid']);
 
-        // Per-day school config for calendar rendering (blocked periods, class hours)
-        $dayConfigs = SchoolDayConfig::active()
-            ->get()
-            ->mapWithKeys(fn ($c) => [
-                $c->day_of_week => [
-                    'start'   => $c->classes_start,
-                    'end'     => $c->classes_end,
-                    'blocked' => $c->blocked_periods ?? [],
-                ],
-            ]);
+        // Per-grade, per-day school config for calendar rendering (blocked
+        // periods, class hours) — derived directly from SchedulingConstants
+        // so it can never drift out of sync with what the generator actually
+        // treats as blocked (recess/lunch/homeroom/wellness/ALP all vary by
+        // grade, so a single flat schedule can't represent this accurately).
+        $dayConfigsByGrade = [];
+        foreach (array_keys(SchedulingConstants::GRADE_SECTIONS) as $grade) {
+            foreach (SchedulingConstants::DAYS as $day) {
+                $window = SchedulingConstants::getEffectiveClassWindow($grade, $day);
+                $dayConfigsByGrade[$grade][$day] = [
+                    'start'   => $window['start'] ?? null,
+                    'end'     => $window['end'] ?? null,
+                    'blocked' => SchedulingConstants::getBlockedSlots($grade, $day),
+                ];
+            }
+        }
 
         // The unplaced-subjects tray is a teaching-placement tool — manage only.
         $unplacedLoads = $cap['level'] === 'manage'
@@ -197,7 +203,7 @@ class ClassScheduleController extends Controller
             'sections'      => $sections,
             'currentTerm'   => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
             'filters'       => $request->only(['term_id', 'section_id', 'faculty_id']),
-            'dayConfigs'    => $dayConfigs,
+            'dayConfigsByGrade' => $dayConfigsByGrade,
             'unplacedLoads' => $unplacedLoads,
             'capability'    => ['level' => $cap['level']],
             'pageMode'      => $pageMode,

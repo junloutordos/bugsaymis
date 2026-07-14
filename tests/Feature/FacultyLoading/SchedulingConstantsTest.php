@@ -156,12 +156,45 @@ class SchedulingConstantsTest extends TestCase
         }
     }
 
-    public function test_monday_g9g10_has_class_at_08_50(): void
+    public function test_monday_g10_has_class_at_08_50(): void
     {
-        // G9/G10 start Period 1 at 08:50 on Monday (unlike G7/G8)
-        $classSlots = SC::getClassSlots(9, 'Monday');
+        // G10 starts Period 1 at 08:50 on Monday (unlike G7/G8/G9)
+        $classSlots = SC::getClassSlots(10, 'Monday');
         $starts     = array_column($classSlots, 'start');
-        $this->assertContains('08:50', $starts, 'G9 Monday Period 1 should start at 08:50');
+        $this->assertContains('08:50', $starts, 'G10 Monday Period 1 should start at 08:50');
+    }
+
+    public function test_monday_g8_and_g9_have_extended_homeroom_no_class_before_10am(): void
+    {
+        // G8 & G9 Homeroom now runs 8:00-9:40 — no class period should start
+        // before 10:00 on Monday for either grade.
+        foreach ([8, 9] as $grade) {
+            $classSlots = SC::getClassSlots($grade, 'Monday');
+            foreach ($classSlots as $slot) {
+                $this->assertGreaterThanOrEqual('10:00', $slot['start'],
+                    "G{$grade} Monday classes must not start before 10:00"
+                );
+            }
+        }
+    }
+
+    public function test_monday_g8_and_g9_homeroom_spans_extended_window(): void
+    {
+        foreach ([8, 9] as $grade) {
+            $timetable = SC::getMondayTimetable($grade);
+            $homeroom  = array_values(array_filter($timetable, fn ($s) => $s['type'] === 'HOMEROOM'));
+            $this->assertNotEmpty($homeroom, "G{$grade} Monday must have a HOMEROOM slot");
+            $this->assertSame('08:00', $homeroom[0]['start']);
+            $this->assertSame('09:40', $homeroom[0]['end']);
+        }
+    }
+
+    public function test_monday_g8_has_no_dead_zone(): void
+    {
+        // Unlike G7, G8's old reclaimed DEAD gap is now part of extended Homeroom.
+        $slots = SC::MONDAY_G8;
+        $dead  = array_filter($slots, fn ($s) => $s['type'] === 'DEAD');
+        $this->assertEmpty($dead, 'G8 Monday must not have a DEAD zone (absorbed into Homeroom)');
     }
 
     public function test_monday_g11g12_uses_advising_not_homeroom(): void
@@ -270,14 +303,60 @@ class SchedulingConstantsTest extends TestCase
         $this->assertSame('10:20', SC::WEDNESDAY_WELLNESS['end']);
     }
 
-    public function test_friday_ila_applies_only_to_g7_and_g8(): void
+    public function test_friday_ila_grades_is_empty(): void
     {
-        $this->assertContains(7, SC::FRIDAY_ILA_GRADES);
-        $this->assertContains(8, SC::FRIDAY_ILA_GRADES);
-        $this->assertNotContains(9,  SC::FRIDAY_ILA_GRADES);
-        $this->assertNotContains(10, SC::FRIDAY_ILA_GRADES);
-        $this->assertNotContains(11, SC::FRIDAY_ILA_GRADES);
-        $this->assertNotContains(12, SC::FRIDAY_ILA_GRADES);
+        // Every grade now has in-person Friday classes — no ILA exceptions.
+        $this->assertEmpty(SC::FRIDAY_ILA_GRADES);
+    }
+
+    public function test_every_grade_has_friday_class_slots(): void
+    {
+        foreach ([7, 8, 9, 10, 11, 12] as $grade) {
+            $this->assertNotEmpty(SC::getClassSlots($grade, 'Friday'),
+                "Grade {$grade} must have Friday class slots"
+            );
+        }
+    }
+
+    public function test_wednesday_alp_block_defined(): void
+    {
+        $this->assertSame('15:10', SC::WEDNESDAY_ALP['start']);
+        $this->assertSame('17:00', SC::WEDNESDAY_ALP['end']);
+    }
+
+    public function test_get_blocked_slots_includes_alp_and_wellness_on_wednesday(): void
+    {
+        foreach ([7, 9, 11] as $grade) {
+            $blocked = SC::getBlockedSlots($grade, 'Wednesday');
+            $types   = array_column($blocked, 'type');
+            $this->assertContains('ACTIVITY', $types, "G{$grade} Wednesday must include an ACTIVITY (ALP) block");
+            $this->assertContains('WELLNESS', $types, "G{$grade} Wednesday must include a WELLNESS block");
+        }
+    }
+
+    public function test_get_blocked_slots_full_wednesday_grade_has_no_wellness_but_has_alp(): void
+    {
+        // G8 is a full-Wednesday grade — not excluded from Wellness during
+        // placement, so it shouldn't show as blocked; ALP still applies.
+        $blocked = SC::getBlockedSlots(8, 'Wednesday');
+        $types   = array_column($blocked, 'type');
+        $this->assertNotContains('WELLNESS', $types);
+        $this->assertContains('ACTIVITY', $types);
+    }
+
+    public function test_effective_wednesday_class_window_never_overlaps_alp(): void
+    {
+        // getEffectiveClassWindow applies the same Wednesday cutoff/wellness/ALP
+        // exclusions the generator uses (unlike raw getClassSlots), so this is
+        // the accurate view of what's actually placeable.
+        foreach ([7, 8, 9, 10, 11, 12] as $grade) {
+            $window = SC::getEffectiveClassWindow($grade, 'Wednesday');
+            $this->assertNotNull($window, "G{$grade} must have an effective Wednesday class window");
+            $this->assertLessThanOrEqual(
+                SC::WEDNESDAY_ALP['start'], $window['end'],
+                "G{$grade} Wednesday effective class end must not reach into the ALP block"
+            );
+        }
     }
 
     // ── Science Core ─────────────────────────────────────────────────────────

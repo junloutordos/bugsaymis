@@ -141,8 +141,8 @@
                       <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                         {{ day.slice(0, 3) }}
                       </span>
-                      <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
-                        {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
+                      <span v-if="dayConfigFor(groupId, day)" class="block text-xs text-slate-400 leading-tight">
+                        {{ fmtConfigTime(dayConfigFor(groupId, day).start) }}–{{ fmtConfigTime(dayConfigFor(groupId, day).end) }}
                       </span>
                     </div>
                   </div>
@@ -176,7 +176,7 @@
 
                       <!-- Day columns -->
                       <div v-for="day in WEEKDAYS" :key="day"
-                        v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), createGhostKey(groupId, day), dayConfigs[day]]"
+                        v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), createGhostKey(groupId, day), dayConfigFor(groupId, day)]"
                         :class="['flex-1 relative border-l border-slate-100 overflow-hidden',
                           canQuickCreate(groupId) ? 'cursor-crosshair' : '']"
                         @mousedown="onColumnMouseDown($event, groupId, day)"
@@ -203,7 +203,7 @@
                         </div>
 
                         <!-- Blocked period overlays -->
-                        <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="bp.label"
+                        <div v-for="bp in (dayConfigFor(groupId, day)?.blocked ?? [])" :key="bp.label"
                           :style="blockedStyle(bp)"
                           class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
                           <div class="absolute inset-0 bg-slate-100/70" />
@@ -213,7 +213,7 @@
                         </div>
 
                         <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
-                        <div v-if="dayConfigs[day] && timeToMin(dayConfigs[day].end) <= 12 * 60"
+                        <div v-if="dayConfigFor(groupId, day) && timeToMin(dayConfigFor(groupId, day).end) <= 12 * 60"
                           :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"
                           class="pointer-events-none z-[1]">
                           <div class="absolute inset-0 bg-slate-50/80 border-t border-slate-200/50" />
@@ -594,7 +594,7 @@ const props = defineProps({
   sections:    { type: Array,  default: () => [] },
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
-  dayConfigs:  { type: Object, default: () => ({}) },
+  dayConfigsByGrade: { type: Object, default: () => ({}) },
   unplacedLoads: { type: Array, default: () => [] },
   capability:  { type: Object, default: () => ({ level: 'manage' }) },
   pageMode:    { type: String, default: 'admin' }, // 'admin' | 'my'
@@ -738,6 +738,14 @@ function groupHeaderInfo(groupId) {
     section_name: fromLoad?.section_name,
     faculty_name: fromLoad?.faculty?.name ?? 'Unassigned / TBA',
   }
+}
+
+/** Blocked-period/class-hours config for a column's day, resolved by that
+ *  column's actual grade — recess/lunch/homeroom/wellness/ALP all vary by
+ *  grade, so this can't be a single flat per-day overlay. */
+function dayConfigFor(groupId, day) {
+  const grade = viewBy.value === 'grade' ? groupId : groupHeaderInfo(groupId).grade_level
+  return props.dayConfigsByGrade?.[grade]?.[day]
 }
 
 /** { groupId: { day: [schedules] } } */
