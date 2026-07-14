@@ -27,7 +27,7 @@ class FaceRecognitionService
     private const CHALLENGE_MIN_FRAMES = 4;
     private const CHALLENGE_MAX_FRAMES = 6;
     private const CHALLENGE_MAX_WINDOW_MS = 4000;
-    private const CHALLENGE_TURN_HEAD_MIN_YAW_RANGE = 20.0;
+    private const CHALLENGE_TURN_HEAD_MIN_YAW_RANGE = 12.0;
     private const QUALITY_MIN_BRIGHTNESS = 35.0;
     private const QUALITY_MIN_SHARPNESS = 35.0;
     private const MAX_BBOX_AREA_RATIO = 1.6;

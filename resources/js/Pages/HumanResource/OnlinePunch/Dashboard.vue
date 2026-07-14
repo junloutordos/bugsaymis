@@ -209,8 +209,8 @@ let lastBrightness = 128
 let geo = { latitude: null, longitude: null, accuracy: null }
 
 const READY_STREAK_REQUIRED = 8
-const FRAME_COUNT = 5
-const FRAME_INTERVAL_MS = 400
+const FRAME_COUNT = 6
+const FRAME_INTERVAL_MS = 450
 const MIN_BRIGHTNESS = 55
 const MAX_BRIGHTNESS = 235
 const MIN_FACE_WIDTH_RATIO = 0.28
@@ -383,7 +383,7 @@ async function beginChallenge() {
     stage.value = 'challenge'
     guidanceMessage.value = data.instruction
 
-    await new Promise(resolve => setTimeout(resolve, 1200))
+    await new Promise(resolve => setTimeout(resolve, 1500))
     await captureBurst(data.challenge_token)
   } catch {
     challengeInFlight = false
