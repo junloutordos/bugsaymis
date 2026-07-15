@@ -91,7 +91,7 @@ class ClassScheduleController extends Controller
     /**
      * My Faculty Schedule — the same calendar pinned to the signed-in user's
      * own schedule for EVERYONE, including managers. Capability is forced to
-     * self, so mapSchedule() marks CID-plotted teaching rows can_edit=false
+     * self, so toCalendarArray() marks CID-plotted teaching rows can_edit=false
      * and the page is personal-view-only by construction. Mutations still go
      * through store/update/destroy, which re-resolve the real capability.
      */
@@ -143,7 +143,7 @@ class ClassScheduleController extends Controller
             ->orderBy('class_schedules.start_time')
             ->select('class_schedules.*')
             ->get()
-            ->map(fn ($s) => $this->mapSchedule($s, $lockedFacultyIds, $cap));
+            ->map(fn ($s) => $s->toCalendarArray($lockedFacultyIds, $cap));
 
         $terms = AcademicTerm::with('schoolYear')
             ->orderByDesc('start_date')
@@ -569,52 +569,6 @@ class ClassScheduleController extends Controller
         return back()->with('success', 'Schedule cancelled.');
     }
 
-    private function mapSchedule(ClassSchedule $s, array $lockedFacultyIds = [], ?array $cap = null): array
-    {
-        $isLocked = in_array((int) $s->user_id, $lockedFacultyIds, true);
-
-        // Teaching rows: manage-only, frozen while the load is locked.
-        // Non-teaching rows: capability reach decides; the lock doesn't apply.
-        $canEdit = false;
-        if ($cap !== null) {
-            $canEdit = $s->entry_type === 'non_teaching'
-                ? $this->canTouchNonTeaching($cap, $s->user_id ? (int) $s->user_id : null)
-                : ($cap['level'] === 'manage' && ! $isLocked);
-        }
-
-        return [
-            'id'                 => $s->id,
-            'load_assignment_id' => $s->load_assignment_id,
-            'school_year_id'     => $s->school_year_id,
-            'entry_type'         => $s->entry_type,
-            'session_type'       => $s->session_type,
-            'title'              => $s->title,
-            'category'           => $s->category,
-            'day_of_week'        => $s->day_of_week,
-            'start_time'         => $s->start_time,
-            'end_time'           => $s->end_time,
-            'status'             => $s->status,
-            'remarks'            => $s->remarks,
-            'subject'            => $s->subject ? [
-                'id'          => $s->subject->id,
-                'code'        => $s->subject->code,
-                'name'        => $s->subject->name,
-                'is_elective' => $s->subject->grade_level === 0 || $s->subject->subject_type === 'elective',
-            ] : null,
-            'classroom'    => $s->classroom ? [
-                'id'   => $s->classroom->id,
-                'name' => $s->classroom->name,
-                'code' => $s->classroom->code,
-            ] : null,
-            'faculty'      => $s->faculty ? [
-                'id'   => $s->faculty->id,
-                'name' => $s->faculty->name,
-            ] : null,
-            'section_id'   => $s->section_id,
-            'section_name' => $s->section?->sectionname ?? ($s->section_id ? "Section {$s->section_id}" : null),
-            'grade_level'  => $s->section?->levelid ?? null,
-            'is_locked'    => $isLocked,
-            'can_edit'     => $canEdit,
-        ];
-    }
+    // Presentation mapping moved to ClassSchedule::toCalendarArray() — shared
+    // with any other page that renders a schedule calendar (e.g. Section Show).
 }

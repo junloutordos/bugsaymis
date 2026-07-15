@@ -67,6 +67,14 @@
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
 
+      <!-- ── Weekly Schedule (read-only) ──────────────────────────────── -->
+      <ScheduleCalendarCard
+        title="Weekly Schedule"
+        :meta="'· ' + schedule.length + ' slot(s)'"
+        :events-by-day="scheduleByDay"
+        :day-configs="dayConfigs"
+        :legend="scheduleLegend" />
+
       <!-- ── Subjects (full catalog for this grade) ──────────────────── -->
       <AppCard :padded="false">
         <div class="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
@@ -217,6 +225,7 @@ import AppTable from '@/Components/AppTable.vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
+import ScheduleCalendarCard from '@/Components/FacultyLoading/ScheduleCalendarCard.vue'
 import { confirmDelete } from '@/Composables/useConfirm.js'
 import {
   AcademicCapIcon,
@@ -231,11 +240,40 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  section:  { type: Object, default: () => ({}) },
-  terms:    { type: Array,  default: () => [] },
-  termId:   { type: Number, default: null },
-  subjects: { type: Array,  default: () => [] },
-  students: { type: Array,  default: () => [] },
+  section:    { type: Object, default: () => ({}) },
+  terms:      { type: Array,  default: () => [] },
+  termId:     { type: Number, default: null },
+  subjects:   { type: Array,  default: () => [] },
+  students:   { type: Array,  default: () => [] },
+  schedule:   { type: Array,  default: () => [] },
+  dayConfigs: { type: Object, default: () => ({}) },
+})
+
+// ── Weekly Schedule (read-only) ─────────────────────────────────────────────
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+
+/** { Monday: [schedule, ...], ... } — faculty name as the secondary label,
+ *  since the section itself is already this whole card's context. */
+const scheduleByDay = computed(() => {
+  const map = {}
+  for (const day of WEEKDAYS) map[day] = []
+  for (const s of props.schedule) {
+    if (!map[s.day_of_week]) map[s.day_of_week] = []
+    map[s.day_of_week].push({
+      ...s,
+      secondary_label: s.entry_type === 'non_teaching' ? '' : (s.faculty?.name ?? 'TBA'),
+    })
+  }
+  return map
+})
+
+const scheduleLegend = computed(() => {
+  const seen = new Map()
+  for (const s of props.schedule) {
+    if (s.subject && !seen.has(s.subject.id)) seen.set(s.subject.id, s.subject)
+  }
+  return [...seen.values()]
 })
 
 // ── Term filter ───────────────────────────────────────────────────────────────

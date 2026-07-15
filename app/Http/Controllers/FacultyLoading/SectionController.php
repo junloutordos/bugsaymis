@@ -5,12 +5,14 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\HeadAdvisoryService;
+use App\Services\FacultyLoading\SchedulingConstants;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -125,12 +127,35 @@ class SectionController extends Controller
 
         $section->loadMissing(['flSchoolYear', 'adviserUser', 'classroom:id,name,code']);
 
+        // This section's own weekly schedule — read-only render, so no locked-
+        // faculty list or capability is passed (toCalendarArray() defaults to
+        // is_locked=false, can_edit=false, which is exactly what a display-only
+        // card needs).
+        $schedule = ClassSchedule::with(['subject', 'classroom', 'faculty:id,name', 'section:id,sectionname,levelid'])
+            ->where('section_id', $section->id)
+            ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
+            ->occupying()
+            ->get()
+            ->map(fn ($s) => $s->toCalendarArray());
+
+        $dayConfigs = [];
+        foreach (SchedulingConstants::DAYS as $day) {
+            $window = SchedulingConstants::getEffectiveClassWindow($section->levelid, $day);
+            $dayConfigs[$day] = [
+                'start'   => $window['start'] ?? null,
+                'end'     => $window['end'] ?? null,
+                'blocked' => SchedulingConstants::getBlockedSlots($section->levelid, $day),
+            ];
+        }
+
         return Inertia::render('FacultyLoading/Sections/Show', [
-            'section'  => $this->mapSection($section),
-            'terms'    => $terms,
-            'termId'   => $termId,
-            'subjects' => $subjects,
-            'students' => $students,
+            'section'    => $this->mapSection($section),
+            'terms'      => $terms,
+            'termId'     => $termId,
+            'subjects'   => $subjects,
+            'students'   => $students,
+            'schedule'   => $schedule,
+            'dayConfigs' => $dayConfigs,
         ]);
     }
 

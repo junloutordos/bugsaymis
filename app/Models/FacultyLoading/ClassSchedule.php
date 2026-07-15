@@ -147,4 +147,66 @@ class ClassSchedule extends Model
     {
         return $query->where('day_of_week', $day);
     }
+
+    // ── Presentation ─────────────────────────────────────────────────────────
+
+    /**
+     * Shape this row for the frontend calendar (ScheduleCalendarCard.vue) —
+     * shared by the Faculty Loading schedule calendar and any other page that
+     * needs to render a section's/faculty's schedule (e.g. Section Show).
+     *
+     * Pass $lockedFacultyIds/$cap for an editable calendar (mirrors the
+     * capability rules in ClassScheduleController::scheduleCapability()); omit
+     * both for a read-only render — every row then comes back is_locked=false,
+     * can_edit=false, which is exactly what a display-only card needs.
+     *
+     * @param array<int> $lockedFacultyIds
+     * @param array{level: string, faculty_ids: array<int>|null}|null $cap
+     */
+    public function toCalendarArray(array $lockedFacultyIds = [], ?array $cap = null): array
+    {
+        $isLocked = in_array((int) $this->user_id, $lockedFacultyIds, true);
+
+        $canEdit = false;
+        if ($cap !== null) {
+            $canEdit = $this->entry_type === 'non_teaching'
+                ? ($cap['level'] === 'manage' || ($this->user_id !== null && in_array((int) $this->user_id, $cap['faculty_ids'] ?? [], true)))
+                : ($cap['level'] === 'manage' && ! $isLocked);
+        }
+
+        return [
+            'id'                 => $this->id,
+            'load_assignment_id' => $this->load_assignment_id,
+            'school_year_id'     => $this->school_year_id,
+            'entry_type'         => $this->entry_type,
+            'session_type'       => $this->session_type,
+            'title'              => $this->title,
+            'category'           => $this->category,
+            'day_of_week'        => $this->day_of_week,
+            'start_time'         => $this->start_time,
+            'end_time'           => $this->end_time,
+            'status'             => $this->status,
+            'remarks'            => $this->remarks,
+            'subject'            => $this->subject ? [
+                'id'          => $this->subject->id,
+                'code'        => $this->subject->code,
+                'name'        => $this->subject->name,
+                'is_elective' => $this->subject->grade_level === 0 || $this->subject->subject_type === 'elective',
+            ] : null,
+            'classroom'    => $this->classroom ? [
+                'id'   => $this->classroom->id,
+                'name' => $this->classroom->name,
+                'code' => $this->classroom->code,
+            ] : null,
+            'faculty'      => $this->faculty ? [
+                'id'   => $this->faculty->id,
+                'name' => $this->faculty->name,
+            ] : null,
+            'section_id'   => $this->section_id,
+            'section_name' => $this->section?->sectionname ?? ($this->section_id ? "Section {$this->section_id}" : null),
+            'grade_level'  => $this->section?->levelid ?? null,
+            'is_locked'    => $isLocked,
+            'can_edit'     => $canEdit,
+        ];
+    }
 }
