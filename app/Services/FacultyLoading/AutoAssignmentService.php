@@ -228,6 +228,16 @@ class AutoAssignmentService
 
             if ($exists) { $skipped++; continue; }
 
+            // The DB enforces one teacher per (term, subject, section) via uq_la_teaching_slot —
+            // check that slot isn't already held by a *different* faculty (stale preview / concurrent apply).
+            if ($sectionId !== null) {
+                $slotTaken = LoadAssignment::where('academic_term_id', $termId)
+                    ->where('subject_id', $item['subject_id'])
+                    ->where('section_id', $sectionId)
+                    ->exists();
+                if ($slotTaken) { $skipped++; continue; }
+            }
+
             $faculty = User::find($item['faculty_id']);
             if (! $faculty) continue;
 
@@ -235,18 +245,24 @@ class AutoAssignmentService
 
             if ($load->is_locked) { $skipped++; continue; }
 
-            LoadAssignment::create([
-                'faculty_load_id'  => $load->id,
-                'user_id'          => $item['faculty_id'],
-                'school_year_id'   => $term->school_year_id,
-                'academic_term_id' => $termId,
-                'assignment_type'  => 'teaching',
-                'subject_id'       => $item['subject_id'],
-                'section_id'       => $item['section_id'] ?? null,
-                'load_units'       => $item['load_units'],
-                'description'      => null,
-                'created_by'       => $createdBy,
-            ]);
+            try {
+                LoadAssignment::create([
+                    'faculty_load_id'  => $load->id,
+                    'user_id'          => $item['faculty_id'],
+                    'school_year_id'   => $term->school_year_id,
+                    'academic_term_id' => $termId,
+                    'assignment_type'  => 'teaching',
+                    'subject_id'       => $item['subject_id'],
+                    'section_id'       => $item['section_id'] ?? null,
+                    'load_units'       => $item['load_units'],
+                    'description'      => null,
+                    'created_by'       => $createdBy,
+                ]);
+            } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+                // Race: another apply() claimed this slot between our check and the insert.
+                $skipped++;
+                continue;
+            }
 
             $this->loads->syncLoad($load);
             $created++;
