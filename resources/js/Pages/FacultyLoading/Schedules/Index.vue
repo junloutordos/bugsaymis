@@ -44,6 +44,10 @@
             :class="['px-3 py-1.5 font-medium border-l border-slate-200 transition-colors', viewBy === 'grade' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
             By Year Level
           </button>
+          <button type="button" @click="setViewBy('subject')"
+            :class="['px-3 py-1.5 font-medium border-l border-slate-200 transition-colors', viewBy === 'subject' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+            By Subject
+          </button>
         </div>
         <select v-model="filters.term_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -63,10 +67,15 @@
           <option :value="null">All Faculty</option>
           <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
         </select>
-        <select v-else-if="!isSelf" v-model="gradeFilter"
+        <select v-else-if="!isSelf && viewBy === 'grade'" v-model="gradeFilter"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option :value="null">All Grades</option>
           <option v-for="g in GRADE_LEVELS" :key="g" :value="g">Grade {{ g }}</option>
+        </select>
+        <select v-else-if="!isSelf && viewBy === 'subject'" v-model="subjectFilter"
+          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option :value="null">All Subjects</option>
+          <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
         </select>
       </AppFilterBar>
 
@@ -89,204 +98,69 @@
                 {{ facultyUnitLabel(groupId) }}
               </div>
 
-            <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+              <ScheduleCalendarCard
+                :title="cardTitle(groupId)"
+                :title-badge="viewBy === 'section' ? ('Grade ' + groupHeaderInfo(groupId).grade_level) : null"
+                :meta="'· ' + (byGroup[groupId]?.length ?? 0) + ' slot(s)'"
+                :events-by-day="cardEventsByDay(groupId)"
+                :day-configs="dayConfigsForGroup(groupId)"
+                :editable="!isOverviewMode"
+                :pack-lanes="isOverviewMode"
+                :legend="subjectsInGroup(groupId)"
+                :drop-preview="dropTarget?.groupId === groupId ? dropTarget : null"
+                :create-draft="createDraft?.groupId === groupId ? createDraft : null"
+                :dim-event-id="dragPayload?.kind === 'move' && groupKeyOf(dragPayload.schedule) === groupId ? dragPayload.schedule.id : null"
+                :can-quick-create="canQuickCreate(groupId)"
+                :is-draggable="canDrag"
+                @column-mousedown="(day, e) => onColumnMouseDown(e, groupId, day)"
+                @column-dragover="(day, e) => onDragOverColumn(e, groupId, day)"
+                @column-drop="(day, e) => onDropColumn(e, groupId, day)"
+                @event-dragstart="(s, e) => onDragStartEvent(e, s)"
+                @event-dragend="onDragEnd"
+                @event-click="onEventClick">
 
-              <!-- Group header -->
-              <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span v-if="viewBy === 'section'" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
-                    Grade {{ groupHeaderInfo(groupId).grade_level }}
-                  </span>
-                  <h3 v-if="viewBy === 'grade'" class="text-sm font-semibold text-slate-800">
-                    Grade {{ groupId }} — Electives
-                  </h3>
-                  <h3 v-else class="text-sm font-semibold text-slate-800">
-                    {{ viewBy === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name }}
-                  </h3>
-                  <span class="text-xs text-slate-400">· {{ byGroup[groupId]?.length ?? 0 }} slot(s)</span>
-                </div>
-                <AppButton v-if="isManage && viewBy === 'section'" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
-                  <PlusIcon class="h-3 w-3" /> Add
-                </AppButton>
-              </div>
+                <template #header-actions>
+                  <AppButton v-if="isManage && viewBy === 'section'" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
+                    <PlusIcon class="h-3 w-3" /> Add
+                  </AppButton>
+                </template>
 
-              <!-- Unplaced subjects for this group -->
-              <div v-if="unplacedByGroup[groupId]?.length"
-                class="px-4 py-2 bg-amber-50/70 border-b border-amber-100">
-                <div class="flex items-center justify-between gap-2">
-                  <p class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">
-                    Unplaced ({{ unplacedByGroup[groupId].length }}){{ viewBy !== 'grade' ? ' — drag onto a slot below' : '' }}
-                  </p>
-                  <button v-if="unplacedByGroup[groupId].length > 4" type="button" @click="toggleUnplacedExpanded(groupId)"
-                    class="text-[11px] font-medium text-amber-600 hover:text-amber-800 shrink-0">
-                    {{ isUnplacedExpanded(groupId) ? 'Show less' : 'Show all' }}
-                  </button>
-                </div>
-                <div class="flex flex-wrap gap-1.5 mt-1.5">
-                  <div v-for="load in visibleUnplaced(groupId)" :key="load.load_assignment_id"
-                    :draggable="viewBy !== 'grade' && !load.is_locked"
-                    @dragstart="onDragStartLoad($event, load)"
-                    @dragend="onDragEnd"
-                    :class="['inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium select-none',
-                      viewBy === 'grade'
-                        ? 'bg-amber-50 border-amber-200 text-amber-800'
-                        : (load.is_locked
-                            ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
-                            : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-grab active:cursor-grabbing')]">
-                    <LockClosedIcon v-if="viewBy !== 'grade' && load.is_locked" class="h-3 w-3" />
-                    <span class="font-bold">{{ load.subject?.code }}</span>
-                    <span v-if="viewBy !== 'faculty'">· {{ load.faculty?.name ?? 'TBA' }}</span>
-                    <span v-if="viewBy !== 'section'">· {{ unplacedGradeSectionLabel(load) }}</span>
-                    <span class="bg-amber-200/60 px-1.5 py-0.5 rounded-full">needs {{ load.still_needed }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Calendar grid -->
-              <div class="overflow-x-auto">
-                <div style="min-width: 760px">
-
-                  <!-- Day column headers -->
-                  <div class="flex border-b border-slate-100">
-                    <div class="shrink-0 border-r border-slate-100" :style="{ width: GUTTER + 'px' }" />
-                    <div v-for="day in WEEKDAYS" :key="day"
-                      class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0">
-                      <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                        {{ day.slice(0, 3) }}
-                      </span>
-                      <span v-if="dayConfigFor(groupId, day)" class="block text-xs text-slate-400 leading-tight">
-                        {{ fmtConfigTime(dayConfigFor(groupId, day).start) }}–{{ fmtConfigTime(dayConfigFor(groupId, day).end) }}
-                      </span>
+                <template #header-extra>
+                  <!-- Unplaced subjects for this group -->
+                  <div v-if="unplacedByGroup[groupId]?.length"
+                    class="px-4 py-2 bg-amber-50/70 border-b border-amber-100">
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">
+                        Unplaced ({{ unplacedByGroup[groupId].length }}){{ !isOverviewMode ? ' — drag onto a slot below' : '' }}
+                      </p>
+                      <button v-if="unplacedByGroup[groupId].length > 4" type="button" @click="toggleUnplacedExpanded(groupId)"
+                        class="text-[11px] font-medium text-amber-600 hover:text-amber-800 shrink-0">
+                        {{ isUnplacedExpanded(groupId) ? 'Show less' : 'Show all' }}
+                      </button>
                     </div>
-                  </div>
-
-                  <!-- Time axis + columns -->
-                  <div class="flex" :style="{ height: CAL_H + 'px' }">
-
-                    <!-- Time gutter -->
-                    <div class="shrink-0 relative border-r border-slate-100" :style="{ width: GUTTER + 'px' }">
-                      <div v-for="h in HOURS" :key="h"
-                        :style="{ top: hourTop(h) + 'px' }"
-                        class="absolute right-2 -translate-y-2.5 select-none">
-                        <span class="text-xs text-slate-400 font-medium">
-                          {{ h === 12 ? '12PM' : h < 12 ? h + 'AM' : (h - 12) + 'PM' }}
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Grid body: gridlines + day columns -->
-                    <div class="flex-1 relative flex">
-
-                      <!-- Horizontal hour lines (drawn over all columns) -->
-                      <div v-for="h in HOURS" :key="'hl-' + h"
-                        :style="{ top: hourTop(h) + 'px' }"
-                        class="absolute inset-x-0 border-t border-slate-100 pointer-events-none z-0" />
-
-                      <!-- Half-hour dashed lines -->
-                      <div v-for="h in HOURS" :key="'hl30-' + h"
-                        :style="{ top: (hourTop(h) + SCALE * 30) + 'px' }"
-                        class="absolute inset-x-0 border-t border-dashed border-slate-50 pointer-events-none z-0" />
-
-                      <!-- Day columns -->
-                      <div v-for="day in WEEKDAYS" :key="day"
-                        v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), createGhostKey(groupId, day), dayConfigFor(groupId, day)]"
-                        :class="['flex-1 relative border-l border-slate-100 overflow-hidden',
-                          canQuickCreate(groupId) ? 'cursor-crosshair' : '']"
-                        @mousedown="onColumnMouseDown($event, groupId, day)"
-                        @dragover.prevent="onDragOverColumn($event, groupId, day)"
-                        @drop.prevent="onDropColumn($event, groupId, day)">
-
-                        <!-- Click/drag-to-create ghost (Google Calendar-style) -->
-                        <div v-if="createDraft && createDraft.groupId === groupId && createDraft.day === day"
-                          :style="createGhostStyle()"
-                          class="absolute inset-x-0.5 rounded-md border-2 border-indigo-400 bg-indigo-100/80 z-20 pointer-events-none flex items-start justify-center px-1 overflow-hidden">
-                          <span class="text-xs font-semibold text-indigo-700 mt-0.5 select-none tabular-nums">
-                            {{ fmtTime(minToTime(createDraft.startMin)) }} – {{ fmtTime(minToTime(createDraft.endMin)) }}
-                          </span>
-                        </div>
-
-                        <!-- Drag-and-drop preview -->
-                        <div v-if="dropTarget && dropTarget.groupId === groupId && dropTarget.day === day"
-                          :style="dropPreviewStyle()"
-                          :class="['absolute rounded border-2 z-30 pointer-events-none flex items-center justify-center px-1 text-center',
-                            dropTarget.hasConflict ? 'bg-red-100/85 border-red-400' : 'bg-emerald-100/85 border-emerald-400']">
-                          <span :class="['text-xs font-semibold truncate', dropTarget.hasConflict ? 'text-red-700' : 'text-emerald-700']">
-                            {{ dropTarget.hasConflict ? (dropTarget.message ?? 'Conflict') : 'Drop here' }}
-                          </span>
-                        </div>
-
-                        <!-- Blocked period overlays -->
-                        <div v-for="bp in (dayConfigFor(groupId, day)?.blocked ?? [])" :key="bp.label"
-                          :style="blockedStyle(bp)"
-                          class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
-                          <div class="absolute inset-0 bg-slate-100/70" />
-                          <span class="relative text-xs text-slate-400 font-medium px-1 text-center leading-tight select-none">
-                            {{ bp.label }}
-                          </span>
-                        </div>
-
-                        <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
-                        <div v-if="dayConfigFor(groupId, day) && timeToMin(dayConfigFor(groupId, day).end) <= 12 * 60"
-                          :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"
-                          class="pointer-events-none z-[1]">
-                          <div class="absolute inset-0 bg-slate-50/80 border-t border-slate-200/50" />
-                          <span class="relative block text-center text-xs text-slate-300 mt-2 select-none font-medium">
-                            No Classes
-                          </span>
-                        </div>
-
-                        <!-- Schedule event blocks -->
-                        <div v-for="s in (byGroupDay[groupId]?.[day] ?? [])" :key="s.id"
-                          data-evt
-                          :style="[eventStyle(s), eventColorStyle(s)]"
-                          :draggable="canDrag(s)"
-                          :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
-                            s.entry_type === 'non_teaching' ? 'border-dashed' : '',
-                            s.session_type === 'ilp' ? 'border-dotted' : '',
-                            canDrag(s) ? 'cursor-grab active:cursor-grabbing' : (s.can_edit ? 'cursor-pointer' : 'cursor-default'),
-                            dragPayload?.kind === 'move' && dragPayload.schedule.id === s.id ? 'opacity-30' : '']"
-                          @dragstart="onDragStartEvent($event, s)"
-                          @dragend="onDragEnd"
-                          @click="onEventClick(s)">
-                          <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
-                            <div :class="['font-bold leading-tight truncate', eventFontSizeClass(s)]">
-                              {{ s.entry_type === 'non_teaching' ? s.title : s.subject?.code }}{{ s.session_type === 'ilp' ? '(ILP)' : '' }}
-                            </div>
-                            <div v-if="eventDisplayMode(s) !== 'compact'" :class="['leading-tight truncate opacity-75', eventFontSizeClass(s)]">
-                              {{ secondaryLabel(s) }}
-                            </div>
-                            <div v-if="eventDisplayMode(s) === 'full'" :class="['leading-tight opacity-55 tabular-nums', eventFontSizeClass(s)]">
-                              {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
-                            </div>
-                          </div>
-                          <!-- Status indicator bar -->
-                          <div v-if="s.status === 'tentative'"
-                            class="absolute top-0 right-0 bottom-0 w-0.5 bg-amber-400" />
-                          <LockClosedIcon v-if="s.is_locked"
-                            class="absolute top-0.5 right-0.5 h-3 w-3 text-slate-400" title="Locked — drag disabled" />
-                          <div v-if="s.status === 'cancelled'"
-                            class="absolute inset-0 bg-white/60 flex items-center justify-center">
-                            <span class="text-xs text-slate-400 font-medium">Cancelled</span>
-                          </div>
-                        </div>
-
+                    <div class="flex flex-wrap gap-1.5 mt-1.5">
+                      <div v-for="load in visibleUnplaced(groupId)" :key="load.load_assignment_id"
+                        :draggable="!isOverviewMode && !load.is_locked"
+                        @dragstart="onDragStartLoad($event, load)"
+                        @dragend="onDragEnd"
+                        :class="['inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium select-none',
+                          isOverviewMode
+                            ? 'bg-amber-50 border-amber-200 text-amber-800'
+                            : (load.is_locked
+                                ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
+                                : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-grab active:cursor-grabbing')]">
+                        <LockClosedIcon v-if="!isOverviewMode && load.is_locked" class="h-3 w-3" />
+                        <span class="font-bold">{{ load.subject?.code }}</span>
+                        <span v-if="viewBy !== 'faculty'">· {{ load.faculty?.name ?? 'TBA' }}</span>
+                        <span v-if="viewBy !== 'section'">· {{ unplacedGradeSectionLabel(load) }}</span>
+                        <span class="bg-amber-200/60 px-1.5 py-0.5 rounded-full">needs {{ load.still_needed }}</span>
                       </div>
                     </div>
                   </div>
+                </template>
 
-                </div>
-              </div>
+              </ScheduleCalendarCard>
 
-              <!-- Legend: subjects for this group -->
-              <div class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5">
-                <div v-for="sub in subjectsInGroup(groupId)" :key="sub.id"
-                  :style="subjectColorStyle(sub.id)"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
-                  {{ sub.code }}
-                </div>
-              </div>
-
-            </div>
             </template>
           </template>
 
@@ -533,6 +407,7 @@ import AppInput from '@/Components/AppInput.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import ScheduleCalendarCard from '@/Components/FacultyLoading/ScheduleCalendarCard.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
@@ -545,26 +420,7 @@ import {
 const WEEKDAYS  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const CAL_START = 7 * 60        // 7:00 AM in minutes
 const CAL_END   = 16 * 60 + 30  // 4:30 PM in minutes
-const SCALE     = 1.5            // px per minute — wider now the sticky tray is gone
-const GUTTER    = 44             // width of the time-axis gutter in px
-const CAL_H     = (CAL_END - CAL_START) * SCALE  // total calendar height in px
-
-// Hour marks to draw (7 AM through 4 PM inclusive)
-const HOURS = Array.from({ length: 10 }, (_, i) => i + 7)
-
-// Subject color palette — 10 distinct colors, cycling by subject_id % 10
-const PALETTE = [
-  { bg: '#dbeafe', border: '#93c5fd', color: '#1e40af' },
-  { bg: '#ede9fe', border: '#c4b5fd', color: '#5b21b6' },
-  { bg: '#d1fae5', border: '#6ee7b7', color: '#065f46' },
-  { bg: '#fef3c7', border: '#fcd34d', color: '#92400e' },
-  { bg: '#fee2e2', border: '#fca5a5', color: '#991b1b' },
-  { bg: '#cffafe', border: '#67e8f9', color: '#0e7490' },
-  { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
-  { bg: '#ecfdf5', border: '#34d399', color: '#064e3b' },
-  { bg: '#fff7ed', border: '#fdba74', color: '#9a3412' },
-  { bg: '#f0f9ff', border: '#7dd3fc', color: '#075985' },
-]
+const SCALE     = 1.5            // px per minute — used by the mousedown/drag-to-create math below
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -636,6 +492,12 @@ const viewBy = ref(
 
 const GRADE_LEVELS = [7, 8, 9, 10, 11, 12]
 const gradeFilter = ref(null)
+const subjectFilter = ref(null)
+
+/** Grade and Subject views are read-only overviews — no drag/drop, no quick-
+ *  create, and (per groupsWithSchedules below) no placeholder cards for a
+ *  group that only has unplaced loads and zero actual schedules yet. */
+const isOverviewMode = computed(() => viewBy.value === 'grade' || viewBy.value === 'subject')
 
 function setViewBy(mode) {
   if (viewBy.value === mode) return
@@ -653,19 +515,28 @@ function setViewBy(mode) {
 
 // ── Grouping ─────────────────────────────────────────────────────────────────
 
-/** Schedules feeding the grouping logic — in "By Year Level" mode this is
- *  narrowed to elective sessions only (and optionally one grade), since that
- *  view exists to give a comprehensive cross-section elective overview. */
+/** Schedules feeding the grouping logic. "By Year Level" narrows to elective
+ *  sessions only (and optionally one grade) — a cross-section elective
+ *  overview. "By Subject" narrows to teaching sessions of one subject (all,
+ *  not just electives) — non-teaching blocks have no subject and are excluded. */
 const displaySchedules = computed(() => {
-  if (viewBy.value !== 'grade') return props.schedules
-  return props.schedules.filter(s =>
-    s.subject?.is_elective && (gradeFilter.value == null || s.grade_level === gradeFilter.value)
-  )
+  if (viewBy.value === 'grade') {
+    return props.schedules.filter(s =>
+      s.subject?.is_elective && (gradeFilter.value == null || s.grade_level === gradeFilter.value)
+    )
+  }
+  if (viewBy.value === 'subject') {
+    return props.schedules.filter(s =>
+      s.entry_type !== 'non_teaching' && s.subject && (subjectFilter.value == null || s.subject.id === subjectFilter.value)
+    )
+  }
+  return props.schedules
 })
 
 /** Group key for a schedule row, depending on the active view mode. */
 function groupKeyOf(s) {
   if (viewBy.value === 'grade') return s.grade_level
+  if (viewBy.value === 'subject') return s.subject?.id ?? null
   return viewBy.value === 'faculty' ? (s.faculty?.id ?? 'unassigned') : s.section_id
 }
 
@@ -689,9 +560,9 @@ const groupsWithSchedules = computed(() => {
   }
   // Sections/faculty with unplaced loads but zero schedules yet still need a
   // calendar card to render so there's somewhere to drop the tray chip. Not
-  // applicable in "By Year Level" mode — that view is read-only overview, no
-  // drop target, and unplaced loads aren't elective-flagged here.
-  if (viewBy.value !== 'grade') {
+  // applicable in overview modes (Grade/Subject) — those are read-only, no
+  // drop target, and their unplaced loads aren't filtered the same way.
+  if (!isOverviewMode.value) {
     for (const load of props.unplacedLoads) {
       const k = viewBy.value === 'faculty' ? (load.faculty?.id ?? 'unassigned') : load.section_id
       if (!seen.includes(k)) seen.push(k)
@@ -699,6 +570,8 @@ const groupsWithSchedules = computed(() => {
   }
   if (viewBy.value === 'grade') {
     seen.sort((a, b) => a - b)
+  } else if (viewBy.value === 'subject') {
+    seen.sort((a, b) => subjectLabel(a).localeCompare(subjectLabel(b)))
   } else if (viewBy.value === 'faculty') {
     // Group by Division/Office (the live Data Management assignment) instead
     // of leaving faculty in whatever order their first schedule row happened
@@ -740,7 +613,9 @@ function shouldShowUnitHeader(facultyId) {
 
 /** { groupId: [unplacedLoads] } — grouped the same way calendar cards are.
  *  Grade view only surfaces electives (that view is an Electives-only
- *  overview) and never adds new cards — it stays read-only, no drop target. */
+ *  overview). Grade/Subject never add new cards — they stay read-only, no
+ *  drop target, so a subject/grade with zero schedules shows no unplaced
+ *  count anywhere in that view (only Section/Faculty guarantee full coverage). */
 const unplacedByGroup = computed(() => {
   const map = {}
   for (const load of props.unplacedLoads) {
@@ -748,6 +623,8 @@ const unplacedByGroup = computed(() => {
     if (viewBy.value === 'grade') {
       if (!load.subject?.is_elective) continue
       k = load.grade_level
+    } else if (viewBy.value === 'subject') {
+      k = load.subject?.id
     } else if (viewBy.value === 'faculty') {
       k = load.faculty?.id ?? 'unassigned'
     } else {
@@ -847,6 +724,7 @@ function secondaryLabel(s) {
     return s.faculty?.name ? lastNameOf(s.faculty.name) : cat
   }
   if (viewBy.value === 'grade') return `${s.section_name} · ${s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA'}`
+  if (viewBy.value === 'subject') return `G${s.grade_level} ${s.section_name} · ${s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA'}`
   return viewBy.value === 'faculty'
     ? `G${s.grade_level} ${s.section_name}`
     : (s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA')
@@ -860,150 +738,41 @@ function timeToMin(t) {
   return parseInt(parts[0]) * 60 + parseInt(parts[1])
 }
 
-/** Top offset in px for a given hour mark */
-function hourTop(h) {
-  return (h * 60 - CAL_START) * SCALE
+// ── ScheduleCalendarCard prop builders ────────────────────────────────────────
+// The grid itself now lives in the shared component; these just shape this
+// page's per-group state into the plain props/objects it expects.
+
+/** Card heading text for a group, matching the old inline template branches. */
+function cardTitle(groupId) {
+  if (viewBy.value === 'grade') return `Grade ${groupId} — Electives`
+  if (viewBy.value === 'subject') return subjectLabel(groupId)
+  return viewBy.value === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name
 }
 
-/**
- * Assigns each event in a single day-column a lane (and the lane count for
- * its overlap cluster) so concurrent sessions render side-by-side instead of
- * stacked. Standard greedy interval-packing: sort by start time, give each
- * event the lowest-numbered lane whose previous occupant has already ended.
- * Returns Map(scheduleId -> { lane, totalLanes }).
- */
-function packOverlaps(events) {
-  const items = events
-    .map(s => ({ id: s.id, start: timeToMin(s.start_time), end: timeToMin(s.end_time) }))
-    .sort((a, b) => a.start - b.start || a.end - b.end)
-
-  const result = new Map()
-  let lanesEnd = []
-  let cluster = []
-  let clusterMaxLane = 0
-  let clusterEnd = -Infinity
-
-  const flush = () => {
-    for (const id of cluster) result.get(id).totalLanes = clusterMaxLane + 1
-    cluster = []
-    clusterMaxLane = 0
-    lanesEnd = []
-  }
-
-  for (const item of items) {
-    if (item.start >= clusterEnd) {
-      flush()
-      clusterEnd = -Infinity
-    }
-    let lane = 0
-    while (lane < lanesEnd.length && lanesEnd[lane] > item.start) lane++
-    lanesEnd[lane] = item.end
-    result.set(item.id, { lane, totalLanes: 1 })
-    cluster.push(item.id)
-    clusterMaxLane = Math.max(clusterMaxLane, lane)
-    clusterEnd = Math.max(clusterEnd, item.end)
-  }
-  flush()
-  return result
+/** "CODE — Name" for a subject id, sourced from the page's subject catalog
+ *  (not from a schedule row) so it's stable even for a subject with no
+ *  sessions placed yet. */
+function subjectLabel(subjectId) {
+  const s = props.subjects.find(x => String(x.id) === String(subjectId))
+  return s ? `${s.code} — ${s.name}` : `Subject ${subjectId}`
 }
 
-/** { groupId: { day: Map(scheduleId -> {lane, totalLanes}) } } — only built
- *  in "By Year Level" mode, where multiple sections' concurrent electives
- *  share the same day column and need side-by-side lanes. */
-const lanePacking = computed(() => {
-  const map = {}
-  if (viewBy.value !== 'grade') return map
-  for (const [groupId, days] of Object.entries(byGroupDay.value)) {
-    map[groupId] = {}
-    for (const [day, events] of Object.entries(days)) {
-      map[groupId][day] = packOverlaps(events)
-    }
+/** { Monday: [schedule, ...], ... } for one card, with secondary_label
+ *  pre-resolved since the component doesn't know about viewBy. */
+function cardEventsByDay(groupId) {
+  const byDay = byGroupDay.value[groupId] ?? {}
+  const out = {}
+  for (const day of WEEKDAYS) {
+    out[day] = (byDay[day] ?? []).map(s => ({ ...s, secondary_label: secondaryLabel(s) }))
   }
-  return map
-})
-
-/** Duration in minutes of a schedule event. */
-function eventDurationMin(s) {
-  return timeToMin(s.end_time) - timeToMin(s.start_time)
+  return out
 }
 
-/** How much text an event block has room for, based on its duration.
- *  'full' (>=40min): title + secondary label + time range.
- *  'compact' (25-39min, e.g. a 30-min ILP session): title + secondary label only.
- *  'minimal' (<25min): title only. */
-function eventDisplayMode(s) {
-  const d = eventDurationMin(s)
-  if (d >= 40) return 'full'
-  if (d >= 25) return 'compact'
-  return 'minimal'
-}
-
-/** Font-size class matching the event's display mode — shrinks on short blocks
- *  so text isn't clipped/compressed inside their reduced height. */
-function eventFontSizeClass(s) {
-  const mode = eventDisplayMode(s)
-  if (mode === 'full') return 'text-xs'
-  if (mode === 'compact') return 'text-[10px]'
-  return 'text-[9px]'
-}
-
-/** Absolute positioning style for a schedule event block. In "By Year Level"
- *  mode, horizontal position/width come from packOverlaps() so concurrent
- *  sections' electives sit in side-by-side lanes instead of overlapping. */
-function eventStyle(s) {
-  const sm = Math.max(timeToMin(s.start_time), CAL_START)
-  const em = Math.min(timeToMin(s.end_time), CAL_END)
-  const style = {
-    position: 'absolute',
-    top:    ((sm - CAL_START) * SCALE) + 'px',
-    height: Math.max((em - sm) * SCALE, 24) + 'px',
-  }
-
-  if (viewBy.value === 'grade') {
-    const pack  = lanePacking.value[groupKeyOf(s)]?.[s.day_of_week]?.get(s.id)
-    const lane  = pack?.lane ?? 0
-    const total = pack?.totalLanes ?? 1
-    const pct   = 100 / total
-    style.left  = `calc(${lane * pct}% + 1px)`
-    style.width = `calc(${pct}% - 2px)`
-  } else {
-    style.left  = '2px'
-    style.right = '2px'
-  }
-
-  return style
-}
-
-/** Absolute positioning style for a blocked-period overlay */
-function blockedStyle(bp) {
-  const sm = Math.max(timeToMin(bp.start), CAL_START)
-  const em = Math.min(timeToMin(bp.end), CAL_END)
-  return {
-    position: 'absolute',
-    top:    ((sm - CAL_START) * SCALE) + 'px',
-    height: Math.max((em - sm) * SCALE, 4) + 'px',
-    left: 0,
-    right: 0,
-  }
-}
-
-/** Inline style for subject-colored event block (cycles palette by subject_id) */
-function subjectColorStyle(subjectId) {
-  const p = PALETTE[(subjectId ?? 0) % PALETTE.length]
-  return {
-    backgroundColor: p.bg,
-    borderColor:     p.border,
-    color:           p.color,
-  }
-}
-
-/** Event color — non-teaching blocks get a fixed neutral slate look so they
- *  read as "reserved time", visually distinct from subject-colored classes. */
-function eventColorStyle(s) {
-  if (s.entry_type === 'non_teaching') {
-    return { backgroundColor: '#f1f5f9', borderColor: '#94a3b8', color: '#334155' }
-  }
-  return subjectColorStyle(s.subject?.id)
+/** { Monday: {start,end,blocked}, ... } for one card. */
+function dayConfigsForGroup(groupId) {
+  const out = {}
+  for (const day of WEEKDAYS) out[day] = dayConfigFor(groupId, day)
+  return out
 }
 
 // ── Drag and drop ────────────────────────────────────────────────────────────
@@ -1017,7 +786,7 @@ const dropTarget  = ref(null)
 const dragBusy     = ref(false)
 
 function canDrag(s) {
-  return viewBy.value !== 'grade' && s.status !== 'cancelled' && !!s.can_edit
+  return !isOverviewMode.value && s.status !== 'cancelled' && !!s.can_edit
 }
 
 /** Blocks the modal for rows the user can't touch (e.g. faculty viewing own classes). */
@@ -1083,22 +852,6 @@ function dropTargetsEqual(a, b) {
     && a.endMin === b.endMin && a.hasConflict === b.hasConflict && a.message === b.message
 }
 
-/** Per-column memo key for v-memo — only the column actually under the
- *  pointer should re-render when dropTarget changes. */
-function dropPreviewKey(groupId, day) {
-  const d = dropTarget.value
-  if (!d || d.groupId !== groupId || d.day !== day) return 'none'
-  return `${d.startMin}-${d.endMin}-${d.hasConflict}-${d.message ?? ''}`
-}
-
-/** Per-column memo key for v-memo — only the column holding the dragged-from
- *  event needs to re-render to apply the dimmed/opacity style. */
-function dragDimKey(groupId, day) {
-  if (dragPayload.value?.kind !== 'move') return null
-  const s = dragPayload.value.schedule
-  return (groupKeyOf(s) === groupId && s.day_of_week === day) ? s.id : null
-}
-
 function onDragStartEvent(e, s) {
   if (!canDrag(s)) { e.preventDefault(); return }
   dragPayload.value = { kind: 'move', schedule: s }
@@ -1134,7 +887,7 @@ function onDragEnd() {
 }
 
 function onDragOverColumn(e, groupId, day) {
-  if (viewBy.value === 'grade') return
+  if (isOverviewMode.value) return
   if (!dragPayload.value) return
   pendingDragOver = { clientY: e.clientY, columnEl: e.currentTarget, groupId, day }
   if (dragFrame) return
@@ -1184,21 +937,8 @@ function processPendingDragOver() {
   }
 }
 
-function dropPreviewStyle() {
-  if (!dropTarget.value) return {}
-  const sm = Math.max(dropTarget.value.startMin, CAL_START)
-  const em = Math.min(dropTarget.value.endMin, CAL_END)
-  return {
-    position: 'absolute',
-    top:    ((sm - CAL_START) * SCALE) + 'px',
-    height: Math.max((em - sm) * SCALE, 16) + 'px',
-    left:   '2px',
-    right:  '2px',
-  }
-}
-
 async function onDropColumn(e, groupId, day) {
-  if (viewBy.value === 'grade') return
+  if (isOverviewMode.value) return
   const payload = dragPayload.value
   const target  = dropTarget.value
   dragPayload.value = null
@@ -1319,7 +1059,7 @@ const qc = reactive({
 let suppressCreateOnce = false
 
 function canQuickCreate(groupId) {
-  if (viewBy.value === 'grade') return false
+  if (isOverviewMode.value) return false
   if (isManage.value) return true
   // unit/self reach: own-calendar columns only (props.faculty is already
   // server-filtered to the reachable set). Section-wide adds are manage-only.
@@ -1383,22 +1123,6 @@ function onCreateDragEnd(e) {
     d.startMin = Math.min(d.anchorMin, d.endMin - CREATE_SNAP_MIN)
   }
   openQuickCreate(e, d)
-}
-
-/** Per-column memo key for v-memo — only the column holding the ghost re-renders. */
-function createGhostKey(groupId, day) {
-  const d = createDraft.value
-  if (!d || d.groupId !== groupId || d.day !== day) return 'none'
-  return `${d.startMin}-${d.endMin}`
-}
-
-function createGhostStyle() {
-  const d = createDraft.value
-  if (!d) return {}
-  return {
-    top:    ((d.startMin - CAL_START) * SCALE) + 'px',
-    height: (Math.max(d.endMin - d.startMin, CREATE_SNAP_MIN) * SCALE) + 'px',
-  }
 }
 
 function openQuickCreate(e, d) {
@@ -1613,14 +1337,6 @@ function fmtTime(t) {
   const [h, m] = t.split(':')
   const hour = parseInt(h)
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`
-}
-
-/** Format HH:MM:SS → h:MM AM/PM for day config display */
-function fmtConfigTime(t) {
-  if (!t) return ''
-  const [h, m] = t.split(':')
-  const hour = parseInt(h)
-  return `${hour % 12 || 12}:${m}${hour >= 12 ? 'PM' : 'AM'}`
 }
 
 /** Extract surname for compact display in event blocks */

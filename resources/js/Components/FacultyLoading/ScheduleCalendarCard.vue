@@ -1,0 +1,452 @@
+<template>
+  <div ref="rootEl"
+    class="schedule-calendar-card bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden"
+    :class="isExpanded ? 'fixed inset-3 z-50 flex flex-col print:static print:inset-auto print:z-auto print:flex-none print:shadow-none print:ring-0' : ''">
+
+    <!-- Card header -->
+    <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0 gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <span v-if="titleBadge" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full shrink-0">
+          {{ titleBadge }}
+        </span>
+        <h3 class="text-sm font-semibold text-slate-800 truncate">{{ title }}</h3>
+        <span v-if="meta" class="text-xs text-slate-400 shrink-0">{{ meta }}</span>
+      </div>
+      <div class="flex items-center gap-1 shrink-0 print:hidden">
+        <slot name="header-actions" />
+        <AppIconButton label="Print" size="sm" @click="printCard">
+          <PrinterIcon class="h-4 w-4" />
+        </AppIconButton>
+        <AppIconButton :label="isExpanded ? 'Collapse' : 'Expand'" size="sm" @click="toggleExpand">
+          <ArrowsPointingInIcon v-if="isExpanded" class="h-4 w-4" />
+          <ArrowsPointingOutIcon v-else class="h-4 w-4" />
+        </AppIconButton>
+      </div>
+    </div>
+
+    <slot name="header-extra" />
+
+    <!-- Calendar grid -->
+    <div class="overflow-x-auto print:overflow-visible" :class="isExpanded ? 'flex-1' : ''">
+      <div style="min-width: 760px" class="print:min-w-0">
+
+        <!-- Day column headers -->
+        <div class="flex border-b border-slate-100">
+          <div class="shrink-0 border-r border-slate-100" :style="{ width: GUTTER + 'px' }" />
+          <div v-for="day in WEEKDAYS" :key="day"
+            class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0">
+            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              {{ day.slice(0, 3) }}
+            </span>
+            <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
+              {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Time axis + columns -->
+        <div class="flex" :style="{ height: CAL_H + 'px' }">
+
+          <!-- Time gutter -->
+          <div class="shrink-0 relative border-r border-slate-100" :style="{ width: GUTTER + 'px' }">
+            <div v-for="h in HOURS" :key="h"
+              :style="{ top: hourTop(h) + 'px' }"
+              class="absolute right-2 -translate-y-2.5 select-none">
+              <span class="text-xs text-slate-400 font-medium">
+                {{ h === 12 ? '12PM' : h < 12 ? h + 'AM' : (h - 12) + 'PM' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Grid body: gridlines + day columns -->
+          <div class="flex-1 relative flex">
+
+            <!-- Horizontal hour lines (drawn over all columns) -->
+            <div v-for="h in HOURS" :key="'hl-' + h"
+              :style="{ top: hourTop(h) + 'px' }"
+              class="absolute inset-x-0 border-t border-slate-100 pointer-events-none z-0" />
+
+            <!-- Half-hour dashed lines -->
+            <div v-for="h in HOURS" :key="'hl30-' + h"
+              :style="{ top: (hourTop(h) + SCALE * 30) + 'px' }"
+              class="absolute inset-x-0 border-t border-dashed border-slate-50 pointer-events-none z-0" />
+
+            <!-- Day columns -->
+            <div v-for="day in WEEKDAYS" :key="day"
+              :class="['flex-1 relative border-l border-slate-100 overflow-hidden',
+                editable && canQuickCreate ? 'cursor-crosshair' : '']"
+              @mousedown="$emit('column-mousedown', day, $event)"
+              @dragover.prevent="$emit('column-dragover', day, $event)"
+              @drop.prevent="$emit('column-drop', day, $event)">
+
+              <!-- Click/drag-to-create ghost (Google Calendar-style) -->
+              <div v-if="createDraft && createDraft.day === day"
+                :style="createGhostStyle()"
+                class="absolute inset-x-0.5 rounded-md border-2 border-indigo-400 bg-indigo-100/80 z-20 pointer-events-none flex items-start justify-center px-1 overflow-hidden">
+                <span class="text-xs font-semibold text-indigo-700 mt-0.5 select-none tabular-nums">
+                  {{ fmtTime(minToTime(createDraft.startMin)) }} – {{ fmtTime(minToTime(createDraft.endMin)) }}
+                </span>
+              </div>
+
+              <!-- Drag-and-drop preview -->
+              <div v-if="dropPreview && dropPreview.day === day"
+                :style="dropPreviewStyle()"
+                :class="['absolute rounded border-2 z-30 pointer-events-none flex items-center justify-center px-1 text-center',
+                  dropPreview.hasConflict ? 'bg-red-100/85 border-red-400' : 'bg-emerald-100/85 border-emerald-400']">
+                <span :class="['text-xs font-semibold truncate', dropPreview.hasConflict ? 'text-red-700' : 'text-emerald-700']">
+                  {{ dropPreview.hasConflict ? (dropPreview.message ?? 'Conflict') : 'Drop here' }}
+                </span>
+              </div>
+
+              <!-- Blocked period overlays -->
+              <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="bp.label"
+                :style="blockedStyle(bp)"
+                class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
+                <div class="absolute inset-0 bg-slate-100/70" />
+                <span class="relative text-xs text-slate-400 font-medium px-1 text-center leading-tight select-none">
+                  {{ bp.label }}
+                </span>
+              </div>
+
+              <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
+              <div v-if="dayConfigs[day] && timeToMin(dayConfigs[day].end) <= 12 * 60"
+                :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"
+                class="pointer-events-none z-[1]">
+                <div class="absolute inset-0 bg-slate-50/80 border-t border-slate-200/50" />
+                <span class="relative block text-center text-xs text-slate-300 mt-2 select-none font-medium">
+                  No Classes
+                </span>
+              </div>
+
+              <!-- Schedule event blocks -->
+              <div v-for="s in (eventsByDay[day] ?? [])" :key="s.id"
+                data-evt
+                :style="[eventStyle(s, day), eventColorStyle(s)]"
+                :draggable="editable && isDraggable(s)"
+                :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
+                  s.entry_type === 'non_teaching' ? 'border-dashed' : '',
+                  s.session_type === 'ilp' ? 'border-dotted' : '',
+                  editable && isDraggable(s) ? 'cursor-grab active:cursor-grabbing' : (s.can_edit ? 'cursor-pointer' : 'cursor-default'),
+                  s.id === dimEventId ? 'opacity-30' : '']"
+                @dragstart="$emit('event-dragstart', s, $event)"
+                @dragend="$emit('event-dragend')"
+                @click="$emit('event-click', s)">
+                <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
+                  <div :class="['font-bold leading-tight truncate', eventFontSizeClass(s)]">
+                    {{ s.entry_type === 'non_teaching' ? s.title : s.subject?.code }}{{ s.session_type === 'ilp' ? '(ILP)' : '' }}
+                  </div>
+                  <div v-if="eventDisplayMode(s) !== 'compact'" :class="['leading-tight truncate opacity-75', eventFontSizeClass(s)]">
+                    {{ s.secondary_label }}
+                  </div>
+                  <div v-if="eventDisplayMode(s) === 'full'" :class="['leading-tight opacity-55 tabular-nums', eventFontSizeClass(s)]">
+                    {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
+                  </div>
+                </div>
+                <!-- Status indicator bar -->
+                <div v-if="s.status === 'tentative'"
+                  class="absolute top-0 right-0 bottom-0 w-0.5 bg-amber-400" />
+                <LockClosedIcon v-if="s.is_locked"
+                  class="absolute top-0.5 right-0.5 h-3 w-3 text-slate-400" title="Locked — drag disabled" />
+                <div v-if="s.status === 'cancelled'"
+                  class="absolute inset-0 bg-white/60 flex items-center justify-center">
+                  <span class="text-xs text-slate-400 font-medium">Cancelled</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div v-if="legend.length" class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5 shrink-0">
+      <div v-for="sub in legend" :key="sub.id"
+        :style="subjectColorStyle(sub.id)"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
+        {{ sub.code }}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Backdrop when expanded -->
+  <div v-if="isExpanded" class="fixed inset-0 bg-slate-900/40 z-40 print:hidden" @click="toggleExpand" />
+</template>
+
+<script setup>
+import { onBeforeUnmount, onMounted, ref, computed } from 'vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import {
+  ArrowsPointingInIcon, ArrowsPointingOutIcon, LockClosedIcon, PrinterIcon,
+} from '@heroicons/vue/24/outline'
+
+const props = defineProps({
+  title:          { type: String, required: true },
+  titleBadge:     { type: [String, Number], default: null },
+  meta:           { type: String, default: '' },
+  /** { Monday: [scheduleRow, ...], ... } — each row may carry a pre-resolved `secondary_label`. */
+  eventsByDay:    { type: Object, default: () => ({}) },
+  /** { Monday: { start, end, blocked: [{label,start,end}] }, ... } */
+  dayConfigs:     { type: Object, default: () => ({}) },
+  editable:       { type: Boolean, default: false },
+  /** Side-by-side lanes for concurrent events instead of full-width — for
+   *  overview modes (Year Level / Subject) where overlap is expected. */
+  packLanes:      { type: Boolean, default: false },
+  legend:         { type: Array, default: () => [] },
+  dropPreview:    { type: Object, default: null },
+  createDraft:    { type: Object, default: null },
+  dimEventId:     { type: [Number, String], default: null },
+  canQuickCreate: { type: Boolean, default: false },
+  isDraggable:    { type: Function, default: () => false },
+})
+
+defineEmits(['column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click'])
+
+// ── Calendar constants (mirrors the values the parent used to own) ───────────
+
+const WEEKDAYS  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+const CAL_START = 7 * 60        // 7:00 AM in minutes
+const CAL_END   = 16 * 60 + 30  // 4:30 PM in minutes
+const SCALE     = 1.5           // px per minute
+const GUTTER    = 44            // width of the time-axis gutter in px
+const CAL_H     = (CAL_END - CAL_START) * SCALE
+
+const HOURS = Array.from({ length: 10 }, (_, i) => i + 7)
+
+const PALETTE = [
+  { bg: '#dbeafe', border: '#93c5fd', color: '#1e40af' },
+  { bg: '#ede9fe', border: '#c4b5fd', color: '#5b21b6' },
+  { bg: '#d1fae5', border: '#6ee7b7', color: '#065f46' },
+  { bg: '#fef3c7', border: '#fcd34d', color: '#92400e' },
+  { bg: '#fee2e2', border: '#fca5a5', color: '#991b1b' },
+  { bg: '#cffafe', border: '#67e8f9', color: '#0e7490' },
+  { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
+  { bg: '#ecfdf5', border: '#34d399', color: '#064e3b' },
+  { bg: '#fff7ed', border: '#fdba74', color: '#9a3412' },
+  { bg: '#f0f9ff', border: '#7dd3fc', color: '#075985' },
+]
+
+function timeToMin(t) {
+  if (!t) return 0
+  const parts = t.split(':')
+  return parseInt(parts[0]) * 60 + parseInt(parts[1])
+}
+
+function minToTime(min) {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function hourTop(h) {
+  return (h * 60 - CAL_START) * SCALE
+}
+
+function fmtTime(t) {
+  if (!t) return '—'
+  const [h, m] = t.split(':')
+  const hour = parseInt(h)
+  return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`
+}
+
+function fmtConfigTime(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':')
+  const hour = parseInt(h)
+  return `${hour % 12 || 12}:${m}${hour >= 12 ? 'PM' : 'AM'}`
+}
+
+/** Greedy interval-packing so concurrent events in a day get side-by-side
+ *  lanes instead of stacking. Returns Map(scheduleId -> {lane, totalLanes}). */
+function packOverlaps(events) {
+  const items = events
+    .map(s => ({ id: s.id, start: timeToMin(s.start_time), end: timeToMin(s.end_time) }))
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+
+  const result = new Map()
+  let lanesEnd = []
+  let cluster = []
+  let clusterMaxLane = 0
+  let clusterEnd = -Infinity
+
+  const flush = () => {
+    for (const id of cluster) result.get(id).totalLanes = clusterMaxLane + 1
+    cluster = []
+    clusterMaxLane = 0
+    lanesEnd = []
+  }
+
+  for (const item of items) {
+    if (item.start >= clusterEnd) {
+      flush()
+      clusterEnd = -Infinity
+    }
+    let lane = 0
+    while (lane < lanesEnd.length && lanesEnd[lane] > item.start) lane++
+    lanesEnd[lane] = item.end
+    result.set(item.id, { lane, totalLanes: 1 })
+    cluster.push(item.id)
+    clusterMaxLane = Math.max(clusterMaxLane, lane)
+    clusterEnd = Math.max(clusterEnd, item.end)
+  }
+  flush()
+  return result
+}
+
+/** { day: Map(scheduleId -> {lane, totalLanes}) } — only built when packLanes. */
+const lanePacking = computed(() => {
+  const map = {}
+  if (!props.packLanes) return map
+  for (const [day, events] of Object.entries(props.eventsByDay)) {
+    map[day] = packOverlaps(events)
+  }
+  return map
+})
+
+function eventDurationMin(s) {
+  return timeToMin(s.end_time) - timeToMin(s.start_time)
+}
+
+function eventDisplayMode(s) {
+  const d = eventDurationMin(s)
+  if (d >= 40) return 'full'
+  if (d >= 25) return 'compact'
+  return 'minimal'
+}
+
+function eventFontSizeClass(s) {
+  const mode = eventDisplayMode(s)
+  if (mode === 'full') return 'text-xs'
+  if (mode === 'compact') return 'text-[10px]'
+  return 'text-[9px]'
+}
+
+function eventStyle(s, day) {
+  const sm = Math.max(timeToMin(s.start_time), CAL_START)
+  const em = Math.min(timeToMin(s.end_time), CAL_END)
+  const style = {
+    position: 'absolute',
+    top:    ((sm - CAL_START) * SCALE) + 'px',
+    height: Math.max((em - sm) * SCALE, 24) + 'px',
+  }
+
+  if (props.packLanes) {
+    const pack  = lanePacking.value[day]?.get(s.id)
+    const lane  = pack?.lane ?? 0
+    const total = pack?.totalLanes ?? 1
+    const pct   = 100 / total
+    style.left  = `calc(${lane * pct}% + 1px)`
+    style.width = `calc(${pct}% - 2px)`
+  } else {
+    style.left  = '2px'
+    style.right = '2px'
+  }
+
+  return style
+}
+
+function blockedStyle(bp) {
+  const sm = Math.max(timeToMin(bp.start), CAL_START)
+  const em = Math.min(timeToMin(bp.end), CAL_END)
+  return {
+    position: 'absolute',
+    top:    ((sm - CAL_START) * SCALE) + 'px',
+    height: Math.max((em - sm) * SCALE, 4) + 'px',
+    left: 0,
+    right: 0,
+  }
+}
+
+function subjectColorStyle(subjectId) {
+  const p = PALETTE[(subjectId ?? 0) % PALETTE.length]
+  return { backgroundColor: p.bg, borderColor: p.border, color: p.color }
+}
+
+function eventColorStyle(s) {
+  if (s.entry_type === 'non_teaching') {
+    return { backgroundColor: '#f1f5f9', borderColor: '#94a3b8', color: '#334155' }
+  }
+  return subjectColorStyle(s.subject?.id)
+}
+
+function dropPreviewStyle() {
+  if (!props.dropPreview) return {}
+  const sm = Math.max(props.dropPreview.startMin, CAL_START)
+  const em = Math.min(props.dropPreview.endMin, CAL_END)
+  return {
+    position: 'absolute',
+    top:    ((sm - CAL_START) * SCALE) + 'px',
+    height: Math.max((em - sm) * SCALE, 16) + 'px',
+    left:   '2px',
+    right:  '2px',
+  }
+}
+
+function createGhostStyle() {
+  if (!props.createDraft) return {}
+  return {
+    top:    ((props.createDraft.startMin - CAL_START) * SCALE) + 'px',
+    height: (Math.max(props.createDraft.endMin - props.createDraft.startMin, 15) * SCALE) + 'px',
+  }
+}
+
+// ── Full-screen expand ────────────────────────────────────────────────────────
+
+const isExpanded = ref(false)
+
+function toggleExpand() {
+  isExpanded.value = !isExpanded.value
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape' && isExpanded.value) toggleExpand()
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+// ── Print (isolates just this card, regardless of expand state) ──────────────
+
+const rootEl = ref(null)
+
+function printCard() {
+  document.body.classList.add('print-single-card')
+  rootEl.value?.classList.add('schedule-print-target')
+  requestAnimationFrame(() => window.print())
+}
+
+function handleAfterPrint() {
+  document.body.classList.remove('print-single-card')
+  rootEl.value?.classList.remove('schedule-print-target')
+}
+
+onMounted(() => window.addEventListener('afterprint', handleAfterPrint))
+onBeforeUnmount(() => window.removeEventListener('afterprint', handleAfterPrint))
+</script>
+
+<style>
+/* Global (unscoped) on purpose: printing one card needs to hide the whole
+ * app shell (sidebar/topbar/other cards), which lives outside this component. */
+@media print {
+  body.print-single-card * {
+    visibility: hidden;
+  }
+  body.print-single-card .schedule-print-target,
+  body.print-single-card .schedule-print-target * {
+    visibility: visible;
+  }
+  body.print-single-card .schedule-print-target {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  @page {
+    size: landscape;
+    margin: 0.4in;
+  }
+}
+</style>
