@@ -8,7 +8,32 @@ class Pds extends Model
 {
     protected $fillable = [
         'user_id', // or employee_id if applicable
+        'submitted_at',
+        'annual_reminder_sent_at',
     ];
+
+    protected $casts = [
+        'submitted_at'             => 'datetime',
+        'annual_reminder_sent_at'  => 'datetime',
+    ];
+
+    /** True when the PDS has never been submitted or was last submitted over a year ago. */
+    public function isOverdue(): bool
+    {
+        return is_null($this->submitted_at) || $this->submitted_at->lt(now()->subYear());
+    }
+
+    /** Owner, SuperAdmin, or anyone with pds.view_all (HR) can view/export read-only. */
+    public function canBeViewedBy(User $user): bool
+    {
+        return $user->id === $this->user_id || $user->isSuperAdmin() || $user->hasPermission('pds.view_all');
+    }
+
+    /** Only the owner or SuperAdmin can edit/submit — HR's pds.view_all does NOT grant edit rights. */
+    public function canBeEditedBy(User $user): bool
+    {
+        return $user->id === $this->user_id || $user->isSuperAdmin();
+    }
 
     public function personalInfo() { return $this->hasOne(PDSPersonalInfo::class); }
     public function familyBackground() { return $this->hasOne(PDSFamilyBackground::class); }

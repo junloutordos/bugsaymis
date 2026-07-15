@@ -261,6 +261,9 @@ class PermissionsSeeder extends Seeder
             ['module' => 'SALN', 'name' => 'saln.view_all', 'description' => 'View all employee SALNs (HR Office)'],
             ['module' => 'SALN', 'name' => 'saln.file',     'description' => 'Mark approved SALN as officially filed (HR Office)'],
 
+            // ── PDS (Personal Data Sheet) ─────────────────────────────────────
+            ['module' => 'PDS', 'name' => 'pds.view_all', 'description' => 'View all employee Personal Data Sheets (HR Office)'],
+
             // ── Student Gate Attendance ───────────────────────────────────────
             ['module' => 'Student Attendance', 'name' => 'students.attendance.view',   'description' => 'View gate attendance logs and parent contacts'],
             ['module' => 'Student Attendance', 'name' => 'students.attendance.scan',   'description' => 'Operate the gate kiosk scanner'],

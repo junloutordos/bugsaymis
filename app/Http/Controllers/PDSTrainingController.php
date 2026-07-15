@@ -11,6 +11,8 @@ class PDSTrainingController extends Controller
 {
     public function uploadCSV(Request $request, PDS $pds)
     {
+        abort_unless($pds->canBeEditedBy(auth()->user()), 403);
+
         $data = $request->validate([
             'csv_base64'   => 'nullable|string',
             'csv_filename' => 'nullable|string|max:255',

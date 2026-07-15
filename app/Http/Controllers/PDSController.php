@@ -32,16 +32,46 @@ class PDSController extends Controller
     }
 
     /* =====================================================
-     | ADMIN: List all PDS
+     | HR/ADMIN: List all employees with PDS status
      ===================================================== */
-    public function index()
+    public function index(Request $request)
     {
-        abort_unless(auth()->user()->role_id === 1, 403);
+        abort_unless(auth()->user()->isSuperAdmin() || auth()->user()->hasPermission('pds.view_all'), 403);
+
+        $search = trim((string) $request->input('search', ''));
+        $status = $request->input('status', '');
+
+        $query = User::where('status', '!=', 'inactive')
+            ->with(['pds:id,user_id,submitted_at,created_at'])
+            ->select('id', 'name', 'email');
+
+        if ($search !== '') {
+            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%"));
+        }
+
+        match ($status) {
+            'not_started' => $query->whereDoesntHave('pds'),
+            'in_progress' => $query->whereHas('pds', fn ($q) => $q->whereNull('submitted_at')),
+            'submitted'   => $query->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '>=', now()->subYear())),
+            'overdue'     => $query->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '<', now()->subYear())),
+            default       => null,
+        };
+
+        $employees = $query->orderBy('name')->paginate(20)->withQueryString();
+
+        $counts = [
+            'total'       => User::where('status', '!=', 'inactive')->count(),
+            'not_started' => User::where('status', '!=', 'inactive')->whereDoesntHave('pds')->count(),
+            'in_progress' => User::where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNull('submitted_at'))->count(),
+            'submitted'   => User::where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '>=', now()->subYear()))->count(),
+            'overdue'     => User::where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '<', now()->subYear()))->count(),
+        ];
 
         return Inertia::render('PDS/Index', [
-            'pdsList' => Pds::with('user:id,name,email')
-                ->latest()
-                ->paginate(10),
+            'employees' => $employees,
+            'counts'    => $counts,
+            'filters'   => ['search' => $search, 'status' => $status],
         ]);
     }
 
@@ -87,6 +117,7 @@ class PDSController extends Controller
                 ]);
 
                 $this->saveRelations($pds, $request);
+                $pds->update(['submitted_at' => now()]);
             });
 
             return redirect()
@@ -106,7 +137,10 @@ class PDSController extends Controller
         $this->authorizeAccess($pds);
 
         return Inertia::render('PDS/Form', [
-            'pds' => $this->loadFullPds($pds),
+            'pds'       => $this->loadFullPds($pds),
+            'canEdit'   => $pds->canBeEditedBy(auth()->user()),
+            'isOwner'   => auth()->id() === $pds->user_id,
+            'isOverdue' => $pds->isOverdue(),
         ]);
     }
 
@@ -115,11 +149,12 @@ class PDSController extends Controller
      ===================================================== */
     public function update(Request $request, Pds $pds)
     {
-        $this->authorizeAccess($pds);
+        $this->authorizeEdit($pds);
 
         try {
             DB::transaction(function () use ($request, $pds) {
                 $this->saveRelations($pds, $request, true);
+                $pds->update(['submitted_at' => now()]);
             });
 
             return back()->with('success', 'Personal Data Sheet updated successfully!');
@@ -237,7 +272,7 @@ class PDSController extends Controller
      ===================================================== */
     public function updatePassportPhoto(Request $request, Pds $pds)
     {
-        $this->authorizeAccess($pds);
+        $this->authorizeEdit($pds);
 
         $request->validate(['photo_base64' => 'required|string']);
 
@@ -269,12 +304,16 @@ class PDSController extends Controller
     /* =====================================================
      | ACCESS CONTROL
      ===================================================== */
+    /** View-only access — owner, SuperAdmin, or HR (pds.view_all). */
     private function authorizeAccess(Pds $pds): void
     {
-        abort_if(
-            auth()->id() !== $pds->user_id && auth()->user()->role_id !== 1,
-            403
-        );
+        abort_unless($pds->canBeViewedBy(auth()->user()), 403);
+    }
+
+    /** Edit access — owner or SuperAdmin only. HR's pds.view_all does not grant edit rights. */
+    private function authorizeEdit(Pds $pds): void
+    {
+        abort_unless($pds->canBeEditedBy(auth()->user()), 403);
     }
 
     /* =====================================================

@@ -56,6 +56,9 @@ class RolePermissionSeeder extends Seeder
         // HR gets full filing & reporting access
         $assign('HR', ['saln.view_all', 'saln.file', 'saln.review', 'saln.approve']);
 
+        // HR can view all employee PDS (Personal Data Sheets)
+        $assign('HR', ['pds.view_all']);
+
         // HRMPSB is the designated SALN review committee
         $assign('HRMPSB', ['saln.review', 'saln.approve']);
 

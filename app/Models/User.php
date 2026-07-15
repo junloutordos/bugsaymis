@@ -70,6 +70,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class, 'role_user');
     }
 
+    public function pds()
+    {
+        return $this->hasOne(\App\Models\Pds::class);
+    }
+
     public function division()
     {
         return $this->belongsTo(Division::class);

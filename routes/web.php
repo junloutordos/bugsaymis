@@ -266,8 +266,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pds/{pds}/edit', [PDSController::class, 'edit'])->name('pds.edit');
     Route::put('/pds/{pds}', [PDSController::class, 'update'])->name('pds.update');
 
-    // Admin-only: list all PDS
-    Route::get('/pds', [PDSController::class, 'index'])->middleware('can:admin')->name('pds.index');
+    // HR/Admin: list all employee PDS statuses
+    Route::get('/pds', [PDSController::class, 'index'])->middleware('permission:pds.view_all')->name('pds.index');
 
     // Optional: show full PDS (for admin or owner)
     Route::get('/pds/{pds}', [PDSController::class, 'show'])->name('pds.show');

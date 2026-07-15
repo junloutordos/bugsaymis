@@ -37,6 +37,9 @@ Schedule::command('log:health')->dailyAt('06:00');
 // ── Backup recency check: was a backup uploaded to Drive in the last 25h? ─
 Schedule::command('backup:verify')->dailyAt('06:30')->withoutOverlapping();
 
+// ── PDS: notify employees whose PDS is overdue for its annual update ─────
+Schedule::command('pds:notify-annual-update')->dailyAt('07:00')->withoutOverlapping();
+
 // ── Atlas Sentinel: expire manual "Fix Now" requests stuck 'delivered' with
 //    no result reported (device went offline/crashed mid-flight) ─────────
 Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinutes()->withoutOverlapping();

@@ -43,6 +43,9 @@ async function uploadPassportPhoto(file) {
 
 const props = defineProps({
   pds: { type: Object, default: null },
+  canEdit: { type: Boolean, default: true },
+  isOwner: { type: Boolean, default: true },
+  isOverdue: { type: Boolean, default: false },
 })
 const { isSubmitting: isUploading, submit: submitUpload } = useSubmit()
 
@@ -503,7 +506,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
       <!-- Page header -->
       <AppPageHeader title="Personal Data Sheet" subtitle="Manage your personal information for civil service records">
         <template #actions>
-          <AppButton v-if="props.pds && !editMode" variant="secondary" @click="editMode = true">
+          <AppButton v-if="props.pds && !editMode && canEdit" variant="secondary" @click="editMode = true">
             <PencilSquareIcon class="h-4 w-4" />
             Edit PDS & WES
           </AppButton>
@@ -517,6 +520,14 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
           </AppButton>
         </template>
       </AppPageHeader>
+
+      <div v-if="props.pds && !canEdit" class="mb-4 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 px-4 py-3 text-sm">
+        Viewing {{ form.personal_info.first_name || 'this employee' }}'s PDS — read only. HR cannot edit or submit on an employee's behalf.
+      </div>
+
+      <div v-if="props.pds && canEdit && isOwner && isOverdue" class="mb-4 rounded-lg border border-warning-100 bg-warning-50 text-warning-700 px-4 py-3 text-sm">
+        Your Personal Data Sheet hasn't been updated in over a year. Please review and re-save it to keep your records current.
+      </div>
 
       <AppCard :padded="false">
         <div class="p-6">
