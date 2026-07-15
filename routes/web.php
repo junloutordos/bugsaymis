@@ -2259,6 +2259,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments',                   [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'upsert'])->name('class-records.assessments.upsert');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from',        [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFrom'])->name('class-records.assessments.copy-from');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from-record', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFromRecord'])->name('class-records.assessments.copy-from-record');
+    Route::get('/class-records/{classRecord}/section-calendar', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'sectionCalendar'])->name('class-records.assessments.section-calendar');
 
     // Students
     Route::get('/class-records/{classRecord}/quarters/{q}/students/from-enrollment', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'fromEnrollment'])->name('class-records.students.from-enrollment');

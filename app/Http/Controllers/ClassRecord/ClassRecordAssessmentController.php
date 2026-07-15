@@ -7,6 +7,7 @@ use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordScore;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +42,56 @@ class ClassRecordAssessmentController extends Controller
             ->get();
 
         return response()->json($assessments);
+    }
+
+    // ── GET /class-records/{cr}/section-calendar ──────────────────────────────
+
+    public function sectionCalendar(ClassRecord $classRecord): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->section_id, 422, 'This class record has no section linked.');
+
+        $rows = ClassRecordAssessment::select([
+                'class_record_assessments.id',
+                'class_record_assessments.title',
+                'class_record_assessments.activity_date',
+                'cr.id as class_record_id',
+                'cr.subject_name',
+                'cr.teacher_id',
+                'gc.code as category_code',
+            ])
+            ->join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
+            ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
+            ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
+            ->where('cr.section_id', $classRecord->section_id)
+            ->where('cr.school_year_id', $classRecord->school_year_id)
+            ->whereNotNull('class_record_assessments.activity_date')
+            ->orderBy('class_record_assessments.activity_date')
+            ->get();
+
+        $teacherIds = $rows->pluck('teacher_id')->filter()->unique()->values()->toArray();
+        $teachers   = User::whereIn('id', $teacherIds)->get(['id', 'name'])->keyBy('id');
+
+        $days = $rows->groupBy(fn ($row) => $row->activity_date instanceof \Carbon\Carbon
+                ? $row->activity_date->toDateString()
+                : (string) $row->activity_date)
+            ->map(function ($items, $date) use ($classRecord, $teachers) {
+                return [
+                    'date'  => $date,
+                    'count' => $items->count(),
+                    'items' => $items->map(fn ($row) => [
+                        'id'            => $row->id,
+                        'title'         => $row->title,
+                        'subject_name'  => $row->subject_name,
+                        'teacher_name'  => $teachers[$row->teacher_id]?->name,
+                        'category_code' => $row->category_code,
+                        'is_own_record' => $row->class_record_id === $classRecord->id,
+                    ])->values(),
+                ];
+            })
+            ->values();
+
+        return response()->json($days);
     }
 
     // ── POST /class-records/{cr}/quarters/{q}/assessments ────────────────────
@@ -82,13 +133,12 @@ class ClassRecordAssessmentController extends Controller
                     })
                     ->pluck('id');
 
-                $existingCount = ClassRecordAssessment::join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
-                    ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
-                    ->where('cr.section_id',      $classRecord->section_id)
-                    ->where('cr.school_year_id',  $classRecord->school_year_id)
-                    ->where('class_record_assessments.activity_date', $date)
-                    ->whereNotIn('class_record_assessments.id', $replacedIds)
-                    ->count();
+                $existingCount = ClassRecordAssessment::countForSectionOnDate(
+                    $classRecord->section_id,
+                    $classRecord->school_year_id,
+                    $date,
+                    $replacedIds->all()
+                );
 
                 $adding = $items->count();
 

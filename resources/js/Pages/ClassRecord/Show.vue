@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -23,9 +23,11 @@ import {
   ChartBarIcon,
   ClipboardDocumentListIcon,
   PlayCircleIcon,
+  CalendarDaysIcon,
 } from '@heroicons/vue/24/outline'
 import ScoreGrid from './components/ScoreGrid.vue'
 import AttendanceGrid from './components/AttendanceGrid.vue'
+import SectionAssessmentCalendar from './components/SectionAssessmentCalendar.vue'
 import { adjectivalColor } from '@/Utils/ClassRecord/gradeUtils.js'
 
 const props = defineProps({
@@ -100,6 +102,8 @@ function buildDraft(quarter) {
         max_score:           found?.max_score ?? '',
         _saved:              !!found,
         _db_id:              found?.id ?? null,  // track DB id for delete validation
+        _prevDate:           found?.activity_date ?? '',
+        _dateWarning:        null,
       })
     }
   }
@@ -117,6 +121,8 @@ function addAssessmentRow(catId) {
     max_score:           '',
     _saved:              false,
     _db_id:              null,
+    _prevDate:           '',
+    _dateWarning:        null,
   })
 }
 
@@ -175,6 +181,7 @@ async function saveSetup() {
     )
     await Swal.fire({ icon: 'success', title: 'Setup saved!', timer: 1000, showConfirmButton: false })
     router.reload({ only: ['classRecord'] })
+    loadSectionCalendar()
   } catch (err) {
     if (err.response?.status === 422) {
       setupErrors.value = Object.values(err.response.data.errors ?? {}).flat()
@@ -183,6 +190,63 @@ async function saveSetup() {
     }
   } finally {
     savingSetup.value = false
+  }
+}
+
+// ── Section assessment calendar (visibility + 3/day enforcement) ──────────────
+
+const sectionCalendarDays = ref([])
+const showSectionCalendar = ref(false)
+
+async function loadSectionCalendar() {
+  if (!props.classRecord.section_id) return
+  try {
+    const { data } = await axios.get(
+      route('class-records.assessments.section-calendar', props.classRecord.id)
+    )
+    sectionCalendarDays.value = data
+  } catch { /* calendar is a reference view only — fail silently */ }
+}
+
+onMounted(loadSectionCalendar)
+
+// IDs of assessments already saved under the quarter currently being edited —
+// excluded from the server baseline below since the live draft rows replace them.
+const currentQuarterAssessmentIds = computed(() =>
+  new Set((currentQuarterData.value?.assessments ?? []).map(a => a.id))
+)
+
+// Per-date assessment counts for this section across the whole school year:
+// server baseline (other quarters/subjects) + this quarter's live, unsaved draft.
+const dateCounts = computed(() => {
+  const map = new Map()
+  for (const day of sectionCalendarDays.value) {
+    const otherCount = day.items.filter(i => !currentQuarterAssessmentIds.value.has(i.id)).length
+    if (otherCount > 0) map.set(day.date, otherCount)
+  }
+  for (const rows of Object.values(assessmentDraft.value)) {
+    for (const row of rows) {
+      if (row.activity_date) {
+        map.set(row.activity_date, (map.get(row.activity_date) ?? 0) + 1)
+      }
+    }
+  }
+  return map
+})
+
+function onDateChange(row) {
+  if (!row.activity_date) {
+    row._dateWarning = null
+    row._prevDate     = ''
+    return
+  }
+  const count = dateCounts.value.get(row.activity_date) ?? 0
+  if (count > 3) {
+    row._dateWarning  = `Section already has 3 assessments scheduled on ${row.activity_date} — pick another date.`
+    row.activity_date = row._prevDate
+  } else {
+    row._dateWarning = null
+    row._prevDate    = row.activity_date
   }
 }
 
@@ -465,6 +529,12 @@ async function checkRecord() {
               Configure assessment titles, dates, and max scores for each category.
             </p>
             <div class="flex items-center gap-2">
+              <AppButton variant="secondary" size="sm"
+                :disabled="!classRecord.section_id"
+                :title="!classRecord.section_id ? 'No section linked to this class record' : ''"
+                @click="showSectionCalendar = true">
+                <CalendarDaysIcon class="h-3.5 w-3.5" /> View Section Calendar
+              </AppButton>
               <template v-if="!isReadOnly">
                 <AppButton v-if="!isLocked" variant="warning" size="sm" @click="lockQuarter">
                   <LockClosedIcon class="h-3.5 w-3.5" /> Lock Quarter
@@ -540,7 +610,9 @@ async function checkRecord() {
                       <td class="px-4 py-2">
                         <input v-model="row.activity_date" type="date"
                           :disabled="isLocked || isReadOnly"
+                          @change="onDateChange(row)"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
+                        <p v-if="row._dateWarning" class="text-red-500 text-[11px] mt-1">{{ row._dateWarning }}</p>
                       </td>
                       <td class="px-4 py-2">
                         <input v-model.number="row.max_score" type="number" min="0.01" step="0.5"
@@ -703,4 +775,12 @@ async function checkRecord() {
       </AppButton>
     </template>
   </AppModal>
+
+  <!-- Section assessment calendar -->
+  <SectionAssessmentCalendar
+    :show="showSectionCalendar"
+    :section-label="classRecord.year_level_section"
+    :days="sectionCalendarDays"
+    @close="showSectionCalendar = false"
+  />
 </template>

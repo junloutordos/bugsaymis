@@ -250,10 +250,8 @@ class CidDashboardController extends Controller
             ->where('class_record_assessments.activity_date', $todayStr)
             ->count();
 
-        $sectionsAtMax = ClassRecordAssessment::select('cr.section_id', DB::raw('COUNT(*) as cnt'))
-            ->join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
-            ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
-            ->where('cr.school_year_id', $schoolYearId)
+        $sectionsAtMax = ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+            ->select('cr.section_id', DB::raw('COUNT(*) as cnt'))
             ->where('class_record_assessments.activity_date', $todayStr)
             ->whereNotNull('cr.section_id')
             ->groupBy('cr.section_id')

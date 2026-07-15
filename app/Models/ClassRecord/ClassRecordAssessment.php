@@ -41,4 +41,31 @@ class ClassRecordAssessment extends Model
     {
         return $this->hasMany(ClassRecordScore::class);
     }
+
+    /**
+     * Base query joining assessments up to their class record, scoped to a
+     * single school year. Single source of truth for the "max 3 assessments
+     * per section per day" rule's underlying join.
+     */
+    public static function schoolYearScopeQuery(int $schoolYearId)
+    {
+        return static::query()
+            ->join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
+            ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
+            ->where('cr.school_year_id', $schoolYearId);
+    }
+
+    public static function sectionScopeQuery(int $sectionId, int $schoolYearId)
+    {
+        return static::schoolYearScopeQuery($schoolYearId)
+            ->where('cr.section_id', $sectionId);
+    }
+
+    public static function countForSectionOnDate(int $sectionId, int $schoolYearId, string $date, array $excludeIds = []): int
+    {
+        return static::sectionScopeQuery($sectionId, $schoolYearId)
+            ->where('class_record_assessments.activity_date', $date)
+            ->whereNotIn('class_record_assessments.id', $excludeIds)
+            ->count();
+    }
 }
