@@ -4,18 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Committee;
 use App\Models\FacultyLoading\AcademicTerm;
-use App\Models\FacultyLoading\FacultyCommitteeAssignment;
-use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
-use App\Services\FacultyLoading\LoadComputationService;
+use App\Services\FacultyLoading\CommitteeRosterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class CommitteeController extends Controller
 {
-    public function __construct(private readonly LoadComputationService $loads) {}
+    public function __construct(private readonly CommitteeRosterService $roster) {}
 
     public function index()
     {
@@ -101,6 +98,8 @@ class CommitteeController extends Controller
             $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
         }
 
+        $this->roster->reconcileCurrentTerm($committee);
+
         return back()->with('success', 'Committee created.');
     }
 
@@ -150,6 +149,8 @@ class CommitteeController extends Controller
             $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
         }
 
+        $this->roster->reconcileCurrentTerm($committee);
+
         return back()->with('success', 'Committee updated.');
     }
 
@@ -169,17 +170,15 @@ class CommitteeController extends Controller
             'school_year_id'   => 'required|exists:school_years,id',
         ]);
 
-        $committee->load(['members', 'subCommittees.members']);
+        $result = $this->roster->reconcileCommitteeRoster($committee, (int) $data['school_year_id'], (int) $data['academic_term_id']);
 
-        $synced = 0;
+        $message = "{$result['created']} assignment(s) synced";
+        if ($result['deactivated']) $message .= ", {$result['deactivated']} deactivated";
+        if ($result['role_updated']) $message .= ", {$result['role_updated']} role(s) updated";
+        if ($result['skipped_locked']) $message .= " ({$result['skipped_locked']} skipped — load locked)";
+        $message .= ' for the selected term.';
 
-        $this->syncCommitteeToTerm($committee, (int) $data['school_year_id'], (int) $data['academic_term_id'], $synced);
-
-        foreach ($committee->subCommittees as $sub) {
-            $this->syncCommitteeToTerm($sub, (int) $data['school_year_id'], (int) $data['academic_term_id'], $synced);
-        }
-
-        return back()->with('success', "{$synced} assignment(s) synced to the selected term.");
+        return back()->with('success', $message);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -191,58 +190,5 @@ class CommitteeController extends Controller
             $syncData[$userId] = ['task' => $memberTasks[$userId] ?? null];
         }
         $committee->members()->sync($syncData);
-    }
-
-    private function syncCommitteeToTerm(Committee $committee, int $syId, int $termId, int &$synced): void
-    {
-        if ($committee->head_id) {
-            $this->createAssignmentIfNew($committee, $committee->head_id, 'chairperson', $syId, $termId, $synced);
-        }
-
-        foreach ($committee->members as $member) {
-            if ($member->id === $committee->head_id) continue;
-            $this->createAssignmentIfNew($committee, $member->id, 'member', $syId, $termId, $synced);
-        }
-    }
-
-    private function createAssignmentIfNew(Committee $committee, int $userId, string $role, int $syId, int $termId, int &$synced): void
-    {
-        $exists = FacultyCommitteeAssignment::where('user_id', $userId)
-            ->where('academic_term_id', $termId)
-            ->where('committee_id', $committee->id)
-            ->where('status', 'active')
-            ->exists();
-
-        if ($exists) return;
-
-        $loadUnits = $committee->loadUnitsFor($role);
-
-        $load = $this->loads->findOrCreateFacultyLoad($userId, $syId, $termId);
-
-        $la = LoadAssignment::create([
-            'faculty_load_id'  => $load->id,
-            'user_id'          => $userId,
-            'school_year_id'   => $syId,
-            'academic_term_id' => $termId,
-            'assignment_type'  => 'committee',
-            'load_units'       => $loadUnits,
-            'description'      => "{$committee->name} ({$role})",
-            'created_by'       => Auth::id(),
-        ]);
-
-        FacultyCommitteeAssignment::create([
-            'user_id'            => $userId,
-            'school_year_id'     => $syId,
-            'academic_term_id'   => $termId,
-            'committee_id'       => $committee->id,
-            'committee_name'     => $committee->name,
-            'role'               => $role,
-            'load_units'         => $loadUnits,
-            'status'             => 'active',
-            'load_assignment_id' => $la->id,
-        ]);
-
-        $this->loads->syncLoad($load);
-        $synced++;
     }
 }

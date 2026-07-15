@@ -5,13 +5,12 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Committee;
-use App\Models\EmployeeIPCR;
-use App\Models\FacultyLoading\FacultyCommitteeAccomplishment;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
+use App\Services\FacultyLoading\CommitteeRatingService;
 use App\Services\FacultyLoading\LoadComputationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +22,10 @@ use Inertia\Response;
 
 class CommitteeAssignmentController extends Controller
 {
-    public function __construct(private readonly LoadComputationService $loads) {}
+    public function __construct(
+        private readonly LoadComputationService $loads,
+        private readonly CommitteeRatingService $rating,
+    ) {}
 
     // ── List committee assignments ────────────────────────────────────────────
 
@@ -384,23 +386,14 @@ class CommitteeAssignmentController extends Controller
         abort_if(auth()->id() !== $committeeAssignment->user_id, 403, 'You can only update your own accomplishment.');
 
         $data = $request->validate([
+            'ipcr_id'                   => 'nullable|exists:employee_ipcrs,id',
             'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
             'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
             'accomplishment'            => 'nullable|string|max:1000',
             'mov_link'                  => 'nullable|string|max:500',
         ]);
 
-        FacultyCommitteeAccomplishment::updateOrCreate(
-            [
-                'faculty_committee_assignment_id' => $committeeAssignment->id,
-                'work_distribution_plan_id'       => $data['work_distribution_plan_id'],
-                'rating_period_id'                => $data['rating_period_id'] ?? null,
-            ],
-            [
-                'accomplishment' => $data['accomplishment'],
-                'mov_link'       => $data['mov_link'],
-            ]
-        );
+        $this->rating->saveAccomplishment($committeeAssignment, $data);
 
         return back()->with('success', 'Accomplishment saved.');
     }
@@ -438,6 +431,7 @@ class CommitteeAssignmentController extends Controller
         }
 
         $data = $request->validate([
+            'ipcr_id'                   => 'nullable|exists:employee_ipcrs,id',
             'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
             'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
             'accomplishment'            => 'nullable|string|max:1000',
@@ -447,53 +441,7 @@ class CommitteeAssignmentController extends Controller
             'sup_timeliness'            => 'nullable|numeric|min:1|max:5',
         ]);
 
-        $ratings = collect([$data['sup_quality'] ?? null, $data['sup_efficiency'] ?? null, $data['sup_timeliness'] ?? null])
-            ->filter(fn ($v) => ! is_null($v));
-
-        $supAverage = $ratings->count() ? round($ratings->avg(), 2) : null;
-
-        FacultyCommitteeAccomplishment::updateOrCreate(
-            [
-                'faculty_committee_assignment_id' => $committeeAssignment->id,
-                'work_distribution_plan_id'       => $data['work_distribution_plan_id'],
-                'rating_period_id'                => $data['rating_period_id'] ?? null,
-            ],
-            [
-                'accomplishment' => $data['accomplishment'] ?? null,
-                'mov_link'       => $data['mov_link'] ?? null,
-                'sup_quality'    => $data['sup_quality'] ?? null,
-                'sup_efficiency' => $data['sup_efficiency'] ?? null,
-                'sup_timeliness' => $data['sup_timeliness'] ?? null,
-                'sup_average'    => $supAverage,
-            ]
-        );
-
-        // Mirror the supervisor rating into the teacher's IPCR plan pivot so the
-        // chairperson only needs to rate once (in Faculty Loading) and it flows
-        // into IPCR. Target the IPCR of the SAME rating period when one is
-        // selected; fall back to the latest rateable IPCR for legacy rows.
-        $activeIpcr = EmployeeIPCR::where('user_id', $committeeAssignment->user_id)
-            ->whereIn('status', ['Targets Approved', 'Submitted for Rating'])
-            ->whereHas('plans', fn ($q) => $q->where('work_distribution_plans.id', $data['work_distribution_plan_id']))
-            ->when($data['rating_period_id'] ?? null, fn ($q, $pid) => $q->where('rating_period_id', $pid))
-            ->latest()
-            ->first();
-
-        if ($activeIpcr) {
-            $ipcrPivot = [
-                'sup_quality'    => $data['sup_quality'] ?? null,
-                'sup_efficiency' => $data['sup_efficiency'] ?? null,
-                'sup_timeliness' => $data['sup_timeliness'] ?? null,
-                'sup_average'    => $supAverage,
-            ];
-            if (! empty($data['accomplishment'])) {
-                $ipcrPivot['accomplishment'] = $data['accomplishment'];
-            }
-            if (! empty($data['mov_link'])) {
-                $ipcrPivot['mov_link'] = $data['mov_link'];
-            }
-            $activeIpcr->plans()->updateExistingPivot($data['work_distribution_plan_id'], $ipcrPivot);
-        }
+        $this->rating->rate($committeeAssignment, $data);
 
         return back()->with('success', 'Rating saved.');
     }

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from "vue"
-import { Head, Link } from "@inertiajs/vue3"
+import { Head, Link, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
 import AppButton from "@/Components/AppButton.vue"
@@ -15,7 +15,6 @@ import AppModal from "@/Components/AppModal.vue"
 import EmptyState from "@/Components/EmptyState.vue"
 import PaginationControl from "@/Components/PaginationControl.vue"
 import { PencilSquareIcon, TrashIcon, PlusIcon, ArrowRightIcon } from "@heroicons/vue/24/outline"
-import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
 import { useSubmit } from "@/Composables/useSubmit"
 import { confirmDelete as confirmDeleteDialog } from "@/Composables/useConfirm.js"
 
@@ -27,9 +26,22 @@ const props = defineProps({
   fiscalYears: { type: Array, default: () => [] },
   selectedFiscalYear: { type: [String, Number], default: "" },
   currentFiscalYear: { type: Number, default: null },
+  terms: { type: Array, default: () => [] },
+  selectedTermId: { type: Number, default: null },
 })
 
 const { isSubmitting, submit } = useSubmit()
+
+// Term + fiscal-year filters are sent together so changing one never drops the other.
+const fyFilter   = ref(String(props.selectedFiscalYear ?? ""))
+const termFilter = ref(props.selectedTermId ?? null)
+
+const applyRosterFilters = () => {
+  router.get(route("pm-committees.index"), {
+    fiscal_year: fyFilter.value,
+    term_id: termFilter.value,
+  }, { preserveState: true, preserveScroll: true })
+}
 
 // --- List ---
 const searchQuery = ref("")
@@ -218,7 +230,15 @@ const structureBadge = (committee) => committee.sub_committees?.length ? 'indigo
 
       <AppFilterBar>
         <AppInput v-model="searchQuery" placeholder="Search committees..." class="w-full sm:w-72" />
-        <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="pm-committees.index" />
+        <select v-model="fyFilter" @change="applyRosterFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+          <option v-for="y in fiscalYears" :key="y" :value="String(y)">FY {{ y }}</option>
+          <option value="all">All years</option>
+        </select>
+        <select v-model="termFilter" @change="applyRosterFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+          <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}{{ t.is_current ? ' (Current)' : '' }}</option>
+        </select>
       </AppFilterBar>
 
       <AppTable :is-empty="paginated.length === 0" :skeleton-cols="6">
@@ -227,7 +247,7 @@ const structureBadge = (committee) => committee.sub_committees?.length ? 'indigo
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Structure</th>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Head</th>
-            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Members</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active This Term</th>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Plans</th>
             <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
           </tr>
@@ -242,7 +262,7 @@ const structureBadge = (committee) => committee.sub_committees?.length ? 'indigo
               </AppBadge>
             </td>
             <td class="px-4 py-3 text-slate-700">{{ committee.head?.name ?? "—" }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ committee.members?.length ?? 0 }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ committee.active_assignment_count ?? 0 }}</td>
             <td class="px-4 py-3 text-slate-700">{{ committee.work_distribution_plans?.length ?? 0 }}</td>
             <td class="px-4 py-3 text-center">
               <div class="flex items-center justify-center gap-1">
@@ -264,7 +284,7 @@ const structureBadge = (committee) => committee.sub_committees?.length ? 'indigo
             </td>
             <td class="px-4 py-2"></td>
             <td class="px-4 py-2 text-slate-600 text-xs">{{ sub.head?.name ?? "—" }}</td>
-            <td class="px-4 py-2 text-slate-600 text-xs">{{ sub.members?.length ?? 0 }}</td>
+            <td class="px-4 py-2 text-slate-600 text-xs">{{ sub.active_assignment_count ?? 0 }}</td>
             <td class="px-4 py-2 text-slate-400 text-xs">—</td>
             <td class="px-4 py-2 text-center">
               <Link :href="route('pm-committees.show', sub.id)"

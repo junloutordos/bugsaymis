@@ -4,17 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\Committee;
 use App\Models\EmployeeIPCR;
+use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\IPCRRatingPeriod;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
-use App\Services\PerformanceManagement\IPCRWorkflowService;
+use App\Services\FacultyLoading\CommitteeRatingService;
+use App\Services\FacultyLoading\CommitteeRosterService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class CommitteePerformanceController extends Controller
 {
-    public function __construct(private IPCRWorkflowService $workflow)
-    {
+    public function __construct(
+        private CommitteeRosterService $roster,
+        private CommitteeRatingService $rating,
+    ) {
     }
 
     public function index(Request $request)
@@ -23,6 +28,9 @@ class CommitteePerformanceController extends Controller
 
         $currentYear = IPCRRatingPeriod::current()->value('year') ?? (int) now()->format('Y');
         $selectedFY  = $request->query('fiscal_year', (string) $currentYear);
+
+        $currentTerm = AcademicTerm::where('is_current', true)->first();
+        $termId      = (int) $request->query('term_id', $currentTerm?->id) ?: null;
 
         $query = Committee::with(['head', 'members', 'workDistributionPlans', 'subCommittees.head', 'subCommittees.members'])
             ->whereNull('parent_committee_id')
@@ -39,7 +47,21 @@ class CommitteePerformanceController extends Controller
             });
         }
 
-        $committees = $query->orderBy('name')->get()->map(fn($c) => [
+        $committeesRaw = $query->orderBy('name')->get();
+
+        // Batch-fetch this term's active assignment counts (roster is now
+        // term-scoped via faculty_committee_assignments) to avoid N+1.
+        $allIds = $committeesRaw->flatMap(fn ($c) => collect([$c->id])->merge($c->subCommittees->pluck('id')));
+        $assignmentCounts = $termId
+            ? FacultyCommitteeAssignment::whereIn('committee_id', $allIds)
+                ->where('academic_term_id', $termId)
+                ->where('status', 'active')
+                ->selectRaw('committee_id, COUNT(*) as cnt')
+                ->groupBy('committee_id')
+                ->pluck('cnt', 'committee_id')
+            : collect();
+
+        $committees = $committeesRaw->map(fn($c) => [
             'id'                      => $c->id,
             'name'                    => $c->name,
             'fiscal_year'             => $c->fiscal_year,
@@ -51,12 +73,14 @@ class CommitteePerformanceController extends Controller
                 'name'  => $m->name,
                 'pivot' => ['task' => $m->pivot->task],
             ]),
+            'active_assignment_count' => $assignmentCounts->get($c->id, 0),
             'work_distribution_plans' => $c->workDistributionPlans->map(fn($p) => ['id' => $p->id])->values(),
             'sub_committees'          => $c->subCommittees->map(fn($sub) => [
-                'id'      => $sub->id,
-                'name'    => $sub->name,
-                'head_id' => $sub->head_id,
-                'head'    => $sub->head?->only('id', 'name'),
+                'id'                      => $sub->id,
+                'name'                    => $sub->name,
+                'head_id'                 => $sub->head_id,
+                'head'                    => $sub->head?->only('id', 'name'),
+                'active_assignment_count' => $assignmentCounts->get($sub->id, 0),
                 'members' => $sub->members->map(fn($m) => [
                     'id'    => $m->id,
                     'name'  => $m->name,
@@ -64,6 +88,9 @@ class CommitteePerformanceController extends Controller
                 ]),
             ])->values(),
         ]);
+
+        $terms = AcademicTerm::with('schoolYear')->orderByDesc('start_date')->get()
+            ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
 
         return Inertia::render('PerformanceManagement/Committees/Index', [
             'committees'         => $committees,
@@ -75,6 +102,8 @@ class CommitteePerformanceController extends Controller
             'fiscalYears'        => IPCRRatingPeriod::query()->distinct()->orderByDesc('year')->pluck('year'),
             'selectedFiscalYear' => $selectedFY,
             'currentFiscalYear'  => $currentYear,
+            'terms'              => $terms,
+            'selectedTermId'     => $termId,
         ]);
     }
 
@@ -123,6 +152,8 @@ class CommitteePerformanceController extends Controller
         } else {
             $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
         }
+
+        $this->roster->reconcileCurrentTerm($committee);
 
         return redirect()->back()->with('success', 'Committee created.');
     }
@@ -182,6 +213,8 @@ class CommitteePerformanceController extends Controller
             $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
         }
 
+        $this->roster->reconcileCurrentTerm($committee);
+
         return redirect()->back()->with('success', 'Committee updated.');
     }
 
@@ -197,22 +230,38 @@ class CommitteePerformanceController extends Controller
     public function show(Request $request, Committee $committee)
     {
         $user = auth()->user();
-        $committee->load(['head', 'members', 'workDistributionPlans.performance_indicator', 'subCommittees.head', 'subCommittees.members']);
+        $committee->load(['head', 'workDistributionPlans.performance_indicator', 'subCommittees.head']);
+
+        $currentTerm = AcademicTerm::where('is_current', true)->first();
+        $termId      = (int) $request->input('term_id', $currentTerm?->id) ?: null;
+        $terms       = AcademicTerm::with('schoolYear')->orderByDesc('start_date')->get()
+            ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
+
+        // Roster is now term-scoped via faculty_committee_assignments — the
+        // same source Faculty Loading reads/writes — instead of the DM
+        // catalog's committee_user pivot, so both modules always agree on
+        // who's actually serving this term.
+        $committeeIds    = collect([$committee->id])->merge($committee->subCommittees->pluck('id'));
+        $allAssignments  = FacultyCommitteeAssignment::with('faculty:id,name,position')
+            ->whereIn('committee_id', $committeeIds)
+            ->where('academic_term_id', $termId)
+            ->where('status', 'active')
+            ->get();
+        $assignments = $allAssignments->where('committee_id', $committee->id)->values();
 
         $isHead    = $user->id == $committee->head_id;
         $isSubHead = $committee->subCommittees->contains(fn ($sub) => $sub->head_id == $user->id);
         $canManage = $user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR']) || $isHead;
-        $isMember  = $committee->members->contains('id', $user->id)
-            || $isSubHead
-            || $committee->subCommittees->contains(fn ($sub) => $sub->members->contains('id', $user->id));
+        $isMember  = $allAssignments->contains('user_id', $user->id) || $isHead || $isSubHead;
 
         if (!$canManage && !$isMember) {
             abort(403, 'You are not a member of this committee.');
         }
 
         // For each plan, list members; each member has all their IPCR periods (latest first)
-        $planMemberData = $committee->workDistributionPlans->map(function ($plan) use ($committee) {
-            $members = $committee->members->map(function ($member) use ($plan) {
+        $planMemberData = $committee->workDistributionPlans->map(function ($plan) use ($assignments) {
+            $members = $assignments->map(function ($a) use ($plan) {
+                $member = $a->faculty;
                 $ipcrs = EmployeeIPCR::where('user_id', $member->id)
                     ->whereHas('plans', fn($q) => $q->where('work_distribution_plans.id', $plan->id))
                     ->with(['plans' => fn($q) => $q->where('work_distribution_plans.id', $plan->id)])
@@ -222,7 +271,8 @@ class CommitteePerformanceController extends Controller
                 $periods = $ipcrs->map(function ($ipcr) {
                     $pivot = $ipcr->plans->first()?->pivot;
                     return [
-                        'ipcr_id'        => $ipcr->id,
+                        'ipcr_id'           => $ipcr->id,
+                        'rating_period_id'  => $ipcr->rating_period_id,
                         'rating_period'  => $ipcr->rating_period ?? '—',
                         'ipcr_status'    => $ipcr->status,
                         'can_rate'       => $ipcr->status === 'Submitted for Rating',
@@ -236,10 +286,11 @@ class CommitteePerformanceController extends Controller
                 })->values();
 
                 return [
+                    'assignment_id' => $a->id,
                     'user_id'       => $member->id,
                     'user_name'     => $member->name,
                     'user_position' => $member->position,
-                    'task'          => $member->pivot->task,
+                    'role'          => $a->role,
                     'periods'       => $periods,
                 ];
             });
@@ -254,23 +305,21 @@ class CommitteePerformanceController extends Controller
         $currentPeriod = IPCRRatingPeriod::current()->first();
         $periodId      = (int) $request->input('rating_period_id', $currentPeriod?->id) ?: null;
 
-        $boardCommitteeIds = collect([$committee->id])->merge($committee->subCommittees->pluck('id'));
-
         $tasks = \App\Models\CommitteeTask::with(['assignees:id,name', 'plan:id,success_indicator', 'period:id,label', 'committee:id,name,parent_committee_id', 'updates.user:id,name'])
             ->withCount('updates')
-            ->whereIn('committee_id', $boardCommitteeIds)
+            ->whereIn('committee_id', $committeeIds)
             ->forPeriod($periodId)
             ->orderBy('sort_order')
             ->get();
 
-        $boardMembers = $committee->members->map(fn ($m) => $m->only('id', 'name'))
-            ->concat($committee->subCommittees->flatMap(fn ($sub) => $sub->members->map(fn ($m) => $m->only('id', 'name'))))
+        $boardMembers = $allAssignments->map(fn ($a) => $a->faculty->only('id', 'name'))
             ->concat(collect([$committee->head?->only('id', 'name')])->filter())
             ->unique('id')
             ->values();
 
         return Inertia::render('PerformanceManagement/Committees/Show', [
             'committee'      => $committee,
+            'activeMemberCount' => $assignments->count(),
             'planMemberData' => $planMemberData,
             'authUser'       => $user->only('id', 'name'),
             'isHead'         => $isHead,
@@ -279,12 +328,14 @@ class CommitteePerformanceController extends Controller
             'boardMembers'     => $boardMembers,
             'ratingPeriods'    => IPCRRatingPeriod::orderByDesc('year')->orderByDesc('semester')->get(['id', 'label', 'status', 'is_current']),
             'selectedPeriodId' => $periodId,
+            'terms'            => $terms,
+            'selectedTermId'   => $termId,
             'canManageBoard'   => app(\App\Services\CommitteeBoardService::class)->canManageBoard($user, $committee) || $isSubHead,
         ]);
     }
 
     /**
-     * Member saves their own accomplishment for a specific IPCR + plan.
+     * Member saves their own accomplishment for a specific plan/period.
      */
     public function saveMemberAccomplishment(Request $request, Committee $committee, User $member)
     {
@@ -293,45 +344,40 @@ class CommitteePerformanceController extends Controller
             abort(403, 'You can only update your own accomplishment.');
         }
 
-        $request->validate([
-            'ipcr_id'        => 'required|exists:employee_ipcrs,id',
-            'plan_id'        => 'required|exists:work_distribution_plans,id',
-            'accomplishment' => 'nullable|string|max:1000',
-            'mov_link'       => 'nullable|string|max:500',
+        $data = $request->validate([
+            'ipcr_id'                   => 'nullable|exists:employee_ipcrs,id',
+            'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
+            'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
+            'term_id'                   => 'nullable|exists:academic_terms,id',
+            'accomplishment'            => 'nullable|string|max:1000',
+            'mov_link'                  => 'nullable|string|max:500',
         ]);
 
-        $ipcr = EmployeeIPCR::where('id', $request->ipcr_id)
-            ->where('user_id', $member->id)
-            ->firstOrFail();
+        $assignment = $this->resolveAssignment($committee, $member, $data['term_id'] ?? null);
 
-        $this->workflow->assertMutable($ipcr);
-
-        if (!$ipcr->plans()->where('work_distribution_plans.id', $request->plan_id)->exists()) {
-            abort(404, 'This plan is not in the specified IPCR.');
-        }
-
-        $ipcr->plans()->updateExistingPivot($request->plan_id, [
-            'accomplishment' => $request->accomplishment,
-            'mov_link'       => $request->mov_link,
-        ]);
+        $this->rating->saveAccomplishment($assignment, $data);
 
         return redirect()->back()->with('success', 'Accomplishment saved.');
     }
 
     /**
-     * Head rates a member for a specific IPCR + plan.
+     * Head rates a member for a specific plan/period.
      * Locked when IPCR status is not "Submitted for Rating".
      */
     public function rateMember(Request $request, Committee $committee, User $member)
     {
         $user   = auth()->user();
         $isHead = $user->id == $committee->head_id;
+        $termId = (int) ($request->input('term_id') ?: AcademicTerm::where('is_current', true)->value('id'));
 
-        // Sub-committee head may rate members of their OWN sub-committee
-        // (mirrors the FL hierarchical gate in rateAssignment)
-        $isSubHeadForMember = Committee::where('parent_committee_id', $committee->id)
-            ->where('head_id', $user->id)
-            ->whereHas('members', fn ($q) => $q->where('users.id', $member->id))
+        // Sub-committee head may rate members of their OWN sub-committee this
+        // term (mirrors the FL hierarchical gate in rateAssignment) — checked
+        // against the same term-scoped assignments used everywhere else,
+        // not the DM catalog pivot, so this gate can't drift from the roster.
+        $isSubHeadForMember = FacultyCommitteeAssignment::where('academic_term_id', $termId)
+            ->where('status', 'active')
+            ->where('user_id', $member->id)
+            ->whereIn('committee_id', Committee::where('parent_committee_id', $committee->id)->where('head_id', $user->id)->pluck('id'))
             ->exists();
 
         $canRate = $isHead || $isSubHeadForMember || $user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD']);
@@ -339,48 +385,39 @@ class CommitteePerformanceController extends Controller
             abort(403, 'Only the committee head or the member\'s sub-committee head can rate members.');
         }
 
-        $request->validate([
-            'ipcr_id'        => 'required|exists:employee_ipcrs,id',
-            'plan_id'        => 'required|exists:work_distribution_plans,id',
-            'accomplishment' => 'nullable|string|max:1000',
-            'mov_link'       => 'nullable|string|max:500',
-            'sup_quality'    => 'nullable|integer|min:1|max:5',
-            'sup_efficiency' => 'nullable|integer|min:1|max:5',
-            'sup_timeliness' => 'nullable|integer|min:1|max:5',
+        $data = $request->validate([
+            'ipcr_id'                   => 'nullable|exists:employee_ipcrs,id',
+            'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
+            'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
+            'term_id'                   => 'nullable|exists:academic_terms,id',
+            'accomplishment'            => 'nullable|string|max:1000',
+            'mov_link'                  => 'nullable|string|max:500',
+            'sup_quality'               => 'nullable|numeric|min:1|max:5',
+            'sup_efficiency'            => 'nullable|numeric|min:1|max:5',
+            'sup_timeliness'            => 'nullable|numeric|min:1|max:5',
         ]);
 
-        $ipcr = EmployeeIPCR::where('id', $request->ipcr_id)
-            ->where('user_id', $member->id)
-            ->firstOrFail();
+        $assignment = $this->resolveAssignment($committee, $member, $termId);
 
-        $this->workflow->assertMutable($ipcr);
-
-        if ($ipcr->status !== 'Submitted for Rating') {
-            abort(403, 'Ratings can only be edited while the IPCR is "Submitted for Rating".');
-        }
-
-        if (!$ipcr->plans()->where('work_distribution_plans.id', $request->plan_id)->exists()) {
-            abort(404, 'This plan is not in the specified IPCR.');
-        }
-
-        $ratings = collect([
-            $request->sup_quality,
-            $request->sup_efficiency,
-            $request->sup_timeliness,
-        ])->filter(fn($v) => !is_null($v));
-
-        $supAverage = $ratings->count() ? round($ratings->avg(), 2) : null;
-
-        $ipcr->plans()->updateExistingPivot($request->plan_id, [
-            'accomplishment' => $request->accomplishment,
-            'mov_link'       => $request->mov_link,
-            'sup_quality'    => $request->sup_quality,
-            'sup_efficiency' => $request->sup_efficiency,
-            'sup_timeliness' => $request->sup_timeliness,
-            'sup_average'    => $supAverage,
-        ]);
+        $this->rating->rate($assignment, $data);
 
         return redirect()->back()->with('success', 'Rating saved.');
+    }
+
+    /** Resolve the member's active committee assignment for a term (default: current). */
+    private function resolveAssignment(Committee $committee, User $member, ?int $termId): FacultyCommitteeAssignment
+    {
+        $termId ??= AcademicTerm::where('is_current', true)->value('id');
+
+        $assignment = FacultyCommitteeAssignment::where('committee_id', $committee->id)
+            ->where('user_id', $member->id)
+            ->where('academic_term_id', $termId)
+            ->where('status', 'active')
+            ->first();
+
+        abort_unless($assignment, 404, 'This member is not an active assignee of this committee for the selected term.');
+
+        return $assignment;
     }
 
     private function syncMembers(Committee $committee, array $memberIds, array $memberTasks): void

@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed } from "vue"
-import { Head, Link } from "@inertiajs/vue3"
+import { Head, Link, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppButton from "@/Components/AppButton.vue"
 import AppCard from "@/Components/AppCard.vue"
 import AppBadge from "@/Components/AppBadge.vue"
 import AppInput from "@/Components/AppInput.vue"
+import AppSelect from "@/Components/AppSelect.vue"
 import AppTextarea from "@/Components/AppTextarea.vue"
 import AppModal from "@/Components/AppModal.vue"
 import AppTabs from "@/Components/AppTabs.vue"
@@ -18,7 +19,10 @@ import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   committee: Object,
+  activeMemberCount: { type: Number, default: 0 },
   planMemberData: Array,
+  terms: { type: Array, default: () => [] },
+  selectedTermId: { type: Number, default: null },
   authUser: Object,
   isHead: Boolean,
   canManage: Boolean,
@@ -28,6 +32,15 @@ const props = defineProps({
   selectedPeriodId: { type: Number, default: null },
   canManageBoard: { type: Boolean, default: false },
 })
+
+// ── Term switching (roster is now term-scoped, same as Faculty Loading) ─────
+function switchTerm(termId) {
+  router.get(
+    route("pm-committees.show", props.committee.id),
+    { term_id: termId, rating_period_id: props.selectedPeriodId ?? undefined },
+    { preserveState: false }
+  )
+}
 
 const activeTab = ref("board")
 const boardTabs = [
@@ -42,13 +55,14 @@ const showModal = ref(false)
 const modalEntry = ref(null) // { planId, member, period, isOwn, canRate }
 
 const editForm = ref({
-  ipcr_id:        null,
-  plan_id:        null,
-  accomplishment: "",
-  mov_link:       "",
-  sup_quality:    null,
-  sup_efficiency: null,
-  sup_timeliness: null,
+  ipcr_id:          null,
+  rating_period_id: null,
+  plan_id:          null,
+  accomplishment:   "",
+  mov_link:         "",
+  sup_quality:      null,
+  sup_efficiency:   null,
+  sup_timeliness:   null,
 })
 
 const openEditModal = (entry, member, period) => {
@@ -59,13 +73,14 @@ const openEditModal = (entry, member, period) => {
 
   modalEntry.value = { planId: entry.plan.id, member, period, isOwn, canRate }
   editForm.value = {
-    ipcr_id:        period.ipcr_id,
-    plan_id:        entry.plan.id,
-    accomplishment: period.accomplishment ?? "",
-    mov_link:       period.mov_link ?? "",
-    sup_quality:    period.sup_quality ?? null,
-    sup_efficiency: period.sup_efficiency ?? null,
-    sup_timeliness: period.sup_timeliness ?? null,
+    ipcr_id:          period.ipcr_id,
+    rating_period_id: period.rating_period_id,
+    plan_id:          entry.plan.id,
+    accomplishment:   period.accomplishment ?? "",
+    mov_link:         period.mov_link ?? "",
+    sup_quality:      period.sup_quality ?? null,
+    sup_efficiency:   period.sup_efficiency ?? null,
+    sup_timeliness:   period.sup_timeliness ?? null,
   }
   showModal.value = true
 }
@@ -88,17 +103,29 @@ const submitEdit = () => {
     submit.post(
       route("pm-committees.member-accomplishment", [props.committee.id, entry.member.user_id]),
       {
-        ipcr_id:        editForm.value.ipcr_id,
-        plan_id:        entry.planId,
-        accomplishment: editForm.value.accomplishment,
-        mov_link:       editForm.value.mov_link,
+        ipcr_id:                    editForm.value.ipcr_id,
+        rating_period_id:           editForm.value.rating_period_id,
+        work_distribution_plan_id:  entry.planId,
+        term_id:                    props.selectedTermId,
+        accomplishment:             editForm.value.accomplishment,
+        mov_link:                   editForm.value.mov_link,
       },
       { onSuccess, onError }
     )
   } else {
     submit.post(
       route("pm-committees.rate-member", [props.committee.id, entry.member.user_id]),
-      { ...editForm.value },
+      {
+        ipcr_id:                    editForm.value.ipcr_id,
+        rating_period_id:           editForm.value.rating_period_id,
+        work_distribution_plan_id:  editForm.value.plan_id,
+        term_id:                    props.selectedTermId,
+        accomplishment:             editForm.value.accomplishment,
+        mov_link:                   editForm.value.mov_link,
+        sup_quality:                editForm.value.sup_quality,
+        sup_efficiency:             editForm.value.sup_efficiency,
+        sup_timeliness:             editForm.value.sup_timeliness,
+      },
       { onSuccess, onError }
     )
   }
@@ -131,6 +158,9 @@ const liveAvg = computed(() => {
   return v !== null ? v.toFixed(2) : "—"
 })
 
+const roleLabels = { chairperson: 'Chairperson', co_chair: 'Co-Chair', secretary: 'Secretary', member: 'Member' }
+const roleLabel = (role) => roleLabels[role] ?? role ?? '—'
+
 const statusColor = (status) => {
   if (status === 'Submitted for Rating') return 'blue'
   if (status === 'Rated & For PMT Review' || status === 'Submitted to PMT') return 'green'
@@ -155,18 +185,27 @@ const statusColor = (status) => {
 
       <!-- Committee Info -->
       <AppCard>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
           <div>
             <span class="text-slate-500 font-medium">Committee Head:</span>
             <p class="font-semibold text-slate-800 mt-0.5">{{ committee.head?.name ?? "—" }}</p>
           </div>
           <div>
-            <span class="text-slate-500 font-medium">Members:</span>
-            <p class="font-semibold text-slate-800 mt-0.5">{{ committee.members?.length ?? 0 }}</p>
+            <span class="text-slate-500 font-medium">Active Members (this term):</span>
+            <p class="font-semibold text-slate-800 mt-0.5">{{ activeMemberCount }}</p>
           </div>
           <div>
             <span class="text-slate-500 font-medium">Description:</span>
             <p class="text-slate-700 mt-0.5">{{ committee.description ?? "—" }}</p>
+          </div>
+          <div>
+            <span class="text-slate-500 font-medium">Term:</span>
+            <AppSelect :model-value="selectedTermId" :show-blank="false" class="mt-0.5"
+              @update:model-value="v => switchTerm(Number(v))">
+              <option v-for="t in terms" :key="t.id" :value="t.id">
+                {{ t.label }}{{ t.is_current ? ' (Current)' : '' }}
+              </option>
+            </AppSelect>
           </div>
         </div>
       </AppCard>
@@ -204,7 +243,7 @@ const statusColor = (status) => {
           <template #head>
             <tr>
               <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Member</th>
-              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Task / Role</th>
+              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Role</th>
               <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Rating Period</th>
               <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">IPCR Status</th>
               <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Accomplishment</th>
@@ -229,7 +268,7 @@ const statusColor = (status) => {
                       <p class="text-xs text-slate-400">{{ member.user_position }}</p>
                     </td>
                     <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top text-slate-600 border-r border-slate-100 text-sm">
-                      {{ member.task || "—" }}
+                      {{ roleLabel(member.role) }}
                     </td>
                     <td class="px-3 py-2 text-sm text-indigo-700 font-medium whitespace-nowrap">{{ period.rating_period }}</td>
                     <td class="px-3 py-2">
@@ -270,7 +309,7 @@ const statusColor = (status) => {
                     <p class="font-medium text-slate-800">{{ member.user_name }}</p>
                     <p class="text-xs text-slate-400">{{ member.user_position }}</p>
                   </td>
-                  <td class="px-3 py-2 text-sm text-slate-600">{{ member.task || "—" }}</td>
+                  <td class="px-3 py-2 text-sm text-slate-600">{{ roleLabel(member.role) }}</td>
                   <td colspan="9" class="px-3 py-2 text-center text-xs text-slate-400">No IPCR linked to this plan</td>
                 </tr>
               </template>
