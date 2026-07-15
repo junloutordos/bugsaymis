@@ -353,6 +353,13 @@ export const menuItems = [
         permissions: ["hr.pds.view"],
       },
       {
+        label: "PDS Records",
+        routeName: "pds.index",
+        href: route("pds.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["pds.view_all"],
+      },
+      {
         label: "Employees",
         routeName: "hr.employees.index",
         href: route('hr.employees.index'),
