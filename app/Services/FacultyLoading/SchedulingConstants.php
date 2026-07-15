@@ -507,19 +507,34 @@ class SchedulingConstants
                 : (self::WEDNESDAY_ACTIVITY_START[$group] ?? self::WEDNESDAY_ALP['start']);
             $activityStart = min($cutoffStart, self::WEDNESDAY_ALP['start']);
 
-            $blocked[] = [
+            $activityBlock = [
                 'start' => $activityStart,
                 'end'   => self::WEDNESDAY_ALP['end'],
                 'type'  => 'ACTIVITY',
                 'label' => 'Activity Proper / ALP',
             ];
+
+            // The timetable's own Consultation/Home Bound slot sits inside this
+            // window for every grade group — drop it so the calendar doesn't
+            // render two overlapping bands for the same time range.
+            $blocked = array_values(array_filter($blocked, static fn ($b) =>
+                ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $activityBlock['start'], $activityBlock['end']))
+            ));
+            $blocked[] = $activityBlock;
         }
 
         if ($day === 'Friday') {
-            $blocked[] = array_merge(self::FRIDAY_FLAG_RETREAT, [
+            $flagBlock = array_merge(self::FRIDAY_FLAG_RETREAT, [
                 'type'  => 'FLAG_RETREAT',
                 'label' => 'Flag Retreat Ceremony',
             ]);
+
+            // Same overlap as Wednesday's ALP — Flag Retreat supersedes the
+            // Consultation/Home Bound slot instead of stacking on top of it.
+            $blocked = array_values(array_filter($blocked, static fn ($b) =>
+                ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $flagBlock['start'], $flagBlock['end']))
+            ));
+            $blocked[] = $flagBlock;
         }
 
         usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);

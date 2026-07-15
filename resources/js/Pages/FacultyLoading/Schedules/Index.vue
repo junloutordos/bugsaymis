@@ -243,13 +243,13 @@
                           @dragend="onDragEnd"
                           @click="onEventClick(s)">
                           <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
-                            <div class="text-xs font-bold leading-tight truncate">
+                            <div :class="['font-bold leading-tight truncate', eventFontSizeClass(s)]">
                               {{ s.entry_type === 'non_teaching' ? s.title : s.subject?.code }}{{ s.session_type === 'ilp' ? '(ILP)' : '' }}
                             </div>
-                            <div class="text-xs leading-tight truncate opacity-75">
+                            <div v-if="eventDisplayMode(s) !== 'compact'" :class="['leading-tight truncate opacity-75', eventFontSizeClass(s)]">
                               {{ secondaryLabel(s) }}
                             </div>
-                            <div class="text-xs leading-tight opacity-55 tabular-nums">
+                            <div v-if="eventDisplayMode(s) === 'full'" :class="['leading-tight opacity-55 tabular-nums', eventFontSizeClass(s)]">
                               {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
                             </div>
                           </div>
@@ -906,6 +906,31 @@ const lanePacking = computed(() => {
   }
   return map
 })
+
+/** Duration in minutes of a schedule event. */
+function eventDurationMin(s) {
+  return timeToMin(s.end_time) - timeToMin(s.start_time)
+}
+
+/** How much text an event block has room for, based on its duration.
+ *  'full' (>=40min): title + secondary label + time range.
+ *  'compact' (25-39min, e.g. a 30-min ILP session): title + secondary label only.
+ *  'minimal' (<25min): title only. */
+function eventDisplayMode(s) {
+  const d = eventDurationMin(s)
+  if (d >= 40) return 'full'
+  if (d >= 25) return 'compact'
+  return 'minimal'
+}
+
+/** Font-size class matching the event's display mode — shrinks on short blocks
+ *  so text isn't clipped/compressed inside their reduced height. */
+function eventFontSizeClass(s) {
+  const mode = eventDisplayMode(s)
+  if (mode === 'full') return 'text-xs'
+  if (mode === 'compact') return 'text-[10px]'
+  return 'text-[9px]'
+}
 
 /** Absolute positioning style for a schedule event block. In "By Year Level"
  *  mode, horizontal position/width come from packOverlaps() so concurrent
