@@ -11,6 +11,9 @@
           <AppButton variant="secondary" @click="openAutoAssign()">
             <SparklesIcon class="h-4 w-4 text-purple-500" /> Auto-Assign
           </AppButton>
+          <AppButton variant="secondary" @click="openReassignTba()">
+            <ArrowsRightLeftIcon class="h-4 w-4 text-amber-500" /> Reassign TBA
+          </AppButton>
           <AppButton @click="openForm()">
             <PlusIcon class="h-4 w-4" /> Add Assignment
           </AppButton>
@@ -484,6 +487,62 @@
       </template>
     </AppModal>
 
+    <!-- ── Reassign TBA Modal ─────────────────────────────────────── -->
+    <AppModal :show="reassignTba.open" title="Reassign TBA Loading"
+      subtitle="Move classes currently parked on the TBA placeholder to real faculty, grouped by subject."
+      size="3xl" @close="reassignTba.open = false">
+
+      <div v-if="!tbaEntry" class="py-12 text-center text-sm text-slate-400">
+        No TBA-held teaching assignments found for this term.
+      </div>
+
+      <template v-else>
+        <div class="px-1 pb-3 text-xs text-slate-500">
+          <strong class="text-slate-700">{{ tbaEntry.faculty_name }}</strong>
+          currently holds <strong class="text-amber-600">{{ reassignTba.groups.length }}</strong> subject(s),
+          <strong class="text-amber-600">{{ tbaTeachingTotal }}u</strong> total.
+          Pick a faculty for each subject you want to move; groups left blank are skipped.
+        </div>
+
+        <div v-if="reassignTba.result" class="mx-1 mb-3 rounded-lg px-3 py-2 text-xs"
+          :class="reassignTba.result.failed ? 'bg-warning-50 border border-warning-100 text-warning-700' : 'bg-success-50 border border-success-100 text-success-700'">
+          {{ reassignTba.result.message }}
+        </div>
+
+        <div class="max-h-[52vh] overflow-y-auto divide-y divide-slate-50 border border-slate-100 rounded-xl">
+          <div v-for="group in reassignTba.groups" :key="group.subject_id ?? 'elective-' + group.assignmentIds[0]"
+            class="px-4 py-3 flex items-center gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-slate-800 truncate">
+                {{ group.subject_code }} — {{ group.subject_name }}
+              </p>
+              <p class="text-xs text-slate-500 mt-0.5">
+                <span v-if="group.sections.length">{{ group.sections.map(s => s.name).join(', ') }}</span>
+                <span v-else class="italic">Elective — no section</span>
+                <span class="ml-1.5 text-slate-400">· {{ group.totalUnits }}u</span>
+              </p>
+            </div>
+            <select v-model="group.target_user_id"
+              class="text-sm border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-500 focus:border-transparent shrink-0 max-w-[220px]"
+              :class="group.target_user_id ? 'border-success-100 bg-success-50 text-success-700' : 'border-slate-200 text-slate-600'">
+              <option :value="null">Leave on TBA…</option>
+              <option v-for="f in reassignableFaculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+            </select>
+          </div>
+        </div>
+      </template>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="reassignTba.open = false">Close</AppButton>
+        <AppButton variant="success" :disabled="!reassignTbaSelectedCount || reassignTba.applying"
+          :loading="reassignTba.applying" @click="applyReassignTba">
+          <CheckIcon v-if="!reassignTba.applying" class="h-4 w-4" />
+          Reassign
+          <span v-if="reassignTbaSelectedCount">({{ reassignTbaSelectedCount }})</span>
+        </AppButton>
+      </template>
+    </AppModal>
+
   </AdminLayout>
 </template>
 
@@ -503,7 +562,7 @@ import AppInput from '@/Components/AppInput.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import { confirmDelete } from '@/Composables/useConfirm.js'
 import {
-  AcademicCapIcon, ArrowPathIcon, CheckCircleIcon, CheckIcon, ClipboardDocumentListIcon,
+  AcademicCapIcon, ArrowPathIcon, ArrowsRightLeftIcon, CheckCircleIcon, CheckIcon, ClipboardDocumentListIcon,
   EyeIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -708,6 +767,114 @@ function nonTeachingBadge(type) {
 
 function typeLabel(type) {
   return assignmentTypes.find(t => t.value === type)?.label ?? type
+}
+
+// ── Reassign TBA ─────────────────────────────────────────────────────────────
+
+const reassignTba = reactive({
+  open:     false,
+  groups:   [],
+  applying: false,
+  result:   null,
+})
+
+// TBA is identified by name convention (no fixed id) — matches the same
+// "starts with TBA" convention used server-side for placeholder faculty.
+const tbaEntry = computed(() =>
+  props.facultyLoads.find(fl => /^TBA/i.test(fl.faculty_name ?? '')) ?? null
+)
+
+const tbaTeachingTotal = computed(() =>
+  reassignTba.groups.reduce((sum, g) => sum + g.totalUnits, 0).toFixed(1)
+)
+
+// Faculty options for the "reassign to" pickers — everyone except TBA itself.
+const reassignableFaculty = computed(() =>
+  props.faculty.filter(f => f.id !== tbaEntry.value?.faculty_id)
+)
+
+const reassignTbaSelectedCount = computed(() =>
+  reassignTba.groups.filter(g => g.target_user_id).length
+)
+
+function openReassignTba() {
+  reassignTba.result = null
+  reassignTba.groups = tbaEntry.value
+    ? groupTbaAssignmentsBySubject(tbaEntry.value.assignments)
+    : []
+  reassignTba.open = true
+}
+
+/** Group TBA's teaching assignments by subject, one entry per subject with all its sections. */
+function groupTbaAssignmentsBySubject(assignments) {
+  const map = {}
+  for (const a of assignments) {
+    if (a.assignment_type !== 'teaching') continue // transfer only supports teaching assignments
+    const key = a.subject?.id ?? `elective-${a.id}`
+    if (!map[key]) {
+      map[key] = {
+        subject_id:     a.subject?.id ?? null,
+        subject_code:   a.subject?.code ?? '—',
+        subject_name:   a.subject?.name ?? a.display_label,
+        sections:       [],
+        totalUnits:     0,
+        assignmentIds:  [],
+        target_user_id: null,
+      }
+    }
+    if (a.section_id) {
+      map[key].sections.push({ id: a.section_id, name: a.section_name ?? `Section #${a.section_id}` })
+    }
+    map[key].totalUnits += a.load_units
+    map[key].assignmentIds.push(a.id)
+  }
+  return Object.values(map)
+}
+
+async function applyReassignTba() {
+  const targeted = reassignTba.groups.filter(g => g.target_user_id)
+  if (!targeted.length || reassignTba.applying) return
+
+  reassignTba.applying = true
+  reassignTba.result   = null
+
+  let ok = 0
+  let failed = 0
+  const failMessages = []
+
+  for (const group of targeted) {
+    for (const assignmentId of group.assignmentIds) {
+      try {
+        await axios.post(route('faculty-loading.load-balance.apply'), {
+          type:               'transfer',
+          load_assignment_id: assignmentId,
+          to_user_id:         group.target_user_id,
+        })
+        ok++
+      } catch (err) {
+        failed++
+        failMessages.push(err.response?.data?.message ?? `Assignment #${assignmentId} failed.`)
+      }
+    }
+  }
+
+  reassignTba.result = {
+    failed,
+    message: failed
+      ? `${ok} assignment(s) reassigned, ${failed} failed — ${failMessages[0]}`
+      : `${ok} assignment(s) reassigned successfully.`,
+  }
+
+  router.reload({
+    only: ['facultyLoads'],
+    onSuccess: () => {
+      // Rebuild from the refreshed TBA entry so reassigned rows drop off the list.
+      reassignTba.groups = tbaEntry.value
+        ? groupTbaAssignmentsBySubject(tbaEntry.value.assignments)
+        : []
+    },
+  })
+  reassignTba.applying = false
 }
 
 // ── Auto-Assign ───────────────────────────────────────────────────────────────
