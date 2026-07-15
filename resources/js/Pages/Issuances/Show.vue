@@ -123,6 +123,48 @@ function resendEmail(recipient) {
   })
 }
 
+// ── Bulk resend (all / selected) ────────────────────────────────────────────
+const selectedRecipientIds = ref([])
+
+function toggleSelect(id) {
+  const idx = selectedRecipientIds.value.indexOf(id)
+  if (idx === -1) selectedRecipientIds.value.push(id)
+  else selectedRecipientIds.value.splice(idx, 1)
+}
+
+function toggleSelectAll() {
+  if (selectedRecipientIds.value.length === (props.recipients ?? []).length) {
+    selectedRecipientIds.value = []
+  } else {
+    selectedRecipientIds.value = (props.recipients ?? []).map(r => r.id)
+  }
+}
+
+function resendBulk(ids, label) {
+  if (!ids.length) return
+  Swal.fire({
+    icon: 'question',
+    title: 'Resend issuance email?',
+    text: `${props.issuance.control_number} will be re-sent to ${ids.length} recipient(s)${label ? ` (${label})` : ''}.`,
+    showCancelButton: true,
+    confirmButtonText: 'Resend',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.post(route('issuances.recipients.resendBulk', props.issuance.id), { recipient_ids: ids }, {
+      preserveScroll: true,
+      onSuccess: () => { selectedRecipientIds.value = [] },
+    })
+  })
+}
+
+function resendAll() {
+  resendBulk((props.recipients ?? []).map(r => r.id), 'all recipients')
+}
+
+function resendSelected() {
+  resendBulk(selectedRecipientIds.value)
+}
+
 function fmtDt(d) {
   if (!d) return '—'
   return new Date(d).toLocaleString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -265,9 +307,19 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
           <!-- Acknowledgment progress (admin) -->
           <AppCard v-if="isAdmin && issuance.status === 'released'">
             <template #header>
-              <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <UserGroupIcon class="h-3.5 w-3.5" /> Acknowledgments
-              </h3>
+              <div class="flex items-center justify-between gap-2">
+                <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <UserGroupIcon class="h-3.5 w-3.5" /> Acknowledgments
+                </h3>
+                <div class="flex items-center gap-1.5">
+                  <AppButton v-if="selectedRecipientIds.length" size="sm" variant="secondary" @click="resendSelected">
+                    <ArrowPathIcon class="h-3.5 w-3.5" /> Resend Selected ({{ selectedRecipientIds.length }})
+                  </AppButton>
+                  <AppButton v-if="totalCount" size="sm" variant="secondary" @click="resendAll">
+                    <ArrowPathIcon class="h-3.5 w-3.5" /> Resend All
+                  </AppButton>
+                </div>
+              </div>
             </template>
             <div class="flex items-center gap-3 mb-2">
               <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -277,19 +329,31 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
             </div>
             <p class="text-xs text-slate-500">{{ ackPercent }}% acknowledged</p>
 
-            <div class="mt-3 max-h-64 overflow-y-auto space-y-1">
+            <label v-if="totalCount" class="mt-3 flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer select-none">
+              <input type="checkbox"
+                :checked="selectedRecipientIds.length === totalCount"
+                @change="toggleSelectAll"
+                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5" />
+              Select all
+            </label>
+
+            <div class="mt-1.5 max-h-64 overflow-y-auto space-y-1">
               <div v-for="r in recipients" :key="r.id"
                 class="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0 gap-2">
-                <div class="min-w-0 flex-1">
-                  <p class="text-xs font-medium text-slate-700 truncate">{{ r.user?.name ?? r.office?.name ?? '—' }}</p>
-                  <p v-if="r.user?.position" class="text-[10px] text-slate-400 truncate">{{ r.user.position }}</p>
-                  <p v-if="r.email_status === 'failed' && r.email_error" class="text-[10px] text-red-500 truncate" :title="r.email_error">{{ r.email_error }}</p>
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <input type="checkbox" :checked="selectedRecipientIds.includes(r.id)" @change="toggleSelect(r.id)"
+                    class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0" />
+                  <div class="min-w-0 flex-1">
+                    <p class="text-xs font-medium text-slate-700 truncate">{{ r.user?.name ?? r.office?.name ?? '—' }}</p>
+                    <p v-if="r.user?.position" class="text-[10px] text-slate-400 truncate">{{ r.user.position }}</p>
+                    <p v-if="r.email_status === 'failed' && r.email_error" class="text-[10px] text-red-500 truncate" :title="r.email_error">{{ r.email_error }}</p>
+                  </div>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
                   <AppBadge :color="EMAIL_STATUS_COLOR[r.email_status] ?? 'slate'">
                     {{ EMAIL_STATUS_LABEL[r.email_status] ?? r.email_status }}
                   </AppBadge>
-                  <button v-if="r.email_status === 'failed' || r.email_status === 'skipped'" type="button"
+                  <button v-if="r.email_status !== 'sent'" type="button"
                     @click="resendEmail(r)"
                     class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Resend email">
                     <ArrowPathIcon class="h-3.5 w-3.5" />

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Traits\SignsDocuments;
 use App\Jobs\ProcessIssuanceRelease;
+use App\Jobs\ResendIssuanceEmails;
 use App\Mail\IssuanceReleasedMail;
 use App\Models\Division;
 use App\Models\Issuance;
@@ -414,5 +415,23 @@ class IssuanceController extends Controller
 
             return back()->withErrors(['email' => 'Sending failed: ' . $e->getMessage()]);
         }
+    }
+
+    /** Re-send the issuance email to multiple recipients at once (queued — can be the full recipient list). */
+    public function resendBulkEmails(Request $request, Issuance $issuance)
+    {
+        abort_if(! $issuance->isReleased(), 422, 'Issuance has not been released yet.');
+
+        $request->validate([
+            'recipient_ids'   => 'required|array|min:1',
+            'recipient_ids.*' => 'integer',
+        ]);
+
+        $ids = $issuance->recipients()->whereIn('id', $request->recipient_ids)->pluck('id')->all();
+        abort_if(empty($ids), 422, 'No valid recipients selected.');
+
+        ResendIssuanceEmails::dispatch($issuance->id, $ids);
+
+        return back()->with('success', 'Resending to ' . count($ids) . ' recipient(s) — statuses will update shortly.');
     }
 }
