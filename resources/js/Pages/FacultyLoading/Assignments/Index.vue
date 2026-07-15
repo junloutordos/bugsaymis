@@ -139,6 +139,8 @@
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              <AppIconButton v-if="a.assignment_type === 'teaching'" label="Reassign to another faculty"
+                @click="openReassign(a)"><ArrowsRightLeftIcon class="h-4 w-4" /></AppIconButton>
               <AppIconButton label="Edit assignment" @click="openForm(a)"><PencilIcon class="h-4 w-4" /></AppIconButton>
               <AppIconButton label="Remove assignment" variant="danger" @click="remove(a)"><TrashIcon class="h-4 w-4" /></AppIconButton>
             </div>
@@ -543,6 +545,31 @@
       </template>
     </AppModal>
 
+    <!-- ── Reassign (single assignment, faculty → faculty) Modal ─────── -->
+    <AppModal :show="reassign.open" title="Reassign Assignment" size="sm" @close="closeReassign">
+      <div v-if="reassign.assignment" class="space-y-3">
+        <p class="text-sm text-slate-600">
+          Move <strong class="text-slate-800">{{ assignmentLabel(reassign.assignment) }}</strong>
+          ({{ reassign.assignment.load_units }}u)
+          from <strong class="text-slate-800">{{ detail.faculty?.faculty_name }}</strong> to:
+        </p>
+        <select v-model="reassign.target_user_id"
+          class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option :value="null">Select faculty...</option>
+          <option v-for="f in reassignTargetsFor(detail.faculty?.faculty_id)" :key="f.id" :value="f.id">{{ f.name }}</option>
+        </select>
+        <p v-if="reassign.error" class="text-xs text-danger-600">{{ reassign.error }}</p>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeReassign">Cancel</AppButton>
+        <AppButton variant="success" :disabled="!reassign.target_user_id || reassign.applying"
+          :loading="reassign.applying" @click="applyReassign">
+          <CheckIcon v-if="!reassign.applying" class="h-4 w-4" /> Reassign
+        </AppButton>
+      </template>
+    </AppModal>
+
   </AdminLayout>
 </template>
 
@@ -655,6 +682,52 @@ const detail = reactive({ open: false, faculty: null })
 function openDetail(fl) {
   detail.faculty = fl
   detail.open    = true
+}
+
+// Single assignment reassign (faculty → faculty), from the detail panel
+const reassign = reactive({
+  open:           false,
+  assignment:     null,
+  target_user_id: null,
+  applying:       false,
+  error:          null,
+})
+
+/** Faculty options for reassign target — everyone except whoever currently holds it. */
+function reassignTargetsFor(currentFacultyId) {
+  return props.faculty.filter(f => f.id !== currentFacultyId)
+}
+
+function openReassign(a) {
+  reassign.assignment     = a
+  reassign.target_user_id = null
+  reassign.error          = null
+  reassign.open           = true
+}
+
+function closeReassign() {
+  reassign.open = false
+}
+
+async function applyReassign() {
+  if (!reassign.target_user_id || !reassign.assignment || reassign.applying) return
+  reassign.applying = true
+  reassign.error     = null
+
+  try {
+    await axios.post(route('faculty-loading.load-balance.apply'), {
+      type:               'transfer',
+      load_assignment_id: reassign.assignment.id,
+      to_user_id:         reassign.target_user_id,
+    })
+    reassign.open = false
+    detail.open   = false
+    router.reload({ only: ['facultyLoads'] })
+  } catch (err) {
+    reassign.error = err.response?.data?.message ?? 'Failed to reassign this assignment.'
+  } finally {
+    reassign.applying = false
+  }
 }
 
 function onTermChange() {
