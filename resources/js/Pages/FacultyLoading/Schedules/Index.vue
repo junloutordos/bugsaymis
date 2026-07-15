@@ -70,33 +70,7 @@
         </select>
       </AppFilterBar>
 
-      <!-- Unplaced subjects tray (mobile/tablet — full-width horizontal bar) -->
-      <div v-if="unplacedLoads.length"
-        class="lg:hidden bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4 space-y-2">
-        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-          Unplaced Subjects — drag onto a slot below
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <div v-for="load in unplacedLoads" :key="load.load_assignment_id"
-            :draggable="!load.is_locked"
-            @dragstart="onDragStartLoad($event, load)"
-            @dragend="onDragEnd"
-            :class="['inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium select-none',
-              load.is_locked
-                ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
-                : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-grab active:cursor-grabbing']">
-            <LockClosedIcon v-if="load.is_locked" class="h-3 w-3" />
-            <span class="font-bold">{{ load.subject?.code }}</span>
-            <span>· {{ load.faculty?.name ?? 'TBA' }}</span>
-            <span>· G{{ load.grade_level }} {{ load.section_name }}</span>
-            <span class="bg-amber-200/60 px-1.5 py-0.5 rounded-full">needs {{ load.still_needed }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Calendars (left) + sticky Unplaced Subjects panel (right, lg+) -->
-      <div class="flex gap-5 items-start">
-        <div class="flex-1 min-w-0 space-y-6">
+      <div class="space-y-6">
 
           <!-- Empty state -->
           <AppCard v-if="groupsWithSchedules.length === 0">
@@ -136,9 +110,41 @@
                 </AppButton>
               </div>
 
+              <!-- Unplaced subjects for this group -->
+              <div v-if="unplacedByGroup[groupId]?.length"
+                class="px-4 py-2 bg-amber-50/70 border-b border-amber-100">
+                <div class="flex items-center justify-between gap-2">
+                  <p class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">
+                    Unplaced ({{ unplacedByGroup[groupId].length }}){{ viewBy !== 'grade' ? ' — drag onto a slot below' : '' }}
+                  </p>
+                  <button v-if="unplacedByGroup[groupId].length > 4" type="button" @click="toggleUnplacedExpanded(groupId)"
+                    class="text-[11px] font-medium text-amber-600 hover:text-amber-800 shrink-0">
+                    {{ isUnplacedExpanded(groupId) ? 'Show less' : 'Show all' }}
+                  </button>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mt-1.5">
+                  <div v-for="load in visibleUnplaced(groupId)" :key="load.load_assignment_id"
+                    :draggable="viewBy !== 'grade' && !load.is_locked"
+                    @dragstart="onDragStartLoad($event, load)"
+                    @dragend="onDragEnd"
+                    :class="['inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium select-none',
+                      viewBy === 'grade'
+                        ? 'bg-amber-50 border-amber-200 text-amber-800'
+                        : (load.is_locked
+                            ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
+                            : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-grab active:cursor-grabbing')]">
+                    <LockClosedIcon v-if="viewBy !== 'grade' && load.is_locked" class="h-3 w-3" />
+                    <span class="font-bold">{{ load.subject?.code }}</span>
+                    <span v-if="viewBy !== 'faculty'">· {{ load.faculty?.name ?? 'TBA' }}</span>
+                    <span v-if="viewBy !== 'section'">· {{ unplacedGradeSectionLabel(load) }}</span>
+                    <span class="bg-amber-200/60 px-1.5 py-0.5 rounded-full">needs {{ load.still_needed }}</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Calendar grid -->
               <div class="overflow-x-auto">
-                <div style="min-width: 580px">
+                <div style="min-width: 760px">
 
                   <!-- Day column headers -->
                   <div class="flex border-b border-slate-100">
@@ -283,37 +289,6 @@
             </div>
             </template>
           </template>
-
-        </div>
-
-        <!-- Unplaced subjects panel (desktop — sticky right rail) -->
-        <div v-if="unplacedLoads.length"
-          class="hidden lg:block w-80 shrink-0 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 sticky top-4">
-          <div class="px-4 py-3 border-b border-slate-100">
-            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Unplaced Subjects ({{ unplacedLoads.length }})
-            </p>
-            <p class="text-xs text-slate-400 mt-0.5">Drag onto a slot in the calendar</p>
-          </div>
-          <div class="p-3 space-y-2 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            <div v-for="load in unplacedLoads" :key="load.load_assignment_id"
-              :draggable="!load.is_locked"
-              @dragstart="onDragStartLoad($event, load)"
-              @dragend="onDragEnd"
-              :class="['rounded-lg border px-3 py-2 text-xs font-medium select-none',
-                load.is_locked
-                  ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
-                  : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-grab active:cursor-grabbing']">
-              <div class="flex items-center justify-between gap-1">
-                <span class="font-bold">{{ load.subject?.code }}</span>
-                <LockClosedIcon v-if="load.is_locked" class="h-3 w-3 shrink-0" />
-                <span v-else class="bg-amber-200/60 px-1.5 py-0.5 rounded-full shrink-0">needs {{ load.still_needed }}</span>
-              </div>
-              <div class="mt-0.5 text-slate-500">{{ load.faculty?.name ?? 'TBA' }}</div>
-              <div class="text-slate-500">G{{ load.grade_level }} {{ load.section_name }}</div>
-            </div>
-          </div>
-        </div>
 
       </div>
 
@@ -570,7 +545,7 @@ import {
 const WEEKDAYS  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const CAL_START = 7 * 60        // 7:00 AM in minutes
 const CAL_END   = 16 * 60 + 30  // 4:30 PM in minutes
-const SCALE     = 1.2            // px per minute
+const SCALE     = 1.5            // px per minute — wider now the sticky tray is gone
 const GUTTER    = 44             // width of the time-axis gutter in px
 const CAL_H     = (CAL_END - CAL_START) * SCALE  // total calendar height in px
 
@@ -761,6 +736,46 @@ function shouldShowUnitHeader(facultyId) {
   const list = groupsWithSchedules.value
   const idx  = list.indexOf(facultyId)
   return idx === 0 || facultyUnitLabel(list[idx - 1]) !== facultyUnitLabel(facultyId)
+}
+
+/** { groupId: [unplacedLoads] } — grouped the same way calendar cards are.
+ *  Grade view only surfaces electives (that view is an Electives-only
+ *  overview) and never adds new cards — it stays read-only, no drop target. */
+const unplacedByGroup = computed(() => {
+  const map = {}
+  for (const load of props.unplacedLoads) {
+    let k
+    if (viewBy.value === 'grade') {
+      if (!load.subject?.is_elective) continue
+      k = load.grade_level
+    } else if (viewBy.value === 'faculty') {
+      k = load.faculty?.id ?? 'unassigned'
+    } else {
+      k = load.section_id
+    }
+    if (!map[k]) map[k] = []
+    map[k].push(load)
+  }
+  return map
+})
+
+const expandedUnplacedGroups = ref(new Set())
+function toggleUnplacedExpanded(groupId) {
+  const next = new Set(expandedUnplacedGroups.value)
+  next.has(groupId) ? next.delete(groupId) : next.add(groupId)
+  expandedUnplacedGroups.value = next
+}
+function isUnplacedExpanded(groupId) {
+  return expandedUnplacedGroups.value.has(groupId)
+}
+/** Unplaced chips to render for a card — capped at 4 unless expanded. */
+function visibleUnplaced(groupId) {
+  const list = unplacedByGroup.value[groupId] ?? []
+  return (list.length <= 4 || isUnplacedExpanded(groupId)) ? list : list.slice(0, 4)
+}
+/** The dimension NOT already shown by the card's own header. */
+function unplacedGradeSectionLabel(load) {
+  return viewBy.value === 'grade' ? load.section_name : `G${load.grade_level} ${load.section_name}`
 }
 
 /** Header info for a group card — falls back to an unplaced-load entry when
