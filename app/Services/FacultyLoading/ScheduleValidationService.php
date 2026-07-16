@@ -90,7 +90,7 @@ class ScheduleValidationService
         }
 
         // ── 4. Load limit checks (warnings only — overload needs approval) ───
-        $loadCheck = $this->validateFacultyLoadLimits($data);
+        $loadCheck = $this->validateFacultyLoadLimits($data, $excludeScheduleId);
         $errors    = array_merge($errors,   $loadCheck['errors']);
         $warnings  = array_merge($warnings, $loadCheck['warnings']);
 
@@ -281,7 +281,7 @@ class ScheduleValidationService
         return $errors;
     }
 
-    private function validateFacultyLoadLimits(array $data): array
+    private function validateFacultyLoadLimits(array $data, ?int $excludeScheduleId = null): array
     {
         $errors   = [];
         $warnings = [];
@@ -307,12 +307,14 @@ class ScheduleValidationService
             $errors[] = $researchResult['message'];
         }
 
-        // Overload warning
-        if ($load->isOverload() && ! $load->overload_approved) {
+        // Overload warning — load units come from load assignments, so
+        // moving/editing an existing schedule ($excludeScheduleId set) never
+        // changes the load; only new placements surface the reminder.
+        if ($excludeScheduleId === null && $load->isOverload() && ! $load->overload_approved) {
             $overloadUnits = $this->loads->getOverloadUnits(
                 (float) $load->total_units, (float) $load->full_load_threshold
             );
-            $warnings[] = "Adding this schedule will result in an overload of {$overloadUnits} units. Campus Director approval is required.";
+            $warnings[] = "This faculty has an overload of {$overloadUnits} units pending Campus Director approval.";
         }
 
         return ['errors' => $errors, 'warnings' => $warnings];
