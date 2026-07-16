@@ -93,24 +93,74 @@ class DeterministicSchedulingService
             ];
         }
 
+        // A full AI run replaces tentative rows, but committed rows remain in
+        // place. Count their load sessions so we generate only the balance,
+        // and seed them as immovable intervals during every placement attempt.
+        $requirementIds = array_column($requirements, 'load_assignment_id');
+        $committedRows  = ClassSchedule::active()
+            ->classes()
+            ->where('academic_term_id', $termId)
+            ->whereIn('load_assignment_id', $requirementIds)
+            ->get(['load_assignment_id', 'section_id', 'session_type']);
+
+        $committedByLoad = $committedRows
+            ->groupBy('load_assignment_id')
+            ->map(fn ($rows) => [
+                'count'     => $rows->count(),
+                'ilp_count' => $rows->where('session_type', 'ilp')->count(),
+            ]);
+        $committedBySection = $committedRows
+            ->groupBy('section_id')
+            ->map(fn ($rows) => $rows->count())
+            ->all();
+
+        $remainingRequirements = [];
+        foreach ($requirements as $requirement) {
+            $committed = $committedByLoad->get($requirement['load_assignment_id'], [
+                'count' => 0, 'ilp_count' => 0,
+            ]);
+            $requirement['total_sessions_needed'] = $requirement['sessions_needed'];
+            $requirement['sessions_needed']       = max(0, $requirement['sessions_needed'] - $committed['count']);
+            $requirement['committed_ilp_count']   = $committed['ilp_count'];
+
+            if ($requirement['sessions_needed'] > 0) {
+                $remainingRequirements[] = $requirement;
+            }
+        }
+
+        if (empty($remainingRequirements)) {
+            return [
+                'fitness'              => 0,
+                'hard_conflicts'       => 0,
+                'schedules_generated'  => 0,
+                'schedules'            => [],
+                'conflict_suggestions' => [],
+                'unplaceable'          => [],
+                'section_report'       => $this->buildSectionReport($requirements, [], $committedBySection),
+                'warning'              => null,
+            ];
+        }
+
         // Pre-compute the available period grid per grade level (shared by all
         // sections of that grade).
-        $this->buildGrids(array_unique(array_column($requirements, 'grade')));
+        $this->buildGrids(array_unique(array_column($remainingRequirements, 'grade')));
 
         // Same-weekday-across-sections: for each grade+subject, decide which
         // weekday each session index lands on — shared by every section of
         // that grade offering the subject (e.g. "Math G7 session 1" is
         // Monday for every G7 section). Electives are exempt — they already
         // use their own cross-section elective windows.
-        $subjectDayAssignment = $this->assignSubjectDays($requirements);
+        $subjectDayAssignment = $this->assignSubjectDays($remainingRequirements);
 
         // Flatten requirements into individual session instances. A subject
         // with has_ilp reserves its LAST weekly session as the Independent
         // Learning Period — only when it has at least 2 sessions, otherwise
         // its only session stays a regular class.
         $baseSessions = [];
-        foreach ($requirements as $req) {
-            $ilpEligible = ($req['has_ilp'] ?? false) && $req['sessions_needed'] >= 2;
+        foreach ($remainingRequirements as $req) {
+            $ilpEligible = ($req['has_ilp'] ?? false)
+                && $req['total_sessions_needed'] >= 2
+                && $req['committed_ilp_count'] === 0;
             $forcedDays  = $subjectDayAssignment[$req['grade']][$req['subject_id']] ?? null;
             for ($i = 0; $i < $req['sessions_needed']; $i++) {
                 $session = $req;
@@ -159,7 +209,7 @@ class DeterministicSchedulingService
             'schedules'            => $placed,
             'conflict_suggestions' => [],
             'unplaceable'          => $unplaceable,
-            'section_report'       => $this->buildSectionReport($requirements, $placed),
+            'section_report'       => $this->buildSectionReport($requirements, $placed, $committedBySection),
             'warning'              => empty($unplaceable)
                 ? null
                 : count($unplaceable) . ' session(s) could not be placed (grade likely over-subscribed). See unplaceable report.',
@@ -406,6 +456,7 @@ class DeterministicSchedulingService
     private function runPlacement(array $sessions, int $schoolYearId, int $termId): array
     {
         $this->resetState();
+        $this->seedBusyFromDb($termId, ['active']);
 
         // Pass 1 — greedy placement.
         $deferred = [];
@@ -655,9 +706,9 @@ class DeterministicSchedulingService
      * for TBA/placeholder users are skipped (mirrors the negative-sentinel
      * convention: parallel TBA sessions never conflict with each other).
      */
-    private function seedBusyFromDb(int $termId): void
+    private function seedBusyFromDb(int $termId, array $statuses = ['active', 'tentative']): void
     {
-        $rows = ClassSchedule::occupying()
+        $rows = ClassSchedule::whereIn('status', $statuses)
             ->where('academic_term_id', $termId)
             ->get(['id', 'user_id', 'section_id', 'subject_id', 'day_of_week',
                 'start_time', 'end_time', 'entry_type', 'session_type']);
@@ -1183,9 +1234,10 @@ class DeterministicSchedulingService
      *
      * @param array<int,array<string,mixed>> $requirements
      * @param array<int,array<string,mixed>> $placed
+     * @param array<int,int> $committedBySection
      * @return array<int,array<string,mixed>>
      */
-    private function buildSectionReport(array $requirements, array $placed): array
+    private function buildSectionReport(array $requirements, array $placed, array $committedBySection = []): array
     {
         $needed = [];
         $names  = [];
@@ -1194,7 +1246,7 @@ class DeterministicSchedulingService
             $names[$req['section_id']]  = ['name' => $req['section_name'], 'grade' => $req['grade']];
         }
 
-        $placedCount = [];
+        $placedCount = $committedBySection;
         foreach ($placed as $row) {
             $placedCount[$row['section_id']] = ($placedCount[$row['section_id']] ?? 0) + 1;
         }
@@ -1207,7 +1259,7 @@ class DeterministicSchedulingService
                 'grade'        => $names[$sectionId]['grade'],
                 'needed'       => $need,
                 'placed'       => $placedCount[$sectionId] ?? 0,
-                'unplaced'     => $need - ($placedCount[$sectionId] ?? 0),
+                'unplaced'     => max(0, $need - ($placedCount[$sectionId] ?? 0)),
             ];
         }
 
