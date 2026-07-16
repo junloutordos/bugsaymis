@@ -843,14 +843,14 @@ function cardTitle(groupId) {
 function printUrlForGroup(groupId) {
   if (!filters.term_id) return null
 
-  if (viewBy.value === 'section' && isManage.value) {
+  if (viewBy.value === 'section' && isManage.value && groupId) {
     return route('faculty-loading.schedules.sections.print', {
       section: groupId,
       term_id: filters.term_id,
     })
   }
 
-  if (viewBy.value === 'faculty' && groupId !== 'unassigned') {
+  if (viewBy.value === 'faculty' && groupId && groupId !== 'unassigned') {
     return route('faculty-loading.schedules.faculty.print', {
       faculty: groupId,
       term_id: filters.term_id,
