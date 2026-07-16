@@ -647,7 +647,9 @@ const groupsWithSchedules = computed(() => {
   const seen = []
   for (const s of displaySchedules.value) {
     const k = groupKeyOf(s)
-    if (!seen.includes(k)) seen.push(k)
+    // null keys (sectionless/gradeless rows, e.g. non-teaching blocks) never
+    // get a card — they belong to the By Faculty view
+    if (k != null && !seen.includes(k)) seen.push(k)
   }
   // Sections/faculty with unplaced loads but zero schedules yet still need a
   // calendar card to render so there's somewhere to drop the tray chip. Not
@@ -656,7 +658,7 @@ const groupsWithSchedules = computed(() => {
   if (!isOverviewMode.value) {
     for (const load of props.unplacedLoads) {
       const k = viewBy.value === 'faculty' ? (load.faculty?.id ?? 'unassigned') : load.section_id
-      if (!seen.includes(k)) seen.push(k)
+      if (k != null && !seen.includes(k)) seen.push(k)
     }
   }
   if (viewBy.value === 'grade') {
