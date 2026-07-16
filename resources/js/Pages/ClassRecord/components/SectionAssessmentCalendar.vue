@@ -128,9 +128,9 @@ function close() {
                 {{ cell.day }}
               </span>
               <span v-if="cell.entry"
-                :class="['font-bold text-[10px]', cell.entry.count >= 3 ? 'text-red-500' : 'text-slate-400']"
-                :title="cell.entry.count >= 3 ? 'Section is at the 3/day maximum' : `${cell.entry.count}/3 scheduled`">
-                {{ cell.entry.count }}/3
+                :class="['font-bold text-[10px]', (cell.entry.graded_count ?? cell.entry.count) >= 3 ? 'text-red-500' : 'text-slate-400']"
+                :title="`${cell.entry.graded_count ?? cell.entry.count}/3 graded · ${cell.entry.major_count ?? 0}/2 major`">
+                {{ cell.entry.graded_count ?? cell.entry.count }}/3
               </span>
             </div>
             <div v-if="cell.entry" class="space-y-0.5 overflow-hidden">
@@ -158,12 +158,21 @@ function close() {
         </div>
 
         <div v-else class="space-y-2 overflow-y-auto max-h-[320px] pr-1">
-          <AppBadge :color="selectedEntry.count >= 3 ? 'red' : 'slate'">
-            {{ selectedEntry.count }} / 3 assessments
-          </AppBadge>
+          <div class="flex flex-wrap gap-1.5">
+            <AppBadge :color="(selectedEntry.graded_count ?? selectedEntry.count) >= 3 ? 'red' : 'slate'">
+              {{ selectedEntry.graded_count ?? selectedEntry.count }} / 3 graded
+            </AppBadge>
+            <AppBadge :color="(selectedEntry.major_count ?? 0) >= 2 ? 'red' : 'slate'">
+              {{ selectedEntry.major_count ?? 0 }} / 2 major
+            </AppBadge>
+          </div>
           <div v-for="item in selectedEntry.items" :key="item.id"
             :class="['rounded-lg p-2.5 border', item.is_own_record ? 'border-indigo-100 bg-indigo-50/60' : 'border-slate-100 bg-slate-50/60']">
             <p class="text-sm font-medium text-slate-800 leading-tight">[{{ item.category_code }}] {{ item.title }}</p>
+            <div class="flex flex-wrap gap-1 mt-1">
+              <span v-if="item.is_major" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
+              <span v-if="item.is_graded === false" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Non-graded</span>
+            </div>
             <p class="text-xs text-slate-500 mt-0.5">{{ item.subject_name }}</p>
             <p v-if="item.teacher_name" class="text-xs text-slate-400 italic">{{ item.teacher_name }}</p>
             <p v-if="item.is_own_record" class="text-[11px] text-indigo-500 mt-0.5">This class record</p>

@@ -98,6 +98,8 @@ function buildDraft(quarter) {
         grading_category_id: cat.id,
         assessment_number:   n,
         title:               found?.title ?? '',
+        assessment_type:     found?.assessment_type ?? '',
+        is_graded:           found ? !!found.is_graded : true,
         activity_date:       found?.activity_date ?? '',
         max_score:           found?.max_score ?? '',
         _saved:              !!found,
@@ -117,6 +119,8 @@ function addAssessmentRow(catId) {
     grading_category_id: catId,
     assessment_number:   nextNum,
     title:               '',
+    assessment_type:     '',
+    is_graded:           true,
     activity_date:       '',
     max_score:           '',
     _saved:              false,
@@ -175,11 +179,15 @@ async function saveSetup() {
   }
 
   try {
-    await axios.post(
+    const { data } = await axios.post(
       route('class-records.assessments.upsert', { classRecord: props.classRecord.id, q: activeQuarter.value }),
       { assessments }
     )
-    await Swal.fire({ icon: 'success', title: 'Setup saved!', timer: 1000, showConfirmButton: false })
+    if (data.warnings?.length) {
+      await Swal.fire({ icon: 'warning', title: 'Saved — please double-check', html: data.warnings.join('<br>') })
+    } else {
+      await Swal.fire({ icon: 'success', title: 'Setup saved!', timer: 1000, showConfirmButton: false })
+    }
     router.reload({ only: ['classRecord'] })
     loadSectionCalendar()
   } catch (err) {
@@ -216,18 +224,49 @@ const currentQuarterAssessmentIds = computed(() =>
   new Set((currentQuarterData.value?.assessments ?? []).map(a => a.id))
 )
 
-// Per-date assessment counts for this section across the whole school year:
+// ── WAT rules (mirrors WatRuleService — server re-validates authoritatively) ──
+const WAT = { dailyGraded: 3, dailyMajor: 2, weeklyGraded: 15, weeklyMajor: 6 }
+
+const categoriesById = computed(() =>
+  Object.fromEntries((props.classRecord.grading_option?.categories ?? []).map(c => [c.id, c]))
+)
+
+// Major = Long Test, or worth ≥10% of the quarterly grade
+function isMajorRow(row) {
+  if (['long_test_1', 'long_test_2'].includes(row.assessment_type)) return true
+  const cat = categoriesById.value[row.grading_category_id]
+  return cat ? (cat.weight / Math.max(1, cat.max_assessments)) >= 0.10 : false
+}
+
+// Monday of the date's week, minus 3 days = the preceding Friday (end of day)
+function plottingDeadline(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const monday = new Date(d)
+  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  const friday = new Date(monday)
+  friday.setDate(monday.getDate() - 3)
+  friday.setHours(23, 59, 59, 999)
+  return friday
+}
+
+// Per-date graded/major counts for this section across the whole school year:
 // server baseline (other quarters/subjects) + this quarter's live, unsaved draft.
 const dateCounts = computed(() => {
   const map = new Map()
+  const bump = (date, graded, major) => {
+    const entry = map.get(date) ?? { graded: 0, major: 0 }
+    entry.graded += graded
+    entry.major  += major
+    map.set(date, entry)
+  }
   for (const day of sectionCalendarDays.value) {
-    const otherCount = day.items.filter(i => !currentQuarterAssessmentIds.value.has(i.id)).length
-    if (otherCount > 0) map.set(day.date, otherCount)
+    const others = day.items.filter(i => !currentQuarterAssessmentIds.value.has(i.id) && i.is_graded !== false)
+    bump(day.date, others.length, others.filter(i => i.is_major).length)
   }
   for (const rows of Object.values(assessmentDraft.value)) {
     for (const row of rows) {
-      if (row.activity_date) {
-        map.set(row.activity_date, (map.get(row.activity_date) ?? 0) + 1)
+      if (row.activity_date && row.is_graded) {
+        bump(row.activity_date, 1, isMajorRow(row) ? 1 : 0)
       }
     }
   }
@@ -240,9 +279,16 @@ function onDateChange(row) {
     row._prevDate     = ''
     return
   }
-  const count = dateCounts.value.get(row.activity_date) ?? 0
-  if (count > 3) {
-    row._dateWarning  = `Section already has 3 assessments scheduled on ${row.activity_date} — pick another date.`
+  const counts = dateCounts.value.get(row.activity_date) ?? { graded: 0, major: 0 }
+  if (row.is_graded && counts.graded > WAT.dailyGraded) {
+    row._dateWarning  = `Section already has ${WAT.dailyGraded} graded assessments on ${row.activity_date} — pick another date.`
+    row.activity_date = row._prevDate
+  } else if (row.is_graded && isMajorRow(row) && counts.major > WAT.dailyMajor) {
+    row._dateWarning  = `Section already has ${WAT.dailyMajor} major assessments on ${row.activity_date} — pick another date.`
+    row.activity_date = row._prevDate
+  } else if (!props.isAdmin && new Date() > plottingDeadline(row.activity_date)) {
+    const deadline = plottingDeadline(row.activity_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+    row._dateWarning  = `Plotting deadline passed — assessments must be plotted by the Friday before their week (${deadline}).`
     row.activity_date = row._prevDate
   } else {
     row._dateWarning = null
@@ -567,6 +613,15 @@ async function checkRecord() {
             </AppButton>
           </div>
 
+          <!-- WAT plotting rules reminder -->
+          <div v-if="!isLocked && !isReadOnly"
+            class="mb-4 bg-slate-50 border border-slate-100 text-slate-500 rounded-lg px-3 py-2 text-[11px]">
+            <span class="font-semibold text-slate-600">WAT rules:</span>
+            plot assessments no later than the Friday before their week (same-week plotting is not allowed)
+            · max {{ WAT.dailyGraded }} graded ({{ WAT.dailyMajor }} major) per section per day
+            · max {{ WAT.weeklyGraded }} graded ({{ WAT.weeklyMajor }} major) per section per week.
+          </div>
+
           <!-- Errors -->
           <div v-if="setupErrors.length"
             class="mb-4 bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-4 py-3 text-xs space-y-1">
@@ -590,6 +645,8 @@ async function checkRecord() {
                     <tr>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-16">#</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-44">Type</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Category</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score</th>
                       <th v-if="!isLocked && !isReadOnly" class="px-2 py-2 w-8"></th>
@@ -606,6 +663,27 @@ async function checkRecord() {
                           :disabled="isLocked || isReadOnly"
                           :placeholder="`${cat.code}${row.assessment_number} title…`"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
+                      </td>
+                      <td class="px-4 py-2">
+                        <select v-model="row.assessment_type"
+                          :disabled="isLocked || isReadOnly"
+                          class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
+                          <option value="">— Select —</option>
+                          <option value="formative">Formative Assessment</option>
+                          <option value="alternative">Alternative Assessment</option>
+                          <option value="ila">Independent Learning Activity</option>
+                          <option value="long_test_1">Long Test 1</option>
+                          <option value="long_test_2">Long Test 2</option>
+                        </select>
+                        <span v-if="isMajorRow(row)" class="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
+                      </td>
+                      <td class="px-4 py-2">
+                        <select v-model="row.is_graded"
+                          :disabled="isLocked || isReadOnly"
+                          class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
+                          <option :value="true">Graded</option>
+                          <option :value="false">Non-graded</option>
+                        </select>
                       </td>
                       <td class="px-4 py-2">
                         <input v-model="row.activity_date" type="date"

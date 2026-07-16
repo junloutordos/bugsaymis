@@ -2220,6 +2220,13 @@ if (app()->environment('local')) {
 */
 Route::middleware(['auth'])->group(function () {
     Route::get('/class-records',      [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'index'])->name('class-records.page.index');
+
+    // Weekly Assessment Tracker — must be registered BEFORE the {classRecord} wildcard
+    Route::get('/class-records/wat',         [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'index'])->name('class-records.wat.index');
+    Route::get('/class-records/wat/print',   [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'printForm'])->name('class-records.wat.print');
+    Route::get('/class-records/wat/review',  [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'review'])->name('class-records.wat.review');
+    Route::post('/class-records/wat/review', [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'storeReview'])->name('class-records.wat.review.store');
+
     Route::get('/class-records/{classRecord}', [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'show'])->name('class-records.page.show');
 });
 // ── PSGC Address Lookup (public geographic data, no auth required) ────────────

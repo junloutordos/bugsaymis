@@ -7,7 +7,10 @@ use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordScore;
+use App\Models\ClassRecord\GradingCategory;
 use App\Models\User;
+use App\Services\ClassRecord\WatRuleService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -55,6 +58,9 @@ class ClassRecordAssessmentController extends Controller
                 'class_record_assessments.id',
                 'class_record_assessments.title',
                 'class_record_assessments.activity_date',
+                'class_record_assessments.assessment_type',
+                'class_record_assessments.is_graded',
+                'class_record_assessments.is_major',
                 'cr.id as class_record_id',
                 'cr.subject_name',
                 'cr.teacher_id',
@@ -77,15 +83,20 @@ class ClassRecordAssessmentController extends Controller
                 : (string) $row->activity_date)
             ->map(function ($items, $date) use ($classRecord, $teachers) {
                 return [
-                    'date'  => $date,
-                    'count' => $items->count(),
+                    'date'         => $date,
+                    'count'        => $items->count(),
+                    'graded_count' => $items->where('is_graded', true)->count(),
+                    'major_count'  => $items->where('is_graded', true)->where('is_major', true)->count(),
                     'items' => $items->map(fn ($row) => [
-                        'id'            => $row->id,
-                        'title'         => $row->title,
-                        'subject_name'  => $row->subject_name,
-                        'teacher_name'  => $teachers[$row->teacher_id]?->name,
-                        'category_code' => $row->category_code,
-                        'is_own_record' => $row->class_record_id === $classRecord->id,
+                        'id'              => $row->id,
+                        'title'           => $row->title,
+                        'subject_name'    => $row->subject_name,
+                        'teacher_name'    => $teachers[$row->teacher_id]?->name,
+                        'category_code'   => $row->category_code,
+                        'assessment_type' => $row->assessment_type,
+                        'is_graded'       => (bool) $row->is_graded,
+                        'is_major'        => (bool) $row->is_major,
+                        'is_own_record'   => $row->class_record_id === $classRecord->id,
                     ])->values(),
                 ];
             })
@@ -109,50 +120,117 @@ class ClassRecordAssessmentController extends Controller
             'assessments.*.grading_category_id'   => 'required|integer|exists:grading_categories,id',
             'assessments.*.assessment_number'      => 'required|integer|min:1',
             'assessments.*.title'                  => 'required|string|max:255',
+            'assessments.*.assessment_type'        => 'nullable|string|in:' . implode(',', array_keys(ClassRecordAssessment::TYPES)),
+            'assessments.*.is_graded'              => 'sometimes|boolean',
             'assessments.*.activity_date'          => 'nullable|date',
             'assessments.*.max_score'              => 'required|numeric|min:0.01',
             'assessments.*.sort_order'             => 'sometimes|integer|min:0',
         ]);
 
-        // Max-3-assessments-per-section-per-day check
-        if ($classRecord->section_id) {
-            $byDate = collect($validated['assessments'])
-                ->filter(fn ($item) => ! empty($item['activity_date']))
-                ->groupBy('activity_date');
+        $categories = GradingCategory::whereIn(
+            'id',
+            collect($validated['assessments'])->pluck('grading_category_id')->unique()
+        )->get()->keyBy('id');
 
-            foreach ($byDate as $date => $items) {
-                // Find IDs of assessments being replaced (already exist in DB for this quarter)
-                $replacedIds = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)
-                    ->where(function ($q) use ($items) {
-                        foreach ($items as $item) {
-                            $q->orWhere(function ($q2) use ($item) {
-                                $q2->where('grading_category_id', $item['grading_category_id'])
-                                   ->where('assessment_number',   $item['assessment_number']);
-                            });
-                        }
-                    })
-                    ->pluck('id');
+        $existingByKey = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)->get()
+            ->keyBy(fn ($a) => $a->grading_category_id . '-' . $a->assessment_number);
 
-                $existingCount = ClassRecordAssessment::countForSectionOnDate(
-                    $classRecord->section_id,
-                    $classRecord->school_year_id,
-                    $date,
-                    $replacedIds->all()
-                );
+        // is_major is always derived server-side — never trusted from the client
+        $items = collect($validated['assessments'])->map(function ($item) use ($categories, $existingByKey) {
+            $item['is_graded'] = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
+            $item['is_major']  = WatRuleService::isMajor(
+                $item['assessment_type'] ?? null,
+                $categories[$item['grading_category_id']]
+            );
+            $item['_existing'] = $existingByKey->get($item['grading_category_id'] . '-' . $item['assessment_number']);
+            $item['_date_changed'] = ! empty($item['activity_date']) && ! (
+                $item['_existing']?->activity_date
+                && $item['_existing']->activity_date->toDateString() === Carbon::parse($item['activity_date'])->toDateString()
+            );
+            return $item;
+        });
 
-                $adding = $items->count();
-
-                if ($existingCount + $adding > 3) {
-                    $formatted = \Carbon\Carbon::parse($date)->format('M d, Y');
+        // WAT rule: plot no later than the Friday preceding the week of
+        // implementation (admins may correct entries past the deadline)
+        if (! $this->isAdmin()) {
+            foreach ($items as $item) {
+                if (! $item['_date_changed'] || empty($item['activity_date'])) {
+                    continue;
+                }
+                if (WatRuleService::violatesPlottingDeadline($item['activity_date'])) {
+                    $when     = Carbon::parse($item['activity_date'])->format('M d, Y');
+                    $deadline = WatRuleService::plottingDeadline($item['activity_date'])->format('D, M d, Y');
                     return response()->json([
-                        'message' => "Section already has {$existingCount} assessment(s) on {$formatted}. Cannot add {$adding} more — max 3 per section per day.",
+                        'message' => "\"{$item['title']}\" is dated {$when}, but the plotting deadline for that week was {$deadline}. Assessments must be plotted no later than the Friday before their week — same-week plotting is not allowed.",
                     ], 422);
                 }
             }
         }
 
+        // WAT daily/weekly caps — graded assessments only, section-wide
+        if ($classRecord->section_id) {
+            $replacedIds = $items->pluck('_existing')->filter()->pluck('id')->all();
+            $datedGraded = $items->filter(fn ($i) => ! empty($i['activity_date']) && $i['is_graded']);
+
+            foreach ($datedGraded->groupBy('activity_date') as $date => $group) {
+                $counts    = WatRuleService::sectionCountsOnDate($classRecord->section_id, $classRecord->school_year_id, $date, $replacedIds);
+                $graded    = $counts['graded'] + $group->count();
+                $major     = $counts['major'] + $group->where('is_major', true)->count();
+                $formatted = Carbon::parse($date)->format('M d, Y');
+
+                if ($graded > WatRuleService::DAILY_GRADED_MAX) {
+                    return response()->json([
+                        'message' => "This section would have {$graded} graded assessments on {$formatted} — the WAT limit is " . WatRuleService::DAILY_GRADED_MAX . ' graded assessments per day.',
+                    ], 422);
+                }
+                if ($major > WatRuleService::DAILY_MAJOR_MAX) {
+                    return response()->json([
+                        'message' => "This section would have {$major} major assessments on {$formatted} — the WAT limit is " . WatRuleService::DAILY_MAJOR_MAX . ' major assessments per day.',
+                    ], 422);
+                }
+            }
+
+            $byWeek = $datedGraded->groupBy(fn ($i) => Carbon::parse($i['activity_date'])->startOfWeek(Carbon::MONDAY)->toDateString());
+            foreach ($byWeek as $weekStart => $group) {
+                $counts = WatRuleService::sectionCountsInWeek($classRecord->section_id, $classRecord->school_year_id, $weekStart, $replacedIds);
+                $graded = $counts['graded'] + $group->count();
+                $major  = $counts['major'] + $group->where('is_major', true)->count();
+                $label  = Carbon::parse($weekStart)->format('M d') . '–' . Carbon::parse($weekStart)->addDays(4)->format('M d, Y');
+
+                if ($graded > WatRuleService::WEEKLY_GRADED_MAX) {
+                    return response()->json([
+                        'message' => "This section would have {$graded} graded assessments in the week of {$label} — the WAT limit is " . WatRuleService::WEEKLY_GRADED_MAX . ' graded assessments per week.',
+                    ], 422);
+                }
+                if ($major > WatRuleService::WEEKLY_MAJOR_MAX) {
+                    return response()->json([
+                        'message' => "This section would have {$major} major assessments in the week of {$label} — the WAT limit is " . WatRuleService::WEEKLY_MAJOR_MAX . ' major assessments per week.',
+                    ], 422);
+                }
+            }
+        }
+
+        // Warn (not block) when the date falls on a day the subject doesn't
+        // meet this section per the class schedule
+        $warnings = [];
+        foreach ($items->filter(fn ($i) => ! empty($i['activity_date']))->unique('activity_date') as $item) {
+            $meets = WatRuleService::meetsOnDate(
+                $classRecord->subject_id,
+                $classRecord->section_id,
+                $classRecord->school_year_id,
+                $item['activity_date']
+            );
+            if ($meets === false) {
+                $day = Carbon::parse($item['activity_date'])->format('l, M d');
+                $warnings[] = "{$classRecord->subject_name} has no scheduled class with this section on {$day} — double-check the date.";
+            }
+        }
+
         $upserted = [];
-        foreach ($validated['assessments'] as $i => $item) {
+        foreach ($items as $i => $item) {
+            $hasDate    = ! empty($item['activity_date']);
+            $existing   = $item['_existing'];
+
             $assessment = ClassRecordAssessment::updateOrCreate(
                 [
                     'class_record_quarter_id' => $quarter->id,
@@ -160,18 +238,24 @@ class ClassRecordAssessmentController extends Controller
                     'assessment_number'       => $item['assessment_number'],
                 ],
                 [
-                    'title'         => $item['title'],
-                    'activity_date' => $item['activity_date'] ?? null,
-                    'max_score'     => $item['max_score'],
-                    'sort_order'    => $item['sort_order'] ?? $i,
+                    'title'           => $item['title'],
+                    'assessment_type' => $item['assessment_type'] ?? null,
+                    'is_graded'       => $item['is_graded'],
+                    'is_major'        => $item['is_major'],
+                    'activity_date'   => $item['activity_date'] ?? null,
+                    'plotted_at'      => ! $hasDate ? null
+                        : ($item['_date_changed'] || ! $existing?->plotted_at ? now() : $existing->plotted_at),
+                    'max_score'       => $item['max_score'],
+                    'sort_order'      => $item['sort_order'] ?? $i,
                 ]
             );
             $upserted[] = $assessment;
         }
 
         return response()->json([
-            'message' => count($upserted) . ' assessment(s) saved.',
-            'data'    => $upserted,
+            'message'  => count($upserted) . ' assessment(s) saved.',
+            'warnings' => $warnings,
+            'data'     => $upserted,
         ]);
     }
 
@@ -213,7 +297,11 @@ class ClassRecordAssessmentController extends Controller
                 'grading_category_id'     => $src->grading_category_id,
                 'assessment_number'       => $src->assessment_number,
                 'title'                   => $src->title,
+                'assessment_type'         => $src->assessment_type,
+                'is_graded'               => $src->is_graded,
+                'is_major'                => $src->is_major,
                 'activity_date'           => null,
+                'plotted_at'              => null,
                 'max_score'               => $src->max_score,
                 'sort_order'              => $src->sort_order,
             ]))->values()->all();
@@ -273,7 +361,11 @@ class ClassRecordAssessmentController extends Controller
                 'grading_category_id'     => $src->grading_category_id,
                 'assessment_number'       => $src->assessment_number,
                 'title'                   => $src->title,
+                'assessment_type'         => $src->assessment_type,
+                'is_graded'               => $src->is_graded,
+                'is_major'                => $src->is_major,
                 'activity_date'           => null,
+                'plotted_at'              => null,
                 'max_score'               => $src->max_score,
                 'sort_order'              => $src->sort_order,
             ]))->values()->all();

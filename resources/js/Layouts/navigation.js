@@ -1324,6 +1324,13 @@ export const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
       },
+      {
+        label: "Weekly Assessment Tracker",
+        routeName: "class-records.wat.index",
+        href: route("class-records.wat.index"),
+        icon: CalendarDaysIcon,
+        roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
+      },
     ],
   },
 

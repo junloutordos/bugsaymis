@@ -10,19 +10,34 @@ class ClassRecordAssessment extends Model
 {
     protected $table = 'class_record_assessments';
 
+    public const TYPES = [
+        'formative'   => 'Formative Assessment',
+        'alternative' => 'Alternative Assessment',
+        'ila'         => 'Independent Learning Activity',
+        'long_test_1' => 'Long Test 1',
+        'long_test_2' => 'Long Test 2',
+    ];
+
     protected $fillable = [
         'class_record_quarter_id',
         'grading_category_id',
+        'assessment_type',
+        'is_graded',
+        'is_major',
         'assessment_number',
         'title',
         'activity_date',
+        'plotted_at',
         'max_score',
         'sort_order',
     ];
 
     protected $casts = [
         'assessment_number' => 'integer',
+        'is_graded'         => 'boolean',
+        'is_major'          => 'boolean',
         'activity_date'     => 'date:Y-m-d',
+        'plotted_at'        => 'datetime',
         'max_score'         => 'decimal:2',
         'sort_order'        => 'integer',
     ];
