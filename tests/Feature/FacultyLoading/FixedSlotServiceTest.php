@@ -130,15 +130,26 @@ class FixedSlotServiceTest extends TestCase
         );
     }
 
-    public function test_wednesday_g7g8_activity_starts_at_15_00(): void
+    public function test_wednesday_g7_activity_starts_at_15_00(): void
     {
         $slots    = FixedSlotService::fixedSlotsForDay(7, 'G7G8', 'Wednesday');
         $activity = array_values(array_filter($slots, fn ($s) => $s['type'] === 'ACTIVITY'));
 
         $this->assertNotEmpty($activity);
         $this->assertSame('15:00', $activity[0]['start'],
-            'G7/G8 Wednesday ACTIVITY must start at 15:00'
+            'G7 Wednesday ACTIVITY must start at 15:00'
         );
+    }
+
+    public function test_wednesday_g8_activity_starts_at_15_50(): void
+    {
+        $slots    = FixedSlotService::fixedSlotsForDay(8, 'G7G8', 'Wednesday');
+        $activity = array_values(array_filter($slots, fn ($s) => $s['type'] === 'ACTIVITY'));
+        $types    = array_column($slots, 'type');
+
+        $this->assertNotContains('WELLNESS', $types);
+        $this->assertNotEmpty($activity);
+        $this->assertSame('15:50', $activity[0]['start']);
     }
 
     public function test_fixed_slots_contain_no_class_type(): void

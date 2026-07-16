@@ -105,7 +105,7 @@ class FullConstraintValidatorTest extends TestCase
     }
 
     // =========================================================================
-    // checkConstant — H9 (Monday dead zone G7/G8)
+    // checkConstant — H9 (Grade 7 Monday dead zone)
     // =========================================================================
 
     public function test_check_constant_fails_h9_for_g7_monday_dead_zone(): void
@@ -119,6 +119,14 @@ class FullConstraintValidatorTest extends TestCase
         foreach ($result['violations'] as $v) {
             $this->assertStringContainsString('H9', $v['reason']);
         }
+    }
+
+    public function test_check_constant_allows_grade_8_reclaimed_monday_period(): void
+    {
+        $result = $this->validator->checkConstant(8, 'Monday', '08:50', '09:40');
+
+        $this->assertTrue($result['passes']);
+        $this->assertEmpty($result['violations']);
     }
 
     public function test_check_constant_passes_h9_for_g9_monday_same_window(): void
@@ -150,6 +158,14 @@ class FullConstraintValidatorTest extends TestCase
     {
         $result = $this->validator->checkConstant(7, 'Wednesday', '14:00', '14:50');
         $this->assertTrue($result['passes']);
+    }
+
+    public function test_check_constant_allows_grade_8_final_wednesday_period(): void
+    {
+        $result = $this->validator->checkConstant(8, 'Wednesday', '15:00', '15:50');
+
+        $this->assertTrue($result['passes']);
+        $this->assertEmpty($result['violations']);
     }
 
     // =========================================================================

@@ -301,7 +301,7 @@ class CoreSubjectPlacementServiceTest extends TestCase
 
     public function test_no_monday_dead_zone_in_g7_plan(): void
     {
-        // G7/G8 Monday 08:50–09:40 is a dead zone (H9)
+        // Grade 7 Monday 08:50–09:40 is a dead zone (H9).
         $plan = $this->service->buildGradePlan(7, $this->g7Subjects);
 
         foreach ($plan['sections'] as $sectionName => $placements) {

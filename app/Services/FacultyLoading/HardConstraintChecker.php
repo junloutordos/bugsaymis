@@ -25,10 +25,10 @@ namespace App\Services\FacultyLoading;
  *  H6  No class during LUNCH       (checkFixedType / Phase 9)
  *  H7  No class during RECESS      (checkFixedType / Phase 9)
  *  H8  No class during CONSULT     (checkFixedType / Phase 9)
- *  H9  G7/G8 Monday dead zone      (checkMondayDeadZone — Phase 4)
+ *  H9  G7 Monday dead zone         (checkMondayDeadZone — Phase 4)
  *  H10 Wednesday Activity lock     (checkWednesdayActivityLock — Phase 4)
  *  H11 Wednesday Wellness block    (checkWednesdayWellness — Phase 4)
- *  H12 G7/G8 Friday ILA            (checkFridayILA — Phase 4)
+ *  H12 Configured Friday ILA       (checkFridayILA — Phase 4)
  *  H13 Unit-load completion        (Phase 8 — full placement)
  *  H14 Room no-overlap             (Phase 9 — needs DB)
  *  H15 Science Core parallel       (Phase 6)
@@ -50,11 +50,11 @@ class HardConstraintChecker
     }
 
     // =========================================================================
-    // H9 — G7/G8 Monday dead zone (08:50–09:40)
+    // H9 — G7 Monday dead zone (08:50–09:40)
     // =========================================================================
 
     /**
-     * H9: G7 and G8 have a dead zone on Monday from 08:50 to 09:40 (no classes).
+     * H9: Grade 7 has a dead zone on Monday from 08:50 to 09:40.
      *
      * @param  int    $grade      7–12
      * @param  string $day        Day of week
@@ -71,7 +71,7 @@ class HardConstraintChecker
             return self::ok();
         }
 
-        if ($grade > 8) {
+        if ($grade !== 7) {
             return self::ok();
         }
 
@@ -94,9 +94,10 @@ class HardConstraintChecker
 
     /**
      * H10: No class may start at or after the Wednesday Activity Start time
-     * for the grade group.
+     * for the grade. Grade-specific ALP windows override the group cutoff.
      *
-     *   G7/G8   → 15:00
+     *   G7      → 15:00
+     *   G8      → 15:50
      *   G9/G10  → 15:00
      *   G11/G12 → 12:20
      *
@@ -113,8 +114,7 @@ class HardConstraintChecker
             return self::ok();
         }
 
-        $gradeGroup  = SchedulingConstants::getGradeGroup($grade);
-        $actStart    = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$gradeGroup];
+        $actStart = self::wednesdayActivityStart($grade);
 
         if ($classStart >= $actStart) {
             return self::fail(
@@ -142,8 +142,7 @@ class HardConstraintChecker
             return self::ok();
         }
 
-        $gradeGroup = SchedulingConstants::getGradeGroup($grade);
-        $actStart   = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$gradeGroup];
+        $actStart = self::wednesdayActivityStart($grade);
 
         // Class must be fully contained before the activity lock
         if ($classEnd > $actStart) {
@@ -162,7 +161,7 @@ class HardConstraintChecker
 
     /**
      * H11: No class slot may overlap the 30-min Wednesday Wellness block.
-     * The wellness block is 09:50–10:20 and applies to all grades.
+     * Full-Wednesday grades are exempt.
      *
      * @param  string $day        Day of week
      * @param  string $classStart HH:MM
@@ -171,9 +170,14 @@ class HardConstraintChecker
     public static function checkWednesdayWellness(
         string $day,
         string $classStart,
-        string $classEnd
+        string $classEnd,
+        ?int $grade = null,
     ): array {
         if ($day !== 'Wednesday') {
+            return self::ok();
+        }
+
+        if ($grade !== null && in_array($grade, SchedulingConstants::WEDNESDAY_FULL_GRADES, true)) {
             return self::ok();
         }
 
@@ -191,11 +195,11 @@ class HardConstraintChecker
     }
 
     // =========================================================================
-    // H12 — G7/G8 Friday ILA day
+    // H12 — configured Friday ILA day
     // =========================================================================
 
     /**
-     * H12: Grades 7 and 8 have no in-person teaching classes on Fridays.
+     * H12: Grades listed in FRIDAY_ILA_GRADES have no Friday classes.
      * The entire day is reserved for Independent Learning Activities.
      *
      * @param  int    $grade  7–12
@@ -242,7 +246,7 @@ class HardConstraintChecker
         $checks = [
             self::checkMondayDeadZone($grade, $day, $classStart, $classEnd),
             self::checkWednesdayActivityLockEnd($grade, $day, $classStart, $classEnd),
-            self::checkWednesdayWellness($day, $classStart, $classEnd),
+            self::checkWednesdayWellness($day, $classStart, $classEnd, $grade),
             self::checkFridayILA($grade, $day),
         ];
 
@@ -253,6 +257,17 @@ class HardConstraintChecker
         }
 
         return self::ok();
+    }
+
+    private static function wednesdayActivityStart(int $grade): string
+    {
+        foreach (SchedulingConstants::getBlockedSlots($grade, 'Wednesday') as $slot) {
+            if ($slot['type'] === 'ACTIVITY') {
+                return $slot['start'];
+            }
+        }
+
+        return SchedulingConstants::getWednesdayAlp($grade)['start'];
     }
 
     // =========================================================================

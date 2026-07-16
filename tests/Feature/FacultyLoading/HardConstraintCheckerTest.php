@@ -33,7 +33,7 @@ class HardConstraintCheckerTest extends TestCase
     }
 
     // =========================================================================
-    // H9 — Monday dead zone (G7/G8 only, 08:50–09:40)
+    // H9 — Monday dead zone (G7 only, 08:50–09:40)
     // =========================================================================
 
     public function test_h9_fails_for_g7_monday_in_dead_zone(): void
@@ -44,12 +44,11 @@ class HardConstraintCheckerTest extends TestCase
         );
     }
 
-    public function test_h9_fails_for_g8_monday_overlapping_dead_zone(): void
+    public function test_h9_passes_for_g8_reclaimed_monday_period(): void
     {
-        // Class starting before dead zone but ending inside it
-        $this->assertFails(
-            HC::checkMondayDeadZone(8, 'Monday', '08:20', '09:10'),
-            'G8 Monday 08:20–09:10 (overlaps dead zone start)'
+        $this->assertPasses(
+            HC::checkMondayDeadZone(8, 'Monday', '08:50', '09:40'),
+            'G8 Monday 08:50–09:40 (reclaimed teaching period)'
         );
     }
 
@@ -141,6 +140,22 @@ class HardConstraintCheckerTest extends TestCase
         );
     }
 
+    public function test_h10_grade_8_allows_final_wednesday_period(): void
+    {
+        $this->assertPasses(
+            HC::checkWednesdayActivityLockEnd(8, 'Wednesday', '15:00', '15:50'),
+            'G8 Wednesday 15:00–15:50 ends at the Grade 8 ALP boundary'
+        );
+    }
+
+    public function test_h10_grade_8_blocks_class_at_alp_start(): void
+    {
+        $this->assertFails(
+            HC::checkWednesdayActivityLock(8, 'Wednesday', '15:50'),
+            'G8 Wednesday class starting at the 15:50 ALP boundary'
+        );
+    }
+
     public function test_h10_passes_for_g11_wednesday_class_before_12_20(): void
     {
         $this->assertPasses(
@@ -197,6 +212,14 @@ class HardConstraintCheckerTest extends TestCase
         $this->assertFails(
             HC::checkWednesdayWellness('Wednesday', '09:50', '10:20'),
             'Wednesday 09:50–10:20 (exact wellness window)'
+        );
+    }
+
+    public function test_h11_grade_8_is_exempt_from_wellness_block(): void
+    {
+        $this->assertPasses(
+            HC::checkWednesdayWellness('Wednesday', '09:50', '10:20', 8),
+            'G8 is a full-Wednesday grade'
         );
     }
 

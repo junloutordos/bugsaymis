@@ -22,8 +22,8 @@ use App\Models\User;
  *     clock times on the same day, even across different grades)
  *   • placements only ever land on real CLASS periods — flag ceremony, homeroom
  *     / advising, recess, lunch and consultation windows are never used
- *   • Wednesday afternoon (post activity-cutoff) and Friday ILA days for the
- *     lower grades are excluded automatically
+ *   • Wednesday activity/ALP windows and configured Friday ILA days are
+ *     excluded automatically
  *   • each section uses its own fixed room (sections.classroom_id), so room
  *     clashes are structurally impossible for homeroom sections
  *
@@ -712,60 +712,9 @@ class DeterministicSchedulingService
      */
     private function buildSlotGrid(int $grade): array
     {
-        $group   = SchedulingConstants::getGradeGroup($grade);
-        $wedCut  = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$group] ?? '23:59';
-        $fullWed = in_array($grade, SchedulingConstants::WEDNESDAY_FULL_GRADES, true);
-
         $slots = [];
         foreach (self::DAYS as $day) {
-            // Friday ILA: any grade still listed has no in-person classes on Friday.
-            if ($day === 'Friday' && in_array($grade, SchedulingConstants::FRIDAY_ILA_GRADES, true)) {
-                continue;
-            }
-
-            $timetable = ($day === 'Monday')
-                ? SchedulingConstants::getMondayTimetable($grade)
-                : SchedulingConstants::getTueFriTimetable($grade);
-
-            foreach ($timetable as $row) {
-                if (($row['type'] ?? '') !== 'CLASS') {
-                    continue;
-                }
-
-                if ($day === 'Wednesday') {
-                    // Wednesday restrictions do not apply to "full Wednesday" grades.
-                    if (! $fullWed) {
-                        if ($row['start'] >= $wedCut) {
-                            continue;
-                        }
-                        if (SchedulingConstants::timesOverlap(
-                            $row['start'], $row['end'],
-                            SchedulingConstants::WEDNESDAY_WELLNESS['start'],
-                            SchedulingConstants::WEDNESDAY_WELLNESS['end'],
-                        )) {
-                            continue;
-                        }
-                    }
-                    // The fixed Activity Learning Program (ALP) block is universal —
-                    // it applies even to "full Wednesday" grades.
-                    if (SchedulingConstants::timesOverlap(
-                        $row['start'], $row['end'],
-                        SchedulingConstants::WEDNESDAY_ALP['start'],
-                        SchedulingConstants::WEDNESDAY_ALP['end'],
-                    )) {
-                        continue;
-                    }
-                }
-
-                // Fixed Flag Retreat Ceremony block — every Friday, all grades.
-                if ($day === 'Friday' && SchedulingConstants::timesOverlap(
-                    $row['start'], $row['end'],
-                    SchedulingConstants::FRIDAY_FLAG_RETREAT['start'],
-                    SchedulingConstants::FRIDAY_FLAG_RETREAT['end'],
-                )) {
-                    continue;
-                }
-
+            foreach (SchedulingConstants::getSchedulableClassSlots($grade, $day) as $row) {
                 $slots[] = [
                     'day'         => $day,
                     'start'       => $row['start'],
@@ -1168,9 +1117,11 @@ class DeterministicSchedulingService
         }
 
         if ($sectionFree === 0) {
+            $capacity = count($grid);
+
             return [
                 'reason_code'  => 'section_full',
-                'reason'       => "Section {$s['section_name']} has no free class period left this week.",
+                'reason'       => "Section {$s['section_name']} has no free class period; all {$capacity} legal weekly periods are occupied.",
                 'can_reassign' => false,
             ];
         }

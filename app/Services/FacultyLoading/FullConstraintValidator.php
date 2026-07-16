@@ -20,10 +20,10 @@ use App\Models\FacultyLoading\TeacherOfficialTime;
  *    H6   No class during LUNCH
  *    H7   No class during RECESS
  *    H8   No class during CONSULT / ILA
- *    H9   G7/G8 Monday dead zone (08:50–09:40)
+ *    H9   G7 Monday dead zone (08:50–09:40)
  *    H10  Wednesday Activity lock
  *    H11  Wednesday Wellness block (09:50–10:20)
- *    H12  G7/G8 Friday ILA
+ *    H12  Configured Friday ILA
  *
  *  DB-based (need live records):
  *    H1   Teacher (faculty) no-overlap

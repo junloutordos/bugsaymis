@@ -18,10 +18,10 @@ use Illuminate\Support\Collection;
  *   H6  — no class during Lunch
  *   H7  — no class during Recess
  *   H8  — no class during Consultation / Home Bound
- *   H9  — no class in G7/G8 Monday dead zone (08:50–09:40)
+ *   H9  — no class in the G7 Monday dead zone (08:50–09:40)
  *   H10 — no class after Wednesday Activity Start
  *   H11 — no class during Wednesday Wellness Block
- *   H12 — no regular class on G7/G8 Friday (ILA day)
+ *   H12 — no regular Friday class for grades listed in FRIDAY_ILA_GRADES
  */
 class FixedSlotService
 {
@@ -138,99 +138,8 @@ class FixedSlotService
      *
      * @return array<int, array{start:string, end:string, type:string, label:string}>
      */
-    public static function fixedSlotsForDay(int $grade, string $gradeGroup, string $day): array
+    public static function fixedSlotsForDay(int $grade, string $_gradeGroup, string $day): array
     {
-        // ── Monday ────────────────────────────────────────────────────────────
-        if ($day === 'Monday') {
-            return self::nonClassSlots(
-                SchedulingConstants::getMondayTimetable($grade)
-            );
-        }
-
-        // ── Friday: G7/G8 — entire day is ILA ────────────────────────────────
-        if ($day === 'Friday' && in_array($grade, SchedulingConstants::FRIDAY_ILA_GRADES)) {
-            return self::fridayIlaSlots($grade);
-        }
-
-        // ── Wednesday: Tue-Fri base + Wellness + Activity lock ────────────────
-        if ($day === 'Wednesday') {
-            return self::wednesdaySlots($grade, $gradeGroup);
-        }
-
-        // ── Tuesday / Thursday / regular Friday ───────────────────────────────
-        return self::nonClassSlots(
-            SchedulingConstants::getTueFriTimetable($grade)
-        );
-    }
-
-    // =========================================================================
-    // Private builders
-    // =========================================================================
-
-    /**
-     * Extract all non-CLASS entries from a timetable array.
-     */
-    private static function nonClassSlots(array $timetable): array
-    {
-        return array_values(
-            array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
-        );
-    }
-
-    /**
-     * Build Friday ILA slots for G7/G8:
-     * Keep structural non-CLASS slots (RECESS, LUNCH, CONSULT) and overlay
-     * ILA blocks over every CLASS window.
-     */
-    private static function fridayIlaSlots(int $grade): array
-    {
-        $timetable = SchedulingConstants::getTueFriTimetable($grade);
-        $slots     = self::nonClassSlots($timetable);
-
-        foreach ($timetable as $s) {
-            if ($s['type'] === 'CLASS') {
-                $slots[] = [
-                    'start' => $s['start'],
-                    'end'   => $s['end'],
-                    'type'  => 'ILA',
-                    'label' => 'Independent Learning Activities',
-                ];
-            }
-        }
-
-        // Sort by start time
-        usort($slots, static fn ($a, $b) => strcmp($a['start'], $b['start']));
-        return $slots;
-    }
-
-    /**
-     * Build Wednesday fixed slots:
-     * Tue-Fri structural non-CLASS slots + Wellness block + Activity lock.
-     */
-    private static function wednesdaySlots(int $grade, string $gradeGroup): array
-    {
-        $timetable = SchedulingConstants::getTueFriTimetable($grade);
-        $slots     = self::nonClassSlots($timetable);
-
-        // Wellness block (all grades, Wednesday only)
-        $slots[] = [
-            'start' => SchedulingConstants::WEDNESDAY_WELLNESS['start'],
-            'end'   => SchedulingConstants::WEDNESDAY_WELLNESS['end'],
-            'type'  => 'WELLNESS',
-            'label' => '30-Wellness Block',
-        ];
-
-        // Activity lock — from activity start to end of shift
-        $actStart   = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$gradeGroup];
-        $shiftEnd   = ($grade >= 11) ? '17:00' : '16:30';  // approx upper bound
-        $slots[] = [
-            'start' => $actStart,
-            'end'   => $shiftEnd,
-            'type'  => 'ACTIVITY',
-            'label' => 'Activity Proper / ALP',
-        ];
-
-        usort($slots, static fn ($a, $b) => strcmp($a['start'], $b['start']));
-        return $slots;
+        return SchedulingConstants::getBlockedSlots($grade, $day);
     }
 }

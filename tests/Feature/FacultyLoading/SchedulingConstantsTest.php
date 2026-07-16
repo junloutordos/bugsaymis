@@ -134,19 +134,19 @@ class SchedulingConstantsTest extends TestCase
         $this->assertSame('08:00', $slots[0]['end']);
     }
 
-    public function test_monday_g7g8_has_dead_zone_after_homeroom(): void
+    public function test_monday_g7_has_dead_zone_after_homeroom(): void
     {
-        // H9: G7-G8 Monday 8:50-9:40 must be DEAD (no classes)
+        // H9: Grade 7 Monday 08:50-09:40 must be DEAD (no classes).
         $slots = SC::MONDAY_G7G8;
         $dead  = array_filter($slots, fn ($s) => $s['type'] === 'DEAD');
-        $this->assertNotEmpty($dead, 'G7/G8 Monday must have a DEAD zone');
+        $this->assertNotEmpty($dead, 'G7 Monday must have a DEAD zone');
 
         $deadSlot = array_values($dead)[0];
         $this->assertSame('08:50', $deadSlot['start']);
         $this->assertSame('09:40', $deadSlot['end']);
     }
 
-    public function test_monday_g7g8_has_no_class_before_10am(): void
+    public function test_monday_g7_has_no_class_before_10am(): void
     {
         $classSlots = SC::getClassSlots(7, 'Monday');
         foreach ($classSlots as $slot) {
@@ -158,40 +158,46 @@ class SchedulingConstantsTest extends TestCase
 
     public function test_monday_g10_has_class_at_08_50(): void
     {
-        // G10 starts Period 1 at 08:50 on Monday (unlike G7/G8/G9)
+        // G10 starts Period 1 at 08:50 on Monday (unlike G7/G9).
         $classSlots = SC::getClassSlots(10, 'Monday');
         $starts     = array_column($classSlots, 'start');
         $this->assertContains('08:50', $starts, 'G10 Monday Period 1 should start at 08:50');
     }
 
-    public function test_monday_g8_and_g9_have_extended_homeroom_no_class_before_10am(): void
+    public function test_monday_g8_reclaims_08_50_period(): void
     {
-        // G8 & G9 Homeroom now runs 8:00-9:40 — no class period should start
-        // before 10:00 on Monday for either grade.
-        foreach ([8, 9] as $grade) {
-            $classSlots = SC::getClassSlots($grade, 'Monday');
-            foreach ($classSlots as $slot) {
-                $this->assertGreaterThanOrEqual('10:00', $slot['start'],
-                    "G{$grade} Monday classes must not start before 10:00"
-                );
-            }
-        }
+        $starts = array_column(SC::getClassSlots(8, 'Monday'), 'start');
+        $this->assertContains('08:50', $starts);
     }
 
-    public function test_monday_g8_and_g9_homeroom_spans_extended_window(): void
+    public function test_monday_g9_keeps_extended_homeroom(): void
     {
-        foreach ([8, 9] as $grade) {
-            $timetable = SC::getMondayTimetable($grade);
-            $homeroom  = array_values(array_filter($timetable, fn ($s) => $s['type'] === 'HOMEROOM'));
-            $this->assertNotEmpty($homeroom, "G{$grade} Monday must have a HOMEROOM slot");
-            $this->assertSame('08:00', $homeroom[0]['start']);
-            $this->assertSame('09:40', $homeroom[0]['end']);
+        $classSlots = SC::getClassSlots(9, 'Monday');
+        foreach ($classSlots as $slot) {
+            $this->assertGreaterThanOrEqual('10:00', $slot['start']);
         }
+
+        $homeroom = array_values(array_filter(
+            SC::getMondayTimetable(9),
+            fn ($slot) => $slot['type'] === 'HOMEROOM',
+        ));
+        $this->assertSame('08:00', $homeroom[0]['start']);
+        $this->assertSame('09:40', $homeroom[0]['end']);
+    }
+
+    public function test_monday_g8_homeroom_ends_before_reclaimed_period(): void
+    {
+        $homeroom = array_values(array_filter(
+            SC::getMondayTimetable(8),
+            fn ($slot) => $slot['type'] === 'HOMEROOM',
+        ));
+        $this->assertSame('08:00', $homeroom[0]['start']);
+        $this->assertSame('08:50', $homeroom[0]['end']);
     }
 
     public function test_monday_g8_has_no_dead_zone(): void
     {
-        // Unlike G7, G8's old reclaimed DEAD gap is now part of extended Homeroom.
+        // Grade 8 uses this window for teaching rather than a DEAD slot.
         $slots = SC::MONDAY_G8;
         $dead  = array_filter($slots, fn ($s) => $s['type'] === 'DEAD');
         $this->assertEmpty($dead, 'G8 Monday must not have a DEAD zone (absorbed into Homeroom)');
@@ -324,6 +330,20 @@ class SchedulingConstantsTest extends TestCase
         $this->assertSame('17:00', SC::WEDNESDAY_ALP['end']);
     }
 
+    public function test_grade_8_wednesday_alp_starts_after_final_class_period(): void
+    {
+        $alp = SC::getWednesdayAlp(8);
+        $this->assertSame('15:50', $alp['start']);
+        $this->assertSame('17:00', $alp['end']);
+    }
+
+    public function test_non_grade_8_wednesday_alp_uses_default_window(): void
+    {
+        foreach ([7, 9, 10, 11, 12] as $grade) {
+            $this->assertSame(SC::WEDNESDAY_ALP, SC::getWednesdayAlp($grade));
+        }
+    }
+
     public function test_get_blocked_slots_includes_alp_and_wellness_on_wednesday(): void
     {
         foreach ([7, 9, 11] as $grade) {
@@ -342,6 +362,8 @@ class SchedulingConstantsTest extends TestCase
         $types   = array_column($blocked, 'type');
         $this->assertNotContains('WELLNESS', $types);
         $this->assertContains('ACTIVITY', $types);
+        $activity = collect($blocked)->firstWhere('type', 'ACTIVITY');
+        $this->assertSame('15:50', $activity['start']);
     }
 
     public function test_effective_wednesday_class_window_never_overlaps_alp(): void
@@ -353,10 +375,29 @@ class SchedulingConstantsTest extends TestCase
             $window = SC::getEffectiveClassWindow($grade, 'Wednesday');
             $this->assertNotNull($window, "G{$grade} must have an effective Wednesday class window");
             $this->assertLessThanOrEqual(
-                SC::WEDNESDAY_ALP['start'], $window['end'],
+                SC::getWednesdayAlp($grade)['start'], $window['end'],
                 "G{$grade} Wednesday effective class end must not reach into the ALP block"
             );
         }
+    }
+
+    public function test_grade_8_has_exactly_39_schedulable_weekly_periods(): void
+    {
+        $slots = collect(SC::DAYS)
+            ->flatMap(fn ($day) => collect(SC::getSchedulableClassSlots(8, $day))
+                ->map(fn ($slot) => ['day' => $day, ...$slot]));
+
+        $this->assertCount(39, $slots);
+        $this->assertTrue($slots->contains(
+            fn ($slot) => $slot['day'] === 'Monday'
+                && $slot['start'] === '08:50'
+                && $slot['end'] === '09:40'
+        ));
+        $this->assertTrue($slots->contains(
+            fn ($slot) => $slot['day'] === 'Wednesday'
+                && $slot['start'] === '15:00'
+                && $slot['end'] === '15:50'
+        ));
     }
 
     public function test_friday_flag_retreat_block_defined(): void
