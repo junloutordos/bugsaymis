@@ -3,8 +3,11 @@
 namespace App\Services\FacultyLoading;
 
 use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
+use App\Models\User;
 
 /**
  * DeterministicSchedulingService
@@ -92,18 +95,7 @@ class DeterministicSchedulingService
 
         // Pre-compute the available period grid per grade level (shared by all
         // sections of that grade).
-        $this->gridByGrade = [];
-        $this->firstPeriodByGrade = [];
-        foreach (array_unique(array_column($requirements, 'grade')) as $grade) {
-            $this->gridByGrade[$grade] = $this->buildSlotGrid((int) $grade);
-            foreach ($this->gridByGrade[$grade] as $slot) {
-                $day = $slot['day'];
-                if (! isset($this->firstPeriodByGrade[$grade][$day])
-                    || $slot['start_min'] < $this->firstPeriodByGrade[$grade][$day]) {
-                    $this->firstPeriodByGrade[$grade][$day] = $slot['start_min'];
-                }
-            }
-        }
+        $this->buildGrids(array_unique(array_column($requirements, 'grade')));
 
         // Same-weekday-across-sections: for each grade+subject, decide which
         // weekday each session index lands on — shared by every section of
@@ -175,6 +167,235 @@ class DeterministicSchedulingService
     }
 
     /**
+     * Incremental pass: place ONLY the still-needed sessions of unplaced teaching
+     * load assignments, treating every existing occupying (active + tentative)
+     * class_schedules row as an immovable busy interval. Existing rows are never
+     * moved or deleted — relocation may only shuffle sessions placed within this
+     * same pass. Nothing is persisted; the caller commits the proposals.
+     *
+     * @param array<int,int>|null $loadAssignmentIds restrict the pass to these
+     *        load assignments (null = every unplaced teaching load for the term)
+     * @return array{
+     *   proposals:array<int,array<string,mixed>>,
+     *   failures:array<int,array<string,mixed>>,
+     *   summary:array{loads_considered:int,sessions_placed:int,sessions_failed:int}
+     * }
+     */
+    public function placeRemaining(int $schoolYearId, int $termId, ?array $loadAssignmentIds = null): array
+    {
+        $requirements = $this->buildRequirements($schoolYearId, $termId);
+        if ($loadAssignmentIds !== null) {
+            $ids          = array_map('intval', $loadAssignmentIds);
+            $requirements = array_values(array_filter(
+                $requirements,
+                fn ($r) => in_array($r['load_assignment_id'], $ids, true)
+            ));
+        }
+
+        $empty = ['proposals' => [], 'failures' => [], 'summary' => [
+            'loads_considered' => 0, 'sessions_placed' => 0, 'sessions_failed' => 0,
+        ]];
+        if (empty($requirements)) {
+            return $empty;
+        }
+
+        // Already-scheduled session counts per load (mirrors the unplaced-tray
+        // math in ClassScheduleController::buildUnplacedLoads()).
+        $counts = ClassSchedule::occupying()
+            ->whereIn('load_assignment_id', array_column($requirements, 'load_assignment_id'))
+            ->selectRaw("load_assignment_id, COUNT(*) as cnt, SUM(session_type = 'ilp') as ilp_cnt")
+            ->groupBy('load_assignment_id')
+            ->get()
+            ->keyBy('load_assignment_id');
+
+        $lockedUserIds = FacultyLoad::where('academic_term_id', $termId)
+            ->where('is_locked', true)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->buildGrids(array_unique(array_column($requirements, 'grade')));
+        $this->resetState();
+        $this->seedBusyFromDb($termId);
+
+        $sessions        = [];
+        $failures        = [];
+        $loadsConsidered = 0;
+        foreach ($requirements as $req) {
+            $row         = $counts->get($req['load_assignment_id']);
+            $stillNeeded = max(0, $req['sessions_needed'] - (int) ($row->cnt ?? 0));
+            if ($stillNeeded === 0) {
+                continue;
+            }
+            $loadsConsidered++;
+
+            if (in_array((int) $req['real_user_id'], $lockedUserIds, true)) {
+                $failures[] = $this->describeFailure($req, $stillNeeded, [
+                    'reason_code'  => 'faculty_locked',
+                    'reason'       => "{$req['faculty_name']}'s faculty load is locked — unlock it before placing sessions.",
+                    'can_reassign' => false,
+                ]);
+                continue;
+            }
+
+            // ILP rule: only when the load has never had an ILP session scheduled —
+            // the LAST still-needed session becomes the ILP one.
+            $ilpEligible = ($req['has_ilp'] ?? false)
+                && $req['sessions_needed'] >= 2
+                && (int) ($row->ilp_cnt ?? 0) === 0;
+            for ($i = 0; $i < $stillNeeded; $i++) {
+                $session                 = $req;
+                $session['session_type'] = ($ilpEligible && $i === $stillNeeded - 1) ? 'ilp' : 'regular';
+                $sessions[]              = $session;
+            }
+        }
+
+        if (empty($sessions)) {
+            return ['proposals' => [], 'failures' => array_values($failures), 'summary' => [
+                'loads_considered' => $loadsConsidered,
+                'sessions_placed'  => 0,
+                'sessions_failed'  => array_sum(array_column($failures, 'sessions_unplaced')),
+            ]];
+        }
+
+        // Most-constrained-first, same comparator as generate(). No forced_day /
+        // assignSubjectDays() here: existing DB rows already fixed each subject's
+        // days, so re-imposing the shared-weekday rule against a partially-filled
+        // week would only manufacture infeasibility.
+        usort($sessions, function ($a, $b) {
+            return [$b['faculty_total'], $b['sessions_needed'], $a['section_id']]
+                <=> [$a['faculty_total'], $a['sessions_needed'], $b['section_id']];
+        });
+
+        $deferred = [];
+        foreach ($sessions as $s) {
+            $slot = $this->findBestSlot($s);
+            if ($slot === null) {
+                $deferred[] = $s;
+                continue;
+            }
+            $this->commit($s, $slot);
+        }
+
+        $failedByLoad = [];
+        foreach ($deferred as $s) {
+            if (! $this->attemptPlace($s, self::RELOCATION_DEPTH)) {
+                $failedByLoad[$s['load_assignment_id']][] = $s;
+            }
+        }
+
+        $proposals = [];
+        foreach ($this->placements as $p) {
+            if ($p !== null) {
+                $rowOut            = $this->toScheduleRow($p['s'], $p['slot'], $schoolYearId, $termId);
+                $rowOut['remarks'] = 'Auto-placed (remaining loads)';
+                $proposals[]       = $rowOut;
+            }
+        }
+
+        foreach ($failedByLoad as $failed) {
+            // Diagnose off a regular session when the load has one — an ILP
+            // session carries an extra constraint that would skew the reason.
+            $sample = $failed[0];
+            foreach ($failed as $f) {
+                if (($f['session_type'] ?? 'regular') !== 'ilp') {
+                    $sample = $f;
+                    break;
+                }
+            }
+            $failures[] = $this->describeFailure($sample, count($failed), $this->diagnoseFailure($sample));
+        }
+
+        return [
+            'proposals' => $proposals,
+            'failures'  => array_values($failures),
+            'summary'   => [
+                'loads_considered' => $loadsConsidered,
+                'sessions_placed'  => count($proposals),
+                'sessions_failed'  => array_sum(array_column($failures, 'sessions_unplaced')),
+            ],
+        ];
+    }
+
+    /**
+     * Rank the feasible free slots for the NEXT still-needed session of one load
+     * assignment against the current live calendar. Read-only companion to
+     * {@see placeRemaining()} for the per-chip suggestions popover.
+     *
+     * @return array<string,mixed> {still_needed, session_type, classroom_id,
+     *         slots:[{day_of_week,start_time,end_time,score}], reason_code?,
+     *         reason?, can_reassign?}
+     */
+    public function suggestSlotsForLoad(int $schoolYearId, int $termId, int $loadAssignmentId, int $limit = 5): array
+    {
+        $requirements = $this->buildRequirements($schoolYearId, $termId);
+        $req          = null;
+        foreach ($requirements as $r) {
+            if ($r['load_assignment_id'] === $loadAssignmentId) {
+                $req = $r;
+                break;
+            }
+        }
+        if ($req === null) {
+            return [
+                'still_needed' => 0, 'slots' => [],
+                'reason_code'  => 'not_found',
+                'reason'       => 'This load assignment is not schedulable for this term.',
+                'can_reassign' => false,
+            ];
+        }
+
+        $counts = ClassSchedule::occupying()
+            ->where('load_assignment_id', $loadAssignmentId)
+            ->selectRaw("COUNT(*) as cnt, SUM(session_type = 'ilp') as ilp_cnt")
+            ->first();
+        $stillNeeded = max(0, $req['sessions_needed'] - (int) ($counts->cnt ?? 0));
+        if ($stillNeeded === 0) {
+            return [
+                'still_needed' => 0, 'slots' => [],
+                'reason_code'  => 'fully_placed',
+                'reason'       => 'This load is already fully placed — refresh the page.',
+                'can_reassign' => false,
+            ];
+        }
+
+        $isLocked = FacultyLoad::where('academic_term_id', $termId)
+            ->where('user_id', $req['real_user_id'])
+            ->where('is_locked', true)
+            ->exists();
+        if ($isLocked) {
+            return [
+                'still_needed' => $stillNeeded, 'slots' => [],
+                'reason_code'  => 'faculty_locked',
+                'reason'       => "{$req['faculty_name']}'s faculty load is locked — unlock it before placing sessions.",
+                'can_reassign' => false,
+            ];
+        }
+
+        $this->buildGrids([$req['grade']]);
+        $this->resetState();
+        $this->seedBusyFromDb($termId);
+
+        // The suggestion is for the NEXT session: regular until only the last
+        // one remains, which becomes the ILP session when the rule applies.
+        $ilpEligible = ($req['has_ilp'] ?? false)
+            && $req['sessions_needed'] >= 2
+            && (int) ($counts->ilp_cnt ?? 0) === 0;
+        $s                 = $req;
+        $s['session_type'] = ($ilpEligible && $stillNeeded === 1) ? 'ilp' : 'regular';
+
+        $slots = $this->rankSlots($s, $limit);
+        $base  = [
+            'still_needed' => $stillNeeded,
+            'session_type' => $s['session_type'],
+            'classroom_id' => $req['classroom_id'],
+            'slots'        => $slots,
+        ];
+
+        return empty($slots) ? array_merge($base, $this->diagnoseFailure($s)) : $base;
+    }
+
+    /**
      * Run one full placement pass (greedy + relocation) over a session ordering,
      * resetting all scheduling state first. Returns the placed schedule rows and
      * the sessions that could not be placed.
@@ -184,12 +405,7 @@ class DeterministicSchedulingService
      */
     private function runPlacement(array $sessions, int $schoolYearId, int $termId): array
     {
-        $this->sectionBusy       = [];
-        $this->facultyBusy       = [];
-        $this->sectionDayCount   = [];
-        $this->sectionSubjDays   = [];
-        $this->sectionIlpDayCount = [];
-        $this->placements        = [];
+        $this->resetState();
 
         // Pass 1 — greedy placement.
         $deferred = [];
@@ -396,6 +612,94 @@ class DeterministicSchedulingService
         return $assignment;
     }
 
+    // ── Shared state helpers ────────────────────────────────────────────────
+
+    /**
+     * (Re)build the per-grade slot grids and first-period lookups.
+     *
+     * @param array<int,int|string> $grades
+     */
+    private function buildGrids(array $grades): void
+    {
+        $this->gridByGrade        = [];
+        $this->firstPeriodByGrade = [];
+        foreach ($grades as $grade) {
+            $grade                     = (int) $grade;
+            $this->gridByGrade[$grade] = $this->buildSlotGrid($grade);
+            foreach ($this->gridByGrade[$grade] as $slot) {
+                $day = $slot['day'];
+                if (! isset($this->firstPeriodByGrade[$grade][$day])
+                    || $slot['start_min'] < $this->firstPeriodByGrade[$grade][$day]) {
+                    $this->firstPeriodByGrade[$grade][$day] = $slot['start_min'];
+                }
+            }
+        }
+    }
+
+    /** Reset all mutable scheduling state (busy maps, counters, placements). */
+    private function resetState(): void
+    {
+        $this->sectionBusy        = [];
+        $this->facultyBusy        = [];
+        $this->sectionDayCount    = [];
+        $this->sectionSubjDays    = [];
+        $this->sectionIlpDayCount = [];
+        $this->placements         = [];
+    }
+
+    /**
+     * Seed the busy maps from every occupying (active + tentative) row already
+     * in class_schedules for the term — classes AND non-teaching blocks both
+     * occupy time. Seeded intervals carry the sentinel placement index -1 so
+     * the relocation search can recognise them as immovable. Faculty intervals
+     * for TBA/placeholder users are skipped (mirrors the negative-sentinel
+     * convention: parallel TBA sessions never conflict with each other).
+     */
+    private function seedBusyFromDb(int $termId): void
+    {
+        $rows = ClassSchedule::occupying()
+            ->where('academic_term_id', $termId)
+            ->get(['id', 'user_id', 'section_id', 'subject_id', 'day_of_week',
+                'start_time', 'end_time', 'entry_type', 'session_type']);
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        $names = User::whereIn('id', $rows->pluck('user_id')->filter()->unique())
+            ->pluck('name', 'id');
+
+        foreach ($rows as $row) {
+            $day   = $row->day_of_week;
+            $start = SchedulingConstants::toMinutes(substr((string) $row->start_time, 0, 5));
+            $end   = SchedulingConstants::toMinutes(substr((string) $row->end_time, 0, 5));
+            if ($end <= $start) {
+                continue;
+            }
+
+            if ($row->section_id) {
+                $this->sectionBusy[(int) $row->section_id][$day][] = [$start, $end, -1];
+            }
+            if ($row->user_id && ! str_starts_with((string) ($names[$row->user_id] ?? ''), 'TBA')) {
+                $this->facultyBusy[(int) $row->user_id][$day][] = [$start, $end, -1];
+            }
+
+            // Keep the soft-scoring counters coherent with what is already on
+            // the calendar so new placements spread around existing classes.
+            if (($row->entry_type ?? 'class') === 'class' && $row->section_id) {
+                $sectionId = (int) $row->section_id;
+                $this->sectionDayCount[$sectionId][$day] = ($this->sectionDayCount[$sectionId][$day] ?? 0) + 1;
+                if ($row->subject_id) {
+                    $this->sectionSubjDays[$sectionId][(int) $row->subject_id][$day] =
+                        ($this->sectionSubjDays[$sectionId][(int) $row->subject_id][$day] ?? 0) + 1;
+                }
+                if (($row->session_type ?? 'regular') === 'ilp') {
+                    $this->sectionIlpDayCount[$sectionId][$day] = ($this->sectionIlpDayCount[$sectionId][$day] ?? 0) + 1;
+                }
+            }
+        }
+    }
+
     // ── Slot grid ─────────────────────────────────────────────────────────
 
     /**
@@ -551,6 +855,59 @@ class DeterministicSchedulingService
     }
 
     /**
+     * Collect every feasible free slot for a session, ranked best-first by the
+     * same soft score {@see findBestSlot()} uses. The filter block is kept as a
+     * deliberate copy — findBestSlot() is the generator's hot path and stays
+     * single-result. ILP sessions report their truncated 30-minute end time.
+     *
+     * @param array<string,mixed> $s
+     * @return array<int,array{day_of_week:string,start_time:string,end_time:string,score:int}>
+     */
+    private function rankSlots(array $s, int $limit): array
+    {
+        $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
+        $found = [];
+
+        foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
+            $day = $slot['day'];
+
+            if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
+                continue;
+            }
+            if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$s['grade']][$day] ?? null)) {
+                continue;
+            }
+            if ($this->sectionBusyAt($s['section_id'], $slot)) {
+                continue;
+            }
+            if ($this->facultyBusyAt($s['faculty_id'], $slot)) {
+                continue;
+            }
+
+            $score = 0;
+            $score += ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) * 10000;
+            if ($isIlp) {
+                $score += ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) * 1000;
+            }
+            $score += ($this->sectionDayCount[$s['section_id']][$day] ?? 0) * 100;
+            $score += array_search($day, self::DAYS, true) * 2;
+            $score += intdiv($slot['start_min'], 30);
+
+            $endMin  = $isIlp ? min($slot['end_min'], $slot['start_min'] + self::ILP_MINUTES) : $slot['end_min'];
+            $found[] = [
+                'day_of_week' => $day,
+                'start_time'  => $slot['start'],
+                'end_time'    => SchedulingConstants::fromMinutes($endMin),
+                'score'       => $score,
+            ];
+        }
+
+        usort($found, fn ($a, $b) => $a['score'] <=> $b['score']);
+
+        return array_slice($found, 0, max(1, $limit));
+    }
+
+    /**
      * Place a session, displacing blocking classes of the same faculty and
      * recursively re-placing them, up to a bounded depth. This is a bounded
      * augmenting-path search that recovers feasible-but-tight placements that
@@ -600,6 +957,11 @@ class DeterministicSchedulingService
             }
 
             $blockIdx = $blockers[0];
+            // A DB-seeded busy interval (sentinel index -1) is immovable — only
+            // sessions placed within this pass may be relocated.
+            if ($blockIdx < 0) {
+                continue;
+            }
             $blocked  = $this->placements[$blockIdx];
 
             // Free the blocker and try to re-place it elsewhere — it (and any
@@ -762,6 +1124,93 @@ class DeterministicSchedulingService
             '_subject_name'      => $s['subject_name'],
             '_faculty_name'      => $s['faculty_name'],
             '_classroom_name'    => $s['classroom_name'],
+        ];
+    }
+
+    /**
+     * Work out WHY a session could not be placed, against the current (post-pass)
+     * scheduling state. Ordered from structural to situational.
+     *
+     * @param array<string,mixed> $s
+     * @return array{reason_code:string,reason:string,can_reassign:bool}
+     */
+    private function diagnoseFailure(array $s): array
+    {
+        $grade = $s['grade'];
+        $grid  = $this->gridByGrade[$grade] ?? [];
+        $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
+
+        if (($s['is_elective'] ?? false)
+            && empty(array_filter($grid, fn ($slot) => $slot['is_elective'] ?? false))) {
+            return [
+                'reason_code'  => 'no_elective_window',
+                'reason'       => "Grade {$grade}'s bell schedule has no elective window — this elective cannot be scheduled for this section.",
+                'can_reassign' => false,
+            ];
+        }
+
+        $sectionFree    = 0;
+        $facultyBlocked = 0;
+        foreach ($grid as $slot) {
+            if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
+                continue;
+            }
+            if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$grade][$slot['day']] ?? null)) {
+                continue;
+            }
+            if ($this->sectionBusyAt($s['section_id'], $slot)) {
+                continue;
+            }
+            $sectionFree++;
+            if ($this->facultyBusyAt($s['faculty_id'], $slot)) {
+                $facultyBlocked++;
+            }
+        }
+
+        if ($sectionFree === 0) {
+            return [
+                'reason_code'  => 'section_full',
+                'reason'       => "Section {$s['section_name']} has no free class period left this week.",
+                'can_reassign' => false,
+            ];
+        }
+        if ($facultyBlocked === $sectionFree) {
+            return [
+                'reason_code'  => 'faculty_busy_everywhere',
+                'reason'       => "{$sectionFree} free period(s) remain for {$s['section_name']}, but {$s['faculty_name']} is already booked at every one — reassigning to another faculty would let it fit.",
+                'can_reassign' => true,
+            ];
+        }
+
+        return [
+            'reason_code'  => 'no_feasible_slot',
+            'reason'       => 'No feasible slot found even after relocation attempts.',
+            'can_reassign' => true,
+        ];
+    }
+
+    /**
+     * Shape one failure entry for the placeRemaining() report.
+     *
+     * @param array<string,mixed> $req requirement or session for the load
+     * @param array{reason_code:string,reason:string,can_reassign:bool} $diagnosis
+     * @return array<string,mixed>
+     */
+    private function describeFailure(array $req, int $sessionsUnplaced, array $diagnosis): array
+    {
+        return [
+            'load_assignment_id' => $req['load_assignment_id'],
+            'subject_code'       => $req['subject_code'],
+            'subject_name'       => $req['subject_name'],
+            'section_id'         => $req['section_id'],
+            'section_name'       => $req['section_name'],
+            'grade'              => $req['grade'],
+            'faculty_id'         => $req['real_user_id'],
+            'faculty_name'       => $req['faculty_name'],
+            'sessions_unplaced'  => $sessionsUnplaced,
+            'reason_code'        => $diagnosis['reason_code'],
+            'reason'             => $diagnosis['reason'],
+            'can_reassign'       => $diagnosis['can_reassign'],
         ];
     }
 

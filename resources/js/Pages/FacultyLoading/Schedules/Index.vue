@@ -9,6 +9,11 @@
             <AppButton variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
               <SparklesIcon class="h-4 w-4" /> AI Generate
             </AppButton>
+            <AppButton v-if="!isMyPage" variant="secondary"
+              :disabled="!unplacedLoads.length || autoPlace.loading"
+              @click="runAutoPlacePreview">
+              <BoltIcon class="h-4 w-4" /> Auto-Place Remaining
+            </AppButton>
             <AppButton @click="openForm()">
               <PlusIcon class="h-4 w-4" /> Assign Schedule
             </AppButton>
@@ -143,6 +148,8 @@
                         :draggable="!isOverviewMode && !load.is_locked"
                         @dragstart="onDragStartLoad($event, load)"
                         @dragend="onDragEnd"
+                        @click="openChipSuggestions($event, load)"
+                        :title="!isOverviewMode && isManage ? 'Click for suggested slots' : null"
                         :class="['inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium select-none',
                           isOverviewMode
                             ? 'bg-amber-50 border-amber-200 text-amber-800'
@@ -273,6 +280,88 @@
         <AppButton size="sm" :loading="qc.saving" :disabled="!qcCanSave" @click="saveQuickCreate">Save</AppButton>
       </div>
     </div>
+
+    <!-- Suggested-slots popover (click an unplaced chip) -->
+    <div v-if="chipSuggest" ref="chipSuggestEl"
+      class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: chipSuggest.x + 'px', top: chipSuggest.y + 'px' }">
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          {{ chipSuggest.load.subject?.code }}
+          <span class="font-normal text-slate-500">· {{ chipSuggest.load.section_name }}</span>
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeChipSuggestions">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+      <div class="px-4 pb-3 space-y-2">
+        <p v-if="chipSuggest.loading" class="text-xs text-slate-400 py-2">Finding free slots…</p>
+        <template v-else-if="chipSuggest.data">
+          <template v-if="chipSuggest.data.slots?.length">
+            <p class="text-xs text-slate-500">
+              Suggested free slots — pick one to place
+              <span v-if="chipSuggest.data.session_type === 'ilp'"
+                class="ml-1 inline-flex text-[10px] font-bold uppercase bg-violet-100 text-violet-700 rounded px-1.5 py-0.5">ILP</span>
+            </p>
+            <button v-for="slot in chipSuggest.data.slots" :key="slot.day_of_week + slot.start_time" type="button"
+              class="w-full text-left text-sm border border-slate-200 rounded-lg px-3 py-2 hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
+              @click="pickSuggestedSlot(slot)">
+              <span class="font-medium text-slate-700">{{ slot.day_of_week }}</span>
+              <span class="text-slate-500"> · {{ fmtTime(slot.start_time) }} – {{ fmtTime(slot.end_time) }}</span>
+            </button>
+          </template>
+          <template v-else>
+            <p class="bg-amber-50 border border-amber-100 text-amber-800 rounded-lg px-3 py-2 text-xs">
+              {{ chipSuggest.data.reason ?? 'No free slot available.' }}
+            </p>
+            <AppButton v-if="chipSuggest.data.can_reassign" variant="secondary" size="sm" class="w-full justify-center"
+              @click="openReassign(chipSuggest.load); closeChipSuggestions()">
+              <ArrowsRightLeftIcon class="h-3.5 w-3.5" /> Reassign to another faculty
+            </AppButton>
+          </template>
+        </template>
+        <p v-else class="text-xs text-danger-600 py-2">Could not load suggestions — try again.</p>
+      </div>
+    </div>
+
+    <!-- Auto-Place Remaining preview/confirm modal -->
+    <AutoPlacePreviewModal
+      :show="autoPlace.show"
+      :proposals="autoPlace.proposals"
+      :failures="autoPlace.failures"
+      :summary="autoPlace.summary"
+      :committing="autoPlace.committing"
+      :commit-errors="autoPlace.commitErrors"
+      @confirm="confirmAutoPlace"
+      @close="autoPlace.show = false"
+      @reassign="openReassign"
+      @refresh="runAutoPlacePreview" />
+
+    <!-- Reassign-to-another-faculty mini modal -->
+    <AppModal :show="!!reassign" title="Reassign Load" size="sm"
+      body-class="px-6 py-4 space-y-3" @close="reassign = null">
+      <template v-if="reassign">
+        <p class="text-sm text-slate-600">
+          Move <span class="font-semibold text-slate-800">{{ reassign.label }}</span>
+          from <span class="font-medium">{{ reassign.from_name }}</span> to:
+        </p>
+        <select v-model="reassign.to_user_id"
+          class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option :value="null">Select faculty…</option>
+          <option v-for="f in reassignTargets" :key="f.id" :value="f.id">{{ f.name }}</option>
+        </select>
+        <p class="text-xs text-slate-400">
+          The load and its scheduled sessions move to the selected faculty; both loads are re-synced.
+        </p>
+      </template>
+      <template #footer>
+        <AppButton variant="secondary" @click="reassign = null">Cancel</AppButton>
+        <AppButton :loading="reassign?.saving" :disabled="!reassign?.to_user_id || reassign?.saving"
+          @click="confirmReassign">
+          Reassign
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- Schedule Form Modal -->
     <AppModal :show="modal" :title="modalTitle" size="lg"
@@ -408,11 +497,12 @@ import AppTextarea from '@/Components/AppTextarea.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import ScheduleCalendarCard from '@/Components/FacultyLoading/ScheduleCalendarCard.vue'
+import AutoPlacePreviewModal from '@/Components/FacultyLoading/AutoPlacePreviewModal.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
-  CalendarIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-  LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
+  ArrowsRightLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon,
+  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────
@@ -884,6 +974,9 @@ function onDragEnd() {
     dragFrame = null
   }
   columnRectCache.clear()
+  // A finished chip drag must not also open the suggestions popover.
+  chipClickSuppressed = true
+  setTimeout(() => { chipClickSuppressed = false }, 0)
 }
 
 function onDragOverColumn(e, groupId, day) {
@@ -1303,11 +1396,15 @@ onBeforeUnmount(() => {
   window.removeEventListener('mouseup', onCreateDragEnd)
   window.removeEventListener('mousedown', onWindowMouseDownQc, true)
   window.removeEventListener('keydown', onQcKeydown)
+  window.removeEventListener('mousedown', onWindowMouseDownChip, true)
+  window.removeEventListener('keydown', onChipKeydown)
   clearTimeout(qcValidateTimer)
 })
 
-/** Open the edit modal prefilled from a dragged "unplaced subjects" tray chip. */
-function openPlaceForm(load, day, startTime, endTime) {
+/** Open the edit modal prefilled from an "unplaced subjects" tray chip —
+ *  via drag-onto-a-slot or a picked suggestion (which also prefills the
+ *  section's own classroom; store() requires one). */
+function openPlaceForm(load, day, startTime, endTime, classroomId = null) {
   validationResult.value = null
   form.reset()
   Object.assign(form, {
@@ -1316,7 +1413,7 @@ function openPlaceForm(load, day, startTime, endTime) {
     faculty_id:         load.faculty?.id ?? null,
     subject_id:         load.subject?.id ?? null,
     section_id:         load.section_id,
-    classroom_id:       null,
+    classroom_id:       classroomId,
     school_year_id:     schoolYearIdForTerm(filters.term_id),
     academic_term_id:   filters.term_id,
     day_of_week:        day,
@@ -1328,6 +1425,155 @@ function openPlaceForm(load, day, startTime, endTime) {
   })
   modal.value = true
   checkConflicts()
+}
+
+// ── Auto-Place Remaining (bulk incremental placement) ────────────────────────
+
+const autoPlace = reactive({
+  show: false, loading: false, committing: false,
+  proposals: [], failures: [], summary: null, commitErrors: [],
+})
+
+async function runAutoPlacePreview() {
+  if (!filters.term_id || autoPlace.loading) return
+  autoPlace.loading      = true
+  autoPlace.commitErrors = []
+  try {
+    const { data } = await axios.post(route('faculty-loading.schedules.auto-place.preview'), {
+      academic_term_id: Number(filters.term_id),
+      section_id:       filters.section_id ? Number(filters.section_id) : null,
+      faculty_id:       filters.faculty_id ? Number(filters.faculty_id) : null,
+    })
+    autoPlace.proposals = data.proposals ?? []
+    autoPlace.failures  = data.failures ?? []
+    autoPlace.summary   = data.summary ?? null
+    autoPlace.show      = true
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to compute placements.', 'error')
+  } finally {
+    autoPlace.loading = false
+  }
+}
+
+async function confirmAutoPlace() {
+  if (!autoPlace.proposals.length || autoPlace.committing) return
+  autoPlace.committing   = true
+  autoPlace.commitErrors = []
+  try {
+    const { data } = await axios.post(route('faculty-loading.schedules.auto-place.commit'), {
+      academic_term_id: Number(filters.term_id),
+      schedules:        autoPlace.proposals,
+    })
+    autoPlace.show = false
+    Swal.fire({ icon: 'success', title: 'Placed', text: data.message, timer: 2200, showConfirmButton: false })
+    router.reload({ only: ['schedules', 'unplacedLoads'], preserveScroll: true })
+  } catch (err) {
+    if (err.response?.status === 422) {
+      autoPlace.commitErrors = err.response.data.conflicts ?? [err.response.data.message]
+    } else {
+      Swal.fire('Error', err.response?.data?.message ?? 'Failed to save placements.', 'error')
+    }
+  } finally {
+    autoPlace.committing = false
+  }
+}
+
+// ── Per-chip suggested slots popover ─────────────────────────────────────────
+
+const chipSuggest   = ref(null) // { x, y, load, loading, data }
+const chipSuggestEl = ref(null)
+// After a chip drag, browsers can still fire a synthetic click — swallow it.
+let chipClickSuppressed = false
+
+function openChipSuggestions(e, load) {
+  if (isOverviewMode.value || !isManage.value) return
+  if (chipClickSuppressed || dragPayload.value) return
+
+  const rect = e.currentTarget.getBoundingClientRect()
+  const W = 300, H = 320
+  chipSuggest.value = {
+    x: Math.min(Math.max(rect.left, 8), window.innerWidth - W - 8),
+    y: Math.min(rect.bottom + 6, window.innerHeight - H - 8),
+    load, loading: true, data: null,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownChip, true)
+  window.addEventListener('keydown', onChipKeydown)
+
+  axios.post(route('faculty-loading.schedules.auto-place.suggestions'), {
+    academic_term_id:   Number(filters.term_id),
+    load_assignment_id: load.load_assignment_id,
+  }).then(({ data }) => {
+    if (chipSuggest.value?.load.load_assignment_id !== load.load_assignment_id) return
+    chipSuggest.value.data    = data
+    chipSuggest.value.loading = false
+  }).catch(() => {
+    if (chipSuggest.value?.load.load_assignment_id !== load.load_assignment_id) return
+    chipSuggest.value.loading = false
+  })
+}
+
+function closeChipSuggestions() {
+  chipSuggest.value = null
+  window.removeEventListener('mousedown', onWindowMouseDownChip, true)
+  window.removeEventListener('keydown', onChipKeydown)
+}
+
+function onWindowMouseDownChip(e) {
+  if (chipSuggestEl.value && chipSuggestEl.value.contains(e.target)) return
+  closeChipSuggestions()
+}
+
+function onChipKeydown(e) {
+  if (e.key === 'Escape') closeChipSuggestions()
+}
+
+/** Picking a suggested slot funnels into the existing prefilled save modal. */
+function pickSuggestedSlot(slot) {
+  const load        = chipSuggest.value.load
+  const classroomId = chipSuggest.value.data?.classroom_id ?? null
+  closeChipSuggestions()
+  openPlaceForm(load, slot.day_of_week, slot.start_time.slice(0, 5), slot.end_time.slice(0, 5), classroomId)
+}
+
+// ── Reassign to another faculty (reuses load-balance transfer) ───────────────
+
+const reassign = ref(null) // { load_assignment_id, label, from_id, from_name, to_user_id, saving }
+
+/** Accepts either an auto-place failure entry or an unplaced-tray chip. */
+function openReassign(item) {
+  reassign.value = {
+    load_assignment_id: item.load_assignment_id,
+    label:     `${item.subject_code ?? item.subject?.code ?? 'Load'} · ${item.section_name ?? ''}`,
+    from_id:   item.faculty_id ?? item.faculty?.id ?? null,
+    from_name: item.faculty_name ?? item.faculty?.name ?? 'TBA',
+    to_user_id: null,
+    saving:    false,
+  }
+}
+
+const reassignTargets = computed(() =>
+  props.faculty.filter(f => String(f.id) !== String(reassign.value?.from_id)))
+
+async function confirmReassign() {
+  const r = reassign.value
+  if (!r?.to_user_id || r.saving) return
+  r.saving = true
+  try {
+    const { data } = await axios.post(route('faculty-loading.load-balance.apply'), {
+      type:               'transfer',
+      load_assignment_id: r.load_assignment_id,
+      to_user_id:         r.to_user_id,
+    })
+    reassign.value = null
+    Swal.fire({ icon: 'success', title: 'Reassigned', text: data.message ?? 'Load moved.', timer: 2200, showConfirmButton: false })
+    router.reload({ only: ['schedules', 'unplacedLoads', 'faculty'], preserveScroll: true })
+    // Stale proposals after a transfer — recompute if the preview is open.
+    if (autoPlace.show) runAutoPlacePreview()
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Reassign failed.', 'error')
+  } finally {
+    if (reassign.value) reassign.value.saving = false
+  }
 }
 
 // ── Formatters ───────────────────────────────────────────────────────────────

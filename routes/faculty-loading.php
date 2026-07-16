@@ -4,6 +4,7 @@ use App\Http\Controllers\FacultyLoading\AcademicUnitController;
 use App\Http\Controllers\FacultyLoading\AiDashboardController;
 use App\Http\Controllers\FacultyLoading\FacultyListController;
 use App\Http\Controllers\FacultyLoading\AutoAssignmentController;
+use App\Http\Controllers\FacultyLoading\AutoPlacementController;
 use App\Http\Controllers\FacultyLoading\AutoScheduleController;
 use App\Http\Controllers\FacultyLoading\SlotPlanController;
 use App\Http\Controllers\FacultyLoading\DesignationController;
@@ -125,6 +126,13 @@ Route::middleware(['web', 'auth', 'verified'])
                     // ── Deterministic Slot Plan Generator (Phases 7–11) ────────
                     Route::get('/slot-plan',         [SlotPlanController::class, 'index'])->name('slot-plan.index');
                     Route::post('/slot-plan/preview',[SlotPlanController::class, 'preview'])->name('slot-plan.preview');
+                });
+
+                // ── Incremental auto-placement (Unplaced Subjects tray) ─────────
+                Route::prefix('schedules/auto-place')->name('schedules.auto-place.')->group(function () {
+                    Route::post('/preview',     [AutoPlacementController::class, 'preview'])->name('preview');
+                    Route::post('/commit',      [AutoPlacementController::class, 'commit'])->name('commit');
+                    Route::post('/suggestions', [AutoPlacementController::class, 'suggestions'])->name('suggestions');
                 });
 
                 // Load Assignments
