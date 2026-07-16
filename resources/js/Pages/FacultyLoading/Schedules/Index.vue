@@ -814,13 +814,13 @@ function secondaryLabel(s) {
   if (s.entry_type === 'non_teaching') {
     const cat = NON_TEACHING_CATEGORIES.find(c => c.value === s.category)?.label ?? 'Non-teaching'
     if (viewBy.value === 'faculty') return s.section_name ?? cat
-    return s.faculty?.name ? lastNameOf(s.faculty.name) : cat
+    return s.faculty?.name ?? cat
   }
-  if (viewBy.value === 'grade') return `${s.section_name} · ${s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA'}`
-  if (viewBy.value === 'subject') return `G${s.grade_level} ${s.section_name} · ${s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA'}`
+  if (viewBy.value === 'grade') return `${s.section_name} · ${s.faculty?.name ?? 'TBA'}`
+  if (viewBy.value === 'subject') return `G${s.grade_level} ${s.section_name} · ${s.faculty?.name ?? 'TBA'}`
   return viewBy.value === 'faculty'
     ? `G${s.grade_level} ${s.section_name}`
-    : (s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA')
+    : (s.faculty?.name ?? 'TBA')
 }
 
 // ── Calendar helpers ─────────────────────────────────────────────────────────
@@ -1608,12 +1608,6 @@ function fmtTime(t) {
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`
 }
 
-/** Extract surname for compact display in event blocks */
-function lastNameOf(name) {
-  if (!name) return ''
-  const parts = name.trim().split(' ')
-  return parts[parts.length - 1]
-}
 
 // ── Form & modal ─────────────────────────────────────────────────────────────
 

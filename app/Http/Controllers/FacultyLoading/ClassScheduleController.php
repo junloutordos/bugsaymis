@@ -11,6 +11,7 @@ use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\FacultyLoading\TeacherOfficialTime;
 use App\Models\Office;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
@@ -146,7 +147,64 @@ class ClassScheduleController extends Controller
             ],
             $term,
             ClassSchedule::where('user_id', $faculty->id),
+            null,
+            [
+                'loadSummary' => $this->facultyLoadSummary($faculty->id, $term->id),
+                'officialTimes' => $this->facultyOfficialTimes($faculty->id),
+            ],
         );
+    }
+
+    /** "Chemistry 1 (G8)(12 units), Research Advisory (1), ..." — mirrors the CID Excel Load line. */
+    private function facultyLoadSummary(int $facultyId, int $termId): ?string
+    {
+        $load = FacultyLoad::with(['assignments.subject', 'assignments.designation'])
+            ->where('user_id', $facultyId)
+            ->where('academic_term_id', $termId)
+            ->first();
+
+        if (! $load) {
+            return null;
+        }
+
+        $formatUnits = fn (float $units) => rtrim(rtrim(number_format($units, 2, '.', ''), '0'), '.');
+
+        $parts = [];
+
+        foreach ($load->assignments->where('assignment_type', 'teaching')->groupBy('subject_id') as $group) {
+            $subject = $group->first()->subject;
+            if (! $subject) {
+                continue;
+            }
+            $grade = $subject->grade_level > 0 ? " (G{$subject->grade_level})" : '';
+            $parts[] = $subject->name . $grade . ' (' . $formatUnits($group->sum(fn ($a) => (float) $a->load_units)) . ' units)';
+        }
+
+        foreach ($load->assignments->where('assignment_type', '<>', 'teaching') as $assignment) {
+            $label = $assignment->designation?->name
+                ?? $assignment->description
+                ?? ucfirst(str_replace('_', ' ', $assignment->assignment_type));
+            $parts[] = $label . ' (' . $formatUnits((float) $assignment->load_units) . ')';
+        }
+
+        return $parts ? implode(', ', $parts) : null;
+    }
+
+    /** { Monday: {start, end}, ... } — official working time per day, defaulting to the early shift. */
+    private function facultyOfficialTimes(int $facultyId): array
+    {
+        $rows = TeacherOfficialTime::forTeacher($facultyId)->get()->keyBy('day_of_week');
+
+        $times = [];
+        foreach (SchedulingConstants::DAYS as $day) {
+            $row = $rows->get($day);
+            $times[$day] = [
+                'start' => substr($row?->start_time ?? '07:30', 0, 5),
+                'end' => substr($row?->end_time ?? '16:30', 0, 5),
+            ];
+        }
+
+        return $times;
     }
 
     private function resolvePrintTerm(Request $request, ?int $schoolYearId = null): AcademicTerm
@@ -160,12 +218,37 @@ class ClassScheduleController extends Controller
             ->findOrFail($termId);
     }
 
+    /** CID Chief + Campus Director for the print signatory block (same resolution as FacultyLoadController). */
+    private function printSignatories(): array
+    {
+        $cidChief = User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))
+            ->where('status', '<>', 'inactive')
+            ->first(['id', 'name', 'position']);
+
+        $director = User::where('position', 'like', '%Director%')
+            ->where('position', 'not like', '%Assistant%')
+            ->where('status', '<>', 'inactive')
+            ->first(['id', 'name', 'position']);
+
+        return [
+            'prepared' => $cidChief ? [
+                'name' => $cidChief->name,
+                'position' => $cidChief->position ?? 'Chief, Curriculum and Instruction Division',
+            ] : null,
+            'approved' => $director ? [
+                'name' => $director->name,
+                'position' => $director->position ?? 'Campus Director',
+            ] : null,
+        ];
+    }
+
     private function renderPrintSchedule(
         string $scheduleType,
         array $owner,
         AcademicTerm $term,
         Builder $query,
         ?int $gradeLevel = null,
+        array $extra = [],
     ): Response {
         $dayOrder = "FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')";
 
@@ -201,6 +284,8 @@ class ClassScheduleController extends Controller
             ],
             'schedules' => $schedules,
             'dayConfigs' => $dayConfigs,
+            'signatories' => $this->printSignatories(),
+            ...$extra,
         ]);
     }
 

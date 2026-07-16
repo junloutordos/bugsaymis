@@ -49,9 +49,10 @@
 
           <!-- Time gutter -->
           <div class="shrink-0 relative border-r border-slate-100" :style="{ width: GUTTER + 'px' }">
+            <!-- First label sits below its gridline so it doesn't straddle the day-header border -->
             <div v-for="h in HOURS" :key="h"
               :style="{ top: hourTop(h) + 'px' }"
-              class="absolute right-2 -translate-y-2.5 select-none">
+              :class="['absolute right-2 select-none', h === HOURS[0] ? 'translate-y-0.5' : '-translate-y-2.5']">
               <span class="text-xs text-slate-400 font-medium">
                 {{ h === 12 ? '12PM' : h < 12 ? h + 'AM' : (h - 12) + 'PM' }}
               </span>
@@ -133,7 +134,7 @@
                 @click="$emit('event-click', s)">
                 <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
                   <div :class="['font-bold leading-tight truncate', eventFontSizeClass(s)]">
-                    {{ s.entry_type === 'non_teaching' ? s.title : s.subject?.code }}{{ s.session_type === 'ilp' ? '(ILP)' : '' }}
+                    {{ s.entry_type === 'non_teaching' ? s.title : (s.subject?.name ?? s.subject?.code) }}{{ s.session_type === 'ilp' ? ' (ILP)' : '' }}
                   </div>
                   <div v-if="eventDisplayMode(s) !== 'compact'" :class="['leading-tight truncate opacity-75', eventFontSizeClass(s)]">
                     {{ s.secondary_label }}

@@ -7,20 +7,11 @@
     <main class="schedule-print-body">
       <div class="schedule-print-heading">
         <h1>{{ documentTitle }}</h1>
-        <div class="schedule-print-meta">
-          <div>
-            <strong>{{ scheduleType === 'section' ? 'Section:' : 'Faculty:' }}</strong>
-            {{ ownerLabel }}
-          </div>
-          <div><strong>School Year:</strong> {{ term.school_year ?? '-' }}</div>
-          <div><strong>Academic Term:</strong> {{ term.label }}</div>
-        </div>
-        <div v-if="scheduleType === 'section' && (owner.adviser || owner.classroom)" class="schedule-print-submeta">
-          <span v-if="owner.adviser"><strong>Adviser:</strong> {{ owner.adviser }}</span>
-          <span v-if="owner.classroom"><strong>Home Room:</strong> {{ owner.classroom }}</span>
-        </div>
-        <div v-else-if="scheduleType === 'faculty' && owner.position" class="schedule-print-submeta">
-          <span><strong>Position:</strong> {{ owner.position }}</span>
+        <p class="schedule-print-sy">S.Y. {{ schoolYearLabel }}</p>
+
+        <div v-if="scheduleType === 'faculty'" class="schedule-print-facultymeta">
+          <div><span class="schedule-print-facultymeta-label">Name:</span> <strong>{{ owner.name?.toUpperCase() }}</strong></div>
+          <div v-if="loadSummary"><span class="schedule-print-facultymeta-label">Load:</span> <em>{{ loadSummary }}</em></div>
         </div>
       </div>
 
@@ -37,6 +28,7 @@
             <span
               v-for="minute in HOUR_MARKS"
               :key="minute"
+              :class="{ 'schedule-print-time-first': minute === CAL_START }"
               :style="positionStyle(minute)"
             >
               {{ formatHour(minute) }}
@@ -80,16 +72,51 @@
                   'schedule-print-event-tentative': entry.status === 'tentative',
                   'schedule-print-event-short': durationMinutes(entry) <= 30,
                 }"
-                :style="[rangeStyle(entry.start_time, entry.end_time), eventColorStyle(entry)]"
+                :style="rangeStyle(entry.start_time, entry.end_time)"
               >
                 <div class="schedule-print-event-title">{{ eventTitle(entry) }}</div>
-                <div class="schedule-print-event-detail">{{ eventDetail(entry) }}</div>
-                <div v-if="durationMinutes(entry) >= 45" class="schedule-print-event-time">
-                  {{ formatTime(entry.start_time) }}-{{ formatTime(entry.end_time) }}
+                <div v-if="eventDetail(entry)" class="schedule-print-event-detail">{{ eventDetail(entry) }}</div>
+                <div v-if="durationMinutes(entry) >= 40" class="schedule-print-event-time">
+                  {{ formatTime(entry.start_time) }}–{{ formatTime(entry.end_time) }}
                 </div>
               </div>
             </div>
           </div>
+        </div>
+
+        <div v-if="scheduleType === 'faculty'" class="schedule-print-summary">
+          <div class="schedule-print-summary-row">
+            <div class="schedule-print-summary-label">Official<br>Time</div>
+            <div v-for="day in WEEKDAYS" :key="'ot-' + day" class="schedule-print-summary-cell">
+              {{ officialTimeLabel(day) }}
+            </div>
+          </div>
+          <div class="schedule-print-summary-row">
+            <div class="schedule-print-summary-label">Lunch<br>Time</div>
+            <div v-for="day in WEEKDAYS" :key="'lt-' + day" class="schedule-print-summary-cell">
+              {{ lunchTimeLabel(day) }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="schedule-print-signatories" :class="{ 'schedule-print-signatories-three': scheduleType === 'faculty' }">
+        <div class="schedule-print-signatory">
+          <div class="schedule-print-signatory-caption">Prepared by:</div>
+          <div class="schedule-print-signatory-name">{{ signatories?.prepared?.name?.toUpperCase() ?? '' }}</div>
+          <div class="schedule-print-signatory-position">{{ signatories?.prepared?.position ?? '' }}</div>
+        </div>
+        <div class="schedule-print-signatory">
+          <div class="schedule-print-signatory-caption">
+            {{ scheduleType === 'faculty' ? 'Reviewed and Approved by:' : 'Approved by:' }}
+          </div>
+          <div class="schedule-print-signatory-name">{{ signatories?.approved?.name?.toUpperCase() ?? '' }}</div>
+          <div class="schedule-print-signatory-position">{{ signatories?.approved?.position ?? '' }}</div>
+        </div>
+        <div v-if="scheduleType === 'faculty'" class="schedule-print-signatory">
+          <div class="schedule-print-signatory-caption">Conforme:</div>
+          <div class="schedule-print-signatory-name">{{ owner.name?.toUpperCase() ?? '' }}</div>
+          <div class="schedule-print-signatory-position">{{ owner.position ?? 'Faculty' }}</div>
         </div>
       </div>
     </main>
@@ -108,6 +135,9 @@ const props = defineProps({
   term: { type: Object, required: true },
   schedules: { type: Array, default: () => [] },
   dayConfigs: { type: Object, default: () => ({}) },
+  signatories: { type: Object, default: null },
+  loadSummary: { type: String, default: null },
+  officialTimes: { type: Object, default: () => ({}) },
 })
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
@@ -120,21 +150,14 @@ const GRID_MARKS = Array.from(
   (_, index) => CAL_START + index * 30,
 )
 
-// Single-color print: every teaching event uses one blue scheme (per-subject
-// palette dropped so B/W and color printers both get a clean, uniform sheet)
-const TEACHING_COLOR    = { backgroundColor: '#dbeafe', borderColor: '#60a5fa', color: '#1e3a8a' }
-const NONTEACHING_COLOR = { backgroundColor: '#f1f5f9', borderColor: '#64748b', color: '#1e293b' }
-
-const documentTitle = computed(() => (
-  props.scheduleType === 'section' ? 'CLASS SCHEDULE' : 'INDIVIDUAL FACULTY SCHEDULE'
-))
-
-const ownerLabel = computed(() => {
+const documentTitle = computed(() => {
   if (props.scheduleType === 'section') {
-    return `Grade ${props.owner.grade_level} - ${props.owner.name}`
+    return `GRADE ${props.owner.grade_level} ${props.owner.name?.toUpperCase() ?? ''} CLASS SCHEDULE`
   }
-  return props.owner.name?.toUpperCase() ?? ''
+  return 'INDIVIDUAL FACULTY SCHEDULE'
 })
+
+const schoolYearLabel = computed(() => (props.term.school_year ?? '').replace('-', '–'))
 
 const schedulesByDay = computed(() => {
   const grouped = Object.fromEntries(WEEKDAYS.map(day => [day, []]))
@@ -184,38 +207,77 @@ function formatTime(time) {
   const hour = Math.floor(minutes / 60)
   const minute = String(minutes % 60).padStart(2, '0')
   const displayHour = hour % 12 || 12
-  return `${displayHour}:${minute}${hour < 12 ? 'AM' : 'PM'}`
-}
-
-function lastName(name) {
-  const parts = name?.trim().split(/\s+/) ?? []
-  return parts.at(-1) ?? 'TBA'
+  return `${displayHour}:${minute} ${hour < 12 ? 'AM' : 'PM'}`
 }
 
 function eventTitle(entry) {
   if (entry.entry_type === 'non_teaching') return entry.title || 'Non-teaching'
-  return `${entry.subject?.code ?? 'TBA'}${entry.session_type === 'ilp' ? ' (ILP)' : ''}`
+  const name = entry.subject?.name ?? entry.subject?.code ?? 'TBA'
+  return `${name}${entry.session_type === 'ilp' ? ' (ILP)' : ''}`
 }
 
 function eventDetail(entry) {
-  const room = entry.classroom?.code ?? entry.classroom?.name
-
-  if (entry.entry_type === 'non_teaching') {
-    const assignment = props.scheduleType === 'section'
-      ? (entry.faculty?.name ? lastName(entry.faculty.name) : '')
-      : (entry.section_name ?? '')
-    return [assignment, room].filter(Boolean).join(' - ')
+  if (props.scheduleType === 'faculty') {
+    if (entry.entry_type === 'non_teaching') return entry.section_name ?? ''
+    return `G${entry.grade_level} ${entry.section_name ?? ''}`.trim()
   }
-
-  const assignment = props.scheduleType === 'section'
-    ? lastName(entry.faculty?.name)
-    : `G${entry.grade_level} ${entry.section_name}`
-
-  return [assignment, room].filter(Boolean).join(' - ')
+  return entry.faculty?.name ?? (entry.entry_type === 'non_teaching' ? '' : 'TBA')
 }
 
-function eventColorStyle(entry) {
-  return entry.entry_type === 'non_teaching' ? NONTEACHING_COLOR : TEACHING_COLOR
+// ── Official / lunch time summary (faculty print only) ───────────────────────
+
+function officialWindow(day) {
+  const config = props.officialTimes?.[day]
+  if (!config?.start || !config?.end) return null
+  return { start: timeToMinutes(config.start), end: timeToMinutes(config.end) }
+}
+
+function officialTimeLabel(day) {
+  const window = officialWindow(day)
+  if (!window) return '—'
+  return `${formatTime(minutesToTime(window.start))} – ${formatTime(minutesToTime(window.end))}`
+}
+
+/**
+ * Lunch = up to 60 free minutes inside the 10:00 AM–2:00 PM window (clipped to
+ * official time), taken from the longest free gap of the day's occupied blocks.
+ * Like the CID Excel sheet, the slot ends when the next class starts; on a day
+ * with no midday classes it defaults to the 12:00–1:00 block.
+ */
+function lunchTimeLabel(day) {
+  const official = officialWindow(day) ?? { start: CAL_START, end: CAL_END }
+  const windowStart = Math.max(10 * 60, official.start)
+  const windowEnd = Math.min(14 * 60, official.end)
+  if (windowEnd - windowStart < 30) return '—'
+
+  const busy = (schedulesByDay.value[day] ?? [])
+    .map(entry => [timeToMinutes(entry.start_time), timeToMinutes(entry.end_time)])
+    .filter(([start, end]) => end > windowStart && start < windowEnd)
+    .map(([start, end]) => [Math.max(start, windowStart), Math.min(end, windowEnd)])
+    .sort((a, b) => a[0] - b[0])
+
+  const gaps = []
+  let cursor = windowStart
+  for (const [start, end] of busy) {
+    if (start > cursor) gaps.push([cursor, start])
+    cursor = Math.max(cursor, end)
+  }
+  if (cursor < windowEnd) gaps.push([cursor, windowEnd])
+
+  const longest = gaps.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0]
+  if (!longest || longest[1] - longest[0] < 30) return '—'
+
+  let [start, end] = longest
+  if (end < windowEnd) {
+    // Gap is bounded by an afternoon class — lunch ends when that class starts.
+    start = Math.max(start, end - 60)
+  } else if (start <= NOON && end >= 13 * 60) {
+    [start, end] = [NOON, 13 * 60]
+  } else {
+    start = Math.max(start, end - 60)
+  }
+
+  return `${formatTime(minutesToTime(start))} – ${formatTime(minutesToTime(end))}`
 }
 
 onMounted(async () => {
@@ -250,8 +312,8 @@ body {
   display: flex;
   flex-direction: column;
   background: #fff;
-  color: #000;
-  font-family: Arial, Helvetica, sans-serif;
+  color: #0f172a;
+  font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
 }
 
 .schedule-print-header,
@@ -283,28 +345,38 @@ body {
 .schedule-print-heading {
   flex: 0 0 auto;
   margin-bottom: 1.5mm;
-  font-size: 7.5pt;
+  text-align: center;
 }
 
 .schedule-print-heading h1 {
-  margin: 0 0 1mm;
-  text-align: center;
-  font-size: 12pt;
-  letter-spacing: 0;
+  margin: 0;
+  font-size: 13pt;
+  font-weight: 800;
+  letter-spacing: 0.06em;
 }
 
-.schedule-print-meta {
-  display: grid;
-  grid-template-columns: 1.35fr 0.8fr 1.35fr;
-  gap: 4mm;
-  line-height: 1.25;
+.schedule-print-sy {
+  margin: 0.4mm 0 0;
+  font-size: 9pt;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #334155;
 }
 
-.schedule-print-submeta {
-  display: flex;
-  gap: 12mm;
-  margin-top: 0.6mm;
-  line-height: 1.2;
+.schedule-print-facultymeta {
+  margin-top: 1.2mm;
+  padding-top: 1mm;
+  border-top: 0.2mm solid #cbd5e1;
+  text-align: left;
+  font-size: 7.5pt;
+  line-height: 1.35;
+}
+
+.schedule-print-facultymeta-label {
+  display: inline-block;
+  min-width: 10mm;
+  font-weight: 700;
+  color: #475569;
 }
 
 .schedule-print-calendar {
@@ -312,16 +384,17 @@ body {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  border: 0.35mm solid #111827;
+  border: 0.35mm solid #1e293b;
+  border-radius: 1mm;
   overflow: hidden;
 }
 
 .schedule-print-days {
   flex: 0 0 7mm;
   display: grid;
-  grid-template-columns: 12mm repeat(5, 1fr);
-  border-bottom: 0.25mm solid #111827;
-  background: #e5e7eb;
+  grid-template-columns: 13mm repeat(5, 1fr);
+  border-bottom: 0.3mm solid #1e293b;
+  background: #eef2ff;
 }
 
 .schedule-print-corner,
@@ -329,13 +402,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-left: 0.2mm solid #9ca3af;
+  border-left: 0.2mm solid #c7d2fe;
+  color: #312e81;
   font-size: 7pt;
   font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .schedule-print-corner {
   border-left: 0;
+  font-size: 6pt;
+  color: #6366f1;
 }
 
 .schedule-print-timeline {
@@ -346,8 +424,9 @@ body {
 
 .schedule-print-time-axis {
   position: relative;
-  flex: 0 0 12mm;
-  border-right: 0.25mm solid #111827;
+  flex: 0 0 13mm;
+  border-right: 0.25mm solid #1e293b;
+  background: #f8fafc;
 }
 
 .schedule-print-time-axis span {
@@ -356,10 +435,16 @@ body {
   z-index: 3;
   transform: translateY(-50%);
   padding: 0 0.5mm;
-  background: #fff;
   font-size: 5.8pt;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #475569;
   white-space: nowrap;
+}
+
+/* First hour label sits below its gridline so it never straddles the day-header border */
+.schedule-print-time-axis .schedule-print-time-first {
+  transform: translateY(15%);
 }
 
 .schedule-print-day-grid {
@@ -375,17 +460,17 @@ body {
   left: 0;
   right: 0;
   z-index: 0;
-  border-top: 0.18mm solid #9ca3af;
+  border-top: 0.16mm solid #cbd5e1;
 }
 
 .schedule-print-gridline-half {
-  border-top: 0.12mm dashed #d1d5db;
+  border-top: 0.1mm dashed #e2e8f0;
 }
 
 .schedule-print-column {
   position: relative;
   min-width: 0;
-  border-left: 0.2mm solid #9ca3af;
+  border-left: 0.2mm solid #cbd5e1;
   overflow: hidden;
 }
 
@@ -405,10 +490,12 @@ body {
   overflow: hidden;
   border-top: 0.12mm solid #cbd5e1;
   border-bottom: 0.12mm solid #cbd5e1;
-  background: #e5e7eb;
+  background: #e2e8f0;
   color: #64748b;
   font-size: 5.5pt;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   text-align: center;
 }
 
@@ -422,22 +509,35 @@ body {
   left: 0.7mm;
   right: 0.7mm;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   min-height: 2.4mm;
   overflow: hidden;
-  padding: 0.5mm 0.7mm;
-  border: 0.25mm solid;
+  padding: 0.4mm 0.8mm 0.4mm 1.1mm;
+  background: #dbeafe;
+  border: 0.18mm solid #93c5fd;
+  border-left: 0.8mm solid #2563eb;
   border-radius: 0.8mm;
+  color: #1e3a8a;
   font-size: 5.8pt;
-  line-height: 1.1;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .schedule-print-event-nonteaching {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  border-left-color: #64748b;
   border-style: dashed;
+  border-left-style: solid;
+  color: #1e293b;
 }
 
 .schedule-print-event-tentative {
   border-right-width: 1mm;
-  border-right-color: #1e40af !important;
+  border-right-style: solid;
+  border-right-color: #1e40af;
 }
 
 .schedule-print-event-title {
@@ -461,20 +561,100 @@ body {
 
 .schedule-print-event-time {
   margin-top: 0.2mm;
+  font-variant-numeric: tabular-nums;
   opacity: 0.75;
 }
 
 .schedule-print-event-short {
-  display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.8mm;
   padding-top: 0.2mm;
   padding-bottom: 0.2mm;
+  text-align: left;
 }
 
 .schedule-print-event-short .schedule-print-event-title,
 .schedule-print-event-short .schedule-print-event-detail {
   min-width: 0;
+}
+
+/* ── Official / lunch time summary rows (faculty print) ───────────────────── */
+
+.schedule-print-summary {
+  flex: 0 0 auto;
+  border-top: 0.3mm solid #1e293b;
+}
+
+.schedule-print-summary-row {
+  display: grid;
+  grid-template-columns: 13mm repeat(5, 1fr);
+  border-top: 0.15mm solid #c7d2fe;
+}
+
+.schedule-print-summary-row:first-of-type {
+  border-top: 0;
+}
+
+.schedule-print-summary-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8mm 0.5mm;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 4.8pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.schedule-print-summary-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8mm 0.5mm;
+  border-left: 0.2mm solid #c7d2fe;
+  background: #f5f7ff;
+  font-size: 6pt;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #1e3a8a;
+}
+
+/* ── Signatories ──────────────────────────────────────────────────────────── */
+
+.schedule-print-signatories {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 24mm;
+  padding: 2.5mm 6mm 1mm;
+}
+
+.schedule-print-signatories-three {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0 12mm;
+}
+
+.schedule-print-signatory-caption {
+  font-size: 7.5pt;
+  color: #334155;
+}
+
+.schedule-print-signatory-name {
+  margin-top: 7mm;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.schedule-print-signatory-position {
+  font-size: 7pt;
+  color: #475569;
 }
 
 @page {
