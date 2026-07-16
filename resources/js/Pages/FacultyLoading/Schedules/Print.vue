@@ -120,15 +120,10 @@ const GRID_MARKS = Array.from(
   (_, index) => CAL_START + index * 30,
 )
 
-const PALETTE = [
-  { background: '#dbeafe', border: '#60a5fa', color: '#1e3a8a' },
-  { background: '#ede9fe', border: '#a78bfa', color: '#4c1d95' },
-  { background: '#d1fae5', border: '#34d399', color: '#064e3b' },
-  { background: '#fef3c7', border: '#f59e0b', color: '#78350f' },
-  { background: '#fee2e2', border: '#f87171', color: '#7f1d1d' },
-  { background: '#cffafe', border: '#22d3ee', color: '#164e63' },
-  { background: '#fce7f3', border: '#f472b6', color: '#831843' },
-]
+// Single-color print: every teaching event uses one blue scheme (per-subject
+// palette dropped so B/W and color printers both get a clean, uniform sheet)
+const TEACHING_COLOR    = { backgroundColor: '#dbeafe', borderColor: '#60a5fa', color: '#1e3a8a' }
+const NONTEACHING_COLOR = { backgroundColor: '#f1f5f9', borderColor: '#64748b', color: '#1e293b' }
 
 const documentTitle = computed(() => (
   props.scheduleType === 'section' ? 'CLASS SCHEDULE' : 'INDIVIDUAL FACULTY SCHEDULE'
@@ -220,16 +215,7 @@ function eventDetail(entry) {
 }
 
 function eventColorStyle(entry) {
-  if (entry.entry_type === 'non_teaching') {
-    return { backgroundColor: '#f1f5f9', borderColor: '#64748b', color: '#1e293b' }
-  }
-
-  const color = PALETTE[Math.abs(Number(entry.subject?.id ?? entry.id)) % PALETTE.length]
-  return {
-    backgroundColor: color.background,
-    borderColor: color.border,
-    color: color.color,
-  }
+  return entry.entry_type === 'non_teaching' ? NONTEACHING_COLOR : TEACHING_COLOR
 }
 
 onMounted(async () => {
@@ -271,9 +257,19 @@ body {
 .schedule-print-header,
 .schedule-print-footer {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
   flex: 0 0 auto;
+}
+
+.schedule-print-header {
+  max-width: 170mm;
+  margin: 2mm auto 0;
+}
+
+.schedule-print-footer {
+  max-width: 140mm;
+  margin: 0 auto 2mm;
 }
 
 .schedule-print-body {
@@ -441,7 +437,7 @@ body {
 
 .schedule-print-event-tentative {
   border-right-width: 1mm;
-  border-right-color: #f59e0b !important;
+  border-right-color: #1e40af !important;
 }
 
 .schedule-print-event-title {
