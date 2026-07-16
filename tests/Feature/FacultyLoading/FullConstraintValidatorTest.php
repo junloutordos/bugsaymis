@@ -160,12 +160,12 @@ class FullConstraintValidatorTest extends TestCase
         $this->assertTrue($result['passes']);
     }
 
-    public function test_check_constant_allows_grade_8_final_wednesday_period(): void
+    public function test_check_constant_blocks_grade_8_period_at_3pm(): void
     {
         $result = $this->validator->checkConstant(8, 'Wednesday', '15:00', '15:50');
 
-        $this->assertTrue($result['passes']);
-        $this->assertEmpty($result['violations']);
+        $this->assertFalse($result['passes']);
+        $this->assertSame('H10', $result['violations'][0]['code']);
     }
 
     // =========================================================================

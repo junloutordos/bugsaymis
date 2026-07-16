@@ -39,7 +39,7 @@
       </div>
 
       <!-- Break Times Card -->
-      <AppCard v-if="section.recess_start || section.lunch_start || section.afternoon_break_start">
+      <AppCard v-if="section.recess_start || section.lunch_start">
         <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
           <ClockIcon class="h-4 w-4" /> Break Times
         </h2>
@@ -50,15 +50,12 @@
           <div v-if="section.lunch_start" class="flex items-center gap-2">
             <AppBadge color="orange">Lunch: {{ formatTime(section.lunch_start) }} – {{ formatTime(section.lunch_end) }}</AppBadge>
           </div>
-          <div v-if="section.afternoon_break_start" class="flex items-center gap-2">
-            <AppBadge color="purple">Afternoon Break: {{ formatTime(section.afternoon_break_start) }} – {{ formatTime(section.afternoon_break_end) }}</AppBadge>
-          </div>
         </div>
       </AppCard>
       <div v-else
         class="bg-warning-50 border border-warning-100 rounded-xl px-5 py-3 text-xs text-warning-700 flex items-center gap-2">
         <ExclamationTriangleIcon class="h-4 w-4 shrink-0" />
-        No break times set. Schedule generation will not block recess, lunch, or afternoon break periods for this section.
+        No break times set. Schedule generation will use the canonical recess and lunch periods for this section.
         <Link :href="route('faculty-loading.sections.index')" class="underline ml-1">Set break times</Link>
       </div>
 

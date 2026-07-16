@@ -97,7 +97,7 @@ class HardConstraintChecker
      * for the grade. Grade-specific ALP windows override the group cutoff.
      *
      *   G7      → 15:00
-     *   G8      → 15:50
+     *   G8      → 15:00
      *   G9/G10  → 15:00
      *   G11/G12 → 12:20
      *

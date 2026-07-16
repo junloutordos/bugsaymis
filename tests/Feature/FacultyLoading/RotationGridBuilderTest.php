@@ -26,20 +26,20 @@ class RotationGridBuilderTest extends TestCase
     // getWeeklyClassSlots — slot counts
     // =========================================================================
 
-    public function test_g7_has_28_weekly_class_slots(): void
+    public function test_g7_has_36_weekly_class_slots(): void
     {
         $slots = $this->builder->getWeeklyClassSlots(7);
-        $this->assertCount(28, $slots, 'G7 should have 28 usable CLASS slots per week');
+        $this->assertCount(36, $slots, 'G7 should have 36 usable CLASS slots per week');
     }
 
-    public function test_g8_has_28_weekly_class_slots(): void
+    public function test_g8_has_40_weekly_class_slots(): void
     {
-        $this->assertCount(28, $this->builder->getWeeklyClassSlots(8));
+        $this->assertCount(40, $this->builder->getWeeklyClassSlots(8));
     }
 
-    public function test_g9_has_36_weekly_class_slots(): void
+    public function test_g9_has_35_weekly_class_slots(): void
     {
-        $this->assertCount(36, $this->builder->getWeeklyClassSlots(9));
+        $this->assertCount(35, $this->builder->getWeeklyClassSlots(9));
     }
 
     public function test_g10_has_37_weekly_class_slots(): void
@@ -48,21 +48,21 @@ class RotationGridBuilderTest extends TestCase
     }
 
     // =========================================================================
-    // getWeeklyClassSlots — Friday exclusion (G7/G8)
+    // getWeeklyClassSlots — Friday availability
     // =========================================================================
 
-    public function test_g7_has_no_friday_class_slots(): void
+    public function test_g7_has_friday_class_slots(): void
     {
         $slots   = $this->builder->getWeeklyClassSlots(7);
         $fridays = array_filter($slots, fn ($s) => $s['day'] === 'Friday');
-        $this->assertEmpty($fridays, 'G7 must have zero Friday slots (ILA day)');
+        $this->assertCount(8, $fridays, 'G7 must have Friday class slots');
     }
 
-    public function test_g8_has_no_friday_class_slots(): void
+    public function test_g8_has_friday_class_slots(): void
     {
         $slots   = $this->builder->getWeeklyClassSlots(8);
         $fridays = array_filter($slots, fn ($s) => $s['day'] === 'Friday');
-        $this->assertEmpty($fridays, 'G8 must have zero Friday slots (ILA day)');
+        $this->assertCount(8, $fridays, 'G8 must have Friday class slots');
     }
 
     public function test_g9_has_friday_class_slots(): void
@@ -287,19 +287,19 @@ class RotationGridBuilderTest extends TestCase
     // getRotationStep
     // =========================================================================
 
-    public function test_rotation_step_is_7_for_g7(): void
+    public function test_rotation_step_is_9_for_g7(): void
     {
-        $this->assertSame(7, $this->builder->getRotationStep(7));
+        $this->assertSame(9, $this->builder->getRotationStep(7));
     }
 
-    public function test_rotation_step_is_7_for_g8(): void
+    public function test_rotation_step_is_10_for_g8(): void
     {
-        $this->assertSame(7, $this->builder->getRotationStep(8));
+        $this->assertSame(10, $this->builder->getRotationStep(8));
     }
 
-    public function test_rotation_step_is_9_for_g9(): void
+    public function test_rotation_step_is_8_for_g9(): void
     {
-        $this->assertSame(9, $this->builder->getRotationStep(9));
+        $this->assertSame(8, $this->builder->getRotationStep(9));
     }
 
     public function test_rotation_step_is_9_for_g10(): void

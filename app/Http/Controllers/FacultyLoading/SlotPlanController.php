@@ -147,7 +147,7 @@ class SlotPlanController extends Controller
      * Build the per-section break-time override map for the current FL
      * school year, keyed by section name, in the shape the generator expects.
      *
-     * @return array<string, array{recess: array|null, lunch: array|null, afternoon_break: array|null}>
+     * @return array<string, array{recess: array|null, lunch: array|null}>
      */
     private function loadSectionBreaks(int $grade): array
     {
@@ -163,12 +163,11 @@ class SlotPlanController extends Controller
 
         return Section::where('school_year_id', $schoolYearId)
             ->where('levelid', $grade)
-            ->get(['sectionname', 'recess_start', 'recess_end', 'lunch_start', 'lunch_end', 'afternoon_break_start', 'afternoon_break_end'])
+            ->get(['sectionname', 'recess_start', 'recess_end', 'lunch_start', 'lunch_end'])
             ->mapWithKeys(fn ($s) => [
                 $s->sectionname => [
-                    'recess'          => $normalize($s->recess_start, $s->recess_end),
-                    'lunch'           => $normalize($s->lunch_start, $s->lunch_end),
-                    'afternoon_break' => $normalize($s->afternoon_break_start, $s->afternoon_break_end),
+                    'recess' => $normalize($s->recess_start, $s->recess_end),
+                    'lunch'  => $normalize($s->lunch_start, $s->lunch_end),
                 ],
             ])
             ->all();

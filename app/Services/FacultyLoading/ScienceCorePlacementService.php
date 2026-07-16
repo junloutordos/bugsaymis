@@ -46,10 +46,10 @@ class ScienceCorePlacementService
      *
      * Since Science Core runs all sections of a grade in parallel at the SAME
      * timeslot (H15), a candidate slot must also avoid every section's own
-     * recess/lunch/afternoon-break windows — not just one section's.
+     * recess/lunch windows — not just one section's.
      *
      * @param  int   $grade  11 or 12
-     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null], ...]
      * @return array<int, array{day:string, start:string, end:string, label:string}>
      */
     public function getCandidateSlots(int $grade, array $sectionBreaks = []): array
@@ -80,13 +80,13 @@ class ScienceCorePlacementService
     }
 
     /**
-     * True if [start, end) overlaps any recess/lunch/afternoon-break window
+     * True if [start, end) overlaps any recess/lunch window
      * configured for any section in $sectionBreaks.
      */
     private function overlapsAnySectionBreak(string $start, string $end, array $sectionBreaks): bool
     {
         foreach ($sectionBreaks as $breaks) {
-            foreach (['recess', 'lunch', 'afternoon_break'] as $key) {
+            foreach (['recess', 'lunch'] as $key) {
                 $window = $breaks[$key] ?? null;
                 if ($window && SchedulingConstants::timesOverlap($start, $end, $window['start'], $window['end'])) {
                     return true;

@@ -86,8 +86,8 @@ class ScheduleGeneratorService
      * @param  int   $grade        7–12
      * @param  array $subjects     Subject list with 'type', 'name', 'sessions_per_week' keys
      * @param  array $sectionNames Ordered section names (must match GRADE_SECTIONS order)
-     * @param  array $sectionBreaks ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
-     *                              Per-section recess/lunch/afternoon-break overrides from the Sections module.
+     * @param  array $sectionBreaks ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null], ...]
+     *                              Per-section recess/lunch overrides from the Sections module.
      *                              Sections absent from this map (or with all-null entries) use the grade's
      *                              constant RECESS/LUNCH windows, exactly as before.
      * @return array               GenerationResult (see class docblock)
@@ -187,7 +187,7 @@ class ScheduleGeneratorService
      * Checks per section:
      *   1. No duplicate (day_of_week, start_time) within a section
      *   2. All placements pass constant constraints (H4–H12), accounting for
-     *      that section's own recess/lunch/afternoon-break overrides
+     *      that section's own recess/lunch overrides
      *
      * @param  array $result        Output of generateSlotPlan
      * @param  array $sectionBreaks Same map passed to generateSlotPlan() — pass the
@@ -452,12 +452,12 @@ class ScheduleGeneratorService
 
     /**
      * Return all CLASS slots for the full week that pass constant constraints,
-     * rebuilt around a section's own recess/lunch/afternoon-break overrides
+     * rebuilt around a section's own recess/lunch overrides
      * (falls back to the grade's constant RECESS/LUNCH windows when a break
      * isn't overridden — see RotationGridBuilder::getWeeklyClassSlotsForSection).
      * No DB access — safe for pure-logic generation.
      *
-     * @param  array $sectionBreaks ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null]
+     * @param  array $sectionBreaks ['recess'=>[..]|null, 'lunch'=>[..]|null]
      * @return list<array{day:string, start:string, end:string, label:string}>
      */
     private function getValidWeekSlots(int $grade, array $sectionBreaks = []): array

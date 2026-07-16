@@ -7,6 +7,7 @@ use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
+use App\Models\FacultyLoading\TeacherOfficialTime;
 use App\Models\User;
 
 /**
@@ -49,6 +50,9 @@ class DeterministicSchedulingService
     /** Minutes an Independent Learning Period session occupies within its period. */
     private const ILP_MINUTES = 30;
 
+    /** Overflow periods are a last resort after every standard period. */
+    private const OVERFLOW_PENALTY = 1000000;
+
     /** @var array<int,array<int,array<string,mixed>>> available slots per grade */
     private array $gridByGrade = [];
     /** @var array<int,array<string,int>> earliest start_min per grade+day (the day's first period) */
@@ -65,6 +69,8 @@ class DeterministicSchedulingService
     private array $sectionSubjDays = [];
     /** @var array<int,?array{s:array<string,mixed>,slot:array<string,mixed>}> */
     private array $placements = [];
+    /** @var array<int,array<string,array{start:int,end:int}>> */
+    private array $officialTimeByFacultyDay = [];
 
     /**
      * Generate a conflict-free schedule for the given term.
@@ -78,6 +84,7 @@ class DeterministicSchedulingService
      */
     public function generate(int $schoolYearId, int $termId, array $params = []): array
     {
+        $this->officialTimeByFacultyDay = [];
         $requirements = $this->buildRequirements($schoolYearId, $termId);
 
         if (empty($requirements)) {
@@ -233,6 +240,7 @@ class DeterministicSchedulingService
      */
     public function placeRemaining(int $schoolYearId, int $termId, ?array $loadAssignmentIds = null): array
     {
+        $this->officialTimeByFacultyDay = [];
         $requirements = $this->buildRequirements($schoolYearId, $termId);
         if ($loadAssignmentIds !== null) {
             $ids          = array_map('intval', $loadAssignmentIds);
@@ -378,6 +386,7 @@ class DeterministicSchedulingService
      */
     public function suggestSlotsForLoad(int $schoolYearId, int $termId, int $loadAssignmentId, int $limit = 5): array
     {
+        $this->officialTimeByFacultyDay = [];
         $requirements = $this->buildRequirements($schoolYearId, $termId);
         $req          = null;
         foreach ($requirements as $r) {
@@ -754,7 +763,7 @@ class DeterministicSchedulingService
     // ── Slot grid ─────────────────────────────────────────────────────────
 
     /**
-     * Build the available CLASS period slots for a grade across the week,
+     * Build the available regular and ILP-only slots for a grade across the week,
      * applying the Wednesday activity cutoff, the Wednesday wellness block,
      * the fixed Friday Flag Retreat block (16:00 onward, all grades), and
      * Friday ILA (no in-person) for any grade still listed.
@@ -765,7 +774,7 @@ class DeterministicSchedulingService
     {
         $slots = [];
         foreach (self::DAYS as $day) {
-            foreach (SchedulingConstants::getSchedulableClassSlots($grade, $day) as $row) {
+            foreach (SchedulingConstants::getSchedulableTeachingSlots($grade, $day) as $row) {
                 $slots[] = [
                     'day'         => $day,
                     'start'       => $row['start'],
@@ -775,6 +784,8 @@ class DeterministicSchedulingService
                     // Periods the bell schedule reserves for electives — core
                     // (homeroom) subjects avoid these; electives only use these.
                     'is_elective' => str_contains($row['label'] ?? '', 'Elective'),
+                    'is_ilp_only'  => ($row['type'] ?? 'CLASS') === 'ILP_ONLY',
+                    'is_overflow'  => str_contains($row['label'] ?? '', 'Overflow'),
                 ];
             }
         }
@@ -802,6 +813,7 @@ class DeterministicSchedulingService
 
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
             $day = $slot['day'];
+            $occupiedSlot = $this->occupiedSlot($s, $slot);
 
             // Same-weekday-across-sections: this subject's session index is
             // fixed to one shared weekday for every section of this grade.
@@ -813,7 +825,10 @@ class DeterministicSchedulingService
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
                 continue;
             }
-            if ($this->overlapsReserved($slot, $reserved)) {
+            if (($slot['is_ilp_only'] ?? false) && ! $isIlp) {
+                continue;
+            }
+            if ($this->overlapsReserved($occupiedSlot, $reserved)) {
                 continue;
             }
             // ILP sessions must never land on the day's first period — students
@@ -823,15 +838,19 @@ class DeterministicSchedulingService
             }
 
             // HARD: section free, faculty free at this time.
-            if ($this->sectionBusyAt($s['section_id'], $slot)) {
+            if (! $this->officialTimeAllows($s, $occupiedSlot)) {
                 continue;
             }
-            if ($this->facultyBusyAt($s['faculty_id'], $slot)) {
+            if ($this->sectionBusyAt($s['section_id'], $occupiedSlot)) {
+                continue;
+            }
+            if ($this->facultyBusyAt($s['faculty_id'], $occupiedSlot)) {
                 continue;
             }
 
             // SOFT scoring (lower is better).
             $score = 0;
+            $score += ($slot['is_overflow'] ?? false) ? self::OVERFLOW_PENALTY : 0;
             // Strongly avoid the same subject twice on the same day for a section.
             $score += ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) * 10000;
             if ($isIlp) {
@@ -870,21 +889,29 @@ class DeterministicSchedulingService
 
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
             $day = $slot['day'];
+            $occupiedSlot = $this->occupiedSlot($s, $slot);
 
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
+                continue;
+            }
+            if (($slot['is_ilp_only'] ?? false) && ! $isIlp) {
                 continue;
             }
             if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$s['grade']][$day] ?? null)) {
                 continue;
             }
-            if ($this->sectionBusyAt($s['section_id'], $slot)) {
+            if (! $this->officialTimeAllows($s, $occupiedSlot)) {
                 continue;
             }
-            if ($this->facultyBusyAt($s['faculty_id'], $slot)) {
+            if ($this->sectionBusyAt($s['section_id'], $occupiedSlot)) {
+                continue;
+            }
+            if ($this->facultyBusyAt($s['faculty_id'], $occupiedSlot)) {
                 continue;
             }
 
             $score = 0;
+            $score += ($slot['is_overflow'] ?? false) ? self::OVERFLOW_PENALTY : 0;
             $score += ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) * 10000;
             if ($isIlp) {
                 $score += ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) * 1000;
@@ -934,6 +961,7 @@ class DeterministicSchedulingService
         $forcedDay = $s['forced_day'] ?? null;
 
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
+            $occupiedSlot = $this->occupiedSlot($s, $slot);
             if ($forcedDay !== null && $slot['day'] !== $forcedDay) {
                 continue;
             }
@@ -941,17 +969,23 @@ class DeterministicSchedulingService
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
                 continue;
             }
-            if ($this->overlapsReserved($slot, $reserved)) {
+            if (($slot['is_ilp_only'] ?? false) && ! $isIlp) {
+                continue;
+            }
+            if ($this->overlapsReserved($occupiedSlot, $reserved)) {
                 continue;
             }
             if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$s['grade']][$slot['day']] ?? null)) {
                 continue;
             }
             // Section must be free here; only the faculty is (singly) blocked.
-            if ($this->sectionBusyAt($s['section_id'], $slot)) {
+            if (! $this->officialTimeAllows($s, $occupiedSlot)) {
                 continue;
             }
-            $blockers = $this->facultyBlockersAt($s['faculty_id'], $slot);
+            if ($this->sectionBusyAt($s['section_id'], $occupiedSlot)) {
+                continue;
+            }
+            $blockers = $this->facultyBlockersAt($s['faculty_id'], $occupiedSlot);
             if (count($blockers) !== 1) {
                 continue;
             }
@@ -968,7 +1002,7 @@ class DeterministicSchedulingService
             // class it displaces in turn) must avoid every slot this chain has
             // reserved, including the one we are reserving now for $s.
             $this->uncommit($blockIdx);
-            if ($this->attemptPlace($blocked['s'], $depth - 1, array_merge($reserved, [$slot]))) {
+            if ($this->attemptPlace($blocked['s'], $depth - 1, array_merge($reserved, [$occupiedSlot]))) {
                 $this->commit($s, $slot);
                 return true;
             }
@@ -996,6 +1030,48 @@ class DeterministicSchedulingService
             }
         }
         return false;
+    }
+
+    /** Return the actual occupied interval; ILP uses only the first 30 minutes. */
+    private function occupiedSlot(array $session, array $slot): array
+    {
+        if (($session['session_type'] ?? 'regular') !== 'ilp') {
+            return $slot;
+        }
+
+        $slot['end_min'] = min($slot['end_min'], $slot['start_min'] + self::ILP_MINUTES);
+        $slot['end']     = SchedulingConstants::fromMinutes($slot['end_min']);
+
+        return $slot;
+    }
+
+    /** Enforce the teacher's per-day official time, with the standard early shift fallback. */
+    private function officialTimeAllows(array $session, array $slot): bool
+    {
+        $facultyId = (int) $session['faculty_id'];
+        if ($facultyId < 0) {
+            return true;
+        }
+
+        $day = $slot['day'];
+        if (! isset($this->officialTimeByFacultyDay[$facultyId][$day])) {
+            $official = TeacherOfficialTime::where('user_id', $facultyId)
+                ->where('day_of_week', $day)
+                ->first(['start_time', 'end_time']);
+
+            $this->officialTimeByFacultyDay[$facultyId][$day] = [
+                'start' => SchedulingConstants::toMinutes($official
+                    ? substr((string) $official->start_time, 0, 5)
+                    : SchedulingConstants::SHIFT_EARLY['start']),
+                'end' => SchedulingConstants::toMinutes($official
+                    ? substr((string) $official->end_time, 0, 5)
+                    : SchedulingConstants::SHIFT_EARLY['end']),
+            ];
+        }
+
+        $window = $this->officialTimeByFacultyDay[$facultyId][$day];
+
+        return $slot['start_min'] >= $window['start'] && $slot['end_min'] <= $window['end'];
     }
 
     /**
@@ -1155,14 +1231,21 @@ class DeterministicSchedulingService
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
                 continue;
             }
+            if (($slot['is_ilp_only'] ?? false) && ! $isIlp) {
+                continue;
+            }
             if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$grade][$slot['day']] ?? null)) {
                 continue;
             }
-            if ($this->sectionBusyAt($s['section_id'], $slot)) {
+            $occupiedSlot = $this->occupiedSlot($s, $slot);
+            if (! $this->officialTimeAllows($s, $occupiedSlot)) {
+                continue;
+            }
+            if ($this->sectionBusyAt($s['section_id'], $occupiedSlot)) {
                 continue;
             }
             $sectionFree++;
-            if ($this->facultyBusyAt($s['faculty_id'], $slot)) {
+            if ($this->facultyBusyAt($s['faculty_id'], $occupiedSlot)) {
                 $facultyBlocked++;
             }
         }

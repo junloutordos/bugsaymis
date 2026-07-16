@@ -140,19 +140,19 @@ class HardConstraintCheckerTest extends TestCase
         );
     }
 
-    public function test_h10_grade_8_allows_final_wednesday_period(): void
+    public function test_h10_grade_8_blocks_period_at_3pm(): void
     {
-        $this->assertPasses(
+        $this->assertFails(
             HC::checkWednesdayActivityLockEnd(8, 'Wednesday', '15:00', '15:50'),
-            'G8 Wednesday 15:00–15:50 ends at the Grade 8 ALP boundary'
+            'G8 Wednesday 15:00–15:50 overlaps ALP'
         );
     }
 
     public function test_h10_grade_8_blocks_class_at_alp_start(): void
     {
         $this->assertFails(
-            HC::checkWednesdayActivityLock(8, 'Wednesday', '15:50'),
-            'G8 Wednesday class starting at the 15:50 ALP boundary'
+            HC::checkWednesdayActivityLock(8, 'Wednesday', '15:00'),
+            'G8 Wednesday class starting at the 15:00 ALP boundary'
         );
     }
 
@@ -401,8 +401,8 @@ class HardConstraintCheckerTest extends TestCase
 
     public function test_fixed_overlap_passes_for_valid_class_period(): void
     {
-        // G7 Tuesday Period 7: 15:00–15:50
-        $result = HC::checkFixedSlotOverlap(7, 'Tuesday', '15:00', '15:50');
+        // G7 Tuesday Period 8: 14:40–15:30
+        $result = HC::checkFixedSlotOverlap(7, 'Tuesday', '14:40', '15:30');
         $this->assertPasses($result, 'G7 Tuesday Period 7');
     }
 

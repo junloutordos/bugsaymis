@@ -10,7 +10,7 @@ namespace App\Services\FacultyLoading;
  *
  * Elective windows:
  *   G7/G8/G9 — no dedicated elective windows (empty candidate list)
- *   G10       — 2 slots  (Wed 14:10–15:00, Thu 14:10–15:00)
+ *   G10       — 2 slots  (Wed 13:50–14:40, Thu 13:50–14:40)
  *   G11/G12   — 5 slots  (Tue×2, Wed×1, Thu×2)
  *
  * Candidate slots are found by overlapping the ELECTIVE_WINDOWS_* constants
@@ -39,8 +39,8 @@ namespace App\Services\FacultyLoading;
  *   'unfilled'       => [],   // sessions that exceed elective capacity
  *   'sections'       => [
  *     'Electron' => [
- *       ['subject'=>'STE Elective', 'session'=>1, 'day'=>'Wednesday', 'start'=>'14:10', 'end'=>'15:00'],
- *       ['subject'=>'STE Elective', 'session'=>2, 'day'=>'Thursday',  'start'=>'14:10', 'end'=>'15:00'],
+ *       ['subject'=>'STE Elective', 'session'=>1, 'day'=>'Wednesday', 'start'=>'13:50', 'end'=>'14:40'],
+ *       ['subject'=>'STE Elective', 'session'=>2, 'day'=>'Thursday',  'start'=>'13:50', 'end'=>'14:40'],
  *     ],
  *     'Graviton' => [...],   // identical slots, different subjects possible
  *     ...
@@ -66,10 +66,10 @@ class ElectiveAdvisoryPlacementService
      *
      * Since electives run all sections of a grade in parallel at the SAME
      * timeslot, a candidate slot must also avoid every section's own
-     * recess/lunch/afternoon-break windows — not just one section's.
+     * recess/lunch windows — not just one section's.
      *
      * @param  int   $grade
-     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null], ...]
      * @return array<int, array{day:string, start:string, end:string, label:string}>
      */
     public function getCandidateElectiveSlots(int $grade, array $sectionBreaks = []): array
@@ -406,13 +406,13 @@ class ElectiveAdvisoryPlacementService
     }
 
     /**
-     * True if [start, end) overlaps any recess/lunch/afternoon-break window
+     * True if [start, end) overlaps any recess/lunch window
      * configured for any section in $sectionBreaks.
      */
     private function overlapsAnySectionBreak(string $start, string $end, array $sectionBreaks): bool
     {
         foreach ($sectionBreaks as $breaks) {
-            foreach (['recess', 'lunch', 'afternoon_break'] as $key) {
+            foreach (['recess', 'lunch'] as $key) {
                 $window = $breaks[$key] ?? null;
                 if ($window && SchedulingConstants::timesOverlap($start, $end, $window['start'], $window['end'])) {
                     return true;

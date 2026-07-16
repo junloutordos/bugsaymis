@@ -337,12 +337,6 @@ class ScheduleValidationService
             }
         }
 
-        if ($section->afternoon_break_start && $section->afternoon_break_end) {
-            if ($this->conflicts->timesOverlap($start, $end, $section->afternoon_break_start, $section->afternoon_break_end)) {
-                return "Schedule ({$start}–{$end}) overlaps with the section's afternoon break ({$section->afternoon_break_start}–{$section->afternoon_break_end}).";
-            }
-        }
-
         return null;
     }
 

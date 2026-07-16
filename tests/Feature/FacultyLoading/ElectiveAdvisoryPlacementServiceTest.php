@@ -116,24 +116,24 @@ class ElectiveAdvisoryPlacementServiceTest extends TestCase
     // getCandidateElectiveSlots — exact slot times
     // =========================================================================
 
-    public function test_g10_wednesday_elective_slot_is_14_10_to_15_00(): void
+    public function test_g10_wednesday_elective_slot_is_13_50_to_14_40(): void
     {
         $slots = $this->service->getCandidateElectiveSlots(10);
         $wed   = array_values(array_filter($slots, fn ($s) => $s['day'] === 'Wednesday'));
 
         $this->assertCount(1, $wed);
-        $this->assertSame('14:10', $wed[0]['start']);
-        $this->assertSame('15:00', $wed[0]['end']);
+        $this->assertSame('13:50', $wed[0]['start']);
+        $this->assertSame('14:40', $wed[0]['end']);
     }
 
-    public function test_g10_thursday_elective_slot_is_14_10_to_15_00(): void
+    public function test_g10_thursday_elective_slot_is_13_50_to_14_40(): void
     {
         $slots = $this->service->getCandidateElectiveSlots(10);
         $thu   = array_values(array_filter($slots, fn ($s) => $s['day'] === 'Thursday'));
 
         $this->assertCount(1, $thu);
-        $this->assertSame('14:10', $thu[0]['start']);
-        $this->assertSame('15:00', $thu[0]['end']);
+        $this->assertSame('13:50', $thu[0]['start']);
+        $this->assertSame('14:40', $thu[0]['end']);
     }
 
     public function test_g11_wednesday_elective_slot_is_10_20_to_11_10(): void
@@ -470,8 +470,8 @@ class ElectiveAdvisoryPlacementServiceTest extends TestCase
             'subject' => 'STE',
             'session' => 1,
             'day'     => 'Wednesday',
-            'start'   => '14:10',
-            'end'     => '15:00',
+            'start'   => '13:50',
+            'end'     => '14:40',
         ];
 
         $plan = [
@@ -492,14 +492,14 @@ class ElectiveAdvisoryPlacementServiceTest extends TestCase
     public function test_g10_wednesday_slot_is_in_elective_window(): void
     {
         $this->assertTrue(
-            $this->service->isInElectiveWindow(10, 'Wednesday', '14:10', '15:00')
+            $this->service->isInElectiveWindow(10, 'Wednesday', '13:50', '14:40')
         );
     }
 
     public function test_g10_thursday_slot_is_in_elective_window(): void
     {
         $this->assertTrue(
-            $this->service->isInElectiveWindow(10, 'Thursday', '14:10', '15:00')
+            $this->service->isInElectiveWindow(10, 'Thursday', '13:50', '14:40')
         );
     }
 

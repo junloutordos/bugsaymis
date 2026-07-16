@@ -124,8 +124,6 @@
             <AppInput v-model="form.recess_end" type="time" label="Recess End" />
             <AppInput v-model="form.lunch_start" type="time" label="Lunch Start" />
             <AppInput v-model="form.lunch_end" type="time" label="Lunch End" />
-            <AppInput v-model="form.afternoon_break_start" type="time" label="Afternoon Break Start" />
-            <AppInput v-model="form.afternoon_break_end" type="time" label="Afternoon Break End" />
           </div>
         </div>
 
@@ -220,8 +218,6 @@ const form = useForm({
   recess_end: '',
   lunch_start: '',
   lunch_end: '',
-  afternoon_break_start: '',
-  afternoon_break_end: '',
   adviser: null,
   syid: null,
   is_active: true,
@@ -240,8 +236,6 @@ function openForm(s = null) {
       recess_end: s.recess_end ?? '',
       lunch_start: s.lunch_start ?? '',
       lunch_end: s.lunch_end ?? '',
-      afternoon_break_start: s.afternoon_break_start ?? '',
-      afternoon_break_end: s.afternoon_break_end ?? '',
       adviser: s.adviser?.id ?? null,
       syid: null,
       is_active: s.is_active,
@@ -256,8 +250,6 @@ function openForm(s = null) {
     form.recess_end = ''
     form.lunch_start = ''
     form.lunch_end = ''
-    form.afternoon_break_start = ''
-    form.afternoon_break_end = ''
     form.is_active = true
     const currentSy = props.schoolYears.find(sy => sy.is_current)
     form.syid = currentSy?.id ?? null

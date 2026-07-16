@@ -112,13 +112,13 @@ class SchedulingConstantsTest extends TestCase
             'G7 Monday'   => [7,  'Monday',    1, '09:40'],
             'G8 Monday'   => [8,  'Monday',    1, '09:40'],
             'G9 Monday'   => [9,  'Monday',    1, '09:40'],
-            'G10 Monday'  => [10, 'Monday',    2, '09:40'],  // two recesses on Monday
+            'G10 Monday'  => [10, 'Monday',    1, '09:40'],
             'G11 Monday'  => [11, 'Monday',    1, '10:30'],
             'G12 Monday'  => [12, 'Monday',    1, '10:30'],
-            'G7 Tuesday'  => [7,  'Tuesday',   2, '08:20'],  // morning + afternoon
-            'G8 Thursday' => [8,  'Thursday',  2, '08:20'],
-            'G9 Tuesday'  => [9,  'Tuesday',   2, '09:10'],
-            'G10 Friday'  => [10, 'Friday',    2, '09:10'],
+            'G7 Tuesday'  => [7,  'Tuesday',   1, '08:20'],
+            'G8 Thursday' => [8,  'Thursday',  1, '08:20'],
+            'G9 Tuesday'  => [9,  'Tuesday',   1, '09:10'],
+            'G10 Friday'  => [10, 'Friday',    1, '09:10'],
             'G11 Tuesday' => [11, 'Tuesday',   1, '10:00'],
             'G12 Thursday'=> [12, 'Thursday',  1, '10:00'],
         ];
@@ -227,11 +227,11 @@ class SchedulingConstantsTest extends TestCase
 
     // ── Tue–Fri Timetables ────────────────────────────────────────────────────
 
-    public function test_tuefri_g7g8_has_morning_and_afternoon_recess(): void
+    public function test_tuefri_g7g8_has_only_morning_recess(): void
     {
         $timetable = SC::TUEFRI_730_G7G8;
         $recesses  = array_filter($timetable, fn ($s) => $s['type'] === 'RECESS');
-        $this->assertCount(2, $recesses, 'G7/G8 Tue-Fri should have 2 recess slots');
+        $this->assertCount(1, $recesses, 'G7/G8 Tue-Fri should have only the morning recess');
     }
 
     public function test_tuefri_g11g12_has_consultation_at_end(): void
@@ -330,10 +330,10 @@ class SchedulingConstantsTest extends TestCase
         $this->assertSame('17:00', SC::WEDNESDAY_ALP['end']);
     }
 
-    public function test_grade_8_wednesday_alp_starts_after_final_class_period(): void
+    public function test_grade_8_wednesday_alp_starts_at_3pm(): void
     {
         $alp = SC::getWednesdayAlp(8);
-        $this->assertSame('15:50', $alp['start']);
+        $this->assertSame('15:00', $alp['start']);
         $this->assertSame('17:00', $alp['end']);
     }
 
@@ -363,7 +363,7 @@ class SchedulingConstantsTest extends TestCase
         $this->assertNotContains('WELLNESS', $types);
         $this->assertContains('ACTIVITY', $types);
         $activity = collect($blocked)->firstWhere('type', 'ACTIVITY');
-        $this->assertSame('15:50', $activity['start']);
+        $this->assertSame('15:00', $activity['start']);
     }
 
     public function test_effective_wednesday_class_window_never_overlaps_alp(): void
@@ -381,22 +381,37 @@ class SchedulingConstantsTest extends TestCase
         }
     }
 
-    public function test_grade_8_has_exactly_39_schedulable_weekly_periods(): void
+    public function test_grade_8_has_40_regular_weekly_periods_and_ilp_overflow(): void
     {
         $slots = collect(SC::DAYS)
             ->flatMap(fn ($day) => collect(SC::getSchedulableClassSlots(8, $day))
                 ->map(fn ($slot) => ['day' => $day, ...$slot]));
 
-        $this->assertCount(39, $slots);
+        $this->assertCount(40, $slots);
         $this->assertTrue($slots->contains(
             fn ($slot) => $slot['day'] === 'Monday'
                 && $slot['start'] === '08:50'
                 && $slot['end'] === '09:40'
         ));
-        $this->assertTrue($slots->contains(
-            fn ($slot) => $slot['day'] === 'Wednesday'
-                && $slot['start'] === '15:00'
-                && $slot['end'] === '15:50'
+        $this->assertFalse($slots->contains(
+            fn ($slot) => $slot['day'] === 'Wednesday' && $slot['start'] === '14:40'
+        ));
+
+        $teachingSlots = collect(SC::DAYS)
+            ->flatMap(fn ($day) => collect(SC::getSchedulableTeachingSlots(8, $day))
+                ->map(fn ($slot) => ['day' => $day, ...$slot]));
+        $this->assertCount(42, $teachingSlots);
+        $this->assertTrue($teachingSlots->contains(
+            fn ($slot) => $slot['day'] === 'Monday'
+                && $slot['type'] === 'ILP_ONLY'
+                && $slot['start'] === '16:00'
+                && $slot['end'] === '16:30'
+        ));
+        $this->assertTrue($teachingSlots->contains(
+            fn ($slot) => $slot['day'] === 'Tuesday'
+                && $slot['type'] === 'ILP_ONLY'
+                && $slot['start'] === '16:20'
+                && $slot['end'] === '16:50'
         ));
     }
 

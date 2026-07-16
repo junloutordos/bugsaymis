@@ -43,7 +43,7 @@ class RotationGridBuilder
      * Get all usable CLASS slots for a grade across a typical week.
      *
      * Filters out:
-     *   - Friday slots for G7/G8 (ILA day — H12)
+     *   - Friday slots for any grade explicitly configured for ILA (H12)
      *   - Wednesday slots blocked by Wellness or Activity lock (H11, H10)
      *
      * Returns a flat array ordered by canonical day order then ascending
@@ -59,14 +59,14 @@ class RotationGridBuilder
 
     /**
      * Same as getWeeklyClassSlots(), but rebuilds each day's CLASS slots
-     * around a section's own recess/lunch/afternoon-break overrides (set in
+     * around a section's own recess/lunch overrides (set in
      * the Sections module) instead of the grade's constant RECESS/LUNCH
      * windows. Any break not overridden by the section falls back to the
      * grade's constant window — RECESS and LUNCH always block (a default
-     * exists), AFTERNOON_BREAK only blocks when the section has set one.
+     * exists).
      *
      * @param  int   $grade
-     * @param  array $breaks  ['recess'=>['start','end']|null, 'lunch'=>...|null, 'afternoon_break'=>...|null]
+     * @param  array $breaks  ['recess'=>['start','end']|null, 'lunch'=>...|null]
      * @return array<int, array{day:string, start:string, end:string, label:string}>
      */
     public function getWeeklyClassSlotsForSection(int $grade, array $breaks): array
@@ -89,7 +89,7 @@ class RotationGridBuilder
 
     /**
      * Rebuild the CLASS-slot list for one grade/day, substituting a section's
-     * own recess/lunch/afternoon-break windows for the grade's constant ones.
+     * own recess/lunch windows for the grade's constant ones.
      *
      * Structural (non-configurable) blocks — FLAG, HOMEROOM/ADVISING, DEAD,
      * CONSULT — are taken from the constant timetable unchanged. The day is
@@ -133,12 +133,35 @@ class RotationGridBuilder
             }
         }
 
-        $afternoonBreak = $breaks['afternoon_break'] ?? null;
-        if ($afternoonBreak) {
-            $blocked[] = $afternoonBreak;
+        $slots = $this->discretize($day, $dayStart, $dayEnd, $blocked);
+
+        // Grade 8's approved regular overflow periods replace consultation on
+        // Tuesday and Thursday. Keep them available in this legacy slot-plan
+        // generator as well as in the main deterministic generator.
+        if ($grade === 8) {
+            foreach (SchedulingConstants::GRADE8_OVERFLOW_SLOTS[$day] ?? [] as $overflow) {
+                if ($overflow['type'] !== 'CLASS') {
+                    continue;
+                }
+                $overlapsBreak = collect([$recess, $lunch])
+                    ->filter()
+                    ->contains(fn ($break) => SchedulingConstants::timesOverlap(
+                        $overflow['start'], $overflow['end'], $break['start'], $break['end']
+                    ));
+                if (! $overlapsBreak) {
+                    $slots[] = [
+                        'day'   => $day,
+                        'start' => $overflow['start'],
+                        'end'   => $overflow['end'],
+                        'label' => $overflow['label'],
+                    ];
+                }
+            }
         }
 
-        return $this->discretize($day, $dayStart, $dayEnd, $blocked);
+        usort($slots, fn ($a, $b) => $this->toMinutes($a['start']) <=> $this->toMinutes($b['start']));
+
+        return $slots;
     }
 
     /**
@@ -219,7 +242,7 @@ class RotationGridBuilder
      * checkAntiCollision() to surface any resulting teacher/room clashes.
      *
      * @param  int   $grade  7–10
-     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null], ...]
      * @return array<int, list<array{day:string,start:string,end:string,label:string,slot_index:int,section_index:int,section_name:string}>>
      *               Outer index = section index (0-based).
      *               Inner index = slot position (0 = first preferred slot this week).

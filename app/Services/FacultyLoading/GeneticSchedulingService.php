@@ -244,7 +244,7 @@ class GeneticSchedulingService
         $sections          = Section::whereIn('id', $sectionIds)->get();
         $sectionClassrooms = $sections->whereNotNull('classroom_id')->pluck('classroom_id', 'id')->toArray();
 
-        // Per-section break windows (recess/lunch/afternoon break), merged into each
+        // Per-section break windows (recess/lunch), merged into each
         // section's day config alongside the global school_day_configs blocks.
         $sectionDayConfigs = [];
         foreach ($sections as $section) {
@@ -252,7 +252,6 @@ class GeneticSchedulingService
             foreach ([
                 [$section->recess_start, $section->recess_end],
                 [$section->lunch_start, $section->lunch_end],
-                [$section->afternoon_break_start, $section->afternoon_break_end],
             ] as [$breakStart, $breakEnd]) {
                 if ($breakStart && $breakEnd) {
                     $ownBreaks[] = ['s' => $this->timeToMinutes($breakStart), 'e' => $this->timeToMinutes($breakEnd)];
@@ -324,7 +323,7 @@ class GeneticSchedulingService
 
     /**
      * Resolve the effective day config for a section, merging in its own
-     * recess/lunch/afternoon break windows (set in the Sections module) on
+     * recess/lunch windows (set in the Sections module) on
      * top of the global school_day_configs blocks. Falls back to the global
      * config when the section has no break times configured.
      */

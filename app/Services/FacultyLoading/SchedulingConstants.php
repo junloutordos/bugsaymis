@@ -21,7 +21,8 @@ namespace App\Services\FacultyLoading;
  *   DEAD       — Dead zone / no classes (G7 Monday 8:50–9:40, labeled "Free Time")
  *   RECESS     — Recess break
  *   LUNCH      — Lunch break
- *   CLASS      — Schedulable class period
+ *   CLASS      — Schedulable regular class period
+ *   ILP_ONLY   — Overflow period reserved for an Independent Learning Period
  *   CONSULT    — Consultation / Home Bound (end of day)
  *   WELLNESS   — Wellness block (Wednesday ~9:50–10:20, all grades except
  *                full-Wednesday grades)
@@ -89,26 +90,21 @@ class SchedulingConstants
         'G9_Monday'  => [['start' => '09:40', 'end' => '10:00']],
         'G10_Monday' => [
             ['start' => '09:40', 'end' => '10:00'],
-            ['start' => '15:10', 'end' => '15:30'],
         ],
         'G11_Monday' => [['start' => '10:30', 'end' => '10:50']],
         'G12_Monday' => [['start' => '10:30', 'end' => '10:50']],
         // Tuesday–Friday
         'G7_TueFri'  => [
             ['start' => '08:20', 'end' => '08:40'],
-            ['start' => '13:00', 'end' => '13:20'],
         ],
         'G8_TueFri'  => [
             ['start' => '08:20', 'end' => '08:40'],
-            ['start' => '13:00', 'end' => '13:20'],
         ],
         'G9_TueFri'  => [
             ['start' => '09:10', 'end' => '09:30'],
-            ['start' => '13:50', 'end' => '14:10'],
         ],
         'G10_TueFri' => [
             ['start' => '09:10', 'end' => '09:30'],
-            ['start' => '13:50', 'end' => '14:10'],
         ],
         'G11_TueFri' => [['start' => '10:00', 'end' => '10:20']],
         'G12_TueFri' => [['start' => '10:00', 'end' => '10:20']],
@@ -163,10 +159,8 @@ class SchedulingConstants
         ['start' => '12:40', 'end' => '13:30', 'type' => 'CLASS',    'label' => 'Period 4'],
         ['start' => '13:30', 'end' => '14:20', 'type' => 'CLASS',    'label' => 'Period 5'],
         ['start' => '14:20', 'end' => '15:10', 'type' => 'CLASS',    'label' => 'Period 6'],
-        // G10 has a second recess 15:10–15:30 and Period 7 (handled separately for G10 only)
-        ['start' => '15:10', 'end' => '15:30', 'type' => 'RECESS',   'label' => 'Recess'],      // G10 only
-        ['start' => '15:30', 'end' => '16:20', 'type' => 'CLASS',    'label' => 'Period 7'],    // G10 only
-        ['start' => '16:20', 'end' => '17:00', 'type' => 'CONSULT',  'label' => 'Consultation / Home Bound'],
+        ['start' => '15:10', 'end' => '16:00', 'type' => 'CLASS',    'label' => 'Period 7'],
+        ['start' => '16:00', 'end' => '17:00', 'type' => 'CONSULT',  'label' => 'Consultation / Home Bound'],
     ];
 
     /**
@@ -211,11 +205,10 @@ class SchedulingConstants
         ['start' => '10:20', 'end' => '11:20', 'type' => 'LUNCH',   'label' => 'Lunch Break'],
         ['start' => '11:20', 'end' => '12:10', 'type' => 'CLASS',   'label' => 'Period 4'],
         ['start' => '12:10', 'end' => '13:00', 'type' => 'CLASS',   'label' => 'Period 5'],
-        ['start' => '13:00', 'end' => '13:20', 'type' => 'RECESS',  'label' => 'Recess'],
-        ['start' => '13:20', 'end' => '14:10', 'type' => 'CLASS',   'label' => 'Period 6'],
-        ['start' => '14:10', 'end' => '15:00', 'type' => 'CLASS',   'label' => 'Period 7'],
-        ['start' => '15:00', 'end' => '15:50', 'type' => 'CLASS',   'label' => 'Period 8'],
-        ['start' => '15:50', 'end' => '16:30', 'type' => 'CONSULT', 'label' => 'Consultation / Home Bound'],
+        ['start' => '13:00', 'end' => '13:50', 'type' => 'CLASS',   'label' => 'Period 6'],
+        ['start' => '13:50', 'end' => '14:40', 'type' => 'CLASS',   'label' => 'Period 7'],
+        ['start' => '14:40', 'end' => '15:30', 'type' => 'CLASS',   'label' => 'Period 8'],
+        ['start' => '15:30', 'end' => '16:30', 'type' => 'CONSULT', 'label' => 'Consultation / Home Bound'],
     ];
 
     public const TUEFRI_730_G9G10 = [
@@ -227,10 +220,9 @@ class SchedulingConstants
         ['start' => '11:10', 'end' => '12:10', 'type' => 'LUNCH',   'label' => 'Lunch Break'],
         ['start' => '12:10', 'end' => '13:00', 'type' => 'CLASS',   'label' => 'Period 5'],
         ['start' => '13:00', 'end' => '13:50', 'type' => 'CLASS',   'label' => 'Period 6'],
-        ['start' => '13:50', 'end' => '14:10', 'type' => 'RECESS',  'label' => 'Recess'],
-        ['start' => '14:10', 'end' => '15:00', 'type' => 'CLASS',   'label' => 'Period 7'],
-        ['start' => '15:00', 'end' => '15:50', 'type' => 'CLASS',   'label' => 'Period 8'],
-        ['start' => '15:50', 'end' => '17:00', 'type' => 'CONSULT', 'label' => 'Consultation / Home Bound'],
+        ['start' => '13:50', 'end' => '14:40', 'type' => 'CLASS',   'label' => 'Period 7'],
+        ['start' => '14:40', 'end' => '15:30', 'type' => 'CLASS',   'label' => 'Period 8'],
+        ['start' => '15:30', 'end' => '17:00', 'type' => 'CONSULT', 'label' => 'Consultation / Home Bound'],
     ];
 
     public const TUEFRI_730_G11G12 = [
@@ -288,13 +280,12 @@ class SchedulingConstants
     ];
 
     /**
-     * Default fixed Activity Learning Program (ALP) block. Grade 8 starts at
-     * 15:50 so its 39-session curriculum retains the final Wednesday period.
+     * Default fixed Activity Learning Program (ALP) block.
      */
     public const WEDNESDAY_ALP = ['start' => '15:10', 'end' => '17:00'];
 
     public const WEDNESDAY_ALP_BY_GRADE = [
-        8 => ['start' => '15:50', 'end' => '17:00'],
+        8 => ['start' => '15:00', 'end' => '17:00'],
     ];
 
     // ── Friday Special ────────────────────────────────────────────────────────
@@ -308,14 +299,27 @@ class SchedulingConstants
     /**
      * Fixed Flag Retreat Ceremony block — every Friday, 16:00 onward, for ALL
      * grades and sections. No class may be scheduled here. No grade's Friday
-     * timetable currently runs a CLASS period past 15:50, so this is purely
+     * timetable currently runs a CLASS period past 15:30, so this is
      * defensive/explicit — it doesn't remove any existing capacity today.
      */
     public const FRIDAY_FLAG_RETREAT = ['start' => '16:00', 'end' => '17:00'];
 
     // ── Over-subscribed-grade exceptions ───────────────────────────────────────
-    // G8 carries the heaviest weekly load (39h). Its load only fits when the
-    // full Wednesday is opened for teaching.
+    // G8 carries the heaviest weekly load. These last-resort periods preserve
+    // capacity while keeping Wednesday ALP at its official 15:00 start.
+
+    public const GRADE8_OVERFLOW_SLOTS = [
+        'Monday' => [
+            ['start' => '16:00', 'end' => '16:30', 'type' => 'ILP_ONLY', 'label' => 'ILP Overflow'],
+        ],
+        'Tuesday' => [
+            ['start' => '15:30', 'end' => '16:20', 'type' => 'CLASS', 'label' => 'Period 9 (Overflow)'],
+            ['start' => '16:20', 'end' => '16:50', 'type' => 'ILP_ONLY', 'label' => 'ILP Overflow'],
+        ],
+        'Thursday' => [
+            ['start' => '15:30', 'end' => '16:20', 'type' => 'CLASS', 'label' => 'Period 9 (Overflow)'],
+        ],
+    ];
 
     /**
      * Grades that hold regular classes through the FULL Wednesday — the activity
@@ -333,9 +337,9 @@ class SchedulingConstants
 
     public const CONSULTATION_START = [
         'G7G8_Monday'   => '16:00',
-        'G7G8_TueFri'   => '15:50',
-        'G9G10_Monday'  => '16:20',
-        'G9G10_TueFri'  => '15:50',
+        'G7G8_TueFri'   => '15:30',
+        'G9G10_Monday'  => '16:00',
+        'G9G10_TueFri'  => '15:30',
         'G11G12_Monday' => '15:10',
         'G11G12_TueFri' => '15:30',
     ];
@@ -377,8 +381,8 @@ class SchedulingConstants
     // ── Elective Windows ──────────────────────────────────────────────────────
 
     public const ELECTIVE_WINDOWS_G10 = [
-        ['day' => 'Wednesday', 'start' => '14:20', 'end' => '15:10'],
-        ['day' => 'Thursday',  'start' => '14:10', 'end' => '15:00'],
+        ['day' => 'Wednesday', 'start' => '13:50', 'end' => '14:40'],
+        ['day' => 'Thursday',  'start' => '13:50', 'end' => '14:40'],
     ];
 
     public const ELECTIVE_WINDOWS_G11G12 = [
@@ -469,9 +473,35 @@ class SchedulingConstants
             ? self::getMondayTimetable($grade)
             : self::getTueFriTimetable($grade);
 
-        return array_values(
+        $slots = array_values(
             array_filter($timetable, static fn ($s) => $s['type'] === 'CLASS')
         );
+
+        if ($grade === 8) {
+            $slots = array_merge($slots, array_values(array_filter(
+                self::GRADE8_OVERFLOW_SLOTS[$day] ?? [],
+                static fn ($s) => $s['type'] === 'CLASS',
+            )));
+        }
+
+        return $slots;
+    }
+
+    /** Return regular and ILP-only teaching slots for generator placement. */
+    public static function getTeachingSlots(int $grade, string $day): array
+    {
+        $slots = self::getClassSlots($grade, $day);
+
+        if ($grade === 8) {
+            $slots = array_merge($slots, array_values(array_filter(
+                self::GRADE8_OVERFLOW_SLOTS[$day] ?? [],
+                static fn ($s) => $s['type'] === 'ILP_ONLY',
+            )));
+        }
+
+        usort($slots, static fn ($a, $b) => $a['start'] <=> $b['start']);
+
+        return array_values($slots);
     }
 
     /**
@@ -495,6 +525,16 @@ class SchedulingConstants
         $blocked = array_values(
             array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
         );
+
+        // Grade 8 overflow teaching replaces the overlapping consultation band.
+        foreach (self::GRADE8_OVERFLOW_SLOTS[$day] ?? [] as $overflow) {
+            if ($grade !== 8) {
+                break;
+            }
+            $blocked = array_values(array_filter($blocked, static fn ($b) =>
+                ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $overflow['start'], $overflow['end']))
+            ));
+        }
 
         if ($day === 'Wednesday') {
             $fullWed = in_array($grade, self::WEDNESDAY_FULL_GRADES, true);
@@ -560,7 +600,7 @@ class SchedulingConstants
      */
     public static function getEffectiveClassWindow(int $grade, string $day): ?array
     {
-        $classSlots = self::getSchedulableClassSlots($grade, $day);
+        $classSlots = self::getSchedulableTeachingSlots($grade, $day);
 
         if (empty($classSlots)) {
             return null;
@@ -584,6 +624,19 @@ class SchedulingConstants
 
         return array_values(array_filter(
             self::getClassSlots($grade, $day),
+            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end']),
+        ));
+    }
+
+    /** Canonical regular and ILP-only periods after applying fixed blocks. */
+    public static function getSchedulableTeachingSlots(int $grade, string $day): array
+    {
+        if ($day === 'Friday' && in_array($grade, self::FRIDAY_ILA_GRADES, true)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            self::getTeachingSlots($grade, $day),
             fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end']),
         ));
     }

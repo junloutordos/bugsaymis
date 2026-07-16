@@ -141,7 +141,7 @@ class FixedSlotServiceTest extends TestCase
         );
     }
 
-    public function test_wednesday_g8_activity_starts_at_15_50(): void
+    public function test_wednesday_g8_activity_starts_at_15_00(): void
     {
         $slots    = FixedSlotService::fixedSlotsForDay(8, 'G7G8', 'Wednesday');
         $activity = array_values(array_filter($slots, fn ($s) => $s['type'] === 'ACTIVITY'));
@@ -149,7 +149,7 @@ class FixedSlotServiceTest extends TestCase
 
         $this->assertNotContains('WELLNESS', $types);
         $this->assertNotEmpty($activity);
-        $this->assertSame('15:50', $activity[0]['start']);
+        $this->assertSame('15:00', $activity[0]['start']);
     }
 
     public function test_fixed_slots_contain_no_class_type(): void
@@ -274,9 +274,9 @@ class FixedSlotServiceTest extends TestCase
         $section = Section::factory()->create(['syid' => $sy->id, 'levelid' => 7, 'is_active' => true]);
         $this->service->sealFixedSlots($sy->id);
 
-        // G7 Tuesday Period 7: 15:00–15:50 (CLASS slot from timetable)
+        // G7 Tuesday Period 8: 14:40–15:30 (CLASS slot from timetable)
         $this->assertFalse(
-            $this->service->isBlocked($section->id, 'Tuesday', '15:00', '15:50'),
+            $this->service->isBlocked($section->id, 'Tuesday', '14:40', '15:30'),
             'isBlocked must return false for a valid G7 Tuesday class window'
         );
     }

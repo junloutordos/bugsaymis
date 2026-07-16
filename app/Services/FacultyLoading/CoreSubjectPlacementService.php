@@ -66,7 +66,7 @@ class CoreSubjectPlacementService
      *
      * @param  int   $grade     7–10
      * @param  array $subjects  [['name' => string, 'sessions_per_week' => int], ...]
-     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null], ...]
      * @return array            Placement plan (see class docblock for shape)
      * @throws \InvalidArgumentException  if grade is outside G7–G10
      */
