@@ -28,6 +28,29 @@ class WatRuleService
     public const WEEKLY_MAJOR_MAX  = 6;
     public const MAJOR_WEIGHT_SHARE = 0.10;
 
+    // ── Type derivation from the grading-option category ─────────────────────
+
+    /**
+     * WAT type is derived from the row's grading category — never chosen by
+     * the teacher (it would duplicate what the grading option already says).
+     * Unknown codes return null; displays fall back to the category name.
+     * A campus-added category with code ILA maps automatically.
+     */
+    public static function deriveType(?string $categoryCode, int $assessmentNumber): ?string
+    {
+        return match (strtoupper((string) $categoryCode)) {
+            'FA', 'QZ'       => 'formative',
+            'AA', 'P1', 'P2' => 'alternative',
+            'ILA'            => 'ila',
+            'QE', 'SE', 'PE' => match ($assessmentNumber) {
+                1       => 'long_test_1',
+                2       => 'long_test_2',
+                default => null,
+            },
+            default => null,
+        };
+    }
+
     // ── Major-assessment derivation ───────────────────────────────────────────
 
     public static function isMajor(?string $type, GradingCategory $category): bool
@@ -36,7 +59,9 @@ class WatRuleService
             return true;
         }
 
-        $perAssessmentShare = (float) $category->weight / max(1, (int) $category->max_assessments);
+        // round() guards the exact-10% boundary against float division
+        // (0.30 / 3 === 0.0999…) — QE at 10% each must count as major
+        $perAssessmentShare = round((float) $category->weight / max(1, (int) $category->max_assessments), 6);
 
         return $perAssessmentShare >= self::MAJOR_WEIGHT_SHARE;
     }

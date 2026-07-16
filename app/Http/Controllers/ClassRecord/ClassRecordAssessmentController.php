@@ -120,7 +120,6 @@ class ClassRecordAssessmentController extends Controller
             'assessments.*.grading_category_id'   => 'required|integer|exists:grading_categories,id',
             'assessments.*.assessment_number'      => 'required|integer|min:1',
             'assessments.*.title'                  => 'required|string|max:255',
-            'assessments.*.assessment_type'        => 'nullable|string|in:' . implode(',', array_keys(ClassRecordAssessment::TYPES)),
             'assessments.*.is_graded'              => 'sometimes|boolean',
             'assessments.*.activity_date'          => 'nullable|date',
             'assessments.*.max_score'              => 'required|numeric|min:0.01',
@@ -135,13 +134,14 @@ class ClassRecordAssessmentController extends Controller
         $existingByKey = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)->get()
             ->keyBy(fn ($a) => $a->grading_category_id . '-' . $a->assessment_number);
 
-        // is_major is always derived server-side — never trusted from the client
+        // Type and is_major are always derived server-side — never trusted from
+        // the client (the grading category already identifies the type)
         $items = collect($validated['assessments'])->map(function ($item) use ($categories, $existingByKey) {
-            $item['is_graded'] = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
-            $item['is_major']  = WatRuleService::isMajor(
-                $item['assessment_type'] ?? null,
-                $categories[$item['grading_category_id']]
-            );
+            $category = $categories[$item['grading_category_id']];
+
+            $item['is_graded']       = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
+            $item['assessment_type'] = WatRuleService::deriveType($category->code, (int) $item['assessment_number']);
+            $item['is_major']        = WatRuleService::isMajor($item['assessment_type'], $category);
             $item['_existing'] = $existingByKey->get($item['grading_category_id'] . '-' . $item['assessment_number']);
             $item['_date_changed'] = ! empty($item['activity_date']) && ! (
                 $item['_existing']?->activity_date
@@ -239,7 +239,7 @@ class ClassRecordAssessmentController extends Controller
                 ],
                 [
                     'title'           => $item['title'],
-                    'assessment_type' => $item['assessment_type'] ?? null,
+                    'assessment_type' => $item['assessment_type'],
                     'is_graded'       => $item['is_graded'],
                     'is_major'        => $item['is_major'],
                     'activity_date'   => $item['activity_date'] ?? null,

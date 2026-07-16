@@ -98,7 +98,6 @@ function buildDraft(quarter) {
         grading_category_id: cat.id,
         assessment_number:   n,
         title:               found?.title ?? '',
-        assessment_type:     found?.assessment_type ?? '',
         is_graded:           found ? !!found.is_graded : true,
         activity_date:       found?.activity_date ?? '',
         max_score:           found?.max_score ?? '',
@@ -119,7 +118,6 @@ function addAssessmentRow(catId) {
     grading_category_id: catId,
     assessment_number:   nextNum,
     title:               '',
-    assessment_type:     '',
     is_graded:           true,
     activity_date:       '',
     max_score:           '',
@@ -231,11 +229,13 @@ const categoriesById = computed(() =>
   Object.fromEntries((props.classRecord.grading_option?.categories ?? []).map(c => [c.id, c]))
 )
 
-// Major = Long Test, or worth ≥10% of the quarterly grade
+// Major = worth ≥10% of the quarterly grade (type is server-derived from the
+// category, so the weight rule is the whole client-side check)
 function isMajorRow(row) {
-  if (['long_test_1', 'long_test_2'].includes(row.assessment_type)) return true
   const cat = categoriesById.value[row.grading_category_id]
-  return cat ? (cat.weight / Math.max(1, cat.max_assessments)) >= 0.10 : false
+  if (!cat) return false
+  // rounding guards the exact-10% boundary against float division (0.30 / 3)
+  return Math.round((cat.weight / Math.max(1, cat.max_assessments)) * 1e6) / 1e6 >= 0.10
 }
 
 // Monday of the date's week, minus 3 days = the preceding Friday (end of day)
@@ -645,8 +645,7 @@ async function checkRecord() {
                     <tr>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-16">#</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description</th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-44">Type</th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Category</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-32">Category</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score</th>
                       <th v-if="!isLocked && !isReadOnly" class="px-2 py-2 w-8"></th>
@@ -665,25 +664,13 @@ async function checkRecord() {
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
                       <td class="px-4 py-2">
-                        <select v-model="row.assessment_type"
-                          :disabled="isLocked || isReadOnly"
-                          class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
-                          <option value="">— Select —</option>
-                          <option value="formative">Formative Assessment</option>
-                          <option value="alternative">Alternative Assessment</option>
-                          <option value="ila">Independent Learning Activity</option>
-                          <option value="long_test_1">Long Test 1</option>
-                          <option value="long_test_2">Long Test 2</option>
-                        </select>
-                        <span v-if="isMajorRow(row)" class="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
-                      </td>
-                      <td class="px-4 py-2">
                         <select v-model="row.is_graded"
                           :disabled="isLocked || isReadOnly"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
                           <option :value="true">Graded</option>
                           <option :value="false">Non-graded</option>
                         </select>
+                        <span v-if="isMajorRow(row)" class="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
                       </td>
                       <td class="px-4 py-2">
                         <input v-model="row.activity_date" type="date"
