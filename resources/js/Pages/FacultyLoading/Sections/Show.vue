@@ -73,6 +73,7 @@
         :meta="'· ' + schedule.length + ' slot(s)'"
         :events-by-day="scheduleByDay"
         :day-configs="dayConfigs"
+        :print-url="route('faculty-loading.schedules.sections.print', { section: section.id, term_id: termId })"
         :legend="scheduleLegend" />
 
       <!-- ── Subjects (full catalog for this grade) ──────────────────── -->

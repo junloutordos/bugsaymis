@@ -3,10 +3,11 @@
 namespace Tests\Feature\FacultyLoading;
 
 use App\Models\FacultyLoading\AcademicTerm;
-use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\Permission;
 use App\Models\Role;
@@ -35,7 +36,7 @@ class FacultyLoadingHttpTest extends TestCase
     private function userWith(array|string $permissions): User
     {
         $permissions = (array) $permissions;
-        $role = Role::create(['name' => 'TestRole_' . uniqid()]);
+        $role = Role::create(['name' => 'TestRole_'.uniqid()]);
         foreach ($permissions as $name) {
             $perm = Permission::firstOrCreate(
                 ['name' => $name],
@@ -45,6 +46,7 @@ class FacultyLoadingHttpTest extends TestCase
         }
         $user = User::factory()->create(['email_verified_at' => now()]);
         $user->roles()->attach($role->id);
+
         return $user;
     }
 
@@ -72,11 +74,11 @@ class FacultyLoadingHttpTest extends TestCase
     private function makeSchoolYear(array $overrides = []): SchoolYear
     {
         return SchoolYear::create(array_merge([
-            'name'       => '2025-2026',
+            'name' => '2025-2026',
             'start_date' => '2025-08-01',
-            'end_date'   => '2026-06-30',
+            'end_date' => '2026-06-30',
             'is_current' => true,
-            'status'     => 'active',
+            'status' => 'active',
         ], $overrides));
     }
 
@@ -84,40 +86,55 @@ class FacultyLoadingHttpTest extends TestCase
     {
         return AcademicTerm::create(array_merge([
             'school_year_id' => $sy->id,
-            'name'           => '1st Semester',
-            'term_type'      => '1st_semester',
-            'start_date'     => '2025-08-01',
-            'end_date'       => '2025-12-31',
-            'is_current'     => true,
+            'name' => '1st Semester',
+            'term_type' => '1st_semester',
+            'start_date' => '2025-08-01',
+            'end_date' => '2025-12-31',
+            'is_current' => true,
         ], $overrides));
     }
 
     private function makeSubject(array $overrides = []): Subject
     {
-        static $i = 0; $i++;
+        static $i = 0;
+        $i++;
+
         return Subject::create(array_merge([
-            'code'                => "SUBJ{$i}",
-            'name'                => "Subject {$i}",
-            'credit_units'        => 3,
-            'lecture_hours'       => 3,
-            'load_units'          => 3,
-            'subject_type'        => 'lecture',
-            'grade_level'         => 9,
-            'sessions_per_week'   => 5,
+            'code' => "SUBJ{$i}",
+            'name' => "Subject {$i}",
+            'credit_units' => 3,
+            'lecture_hours' => 3,
+            'load_units' => 3,
+            'subject_type' => 'lecture',
+            'grade_level' => 9,
+            'sessions_per_week' => 5,
             'minutes_per_session' => 60,
-            'is_active'           => true,
+            'is_active' => true,
         ], $overrides));
     }
 
     private function makeClassroom(array $overrides = []): Classroom
     {
-        static $j = 0; $j++;
+        static $j = 0;
+        $j++;
+
         return Classroom::create(array_merge([
-            'name'           => "Room {$j}",
-            'code'           => "R{$j}",
+            'name' => "Room {$j}",
+            'code' => "R{$j}",
             'classroom_type' => 'lecture',
-            'capacity'       => 40,
-            'is_available'   => true,
+            'capacity' => 40,
+            'is_available' => true,
+        ], $overrides));
+    }
+
+    private function makeSection(SchoolYear $sy, array $overrides = []): Section
+    {
+        return Section::create(array_merge([
+            'levelid' => 9,
+            'sectionname' => 'Diamond',
+            'syid' => $sy->id,
+            'school_year_id' => $sy->id,
+            'is_active' => true,
         ], $overrides));
     }
 
@@ -149,11 +166,11 @@ class FacultyLoadingHttpTest extends TestCase
     {
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.school-years.store'), [
-                'name'       => '2025-2026',
+                'name' => '2025-2026',
                 'start_date' => '2025-08-01',
-                'end_date'   => '2026-06-30',
+                'end_date' => '2026-06-30',
                 'is_current' => true,
-                'status'     => 'active',
+                'status' => 'active',
             ])
             ->assertRedirect();
 
@@ -178,11 +195,11 @@ class FacultyLoadingHttpTest extends TestCase
 
         $this->actingAs($this->cidUser())
             ->put(route('faculty-loading.school-years.update', $sy), [
-                'name'       => '2025-2026',
+                'name' => '2025-2026',
                 'start_date' => '2025-08-01',
-                'end_date'   => '2026-06-30',
+                'end_date' => '2026-06-30',
                 'is_current' => true,
-                'status'     => 'inactive',
+                'status' => 'inactive',
             ])
             ->assertRedirect();
 
@@ -195,10 +212,10 @@ class FacultyLoadingHttpTest extends TestCase
 
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.school-years.terms.store', $sy), [
-                'name'       => '1st Semester',
-                'term_type'  => '1st_semester',
+                'name' => '1st Semester',
+                'term_type' => '1st_semester',
                 'start_date' => '2025-08-01',
-                'end_date'   => '2025-12-31',
+                'end_date' => '2025-12-31',
                 'is_current' => true,
             ])
             ->assertRedirect();
@@ -233,17 +250,17 @@ class FacultyLoadingHttpTest extends TestCase
     {
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.subjects.store'), [
-                'code'                => 'SCI901',
-                'name'                => 'Science 9',
-                'credit_units'        => 3,
-                'lecture_hours'       => 3,
-                'lab_hours'           => 0,
-                'load_units'          => 3,
-                'subject_type'        => 'lecture',
-                'grade_level'         => 9,
-                'sessions_per_week'   => 5,
+                'code' => 'SCI901',
+                'name' => 'Science 9',
+                'credit_units' => 3,
+                'lecture_hours' => 3,
+                'lab_hours' => 0,
+                'load_units' => 3,
+                'subject_type' => 'lecture',
+                'grade_level' => 9,
+                'sessions_per_week' => 5,
                 'minutes_per_session' => 60,
-                'is_active'           => true,
+                'is_active' => true,
             ])
             ->assertRedirect();
 
@@ -269,16 +286,16 @@ class FacultyLoadingHttpTest extends TestCase
 
         $this->actingAs($this->cidUser())
             ->put(route('faculty-loading.subjects.update', $sub), [
-                'code'                => $sub->code,
-                'name'                => 'Updated Name',
-                'credit_units'        => 3,
-                'lecture_hours'       => 3,
-                'load_units'          => 3,
-                'subject_type'        => 'lecture',
-                'grade_level'         => 9,
-                'sessions_per_week'   => 5,
+                'code' => $sub->code,
+                'name' => 'Updated Name',
+                'credit_units' => 3,
+                'lecture_hours' => 3,
+                'load_units' => 3,
+                'subject_type' => 'lecture',
+                'grade_level' => 9,
+                'sessions_per_week' => 5,
                 'minutes_per_session' => 60,
-                'is_active'           => true,
+                'is_active' => true,
             ])
             ->assertRedirect();
 
@@ -319,11 +336,11 @@ class FacultyLoadingHttpTest extends TestCase
     {
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.classrooms.store'), [
-                'name'           => 'Rm 201',
-                'code'           => 'RM201',
+                'name' => 'Rm 201',
+                'code' => 'RM201',
                 'classroom_type' => 'lecture',
-                'capacity'       => 40,
-                'is_available'   => true,
+                'capacity' => 40,
+                'is_available' => true,
             ])
             ->assertRedirect();
 
@@ -394,34 +411,34 @@ class FacultyLoadingHttpTest extends TestCase
     public function test_director_can_approve_overload(): void
     {
         $faculty = $this->facultyUser();
-        $sy      = $this->makeSchoolYear();
-        $term    = $this->makeTerm($sy);
-        $load    = FacultyLoad::create([
-            'user_id'            => $faculty->id,
-            'school_year_id'     => $sy->id,
-            'academic_term_id'   => $term->id,
-            'total_units'        => 21,
-            'full_load_threshold'=> 18,
-            'load_status'        => 'overload',
-            'overload_approved'  => false,
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $load = FacultyLoad::create([
+            'user_id' => $faculty->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'total_units' => 21,
+            'full_load_threshold' => 18,
+            'load_status' => 'overload',
+            'overload_approved' => false,
         ]);
 
         $this->actingAs($this->directorUser())
             ->post(route('faculty-loading.approve-overload', $load), [
-                'approved'         => true,
+                'approved' => true,
                 'approval_remarks' => 'Approved for exigency.',
             ])
             ->assertRedirect();
 
         $this->assertDatabaseHas('faculty_loads', [
-            'id'               => $load->id,
-            'overload_approved'=> true,
+            'id' => $load->id,
+            'overload_approved' => true,
         ]);
     }
 
     public function test_unauthorized_user_cannot_approve_overload(): void
     {
-        $sy   = $this->makeSchoolYear();
+        $sy = $this->makeSchoolYear();
         $term = $this->makeTerm($sy);
         $load = FacultyLoad::create([
             'user_id' => $this->facultyUser()->id, 'school_year_id' => $sy->id,
@@ -446,43 +463,119 @@ class FacultyLoadingHttpTest extends TestCase
             ->assertInertia(fn ($p) => $p->component('FacultyLoading/Schedules/Index'));
     }
 
+    public function test_cid_can_print_one_section_schedule_for_its_term(): void
+    {
+        $faculty = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $section = $this->makeSection($sy);
+        $subject = $this->makeSubject();
+        $room = $this->makeClassroom();
+
+        $active = ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'cancelled',
+        ]);
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.schedules.sections.print', [
+                'section' => $section,
+                'term_id' => $term->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('FacultyLoading/Schedules/Print')
+                ->where('scheduleType', 'section')
+                ->where('owner.id', $section->id)
+                ->where('term.id', $term->id)
+                ->where('schedules.0.id', $active->id)
+                ->missing('schedules.1'));
+    }
+
+    public function test_section_print_rejects_a_term_from_another_school_year(): void
+    {
+        $sectionYear = $this->makeSchoolYear(['name' => '2025-2026']);
+        $otherYear = $this->makeSchoolYear(['name' => '2026-2027', 'is_current' => false]);
+        $section = $this->makeSection($sectionYear);
+        $otherTerm = $this->makeTerm($otherYear, ['is_current' => false]);
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.schedules.sections.print', [
+                'section' => $section,
+                'term_id' => $otherTerm->id,
+            ]))
+            ->assertNotFound();
+    }
+
+    public function test_faculty_can_print_only_their_own_schedule(): void
+    {
+        $faculty = $this->facultyUser();
+        $other = $this->facultyUser();
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+
+        $this->actingAs($faculty)
+            ->get(route('faculty-loading.schedules.faculty.print', [
+                'faculty' => $faculty,
+                'term_id' => $term->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('FacultyLoading/Schedules/Print')
+                ->where('scheduleType', 'faculty')
+                ->where('owner.id', $faculty->id));
+
+        $this->actingAs($faculty)
+            ->get(route('faculty-loading.schedules.faculty.print', [
+                'faculty' => $other,
+                'term_id' => $term->id,
+            ]))
+            ->assertForbidden();
+    }
+
     public function test_cid_can_create_schedule(): void
     {
         $faculty = User::factory()->create(['email_verified_at' => now()]);
-        $sy      = $this->makeSchoolYear();
-        $term    = $this->makeTerm($sy);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
         $subject = $this->makeSubject();
-        $room    = $this->makeClassroom();
+        $room = $this->makeClassroom();
 
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.schedules.store'), [
-                'faculty_id'       => $faculty->id,
-                'subject_id'       => $subject->id,
-                'section_id'       => 1,
-                'classroom_id'     => $room->id,
-                'school_year_id'   => $sy->id,
+                'faculty_id' => $faculty->id,
+                'subject_id' => $subject->id,
+                'section_id' => 1,
+                'classroom_id' => $room->id,
+                'school_year_id' => $sy->id,
                 'academic_term_id' => $term->id,
-                'day_of_week'      => 'Monday',
-                'start_time'       => '08:00',
-                'end_time'         => '10:00',
-                'status'           => 'active',
+                'day_of_week' => 'Monday',
+                'start_time' => '08:00',
+                'end_time' => '10:00',
+                'status' => 'active',
             ])
             ->assertRedirect();
 
         $this->assertDatabaseHas('class_schedules', [
-            'user_id'    => $faculty->id,
+            'user_id' => $faculty->id,
             'subject_id' => $subject->id,
-            'day_of_week'=> 'Monday',
+            'day_of_week' => 'Monday',
         ]);
     }
 
     public function test_store_rejects_conflicting_schedule(): void
     {
         $faculty = User::factory()->create(['email_verified_at' => now()]);
-        $sy      = $this->makeSchoolYear();
-        $term    = $this->makeTerm($sy);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
         $subject = $this->makeSubject();
-        $room    = $this->makeClassroom();
+        $room = $this->makeClassroom();
 
         // First schedule
         ClassSchedule::create([
@@ -494,15 +587,15 @@ class FacultyLoadingHttpTest extends TestCase
         // Overlapping second schedule for same faculty
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.schedules.store'), [
-                'faculty_id'       => $faculty->id,
-                'subject_id'       => $subject->id,
-                'section_id'       => 1,
-                'classroom_id'     => $room->id,
-                'school_year_id'   => $sy->id,
+                'faculty_id' => $faculty->id,
+                'subject_id' => $subject->id,
+                'section_id' => 1,
+                'classroom_id' => $room->id,
+                'school_year_id' => $sy->id,
                 'academic_term_id' => $term->id,
-                'day_of_week'      => 'Monday',
-                'start_time'       => '09:00',
-                'end_time'         => '11:00',
+                'day_of_week' => 'Monday',
+                'start_time' => '09:00',
+                'end_time' => '11:00',
             ])
             ->assertSessionHasErrors();
     }
@@ -517,22 +610,22 @@ class FacultyLoadingHttpTest extends TestCase
     public function test_store_validates_end_time_after_start_time(): void
     {
         $faculty = User::factory()->create(['email_verified_at' => now()]);
-        $sy      = $this->makeSchoolYear();
-        $term    = $this->makeTerm($sy);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
         $subject = $this->makeSubject();
-        $room    = $this->makeClassroom();
+        $room = $this->makeClassroom();
 
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.schedules.store'), [
-                'faculty_id'       => $faculty->id,
-                'subject_id'       => $subject->id,
-                'section_id'       => 1,
-                'classroom_id'     => $room->id,
-                'school_year_id'   => $sy->id,
+                'faculty_id' => $faculty->id,
+                'subject_id' => $subject->id,
+                'section_id' => 1,
+                'classroom_id' => $room->id,
+                'school_year_id' => $sy->id,
                 'academic_term_id' => $term->id,
-                'day_of_week'      => 'Monday',
-                'start_time'       => '10:00',
-                'end_time'         => '08:00', // invalid
+                'day_of_week' => 'Monday',
+                'start_time' => '10:00',
+                'end_time' => '08:00', // invalid
             ])
             ->assertSessionHasErrors('end_time');
     }
@@ -540,10 +633,10 @@ class FacultyLoadingHttpTest extends TestCase
     public function test_cid_can_cancel_schedule(): void
     {
         $faculty = User::factory()->create(['email_verified_at' => now()]);
-        $sy      = $this->makeSchoolYear();
-        $term    = $this->makeTerm($sy);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
         $subject = $this->makeSubject();
-        $room    = $this->makeClassroom();
+        $room = $this->makeClassroom();
 
         $schedule = ClassSchedule::create([
             'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => 1,

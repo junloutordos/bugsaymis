@@ -5,8 +5,8 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\Division;
 use App\Models\FacultyLoading\AcademicTerm;
-use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
@@ -16,12 +16,12 @@ use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\FacultyLoading\ScheduleValidationService;
 use App\Services\FacultyLoading\SchedulingConstants;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,7 +29,7 @@ class ClassScheduleController extends Controller
 {
     public function __construct(
         private readonly ScheduleValidationService $validation,
-        private readonly LoadComputationService    $loads,
+        private readonly LoadComputationService $loads,
     ) {}
 
     /**
@@ -104,12 +104,112 @@ class ClassScheduleController extends Controller
         );
     }
 
+    public function printSection(Request $request, Section $section): Response
+    {
+        $this->authorize('faculty_loading.manage');
+
+        $term = $this->resolvePrintTerm($request, $section->school_year_id);
+        $section->loadMissing(['flSchoolYear', 'adviserUser:id,name', 'classroom:id,name,code']);
+
+        return $this->renderPrintSchedule(
+            'section',
+            [
+                'id' => $section->id,
+                'name' => $section->sectionname,
+                'grade_level' => $section->levelid,
+                'adviser' => $section->adviserUser?->name,
+                'classroom' => $section->classroom?->code ?? $section->classroom?->name,
+            ],
+            $term,
+            ClassSchedule::where('section_id', $section->id),
+            (int) $section->levelid,
+        );
+    }
+
+    public function printFaculty(Request $request, User $faculty): Response
+    {
+        $cap = $this->scheduleCapability();
+
+        abort_unless(
+            $cap['level'] === 'manage' || in_array((int) $faculty->id, $cap['faculty_ids'] ?? [], true),
+            403,
+        );
+
+        $term = $this->resolvePrintTerm($request);
+
+        return $this->renderPrintSchedule(
+            'faculty',
+            [
+                'id' => $faculty->id,
+                'name' => $faculty->name,
+                'position' => $faculty->position,
+            ],
+            $term,
+            ClassSchedule::where('user_id', $faculty->id),
+        );
+    }
+
+    private function resolvePrintTerm(Request $request, ?int $schoolYearId = null): AcademicTerm
+    {
+        $termId = $request->integer('term_id') ?: AcademicTerm::where('is_current', true)->value('id');
+
+        abort_unless($termId, 404, 'No academic term is available.');
+
+        return AcademicTerm::with('schoolYear')
+            ->when($schoolYearId, fn ($q) => $q->where('school_year_id', $schoolYearId))
+            ->findOrFail($termId);
+    }
+
+    private function renderPrintSchedule(
+        string $scheduleType,
+        array $owner,
+        AcademicTerm $term,
+        Builder $query,
+        ?int $gradeLevel = null,
+    ): Response {
+        $dayOrder = "FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')";
+
+        $schedules = $query
+            ->with(['subject', 'classroom', 'faculty:id,name', 'section:id,sectionname,levelid'])
+            ->where('academic_term_id', $term->id)
+            ->occupying()
+            ->orderByRaw($dayOrder)
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn ($schedule) => $schedule->toCalendarArray())
+            ->values();
+
+        $dayConfigs = [];
+        if ($gradeLevel !== null) {
+            foreach (SchedulingConstants::DAYS as $day) {
+                $window = SchedulingConstants::getEffectiveClassWindow($gradeLevel, $day);
+                $dayConfigs[$day] = [
+                    'start' => $window['start'] ?? null,
+                    'end' => $window['end'] ?? null,
+                    'blocked' => SchedulingConstants::getBlockedSlots($gradeLevel, $day),
+                ];
+            }
+        }
+
+        return Inertia::render('FacultyLoading/Schedules/Print', [
+            'scheduleType' => $scheduleType,
+            'owner' => $owner,
+            'term' => [
+                'id' => $term->id,
+                'label' => $term->full_label,
+                'school_year' => $term->schoolYear?->name,
+            ],
+            'schedules' => $schedules,
+            'dayConfigs' => $dayConfigs,
+        ]);
+    }
+
     private function renderCalendar(Request $request, array $cap, string $pageMode): Response
     {
         $currentTerm = AcademicTerm::where('is_current', true)->first();
-        $termId      = $request->input('term_id', $currentTerm?->id);
-        $sectionId   = $request->input('section_id');
-        $facultyId   = $request->input('faculty_id');
+        $termId = $request->input('term_id', $currentTerm?->id);
+        $sectionId = $request->input('section_id');
+        $facultyId = $request->input('faculty_id');
 
         // Self mode is pinned to the user's own calendar.
         if ($cap['level'] === 'self') {
@@ -149,9 +249,9 @@ class ClassScheduleController extends Controller
             ->orderByDesc('start_date')
             ->get()
             ->map(fn ($t) => [
-                'id'             => $t->id,
-                'label'          => $t->full_label,
-                'is_current'     => $t->is_current,
+                'id' => $t->id,
+                'label' => $t->full_label,
+                'is_current' => $t->is_current,
                 'school_year_id' => $t->school_year_id,
             ]);
 
@@ -165,18 +265,18 @@ class ClassScheduleController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'position', 'division_id', 'office_id'])
             ->map(fn ($u) => [
-                'id'            => $u->id,
-                'name'          => $u->name,
-                'position'      => $u->position,
+                'id' => $u->id,
+                'name' => $u->name,
+                'position' => $u->position,
                 'division_name' => $u->division?->division_name,
-                'office_name'   => $u->office?->name,
+                'office_name' => $u->office?->name,
             ]);
 
-        $subjects   = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);
+        $subjects = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);
         $classrooms = Classroom::available()->orderBy('name')->get(['id', 'name', 'code', 'classroom_type', 'capacity']);
 
         // Sections filtered to the term's school year (fall back to all active sections)
-        $syId     = $currentTerm?->school_year_id;
+        $syId = $currentTerm?->school_year_id;
         $sections = Section::when($syId, fn ($q) => $q->where('school_year_id', $syId))
             ->where('is_active', true)
             ->orderBy('levelid')
@@ -193,8 +293,8 @@ class ClassScheduleController extends Controller
             foreach (SchedulingConstants::DAYS as $day) {
                 $window = SchedulingConstants::getEffectiveClassWindow($grade, $day);
                 $dayConfigsByGrade[$grade][$day] = [
-                    'start'   => $window['start'] ?? null,
-                    'end'     => $window['end'] ?? null,
+                    'start' => $window['start'] ?? null,
+                    'end' => $window['end'] ?? null,
                     'blocked' => SchedulingConstants::getBlockedSlots($grade, $day),
                 ];
             }
@@ -206,18 +306,18 @@ class ClassScheduleController extends Controller
             : [];
 
         return Inertia::render('FacultyLoading/Schedules/Index', [
-            'schedules'     => $schedules,
-            'terms'         => $terms,
-            'faculty'       => $faculty,
-            'subjects'      => $subjects,
-            'classrooms'    => $classrooms,
-            'sections'      => $sections,
-            'currentTerm'   => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
-            'filters'       => $request->only(['term_id', 'section_id', 'faculty_id']),
+            'schedules' => $schedules,
+            'terms' => $terms,
+            'faculty' => $faculty,
+            'subjects' => $subjects,
+            'classrooms' => $classrooms,
+            'sections' => $sections,
+            'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
+            'filters' => $request->only(['term_id', 'section_id', 'faculty_id']),
             'dayConfigsByGrade' => $dayConfigsByGrade,
             'unplacedLoads' => $unplacedLoads,
-            'capability'    => ['level' => $cap['level']],
-            'pageMode'      => $pageMode,
+            'capability' => ['level' => $cap['level']],
+            'pageMode' => $pageMode,
         ]);
     }
 
@@ -260,8 +360,8 @@ class ClassScheduleController extends Controller
 
         return $loads
             ->map(function ($la) use ($scheduledCounts, $sectionsById, $lockedFacultyIds) {
-                $required    = max(1, (int) round((float) ($la->subject->load_units ?? 1)));
-                $scheduled   = (int) ($scheduledCounts[$la->id] ?? 0);
+                $required = max(1, (int) round((float) ($la->subject->load_units ?? 1)));
+                $scheduled = (int) ($scheduledCounts[$la->id] ?? 0);
                 $stillNeeded = max(0, $required - $scheduled);
 
                 if ($stillNeeded === 0) {
@@ -272,21 +372,21 @@ class ClassScheduleController extends Controller
 
                 return [
                     'load_assignment_id' => $la->id,
-                    'subject'            => $la->subject ? [
-                        'id'          => $la->subject->id,
-                        'code'        => $la->subject->code,
-                        'name'        => $la->subject->name,
+                    'subject' => $la->subject ? [
+                        'id' => $la->subject->id,
+                        'code' => $la->subject->code,
+                        'name' => $la->subject->name,
                         'is_elective' => $la->subject->grade_level === 0 || $la->subject->subject_type === 'elective',
                     ] : null,
                     'faculty' => $la->faculty ? [
-                        'id'   => $la->faculty->id,
+                        'id' => $la->faculty->id,
                         'name' => $la->faculty->name,
                     ] : null,
-                    'section_id'   => $la->section_id,
+                    'section_id' => $la->section_id,
                     'section_name' => $section?->sectionname ?? "Section {$la->section_id}",
-                    'grade_level'  => $section?->levelid,
+                    'grade_level' => $section?->levelid,
                     'still_needed' => $stillNeeded,
-                    'is_locked'    => in_array((int) $la->user_id, $lockedFacultyIds, true),
+                    'is_locked' => in_array((int) $la->user_id, $lockedFacultyIds, true),
                 ];
             })
             ->filter()
@@ -300,16 +400,16 @@ class ClassScheduleController extends Controller
     public function validateSchedule(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'entry_type'       => 'nullable|in:class,non_teaching',
-            'faculty_id'       => 'nullable|integer',
-            'subject_id'       => 'nullable|integer',
-            'section_id'       => 'nullable|integer',
-            'classroom_id'     => 'nullable|integer',
+            'entry_type' => 'nullable|in:class,non_teaching',
+            'faculty_id' => 'nullable|integer',
+            'subject_id' => 'nullable|integer',
+            'section_id' => 'nullable|integer',
+            'classroom_id' => 'nullable|integer',
             'academic_term_id' => 'required|integer',
-            'day_of_week'      => 'required|string',
-            'start_time'       => 'required|string',
-            'end_time'         => 'required|string',
-            'exclude_id'       => 'nullable|integer',
+            'day_of_week' => 'required|string',
+            'start_time' => 'required|string',
+            'end_time' => 'required|string',
+            'exclude_id' => 'nullable|integer',
         ]);
 
         $result = ($data['entry_type'] ?? 'class') === 'non_teaching'
@@ -328,18 +428,18 @@ class ClassScheduleController extends Controller
         $this->authorize('faculty_loading.manage');
 
         $data = $request->validate([
-            'faculty_id'         => 'required|exists:users,id',
-            'subject_id'         => 'required|exists:subjects,id',
-            'section_id'         => 'required|integer',
-            'classroom_id'       => 'required|exists:classrooms,id',
-            'school_year_id'     => 'required|exists:school_years,id',
-            'academic_term_id'   => 'required|exists:academic_terms,id',
-            'day_of_week'        => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-            'start_time'         => 'required|date_format:H:i',
-            'end_time'           => 'required|date_format:H:i|after:start_time',
-            'status'             => 'in:active,tentative',
-            'remarks'            => 'nullable|string|max:500',
-            'force'              => 'boolean',   // override warnings only
+            'faculty_id' => 'required|exists:users,id',
+            'subject_id' => 'required|exists:subjects,id',
+            'section_id' => 'required|integer',
+            'classroom_id' => 'required|exists:classrooms,id',
+            'school_year_id' => 'required|exists:school_years,id',
+            'academic_term_id' => 'required|exists:academic_terms,id',
+            'day_of_week' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'status' => 'in:active,tentative',
+            'remarks' => 'nullable|string|max:500',
+            'force' => 'boolean',   // override warnings only
             'load_assignment_id' => 'nullable|exists:load_assignments,id',
         ]);
 
@@ -361,23 +461,23 @@ class ClassScheduleController extends Controller
 
         $schedule = ClassSchedule::create([
             'load_assignment_id' => $data['load_assignment_id'] ?? null,
-            'user_id'            => $data['faculty_id'],
-            'subject_id'         => $data['subject_id'],
-            'section_id'         => $data['section_id'],
-            'classroom_id'       => $data['classroom_id'],
-            'school_year_id'     => $data['school_year_id'],
-            'academic_term_id'   => $data['academic_term_id'],
-            'day_of_week'        => $data['day_of_week'],
-            'start_time'         => $data['start_time'],
-            'end_time'           => $data['end_time'],
-            'status'             => $data['status'] ?? 'active',
-            'remarks'            => $data['remarks'] ?? null,
-            'created_by'         => Auth::id(),
+            'user_id' => $data['faculty_id'],
+            'subject_id' => $data['subject_id'],
+            'section_id' => $data['section_id'],
+            'classroom_id' => $data['classroom_id'],
+            'school_year_id' => $data['school_year_id'],
+            'academic_term_id' => $data['academic_term_id'],
+            'day_of_week' => $data['day_of_week'],
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'status' => $data['status'] ?? 'active',
+            'remarks' => $data['remarks'] ?? null,
+            'created_by' => Auth::id(),
         ]);
 
         $msg = 'Schedule created.';
         if (! empty($validation['warnings'])) {
-            $msg .= ' Note: ' . implode(' ', $validation['warnings']);
+            $msg .= ' Note: '.implode(' ', $validation['warnings']);
         }
 
         return back()->with('success', $msg);
@@ -391,24 +491,24 @@ class ClassScheduleController extends Controller
     private function storeNonTeaching(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'title'            => 'required|string|max:120',
-            'category'         => 'nullable|string|max:30',
-            'faculty_id'       => 'nullable|exists:users,id',
-            'section_id'       => 'nullable|integer',
-            'classroom_id'     => 'nullable|exists:classrooms,id',
-            'school_year_id'   => 'required|exists:school_years,id',
+            'title' => 'required|string|max:120',
+            'category' => 'nullable|string|max:30',
+            'faculty_id' => 'nullable|exists:users,id',
+            'section_id' => 'nullable|integer',
+            'classroom_id' => 'nullable|exists:classrooms,id',
+            'school_year_id' => 'required|exists:school_years,id',
             'academic_term_id' => 'required|exists:academic_terms,id',
-            'day_of_week'      => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-            'start_time'       => 'required|date_format:H:i',
-            'end_time'         => 'required|date_format:H:i|after:start_time',
-            'status'           => 'in:active,tentative',
-            'remarks'          => 'nullable|string|max:500',
+            'day_of_week' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'status' => 'in:active,tentative',
+            'remarks' => 'nullable|string|max:500',
         ]);
 
         $cap = $this->scheduleCapability();
         if (! $this->canTouchNonTeaching($cap, $data['faculty_id'] ?? null)) {
             return back()->withErrors(['faculty_id' => 'You can only add non-teaching blocks to your own schedule'
-                . ($cap['level'] === 'unit' ? " or your unit's faculty." : '.')]);
+                .($cap['level'] === 'unit' ? " or your unit's faculty." : '.')]);
         }
 
         $validation = $this->validation->validateNonTeaching($data);
@@ -417,21 +517,21 @@ class ClassScheduleController extends Controller
         }
 
         ClassSchedule::create([
-            'entry_type'       => 'non_teaching',
-            'title'            => $data['title'],
-            'category'         => $data['category'] ?? null,
-            'user_id'          => $data['faculty_id'] ?? null,
-            'subject_id'       => null,
-            'section_id'       => $data['section_id'] ?? null,
-            'classroom_id'     => $data['classroom_id'] ?? null,
-            'school_year_id'   => $data['school_year_id'],
+            'entry_type' => 'non_teaching',
+            'title' => $data['title'],
+            'category' => $data['category'] ?? null,
+            'user_id' => $data['faculty_id'] ?? null,
+            'subject_id' => null,
+            'section_id' => $data['section_id'] ?? null,
+            'classroom_id' => $data['classroom_id'] ?? null,
+            'school_year_id' => $data['school_year_id'],
             'academic_term_id' => $data['academic_term_id'],
-            'day_of_week'      => $data['day_of_week'],
-            'start_time'       => $data['start_time'],
-            'end_time'         => $data['end_time'],
-            'status'           => $data['status'] ?? 'active',
-            'remarks'          => $data['remarks'] ?? null,
-            'created_by'       => Auth::id(),
+            'day_of_week' => $data['day_of_week'],
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'status' => $data['status'] ?? 'active',
+            'remarks' => $data['remarks'] ?? null,
+            'created_by' => Auth::id(),
         ]);
 
         return back()->with('success', 'Non-teaching block added.');
@@ -446,18 +546,18 @@ class ClassScheduleController extends Controller
         $this->authorize('faculty_loading.manage');
 
         $data = $request->validate([
-            'faculty_id'         => 'required|exists:users,id',
-            'subject_id'         => 'required|exists:subjects,id',
-            'section_id'         => 'required|integer',
-            'classroom_id'       => 'required|exists:classrooms,id',
-            'school_year_id'     => 'required|exists:school_years,id',
-            'academic_term_id'   => 'required|exists:academic_terms,id',
-            'day_of_week'        => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-            'start_time'         => 'required|date_format:H:i',
-            'end_time'           => 'required|date_format:H:i|after:start_time',
-            'status'             => 'in:active,tentative,cancelled',
-            'remarks'            => 'nullable|string|max:500',
-            'force'              => 'boolean',
+            'faculty_id' => 'required|exists:users,id',
+            'subject_id' => 'required|exists:subjects,id',
+            'section_id' => 'required|integer',
+            'classroom_id' => 'required|exists:classrooms,id',
+            'school_year_id' => 'required|exists:school_years,id',
+            'academic_term_id' => 'required|exists:academic_terms,id',
+            'day_of_week' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'status' => 'in:active,tentative,cancelled',
+            'remarks' => 'nullable|string|max:500',
+            'force' => 'boolean',
         ]);
 
         $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
@@ -474,17 +574,17 @@ class ClassScheduleController extends Controller
         }
 
         $classSchedule->update([
-            'user_id'          => $data['faculty_id'],
-            'subject_id'       => $data['subject_id'],
-            'section_id'       => $data['section_id'],
-            'classroom_id'     => $data['classroom_id'],
-            'school_year_id'   => $data['school_year_id'],
+            'user_id' => $data['faculty_id'],
+            'subject_id' => $data['subject_id'],
+            'section_id' => $data['section_id'],
+            'classroom_id' => $data['classroom_id'],
+            'school_year_id' => $data['school_year_id'],
             'academic_term_id' => $data['academic_term_id'],
-            'day_of_week'      => $data['day_of_week'],
-            'start_time'       => $data['start_time'],
-            'end_time'         => $data['end_time'],
-            'status'           => $data['status'] ?? $classSchedule->status,
-            'remarks'          => $data['remarks'] ?? null,
+            'day_of_week' => $data['day_of_week'],
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'status' => $data['status'] ?? $classSchedule->status,
+            'remarks' => $data['remarks'] ?? null,
         ]);
 
         return back()->with('success', 'Schedule updated.');
@@ -499,18 +599,18 @@ class ClassScheduleController extends Controller
         }
 
         $data = $request->validate([
-            'title'            => 'required|string|max:120',
-            'category'         => 'nullable|string|max:30',
-            'faculty_id'       => 'nullable|exists:users,id',
-            'section_id'       => 'nullable|integer',
-            'classroom_id'     => 'nullable|exists:classrooms,id',
-            'school_year_id'   => 'required|exists:school_years,id',
+            'title' => 'required|string|max:120',
+            'category' => 'nullable|string|max:30',
+            'faculty_id' => 'nullable|exists:users,id',
+            'section_id' => 'nullable|integer',
+            'classroom_id' => 'nullable|exists:classrooms,id',
+            'school_year_id' => 'required|exists:school_years,id',
             'academic_term_id' => 'required|exists:academic_terms,id',
-            'day_of_week'      => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-            'start_time'       => 'required|date_format:H:i',
-            'end_time'         => 'required|date_format:H:i|after:start_time',
-            'status'           => 'in:active,tentative,cancelled',
-            'remarks'          => 'nullable|string|max:500',
+            'day_of_week' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'status' => 'in:active,tentative,cancelled',
+            'remarks' => 'nullable|string|max:500',
         ]);
 
         // The reassigned target must also be within reach.
@@ -524,18 +624,18 @@ class ClassScheduleController extends Controller
         }
 
         $classSchedule->update([
-            'title'            => $data['title'],
-            'category'         => $data['category'] ?? null,
-            'user_id'          => $data['faculty_id'] ?? null,
-            'section_id'       => $data['section_id'] ?? null,
-            'classroom_id'     => $data['classroom_id'] ?? null,
-            'school_year_id'   => $data['school_year_id'],
+            'title' => $data['title'],
+            'category' => $data['category'] ?? null,
+            'user_id' => $data['faculty_id'] ?? null,
+            'section_id' => $data['section_id'] ?? null,
+            'classroom_id' => $data['classroom_id'] ?? null,
+            'school_year_id' => $data['school_year_id'],
             'academic_term_id' => $data['academic_term_id'],
-            'day_of_week'      => $data['day_of_week'],
-            'start_time'       => $data['start_time'],
-            'end_time'         => $data['end_time'],
-            'status'           => $data['status'] ?? $classSchedule->status,
-            'remarks'          => $data['remarks'] ?? null,
+            'day_of_week' => $data['day_of_week'],
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'status' => $data['status'] ?? $classSchedule->status,
+            'remarks' => $data['remarks'] ?? null,
         ]);
 
         return back()->with('success', 'Non-teaching block updated.');

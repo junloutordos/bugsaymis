@@ -200,6 +200,7 @@ const props = defineProps({
   dimEventId:     { type: [Number, String], default: null },
   canQuickCreate: { type: Boolean, default: false },
   isDraggable:    { type: Function, default: () => false },
+  printUrl:       { type: String, default: null },
 })
 
 defineEmits(['column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click'])
@@ -412,6 +413,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 const rootEl = ref(null)
 
 function printCard() {
+  if (props.printUrl) {
+    window.open(props.printUrl, '_blank', 'noopener')
+    return
+  }
+
   document.body.classList.add('print-single-card')
   rootEl.value?.classList.add('schedule-print-target')
   requestAnimationFrame(() => window.print())

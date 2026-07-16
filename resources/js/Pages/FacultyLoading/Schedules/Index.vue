@@ -117,6 +117,7 @@
                 :dim-event-id="dragPayload?.kind === 'move' && groupKeyOf(dragPayload.schedule) === groupId ? dragPayload.schedule.id : null"
                 :can-quick-create="canQuickCreate(groupId)"
                 :is-draggable="canDrag"
+                :print-url="printUrlForGroup(groupId)"
                 @column-mousedown="(day, e) => onColumnMouseDown(e, groupId, day)"
                 @column-dragover="(day, e) => onDragOverColumn(e, groupId, day)"
                 @column-drop="(day, e) => onDropColumn(e, groupId, day)"
@@ -837,6 +838,26 @@ function cardTitle(groupId) {
   if (viewBy.value === 'grade') return `Grade ${groupId} — Electives`
   if (viewBy.value === 'subject') return subjectLabel(groupId)
   return viewBy.value === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name
+}
+
+function printUrlForGroup(groupId) {
+  if (!filters.term_id) return null
+
+  if (viewBy.value === 'section' && isManage.value) {
+    return route('faculty-loading.schedules.sections.print', {
+      section: groupId,
+      term_id: filters.term_id,
+    })
+  }
+
+  if (viewBy.value === 'faculty' && groupId !== 'unassigned') {
+    return route('faculty-loading.schedules.faculty.print', {
+      faculty: groupId,
+      term_id: filters.term_id,
+    })
+  }
+
+  return null
 }
 
 /** "CODE — Name" for a subject id, sourced from the page's subject catalog

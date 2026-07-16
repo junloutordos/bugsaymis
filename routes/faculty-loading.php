@@ -86,11 +86,16 @@ Route::middleware(['web', 'auth', 'verified'])
         Route::middleware('permission:faculty_loading.manage|faculty_loading.view_own')
             ->prefix('schedules')->name('schedules.')->group(function () {
                 Route::get('/',                   [ClassScheduleController::class, 'index'])->name('index');
+                Route::get('/faculty/{faculty}/print', [ClassScheduleController::class, 'printFaculty'])->name('faculty.print');
                 Route::post('/validate',          [ClassScheduleController::class, 'validateSchedule'])->name('validate');
                 Route::post('/',                  [ClassScheduleController::class, 'store'])->name('store');
                 Route::put('/{classSchedule}',    [ClassScheduleController::class, 'update'])->name('update');
                 Route::delete('/{classSchedule}', [ClassScheduleController::class, 'destroy'])->name('destroy');
             });
+
+        Route::middleware('permission:faculty_loading.manage')
+            ->get('/schedules/sections/{section}/print', [ClassScheduleController::class, 'printSection'])
+            ->name('schedules.sections.print');
 
         Route::middleware('permission:faculty_loading.manage')
             ->group(function () {
