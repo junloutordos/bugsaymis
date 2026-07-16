@@ -13,6 +13,7 @@ import VersionHistoryModal from '@/Components/Layout/VersionHistoryModal.vue';
 import SignatureSetupModal from '@/Components/Layout/SignatureSetupModal.vue';
 import { ChevronDownIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
+import AppLoadingOverlay from '@/Components/AppLoadingOverlay.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
 import { menuItems } from './navigation.js';
 
@@ -551,6 +552,8 @@ filteredMenu.value.forEach((item) => {
 </div>
 
   <SessionExpiredOverlay :show="sessionExpired" />
+
+  <AppLoadingOverlay />
 
 </template>
 

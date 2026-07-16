@@ -1,5 +1,10 @@
 <template>
-  <div role="status" aria-label="Loading..." class="animate-skeleton w-full">
+  <div role="status" aria-label="Loading..." class="animate-skeleton relative w-full">
+
+    <!-- Branded focal indicator over the skeleton -->
+    <div class="pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center">
+      <AtlasMarkLoader caption="Wayfinding" />
+    </div>
 
     <!-- Page header -->
     <div class="mb-6 space-y-2">
@@ -74,6 +79,8 @@
 </template>
 
 <script setup>
+import AtlasMarkLoader from '@/Components/AtlasMarkLoader.vue'
+
 defineProps({
   type: { type: String, default: 'table' },
 })

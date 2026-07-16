@@ -31,3 +31,9 @@ storage/app/pshs-crc-dts-19dea47e8396.json
 /inception/
 /construction/
 /plan.md
+
+# Local architecture diagrams (not for production)
+/docs/module-architecture.md
+/docs/flowchart-architecture.md
+/output/pdf/module-architecture.pdf
+/output/pdf/flowchart-architecture-diagram.pdf
