@@ -184,6 +184,9 @@
               <AppButton variant="secondary" @click="closeModal">
                 Close
               </AppButton>
+              <AppButton v-if="selectedItem.view_url" variant="secondary" as="a" :href="selectedItem.view_url" target="_blank">
+                <ArrowTopRightOnSquareIcon class="w-4 h-4" /> View Full Schedule
+              </AppButton>
               <AppButton variant="danger" :disabled="isSubmitting" @click="showDecline = true">
                 <XCircleIcon class="w-4 h-4" /> Decline
               </AppButton>
@@ -222,7 +225,7 @@
 import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { MagnifyingGlassIcon, EyeIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, EyeIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'

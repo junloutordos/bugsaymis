@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { Head, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
@@ -19,6 +19,8 @@ const props = defineProps({
   permissions: Array,
   stats:       Object,
 })
+
+const page = usePage()
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 const activeSection = ref('overview')
@@ -255,69 +257,18 @@ const modules = [
 ]
 
 // ── Changelog data ─────────────────────────────────────────────────────────
-const changelog = [
-  {
-    version: '2.5.0',
-    date: 'May 2026',
-    type: 'feat',
-    items: [
-      'Technical Documentation module (this page)',
-      'Comprehensive Profile module — base64 photo upload, employment details',
-      'Document Tracking System — internal + external, Google Drive scan storage, routing templates',
-      'Push notifications (Web Push via FCM + VAPID) + in-app bell',
-      'IT Job Request priority queue and MIS assessment modal',
-    ],
-  },
-  {
-    version: '2.4.0',
-    date: 'May 2026',
-    type: 'feat',
-    items: [
-      'AWS infrastructure security hardening (A− rating)',
-      'CloudTrail audit logging, ECR scan-on-push, scoped S3 IAM',
-      'nginx rate limiting (login: 10/min, API: 60/min)',
-      'PHP security hardening (open_basedir, disable_functions, max_execution_time)',
-      'Google Drive credentials moved to AWS Secrets Manager',
-    ],
-  },
-  {
-    version: '2.3.0',
-    date: 'May 2026',
-    type: 'feat',
-    items: [
-      'WFH photos migrated from Google Drive to private S3 with proxy route',
-      'Payroll Cashier disbursement workflow',
-      'Messengerial signature fix (removed division chief from "Received By")',
-      'Gate pass OCD division bypass for approval',
-      'MIS Dashboard personnel workload normalization',
-    ],
-  },
-  {
-    version: '2.2.0',
-    date: 'April 2026',
-    type: 'feat',
-    items: [
-      'Class Record module with running grade computation',
-      'CSM Feedback module (polymorphic respondable)',
-      'PDS Work Experience Sheet (WES) tab',
-      'DTR travel flag and gate pass integration',
-    ],
-  },
-  {
-    version: '2.1.0',
-    date: 'March 2026',
-    type: 'feat',
-    items: [
-      'Production deployment to AWS ECS Fargate',
-      'Cloudflare WAF + ALB TLS 1.3',
-      'GitHub Actions CI/CD pipeline',
-      'S3 private bucket with /media/ proxy',
-    ],
-  },
-]
+const changelog = computed(() => (page.props.appVersion?.history ?? []).map(release => ({
+  ...release,
+  type: 'release',
+  items: [
+    ...(release.changes?.features ?? []),
+    ...(release.changes?.improvements ?? []),
+    ...(release.changes?.fixes ?? []),
+  ],
+})))
 
 function changelogBadgeColor(type) {
-  const map = { feat: 'indigo', fix: 'red', ops: 'slate' }
+  const map = { release: 'indigo', feat: 'indigo', fix: 'red', ops: 'slate' }
   return map[type] ?? 'indigo'
 }
 

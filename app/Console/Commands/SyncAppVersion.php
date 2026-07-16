@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class SyncAppVersion extends Command
 {
-    protected $signature   = 'app:version-sync';
+    protected $signature = 'app:version-sync';
+
     protected $description = 'Sync the current release (version.json baked in by CI, or composer.json fallback) into the app_versions table.';
 
     public function handle(): int
@@ -17,19 +18,26 @@ class SyncAppVersion extends Command
 
         if (! $release) {
             $this->warn('No version.json or composer.json version found — skipping.');
+
             return self::SUCCESS;
         }
 
         $version = $release['version'];
-        $exists  = DB::table('app_versions')->where('version', $version)->exists();
+        if (! preg_match('/^\d{1,2}\.\d{1,2}\.\d{1,3}$/', $version)) {
+            $this->error("Invalid version {$version}; expected major.minor.patch (up to 2.2.3 digits).");
+
+            return self::FAILURE;
+        }
+        $exists = DB::table('app_versions')->where('version', $version)->exists();
 
         if (! $exists) {
             DB::table('app_versions')->insert([
-                'version'    => $version,
-                'date'       => $release['date'] ?? now()->toDateString(),
-                'remarks'    => $release['remarks'] ?? '',
-                'changes'    => isset($release['changes']) ? json_encode($release['changes']) : null,
+                'version' => $version,
+                'date' => $release['date'] ?? now()->toDateString(),
+                'remarks' => $release['remarks'] ?? '',
+                'changes' => isset($release['changes']) ? json_encode($release['changes']) : null,
                 'is_current' => true,
+                'is_visible' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -41,7 +49,7 @@ class SyncAppVersion extends Command
         }
 
         DB::table('app_versions')->where('version', '!=', $version)->update(['is_current' => false]);
-        DB::table('app_versions')->where('version', $version)->update(['is_current' => true]);
+        DB::table('app_versions')->where('version', $version)->update(['is_current' => true, 'is_visible' => true]);
 
         Cache::forget('app.version');
 
@@ -65,19 +73,20 @@ class SyncAppVersion extends Command
 
         if (empty($release['version'])) {
             $this->warn('version.json is present but has no "version" key — ignoring.');
+
             return null;
         }
 
         $changes = $release['changes'] ?? [];
-        $counts  = array_filter([
+        $counts = array_filter([
             'new feature' => count($changes['features'] ?? []),
-            'fix'         => count($changes['fixes'] ?? []),
+            'fix' => count($changes['fixes'] ?? []),
             'improvement' => count($changes['improvements'] ?? []),
         ]);
 
         $release['remarks'] = $counts
             ? implode(', ', array_map(
-                fn ($label, $n) => $n . ' ' . $label . ($n > 1 ? 's' : ''),
+                fn ($label, $n) => $n.' '.$label.($n > 1 ? 's' : ''),
                 array_keys($counts),
                 $counts
             ))
@@ -98,7 +107,7 @@ class SyncAppVersion extends Command
         }
 
         $composer = json_decode(file_get_contents($composerPath), true);
-        $version  = $composer['version'] ?? null;
+        $version = $composer['version'] ?? null;
 
         return $version ? ['version' => $version] : null;
     }

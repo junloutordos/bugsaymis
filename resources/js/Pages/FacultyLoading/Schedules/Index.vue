@@ -6,19 +6,25 @@
       <AppPageHeader :title="pageTitle" :subtitle="pageSubtitle">
         <template #actions>
           <template v-if="isManage">
-            <AppButton variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
+            <AppButton v-if="!scheduleLocked" variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
               <SparklesIcon class="h-4 w-4" /> AI Generate
             </AppButton>
             <AppButton v-if="!isMyPage" variant="secondary"
-              :disabled="!unplacedLoads.length || autoPlace.loading"
+              :disabled="scheduleLocked || !unplacedLoads.length || autoPlace.loading"
               @click="runAutoPlacePreview">
               <BoltIcon class="h-4 w-4" /> Auto-Place Remaining
             </AppButton>
-            <AppButton @click="openForm()">
+            <AppButton :disabled="scheduleLocked" @click="openForm()">
               <PlusIcon class="h-4 w-4" /> Assign Schedule
             </AppButton>
+            <AppButton v-if="canSubmitSchedule && !scheduleLocked" :disabled="!schedules.length" @click="submitSchedule">
+              <PaperAirplaneIcon class="h-4 w-4" /> Submit to OCD
+            </AppButton>
           </template>
-          <AppButton :variant="isManage ? 'secondary' : 'primary'" @click="openNonTeachingForm()">
+          <AppButton v-if="canConforme" variant="primary" @click="signConforme">
+            <PencilSquareIcon class="h-4 w-4" /> Sign Conforme
+          </AppButton>
+          <AppButton v-if="!isReview" :variant="isManage ? 'secondary' : 'primary'" :disabled="scheduleLocked" @click="openNonTeachingForm()">
             <ClockIcon class="h-4 w-4" /> Add Non-teaching
           </AppButton>
         </template>
@@ -32,6 +38,16 @@
       <div v-if="Object.keys($page.props.errors ?? {}).length"
         class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm space-y-1">
         <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
+      </div>
+
+      <div v-if="approvalBatch" class="flex flex-wrap items-center justify-between gap-3 border px-4 py-3 text-sm"
+        :class="approvalStatusClass">
+        <div>
+          <span class="font-semibold">Schedule approval:</span>
+          {{ approvalStatusLabel }}
+          <span v-if="approvalBatch.return_remarks"> — {{ approvalBatch.return_remarks }}</span>
+        </div>
+        <span v-if="approvalBatch.conforme_signed" class="font-medium">Conforme signed</span>
       </div>
 
       <!-- Filters -->
@@ -109,7 +125,7 @@
                 :meta="'· ' + (byGroup[groupId]?.length ?? 0) + ' slot(s)'"
                 :events-by-day="cardEventsByDay(groupId)"
                 :day-configs="dayConfigsForGroup(groupId)"
-                :editable="!isOverviewMode"
+                :editable="!isOverviewMode && !scheduleLocked"
                 :pack-lanes="isOverviewMode"
                 :legend="subjectsInGroup(groupId)"
                 :drop-preview="dropTarget?.groupId === groupId ? dropTarget : null"
@@ -126,7 +142,7 @@
                 @event-click="onEventClick">
 
                 <template #header-actions>
-                  <AppButton v-if="isManage && viewBy === 'section'" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
+                  <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
                     <PlusIcon class="h-3 w-3" /> Add
                   </AppButton>
                 </template>
@@ -146,7 +162,7 @@
                     </div>
                     <div class="flex flex-wrap gap-1.5 mt-1.5">
                       <div v-for="load in visibleUnplaced(groupId)" :key="load.load_assignment_id"
-                        :draggable="!isOverviewMode && !load.is_locked"
+                        :draggable="!scheduleLocked && !isOverviewMode && !load.is_locked"
                         @dragstart="onDragStartLoad($event, load)"
                         @dragend="onDragEnd"
                         @click="openChipSuggestions($event, load)"
@@ -503,7 +519,7 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
   ArrowsRightLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon,
-  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
+  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────
@@ -528,18 +544,63 @@ const props = defineProps({
   unplacedLoads: { type: Array, default: () => [] },
   capability:  { type: Object, default: () => ({ level: 'manage' }) },
   pageMode:    { type: String, default: 'admin' }, // 'admin' | 'my'
+  approvalBatch: { type: Object, default: null },
+  canSubmitSchedule: { type: Boolean, default: false },
 })
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
 
 const isManage = computed(() => props.capability.level === 'manage')
 const isSelf   = computed(() => props.capability.level === 'self')
+const isReview = computed(() => props.capability.level === 'review')
 const isMyPage = computed(() => props.pageMode === 'my')
+const scheduleLocked = computed(() => !!props.approvalBatch?.locked)
+const canConforme = computed(() =>
+  (isMyPage.value || isSelf.value)
+  && props.approvalBatch?.status === 'approved'
+  && !props.approvalBatch?.conforme_signed)
+const approvalStatusLabel = computed(() => ({
+  pending_ocd: 'Pending OCD approval. Editing is locked.',
+  approved: 'Approved by OCD. The official schedule is locked.',
+  returned: 'Returned to CID for revision.',
+}[props.approvalBatch?.status] ?? props.approvalBatch?.status))
+const approvalStatusClass = computed(() => ({
+  pending_ocd: 'border-amber-200 bg-amber-50 text-amber-800',
+  approved: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  returned: 'border-red-200 bg-red-50 text-red-800',
+}[props.approvalBatch?.status] ?? 'border-slate-200 bg-slate-50 text-slate-700'))
+
+async function requestSignaturePin(title, confirmButtonText) {
+  const result = await Swal.fire({
+    title,
+    input: 'password',
+    inputLabel: 'Signature PIN',
+    inputAttributes: { autocomplete: 'off', inputmode: 'numeric' },
+    showCancelButton: true,
+    confirmButtonText,
+    inputValidator: value => value ? null : 'Enter your signature PIN.',
+  })
+  return result.isConfirmed ? result.value : null
+}
+
+async function submitSchedule() {
+  const pin = await requestSignaturePin('Submit complete schedule to OCD?', 'Sign and submit')
+  if (!pin) return
+  router.post(route('faculty-loading.schedules.approval.submit', filters.term_id), { pin }, { preserveScroll: true })
+}
+
+async function signConforme() {
+  const pin = await requestSignaturePin('Sign your individual faculty schedule Conforme?', 'Sign Conforme')
+  if (!pin) return
+  router.post(route('faculty-loading.schedules.approval.conforme', props.approvalBatch.id), { pin }, { preserveScroll: true })
+}
 
 const pageTitle = computed(() =>
   isMyPage.value ? 'My Faculty Schedule' : (isSelf.value ? 'My Schedule' : 'Class Schedules'))
 const pageSubtitle = computed(() =>
-  isMyPage.value
+  scheduleLocked.value
+    ? 'Official term schedule — editing is locked during or after OCD approval'
+    : isMyPage.value
     ? 'Your weekly timetable — plotted classes are view-only; click a free slot to add your own blocks'
     : (isSelf.value
         ? 'Your weekly timetable — add non-teaching blocks to your free time'
@@ -899,12 +960,12 @@ const dropTarget  = ref(null)
 const dragBusy     = ref(false)
 
 function canDrag(s) {
-  return !isOverviewMode.value && s.status !== 'cancelled' && !!s.can_edit
+  return !scheduleLocked.value && !isOverviewMode.value && s.status !== 'cancelled' && !!s.can_edit
 }
 
 /** Blocks the modal for rows the user can't touch (e.g. faculty viewing own classes). */
 function onEventClick(s) {
-  if (!s.can_edit) return
+  if (scheduleLocked.value || !s.can_edit) return
   openForm(s)
 }
 
@@ -1175,7 +1236,7 @@ const qc = reactive({
 let suppressCreateOnce = false
 
 function canQuickCreate(groupId) {
-  if (isOverviewMode.value) return false
+  if (scheduleLocked.value || isOverviewMode.value) return false
   if (isManage.value) return true
   // unit/self reach: own-calendar columns only (props.faculty is already
   // server-filtered to the reachable set). Section-wide adds are manage-only.
@@ -1640,6 +1701,7 @@ const modalTitle = computed(() => {
  * - Pass nothing to open a blank new-schedule form.
  */
 function openForm(s = null) {
+  if (scheduleLocked.value) return
   validationResult.value = null
   if (s && s.id) {
     Object.assign(form, {
@@ -1676,6 +1738,7 @@ function openForm(s = null) {
 
 /** Blank form for a new non-teaching block. Self mode pins faculty to the user. */
 function openNonTeachingForm() {
+  if (scheduleLocked.value) return
   validationResult.value = null
   form.reset()
   form.id               = null

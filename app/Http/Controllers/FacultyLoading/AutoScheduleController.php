@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AiScheduleJob;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Services\FacultyLoading\ClassScheduleApprovalService;
 use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\DeterministicSchedulingService;
 use Illuminate\Http\JsonResponse;
@@ -37,13 +38,13 @@ class AutoScheduleController extends Controller
             ->orderByDesc('start_date')
             ->get()
             ->map(fn ($sy) => [
-                'id'         => $sy->id,
-                'name'       => $sy->name,
+                'id' => $sy->id,
+                'name' => $sy->name,
                 'is_current' => $sy->is_current,
-                'terms'      => $sy->terms->map(fn ($t) => [
-                    'id'         => $t->id,
-                    'name'       => $t->name,
-                    'label'      => $t->label ?? $t->name,
+                'terms' => $sy->terms->map(fn ($t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'label' => $t->label ?? $t->name,
                     'is_current' => $t->is_current,
                 ])->values(),
             ]);
@@ -57,7 +58,7 @@ class AutoScheduleController extends Controller
 
         return Inertia::render('FacultyLoading/AutoSchedule/Index', [
             'schoolYears' => $schoolYears,
-            'recentJobs'  => $recentJobs,
+            'recentJobs' => $recentJobs,
         ]);
     }
 
@@ -80,52 +81,52 @@ class AutoScheduleController extends Controller
         $this->authorize('faculty_loading.manage');
 
         $data = $request->validate([
-            'school_year_id'   => 'required|integer',
+            'school_year_id' => 'required|integer',
             'academic_term_id' => 'required|integer',
         ]);
 
         // Create a job record
         $job = AiScheduleJob::create([
-            'school_year_id'   => $data['school_year_id'],
+            'school_year_id' => $data['school_year_id'],
             'academic_term_id' => $data['academic_term_id'],
-            'status'           => 'running',
-            'parameters'       => ['engine' => 'deterministic'],
-            'started_at'       => now(),
-            'created_by'       => Auth::id(),
+            'status' => 'running',
+            'parameters' => ['engine' => 'deterministic'],
+            'started_at' => now(),
+            'created_by' => Auth::id(),
         ]);
 
         try {
             $result = $this->scheduler->generate(
                 schoolYearId: (int) $data['school_year_id'],
-                termId:       (int) $data['academic_term_id'],
+                termId: (int) $data['academic_term_id'],
             );
 
             $job->update([
-                'status'              => 'completed',
-                'fitness_score'       => $result['fitness'],
-                'hard_conflicts'      => $result['hard_conflicts'],
+                'status' => 'completed',
+                'fitness_score' => $result['fitness'],
+                'hard_conflicts' => $result['hard_conflicts'],
                 'schedules_generated' => $result['schedules_generated'],
                 'generated_schedules' => $result['schedules'],
-                'completed_at'        => now(),
+                'completed_at' => now(),
             ]);
 
             return response()->json([
-                'job'                  => $this->serializeJob($job->fresh(), true),
+                'job' => $this->serializeJob($job->fresh(), true),
                 'conflict_suggestions' => $result['conflict_suggestions'] ?? [],
-                'unplaceable'          => $result['unplaceable'] ?? [],
-                'section_report'       => $result['section_report'] ?? [],
-                'warning'              => $result['warning'] ?? null,
+                'unplaceable' => $result['unplaceable'] ?? [],
+                'section_report' => $result['section_report'] ?? [],
+                'warning' => $result['warning'] ?? null,
             ]);
 
         } catch (Throwable $e) {
             $job->update([
-                'status'        => 'failed',
+                'status' => 'failed',
                 'error_message' => $e->getMessage(),
-                'completed_at'  => now(),
+                'completed_at' => now(),
             ]);
 
             return response()->json([
-                'message' => 'Schedule generation failed: ' . $e->getMessage(),
+                'message' => 'Schedule generation failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -141,6 +142,10 @@ class AutoScheduleController extends Controller
     public function apply(Request $request, AiScheduleJob $aiScheduleJob): JsonResponse
     {
         $this->authorize('faculty_loading.manage');
+
+        if (ClassScheduleApprovalService::termIsLocked((int) $aiScheduleJob->academic_term_id)) {
+            return response()->json(['message' => 'This term schedule is locked for OCD approval.'], 423);
+        }
 
         if (! $aiScheduleJob->isCompleted()) {
             return response()->json(['message' => 'Job is not in a completed state.'], 422);
@@ -159,7 +164,7 @@ class AutoScheduleController extends Controller
         $conflictMessages = $this->detectApplyConflicts($schedules, (int) $aiScheduleJob->academic_term_id);
         if (! empty($conflictMessages)) {
             return response()->json([
-                'message'   => count($conflictMessages) . ' conflict(s) detected — resolve before applying.',
+                'message' => count($conflictMessages).' conflict(s) detected — resolve before applying.',
                 'conflicts' => $conflictMessages,
             ], 422);
         }
@@ -175,21 +180,21 @@ class AutoScheduleController extends Controller
             $rows = array_map(function ($s) use ($now) {
                 return [
                     'load_assignment_id' => $s['load_assignment_id'],
-                    'user_id'            => $s['user_id'],
-                    'subject_id'         => $s['subject_id'],
-                    'section_id'         => $s['section_id'],
-                    'classroom_id'       => $s['classroom_id'],
-                    'school_year_id'     => $s['school_year_id'],
-                    'academic_term_id'   => $s['academic_term_id'],
-                    'session_type'       => $s['session_type'] ?? 'regular',
-                    'day_of_week'        => $s['day_of_week'],
-                    'start_time'         => $s['start_time'],
-                    'end_time'           => $s['end_time'],
-                    'status'             => 'tentative',
-                    'remarks'            => $s['remarks'] ?? 'AI-generated schedule',
-                    'created_by'         => Auth::id(),
-                    'created_at'         => $now,
-                    'updated_at'         => $now,
+                    'user_id' => $s['user_id'],
+                    'subject_id' => $s['subject_id'],
+                    'section_id' => $s['section_id'],
+                    'classroom_id' => $s['classroom_id'],
+                    'school_year_id' => $s['school_year_id'],
+                    'academic_term_id' => $s['academic_term_id'],
+                    'session_type' => $s['session_type'] ?? 'regular',
+                    'day_of_week' => $s['day_of_week'],
+                    'start_time' => $s['start_time'],
+                    'end_time' => $s['end_time'],
+                    'status' => 'tentative',
+                    'remarks' => $s['remarks'] ?? 'AI-generated schedule',
+                    'created_by' => Auth::id(),
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
             }, $schedules);
 
@@ -197,7 +202,7 @@ class AutoScheduleController extends Controller
         });
 
         return response()->json([
-            'message' => count($schedules) . ' schedules saved as tentative successfully.',
+            'message' => count($schedules).' schedules saved as tentative successfully.',
         ]);
     }
 
@@ -214,7 +219,7 @@ class AutoScheduleController extends Controller
     private function detectApplyConflicts(array $schedules, int $termId): array
     {
         $messages = [];
-        $axes     = ['user_id' => 'Faculty', 'classroom_id' => 'Room', 'section_id' => 'Section'];
+        $axes = ['user_id' => 'Faculty', 'classroom_id' => 'Room', 'section_id' => 'Section'];
 
         // 1. Against already-active (committed) schedules
         foreach ($schedules as $s) {
@@ -234,7 +239,7 @@ class AutoScheduleController extends Controller
 
                 if ($exists) {
                     $messages[] = "{$label} conflict: {$s['day_of_week']} {$s['start_time']}–{$s['end_time']} "
-                        . 'overlaps an already-active (committed) schedule.';
+                        .'overlaps an already-active (committed) schedule.';
                 }
             }
         }
@@ -256,7 +261,7 @@ class AutoScheduleController extends Controller
                 foreach ($axes as $column => $label) {
                     if (! empty($a[$column]) && ($a[$column] ?? null) === ($b[$column] ?? null)) {
                         $messages[] = "{$label} conflict within generated batch: {$a['day_of_week']} "
-                            . "{$a['start_time']}–{$a['end_time']} overlaps {$b['start_time']}–{$b['end_time']}.";
+                            ."{$a['start_time']}–{$a['end_time']} overlaps {$b['start_time']}–{$b['end_time']}.";
                     }
                 }
             }
@@ -305,21 +310,21 @@ class AutoScheduleController extends Controller
     private function serializeJob(AiScheduleJob $job, bool $includeSchedules): array
     {
         return [
-            'id'                  => $job->id,
-            'school_year_id'      => $job->school_year_id,
-            'academic_term_id'    => $job->academic_term_id,
+            'id' => $job->id,
+            'school_year_id' => $job->school_year_id,
+            'academic_term_id' => $job->academic_term_id,
             'academic_term_label' => $job->academicTerm?->name ?? '—',
-            'status'              => $job->status,
-            'parameters'          => $job->parameters,
-            'fitness_score'       => $job->fitness_score,
-            'hard_conflicts'      => $job->hard_conflicts,
+            'status' => $job->status,
+            'parameters' => $job->parameters,
+            'fitness_score' => $job->fitness_score,
+            'hard_conflicts' => $job->hard_conflicts,
             'schedules_generated' => $job->schedules_generated,
-            'error_message'       => $job->error_message,
-            'duration_seconds'    => $job->duration_seconds,
-            'created_by_name'     => $job->createdBy?->name ?? '—',
-            'created_at'          => $job->created_at?->toISOString(),
-            'completed_at'        => $job->completed_at?->toISOString(),
-            'schedules'           => $includeSchedules ? ($job->generated_schedules ?? []) : [],
+            'error_message' => $job->error_message,
+            'duration_seconds' => $job->duration_seconds,
+            'created_by_name' => $job->createdBy?->name ?? '—',
+            'created_at' => $job->created_at?->toISOString(),
+            'completed_at' => $job->completed_at?->toISOString(),
+            'schedules' => $includeSchedules ? ($job->generated_schedules ?? []) : [],
         ];
     }
 }

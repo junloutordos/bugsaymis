@@ -7,6 +7,7 @@ use App\Models\Division;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
@@ -14,9 +15,12 @@ use App\Models\FacultyLoading\Subject;
 use App\Models\FacultyLoading\TeacherOfficialTime;
 use App\Models\Office;
 use App\Models\User;
+use App\Services\DigitalSignatureService;
+use App\Services\FacultyLoading\ClassScheduleApprovalService;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\FacultyLoading\ScheduleValidationService;
 use App\Services\FacultyLoading\SchedulingConstants;
+use App\Services\PersonNameFormatter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -31,6 +35,8 @@ class ClassScheduleController extends Controller
     public function __construct(
         private readonly ScheduleValidationService $validation,
         private readonly LoadComputationService $loads,
+        private readonly DigitalSignatureService $signatures,
+        private readonly PersonNameFormatter $names,
     ) {}
 
     /**
@@ -51,6 +57,10 @@ class ClassScheduleController extends Controller
 
         if ($user->isSuperAdmin() || $user->hasPermission('faculty_loading.manage')) {
             return ['level' => 'manage', 'faculty_ids' => null];
+        }
+
+        if ($user->hasPermission('faculty_loading.approve') || $user->hasRole('OCD')) {
+            return ['level' => 'review', 'faculty_ids' => null];
         }
 
         $cidDivisionId = Division::where('acronym', 'CID')->value('id');
@@ -78,6 +88,10 @@ class ClassScheduleController extends Controller
     {
         if ($cap['level'] === 'manage') {
             return true;
+        }
+
+        if ($cap['faculty_ids'] === null) {
+            return false;
         }
 
         // Section-only blocks (no faculty) are a manage-level action.
@@ -142,7 +156,7 @@ class ClassScheduleController extends Controller
             'faculty',
             [
                 'id' => $faculty->id,
-                'name' => $faculty->name,
+                'name' => $this->names->formal($faculty),
                 'position' => $faculty->position,
             ],
             $term,
@@ -177,14 +191,14 @@ class ClassScheduleController extends Controller
                 continue;
             }
             $grade = $subject->grade_level > 0 ? " (G{$subject->grade_level})" : '';
-            $parts[] = $subject->name . $grade . ' (' . $formatUnits($group->sum(fn ($a) => (float) $a->load_units)) . ' units)';
+            $parts[] = $subject->name.$grade.' ('.$formatUnits($group->sum(fn ($a) => (float) $a->load_units)).' units)';
         }
 
         foreach ($load->assignments->where('assignment_type', '<>', 'teaching') as $assignment) {
             $label = $assignment->designation?->name
                 ?? $assignment->description
                 ?? ucfirst(str_replace('_', ' ', $assignment->assignment_type));
-            $parts[] = $label . ' (' . $formatUnits((float) $assignment->load_units) . ')';
+            $parts[] = $label.' ('.$formatUnits((float) $assignment->load_units).')';
         }
 
         return $parts ? implode(', ', $parts) : null;
@@ -219,8 +233,12 @@ class ClassScheduleController extends Controller
     }
 
     /** CID Chief + Campus Director for the print signatory block (same resolution as FacultyLoadController). */
-    private function printSignatories(): array
+    private function printSignatories(AcademicTerm $term, ?User $conforme = null): array
     {
+        $batch = ClassScheduleApprovalBatch::with(['submitter.pds.personalInfo', 'approver.pds.personalInfo', 'signatures.signer.pds.personalInfo'])
+            ->where('academic_term_id', $term->id)
+            ->whereIn('status', ['pending_ocd', 'approved'])
+            ->latest('id')->first();
         $cidChief = User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))
             ->where('status', '<>', 'inactive')
             ->first(['id', 'name', 'position']);
@@ -230,15 +248,41 @@ class ClassScheduleController extends Controller
             ->where('status', '<>', 'inactive')
             ->first(['id', 'name', 'position']);
 
+        $preparedUser = $batch?->submitter ?? $cidChief;
+        $approvedUser = $batch?->approver ?? $director;
+        $signatureRecords = $batch?->signatures ?? collect();
+
+        $formatSignatory = function (?User $user, string $position, string $stage) use ($signatureRecords) {
+            if (! $user) {
+                return null;
+            }
+            $record = $signatureRecords->first(fn ($sig) => ($sig->metadata['stage'] ?? '') === $stage
+                && ($stage !== 'conforme' || (int) $sig->signer_id === (int) $user->id)
+            );
+
+            return [
+                'name' => $this->names->formal($user),
+                'position' => $user->position ?? $position,
+                'signature' => $record
+                    ? $this->signatures->getImageDataUriFromPath($record->metadata['signature_path'] ?? $record->signer?->electronic_signature)
+                    : null,
+                'signed_at' => $record?->signed_at?->format('F j, Y'),
+            ];
+        };
+
         return [
-            'prepared' => $cidChief ? [
-                'name' => $cidChief->name,
-                'position' => $cidChief->position ?? 'Chief, Curriculum and Instruction Division',
-            ] : null,
-            'approved' => $director ? [
-                'name' => $director->name,
-                'position' => $director->position ?? 'Campus Director',
-            ] : null,
+            'batch_status' => $batch?->status,
+            'prepared' => $formatSignatory(
+                $preparedUser,
+                'Chief, Curriculum and Instruction Division',
+                'prepared',
+            ),
+            'approved' => $formatSignatory(
+                $approvedUser,
+                'Campus Director',
+                'approved',
+            ),
+            'conforme' => $conforme ? $formatSignatory($conforme, 'Faculty', 'conforme') : null,
         ];
     }
 
@@ -284,7 +328,10 @@ class ClassScheduleController extends Controller
             ],
             'schedules' => $schedules,
             'dayConfigs' => $dayConfigs,
-            'signatories' => $this->printSignatories(),
+            'signatories' => $this->printSignatories(
+                $term,
+                $scheduleType === 'faculty' ? User::find($owner['id']) : null,
+            ),
             ...$extra,
         ]);
     }
@@ -345,7 +392,7 @@ class ClassScheduleController extends Controller
         // used to group the "By Faculty" calendar view by org unit.
         $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
-            ->when($cap['level'] !== 'manage', fn ($q) => $q->whereIn('id', $cap['faculty_ids']))
+            ->when($cap['faculty_ids'] !== null, fn ($q) => $q->whereIn('id', $cap['faculty_ids']))
             ->with(['division:id,division_name', 'office:id,name'])
             ->orderBy('name')
             ->get(['id', 'name', 'position', 'division_id', 'office_id'])
@@ -390,6 +437,12 @@ class ClassScheduleController extends Controller
             ? $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections)
             : [];
 
+        $approvalBatch = $termId ? ClassScheduleApprovalBatch::with(['submitter:id,name', 'approver:id,name'])
+            ->where('academic_term_id', $termId)->latest('id')->first() : null;
+        $conformeSigned = $approvalBatch?->status === 'approved'
+            && $approvalBatch->signatures()->where('signer_id', Auth::id())
+                ->where('metadata->stage', 'conforme')->exists();
+
         return Inertia::render('FacultyLoading/Schedules/Index', [
             'schedules' => $schedules,
             'terms' => $terms,
@@ -403,6 +456,18 @@ class ClassScheduleController extends Controller
             'unplacedLoads' => $unplacedLoads,
             'capability' => ['level' => $cap['level']],
             'pageMode' => $pageMode,
+            'approvalBatch' => $approvalBatch ? [
+                'id' => $approvalBatch->id,
+                'status' => $approvalBatch->status,
+                'submitted_by' => $approvalBatch->submitter?->name,
+                'submitted_at' => $approvalBatch->submitted_at?->toIso8601String(),
+                'approved_by' => $approvalBatch->approver?->name,
+                'approved_at' => $approvalBatch->approved_at?->toIso8601String(),
+                'return_remarks' => $approvalBatch->return_remarks,
+                'locked' => in_array($approvalBatch->status, ['pending_ocd', 'approved'], true),
+                'conforme_signed' => $conformeSigned,
+            ] : null,
+            'canSubmitSchedule' => Auth::user()->hasRole('CID Chief') || Auth::user()->isSuperAdmin(),
         ]);
     }
 
@@ -496,6 +561,9 @@ class ClassScheduleController extends Controller
             'end_time' => 'required|string',
             'exclude_id' => 'nullable|integer',
         ]);
+        if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
+            return response()->json(['message' => 'This term schedule is locked for OCD approval.'], 423);
+        }
 
         $result = ($data['entry_type'] ?? 'class') === 'non_teaching'
             ? $this->validation->validateNonTeaching($data, $data['exclude_id'] ?? null)
@@ -527,6 +595,9 @@ class ClassScheduleController extends Controller
             'force' => 'boolean',   // override warnings only
             'load_assignment_id' => 'nullable|exists:load_assignments,id',
         ]);
+        if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
+            return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
+        }
 
         $validation = $this->validation->validate($data);
 
@@ -589,6 +660,9 @@ class ClassScheduleController extends Controller
             'status' => 'in:active,tentative',
             'remarks' => 'nullable|string|max:500',
         ]);
+        if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
+            return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
+        }
 
         $cap = $this->scheduleCapability();
         if (! $this->canTouchNonTeaching($cap, $data['faculty_id'] ?? null)) {
@@ -644,6 +718,10 @@ class ClassScheduleController extends Controller
             'remarks' => 'nullable|string|max:500',
             'force' => 'boolean',
         ]);
+        if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)
+            || ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
+            return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
+        }
 
         $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
             ->where('academic_term_id', $classSchedule->academic_term_id)
@@ -697,6 +775,10 @@ class ClassScheduleController extends Controller
             'status' => 'in:active,tentative,cancelled',
             'remarks' => 'nullable|string|max:500',
         ]);
+        if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)
+            || ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
+            return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
+        }
 
         // The reassigned target must also be within reach.
         if (! $this->canTouchNonTeaching($cap, $data['faculty_id'] ?? null)) {
@@ -728,6 +810,9 @@ class ClassScheduleController extends Controller
 
     public function destroy(ClassSchedule $classSchedule): RedirectResponse
     {
+        if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)) {
+            return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
+        }
         // Non-teaching blocks are hard-deleted (no load/audit linkage to keep).
         if ($classSchedule->entry_type === 'non_teaching') {
             $cap = $this->scheduleCapability();

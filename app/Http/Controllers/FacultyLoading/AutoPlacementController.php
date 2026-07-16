@@ -7,6 +7,7 @@ use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
+use App\Services\FacultyLoading\ClassScheduleApprovalService;
 use App\Services\FacultyLoading\DeterministicSchedulingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,11 +42,14 @@ class AutoPlacementController extends Controller
 
         $data = $request->validate([
             'academic_term_id' => 'required|integer|exists:academic_terms,id',
-            'section_id'       => 'nullable|integer',
-            'faculty_id'       => 'nullable|integer',
+            'section_id' => 'nullable|integer',
+            'faculty_id' => 'nullable|integer',
         ]);
 
-        $termId       = (int) $data['academic_term_id'];
+        $termId = (int) $data['academic_term_id'];
+        if (ClassScheduleApprovalService::termIsLocked($termId)) {
+            return response()->json(['message' => 'This term schedule is locked for OCD approval.'], 423);
+        }
         $schoolYearId = (int) AcademicTerm::findOrFail($termId)->school_year_id;
 
         // Scope to the filtered section/faculty when the page is filtered —
@@ -80,27 +84,30 @@ class AutoPlacementController extends Controller
         $this->authorize('faculty_loading.manage');
 
         $data = $request->validate([
-            'academic_term_id'                => 'required|integer|exists:academic_terms,id',
-            'schedules'                       => 'required|array|min:1',
-            'schedules.*.load_assignment_id'  => 'required|integer|exists:load_assignments,id',
-            'schedules.*.user_id'             => 'required|integer',
-            'schedules.*.subject_id'          => 'required|integer',
-            'schedules.*.section_id'          => 'required|integer',
-            'schedules.*.classroom_id'        => 'nullable|integer',
-            'schedules.*.session_type'        => 'nullable|in:regular,ilp',
-            'schedules.*.day_of_week'         => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday',
-            'schedules.*.start_time'          => 'required|string',
-            'schedules.*.end_time'            => 'required|string',
+            'academic_term_id' => 'required|integer|exists:academic_terms,id',
+            'schedules' => 'required|array|min:1',
+            'schedules.*.load_assignment_id' => 'required|integer|exists:load_assignments,id',
+            'schedules.*.user_id' => 'required|integer',
+            'schedules.*.subject_id' => 'required|integer',
+            'schedules.*.section_id' => 'required|integer',
+            'schedules.*.classroom_id' => 'nullable|integer',
+            'schedules.*.session_type' => 'nullable|in:regular,ilp',
+            'schedules.*.day_of_week' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday',
+            'schedules.*.start_time' => 'required|string',
+            'schedules.*.end_time' => 'required|string',
         ]);
 
-        $termId       = (int) $data['academic_term_id'];
+        $termId = (int) $data['academic_term_id'];
+        if (ClassScheduleApprovalService::termIsLocked($termId)) {
+            return response()->json(['message' => 'This term schedule is locked for OCD approval.'], 423);
+        }
         $schoolYearId = (int) AcademicTerm::findOrFail($termId)->school_year_id;
-        $schedules    = $data['schedules'];
+        $schedules = $data['schedules'];
 
         $conflicts = $this->detectCommitConflicts($schedules, $termId);
         if (! empty($conflicts)) {
             return response()->json([
-                'message'   => count($conflicts) . ' conflict(s) detected — the calendar changed since the preview. Refresh and try again.',
+                'message' => count($conflicts).' conflict(s) detected — the calendar changed since the preview. Refresh and try again.',
                 'conflicts' => $conflicts,
             ], 422);
         }
@@ -125,7 +132,7 @@ class AutoPlacementController extends Controller
             if (! $load) {
                 continue;
             }
-            $required    = max(1, (int) round((float) ($load->subject->load_units ?? 1)));
+            $required = max(1, (int) round((float) ($load->subject->load_units ?? 1)));
             $stillNeeded = max(0, $required - (int) ($scheduledCounts[$loadId] ?? 0));
             if ($proposedCount > $stillNeeded) {
                 return response()->json([
@@ -135,33 +142,33 @@ class AutoPlacementController extends Controller
         }
 
         DB::transaction(function () use ($schedules, $termId, $schoolYearId) {
-            $now  = now();
+            $now = now();
             $rows = array_map(fn ($s) => [
                 'load_assignment_id' => $s['load_assignment_id'],
-                'user_id'            => $s['user_id'],
-                'subject_id'         => $s['subject_id'],
-                'section_id'         => $s['section_id'],
-                'classroom_id'       => $s['classroom_id'] ?? null,
+                'user_id' => $s['user_id'],
+                'subject_id' => $s['subject_id'],
+                'section_id' => $s['section_id'],
+                'classroom_id' => $s['classroom_id'] ?? null,
                 // Term + school year come from the validated top-level term, not
                 // the client rows — a stale/patched row can't cross terms.
-                'school_year_id'     => $schoolYearId,
-                'academic_term_id'   => $termId,
-                'session_type'       => $s['session_type'] ?? 'regular',
-                'day_of_week'        => $s['day_of_week'],
-                'start_time'         => $s['start_time'],
-                'end_time'           => $s['end_time'],
-                'status'             => 'tentative',
-                'remarks'            => 'Auto-placed (remaining loads)',
-                'created_by'         => Auth::id(),
-                'created_at'         => $now,
-                'updated_at'         => $now,
+                'school_year_id' => $schoolYearId,
+                'academic_term_id' => $termId,
+                'session_type' => $s['session_type'] ?? 'regular',
+                'day_of_week' => $s['day_of_week'],
+                'start_time' => $s['start_time'],
+                'end_time' => $s['end_time'],
+                'status' => 'tentative',
+                'remarks' => 'Auto-placed (remaining loads)',
+                'created_by' => Auth::id(),
+                'created_at' => $now,
+                'updated_at' => $now,
             ], $schedules);
 
             ClassSchedule::insert($rows);
         });
 
         return response()->json([
-            'message' => count($schedules) . ' session(s) saved as tentative.',
+            'message' => count($schedules).' session(s) saved as tentative.',
             'created' => count($schedules),
         ]);
     }
@@ -178,12 +185,12 @@ class AutoPlacementController extends Controller
         $this->authorize('faculty_loading.manage');
 
         $data = $request->validate([
-            'academic_term_id'   => 'required|integer|exists:academic_terms,id',
+            'academic_term_id' => 'required|integer|exists:academic_terms,id',
             'load_assignment_id' => 'required|integer|exists:load_assignments,id',
-            'limit'              => 'nullable|integer|min:1|max:10',
+            'limit' => 'nullable|integer|min:1|max:10',
         ]);
 
-        $termId       = (int) $data['academic_term_id'];
+        $termId = (int) $data['academic_term_id'];
         $schoolYearId = (int) AcademicTerm::findOrFail($termId)->school_year_id;
 
         $result = $this->scheduler->suggestSlotsForLoad(
@@ -203,13 +210,13 @@ class AutoPlacementController extends Controller
      * within the batch itself. The faculty axis is skipped for TBA/placeholder
      * users — parallel TBA sessions are not real double-bookings.
      *
-     * @param array<int,array<string,mixed>> $schedules
+     * @param  array<int,array<string,mixed>>  $schedules
      * @return string[] Human-readable conflict descriptions (empty = clean)
      */
     private function detectCommitConflicts(array $schedules, int $termId): array
     {
         $messages = [];
-        $axes     = ['user_id' => 'Faculty', 'classroom_id' => 'Room', 'section_id' => 'Section'];
+        $axes = ['user_id' => 'Faculty', 'classroom_id' => 'Room', 'section_id' => 'Section'];
 
         $tbaUserIds = User::whereIn('id', array_unique(array_column($schedules, 'user_id')))
             ->where('name', 'like', 'TBA%')
@@ -238,7 +245,7 @@ class AutoPlacementController extends Controller
 
                 if ($exists) {
                     $messages[] = "{$label} conflict: {$s['day_of_week']} {$s['start_time']}–{$s['end_time']} "
-                        . 'overlaps an existing schedule.';
+                        .'overlaps an existing schedule.';
                 }
             }
         }
@@ -262,7 +269,7 @@ class AutoPlacementController extends Controller
                         continue;
                     }
                     $messages[] = "{$label} conflict within the batch: {$a['day_of_week']} "
-                        . "{$a['start_time']}–{$a['end_time']} overlaps {$b['start_time']}–{$b['end_time']}.";
+                        ."{$a['start_time']}–{$a['end_time']} overlaps {$b['start_time']}–{$b['end_time']}.";
                 }
             }
         }

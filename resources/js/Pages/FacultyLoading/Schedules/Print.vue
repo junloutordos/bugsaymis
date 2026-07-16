@@ -10,7 +10,7 @@
         <p class="schedule-print-sy">S.Y. {{ schoolYearLabel }}</p>
 
         <div v-if="scheduleType === 'faculty'" class="schedule-print-facultymeta">
-          <div><span class="schedule-print-facultymeta-label">Name:</span> <strong>{{ owner.name?.toUpperCase() }}</strong></div>
+          <div><span class="schedule-print-facultymeta-label">Name:</span> <strong>{{ owner.name }}</strong></div>
           <div v-if="loadSummary"><span class="schedule-print-facultymeta-label">Load:</span> <em>{{ loadSummary }}</em></div>
         </div>
       </div>
@@ -103,20 +103,32 @@
       <div class="schedule-print-signatories" :class="{ 'schedule-print-signatories-three': scheduleType === 'faculty' }">
         <div class="schedule-print-signatory">
           <div class="schedule-print-signatory-caption">Prepared by:</div>
-          <div class="schedule-print-signatory-name">{{ signatories?.prepared?.name?.toUpperCase() ?? '' }}</div>
+          <div class="schedule-print-signature-space">
+            <img v-if="signatories?.prepared?.signature" :src="signatories.prepared.signature" alt="" />
+          </div>
+          <div class="schedule-print-signatory-name">{{ signatories?.prepared?.name ?? '' }}</div>
           <div class="schedule-print-signatory-position">{{ signatories?.prepared?.position ?? '' }}</div>
+          <div v-if="signatories?.prepared?.signed_at" class="schedule-print-signatory-date">Digitally signed {{ signatories.prepared.signed_at }}</div>
         </div>
         <div class="schedule-print-signatory">
           <div class="schedule-print-signatory-caption">
             {{ scheduleType === 'faculty' ? 'Reviewed and Approved by:' : 'Approved by:' }}
           </div>
-          <div class="schedule-print-signatory-name">{{ signatories?.approved?.name?.toUpperCase() ?? '' }}</div>
+          <div class="schedule-print-signature-space">
+            <img v-if="signatories?.approved?.signature" :src="signatories.approved.signature" alt="" />
+          </div>
+          <div class="schedule-print-signatory-name">{{ signatories?.approved?.name ?? '' }}</div>
           <div class="schedule-print-signatory-position">{{ signatories?.approved?.position ?? '' }}</div>
+          <div v-if="signatories?.approved?.signed_at" class="schedule-print-signatory-date">Digitally signed {{ signatories.approved.signed_at }}</div>
         </div>
         <div v-if="scheduleType === 'faculty'" class="schedule-print-signatory">
           <div class="schedule-print-signatory-caption">Conforme:</div>
-          <div class="schedule-print-signatory-name">{{ owner.name?.toUpperCase() ?? '' }}</div>
-          <div class="schedule-print-signatory-position">{{ owner.position ?? 'Faculty' }}</div>
+          <div class="schedule-print-signature-space">
+            <img v-if="signatories?.conforme?.signature" :src="signatories.conforme.signature" alt="" />
+          </div>
+          <div class="schedule-print-signatory-name">{{ signatories?.conforme?.name ?? owner.name ?? '' }}</div>
+          <div class="schedule-print-signatory-position">{{ signatories?.conforme?.position ?? owner.position ?? 'Faculty' }}</div>
+          <div v-if="signatories?.conforme?.signed_at" class="schedule-print-signatory-date">Digitally signed {{ signatories.conforme.signed_at }}</div>
         </div>
       </div>
     </main>
@@ -645,8 +657,21 @@ body {
   color: #334155;
 }
 
+.schedule-print-signature-space {
+  height: 7mm;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+.schedule-print-signature-space img {
+  display: block;
+  max-width: 36mm;
+  max-height: 9mm;
+  object-fit: contain;
+}
+
 .schedule-print-signatory-name {
-  margin-top: 7mm;
   font-size: 8.5pt;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -655,6 +680,12 @@ body {
 .schedule-print-signatory-position {
   font-size: 7pt;
   color: #475569;
+}
+
+.schedule-print-signatory-date {
+  margin-top: 0.3mm;
+  font-size: 5.5pt;
+  color: #64748b;
 }
 
 @page {

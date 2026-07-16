@@ -13,6 +13,7 @@ use App\Http\Controllers\FacultyLoading\LoadBalancingController;
 use App\Http\Controllers\FacultyLoading\ClassroomController;
 use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
+use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\CommitteeAssignmentController;
 use App\Http\Controllers\FacultyLoading\FacultyLoadController;
 use App\Http\Controllers\FacultyLoading\LoadAssignmentController;
@@ -83,7 +84,7 @@ Route::middleware(['web', 'auth', 'verified'])
         // Schedules calendar — CID/AUH manage everything; faculty_loading.view_own
         // holders get self-mode access to add non-teaching blocks to their own
         // calendar. Per-action capability checks live in ClassScheduleController.
-        Route::middleware('permission:faculty_loading.manage|faculty_loading.view_own')
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.view_own|faculty_loading.approve')
             ->prefix('schedules')->name('schedules.')->group(function () {
                 Route::get('/',                   [ClassScheduleController::class, 'index'])->name('index');
                 Route::get('/faculty/{faculty}/print', [ClassScheduleController::class, 'printFaculty'])->name('faculty.print');
@@ -96,6 +97,15 @@ Route::middleware(['web', 'auth', 'verified'])
         Route::middleware('permission:faculty_loading.manage')
             ->get('/schedules/sections/{section}/print', [ClassScheduleController::class, 'printSection'])
             ->name('schedules.sections.print');
+
+        Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])
+            ->name('schedules.approval.submit');
+        Route::post('/schedules/approvals/{batch}/approve', [ClassScheduleApprovalController::class, 'approve'])
+            ->name('schedules.approval.approve');
+        Route::post('/schedules/approvals/{batch}/return', [ClassScheduleApprovalController::class, 'returnForRevision'])
+            ->name('schedules.approval.return');
+        Route::post('/schedules/approvals/{batch}/conforme', [ClassScheduleApprovalController::class, 'conforme'])
+            ->name('schedules.approval.conforme');
 
         Route::middleware('permission:faculty_loading.manage')
             ->group(function () {
