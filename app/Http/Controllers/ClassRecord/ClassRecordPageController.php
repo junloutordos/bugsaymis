@@ -7,6 +7,7 @@ use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\ClassRecord\StanineLookup;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -66,6 +67,21 @@ class ClassRecordPageController extends Controller
         $currentSY   = SchoolYear::where('is_current', true)->first();
         $isCurrentSY = $currentSY && $classRecord->school_year_id === $currentSY->id;
 
+        // Weekdays this subject meets this section per the class schedule —
+        // drives the Setup datepicker's disabled days. Empty = no schedule
+        // plotted yet, so the picker disables nothing (fail-open, mirrors
+        // WatRuleService::meetsOnDate()).
+        $scheduledDays = [];
+        if ($classRecord->subject_id && $classRecord->section_id) {
+            $scheduledDays = ClassSchedule::where('section_id', $classRecord->section_id)
+                ->where('subject_id', $classRecord->subject_id)
+                ->where('school_year_id', $classRecord->school_year_id)
+                ->distinct()
+                ->pluck('day_of_week')
+                ->values()
+                ->all();
+        }
+
         // Other class records by the same teacher for the same subject (for copy-from-section feature)
         $sameSubjectRecords = ClassRecord::where('teacher_id', $classRecord->teacher_id)
             ->where('id', '!=', $classRecord->id)
@@ -80,6 +96,7 @@ class ClassRecordPageController extends Controller
             'isCurrentSY'        => $isCurrentSY,
             'currentSYName'      => $currentSY?->name,
             'sameSubjectRecords' => $sameSubjectRecords,
+            'scheduledDays'      => $scheduledDays,
             'quizzes'            => \App\Models\Quiz\Quiz::where('source_type', 'class_record')
                 ->where('source_id', $classRecord->id)
                 ->withCount('questions')

@@ -25,6 +25,7 @@ import {
   PlayCircleIcon,
   CalendarDaysIcon,
 } from '@heroicons/vue/24/outline'
+import AppDatePicker from '@/Components/AppDatePicker.vue'
 import ScoreGrid from './components/ScoreGrid.vue'
 import AttendanceGrid from './components/AttendanceGrid.vue'
 import SectionAssessmentCalendar from './components/SectionAssessmentCalendar.vue'
@@ -38,6 +39,7 @@ const props = defineProps({
   currentSYName:      { type: String, default: null },
   sameSubjectRecords: { type: Array, default: () => [] },
   quizzes:            { type: Array, default: () => [] },
+  scheduledDays:      { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -272,6 +274,21 @@ const dateCounts = computed(() => {
   }
   return map
 })
+
+// ── Schedule-day restriction ──────────────────────────────────────────────────
+// Faculty may only date assessments on days the class meets per the schedule.
+// Fail-open when no schedule is plotted yet; admins keep every day pickable
+// so they can plot make-up/special dates (server warns instead of blocking).
+const WEEKDAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+const disabledWeekdays = computed(() => {
+  if (props.isAdmin || !props.scheduledDays.length) return []
+  return WEEKDAY_ORDER.filter(d => !props.scheduledDays.includes(d))
+})
+
+const meetingDaysLabel = computed(() =>
+  WEEKDAY_ORDER.filter(d => props.scheduledDays.includes(d)).map(d => d.slice(0, 3)).join(' · ')
+)
 
 function onDateChange(row) {
   if (!row.activity_date) {
@@ -620,6 +637,10 @@ async function checkRecord() {
             plot assessments no later than the Friday before their week (same-week plotting is not allowed)
             · max {{ WAT.dailyGraded }} graded ({{ WAT.dailyMajor }} major) per section per day
             · max {{ WAT.weeklyGraded }} graded ({{ WAT.weeklyMajor }} major) per section per week.
+            <template v-if="scheduledDays.length">
+              <br><span class="font-semibold text-slate-600">Class meets:</span>
+              {{ meetingDaysLabel }}<span v-if="!isAdmin"> — other days are disabled in the date picker.</span>
+            </template>
           </div>
 
           <!-- Errors -->
@@ -673,10 +694,10 @@ async function checkRecord() {
                         <span v-if="isMajorRow(row)" class="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
                       </td>
                       <td class="px-4 py-2">
-                        <input v-model="row.activity_date" type="date"
+                        <AppDatePicker v-model="row.activity_date"
                           :disabled="isLocked || isReadOnly"
-                          @change="onDateChange(row)"
-                          class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
+                          :disabled-weekdays="disabledWeekdays"
+                          @change="onDateChange(row)" />
                         <p v-if="row._dateWarning" class="text-red-500 text-[11px] mt-1">{{ row._dateWarning }}</p>
                       </td>
                       <td class="px-4 py-2">

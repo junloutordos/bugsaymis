@@ -210,19 +210,33 @@ class ClassRecordAssessmentController extends Controller
             }
         }
 
-        // Warn (not block) when the date falls on a day the subject doesn't
-        // meet this section per the class schedule
+        // Schedule-day rule: faculty may only plot on days the subject meets
+        // this section (422 on changed dates, matching the deadline rule);
+        // admins stay warn-only so they can plot make-up/special dates.
         $warnings = [];
-        foreach ($items->filter(fn ($i) => ! empty($i['activity_date']))->unique('activity_date') as $item) {
-            $meets = WatRuleService::meetsOnDate(
-                $classRecord->subject_id,
-                $classRecord->section_id,
-                $classRecord->school_year_id,
-                $item['activity_date']
-            );
-            if ($meets === false) {
-                $day = Carbon::parse($item['activity_date'])->format('l, M d');
-                $warnings[] = "{$classRecord->subject_name} has no scheduled class with this section on {$day} — double-check the date.";
+        $meetsByDate = [];
+        foreach ($items->filter(fn ($i) => ! empty($i['activity_date'])) as $item) {
+            $date = $item['activity_date'];
+            if (! array_key_exists($date, $meetsByDate)) {
+                $meetsByDate[$date] = WatRuleService::meetsOnDate(
+                    $classRecord->subject_id,
+                    $classRecord->section_id,
+                    $classRecord->school_year_id,
+                    $date
+                );
+            }
+            if ($meetsByDate[$date] !== false) {
+                continue;
+            }
+            $day = Carbon::parse($date)->format('l, M d');
+            if (! $this->isAdmin() && $item['_date_changed']) {
+                return response()->json([
+                    'message' => "{$classRecord->subject_name} has no scheduled class with this section on {$day} — assessments can only be dated on days the class meets.",
+                ], 422);
+            }
+            $warning = "{$classRecord->subject_name} has no scheduled class with this section on {$day} — double-check the date.";
+            if (! in_array($warning, $warnings, true)) {
+                $warnings[] = $warning;
             }
         }
 
