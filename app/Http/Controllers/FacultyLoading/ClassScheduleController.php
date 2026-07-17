@@ -313,7 +313,7 @@ class ClassScheduleController extends Controller
                 $dayConfigs[$day] = [
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
-                    'blocked' => SchedulingConstants::getBlockedSlots($gradeLevel, $day),
+                    'blocked' => SchedulingConstants::getDisplayBlockedSlots($gradeLevel, $day),
                 ];
             }
         }
@@ -427,7 +427,7 @@ class ClassScheduleController extends Controller
                 $dayConfigsByGrade[$grade][$day] = [
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
-                    'blocked' => SchedulingConstants::getBlockedSlots($grade, $day),
+                    'blocked' => SchedulingConstants::getDisplayBlockedSlots($grade, $day),
                 ];
             }
         }

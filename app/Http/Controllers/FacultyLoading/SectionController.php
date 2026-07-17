@@ -144,7 +144,7 @@ class SectionController extends Controller
             $dayConfigs[$day] = [
                 'start'   => $window['start'] ?? null,
                 'end'     => $window['end'] ?? null,
-                'blocked' => SchedulingConstants::getBlockedSlots($section->levelid, $day),
+                'blocked' => SchedulingConstants::getDisplayBlockedSlots($section->levelid, $day),
             ];
         }
 

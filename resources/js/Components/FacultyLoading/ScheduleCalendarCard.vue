@@ -100,12 +100,17 @@
               </div>
 
               <!-- Blocked period overlays -->
-              <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="bp.label"
+              <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="`${bp.label}-${bp.start}`"
                 :style="blockedStyle(bp)"
                 class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
                 <div class="absolute inset-0 bg-slate-100/70" />
-                <span class="relative text-xs text-slate-400 font-medium px-1 text-center leading-tight select-none">
-                  {{ bp.label }}
+                <span class="relative w-full text-slate-400 font-medium px-1 text-center leading-tight select-none">
+                  <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
+                    {{ bp.label }}
+                  </span>
+                  <span :class="['block tabular-nums opacity-80', blockedDurationMin(bp) >= 40 ? 'text-[10px]' : 'text-[9px]']">
+                    {{ fmtTimeRange(bp.start, bp.end) }}
+                  </span>
                 </span>
               </div>
 
@@ -258,6 +263,23 @@ function fmtConfigTime(t) {
   const [h, m] = t.split(':')
   const hour = parseInt(h)
   return `${hour % 12 || 12}:${m}${hour >= 12 ? 'PM' : 'AM'}`
+}
+
+/** "9:40–10:00 AM" — the meridiem is repeated only when it differs. */
+function fmtTimeRange(start, end) {
+  if (!start || !end) return ''
+  const short = (t) => {
+    const [h, m] = t.split(':')
+    return `${parseInt(h) % 12 || 12}:${m}`
+  }
+  const mer = (t) => (parseInt(t) >= 12 ? 'PM' : 'AM')
+  return mer(start) === mer(end)
+    ? `${short(start)}–${short(end)} ${mer(end)}`
+    : `${short(start)} ${mer(start)}–${short(end)} ${mer(end)}`
+}
+
+function blockedDurationMin(bp) {
+  return timeToMin(bp.end) - timeToMin(bp.start)
 }
 
 /** Greedy interval-packing so concurrent events in a day get side-by-side

@@ -53,6 +53,7 @@
                   :style="rangeStyle(blocked.start, blocked.end)"
                 >
                   <span>{{ blocked.label }}</span>
+                  <span class="schedule-print-blocked-time">{{ formatTimeRange(blocked.start, blocked.end) }}</span>
                 </div>
                 <div
                   v-if="timeToMinutes(dayConfigs[day].end) <= NOON"
@@ -220,6 +221,13 @@ function formatTime(time) {
   const minute = String(minutes % 60).padStart(2, '0')
   const displayHour = hour % 12 || 12
   return `${displayHour}:${minute} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
+/** "9:40–10:00 AM" — the meridiem is repeated only when it differs. */
+function formatTimeRange(start, end) {
+  const s = formatTime(start)
+  const e = formatTime(end)
+  return s.slice(-2) === e.slice(-2) ? `${s.slice(0, -3)}–${e}` : `${s}–${e}`
 }
 
 function eventTitle(entry) {
@@ -503,6 +511,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Label + time share one line when they fit; tall bands wrap to two. */
+  flex-wrap: wrap;
+  column-gap: 1.2mm;
+  line-height: 1.15;
   overflow: hidden;
   border-top: 0.12mm solid #cbd5e1;
   border-bottom: 0.12mm solid #cbd5e1;
@@ -513,6 +525,15 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: center;
+}
+
+.schedule-print-blocked-time {
+  font-size: 5pt;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
 }
 
 .schedule-print-no-classes {

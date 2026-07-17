@@ -591,6 +591,94 @@ class SchedulingConstants
     }
 
     /**
+     * Blocked slots for CALENDAR/PRINT display only. Unlike getBlockedSlots()
+     * (the placement/capacity source consumed by overlapsBlocked()), the
+     * Consultation/Home Bound band is TRIMMED against the Wednesday ALP and
+     * Friday Flag Retreat windows instead of dropped wholesale, and Grade 8's
+     * overflow teaching windows do not suppress it — a scheduled overflow
+     * class simply renders on top of the band, and when the overflow period
+     * is unused that time genuinely is consultation. Never feed this into
+     * capacity/placement math: restoring the G8 consult band there would
+     * filter the overflow periods out of the schedulable grid.
+     */
+    public static function getDisplayBlockedSlots(int $grade, string $day): array
+    {
+        $timetable = ($day === 'Monday')
+            ? self::getMondayTimetable($grade)
+            : self::getTueFriTimetable($grade);
+
+        $blocked = array_values(
+            array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
+        );
+
+        if ($day === 'Wednesday') {
+            $fullWed = in_array($grade, self::WEDNESDAY_FULL_GRADES, true);
+            $alp     = self::getWednesdayAlp($grade);
+
+            if (! $fullWed) {
+                $blocked[] = array_merge(self::WEDNESDAY_WELLNESS, [
+                    'type'  => 'WELLNESS',
+                    'label' => 'Wellness Break',
+                ]);
+            }
+
+            $group       = self::getGradeGroup($grade);
+            $cutoffStart = $fullWed
+                ? $alp['start']
+                : (self::WEDNESDAY_ACTIVITY_START[$group] ?? $alp['start']);
+
+            $activityBlock = [
+                'start' => min($cutoffStart, $alp['start']),
+                'end'   => $alp['end'],
+                'type'  => 'ACTIVITY',
+                'label' => 'Activity Proper / ALP',
+            ];
+
+            $blocked   = self::trimConsultAround($blocked, $activityBlock['start'], $activityBlock['end']);
+            $blocked[] = $activityBlock;
+        }
+
+        if ($day === 'Friday') {
+            $flagBlock = array_merge(self::FRIDAY_FLAG_RETREAT, [
+                'type'  => 'FLAG_RETREAT',
+                'label' => 'Flag Retreat Ceremony',
+            ]);
+
+            $blocked   = self::trimConsultAround($blocked, $flagBlock['start'], $flagBlock['end']);
+            $blocked[] = $flagBlock;
+        }
+
+        usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
+
+        return array_values($blocked);
+    }
+
+    /**
+     * Trim every CONSULT entry against a window: the overlapping portion is
+     * cut away and any non-empty remainder kept (a fully-covered band
+     * disappears entirely).
+     */
+    private static function trimConsultAround(array $blocked, string $start, string $end): array
+    {
+        $result = [];
+
+        foreach ($blocked as $b) {
+            if ($b['type'] !== 'CONSULT' || ! self::timesOverlap($b['start'], $b['end'], $start, $end)) {
+                $result[] = $b;
+                continue;
+            }
+            if ($b['start'] < $start) {
+                $result[] = array_merge($b, ['end' => $start]);
+            }
+            if ($b['end'] > $end) {
+                $result[] = array_merge($b, ['start' => $end]);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * The actual first-class-start / last-class-end for a grade+day, after
      * applying Wednesday's cutoff/wellness/ALP exclusions and Friday's Flag
      * Retreat exclusion (via getBlockedSlots), and the Friday ILA day-skip.
