@@ -55,6 +55,36 @@ class OnlineTimePunchController extends Controller
         return response()->json($this->faceService->issueChallenge(Auth::user()));
     }
 
+    // ─── API: Location Pre-check ──────────────────────────────────────────────
+
+    /**
+     * Fail-fast location gate, called right after the browser resolves
+     * geolocation so an off-campus or coarse-location user is told before the
+     * camera/liveness flow runs (and before burning a punch attempt). The same
+     * gate is re-enforced server-side on the actual punch submission.
+     */
+    public function locationCheck(Request $request)
+    {
+        $data = $request->validate([
+            'latitude'  => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy'  => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $gate = $this->faceService->resolveLocationGate(
+            lat:      (float) $data['latitude'],
+            lng:      (float) $data['longitude'],
+            accuracy: isset($data['accuracy']) ? (float) $data['accuracy'] : null,
+            ip:       $this->clientIp($request),
+        );
+
+        return response()->json([
+            'status'          => $gate['status'],
+            'distance_meters' => $gate['geofence']['distanceMeters'],
+            'network_status'  => $gate['networkStatus'],
+        ]);
+    }
+
     // ─── API: Submit Punch ────────────────────────────────────────────────────
 
     public function punch(OnlineTimePunchRequest $request)
@@ -66,16 +96,17 @@ class OnlineTimePunchController extends Controller
             frames:         $request->validated('frames'),
             challengeToken: $request->validated('challenge_token'),
             punchType:      $request->validated('punch_type'),
-            ip:             $request->ip(),
+            ip:             $this->clientIp($request),
             lat:            $request->validated('latitude'),
             lng:            $request->validated('longitude'),
+            accuracy:       $request->validated('accuracy'),
             userAgent:      $request->userAgent(),
         );
 
         $messages = [
             'verified'      => 'Punch recorded and verified successfully.',
             'manual_review' => 'Punch recorded but flagged for HR review — confidence was low.',
-            'rejected'      => 'Punch was rejected — face match failed. Please try again or use another method.',
+            'rejected'      => $this->rejectionMessage($punch),
         ];
 
         $attemptsUsed = OnlineTimePunch::where('user_id', $user->id)
@@ -95,6 +126,42 @@ class OnlineTimePunchController extends Controller
             'max_attempts'  => FaceRecognitionService::MAX_PUNCH_ATTEMPTS,
             'dtr_summary'   => $dtrSummary,
         ]);
+    }
+
+    /**
+     * Real client IP. Laravel's trustProxies('*') only trusts the immediate
+     * peer (the ALB), so $request->ip() resolves to the Cloudflare edge IP —
+     * useless for campus-network matching. CF-Connecting-IP carries the real
+     * client and is trustworthy here because the ALB only accepts traffic
+     * from Cloudflare.
+     */
+    private function clientIp(Request $request): ?string
+    {
+        return $request->header('CF-Connecting-IP') ?: $request->ip();
+    }
+
+    /** A location rejection must read as a location rejection, not a face-match failure. */
+    private function rejectionMessage(OnlineTimePunch $punch): string
+    {
+        return match ($punch->failure_reason) {
+            'outside_geofence' => 'Punch rejected — you appear to be '
+                . $this->formatDistance($punch->distance_meters)
+                . ' from campus. Online punches are only allowed on campus.',
+            'no_location_permission' => 'Punch rejected — location access is required to punch.',
+            'location_too_coarse' => 'Punch rejected — your device could not provide a precise enough location. Use a phone with GPS, or punch from the campus network.',
+            default => 'Punch was rejected — face match failed. Please try again or use another method.',
+        };
+    }
+
+    private function formatDistance(?float $meters): string
+    {
+        if ($meters === null) {
+            return 'too far';
+        }
+
+        return $meters >= 1000
+            ? number_format($meters / 1000, 1) . ' km'
+            : round($meters) . ' m';
     }
 
     // ─── API: My Punches ──────────────────────────────────────────────────────

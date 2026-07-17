@@ -1277,6 +1277,9 @@ Route::middleware(['auth', 'permission:hr.online-punch.record'])->prefix('hr/onl
     Route::post('/challenge/start', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'challengeStart'])
         ->name('challenge.start');
 
+    Route::post('/location-check', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'locationCheck'])
+        ->name('location-check');
+
     Route::post('/punch', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'punch'])
         ->name('punch');
 

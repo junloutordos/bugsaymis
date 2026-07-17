@@ -74,6 +74,15 @@
             <p class="text-rose-700 font-medium">Location access is required to punch.</p>
             <p class="text-sm text-slate-500">Please allow location access — you must be on campus to use Online Time Punches.</p>
             <AppButton block @click="startLocating">Retry</AppButton>
+            <AppButton variant="ghost" block @click="cancelCamera">Cancel</AppButton>
+          </div>
+
+          <!-- Off campus / location too coarse -->
+          <div v-else-if="stage === 'location_blocked'" class="py-8 text-center space-y-3">
+            <p class="text-rose-700 font-medium">You can't punch from here.</p>
+            <p class="text-sm text-slate-500">{{ locationBlockMessage }}</p>
+            <AppButton block @click="startLocating">Check again</AppButton>
+            <AppButton variant="ghost" block @click="cancelCamera">Cancel</AppButton>
           </div>
 
           <!-- Loading detection model -->
@@ -227,6 +236,7 @@ function fmtTime(val) {
 const showCamera     = ref(false)
 const activeSlotType = ref(null)
 const stage          = ref('locating')
+const locationBlockMessage = ref('')
 const guideReady     = ref(false)
 const guidanceMessage = ref('')
 const captureProgress = ref(0)
@@ -267,10 +277,42 @@ async function startLocating() {
   try {
     const pos = await getPosition()
     geo = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }
-    await startCamera()
   } catch {
     stage.value = 'location_denied'
+    return
   }
+
+  // Fail fast: tell an off-campus / coarse-location user now, before the
+  // camera + liveness flow runs. The server re-enforces the same gate on submit.
+  try {
+    const { data } = await axios.post(route('hr.online-punch.location-check'), {
+      latitude:  geo.latitude,
+      longitude: geo.longitude,
+      accuracy:  geo.accuracy,
+    })
+    if (data.status !== 'ok') {
+      locationBlockMessage.value = locationBlockText(data)
+      stage.value = 'location_blocked'
+      return
+    }
+  } catch {
+    // Pre-check unavailable — proceed; the punch submission still enforces it.
+  }
+
+  await startCamera()
+}
+
+function locationBlockText({ status, distance_meters }) {
+  if (status === 'outside') {
+    const distance = distance_meters >= 1000
+      ? `${(distance_meters / 1000).toFixed(1)} km`
+      : `${Math.round(distance_meters)} m`
+    return `You appear to be ${distance} from campus. Online punches are only allowed on campus.`
+  }
+  if (status === 'coarse') {
+    return 'Your device could not provide a precise enough location. Use a phone with GPS enabled, or connect to the campus network.'
+  }
+  return 'Location access is required — you must be on campus to punch.'
 }
 
 function getPosition() {

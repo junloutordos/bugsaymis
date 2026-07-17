@@ -8,8 +8,10 @@ use App\Models\HR\OnlinePunchNetworkRule;
  * Resolves whether a request IP matches a known campus network range.
  * Deliberately conservative, same reasoning as AtlasSentinelNetworkLocationResolver:
  * several campus ISPs are dynamic/CGNAT, so a non-match is inconclusive, never
- * treated as proof of being off-campus. This signal is informational only —
- * callers must not use it to block or downgrade a punch on its own.
+ * treated as proof of being off-campus. Callers must not use a non-match to
+ * block or downgrade a punch on its own — but a positive match IS conclusive
+ * (the IP is server-observed, unlike client-supplied GPS coordinates), so it
+ * may be used to let a punch through, e.g. when the GPS fix is too coarse.
  */
 class NetworkTrustService
 {

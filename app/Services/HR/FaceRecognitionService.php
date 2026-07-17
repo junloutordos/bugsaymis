@@ -34,15 +34,27 @@ class FaceRecognitionService
     private const MAX_BBOX_AREA_RATIO = 1.6;
 
     /**
-     * Set once per verifyPunch() call and read by savePunch() — informational
-     * network-trust signal, never used to gate anything, so it's threaded
-     * through as instance state rather than adding a parameter to every one
-     * of savePunch()'s call sites.
+     * Browser geolocation on devices without GPS (desktop PCs) falls back to
+     * Wi-Fi/IP positioning that can be off by kilometers — a coarse fix whose
+     * center happens to land inside a geofence zone proves nothing. Fixes
+     * coarser than this are rejected unless the request comes from a trusted
+     * campus network (which is server-observed and proves presence on its own).
+     */
+    public const MAX_LOCATION_ACCURACY_METERS = 250.0;
+
+    /**
+     * Set once per verifyPunch() call and read by savePunch() — never used to
+     * gate a punch on its own (a non-match is inconclusive, see
+     * NetworkTrustService), so it's threaded through as instance state rather
+     * than adding a parameter to every one of savePunch()'s call sites.
      */
     private ?string $currentNetworkStatus = null;
 
     /** Set once per verifyPunch() call and read by savePunch() — same reasoning as above. */
     private int $currentAttemptNumber = 1;
+
+    /** Set once per verifyPunch() call and read by savePunch() — same reasoning as above. */
+    private ?float $currentAccuracy = null;
 
     public function __construct(
         private readonly DTRService $dtrService,
@@ -164,6 +176,31 @@ class FaceRecognitionService
      * theoretically pass. Campus geofencing is enforced first, before any
      * Rekognition calls, since a location failure isn't a face-match failure.
      */
+    /**
+     * Resolve whether a punch attempt is allowed from this location/network.
+     * Shared by verifyPunch() and the pre-check endpoint so the fail-fast UI
+     * and the enforcement path can never disagree.
+     *
+     * status: ok | outside | no_permission | coarse
+     */
+    public function resolveLocationGate(?float $lat, ?float $lng, ?float $accuracy, ?string $ip): array
+    {
+        $geofence      = $this->geofenceService->resolve($lat, $lng);
+        $networkStatus = $this->networkTrustService->resolve($ip)['status'];
+
+        $status = match (true) {
+            in_array($geofence['status'], ['outside', 'no_permission'], true) => $geofence['status'],
+            // A coarse fix inside the zone proves nothing — unless the request
+            // IP is a trusted campus network, which proves presence by itself.
+            $geofence['status'] === 'inside'
+                && ($accuracy === null || $accuracy > self::MAX_LOCATION_ACCURACY_METERS)
+                && $networkStatus !== 'trusted' => 'coarse',
+            default => 'ok', // inside with a precise fix, or geofencing unconfigured
+        };
+
+        return ['status' => $status, 'geofence' => $geofence, 'networkStatus' => $networkStatus];
+    }
+
     public function verifyPunch(
         User $user,
         array $frames,
@@ -172,6 +209,7 @@ class FaceRecognitionService
         ?string $ip,
         ?float $lat,
         ?float $lng,
+        ?float $accuracy,
         ?string $userAgent,
     ): OnlineTimePunch {
         $today = Carbon::today()->toDateString();
@@ -228,19 +266,22 @@ class FaceRecognitionService
             ]);
         }
 
-        // Geofence check first — cheap, and keeps the audit trail honest (a
+        // Location gate first — cheap, and keeps the audit trail honest (a
         // location failure is recorded as a location failure, not a face failure).
-        $geofence = $this->geofenceService->resolve($lat, $lng);
+        $gate     = $this->resolveLocationGate($lat, $lng, $accuracy, $ip);
+        $geofence = $gate['geofence'];
 
-        // Network-trust is informational only (several campus ISPs are dynamic/
-        // CGNAT, so a non-match is inconclusive, never grounds to block or
-        // downgrade a punch) — resolved once here, applied to every outcome below.
-        $this->currentNetworkStatus = $this->networkTrustService->resolve($ip)['status'];
+        $this->currentNetworkStatus = $gate['networkStatus'];
+        $this->currentAccuracy      = $accuracy;
 
-        if (in_array($geofence['status'], ['outside', 'no_permission'], true)) {
+        if ($gate['status'] !== 'ok') {
             return $this->savePunch($user, $enrollment, $punchType, $today, [
                 'match_status'    => 'rejected',
-                'failure_reason'  => $geofence['status'] === 'outside' ? 'outside_geofence' : 'no_location_permission',
+                'failure_reason'  => match ($gate['status']) {
+                    'outside'       => 'outside_geofence',
+                    'no_permission' => 'no_location_permission',
+                    'coarse'        => 'location_too_coarse',
+                },
                 'geofence_status' => $geofence['status'],
                 'distance_meters' => $geofence['distanceMeters'],
             ], $ip, $lat, $lng, $userAgent);
@@ -534,6 +575,7 @@ class FaceRecognitionService
             'ip_address'          => $ip,
             'latitude'            => $lat,
             'longitude'           => $lng,
+            'accuracy_meters'     => $this->currentAccuracy,
             'network_status'      => $this->currentNetworkStatus,
             'user_agent'          => $userAgent,
         ], $attributes));
