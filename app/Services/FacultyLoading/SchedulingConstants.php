@@ -616,7 +616,11 @@ class SchedulingConstants
             $alp     = self::getWednesdayAlp($grade);
 
             if (! $fullWed) {
-                $blocked[] = array_merge(self::WEDNESDAY_WELLNESS, [
+                $wellness = self::WEDNESDAY_WELLNESS;
+                // G11/G12's Wednesday recess sits inside the Wellness window —
+                // trim it so the two bands don't render on top of each other.
+                $blocked   = self::trimAround($blocked, $wellness['start'], $wellness['end'], ['RECESS']);
+                $blocked[] = array_merge($wellness, [
                     'type'  => 'WELLNESS',
                     'label' => 'Wellness Break',
                 ]);
@@ -634,7 +638,7 @@ class SchedulingConstants
                 'label' => 'Activity Proper / ALP',
             ];
 
-            $blocked   = self::trimConsultAround($blocked, $activityBlock['start'], $activityBlock['end']);
+            $blocked   = self::trimAround($blocked, $activityBlock['start'], $activityBlock['end'], ['CONSULT']);
             $blocked[] = $activityBlock;
         }
 
@@ -644,7 +648,7 @@ class SchedulingConstants
                 'label' => 'Flag Retreat Ceremony',
             ]);
 
-            $blocked   = self::trimConsultAround($blocked, $flagBlock['start'], $flagBlock['end']);
+            $blocked   = self::trimAround($blocked, $flagBlock['start'], $flagBlock['end'], ['CONSULT']);
             $blocked[] = $flagBlock;
         }
 
@@ -654,16 +658,16 @@ class SchedulingConstants
     }
 
     /**
-     * Trim every CONSULT entry against a window: the overlapping portion is
-     * cut away and any non-empty remainder kept (a fully-covered band
-     * disappears entirely).
+     * Trim entries of the given types against a window: the overlapping
+     * portion is cut away and any non-empty remainder kept (a fully-covered
+     * band disappears entirely).
      */
-    private static function trimConsultAround(array $blocked, string $start, string $end): array
+    private static function trimAround(array $blocked, string $start, string $end, array $types): array
     {
         $result = [];
 
         foreach ($blocked as $b) {
-            if ($b['type'] !== 'CONSULT' || ! self::timesOverlap($b['start'], $b['end'], $start, $end)) {
+            if (! in_array($b['type'], $types, true) || ! self::timesOverlap($b['start'], $b['end'], $start, $end)) {
                 $result[] = $b;
                 continue;
             }

@@ -235,10 +235,27 @@ class ClassScheduleController extends Controller
     /** CID Chief + Campus Director for the print signatory block (same resolution as FacultyLoadController). */
     private function printSignatories(AcademicTerm $term, ?User $conforme = null): array
     {
-        $batch = ClassScheduleApprovalBatch::with(['submitter.pds.personalInfo', 'approver.pds.personalInfo', 'signatures.signer.pds.personalInfo'])
+        $batch = $this->printApprovalBatch($term);
+
+        $signatories = $this->printSharedSignatories($batch);
+        $signatories['conforme'] = $conforme
+            ? $this->formatPrintSignatory($batch, $conforme, 'Faculty', 'conforme')
+            : null;
+
+        return $signatories;
+    }
+
+    private function printApprovalBatch(AcademicTerm $term): ?ClassScheduleApprovalBatch
+    {
+        return ClassScheduleApprovalBatch::with(['submitter.pds.personalInfo', 'approver.pds.personalInfo', 'signatures.signer.pds.personalInfo'])
             ->where('academic_term_id', $term->id)
             ->whereIn('status', ['pending_ocd', 'approved'])
             ->latest('id')->first();
+    }
+
+    /** batch_status + Prepared/Approved — identical for every sheet of a term. */
+    private function printSharedSignatories(?ClassScheduleApprovalBatch $batch): array
+    {
         $cidChief = User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))
             ->where('status', '<>', 'inactive')
             ->first(['id', 'name', 'position']);
@@ -248,52 +265,51 @@ class ClassScheduleController extends Controller
             ->where('status', '<>', 'inactive')
             ->first(['id', 'name', 'position']);
 
-        $preparedUser = $batch?->submitter ?? $cidChief;
-        $approvedUser = $batch?->approver ?? $director;
-        $signatureRecords = $batch?->signatures ?? collect();
-
-        $formatSignatory = function (?User $user, string $position, string $stage) use ($signatureRecords) {
-            if (! $user) {
-                return null;
-            }
-            $record = $signatureRecords->first(fn ($sig) => ($sig->metadata['stage'] ?? '') === $stage
-                && ($stage !== 'conforme' || (int) $sig->signer_id === (int) $user->id)
-            );
-
-            return [
-                'name' => $this->names->formal($user),
-                'position' => $user->position ?? $position,
-                'signature' => $record
-                    ? $this->signatures->getImageDataUriFromPath($record->metadata['signature_path'] ?? $record->signer?->electronic_signature)
-                    : null,
-                'signed_at' => $record?->signed_at?->format('F j, Y'),
-            ];
-        };
-
         return [
             'batch_status' => $batch?->status,
-            'prepared' => $formatSignatory(
-                $preparedUser,
+            'prepared' => $this->formatPrintSignatory(
+                $batch,
+                $batch?->submitter ?? $cidChief,
                 'Chief, Curriculum and Instruction Division',
                 'prepared',
             ),
-            'approved' => $formatSignatory(
-                $approvedUser,
+            'approved' => $this->formatPrintSignatory(
+                $batch,
+                $batch?->approver ?? $director,
                 'Campus Director',
                 'approved',
             ),
-            'conforme' => $conforme ? $formatSignatory($conforme, 'Faculty', 'conforme') : null,
         ];
     }
 
-    private function renderPrintSchedule(
-        string $scheduleType,
+    private function formatPrintSignatory(?ClassScheduleApprovalBatch $batch, ?User $user, string $position, string $stage): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+
+        $record = ($batch?->signatures ?? collect())->first(fn ($sig) => ($sig->metadata['stage'] ?? '') === $stage
+            && ($stage !== 'conforme' || (int) $sig->signer_id === (int) $user->id)
+        );
+
+        return [
+            'name' => $this->names->formal($user),
+            'position' => $user->position ?? $position,
+            'signature' => $record
+                ? $this->signatures->getImageDataUriFromPath($record->metadata['signature_path'] ?? $record->signer?->electronic_signature)
+                : null,
+            'signed_at' => $record?->signed_at?->format('F j, Y'),
+        ];
+    }
+
+    /** One sheet's worth of print props: owner + schedules + dayConfigs (+ extras). */
+    private function buildPrintSheet(
         array $owner,
         AcademicTerm $term,
         Builder $query,
         ?int $gradeLevel = null,
         array $extra = [],
-    ): Response {
+    ): array {
         $dayOrder = "FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')";
 
         $schedules = $query
@@ -318,21 +334,122 @@ class ClassScheduleController extends Controller
             }
         }
 
+        return [
+            'owner' => $owner,
+            'schedules' => $schedules,
+            'dayConfigs' => $dayConfigs,
+            ...$extra,
+        ];
+    }
+
+    private function renderPrintSchedule(
+        string $scheduleType,
+        array $owner,
+        AcademicTerm $term,
+        Builder $query,
+        ?int $gradeLevel = null,
+        array $extra = [],
+    ): Response {
         return Inertia::render('FacultyLoading/Schedules/Print', [
             'scheduleType' => $scheduleType,
-            'owner' => $owner,
             'term' => [
                 'id' => $term->id,
                 'label' => $term->full_label,
                 'school_year' => $term->schoolYear?->name,
             ],
-            'schedules' => $schedules,
-            'dayConfigs' => $dayConfigs,
             'signatories' => $this->printSignatories(
                 $term,
                 $scheduleType === 'faculty' ? User::find($owner['id']) : null,
             ),
-            ...$extra,
+            ...$this->buildPrintSheet($owner, $term, $query, $gradeLevel, $extra),
+        ]);
+    }
+
+    /**
+     * Batch print — one document with one official sheet per section (or per
+     * faculty) that has occupying schedules in the term. Prepared/Approved
+     * signatories are identical on every sheet, so they're sent once and
+     * merged client-side; faculty sheets carry only their own Conforme.
+     */
+    public function printBatchSchedules(Request $request): Response
+    {
+        $this->authorize('faculty_loading.manage');
+
+        $type = (string) $request->query('type');
+        abort_unless(in_array($type, ['section', 'faculty'], true), 404);
+
+        $term = $this->resolvePrintTerm($request);
+        $batch = $this->printApprovalBatch($term);
+
+        $sheets = [];
+
+        if ($type === 'section') {
+            $sectionIds = ClassSchedule::where('academic_term_id', $term->id)
+                ->occupying()
+                ->whereNotNull('section_id')
+                ->distinct()
+                ->pluck('section_id');
+
+            $sections = Section::whereIn('id', $sectionIds)
+                ->when($request->integer('section_id'), fn ($q, $id) => $q->where('id', $id))
+                ->orderBy('levelid')
+                ->orderBy('sectionname')
+                ->get();
+
+            foreach ($sections as $section) {
+                $sheets[] = $this->buildPrintSheet(
+                    [
+                        'id' => $section->id,
+                        'name' => $section->sectionname,
+                        'grade_level' => $section->levelid,
+                    ],
+                    $term,
+                    ClassSchedule::where('section_id', $section->id),
+                    (int) $section->levelid,
+                );
+            }
+        } else {
+            $facultyIds = ClassSchedule::where('academic_term_id', $term->id)
+                ->occupying()
+                ->whereNotNull('user_id')
+                ->distinct()
+                ->pluck('user_id');
+
+            $faculty = User::whereIn('id', $facultyIds)
+                ->where('status', '<>', 'inactive')
+                ->where('name', 'not like', 'TBA%')
+                ->when($request->integer('faculty_id'), fn ($q, $id) => $q->where('id', $id))
+                ->orderBy('name')
+                ->get(['id', 'name', 'position']);
+
+            foreach ($faculty as $member) {
+                $sheets[] = $this->buildPrintSheet(
+                    [
+                        'id' => $member->id,
+                        'name' => $this->names->formal($member),
+                        'position' => $member->position,
+                    ],
+                    $term,
+                    ClassSchedule::where('user_id', $member->id),
+                    null,
+                    [
+                        'loadSummary' => $this->facultyLoadSummary($member->id, $term->id),
+                        'officialTimes' => $this->facultyOfficialTimes($member->id),
+                        'conforme' => $this->formatPrintSignatory($batch, $member, 'Faculty', 'conforme'),
+                    ],
+                );
+            }
+        }
+
+        return Inertia::render('FacultyLoading/Schedules/PrintBatch', [
+            'scheduleType' => $type,
+            'term' => [
+                'id' => $term->id,
+                'label' => $term->full_label,
+                'school_year' => $term->schoolYear?->name,
+            ],
+            'sheets' => $sheets,
+            'sharedSignatories' => $this->printSharedSignatories($batch),
         ]);
     }
 

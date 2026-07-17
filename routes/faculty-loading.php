@@ -98,6 +98,10 @@ Route::middleware(['web', 'auth', 'verified'])
             ->get('/schedules/sections/{section}/print', [ClassScheduleController::class, 'printSection'])
             ->name('schedules.sections.print');
 
+        Route::middleware('permission:faculty_loading.manage')
+            ->get('/schedules/print-batch', [ClassScheduleController::class, 'printBatchSchedules'])
+            ->name('schedules.print-batch');
+
         Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])
             ->name('schedules.approval.submit');
         Route::post('/schedules/approvals/{batch}/approve', [ClassScheduleApprovalController::class, 'approve'])

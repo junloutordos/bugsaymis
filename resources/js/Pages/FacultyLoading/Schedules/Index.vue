@@ -6,6 +6,10 @@
       <AppPageHeader :title="pageTitle" :subtitle="pageSubtitle">
         <template #actions>
           <template v-if="isManage">
+            <AppButton v-if="!isMyPage && (viewBy === 'section' || viewBy === 'faculty')" variant="secondary"
+              :disabled="!schedules.length" @click="printAll">
+              <PrinterIcon class="h-4 w-4" /> Print All
+            </AppButton>
             <AppButton v-if="!scheduleLocked" variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
               <SparklesIcon class="h-4 w-4" /> AI Generate
             </AppButton>
@@ -519,7 +523,7 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
   ArrowsRightLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon,
-  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
+  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, PrinterIcon, SparklesIcon, TrashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────
@@ -901,6 +905,18 @@ function cardTitle(groupId) {
   if (viewBy.value === 'grade') return `Grade ${groupId} — Electives`
   if (viewBy.value === 'subject') return subjectLabel(groupId)
   return viewBy.value === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name
+}
+
+/** Batch print — every section (or faculty) with schedules this term, one
+ *  document with one sheet per page. Honors a specific section/faculty filter. */
+function printAll() {
+  if (!filters.term_id) return
+
+  const params = { type: viewBy.value, term_id: filters.term_id }
+  if (viewBy.value === 'section' && filters.section_id) params.section_id = filters.section_id
+  if (viewBy.value === 'faculty' && filters.faculty_id) params.faculty_id = filters.faculty_id
+
+  window.open(route('faculty-loading.schedules.print-batch', params), '_blank', 'noopener')
 }
 
 function printUrlForGroup(groupId) {
