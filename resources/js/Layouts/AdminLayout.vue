@@ -293,6 +293,12 @@ const filterMenuByRole = (items, userRoleNames) =>
       if (item.excludePermissions?.length && hasPerm(...item.excludePermissions)) {
         return false;
       }
+      // Opt-in role override: show even without the item's permissions when
+      // the user holds any of these roles (e.g. AUH sees "Schedules" without
+      // faculty_loading.manage — the page itself scopes them to their unit).
+      if (item.orRoles?.some((r) => userRoleNames.includes(r))) {
+        return true;
+      }
       if (item.permissions?.length) {
         return hasPerm(...item.permissions);
       }

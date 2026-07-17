@@ -6,21 +6,36 @@
       <AppPageHeader :title="pageTitle" :subtitle="pageSubtitle">
         <template #actions>
           <template v-if="isManage">
-            <AppButton v-if="!isMyPage" variant="secondary" @click="swapReviewModal = true">
-              <ArrowsRightLeftIcon class="h-4 w-4" /> Swap Requests
-              <span v-if="openSwapRequests.length" class="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{{ openSwapRequests.length }}</span>
-            </AppButton>
-            <AppButton v-if="!isMyPage && (viewBy === 'section' || viewBy === 'faculty')" variant="secondary"
-              :disabled="!schedules.length" @click="printAll">
-              <PrinterIcon class="h-4 w-4" /> Print All
-            </AppButton>
-            <AppButton v-if="!scheduleLocked" variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
+            <!-- Secondary tools live in one dropdown so the header never overflows -->
+            <Dropdown v-if="!isMyPage" align="right" width="56">
+              <template #trigger>
+                <AppButton variant="secondary">
+                  <WrenchScrewdriverIcon class="h-4 w-4" /> Tools
+                  <span v-if="openSwapRequests.length" class="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{{ openSwapRequests.length }}</span>
+                  <ChevronDownIcon class="h-3.5 w-3.5" />
+                </AppButton>
+              </template>
+              <template #content>
+                <button type="button" @click="swapReviewModal = true" :class="toolItemClass">
+                  <ArrowsRightLeftIcon class="h-4 w-4 text-slate-400" /> Swap Requests
+                  <span v-if="openSwapRequests.length" class="ml-auto rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{{ openSwapRequests.length }}</span>
+                </button>
+                <button v-if="viewBy === 'section' || viewBy === 'faculty'" type="button"
+                  :disabled="!schedules.length" @click="printAll" :class="toolItemClass">
+                  <PrinterIcon class="h-4 w-4 text-slate-400" /> Print All
+                </button>
+                <Link v-if="!scheduleLocked" :href="route('faculty-loading.auto-schedule.index')" :class="toolItemClass">
+                  <SparklesIcon class="h-4 w-4 text-slate-400" /> AI Generate
+                </Link>
+                <button type="button"
+                  :disabled="scheduleLocked || !unplacedLoads.length || autoPlace.loading"
+                  @click="runAutoPlacePreview" :class="toolItemClass">
+                  <BoltIcon class="h-4 w-4 text-slate-400" /> Auto-Place Remaining
+                </button>
+              </template>
+            </Dropdown>
+            <AppButton v-if="isMyPage && !scheduleLocked" variant="secondary" as="link" :href="route('faculty-loading.auto-schedule.index')">
               <SparklesIcon class="h-4 w-4" /> AI Generate
-            </AppButton>
-            <AppButton v-if="!isMyPage" variant="secondary"
-              :disabled="scheduleLocked || !unplacedLoads.length || autoPlace.loading"
-              @click="runAutoPlacePreview">
-              <BoltIcon class="h-4 w-4" /> Auto-Place Remaining
             </AppButton>
             <AppButton :disabled="scheduleLocked" @click="openForm()">
               <PlusIcon class="h-4 w-4" /> Assign Schedule
@@ -605,7 +620,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppFilterBar from '@/Components/AppFilterBar.vue'
@@ -616,13 +631,15 @@ import AppInput from '@/Components/AppInput.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import Dropdown from '@/Components/Dropdown.vue'
 import ScheduleCalendarCard from '@/Components/FacultyLoading/ScheduleCalendarCard.vue'
 import AutoPlacePreviewModal from '@/Components/FacultyLoading/AutoPlacePreviewModal.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
-  ArrowsRightLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon,
-  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, PrinterIcon, SparklesIcon, TrashIcon, XMarkIcon,
+  ArrowsRightLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ChevronDownIcon, ClockIcon, ExclamationCircleIcon,
+  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, PrinterIcon, SparklesIcon, TrashIcon,
+  WrenchScrewdriverIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────
@@ -658,6 +675,9 @@ const props = defineProps({
 const isManage = computed(() => props.capability.level === 'manage')
 const isSelf   = computed(() => props.capability.level === 'self')
 const isReview = computed(() => props.capability.level === 'review')
+
+// Shared styling for the header Tools dropdown items.
+const toolItemClass = 'flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed'
 const isMyPage = computed(() => props.pageMode === 'my')
 const scheduleLocked = computed(() => !!props.approvalBatch?.locked)
 const canConforme = computed(() =>
@@ -849,7 +869,9 @@ function applyFilters() {
 // ── View mode (group calendar cards by section or by faculty) ────────────────
 
 const viewBy = ref(
-  props.capability.level === 'self' || props.filters.faculty_id ? 'faculty' : 'section'
+  // Unit heads and self-mode users live on faculty-grouped calendars; section
+  // cards would only show the partial subset their reach allows.
+  ['self', 'unit'].includes(props.capability.level) || props.filters.faculty_id ? 'faculty' : 'section'
 )
 
 const GRADE_LEVELS = [7, 8, 9, 10, 11, 12]

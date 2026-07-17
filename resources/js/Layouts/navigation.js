@@ -1467,6 +1467,9 @@ export const menuItems = [
         icon: CalendarDaysIcon,
         roles: [],
         permissions: ["faculty_loading.manage"],
+        // Academic Unit Heads reach the calendar too — the controller scopes
+        // them to their own unit's faculty (capability level "unit").
+        orRoles: ["AUH"],
       },
       // Personal calendar for everyone — faculty AND managers see their own
       // schedule here; CID-plotted classes are read-only on this page.
