@@ -177,12 +177,13 @@ class HardConstraintChecker
             return self::ok();
         }
 
-        if ($grade !== null && in_array($grade, SchedulingConstants::WEDNESDAY_FULL_GRADES, true)) {
+        if ($grade !== null && in_array($grade, SchedulingConstants::wednesdayFullGrades(), true)) {
             return self::ok();
         }
 
-        $wStart = SchedulingConstants::WEDNESDAY_WELLNESS['start']; // 09:50
-        $wEnd   = SchedulingConstants::WEDNESDAY_WELLNESS['end'];   // 10:20
+        $wellness = SchedulingConstants::wednesdayWellness();
+        $wStart = $wellness['start']; // default 09:50
+        $wEnd   = $wellness['end'];   // default 10:20
 
         if (SchedulingConstants::timesOverlap($classStart, $classEnd, $wStart, $wEnd)) {
             return self::fail(
@@ -211,7 +212,7 @@ class HardConstraintChecker
             return self::ok();
         }
 
-        if (! in_array($grade, SchedulingConstants::FRIDAY_ILA_GRADES, true)) {
+        if (! in_array($grade, SchedulingConstants::fridayIlaGrades(), true)) {
             return self::ok();
         }
 

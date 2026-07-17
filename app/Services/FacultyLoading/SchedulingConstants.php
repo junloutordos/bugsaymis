@@ -486,10 +486,112 @@ class SchedulingConstants
         return self::timetable($key);
     }
 
-    /** Drop the request-scoped override cache (call after saving an edit). */
+    // ── Special-window override layer (bell_schedule_settings) ────────────────
+
+    /**
+     * Editable special windows/lists that aren't full timetables. Each key maps
+     * to its hardcoded default; an admin edit is stored in bell_schedule_settings
+     * and read back here with the default as fallback.
+     */
+    public const SETTING_KEYS = [
+        'WEDNESDAY_WELLNESS',
+        'WEDNESDAY_ALP',
+        'WEDNESDAY_ALP_BY_GRADE',
+        'WEDNESDAY_ACTIVITY_START',
+        'WEDNESDAY_FULL_GRADES',
+        'FRIDAY_FLAG_RETREAT',
+        'FRIDAY_ILA_GRADES',
+        'GRADE8_OVERFLOW_SLOTS',
+    ];
+
+    /** @var array<string,mixed>|null request-scoped settings cache */
+    private static ?array $settingCache = null;
+
+    /** Hardcoded default value for a special-window setting key. */
+    public static function defaultSetting(string $key): mixed
+    {
+        return match ($key) {
+            'WEDNESDAY_WELLNESS'       => self::WEDNESDAY_WELLNESS,
+            'WEDNESDAY_ALP'            => self::WEDNESDAY_ALP,
+            'WEDNESDAY_ALP_BY_GRADE'   => self::WEDNESDAY_ALP_BY_GRADE,
+            'WEDNESDAY_ACTIVITY_START' => self::WEDNESDAY_ACTIVITY_START,
+            'WEDNESDAY_FULL_GRADES'    => self::WEDNESDAY_FULL_GRADES,
+            'FRIDAY_FLAG_RETREAT'      => self::FRIDAY_FLAG_RETREAT,
+            'FRIDAY_ILA_GRADES'        => self::FRIDAY_ILA_GRADES,
+            'GRADE8_OVERFLOW_SLOTS'    => self::GRADE8_OVERFLOW_SLOTS,
+            default                    => null,
+        };
+    }
+
+    /** Effective value for a setting key — saved override or hardcoded default. */
+    public static function setting(string $key): mixed
+    {
+        if (self::$settingCache === null) {
+            try {
+                self::$settingCache = DB::table('bell_schedule_settings')
+                    ->pluck('value', 'setting_key')
+                    ->map(fn ($json) => json_decode((string) $json, true))
+                    ->all();
+            } catch (\Throwable $e) {
+                self::$settingCache = [];
+            }
+        }
+
+        return array_key_exists($key, self::$settingCache) && self::$settingCache[$key] !== null
+            ? self::$settingCache[$key]
+            : self::defaultSetting($key);
+    }
+
+    // Typed accessors — every consumer reads through these so overrides apply
+    // uniformly (never read the raw WEDNESDAY_*/FRIDAY_*/GRADE8_* consts directly).
+
+    /** Normalise a stored window to a clean start→end shape (JSON reorders keys). */
+    private static function window(mixed $w): array
+    {
+        return ['start' => $w['start'] ?? null, 'end' => $w['end'] ?? null];
+    }
+
+    public static function wednesdayWellness(): array
+    {
+        return self::window(self::setting('WEDNESDAY_WELLNESS'));
+    }
+
+    public static function wednesdayActivityStart(string $group): ?string
+    {
+        return self::setting('WEDNESDAY_ACTIVITY_START')[$group] ?? null;
+    }
+
+    /** @return array<int,int> */
+    public static function wednesdayFullGrades(): array
+    {
+        return array_map('intval', self::setting('WEDNESDAY_FULL_GRADES'));
+    }
+
+    public static function fridayFlagRetreat(): array
+    {
+        return self::window(self::setting('FRIDAY_FLAG_RETREAT'));
+    }
+
+    /** @return array<int,int> */
+    public static function fridayIlaGrades(): array
+    {
+        return array_map('intval', self::setting('FRIDAY_ILA_GRADES'));
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    public static function grade8Overflow(string $day): array
+    {
+        return array_map(
+            fn ($r) => ['start' => $r['start'], 'end' => $r['end'], 'type' => $r['type'], 'label' => $r['label']],
+            self::setting('GRADE8_OVERFLOW_SLOTS')[$day] ?? []
+        );
+    }
+
+    /** Drop the request-scoped override caches (call after saving an edit). */
     public static function flushOverrideCache(): void
     {
         self::$overrideCache = null;
+        self::$settingCache  = null;
     }
 
     /** Map a grade integer to its grade group string. */
@@ -518,7 +620,7 @@ class SchedulingConstants
     /** Grade-specific Wednesday ALP window, falling back to the campus default. */
     public static function getWednesdayAlp(int $grade): array
     {
-        return self::WEDNESDAY_ALP_BY_GRADE[$grade] ?? self::WEDNESDAY_ALP;
+        return self::window(self::setting('WEDNESDAY_ALP_BY_GRADE')[$grade] ?? self::setting('WEDNESDAY_ALP'));
     }
 
     /**
@@ -560,7 +662,7 @@ class SchedulingConstants
 
         if ($grade === 8) {
             $slots = array_merge($slots, array_values(array_filter(
-                self::GRADE8_OVERFLOW_SLOTS[$day] ?? [],
+                self::grade8Overflow($day),
                 static fn ($s) => $s['type'] === 'CLASS',
             )));
         }
@@ -575,7 +677,7 @@ class SchedulingConstants
 
         if ($grade === 8) {
             $slots = array_merge($slots, array_values(array_filter(
-                self::GRADE8_OVERFLOW_SLOTS[$day] ?? [],
+                self::grade8Overflow($day),
                 static fn ($s) => $s['type'] === 'ILP_ONLY',
             )));
         }
@@ -608,7 +710,7 @@ class SchedulingConstants
         );
 
         // Grade 8 overflow teaching replaces the overlapping consultation band.
-        foreach (self::GRADE8_OVERFLOW_SLOTS[$day] ?? [] as $overflow) {
+        foreach (self::grade8Overflow($day) as $overflow) {
             if ($grade !== 8) {
                 break;
             }
@@ -618,13 +720,13 @@ class SchedulingConstants
         }
 
         if ($day === 'Wednesday') {
-            $fullWed = in_array($grade, self::WEDNESDAY_FULL_GRADES, true);
+            $fullWed = in_array($grade, self::wednesdayFullGrades(), true);
             $alp     = self::getWednesdayAlp($grade);
 
             // Full-Wednesday grades are not excluded from the Wellness window
             // during placement, so it isn't shown as blocked for them either.
             if (! $fullWed) {
-                $blocked[] = array_merge(self::WEDNESDAY_WELLNESS, [
+                $blocked[] = array_merge(self::wednesdayWellness(), [
                     'type'  => 'WELLNESS',
                     'label' => 'Wellness Break',
                 ]);
@@ -633,7 +735,7 @@ class SchedulingConstants
             $group        = self::getGradeGroup($grade);
             $cutoffStart  = $fullWed
                 ? $alp['start']
-                : (self::WEDNESDAY_ACTIVITY_START[$group] ?? $alp['start']);
+                : (self::wednesdayActivityStart($group) ?? $alp['start']);
             $activityStart = min($cutoffStart, $alp['start']);
 
             $activityBlock = [
@@ -653,7 +755,7 @@ class SchedulingConstants
         }
 
         if ($day === 'Friday') {
-            $flagBlock = array_merge(self::FRIDAY_FLAG_RETREAT, [
+            $flagBlock = array_merge(self::fridayFlagRetreat(), [
                 'type'  => 'FLAG_RETREAT',
                 'label' => 'Flag Retreat Ceremony',
             ]);
@@ -693,11 +795,11 @@ class SchedulingConstants
         );
 
         if ($day === 'Wednesday') {
-            $fullWed = in_array($grade, self::WEDNESDAY_FULL_GRADES, true);
+            $fullWed = in_array($grade, self::wednesdayFullGrades(), true);
             $alp     = self::getWednesdayAlp($grade);
 
             if (! $fullWed) {
-                $wellness = self::WEDNESDAY_WELLNESS;
+                $wellness = self::wednesdayWellness();
                 // G11/G12's Wednesday recess sits inside the Wellness window —
                 // trim it so the two bands don't render on top of each other.
                 $blocked   = self::trimAround($blocked, $wellness['start'], $wellness['end'], ['RECESS']);
@@ -710,7 +812,7 @@ class SchedulingConstants
             $group       = self::getGradeGroup($grade);
             $cutoffStart = $fullWed
                 ? $alp['start']
-                : (self::WEDNESDAY_ACTIVITY_START[$group] ?? $alp['start']);
+                : (self::wednesdayActivityStart($group) ?? $alp['start']);
 
             $activityBlock = [
                 'start' => min($cutoffStart, $alp['start']),
@@ -724,7 +826,7 @@ class SchedulingConstants
         }
 
         if ($day === 'Friday') {
-            $flagBlock = array_merge(self::FRIDAY_FLAG_RETREAT, [
+            $flagBlock = array_merge(self::fridayFlagRetreat(), [
                 'type'  => 'FLAG_RETREAT',
                 'label' => 'Flag Retreat Ceremony',
             ]);
@@ -791,7 +893,7 @@ class SchedulingConstants
      */
     public static function getSchedulableClassSlots(int $grade, string $day): array
     {
-        if ($day === 'Friday' && in_array($grade, self::FRIDAY_ILA_GRADES, true)) {
+        if ($day === 'Friday' && in_array($grade, self::fridayIlaGrades(), true)) {
             return [];
         }
 
@@ -804,7 +906,7 @@ class SchedulingConstants
     /** Canonical regular and ILP-only periods after applying fixed blocks. */
     public static function getSchedulableTeachingSlots(int $grade, string $day): array
     {
-        if ($day === 'Friday' && in_array($grade, self::FRIDAY_ILA_GRADES, true)) {
+        if ($day === 'Friday' && in_array($grade, self::fridayIlaGrades(), true)) {
             return [];
         }
 

@@ -139,7 +139,7 @@ class RotationGridBuilder
         // Tuesday and Thursday. Keep them available in this legacy slot-plan
         // generator as well as in the main deterministic generator.
         if ($grade === 8) {
-            foreach (SchedulingConstants::GRADE8_OVERFLOW_SLOTS[$day] ?? [] as $overflow) {
+            foreach (SchedulingConstants::grade8Overflow($day) as $overflow) {
                 if ($overflow['type'] !== 'CLASS') {
                     continue;
                 }

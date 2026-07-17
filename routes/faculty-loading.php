@@ -124,9 +124,11 @@ Route::middleware(['web', 'auth', 'verified'])
         // ── Bell Schedule editor (Administrator + CID Chief; role-gated in ctrl) ─
         Route::middleware('permission:faculty_loading.manage')
             ->prefix('bell-schedule')->name('bell-schedule.')->group(function () {
-                Route::get('/',       [BellScheduleController::class, 'index'])->name('index');
-                Route::post('/',      [BellScheduleController::class, 'update'])->name('update');
-                Route::post('/reset', [BellScheduleController::class, 'reset'])->name('reset');
+                Route::get('/',               [BellScheduleController::class, 'index'])->name('index');
+                Route::post('/',              [BellScheduleController::class, 'update'])->name('update');
+                Route::post('/reset',         [BellScheduleController::class, 'reset'])->name('reset');
+                Route::post('/setting',       [BellScheduleController::class, 'updateSetting'])->name('setting.update');
+                Route::post('/setting/reset', [BellScheduleController::class, 'resetSetting'])->name('setting.reset');
             });
 
         Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])
