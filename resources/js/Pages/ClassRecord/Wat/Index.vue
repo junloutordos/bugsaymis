@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import {
@@ -86,6 +87,18 @@ function complianceColor(pct) {
   <AdminLayout title="Weekly Assessment Tracker">
     <div class="max-w-6xl mx-auto space-y-4">
 
+      <AppPageHeader title="Weekly Assessment Tracker"
+        subtitle="Section-wide view of plotted assessments against the daily and weekly WAT limits.">
+        <template #actions>
+          <AppButton v-if="canReview" variant="secondary" @click="router.get(route('class-records.wat.review', { week: selectedWeek }))">
+            <ClipboardDocumentCheckIcon class="w-4 h-4" /> Review All Sections
+          </AppButton>
+          <AppButton v-if="sectionId" variant="secondary" @click="openPrint">
+            <PrinterIcon class="w-4 h-4" /> Print WAT Form
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
       <!-- Controls -->
       <div class="bg-white rounded-xl border border-slate-100 p-4 flex flex-wrap items-end gap-3">
         <div>
@@ -110,13 +123,6 @@ function complianceColor(pct) {
             </button>
           </div>
         </div>
-        <div class="flex-1"></div>
-        <AppButton v-if="canReview" variant="secondary" @click="router.get(route('class-records.wat.review', { week: selectedWeek }))">
-          <ClipboardDocumentCheckIcon class="w-4 h-4 mr-1.5" /> Review All Sections
-        </AppButton>
-        <AppButton v-if="sectionId" variant="secondary" @click="openPrint">
-          <PrinterIcon class="w-4 h-4 mr-1.5" /> Print WAT Form
-        </AppButton>
       </div>
 
       <template v-if="wat">

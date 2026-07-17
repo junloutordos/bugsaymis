@@ -13,6 +13,7 @@ class ClassRecordAttendanceRecord extends Model
         'class_record_attendance_date_id',
         'class_record_student_id',
         'status',
+        'uniform_status',
     ];
 
     public function attendanceDate(): BelongsTo

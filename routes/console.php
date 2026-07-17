@@ -44,9 +44,9 @@ Schedule::command('pds:notify-annual-update')->dailyAt('07:00')->withoutOverlapp
 //    no result reported (device went offline/crashed mid-flight) ─────────
 Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinutes()->withoutOverlapping();
 
-// ── Atlas Sentinel: proactively notify IT staff when a device stops
-//    checking in, instead of relying on someone noticing the dashboard badge
-Schedule::command('atlas-sentinel:notify-stale-devices')->everyFifteenMinutes()->withoutOverlapping();
+// Atlas Sentinel stale-device bell notifications removed 2026-07-17 (offline /
+// not-reporting devices were spamming IT staff). The command still exists for
+// manual runs: php artisan atlas-sentinel:notify-stale-devices
 
 // ── Atlas Sentinel: time out unclaimed/overlong remote-help requests and
 //    force-finalize sessions a dark agent never acked (must run often so an

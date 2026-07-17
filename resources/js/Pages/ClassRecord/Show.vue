@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
@@ -13,7 +14,6 @@ import Swal from 'sweetalert2'
 import {
   LockClosedIcon,
   LockOpenIcon,
-  ArrowLeftIcon,
   CheckCircleIcon,
   ArrowDownTrayIcon,
   PlusIcon,
@@ -460,29 +460,17 @@ async function checkRecord() {
   <AdminLayout :title="classRecord.subject_name">
     <div class="space-y-5">
 
-      <!-- Back + header -->
-      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div class="flex items-start gap-3">
-          <AppIconButton label="Back to Class Records" variant="secondary" class="mt-0.5"
-            @click="router.visit(route('class-records.page.index'))">
-            <ArrowLeftIcon class="h-4 w-4" />
-          </AppIconButton>
-          <div>
-            <h1 class="text-xl font-bold text-slate-800">{{ classRecord.subject_name }}</h1>
-            <p class="text-sm text-slate-500 mt-0.5">
-              {{ classRecord.year_level_section }} &middot; {{ classRecord.school_year }}
-              &middot; {{ classRecord.grading_option?.name }}
-            </p>
-            <div class="mt-1.5">
-              <AppBadge :color="statusBadge(classRecord.status)">
-                {{ classRecord.status === 'checked' ? 'Checked ✓' : classRecord.status.charAt(0).toUpperCase() + classRecord.status.slice(1) }}
-              </AppBadge>
-            </div>
-          </div>
-        </div>
-
-        <!-- Workflow actions -->
-        <div class="flex items-center gap-2 shrink-0">
+      <AppPageHeader
+        :title="classRecord.subject_name"
+        :subtitle="`${classRecord.year_level_section} · SY ${classRecord.school_year} · ${classRecord.grading_option?.name ?? ''}`"
+        :breadcrumb="[
+          { label: 'Class Records', href: route('class-records.page.index') },
+          { label: classRecord.subject_name },
+        ]">
+        <template #actions>
+          <AppBadge :color="statusBadge(classRecord.status)">
+            {{ classRecord.status === 'checked' ? 'Checked ✓' : classRecord.status.charAt(0).toUpperCase() + classRecord.status.slice(1) }}
+          </AppBadge>
           <AppButton variant="secondary" as="a" :href="route('class-records.export', classRecord.id)">
             <ArrowDownTrayIcon class="h-4 w-4" /> Export All
           </AppButton>
@@ -492,8 +480,8 @@ async function checkRecord() {
           <AppButton v-if="classRecord.status === 'submitted' && isAdmin" variant="success" @click="checkRecord">
             <CheckCircleIcon class="h-4 w-4" /> Mark as Checked
           </AppButton>
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <!-- Past SY read-only banner -->
       <div v-if="isReadOnly"

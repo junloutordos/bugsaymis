@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import Swal from 'sweetalert2'
@@ -64,6 +65,15 @@ function viewSection(row) {
   <Head title="WAT Review" />
   <AdminLayout title="WAT Review — All Sections">
     <div class="max-w-5xl mx-auto space-y-4">
+
+      <AppPageHeader title="WAT Review — All Sections"
+        subtitle="Weekly assessment compliance across every section, for the ACIDAA review.">
+        <template #actions>
+          <AppButton variant="secondary" @click="router.get(route('class-records.wat.index'), { week: selectedWeek })">
+            <ChevronLeftIcon class="w-4 h-4" /> Back to Tracker
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <div class="bg-white rounded-xl border border-slate-100 p-4 flex flex-wrap items-end gap-3">
         <div>

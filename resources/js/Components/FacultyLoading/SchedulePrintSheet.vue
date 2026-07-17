@@ -1,6 +1,6 @@
 <template>
   <div class="schedule-print-sheet">
-    <img class="schedule-print-header print-asset" src="/images/report_header.jpeg" alt="" />
+    <img class="schedule-print-header print-asset" src="/images/report_header_landscape.jpg" alt="" />
 
     <main class="schedule-print-body">
       <div class="schedule-print-heading">
@@ -132,7 +132,7 @@
       </div>
     </main>
 
-    <img class="schedule-print-footer print-asset" src="/images/report_footer.jpeg" alt="" />
+    <img class="schedule-print-footer print-asset" src="/images/report_footer_landscape.jpg" alt="" />
   </div>
 </template>
 
@@ -324,14 +324,15 @@ function lunchTimeLabel(day) {
   flex: 0 0 auto;
 }
 
+/* Landscape strips designed at full A4-landscape width — render edge to edge. */
 .schedule-print-header {
-  max-width: 170mm;
-  margin: 2mm auto 0;
+  width: 100%;
+  margin: 0;
 }
 
 .schedule-print-footer {
-  max-width: 140mm;
-  margin: 0 auto 2mm;
+  width: 100%;
+  margin: 0;
 }
 
 .schedule-print-body {
