@@ -13,20 +13,25 @@ use Illuminate\Support\Facades\DB;
 
 class GradingOptionController extends Controller
 {
-    private function isAdmin(): bool
+    /**
+     * Full class-record admins (CID Chief/Administrator) and holders of the
+     * scoped class-records.grading-options grant (AUHs) can both manage the
+     * shared grading options.
+     */
+    private function canManageOptions(): bool
     {
-        return Auth::user()->hasPermission('class-records.admin');
+        return Auth::user()->hasAnyPermission(['class-records.admin', 'class-records.grading-options']);
     }
 
     /**
      * GET /grading-options
-     * List ALL grading options with their categories (admin sees inactive too).
+     * List ALL grading options with their categories (managers see inactive too).
      */
     public function index(): JsonResponse
     {
         $query = GradingOption::with(['categories' => fn ($q) => $q->orderBy('sort_order')]);
 
-        if (! $this->isAdmin()) {
+        if (! $this->canManageOptions()) {
             $query->where('is_active', true);
         }
 
@@ -39,7 +44,7 @@ class GradingOptionController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        abort_unless($this->isAdmin(), 403, 'Only administrators can create grading options.');
+        abort_unless($this->canManageOptions(), 403, 'You are not allowed to create grading options.');
 
         $validated = $request->validate([
             'name'                         => 'required|string|max:255|unique:grading_options,name',
@@ -94,7 +99,7 @@ class GradingOptionController extends Controller
      */
     public function destroy(GradingOption $gradingOption): JsonResponse
     {
-        abort_unless($this->isAdmin(), 403, 'Only administrators can delete grading options.');
+        abort_unless($this->canManageOptions(), 403, 'You are not allowed to delete grading options.');
 
         $inUse = \App\Models\ClassRecord\ClassRecord::where('grading_option_id', $gradingOption->id)->exists();
         if ($inUse) {
@@ -114,7 +119,7 @@ class GradingOptionController extends Controller
      */
     public function update(Request $request, GradingOption $gradingOption): JsonResponse
     {
-        abort_unless($this->isAdmin(), 403, 'Only administrators can edit grading options.');
+        abort_unless($this->canManageOptions(), 403, 'You are not allowed to edit grading options.');
 
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
@@ -137,7 +142,7 @@ class GradingOptionController extends Controller
      */
     public function updateCategories(Request $request, GradingOption $gradingOption): JsonResponse
     {
-        abort_unless($this->isAdmin(), 403, 'Only administrators can edit grading option categories.');
+        abort_unless($this->canManageOptions(), 403, 'You are not allowed to edit grading option categories.');
 
         $validated = $request->validate([
             'categories'                   => 'required|array|min:1',

@@ -44,6 +44,9 @@ class ClassRecordPageController extends Controller
             'classRecords'      => $records,
             'gradingOptions'    => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
             'isAdmin'           => $this->isAdmin(),
+            // Grading Options management is broader than isAdmin: AUHs hold the
+            // scoped class-records.grading-options grant without full admin.
+            'canManageGradingOptions' => Auth::user()->hasAnyPermission(['class-records.admin', 'class-records.grading-options']),
             'filters'           => $request->only(['school_year']),
             'currentSchoolYear' => $currentSY ? $currentSY->name : null,
         ]);

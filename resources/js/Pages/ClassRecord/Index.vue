@@ -5,8 +5,9 @@
 
       <AppPageHeader title="Class Records" subtitle="Manage grade class records per subject and section">
         <template #actions>
-          <!-- Grading options editor — admin/CID Chief only -->
-          <div v-if="isAdmin" class="relative group">
+          <!-- Grading options editor — class-records.admin OR the scoped
+               class-records.grading-options grant (AUHs) -->
+          <div v-if="canManageGradingOptions" class="relative group">
             <AppButton variant="secondary">
               <Cog6ToothIcon class="h-4 w-4" /> Grading Options
             </AppButton>
@@ -339,6 +340,7 @@ const props = defineProps({
   classRecords:      Array,
   gradingOptions:    Array,
   isAdmin:           { type: Boolean, default: false },
+  canManageGradingOptions: { type: Boolean, default: false },
   currentSchoolYear: { type: String, default: null },
 })
 

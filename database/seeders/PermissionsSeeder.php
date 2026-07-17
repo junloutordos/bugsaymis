@@ -71,6 +71,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'ClassRecord', 'name' => 'class-records.view',   'description' => 'View own class records (teacher)'],
             ['module' => 'ClassRecord', 'name' => 'class-records.manage', 'description' => 'Create, edit, enter scores for own class records'],
             ['module' => 'ClassRecord', 'name' => 'class-records.admin',  'description' => 'View all class records, check, unlock quarters (AUH/Admin)'],
+            ['module' => 'ClassRecord', 'name' => 'class-records.grading-options', 'description' => 'Manage grading options and their categories (scoped subset of class-records.admin)'],
 
             // ── IT / MIS ──────────────────────────────────────────────────────
             ['module' => 'IT',       'name' => 'it.requests.view',   'description' => 'View IT job requests'],

@@ -415,6 +415,8 @@ class RolePermissionSeeder extends Seeder
 
         // ── Class Records ─────────────────────────────────────────────────────
         $assign('CID Chief', ['class-records.view', 'class-records.manage', 'class-records.admin']);
+        // AUHs manage the shared grading options only — NOT full class-records.admin
+        $assign('AUH',       ['class-records.grading-options']);
         $assign('Faculty',   ['class-records.view', 'class-records.manage', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
         $assign('Staff',     ['class-records.view', 'students.clearance.sign']);
         $assign('CID Chief', ['students.clearance.view', 'students.clearance.sign', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
