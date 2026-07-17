@@ -7,6 +7,7 @@ import { useCountUp } from '@/Composables/useCountUp.js'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import EmptyState from '@/Components/EmptyState.vue'
+import FacultyCidPanel from '@/Pages/Dashboard/FacultyCidPanel.vue'
 import {
   BellAlertIcon,
   CalendarDaysIcon,
@@ -34,6 +35,7 @@ const props = defineProps({
   calendarEvents: { type: Array, default: () => [] },
   quickLinks: { type: Array, default: () => [] },
   announcements: { type: Array, default: () => [] },
+  faculty: { type: Object, default: null },
 })
 
 const page = usePage()
@@ -304,7 +306,10 @@ function statusClass(status) {
         </div>
       </section>
 
-      <section class="dash-section grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" style="--stagger: 1">
+      <!-- Faculty see CID analytics in place of the generic stat cards -->
+      <FacultyCidPanel v-if="faculty" :data="faculty" />
+
+      <section v-else class="dash-section grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" style="--stagger: 1">
         <div
           v-for="(card, index) in summaryCards"
           :key="card.label"
