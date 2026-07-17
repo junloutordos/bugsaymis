@@ -28,7 +28,7 @@
             <span
               v-for="minute in HOUR_MARKS"
               :key="minute"
-              :class="{ 'schedule-print-time-first': minute === CAL_START }"
+              :class="{ 'schedule-print-time-first': minute === CAL_START, 'schedule-print-time-last': minute === CAL_END }"
               :style="positionStyle(minute)"
             >
               {{ formatHour(minute) }}
@@ -154,9 +154,9 @@ const props = defineProps({
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const CAL_START = 7 * 60
-const CAL_END = 16 * 60 + 30
+const CAL_END = 17 * 60 // bell schedules run to 17:00 (Consultation/ALP)
 const NOON = 12 * 60
-const HOUR_MARKS = Array.from({ length: 10 }, (_, index) => CAL_START + index * 60)
+const HOUR_MARKS = Array.from({ length: 11 }, (_, index) => CAL_START + index * 60)
 const GRID_MARKS = Array.from(
   { length: Math.floor((CAL_END - CAL_START) / 30) + 1 },
   (_, index) => CAL_START + index * 30,
@@ -457,6 +457,10 @@ body {
 /* First hour label sits below its gridline so it never straddles the day-header border */
 .schedule-print-time-axis .schedule-print-time-first {
   transform: translateY(15%);
+}
+
+.schedule-print-time-axis .schedule-print-time-last {
+  transform: translateY(-100%);
 }
 
 .schedule-print-day-grid {

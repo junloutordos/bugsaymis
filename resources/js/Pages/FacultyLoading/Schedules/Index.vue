@@ -525,8 +525,8 @@ import {
 // ── Calendar constants ───────────────────────────────────────────────────────
 
 const WEEKDAYS  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-const CAL_START = 7 * 60        // 7:00 AM in minutes
-const CAL_END   = 16 * 60 + 30  // 4:30 PM in minutes
+const CAL_START = 7 * 60   // 7:00 AM in minutes
+const CAL_END   = 17 * 60  // 5:00 PM in minutes — must match ScheduleCalendarCard's canvas
 const SCALE     = 1.5            // px per minute — used by the mousedown/drag-to-create math below
 
 // ── Props ────────────────────────────────────────────────────────────────────

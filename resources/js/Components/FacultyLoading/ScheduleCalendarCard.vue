@@ -67,8 +67,8 @@
               :style="{ top: hourTop(h) + 'px' }"
               class="absolute inset-x-0 border-t border-slate-100 pointer-events-none z-0" />
 
-            <!-- Half-hour dashed lines -->
-            <div v-for="h in HOURS" :key="'hl30-' + h"
+            <!-- Half-hour dashed lines (skip the one past the canvas bottom) -->
+            <div v-for="h in HOURS.filter(h => h * 60 + 30 < CAL_END)" :key="'hl30-' + h"
               :style="{ top: (hourTop(h) + SCALE * 30) + 'px' }"
               class="absolute inset-x-0 border-t border-dashed border-slate-50 pointer-events-none z-0" />
 
@@ -209,13 +209,13 @@ defineEmits(['column-mousedown', 'column-dragover', 'column-drop', 'event-dragst
 // ── Calendar constants (mirrors the values the parent used to own) ───────────
 
 const WEEKDAYS  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-const CAL_START = 7 * 60        // 7:00 AM in minutes
-const CAL_END   = 16 * 60 + 30  // 4:30 PM in minutes
-const SCALE     = 1.5           // px per minute
-const GUTTER    = 44            // width of the time-axis gutter in px
+const CAL_START = 7 * 60   // 7:00 AM in minutes
+const CAL_END   = 17 * 60  // 5:00 PM in minutes — bell schedules run to 17:00 (Consultation/ALP)
+const SCALE     = 1.5      // px per minute
+const GUTTER    = 44       // width of the time-axis gutter in px
 const CAL_H     = (CAL_END - CAL_START) * SCALE
 
-const HOURS = Array.from({ length: 10 }, (_, i) => i + 7)
+const HOURS = Array.from({ length: 11 }, (_, i) => i + 7)
 
 const PALETTE = [
   { bg: '#dbeafe', border: '#93c5fd', color: '#1e40af' },
