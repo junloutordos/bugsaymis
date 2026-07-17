@@ -46,9 +46,9 @@ class ScheduleValidationService
      *   start_time:       string  (H:i or H:i:s),
      *   end_time:         string  (H:i or H:i:s),
      * }
-     * @param int|null $excludeScheduleId  Existing schedule id to skip (updates)
+     * @param int|array<int>|null $excludeScheduleId Existing schedule ids to skip
      */
-    public function validate(array $data, ?int $excludeScheduleId = null): array
+    public function validate(array $data, int|array|null $excludeScheduleId = null): array
     {
         $errors   = [];
         $warnings = [];
@@ -159,7 +159,7 @@ class ScheduleValidationService
      *   end_time:         string,
      * }
      */
-    public function validateNonTeaching(array $data, ?int $excludeScheduleId = null): array
+    public function validateNonTeaching(array $data, int|array|null $excludeScheduleId = null): array
     {
         $errors   = [];
         $warnings = [];
@@ -281,7 +281,7 @@ class ScheduleValidationService
         return $errors;
     }
 
-    private function validateFacultyLoadLimits(array $data, ?int $excludeScheduleId = null): array
+    private function validateFacultyLoadLimits(array $data, int|array|null $excludeScheduleId = null): array
     {
         $errors   = [];
         $warnings = [];

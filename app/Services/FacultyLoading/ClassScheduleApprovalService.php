@@ -5,6 +5,7 @@ namespace App\Services\FacultyLoading;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
+use App\Models\FacultyLoading\ClassScheduleSwapRequest;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
@@ -83,8 +84,18 @@ class ClassScheduleApprovalService
             }
 
             $current = $this->snapshot($batch->academic_term_id);
-            $encoded = json_encode($current, JSON_UNESCAPED_SLASHES);
-            if (! hash_equals($batch->schedule_hash, hash('sha256', $encoded))) {
+            $currentEncoded = json_encode($current, JSON_UNESCAPED_SLASHES);
+
+            if ($batch->approval_type === 'swap_amendment') {
+                if (! $batch->baseline_hash || ! hash_equals($batch->baseline_hash, hash('sha256', $currentEncoded))) {
+                    throw ValidationException::withMessages(['schedule' => 'The official schedule changed after this amendment was submitted.']);
+                }
+                $this->applyChangeSet($batch->change_set ?? []);
+                $current = $this->snapshot($batch->academic_term_id);
+                $currentEncoded = json_encode($current, JSON_UNESCAPED_SLASHES);
+            }
+
+            if (! hash_equals($batch->schedule_hash, hash('sha256', $currentEncoded))) {
                 throw ValidationException::withMessages(['schedule' => 'The schedule changed after submission and cannot be approved.']);
             }
 
@@ -93,13 +104,35 @@ class ClassScheduleApprovalService
                 ClassScheduleApprovalBatch::class,
                 $batch->id,
                 "Class Schedule - {$batch->academicTerm->full_label}",
-                $encoded,
+                $currentEncoded,
                 ['stage' => 'approved', 'signature_path' => $ocd->electronic_signature],
             );
 
             ClassSchedule::where('academic_term_id', $batch->academic_term_id)
                 ->where('status', 'tentative')->update(['status' => 'active']);
+            if ($batch->supersedes_batch_id) {
+                ClassScheduleApprovalBatch::whereKey($batch->supersedes_batch_id)
+                    ->where('status', 'approved')->update(['status' => 'superseded']);
+            }
             $batch->update(['status' => 'approved', 'approved_by' => $ocd->id, 'approved_at' => now()]);
+            $swapRequests = ClassScheduleSwapRequest::with(['requester', 'targetSchedule.faculty'])
+                ->where('approval_batch_id', $batch->id)->get();
+            ClassScheduleSwapRequest::where('approval_batch_id', $batch->id)->update([
+                'status' => 'applied', 'applied_at' => now(),
+            ]);
+            foreach ($swapRequests as $swapRequest) {
+                NotificationService::notifyUser(
+                    $swapRequest->requester, 'Class Schedule', "Swap Request #{$swapRequest->id}",
+                    'OCD Approved Schedule Swap', route('faculty-loading.my-schedule', ['term_id' => $batch->academic_term_id]),
+                );
+                $partner = $swapRequest->targetSchedule?->faculty;
+                if ($partner && $partner->id !== $swapRequest->requester->id) {
+                    NotificationService::notifyUser(
+                        $partner, 'Class Schedule', "Swap Request #{$swapRequest->id}",
+                        'OCD Approved Schedule Swap', route('faculty-loading.my-schedule', ['term_id' => $batch->academic_term_id]),
+                    );
+                }
+            }
 
             NotificationService::notifyUser(
                 $batch->submitter, 'Class Schedule', "Schedule Batch #{$batch->id}",
@@ -118,6 +151,9 @@ class ClassScheduleApprovalService
             $batch->update([
                 'status' => 'returned', 'returned_by' => $ocd->id,
                 'returned_at' => now(), 'return_remarks' => $reason,
+            ]);
+            ClassScheduleSwapRequest::where('approval_batch_id', $batch->id)->update([
+                'status' => 'pending', 'approval_batch_id' => null,
             ]);
             NotificationService::notifyUser(
                 $batch->submitter, 'Class Schedule', "Schedule Batch #{$batch->id}",
@@ -155,6 +191,69 @@ class ClassScheduleApprovalService
             ->whereIn('status', ['pending_ocd', 'approved'])->exists();
     }
 
+    public function submitSwapAmendment(
+        AcademicTerm $term,
+        User $cidChief,
+        string $pin,
+        array $changeSet,
+        ClassScheduleSwapRequest $swapRequest
+    ): ClassScheduleApprovalBatch {
+        $this->requireSigningIdentity($cidChief, $pin);
+
+        return DB::transaction(function () use ($term, $cidChief, $changeSet, $swapRequest) {
+            if (ClassScheduleApprovalBatch::where('academic_term_id', $term->id)
+                ->where('status', 'pending_ocd')->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages(['schedule' => 'OCD must act on the pending schedule submission first.']);
+            }
+
+            $approved = ClassScheduleApprovalBatch::where('academic_term_id', $term->id)
+                ->where('status', 'approved')->latest('id')->lockForUpdate()->first();
+            if (! $approved) {
+                throw ValidationException::withMessages(['schedule' => 'No approved schedule exists for this amendment.']);
+            }
+
+            ClassSchedule::where('academic_term_id', $term->id)->lockForUpdate()->get(['id']);
+            $changeSet = $this->normalizeChangeSet($changeSet);
+            $baseline = $this->snapshot($term->id);
+            $baselineEncoded = json_encode($baseline, JSON_UNESCAPED_SLASHES);
+            $proposed = $this->applyChangeSetToSnapshot($baseline, $changeSet);
+            $proposedEncoded = json_encode($proposed, JSON_UNESCAPED_SLASHES);
+
+            $batch = ClassScheduleApprovalBatch::create([
+                'academic_term_id' => $term->id,
+                'status' => 'pending_ocd',
+                'approval_type' => 'swap_amendment',
+                'schedule_snapshot' => $proposed,
+                'schedule_hash' => hash('sha256', $proposedEncoded),
+                'baseline_hash' => hash('sha256', $baselineEncoded),
+                'change_set' => $changeSet,
+                'supersedes_batch_id' => $approved->id,
+                'submitted_by' => $cidChief->id,
+                'submitted_at' => now(),
+            ]);
+
+            $this->signatures->sign(
+                $cidChief,
+                ClassScheduleApprovalBatch::class,
+                $batch->id,
+                "Class Schedule Swap Amendment - {$term->full_label}",
+                $proposedEncoded,
+                ['stage' => 'prepared', 'signature_path' => $cidChief->electronic_signature],
+            );
+
+            $swapRequest->update(['status' => 'pending_ocd', 'approval_batch_id' => $batch->id]);
+
+            User::havingRole('OCD')->where('status', '<>', 'inactive')->get()->each(
+                fn (User $user) => NotificationService::notifyUser(
+                    $user, 'Class Schedule', "Swap Amendment #{$batch->id}",
+                    'Pending OCD Approval', route('approvals.index'), $term->full_label,
+                )
+            );
+
+            return $batch;
+        });
+    }
+
     private function requireSigningIdentity(User $user, string $pin): void
     {
         if (! $user->electronic_signature || ! $user->signature_pin) {
@@ -173,6 +272,43 @@ class ClassScheduleApprovalService
                 'school_year_id', 'academic_term_id', 'entry_type', 'session_type', 'title', 'category',
                 'day_of_week', 'start_time', 'end_time', 'status', 'remarks',
             ])->map(fn ($row) => $row->getAttributes())->values()->all();
+    }
+
+    private function applyChangeSet(array $changeSet): void
+    {
+        foreach ($changeSet as $change) {
+            $schedule = ClassSchedule::whereKey((int) $change['schedule_id'])->lockForUpdate()->firstOrFail();
+            $schedule->update($change['attributes']);
+        }
+    }
+
+    private function applyChangeSetToSnapshot(array $snapshot, array $changeSet): array
+    {
+        $changes = collect($changeSet)->keyBy(fn ($change) => (int) $change['schedule_id']);
+
+        foreach ($snapshot as &$row) {
+            $change = $changes->get((int) $row['id']);
+            if ($change) {
+                $row = array_merge($row, $change['attributes']);
+            }
+        }
+        unset($row);
+
+        return $snapshot;
+    }
+
+    private function normalizeChangeSet(array $changeSet): array
+    {
+        foreach ($changeSet as &$change) {
+            foreach (['start_time', 'end_time'] as $field) {
+                if (isset($change['attributes'][$field]) && strlen($change['attributes'][$field]) === 5) {
+                    $change['attributes'][$field] .= ':00';
+                }
+            }
+        }
+        unset($change);
+
+        return $changeSet;
     }
 
     private function conflicts(array $rows): array

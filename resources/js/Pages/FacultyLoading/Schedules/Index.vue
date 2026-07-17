@@ -6,6 +6,10 @@
       <AppPageHeader :title="pageTitle" :subtitle="pageSubtitle">
         <template #actions>
           <template v-if="isManage">
+            <AppButton v-if="!isMyPage" variant="secondary" @click="swapReviewModal = true">
+              <ArrowsRightLeftIcon class="h-4 w-4" /> Swap Requests
+              <span v-if="openSwapRequests.length" class="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{{ openSwapRequests.length }}</span>
+            </AppButton>
             <AppButton v-if="!isMyPage && (viewBy === 'section' || viewBy === 'faculty')" variant="secondary"
               :disabled="!schedules.length" @click="printAll">
               <PrinterIcon class="h-4 w-4" /> Print All
@@ -25,6 +29,9 @@
               <PaperAirplaneIcon class="h-4 w-4" /> Submit to OCD
             </AppButton>
           </template>
+          <AppButton v-if="(!isManage || isMyPage) && canRequestSwap" variant="secondary" :disabled="!requestableSchedules.length" @click="openSwapRequest">
+            <ArrowsRightLeftIcon class="h-4 w-4" /> Request Swap
+          </AppButton>
           <AppButton v-if="canConforme" variant="primary" @click="signConforme">
             <PencilSquareIcon class="h-4 w-4" /> Sign Conforme
           </AppButton>
@@ -195,6 +202,98 @@
       </div>
 
     </div>
+
+    <AppModal :show="swapRequestModal" title="Request Schedule Swap" size="md" @close="swapRequestModal = false">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Class *</label>
+          <select v-model="swapRequestForm.source_schedule_id"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option :value="null">Select class...</option>
+            <option v-for="s in requestableSchedules" :key="s.id" :value="s.id">
+              {{ s.subject?.code }} · {{ s.day_of_week }} {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }} · {{ s.section_name }}
+            </option>
+          </select>
+        </div>
+        <AppTextarea v-model="swapRequestForm.reason" label="Reason" :rows="3" required />
+        <div class="grid grid-cols-3 gap-3">
+          <AppSelect v-model="swapRequestForm.preferred_day" label="Preferred Day">
+            <option v-for="d in WEEKDAYS" :key="d" :value="d">{{ d }}</option>
+          </AppSelect>
+          <AppInput v-model="swapRequestForm.preferred_start_time" type="time" label="Earliest Time" />
+          <AppInput v-model="swapRequestForm.preferred_end_time" type="time" label="Latest Time" />
+        </div>
+        <div v-if="openSwapRequests.length" class="border-t border-slate-200 pt-3">
+          <p class="mb-2 text-xs font-semibold uppercase text-slate-500">Open requests</p>
+          <div v-for="request in openSwapRequests" :key="request.id" class="flex items-center justify-between gap-3 py-1.5 text-sm">
+            <span class="text-slate-700">{{ request.source?.subject }} · {{ request.source?.day }} {{ request.source?.start }}</span>
+            <AppButton v-if="request.status === 'pending'" variant="ghost" size="sm" @click="cancelSwapRequest(request)">Cancel</AppButton>
+            <span v-else class="text-xs text-amber-700">{{ swapStatusLabel(request.status) }}</span>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="swapRequestModal = false">Cancel</AppButton>
+        <AppButton :loading="swapRequestForm.processing" @click="submitSwapRequest">
+          <PaperAirplaneIcon class="h-4 w-4" /> Submit Request
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal :show="swapReviewModal" title="Schedule Swap Requests" size="xl" @close="closeSwapReview">
+      <div v-if="!swapRequests.length" class="py-10 text-center text-sm text-slate-500">No swap requests for this term.</div>
+      <div v-else class="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div class="max-h-[560px] overflow-y-auto border-r border-slate-200 pr-3 space-y-2">
+          <button v-for="request in swapRequests" :key="request.id" type="button" @click="selectSwapRequest(request)"
+            :class="['w-full border p-3 text-left transition-colors', selectedSwapRequest?.id === request.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50']">
+            <div class="flex items-start justify-between gap-2">
+              <span class="text-sm font-semibold text-slate-800">{{ request.source?.subject ?? 'Removed class' }}</span>
+              <span :class="swapStatusClass(request.status)" class="text-[11px] font-medium uppercase">{{ swapStatusLabel(request.status) }}</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-600">{{ request.requester }} · G{{ request.source?.grade }} {{ request.source?.section }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ request.source?.day }} {{ request.source?.start }}–{{ request.source?.end }}</p>
+          </button>
+        </div>
+
+        <div v-if="selectedSwapRequest" class="min-w-0 space-y-4">
+          <div class="border-b border-slate-200 pb-3">
+            <p class="text-sm font-semibold text-slate-800">{{ selectedSwapRequest.requester }} requested a change</p>
+            <p class="mt-1 text-sm text-slate-600">{{ selectedSwapRequest.reason }}</p>
+          </div>
+          <div v-if="swapCandidatesLoading" class="py-10 text-center text-sm text-slate-500">Checking all valid slots and swap partners...</div>
+          <div v-else-if="swapCandidates.length" class="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+            <div v-for="candidate in swapCandidates" :key="candidate.id" class="border border-slate-200 p-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-slate-800">{{ candidate.label }}</p>
+                  <p class="mt-1 text-xs text-slate-600">
+                    Requested class → {{ candidate.source_new.day_of_week }} {{ candidate.source_new.start_time }}–{{ candidate.source_new.end_time }}
+                  </p>
+                  <p v-if="candidate.target" class="mt-0.5 text-xs text-slate-600">
+                    {{ candidate.target.subject }} → {{ candidate.target_new.day_of_week }} {{ candidate.target_new.start_time }}–{{ candidate.target_new.end_time }}
+                  </p>
+                  <p v-if="candidate.type === 'swap_with_rooms'" class="mt-1 text-xs font-medium text-amber-700">Classrooms are exchanged with the time slots.</p>
+                  <p v-for="warning in candidate.warnings" :key="warning" class="mt-1 text-xs text-amber-700">{{ warning }}</p>
+                </div>
+                <AppButton size="sm" @click="applySwapCandidate(candidate)">Select</AppButton>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="swapCandidatesLoaded" class="py-10 text-center text-sm text-slate-500">
+            No valid exact swap or vacant slot satisfies all scheduling rules.
+          </div>
+          <div v-else class="py-10 text-center">
+            <AppButton :disabled="!['pending', 'recommended'].includes(selectedSwapRequest.status)" @click="findSwapCandidates">
+              <MagnifyingGlassIcon class="h-4 w-4" /> Find Possible Swaps
+            </AppButton>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <AppButton v-if="selectedSwapRequest && ['pending', 'recommended'].includes(selectedSwapRequest.status)" variant="danger" @click="declineSwapRequest">Decline</AppButton>
+        <AppButton variant="ghost" @click="closeSwapReview">Close</AppButton>
+      </template>
+    </AppModal>
 
     <!-- Quick-create popover (Google Calendar-style) -->
     <div v-if="quickCreate" ref="qcEl"
@@ -550,6 +649,8 @@ const props = defineProps({
   pageMode:    { type: String, default: 'admin' }, // 'admin' | 'my'
   approvalBatch: { type: Object, default: null },
   canSubmitSchedule: { type: Boolean, default: false },
+  swapRequests: { type: Array, default: () => [] },
+  canRequestSwap: { type: Boolean, default: false },
 })
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
@@ -563,7 +664,10 @@ const canConforme = computed(() =>
   (isMyPage.value || isSelf.value)
   && props.approvalBatch?.status === 'approved'
   && !props.approvalBatch?.conforme_signed)
-const approvalStatusLabel = computed(() => ({
+const approvalStatusLabel = computed(() => props.approvalBatch?.approval_type === 'swap_amendment'
+  && props.approvalBatch?.status === 'pending_ocd'
+  ? 'Swap amendment pending OCD approval. The official schedule remains unchanged.'
+  : ({
   pending_ocd: 'Pending OCD approval. Editing is locked.',
   approved: 'Approved by OCD. The official schedule is locked.',
   returned: 'Returned to CID for revision.',
@@ -597,6 +701,108 @@ async function signConforme() {
   const pin = await requestSignaturePin('Sign your individual faculty schedule Conforme?', 'Sign Conforme')
   if (!pin) return
   router.post(route('faculty-loading.schedules.approval.conforme', props.approvalBatch.id), { pin }, { preserveScroll: true })
+}
+
+const swapRequestModal = ref(false)
+const swapReviewModal = ref(false)
+const selectedSwapRequest = ref(null)
+const swapCandidates = ref([])
+const swapCandidatesLoading = ref(false)
+const swapCandidatesLoaded = ref(false)
+const openSwapRequests = computed(() => props.swapRequests.filter(r => ['pending', 'recommended', 'pending_ocd'].includes(r.status)))
+const swapRequests = computed(() => props.swapRequests)
+const requestableSchedules = computed(() => props.schedules.filter(s => s.entry_type === 'class' && s.status !== 'cancelled'))
+const swapRequestForm = useForm({
+  source_schedule_id: null,
+  reason: '',
+  preferred_day: '',
+  preferred_start_time: '',
+  preferred_end_time: '',
+})
+
+function openSwapRequest() {
+  swapRequestForm.reset()
+  swapRequestModal.value = true
+}
+
+function submitSwapRequest() {
+  if (!swapRequestForm.source_schedule_id) return
+  swapRequestForm.post(route('faculty-loading.schedules.swap-requests.store', swapRequestForm.source_schedule_id), {
+    preserveScroll: true,
+    onSuccess: () => { swapRequestModal.value = false },
+  })
+}
+
+function cancelSwapRequest(request) {
+  router.post(route('faculty-loading.schedules.swap-requests.cancel', request.id), {}, {
+    preserveScroll: true,
+    onSuccess: () => { swapRequestModal.value = false },
+  })
+}
+
+function selectSwapRequest(request) {
+  selectedSwapRequest.value = request
+  swapCandidates.value = []
+  swapCandidatesLoaded.value = false
+}
+
+async function findSwapCandidates() {
+  if (!selectedSwapRequest.value) return
+  swapCandidatesLoading.value = true
+  try {
+    const { data } = await axios.get(route('faculty-loading.schedules.swap-requests.candidates', selectedSwapRequest.value.id))
+    swapCandidates.value = data.candidates ?? []
+    swapCandidatesLoaded.value = true
+  } catch (error) {
+    Swal.fire({ icon: 'error', title: 'Unable to find swaps', text: error.response?.data?.message ?? 'The request could not be evaluated.' })
+  } finally {
+    swapCandidatesLoading.value = false
+  }
+}
+
+async function applySwapCandidate(candidate) {
+  let pin = null
+  if (props.approvalBatch?.status === 'approved') {
+    pin = await requestSignaturePin('Submit this swap amendment to OCD?', 'Sign and submit')
+    if (!pin) return
+  }
+  const result = await Swal.fire({
+    icon: 'question',
+    title: candidate.type === 'vacant_slot' ? 'Move to this vacant slot?' : 'Apply this schedule swap?',
+    text: props.approvalBatch?.status === 'approved' ? 'The official schedule will change only after OCD approval.' : 'Both schedules will be revalidated before saving.',
+    showCancelButton: true,
+    confirmButtonText: props.approvalBatch?.status === 'approved' ? 'Submit amendment' : 'Apply',
+  })
+  if (!result.isConfirmed) return
+  router.post(route('faculty-loading.schedules.swap-requests.apply', selectedSwapRequest.value.id), {
+    candidate_id: candidate.id,
+    pin,
+  }, { preserveScroll: true, onSuccess: closeSwapReview })
+}
+
+function declineSwapRequest() {
+  router.post(route('faculty-loading.schedules.swap-requests.decline', selectedSwapRequest.value.id), {}, {
+    preserveScroll: true,
+    onSuccess: closeSwapReview,
+  })
+}
+
+function closeSwapReview() {
+  swapReviewModal.value = false
+  selectedSwapRequest.value = null
+  swapCandidates.value = []
+  swapCandidatesLoaded.value = false
+}
+
+function swapStatusLabel(status) {
+  return ({ pending: 'Pending', recommended: 'Reviewed', pending_ocd: 'Pending OCD', applied: 'Applied', declined: 'Declined', cancelled: 'Cancelled' })[status] ?? status
+}
+
+function swapStatusClass(status) {
+  if (status === 'applied') return 'text-emerald-700'
+  if (status === 'pending_ocd' || status === 'pending') return 'text-amber-700'
+  if (status === 'declined' || status === 'cancelled') return 'text-red-600'
+  return 'text-slate-600'
 }
 
 const pageTitle = computed(() =>

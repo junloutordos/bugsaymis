@@ -364,6 +364,8 @@ class ApprovalInboxService
 
     private function normaliseClassSchedule(ClassScheduleApprovalBatch $batch): array
     {
+        $isAmendment = $batch->approval_type === 'swap_amendment';
+
         return [
             'id' => $batch->id,
             'type' => 'class_schedules',
@@ -371,14 +373,16 @@ class ApprovalInboxService
             'requester_name' => $batch->submitter?->name ?? 'CID Chief',
             'filed_at' => $batch->submitted_at?->toISOString(),
             'status' => 'Pending OCD Approval',
-            'summary' => $batch->academicTerm?->full_label ?? 'Class Schedule',
+            'summary' => ($isAmendment ? 'Schedule Swap Amendment - ' : '').($batch->academicTerm?->full_label ?? 'Class Schedule'),
             'view_url' => route('faculty-loading.schedules.index', ['term_id' => $batch->academic_term_id]),
             'sections' => [[
-                'title' => 'Schedule Submission',
+                'title' => $isAmendment ? 'Schedule Swap Amendment' : 'Schedule Submission',
                 'fields' => [
+                    ['label' => 'Submission Type', 'value' => $isAmendment ? 'Faculty Schedule Swap Amendment' : 'Complete Class Schedule', 'full' => true],
                     ['label' => 'Academic Term', 'value' => $batch->academicTerm?->full_label ?? '—', 'full' => true],
                     ['label' => 'Submitted By', 'value' => $batch->submitter?->name ?? '—'],
                     ['label' => 'Schedule Entries', 'value' => count($batch->schedule_snapshot ?? [])],
+                    ['label' => 'Changed Entries', 'value' => $isAmendment ? count($batch->change_set ?? []) : '—'],
                     ['label' => 'Submitted At', 'value' => $batch->submitted_at?->format('M d, Y h:i A') ?? '—'],
                 ],
             ]],

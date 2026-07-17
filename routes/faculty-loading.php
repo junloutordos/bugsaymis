@@ -14,6 +14,7 @@ use App\Http\Controllers\FacultyLoading\ClassroomController;
 use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
+use App\Http\Controllers\FacultyLoading\ClassScheduleSwapController;
 use App\Http\Controllers\FacultyLoading\CommitteeAssignmentController;
 use App\Http\Controllers\FacultyLoading\FacultyLoadController;
 use App\Http\Controllers\FacultyLoading\LoadAssignmentController;
@@ -92,6 +93,15 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/',                  [ClassScheduleController::class, 'store'])->name('store');
                 Route::put('/{classSchedule}',    [ClassScheduleController::class, 'update'])->name('update');
                 Route::delete('/{classSchedule}', [ClassScheduleController::class, 'destroy'])->name('destroy');
+                Route::post('/{classSchedule}/swap-requests', [ClassScheduleSwapController::class, 'store'])->name('swap-requests.store');
+                Route::post('/swap-requests/{swapRequest}/cancel', [ClassScheduleSwapController::class, 'cancel'])->name('swap-requests.cancel');
+            });
+
+        Route::middleware('permission:faculty_loading.manage')
+            ->prefix('schedules/swap-requests')->name('schedules.swap-requests.')->group(function () {
+                Route::get('/{swapRequest}/candidates', [ClassScheduleSwapController::class, 'candidates'])->name('candidates');
+                Route::post('/{swapRequest}/apply', [ClassScheduleSwapController::class, 'apply'])->name('apply');
+                Route::post('/{swapRequest}/decline', [ClassScheduleSwapController::class, 'decline'])->name('decline');
             });
 
         Route::middleware('permission:faculty_loading.manage')

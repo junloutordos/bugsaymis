@@ -8,6 +8,7 @@ use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
+use App\Models\FacultyLoading\ClassScheduleSwapRequest;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
@@ -554,11 +555,45 @@ class ClassScheduleController extends Controller
             ? $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections)
             : [];
 
-        $approvalBatch = $termId ? ClassScheduleApprovalBatch::with(['submitter:id,name', 'approver:id,name'])
-            ->where('academic_term_id', $termId)->latest('id')->first() : null;
+        $approvalBatch = null;
+        if ($termId) {
+            $approvalQuery = ClassScheduleApprovalBatch::with(['submitter:id,name', 'approver:id,name'])
+                ->where('academic_term_id', $termId);
+            $approvalBatch = (clone $approvalQuery)->whereIn('status', ['pending_ocd', 'approved'])->latest('id')->first()
+                ?? $approvalQuery->latest('id')->first();
+        }
         $conformeSigned = $approvalBatch?->status === 'approved'
             && $approvalBatch->signatures()->where('signer_id', Auth::id())
                 ->where('metadata->stage', 'conforme')->exists();
+
+        $swapRequests = $termId ? ClassScheduleSwapRequest::with([
+            'requester:id,name',
+            'sourceSchedule.subject:id,code,name',
+            'sourceSchedule.section:id,sectionname,levelid',
+            'sourceSchedule.faculty:id,name',
+        ])
+            ->where('academic_term_id', $termId)
+            ->when($cap['level'] !== 'manage' || $pageMode === 'my', fn ($q) => $q->where('requested_by', Auth::id()))
+            ->latest('id')->limit(50)->get()
+            ->map(fn ($swap) => [
+                'id' => $swap->id,
+                'status' => $swap->status,
+                'reason' => $swap->reason,
+                'preferences' => $swap->preferences,
+                'requester' => $swap->requester?->name,
+                'source' => $swap->sourceSchedule ? [
+                    'id' => $swap->sourceSchedule->id,
+                    'subject' => $swap->sourceSchedule->subject?->code ?? $swap->sourceSchedule->subject?->name,
+                    'faculty' => $swap->sourceSchedule->faculty?->name,
+                    'section' => $swap->sourceSchedule->section?->sectionname,
+                    'grade' => $swap->sourceSchedule->section?->levelid,
+                    'day' => $swap->sourceSchedule->day_of_week,
+                    'start' => substr($swap->sourceSchedule->start_time, 0, 5),
+                    'end' => substr($swap->sourceSchedule->end_time, 0, 5),
+                ] : null,
+                'approval_batch_id' => $swap->approval_batch_id,
+                'created_at' => $swap->created_at?->toIso8601String(),
+            ])->values() : collect();
 
         return Inertia::render('FacultyLoading/Schedules/Index', [
             'schedules' => $schedules,
@@ -576,6 +611,7 @@ class ClassScheduleController extends Controller
             'approvalBatch' => $approvalBatch ? [
                 'id' => $approvalBatch->id,
                 'status' => $approvalBatch->status,
+                'approval_type' => $approvalBatch->approval_type,
                 'submitted_by' => $approvalBatch->submitter?->name,
                 'submitted_at' => $approvalBatch->submitted_at?->toIso8601String(),
                 'approved_by' => $approvalBatch->approver?->name,
@@ -585,6 +621,8 @@ class ClassScheduleController extends Controller
                 'conforme_signed' => $conformeSigned,
             ] : null,
             'canSubmitSchedule' => Auth::user()->hasRole('CID Chief') || Auth::user()->isSuperAdmin(),
+            'swapRequests' => $swapRequests,
+            'canRequestSwap' => $cap['level'] !== 'review',
         ]);
     }
 

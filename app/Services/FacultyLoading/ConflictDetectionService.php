@@ -53,7 +53,7 @@ class ConflictDetectionService
         string $start,
         string $end,
         int    $termId,
-        ?int   $excludeId = null
+        int|array|null $excludeId = null
     ): Collection {
         // TBA/vacant placeholder faculty share one DB account across many unrelated
         // sessions — they don't represent a real person being double-booked, so the
@@ -91,7 +91,7 @@ class ConflictDetectionService
         string $start,
         string $end,
         int    $termId,
-        ?int   $excludeId = null
+        int|array|null $excludeId = null
     ): Collection {
         return $this->findConflicts('classroom_id', $classroomId, $day, $start, $end, $termId, $excludeId);
     }
@@ -108,7 +108,7 @@ class ConflictDetectionService
         string $start,
         string $end,
         int    $termId,
-        ?int   $excludeId = null
+        int|array|null $excludeId = null
     ): Collection {
         return $this->findConflicts('section_id', $sectionId, $day, $start, $end, $termId, $excludeId);
     }
@@ -127,7 +127,7 @@ class ConflictDetectionService
      *   end_time:      string,
      *   academic_term_id: int,
      * }
-     * @param int|null $excludeId  ClassSchedule id to exclude (for updates)
+     * @param int|array<int>|null $excludeId ClassSchedule ids to exclude
      *
      * @return array {
      *   has_conflicts: bool,
@@ -139,7 +139,7 @@ class ConflictDetectionService
      *   messages: string[],
      * }
      */
-    public function detectAllConflicts(array $data, ?int $excludeId = null): array
+    public function detectAllConflicts(array $data, int|array|null $excludeId = null): array
     {
         $day    = $data['day_of_week'];
         $start  = $data['start_time'];
@@ -199,7 +199,7 @@ class ConflictDetectionService
         int    $facultyId,
         string $day,
         int    $termId,
-        ?int   $excludeId = null
+        int|array|null $excludeId = null
     ): float {
         $query = ClassSchedule::occupying()
             ->classes()
@@ -208,7 +208,7 @@ class ConflictDetectionService
             ->where('academic_term_id', $termId);
 
         if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
+            $query->whereNotIn('id', (array) $excludeId);
         }
 
         $schedules = $query->get();
@@ -229,7 +229,7 @@ class ConflictDetectionService
         string $newStart,
         string $newEnd,
         int    $termId,
-        ?int   $excludeId = null
+        int|array|null $excludeId = null
     ): float {
         $existing = $this->getDailyTeachingHours($facultyId, $day, $termId, $excludeId);
         $newSlot  = $this->minutesBetween($newStart, $newEnd) / 60;
@@ -249,7 +249,7 @@ class ConflictDetectionService
         string $start,
         string $end,
         int    $termId,
-        ?int   $excludeId
+        int|array|null $excludeId
     ): Collection {
         $start = $this->normalizeTime($start);
         $end   = $this->normalizeTime($end);
@@ -264,7 +264,7 @@ class ConflictDetectionService
             ->where('end_time',   '>', $start);
 
         if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
+            $query->whereNotIn('id', (array) $excludeId);
         }
 
         return $query->get();
