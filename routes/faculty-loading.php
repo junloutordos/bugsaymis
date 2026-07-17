@@ -12,6 +12,7 @@ use App\Http\Controllers\FacultyLoading\FacultyVacancyController;
 use App\Http\Controllers\FacultyLoading\LoadBalancingController;
 use App\Http\Controllers\FacultyLoading\ClassroomController;
 use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
+use App\Http\Controllers\FacultyLoading\ScheduleAnalyticsController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleSwapController;
@@ -111,6 +112,13 @@ Route::middleware(['web', 'auth', 'verified'])
         Route::middleware('permission:faculty_loading.manage')
             ->get('/schedules/print-batch', [ClassScheduleController::class, 'printBatchSchedules'])
             ->name('schedules.print-batch');
+
+        // ── Schedule Balance Analytics (read-only) ─────────────────────────
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.approve')
+            ->prefix('schedule-analytics')->name('schedule-analytics.')->group(function () {
+                Route::get('/',     [ScheduleAnalyticsController::class, 'index'])->name('index');
+                Route::get('/data', [ScheduleAnalyticsController::class, 'data'])->name('data');
+            });
 
         Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])
             ->name('schedules.approval.submit');

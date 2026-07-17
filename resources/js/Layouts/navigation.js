@@ -1499,6 +1499,14 @@ export const menuItems = [
         permissions: ["faculty_loading.manage"],
       },
       {
+        label: "Schedule Analytics",
+        routeName: "faculty-loading.schedule-analytics.index",
+        href: route("faculty-loading.schedule-analytics.index"),
+        icon: PresentationChartLineIcon,
+        roles: [],
+        permissions: ["faculty_loading.manage", "faculty_loading.approve"],
+      },
+      {
         label: "AI Schedule Generator",
         routeName: "faculty-loading.auto-schedule.index",
         href: route("faculty-loading.auto-schedule.index"),
