@@ -49,6 +49,33 @@
             </div>
           </div>
 
+          <!-- Grade scope -->
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">
+              Grade Scope <span class="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <div class="flex flex-wrap gap-1.5">
+              <button v-for="g in [7, 8, 9, 10, 11, 12]" :key="g" type="button" @click="toggleGrade(g)"
+                :class="[
+                  'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+                  form.grade_levels.includes(g)
+                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300',
+                ]">
+                Grade {{ g }}
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5">
+              <template v-if="form.grade_levels.length">
+                Only {{ gradeScopeLabel(form.grade_levels) }} will be regenerated — other grades' tentative
+                schedules stay untouched when you save.
+              </template>
+              <template v-else>
+                All grades will be regenerated. Pick one or more grades to limit the run.
+              </template>
+            </p>
+          </div>
+
           <!-- Generate button -->
           <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
             <AppButton size="lg" :disabled="!canGenerate || generating" :loading="generating" @click="runGenerate">
@@ -348,7 +375,14 @@
           </AppButton>
           <p class="text-xs text-slate-400">
             Saving adds these as <strong>tentative</strong> schedules in the Schedules module.
-            Existing tentative schedules for this term will be replaced.
+            <template v-if="result.grade_levels?.length">
+              Only {{ gradeScopeLabel(result.grade_levels) }} tentative class schedules will be replaced —
+              other grades stay untouched.
+            </template>
+            <template v-else>
+              Existing tentative schedules for this term will be replaced.
+            </template>
+            A snapshot of the replaced schedules is kept, so the save can be restored from the history below.
           </p>
         </div>
       </template>
@@ -372,7 +406,12 @@
           </thead>
           <tbody class="divide-y divide-slate-50">
             <tr v-for="job in recentJobs" :key="job.id" class="hover:bg-slate-50/50">
-              <td class="px-4 py-2.5 text-slate-700">{{ job.academic_term_label }}</td>
+              <td class="px-4 py-2.5 text-slate-700">
+                {{ job.academic_term_label }}
+                <AppBadge v-if="job.grade_levels?.length" color="indigo" class="ml-1">
+                  G{{ job.grade_levels.join(', G') }}
+                </AppBadge>
+              </td>
               <td class="px-4 py-2.5 text-slate-500 text-xs">
                 {{ fmtDateTime(job.created_at) }}
                 <span v-if="job.created_by_name !== '—'" class="text-slate-400"> by {{ job.created_by_name }}</span>
@@ -391,11 +430,22 @@
                 <AppBadge :color="statusClass(job.status)">{{ job.status }}</AppBadge>
               </td>
               <td class="px-4 py-2.5 text-center">
-                <button v-if="job.status === 'completed'"
-                  @click="loadJob(job)"
-                  class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
-                  Load
-                </button>
+                <div class="flex items-center justify-center gap-3">
+                  <button v-if="job.status === 'completed'"
+                    @click="loadJob(job)"
+                    class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                    Load
+                  </button>
+                  <button v-if="job.has_snapshot"
+                    @click="restoreJob(job)"
+                    :disabled="restoringJobId === job.id"
+                    class="text-xs text-warning-600 hover:text-warning-700 font-medium disabled:opacity-50">
+                    {{ restoringJobId === job.id ? 'Restoring…' : 'Restore' }}
+                  </button>
+                  <span v-if="job.restored_at" class="text-[10px] text-slate-400">
+                    restored {{ fmtDateTime(job.restored_at) }}
+                  </span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -436,7 +486,20 @@ const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const form = reactive({
   school_year_id:   null,
   academic_term_id: null,
+  grade_levels:     [],   // empty = all grades
 })
+
+function toggleGrade(g) {
+  const i = form.grade_levels.indexOf(g)
+  if (i === -1) form.grade_levels.push(g)
+  else form.grade_levels.splice(i, 1)
+  form.grade_levels.sort((a, b) => a - b)
+}
+
+function gradeScopeLabel(grades) {
+  if (!grades?.length) return 'all grades'
+  return (grades.length === 1 ? 'Grade ' : 'Grades ') + grades.join(', ')
+}
 
 const selectedSchoolYear = computed(() =>
   props.schoolYears?.find(sy => sy.id === form.school_year_id) ?? null
@@ -483,6 +546,7 @@ async function runGenerate() {
     const { data } = await axios.post('/faculty-loading/auto-schedule/generate', {
       school_year_id:   form.school_year_id,
       academic_term_id: form.academic_term_id,
+      grade_levels:     form.grade_levels,
     })
 
     result.value             = data.job
@@ -603,6 +667,7 @@ async function applySchedules() {
       { schedules: result.value.schedules }
     )
     await Swal.fire('Success', data.message, 'success')
+    refreshJobs()
   } catch (err) {
     const conflicts = err.response?.data?.conflicts ?? []
     const message   = err.response?.data?.message ?? 'Failed to save schedules.'
@@ -629,6 +694,7 @@ function discardResult() {
 // ── History ─────────────────────────────────────────────────────────────────
 
 const recentJobs = ref(props.recentJobs ?? [])
+const restoringJobId = ref(null)
 
 function loadJob(job) {
   // Load a past job result into the preview panel (no conflict suggestions for history)
@@ -640,10 +706,44 @@ function loadJob(job) {
       unplaceable.value         = []
       sectionReport.value       = []
       form.academic_term_id     = data.academic_term_id
+      form.grade_levels         = [...(data.grade_levels ?? [])]
     })
     .catch(() => {
       Swal.fire('Error', 'Could not load the selected job.', 'error')
     })
+}
+
+function refreshJobs() {
+  axios.get('/faculty-loading/auto-schedule/jobs')
+    .then(({ data }) => { recentJobs.value = data.slice(0, 10) })
+    .catch(() => {})
+}
+
+async function restoreJob(job) {
+  const scope = job.grade_levels?.length
+    ? `${gradeScopeLabel(job.grade_levels)} tentative class schedules`
+    : 'ALL tentative schedules for this term'
+  const confirmed = await Swal.fire({
+    title: 'Restore snapshot?',
+    html: `This deletes the ${scope} currently on the calendar and re-inserts the `
+      + 'snapshot taken right before this run was saved. Manual tentative edits made '
+      + 'in that scope since then will be lost.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Restore',
+  })
+  if (!confirmed.isConfirmed) return
+
+  restoringJobId.value = job.id
+  try {
+    const { data } = await axios.post(`/faculty-loading/auto-schedule/jobs/${job.id}/restore`)
+    await Swal.fire('Restored', data.message, 'success')
+    refreshJobs()
+  } catch (err) {
+    await Swal.fire('Error', err.response?.data?.message ?? 'Restore failed.', 'error')
+  } finally {
+    restoringJobId.value = null
+  }
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────

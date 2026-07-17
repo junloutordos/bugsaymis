@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AiScheduleJob;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
 use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\DeterministicSchedulingService;
@@ -74,6 +75,8 @@ class AutoScheduleController extends Controller
      * Body: {
      *   school_year_id:   int (required)
      *   academic_term_id: int (required)
+     *   grade_levels:     int[] (optional — e.g. [7] regenerates only Grade 7;
+     *                     empty/omitted = all grades, the original behavior)
      * }
      */
     public function generate(Request $request): JsonResponse
@@ -83,14 +86,20 @@ class AutoScheduleController extends Controller
         $data = $request->validate([
             'school_year_id' => 'required|integer',
             'academic_term_id' => 'required|integer',
+            'grade_levels' => 'nullable|array',
+            'grade_levels.*' => 'integer|between:7,12',
         ]);
 
-        // Create a job record
+        $gradeLevels = array_values(array_unique(array_map('intval', (array) ($data['grade_levels'] ?? []))));
+        sort($gradeLevels);
+
+        // Create a job record — the grade scope is stored on the job so apply()
+        // and restore() use the server-side scope, never a client-supplied one.
         $job = AiScheduleJob::create([
             'school_year_id' => $data['school_year_id'],
             'academic_term_id' => $data['academic_term_id'],
             'status' => 'running',
-            'parameters' => ['engine' => 'deterministic'],
+            'parameters' => ['engine' => 'deterministic', 'grade_levels' => $gradeLevels],
             'started_at' => now(),
             'created_by' => Auth::id(),
         ]);
@@ -99,6 +108,7 @@ class AutoScheduleController extends Controller
             $result = $this->scheduler->generate(
                 schoolYearId: (int) $data['school_year_id'],
                 termId: (int) $data['academic_term_id'],
+                params: ['grade_levels' => $gradeLevels],
             );
 
             $job->update([
@@ -135,7 +145,11 @@ class AutoScheduleController extends Controller
 
     /**
      * Save a completed job's generated schedules into class_schedules
-     * as 'tentative' rows (existing tentative rows for the term are replaced).
+     * as 'tentative' rows. Unscoped jobs replace every tentative row for the
+     * term (original behavior); grade-scoped jobs replace only the scoped
+     * grades' tentative CLASS rows — other grades' tentative schedules and all
+     * non-teaching blocks survive. The replaced rows are snapshotted onto the
+     * job (replaced_schedules) so the apply can be rolled back via restore().
      *
      * POST /faculty-loading/auto-schedule/jobs/{job}/apply
      */
@@ -158,10 +172,33 @@ class AutoScheduleController extends Controller
             return response()->json(['message' => 'No schedules to apply.'], 422);
         }
 
-        // Block the apply when the batch conflicts with already-committed (active)
-        // schedules, or contains internal faculty/room/section overlaps of its own —
-        // the GA's own fitness score is a soft heuristic, not a guarantee.
-        $conflictMessages = $this->detectApplyConflicts($schedules, (int) $aiScheduleJob->academic_term_id);
+        $gradeLevels      = $this->jobGradeLevels($aiScheduleJob);
+        $scopedSectionIds = $this->scopedSectionIds($aiScheduleJob, $gradeLevels);
+
+        // A scoped batch must only contain rows for the scoped sections —
+        // anything else would be inserted without its old counterpart deleted.
+        if ($gradeLevels !== []) {
+            $outOfScope = array_filter(
+                $schedules,
+                fn ($s) => ! in_array((int) ($s['section_id'] ?? 0), $scopedSectionIds, true)
+            );
+            if (! empty($outOfScope)) {
+                return response()->json([
+                    'message' => 'This job is scoped to Grade '.implode(', ', $gradeLevels).' — '
+                        .count($outOfScope).' schedule(s) in the batch belong to other sections.',
+                ], 422);
+            }
+        }
+
+        // Block the apply when the batch conflicts with schedules it will NOT
+        // replace (active rows; for scoped jobs also surviving tentative rows),
+        // or contains internal faculty/room/section overlaps of its own.
+        $conflictMessages = $this->detectApplyConflicts(
+            $schedules,
+            (int) $aiScheduleJob->academic_term_id,
+            $gradeLevels !== [],
+            $scopedSectionIds,
+        );
         if (! empty($conflictMessages)) {
             return response()->json([
                 'message' => count($conflictMessages).' conflict(s) detected — resolve before applying.',
@@ -169,11 +206,22 @@ class AutoScheduleController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($aiScheduleJob, $schedules) {
-            // Remove existing tentative schedules for this term
-            ClassSchedule::where('academic_term_id', $aiScheduleJob->academic_term_id)
-                ->where('status', 'tentative')
-                ->delete();
+        DB::transaction(function () use ($aiScheduleJob, $schedules, $gradeLevels, $scopedSectionIds) {
+            // Remove the tentative schedules this job replaces — snapshotting
+            // them first so the apply can be undone (restore endpoint).
+            $deleteQuery = ClassSchedule::where('academic_term_id', $aiScheduleJob->academic_term_id)
+                ->where('status', 'tentative');
+            if ($gradeLevels !== []) {
+                $deleteQuery->where('entry_type', 'class')
+                    ->whereIn('section_id', $scopedSectionIds);
+            }
+
+            $replaced = (clone $deleteQuery)->get()
+                ->map(fn ($row) => $row->getAttributes())
+                ->all();
+            $aiScheduleJob->update(['replaced_schedules' => $replaced, 'restored_at' => null]);
+
+            $deleteQuery->delete();
 
             // Insert new tentative schedules, stripping preview metadata
             $now = now();
@@ -207,21 +255,105 @@ class AutoScheduleController extends Controller
     }
 
     /**
+     * Roll back an applied job: delete the tentative class schedules in the
+     * job's scope and re-insert the snapshot taken when it was applied.
+     *
+     * POST /faculty-loading/auto-schedule/jobs/{job}/restore
+     */
+    public function restore(AiScheduleJob $aiScheduleJob): JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+
+        if (ClassScheduleApprovalService::termIsLocked((int) $aiScheduleJob->academic_term_id)) {
+            return response()->json(['message' => 'This term schedule is locked for OCD approval.'], 423);
+        }
+
+        $snapshot = $aiScheduleJob->replaced_schedules;
+        if ($snapshot === null) {
+            return response()->json(['message' => 'This job has no snapshot — it was never applied.'], 422);
+        }
+
+        $gradeLevels      = $this->jobGradeLevels($aiScheduleJob);
+        $scopedSectionIds = $this->scopedSectionIds($aiScheduleJob, $gradeLevels);
+
+        DB::transaction(function () use ($aiScheduleJob, $snapshot, $gradeLevels, $scopedSectionIds) {
+            // Delete what the apply inserted (plus any tentative edits made in
+            // its scope since) — same scope as the apply's own delete.
+            $deleteQuery = ClassSchedule::where('academic_term_id', $aiScheduleJob->academic_term_id)
+                ->where('status', 'tentative');
+            if ($gradeLevels !== []) {
+                $deleteQuery->where('entry_type', 'class')
+                    ->whereIn('section_id', $scopedSectionIds);
+            }
+            $deleteQuery->delete();
+
+            // Re-insert the snapshot verbatim (fresh primary keys).
+            $rows = array_map(function ($row) {
+                unset($row['id']);
+                return $row;
+            }, $snapshot);
+            if (! empty($rows)) {
+                ClassSchedule::insert($rows);
+            }
+
+            $aiScheduleJob->update(['restored_at' => now()]);
+        });
+
+        return response()->json([
+            'message' => count($snapshot).' schedule(s) restored from the pre-apply snapshot.',
+        ]);
+    }
+
+    /** Grade scope stored on a job at generation time ([] = unscoped). */
+    private function jobGradeLevels(AiScheduleJob $job): array
+    {
+        $grades = array_values(array_unique(array_map(
+            'intval',
+            (array) (($job->parameters ?? [])['grade_levels'] ?? [])
+        )));
+        sort($grades);
+
+        return $grades;
+    }
+
+    /**
+     * Section ids covered by a job's grade scope (its school year's sections
+     * at those grade levels, including ELEC-* synthetics). Empty when unscoped.
+     *
+     * @return array<int,int>
+     */
+    private function scopedSectionIds(AiScheduleJob $job, array $gradeLevels): array
+    {
+        if ($gradeLevels === []) {
+            return [];
+        }
+
+        return Section::where('school_year_id', $job->school_year_id)
+            ->whereIn('levelid', $gradeLevels)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
      * Check a proposed schedule batch for:
-     *   1. Faculty/room/section overlap against already-committed ACTIVE schedules
-     *      for the term (tentative rows are excluded — this batch is about to
-     *      replace them, so comparing against them would produce false positives).
+     *   1. Faculty/room/section overlap against schedules the apply will NOT
+     *      replace. Unscoped: ACTIVE rows only (every tentative row is about to
+     *      be replaced, so comparing against them would produce false positives).
+     *      Scoped: all occupying rows except the scoped sections' tentative
+     *      class rows — other grades' tentative schedules survive the apply and
+     *      must be conflict-checked.
      *   2. Faculty/room/section overlap WITHIN the batch itself — the GA's fitness
      *      score only penalizes this, it doesn't guarantee zero conflicts.
      *
      * @return string[] Human-readable conflict descriptions (empty = clean)
      */
-    private function detectApplyConflicts(array $schedules, int $termId): array
+    private function detectApplyConflicts(array $schedules, int $termId, bool $scoped = false, array $scopedSectionIds = []): array
     {
         $messages = [];
         $axes = ['user_id' => 'Faculty', 'classroom_id' => 'Room', 'section_id' => 'Section'];
 
-        // 1. Against already-active (committed) schedules
+        // 1. Against schedules that will survive the apply
         foreach ($schedules as $s) {
             foreach ($axes as $column => $label) {
                 $value = $s[$column] ?? null;
@@ -229,17 +361,25 @@ class AutoScheduleController extends Controller
                     continue;
                 }
 
-                $exists = ClassSchedule::active()
+                $query = ClassSchedule::query()
                     ->where($column, $value)
                     ->where('day_of_week', $s['day_of_week'])
                     ->where('academic_term_id', $termId)
                     ->where('start_time', '<', $s['end_time'])
-                    ->where('end_time', '>', $s['start_time'])
-                    ->exists();
+                    ->where('end_time', '>', $s['start_time']);
 
-                if ($exists) {
+                if ($scoped) {
+                    $query->occupying()->whereNot(fn ($w) => $w
+                        ->where('status', 'tentative')
+                        ->where('entry_type', 'class')
+                        ->whereIn('section_id', $scopedSectionIds));
+                } else {
+                    $query->active();
+                }
+
+                if ($query->exists()) {
                     $messages[] = "{$label} conflict: {$s['day_of_week']} {$s['start_time']}–{$s['end_time']} "
-                        .'overlaps an already-active (committed) schedule.';
+                        .'overlaps an existing schedule that this apply will not replace.';
                 }
             }
         }
@@ -316,6 +456,9 @@ class AutoScheduleController extends Controller
             'academic_term_label' => $job->academicTerm?->name ?? '—',
             'status' => $job->status,
             'parameters' => $job->parameters,
+            'grade_levels' => $this->jobGradeLevels($job),
+            'has_snapshot' => $job->replaced_schedules !== null,
+            'restored_at' => $job->restored_at?->toISOString(),
             'fitness_score' => $job->fitness_score,
             'hard_conflicts' => $job->hard_conflicts,
             'schedules_generated' => $job->schedules_generated,

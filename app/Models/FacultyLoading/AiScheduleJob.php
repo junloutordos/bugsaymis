@@ -19,9 +19,11 @@ class AiScheduleJob extends Model
         'hard_conflicts',
         'schedules_generated',
         'generated_schedules',
+        'replaced_schedules',
         'error_message',
         'started_at',
         'completed_at',
+        'restored_at',
         'created_by',
     ];
 
@@ -31,8 +33,10 @@ class AiScheduleJob extends Model
         'hard_conflicts'      => 'integer',
         'schedules_generated' => 'integer',
         'generated_schedules' => 'array',
+        'replaced_schedules'  => 'array',
         'started_at'          => 'datetime',
         'completed_at'        => 'datetime',
+        'restored_at'         => 'datetime',
     ];
 
     // ── Relationships ────────────────────────────────────────────────────────

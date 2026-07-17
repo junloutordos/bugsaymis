@@ -75,6 +75,14 @@ class DeterministicSchedulingService
     /**
      * Generate a conflict-free schedule for the given term.
      *
+     * Pass $params['grade_levels'] (e.g. [7]) to regenerate only those grades:
+     * requirements are filtered to the scoped grades, and every occupying row
+     * outside the scope — other grades' classes (active AND tentative) plus all
+     * non-teaching blocks — is seeded as an immovable busy interval, so
+     * cross-grade faculty commitments are respected. Within the scoped grades,
+     * active rows stay committed as usual; only their tentative class rows are
+     * treated as replaceable (the scoped apply deletes exactly those).
+     *
      * @return array{
      *   fitness:int, hard_conflicts:int, schedules_generated:int,
      *   schedules:array<int,array<string,mixed>>, conflict_suggestions:array,
@@ -85,9 +93,19 @@ class DeterministicSchedulingService
     public function generate(int $schoolYearId, int $termId, array $params = []): array
     {
         $this->officialTimeByFacultyDay = [];
+        $gradeLevels = array_values(array_unique(array_map('intval', (array) ($params['grade_levels'] ?? []))));
+
         $requirements = $this->buildRequirements($schoolYearId, $termId);
+        if ($gradeLevels !== []) {
+            $requirements = array_values(array_filter(
+                $requirements,
+                fn ($r) => in_array($r['grade'], $gradeLevels, true)
+            ));
+        }
 
         if (empty($requirements)) {
+            $scopeLabel = $gradeLevels === [] ? '' : ' for Grade ' . implode(', ', $gradeLevels);
+
             return [
                 'fitness'              => 0,
                 'hard_conflicts'       => 0,
@@ -96,8 +114,19 @@ class DeterministicSchedulingService
                 'conflict_suggestions' => [],
                 'unplaceable'          => [],
                 'section_report'       => [],
-                'warning'              => 'No teaching assignments with a subject and section were found for this term.',
+                'warning'              => "No teaching assignments with a subject and section were found{$scopeLabel} for this term.",
             ];
+        }
+
+        // Sections whose tentative class rows this scoped run may regenerate
+        // (empty = unscoped run, every tentative row is replaceable).
+        $scopedSectionIds = [];
+        if ($gradeLevels !== []) {
+            $scopedSectionIds = Section::where('school_year_id', $schoolYearId)
+                ->whereIn('levelid', $gradeLevels)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
         }
 
         // A full AI run replaces tentative rows, but committed rows remain in
@@ -187,7 +216,7 @@ class DeterministicSchedulingService
             return [$b['faculty_total'], $b['sessions_needed'], $a['section_id']]
                 <=> [$a['faculty_total'], $a['sessions_needed'], $b['section_id']];
         });
-        $best = $this->runPlacement($ordered, $schoolYearId, $termId);
+        $best = $this->runPlacement($ordered, $schoolYearId, $termId, $scopedSectionIds);
 
         // Randomized restarts — when a near-fully-packed week leaves feasible
         // sessions unplaced, a different tie-break order often resolves them.
@@ -200,7 +229,7 @@ class DeterministicSchedulingService
             usort($shuffled, fn ($a, $b) =>
                 [$b['faculty_total'], $b['sessions_needed']] <=> [$a['faculty_total'], $a['sessions_needed']]);
 
-            $candidate = $this->runPlacement($shuffled, $schoolYearId, $termId);
+            $candidate = $this->runPlacement($shuffled, $schoolYearId, $termId, $scopedSectionIds);
             if (count($candidate['unplaceable']) < count($best['unplaceable'])) {
                 $best = $candidate;
             }
@@ -460,12 +489,20 @@ class DeterministicSchedulingService
      * the sessions that could not be placed.
      *
      * @param array<int,array<string,mixed>> $sessions
+     * @param array<int,int> $scopedSectionIds grade-scoped run: only these
+     *        sections' tentative class rows are replaceable — everything else
+     *        occupying (other grades' tentative rows, non-teaching blocks) is
+     *        seeded as immovable. Empty = unscoped full-term run.
      * @return array{placed:array<int,array<string,mixed>>,unplaceable:array<int,array<string,mixed>>}
      */
-    private function runPlacement(array $sessions, int $schoolYearId, int $termId): array
+    private function runPlacement(array $sessions, int $schoolYearId, int $termId, array $scopedSectionIds = []): array
     {
         $this->resetState();
-        $this->seedBusyFromDb($termId, ['active']);
+        if ($scopedSectionIds === []) {
+            $this->seedBusyFromDb($termId, ['active']);
+        } else {
+            $this->seedBusyFromDb($termId, ['active', 'tentative'], $scopedSectionIds);
+        }
 
         // Pass 1 — greedy placement.
         $deferred = [];
@@ -714,13 +751,17 @@ class DeterministicSchedulingService
      * the relocation search can recognise them as immovable. Faculty intervals
      * for TBA/placeholder users are skipped (mirrors the negative-sentinel
      * convention: parallel TBA sessions never conflict with each other).
+     *
+     * $replaceableTentativeSectionIds (grade-scoped runs): tentative CLASS rows
+     * belonging to these sections are skipped — they are about to be replaced
+     * by the scoped apply, so they must not block the regeneration.
      */
-    private function seedBusyFromDb(int $termId, array $statuses = ['active', 'tentative']): void
+    private function seedBusyFromDb(int $termId, array $statuses = ['active', 'tentative'], array $replaceableTentativeSectionIds = []): void
     {
         $rows = ClassSchedule::whereIn('status', $statuses)
             ->where('academic_term_id', $termId)
             ->get(['id', 'user_id', 'section_id', 'subject_id', 'day_of_week',
-                'start_time', 'end_time', 'entry_type', 'session_type']);
+                'start_time', 'end_time', 'entry_type', 'session_type', 'status']);
 
         if ($rows->isEmpty()) {
             return;
@@ -730,6 +771,13 @@ class DeterministicSchedulingService
             ->pluck('name', 'id');
 
         foreach ($rows as $row) {
+            if ($replaceableTentativeSectionIds !== []
+                && $row->status === 'tentative'
+                && ($row->entry_type ?? 'class') === 'class'
+                && in_array((int) $row->section_id, $replaceableTentativeSectionIds, true)) {
+                continue;
+            }
+
             $day   = $row->day_of_week;
             $start = SchedulingConstants::toMinutes(substr((string) $row->start_time, 0, 5));
             $end   = SchedulingConstants::toMinutes(substr((string) $row->end_time, 0, 5));

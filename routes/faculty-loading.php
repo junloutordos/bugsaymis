@@ -151,6 +151,7 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::get('/jobs',                         [AutoScheduleController::class, 'jobs'])->name('jobs');
                     Route::get('/jobs/{aiScheduleJob}',         [AutoScheduleController::class, 'showJob'])->name('jobs.show');
                     Route::post('/jobs/{aiScheduleJob}/apply',  [AutoScheduleController::class, 'apply'])->name('jobs.apply');
+                    Route::post('/jobs/{aiScheduleJob}/restore',[AutoScheduleController::class, 'restore'])->name('jobs.restore');
 
                     // ── Deterministic Slot Plan Generator (Phases 7–11) ────────
                     Route::get('/slot-plan',         [SlotPlanController::class, 'index'])->name('slot-plan.index');
