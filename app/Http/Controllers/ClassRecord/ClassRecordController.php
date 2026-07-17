@@ -9,7 +9,7 @@ use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
-use App\Models\Subject;
+use App\Models\FacultyLoading\Subject;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
