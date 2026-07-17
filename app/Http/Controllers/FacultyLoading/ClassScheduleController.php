@@ -71,6 +71,7 @@ class ClassScheduleController extends Controller
 
         if ($unitIds->isNotEmpty()) {
             $facultyIds = User::whereIn('office_id', $unitIds)
+                ->where('status', '<>', 'inactive')
                 ->pluck('id')
                 ->push($user->id)
                 ->unique()
@@ -82,6 +83,24 @@ class ClassScheduleController extends Controller
         }
 
         return ['level' => 'self', 'faculty_ids' => [(int) $user->id]];
+    }
+
+    /**
+     * True if the capability allows creating/editing/removing a CLASS row for
+     * this faculty. Manage → anyone; unit → only the head's own faculty; every
+     * other level → no (teaching CRUD is never a self/review action).
+     */
+    private function canTouchClass(array $cap, ?int $facultyId): bool
+    {
+        if ($cap['level'] === 'manage') {
+            return true;
+        }
+
+        if ($cap['level'] === 'unit' && $facultyId !== null) {
+            return in_array($facultyId, $cap['faculty_ids'] ?? [], true);
+        }
+
+        return false;
     }
 
     /** True if the capability allows creating/editing a non-teaching block for this faculty. */
@@ -550,10 +569,13 @@ class ClassScheduleController extends Controller
             }
         }
 
-        // The unplaced-subjects tray is a teaching-placement tool — manage only.
-        $unplacedLoads = $cap['level'] === 'manage'
-            ? $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections)
-            : [];
+        // The unplaced-subjects tray is a teaching-placement tool — CID/admin
+        // see all loads; unit heads see only their own faculty's unplaced loads.
+        $unplacedLoads = match ($cap['level']) {
+            'manage' => $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections),
+            'unit'   => $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections, $cap['faculty_ids']),
+            default  => [],
+        };
 
         $approvalBatch = null;
         if ($termId) {
@@ -636,7 +658,8 @@ class ClassScheduleController extends Controller
         ?int $sectionId,
         ?int $facultyId,
         array $lockedFacultyIds,
-        Collection $sections
+        Collection $sections,
+        ?array $restrictFacultyIds = null
     ): array {
         if (! $termId) {
             return [];
@@ -647,6 +670,8 @@ class ClassScheduleController extends Controller
             ->where('assignment_type', 'teaching')
             ->whereNotNull('section_id')
             ->whereNotNull('subject_id')
+            // Unit heads only see unplaced loads for their own faculty.
+            ->when($restrictFacultyIds !== null, fn ($q) => $q->whereIn('user_id', $restrictFacultyIds))
             ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId))
             ->when($facultyId, fn ($q) => $q->where('user_id', $facultyId))
             ->get();
@@ -733,7 +758,11 @@ class ClassScheduleController extends Controller
             return $this->storeNonTeaching($request);
         }
 
-        $this->authorize('faculty_loading.manage');
+        // Class CRUD is open to CID/admin (manage) and Academic Unit Heads
+        // (unit) — the latter only for their own unit's faculty (checked below,
+        // once faculty_id is validated).
+        $cap = $this->scheduleCapability();
+        abort_unless(in_array($cap['level'], ['manage', 'unit'], true), 403);
 
         $data = $request->validate([
             'faculty_id' => 'required|exists:users,id',
@@ -750,6 +779,11 @@ class ClassScheduleController extends Controller
             'force' => 'boolean',   // override warnings only
             'load_assignment_id' => 'nullable|exists:load_assignments,id',
         ]);
+
+        if (! $this->canTouchClass($cap, (int) $data['faculty_id'])) {
+            return back()->withErrors(['faculty_id' => "You can only plot schedules for your own unit's faculty."]);
+        }
+
         if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
@@ -857,7 +891,11 @@ class ClassScheduleController extends Controller
             return $this->updateNonTeaching($request, $classSchedule);
         }
 
-        $this->authorize('faculty_loading.manage');
+        $cap = $this->scheduleCapability();
+        // The existing class's faculty must be within reach before editing.
+        if (! $this->canTouchClass($cap, $classSchedule->user_id ? (int) $classSchedule->user_id : null)) {
+            abort(403);
+        }
 
         $data = $request->validate([
             'faculty_id' => 'required|exists:users,id',
@@ -873,6 +911,12 @@ class ClassScheduleController extends Controller
             'remarks' => 'nullable|string|max:500',
             'force' => 'boolean',
         ]);
+
+        // A unit head may not reassign a class to a faculty outside their unit.
+        if (! $this->canTouchClass($cap, (int) $data['faculty_id'])) {
+            return back()->withErrors(['faculty_id' => "You can only assign classes to your own unit's faculty."]);
+        }
+
         if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)
             || ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
@@ -980,7 +1024,11 @@ class ClassScheduleController extends Controller
             return back()->with('success', 'Non-teaching block removed.');
         }
 
-        $this->authorize('faculty_loading.manage');
+        // Class rows: CID/admin (manage) or the unit head whose faculty owns it.
+        $cap = $this->scheduleCapability();
+        if (! $this->canTouchClass($cap, $classSchedule->user_id ? (int) $classSchedule->user_id : null)) {
+            abort(403);
+        }
 
         $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
             ->where('academic_term_id', $classSchedule->academic_term_id)

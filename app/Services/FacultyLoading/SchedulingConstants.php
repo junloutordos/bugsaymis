@@ -2,12 +2,20 @@
 
 namespace App\Services\FacultyLoading;
 
+use Illuminate\Support\Facades\DB;
+
 /**
  * SchedulingConstants
  *
  * Single source of truth for all PSHS-CRC scheduling rules.
  * Every time window, timetable structure, and grade-group mapping
  * used by the scheduling engine lives here as named constants.
+ *
+ * The Monday / Tue–Fri timetables are additionally overridable at runtime by
+ * the Bell Schedule editor (bell_schedule_overrides table) — CID/admin can
+ * shift flag ceremony, recess, lunch, consultation, etc. When no override
+ * row exists for a timetable, the hardcoded default below is used unchanged,
+ * so an empty override table reproduces today's behavior exactly.
  *
  * Time strings use 'HH:MM' (24-hour). Slot arrays use:
  *   ['start' => 'HH:MM', 'end' => 'HH:MM', 'type' => '...', 'label' => '...']
@@ -411,6 +419,79 @@ class SchedulingConstants
     // Static helper methods
     // =========================================================================
 
+    // ── Editable timetable override layer ────────────────────────────────────
+
+    /**
+     * Timetables the Bell Schedule editor can override, in display order.
+     * Key = the constant name; the label is what the editor shows.
+     */
+    public const EDITABLE_TIMETABLES = [
+        'MONDAY_G7G8'       => 'Grade 7 — Monday',
+        'MONDAY_G8'         => 'Grade 8 — Monday',
+        'MONDAY_G9'         => 'Grade 9 — Monday',
+        'MONDAY_G9G10'      => 'Grade 10 — Monday',
+        'MONDAY_G11G12'     => 'Grades 11–12 — Monday',
+        'TUEFRI_730_G7G8'   => 'Grades 7–8 — Tue to Fri',
+        'TUEFRI_730_G9G10'  => 'Grades 9–10 — Tue to Fri',
+        'TUEFRI_730_G11G12' => 'Grades 11–12 — Tue to Fri',
+    ];
+
+    /** @var array<string,array<int,array<string,mixed>>>|null request-scoped override cache */
+    private static ?array $overrideCache = null;
+
+    /** The hardcoded default rows for an editable timetable key. */
+    public static function defaultTimetableRows(string $key): array
+    {
+        return match ($key) {
+            'MONDAY_G7G8'       => self::MONDAY_G7G8,
+            'MONDAY_G8'         => self::MONDAY_G8,
+            'MONDAY_G9'         => self::MONDAY_G9,
+            'MONDAY_G9G10'      => self::MONDAY_G9G10,
+            'MONDAY_G11G12'     => self::MONDAY_G11G12,
+            'TUEFRI_730_G7G8'   => self::TUEFRI_730_G7G8,
+            'TUEFRI_730_G9G10'  => self::TUEFRI_730_G9G10,
+            'TUEFRI_730_G11G12' => self::TUEFRI_730_G11G12,
+            default             => [],
+        };
+    }
+
+    /**
+     * The effective rows for a timetable key — the saved override if present
+     * and non-empty, otherwise the hardcoded default. DB failures fall back to
+     * the default (this runs in artisan commands too, never let it throw).
+     */
+    private static function timetable(string $key): array
+    {
+        if (self::$overrideCache === null) {
+            try {
+                self::$overrideCache = DB::table('bell_schedule_overrides')
+                    ->pluck('rows', 'timetable_key')
+                    ->map(fn ($json) => json_decode((string) $json, true))
+                    ->all();
+            } catch (\Throwable $e) {
+                self::$overrideCache = [];
+            }
+        }
+
+        $override = self::$overrideCache[$key] ?? null;
+
+        return is_array($override) && $override !== []
+            ? $override
+            : self::defaultTimetableRows($key);
+    }
+
+    /** Public accessor: the effective rows for an editable timetable key. */
+    public static function effectiveTimetableRows(string $key): array
+    {
+        return self::timetable($key);
+    }
+
+    /** Drop the request-scoped override cache (call after saving an edit). */
+    public static function flushOverrideCache(): void
+    {
+        self::$overrideCache = null;
+    }
+
     /** Map a grade integer to its grade group string. */
     public static function getGradeGroup(int $grade): string
     {
@@ -447,11 +528,11 @@ class SchedulingConstants
      */
     public static function getMondayTimetable(int $grade): array
     {
-        if ($grade === 7)  return self::MONDAY_G7G8;
-        if ($grade === 8)  return self::MONDAY_G8;
-        if ($grade === 9)  return self::MONDAY_G9;
-        if ($grade === 10) return self::MONDAY_G9G10;
-        return self::MONDAY_G11G12;
+        if ($grade === 7)  return self::timetable('MONDAY_G7G8');
+        if ($grade === 8)  return self::timetable('MONDAY_G8');
+        if ($grade === 9)  return self::timetable('MONDAY_G9');
+        if ($grade === 10) return self::timetable('MONDAY_G9G10');
+        return self::timetable('MONDAY_G11G12');
     }
 
     /**
@@ -459,9 +540,9 @@ class SchedulingConstants
      */
     public static function getTueFriTimetable(int $grade): array
     {
-        if ($grade <= 8)  return self::TUEFRI_730_G7G8;
-        if ($grade <= 10) return self::TUEFRI_730_G9G10;
-        return self::TUEFRI_730_G11G12;
+        if ($grade <= 8)  return self::timetable('TUEFRI_730_G7G8');
+        if ($grade <= 10) return self::timetable('TUEFRI_730_G9G10');
+        return self::timetable('TUEFRI_730_G11G12');
     }
 
     /**

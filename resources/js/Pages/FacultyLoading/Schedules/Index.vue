@@ -44,6 +44,10 @@
               <PaperAirplaneIcon class="h-4 w-4" /> Submit to OCD
             </AppButton>
           </template>
+          <!-- Unit heads (AUH) plot/adjust classes for their own faculty. -->
+          <AppButton v-if="isUnit && !isMyPage" :disabled="scheduleLocked" @click="openForm()">
+            <PlusIcon class="h-4 w-4" /> Assign Schedule
+          </AppButton>
           <AppButton v-if="(!isManage || isMyPage) && canRequestSwap" variant="secondary" :disabled="!requestableSchedules.length" @click="openSwapRequest">
             <ArrowsRightLeftIcon class="h-4 w-4" /> Request Swap
           </AppButton>
@@ -673,8 +677,14 @@ const props = defineProps({
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
 
 const isManage = computed(() => props.capability.level === 'manage')
+const isUnit   = computed(() => props.capability.level === 'unit')
 const isSelf   = computed(() => props.capability.level === 'self')
 const isReview = computed(() => props.capability.level === 'review')
+
+// Class plotting/adjusting is open to CID/admin AND Academic Unit Heads — the
+// server scopes a unit head to their own faculty. School-wide tools (AI
+// Generate, Auto-Place, Submit to OCD) stay manage-only.
+const canManageClasses = computed(() => isManage.value || isUnit.value)
 
 // Shared styling for the header Tools dropdown items.
 const toolItemClass = 'flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed'
@@ -1547,7 +1557,7 @@ function onCreateDragEnd(e) {
 }
 
 function openQuickCreate(e, d) {
-  const allowClass    = isManage.value
+  const allowClass    = canManageClasses.value
   const sectionPinned = viewBy.value === 'section' ? Number(d.groupId) : null
   const facultyPinned = viewBy.value === 'faculty' && String(d.groupId) !== 'tba' ? Number(d.groupId) : null
 

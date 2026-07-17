@@ -1507,6 +1507,15 @@ export const menuItems = [
         permissions: ["faculty_loading.manage", "faculty_loading.approve"],
       },
       {
+        label: "Bell Schedule",
+        routeName: "faculty-loading.bell-schedule.index",
+        href: route("faculty-loading.bell-schedule.index"),
+        icon: ClockIcon,
+        // Administrator + CID Chief only (controller re-checks the role).
+        roles: ["Administrator", "CID Chief"],
+        permissions: [],
+      },
+      {
         label: "AI Schedule Generator",
         routeName: "faculty-loading.auto-schedule.index",
         href: route("faculty-loading.auto-schedule.index"),

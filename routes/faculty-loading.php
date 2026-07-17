@@ -13,6 +13,7 @@ use App\Http\Controllers\FacultyLoading\LoadBalancingController;
 use App\Http\Controllers\FacultyLoading\ClassroomController;
 use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
 use App\Http\Controllers\FacultyLoading\ScheduleAnalyticsController;
+use App\Http\Controllers\FacultyLoading\BellScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleSwapController;
@@ -118,6 +119,14 @@ Route::middleware(['web', 'auth', 'verified'])
             ->prefix('schedule-analytics')->name('schedule-analytics.')->group(function () {
                 Route::get('/',     [ScheduleAnalyticsController::class, 'index'])->name('index');
                 Route::get('/data', [ScheduleAnalyticsController::class, 'data'])->name('data');
+            });
+
+        // ── Bell Schedule editor (Administrator + CID Chief; role-gated in ctrl) ─
+        Route::middleware('permission:faculty_loading.manage')
+            ->prefix('bell-schedule')->name('bell-schedule.')->group(function () {
+                Route::get('/',       [BellScheduleController::class, 'index'])->name('index');
+                Route::post('/',      [BellScheduleController::class, 'update'])->name('update');
+                Route::post('/reset', [BellScheduleController::class, 'reset'])->name('reset');
             });
 
         Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])

@@ -169,9 +169,15 @@ class ClassSchedule extends Model
 
         $canEdit = false;
         if ($cap !== null) {
+            // Non-teaching blocks: manage, or a unit head / owner within reach.
+            // Class rows: manage, or a unit head whose own faculty owns the row
+            // (and never while that faculty's load is locked).
+            $withinUnitReach = $this->user_id !== null
+                && in_array((int) $this->user_id, $cap['faculty_ids'] ?? [], true);
+
             $canEdit = $this->entry_type === 'non_teaching'
-                ? ($cap['level'] === 'manage' || ($this->user_id !== null && in_array((int) $this->user_id, $cap['faculty_ids'] ?? [], true)))
-                : ($cap['level'] === 'manage' && ! $isLocked);
+                ? ($cap['level'] === 'manage' || $withinUnitReach)
+                : (($cap['level'] === 'manage' || ($cap['level'] === 'unit' && $withinUnitReach)) && ! $isLocked);
         }
 
         return [
