@@ -350,6 +350,7 @@ class ClassScheduleController extends Controller
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
                     'blocked' => SchedulingConstants::getDisplayBlockedSlots($gradeLevel, $day),
+                    'electives' => SchedulingConstants::getElectiveWindows($gradeLevel, $day),
                 ];
             }
         }
@@ -565,6 +566,7 @@ class ClassScheduleController extends Controller
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
                     'blocked' => SchedulingConstants::getDisplayBlockedSlots($grade, $day),
+                    'electives' => SchedulingConstants::getElectiveWindows($grade, $day),
                 ];
             }
         }

@@ -54,6 +54,15 @@
                   <span class="schedule-print-blocked-time">{{ formatTimeRange(blocked.start, blocked.end) }}</span>
                 </div>
                 <div
+                  v-for="el in dayConfigs[day].electives ?? []"
+                  :key="`${day}-elec-${el.start}`"
+                  class="schedule-print-elective"
+                  :style="rangeStyle(el.start, el.end)"
+                >
+                  <span>{{ el.label || 'Electives' }}</span>
+                  <span class="schedule-print-blocked-time">{{ formatTimeRange(el.start, el.end) }}</span>
+                </div>
+                <div
                   v-if="timeToMinutes(dayConfigs[day].end) <= NOON"
                   class="schedule-print-no-classes"
                   :style="rangeStyle(dayConfigs[day].end, minutesToTime(CAL_END))"
@@ -484,6 +493,7 @@ function lunchTimeLabel(day) {
 }
 
 .schedule-print-blocked,
+.schedule-print-elective,
 .schedule-print-no-classes {
   position: absolute;
   left: 0;
@@ -506,6 +516,15 @@ function lunchTimeLabel(day) {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: center;
+}
+
+/* Elective band — amber, distinct from grey blocked periods. */
+.schedule-print-elective {
+  z-index: 2;
+  border-top: 0.12mm solid #fcd34d;
+  border-bottom: 0.12mm solid #fcd34d;
+  background: #fef3c7;
+  color: #b45309;
 }
 
 .schedule-print-blocked-time {

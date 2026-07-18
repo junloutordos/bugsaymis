@@ -114,6 +114,21 @@
                 </span>
               </div>
 
+              <!-- Elective window band — students attend cross-section electives -->
+              <div v-for="el in (dayConfigs[day]?.electives ?? [])" :key="`elec-${el.start}`"
+                :style="blockedStyle(el)"
+                class="absolute inset-x-0 pointer-events-none z-[2] flex items-center justify-center">
+                <div class="absolute inset-0 rounded-sm border border-amber-200 bg-amber-50/80" />
+                <span class="relative w-full text-amber-700 font-semibold px-1 text-center leading-tight select-none">
+                  <span :class="['block truncate', blockedDurationMin(el) >= 40 ? 'text-xs' : 'text-[10px]']">
+                    {{ el.label || 'Electives' }}
+                  </span>
+                  <span :class="['block tabular-nums opacity-80', blockedDurationMin(el) >= 40 ? 'text-[10px]' : 'text-[9px]']">
+                    {{ fmtTimeRange(el.start, el.end) }}
+                  </span>
+                </span>
+              </div>
+
               <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
               <div v-if="dayConfigs[day] && timeToMin(dayConfigs[day].end) <= 12 * 60"
                 :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"

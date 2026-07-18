@@ -142,9 +142,10 @@ class SectionController extends Controller
         foreach (SchedulingConstants::DAYS as $day) {
             $window = SchedulingConstants::getEffectiveClassWindow($section->levelid, $day);
             $dayConfigs[$day] = [
-                'start'   => $window['start'] ?? null,
-                'end'     => $window['end'] ?? null,
-                'blocked' => SchedulingConstants::getDisplayBlockedSlots($section->levelid, $day),
+                'start'     => $window['start'] ?? null,
+                'end'       => $window['end'] ?? null,
+                'blocked'   => SchedulingConstants::getDisplayBlockedSlots($section->levelid, $day),
+                'electives' => SchedulingConstants::getElectiveWindows($section->levelid, $day),
             ];
         }
 

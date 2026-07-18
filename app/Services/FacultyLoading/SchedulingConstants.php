@@ -639,12 +639,79 @@ class SchedulingConstants
 
     /**
      * Get the canonical Tue–Fri timetable for a grade (early 7:30 shift).
+     *
+     * Grade 10 shares the G9G10 table with Grade 9, but reserves one fixed
+     * period every Tue–Fri for electives (like G11–G12). We tag that period's
+     * label with "(Elective)" for Grade 10 only, so every downstream consumer —
+     * the generator's slot grid, class/blocked-slot helpers, and the calendar
+     * elective band — treats it uniformly, without giving Grade 9 an elective.
      */
     public static function getTueFriTimetable(int $grade): array
     {
         if ($grade <= 8)  return self::timetable('TUEFRI_730_G7G8');
-        if ($grade <= 10) return self::timetable('TUEFRI_730_G9G10');
+        if ($grade === 9) return self::timetable('TUEFRI_730_G9G10');
+        if ($grade === 10) return self::tagElectivePeriod(self::timetable('TUEFRI_730_G9G10'), self::G10_ELECTIVE_START);
         return self::timetable('TUEFRI_730_G11G12');
+    }
+
+    /** Grade 10's fixed Tue–Fri elective period start (matches Period 7). */
+    private const G10_ELECTIVE_START = '13:50';
+
+    /**
+     * Append "(Elective)" to the CLASS row that starts at $start, so it reads as
+     * an elective window. No-op if the row isn't found (e.g. an editor override
+     * moved it) or is already tagged.
+     */
+    private static function tagElectivePeriod(array $rows, string $start): array
+    {
+        foreach ($rows as &$row) {
+            if (($row['type'] ?? '') === 'CLASS'
+                && ($row['start'] ?? null) === $start
+                && ! str_contains((string) ($row['label'] ?? ''), 'Elective')) {
+                $row['label'] = trim(($row['label'] ?? '').' (Elective)');
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * The elective window(s) reserved for a grade on a day, as display bands —
+     * contiguous elective-labelled periods are merged into a single "Electives"
+     * block. Empty for grades whose bell schedule has no elective period.
+     *
+     * @return array<int,array{start:string,end:string,label:string}>
+     */
+    public static function getElectiveWindows(int $grade, string $day): array
+    {
+        $timetable = ($day === 'Monday')
+            ? self::getMondayTimetable($grade)
+            : self::getTueFriTimetable($grade);
+
+        $periods = array_values(array_filter(
+            $timetable,
+            static fn ($s) => ($s['type'] ?? '') === 'CLASS'
+                && str_contains((string) ($s['label'] ?? ''), 'Elective')
+        ));
+
+        if ($periods === []) {
+            return [];
+        }
+
+        usort($periods, static fn ($a, $b) => $a['start'] <=> $b['start']);
+
+        $windows = [];
+        foreach ($periods as $period) {
+            $lastIdx = count($windows) - 1;
+            if ($lastIdx >= 0 && $windows[$lastIdx]['end'] === $period['start']) {
+                $windows[$lastIdx]['end'] = $period['end'];
+            } else {
+                $windows[] = ['start' => $period['start'], 'end' => $period['end'], 'label' => 'Electives'];
+            }
+        }
+
+        return $windows;
     }
 
     /**
