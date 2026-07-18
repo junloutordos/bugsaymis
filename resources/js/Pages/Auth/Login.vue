@@ -181,10 +181,10 @@ const brandPillars = [
               <span class="mobile-app-option-label">Android</span>
               <span class="mobile-app-option-sub">Direct download · v{{ atlasGoVersion }}</span>
             </a>
-            <div class="mobile-app-option mobile-app-option-disabled">
+            <a href="https://apps.apple.com/app/id6789103155" target="_blank" rel="noopener noreferrer" class="mobile-app-option">
               <span class="mobile-app-option-label">iOS</span>
-              <span class="mobile-app-option-sub">Coming soon to the App Store</span>
-            </div>
+              <span class="mobile-app-option-sub">App Store · Free</span>
+            </a>
             <p class="mobile-app-note">Not yet on Google Play — you'll see an "Unknown sources" prompt when installing on Android.</p>
           </div>
           </Transition>
