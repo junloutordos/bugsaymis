@@ -34,7 +34,7 @@ const active = computed(() => tables.value.find(t => t.key === activeKey.value) 
 const saving = ref(false)
 
 // ── Special windows (deep local copy so edits stay local until saved) ────────
-const specials = ref(props.settings.map(s => ({ ...s, value: structuredClone(s.value) })))
+const specials = ref(props.settings.map(s => ({ ...s, value: JSON.parse(JSON.stringify(s.value)) })))
 const savingKey = ref(null)
 
 function gradeWindowRows(setting) {
