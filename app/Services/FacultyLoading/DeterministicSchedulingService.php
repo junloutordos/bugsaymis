@@ -47,6 +47,15 @@ class DeterministicSchedulingService
      */
     private const MAX_RESTARTS = 150;
 
+    /**
+     * Once a fully-placed (zero-unplaced) schedule is found, spend this many
+     * extra randomized-restart attempts searching for a lower aggregate soft
+     * score (fewer idle gaps, better day balance) instead of stopping at the
+     * first feasible result. Feasibility always wins — a candidate that drops
+     * even one session is never preferred over a lower-quality feasible one.
+     */
+    private const QUALITY_RESTART_ATTEMPTS = 20;
+
     /** Minutes an Independent Learning Period session occupies within its period. */
     private const ILP_MINUTES = 30;
 
@@ -67,6 +76,10 @@ class DeterministicSchedulingService
     private array $sectionDayCount = [];
     /** @var array<int,array<int,array<string,int>>> */
     private array $sectionSubjDays = [];
+    /** @var array<int,array<string,int>> teaching sessions placed so far per faculty+day (soft day-spread) */
+    private array $facultyDayCount = [];
+    /** Soft score of the slot findBestSlot() most recently returned (paired with its result). */
+    private int $lastSlotScore = 0;
     /** @var array<int,?array{s:array<string,mixed>,slot:array<string,mixed>}> */
     private array $placements = [];
     /** @var array<int,array<string,array{start:int,end:int}>> */
@@ -222,7 +235,8 @@ class DeterministicSchedulingService
         // sessions unplaced, a different tie-break order often resolves them.
         // PHP's usort is stable, so shuffling first then sorting by the
         // constraint key keeps most-constrained-first while varying ties.
-        for ($attempt = 1; $attempt <= self::MAX_RESTARTS && ! empty($best['unplaceable']); $attempt++) {
+        $attempt = 1;
+        for (; $attempt <= self::MAX_RESTARTS && ! empty($best['unplaceable']); $attempt++) {
             mt_srand($attempt * 7919);
             $shuffled = $baseSessions;
             shuffle($shuffled);
@@ -232,6 +246,30 @@ class DeterministicSchedulingService
             $candidate = $this->runPlacement($shuffled, $schoolYearId, $termId, $scopedSectionIds);
             if (count($candidate['unplaceable']) < count($best['unplaceable'])) {
                 $best = $candidate;
+            }
+        }
+
+        // Feasibility is settled (or exhausted) above — never traded away below.
+        // If a fully-placed schedule was found, spend a small bounded extra
+        // budget searching for a lower aggregate soft score (fewer idle gaps,
+        // better day balance) instead of keeping whichever ordering happened
+        // to reach zero-unplaced first.
+        if (empty($best['unplaceable'])) {
+            $qualityCap = $attempt + self::QUALITY_RESTART_ATTEMPTS;
+            for (; $attempt <= $qualityCap; $attempt++) {
+                mt_srand($attempt * 7919);
+                $shuffled = $baseSessions;
+                shuffle($shuffled);
+                usort($shuffled, fn ($a, $b) =>
+                    [$b['faculty_total'], $b['sessions_needed']] <=> [$a['faculty_total'], $a['sessions_needed']]);
+
+                $candidate = $this->runPlacement($shuffled, $schoolYearId, $termId, $scopedSectionIds);
+                if (! empty($candidate['unplaceable'])) {
+                    continue;
+                }
+                if ($candidate['quality_score'] < $best['quality_score']) {
+                    $best = $candidate;
+                }
             }
         }
 
@@ -361,7 +399,7 @@ class DeterministicSchedulingService
                 $deferred[] = $s;
                 continue;
             }
-            $this->commit($s, $slot);
+            $this->commit($s, $slot, null, $this->lastSlotScore);
         }
 
         $failedByLoad = [];
@@ -512,7 +550,7 @@ class DeterministicSchedulingService
                 $deferred[] = $s;
                 continue;
             }
-            $this->commit($s, $slot);
+            $this->commit($s, $slot, null, $this->lastSlotScore);
         }
 
         // Pass 2 — recursive relocation (bounded augmenting-path search).
@@ -523,14 +561,16 @@ class DeterministicSchedulingService
             }
         }
 
-        $placed = [];
+        $placed        = [];
+        $qualityScore  = 0;
         foreach ($this->placements as $p) {
             if ($p !== null) {
-                $placed[] = $this->toScheduleRow($p['s'], $p['slot'], $schoolYearId, $termId);
+                $placed[]      = $this->toScheduleRow($p['s'], $p['slot'], $schoolYearId, $termId);
+                $qualityScore += $p['score'] ?? 0;
             }
         }
 
-        return ['placed' => $placed, 'unplaceable' => $unplaceable];
+        return ['placed' => $placed, 'unplaceable' => $unplaceable, 'quality_score' => $qualityScore];
     }
 
     // ── Requirements ────────────────────────────────────────────────────────
@@ -741,6 +781,7 @@ class DeterministicSchedulingService
         $this->sectionDayCount    = [];
         $this->sectionSubjDays    = [];
         $this->sectionIlpDayCount = [];
+        $this->facultyDayCount    = [];
         $this->placements         = [];
     }
 
@@ -785,10 +826,11 @@ class DeterministicSchedulingService
                 continue;
             }
 
+            $isPlaceholderFaculty = str_starts_with((string) ($names[$row->user_id] ?? ''), 'TBA');
             if ($row->section_id) {
                 $this->sectionBusy[(int) $row->section_id][$day][] = [$start, $end, -1];
             }
-            if ($row->user_id && ! str_starts_with((string) ($names[$row->user_id] ?? ''), 'TBA')) {
+            if ($row->user_id && ! $isPlaceholderFaculty) {
                 $this->facultyBusy[(int) $row->user_id][$day][] = [$start, $end, -1];
             }
 
@@ -803,6 +845,10 @@ class DeterministicSchedulingService
                 }
                 if (($row->session_type ?? 'regular') === 'ilp') {
                     $this->sectionIlpDayCount[$sectionId][$day] = ($this->sectionIlpDayCount[$sectionId][$day] ?? 0) + 1;
+                }
+                if ($row->user_id && ! $isPlaceholderFaculty) {
+                    $this->facultyDayCount[(int) $row->user_id][$day] =
+                        ($this->facultyDayCount[(int) $row->user_id][$day] ?? 0) + 1;
                 }
             }
         }
@@ -897,20 +943,7 @@ class DeterministicSchedulingService
             }
 
             // SOFT scoring (lower is better).
-            $score = 0;
-            $score += ($slot['is_overflow'] ?? false) ? self::OVERFLOW_PENALTY : 0;
-            // Strongly avoid the same subject twice on the same day for a section.
-            $score += ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) * 10000;
-            if ($isIlp) {
-                // Spread a section's ILP sessions evenly across the week — this
-                // outweighs the generic day-spread preference below.
-                $score += ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) * 1000;
-            }
-            // Spread a section's classes evenly across the week.
-            $score += ($this->sectionDayCount[$s['section_id']][$day] ?? 0) * 100;
-            // Slight preference for earlier days/times for determinism + compactness.
-            $score += array_search($day, self::DAYS, true) * 2;
-            $score += intdiv($slot['start_min'], 30);
+            $score = $this->computeSlotScore($s, $slot, $occupiedSlot, $isIlp);
 
             if ($score < $bestScore) {
                 $bestScore = $score;
@@ -918,7 +951,51 @@ class DeterministicSchedulingService
             }
         }
 
+        $this->lastSlotScore = $best !== null ? $bestScore : 0;
+
         return $best;
+    }
+
+    /**
+     * Soft penalty for placing session $s at $slot (lower is better). Shared by
+     * {@see findBestSlot()}, {@see rankSlots()} and the relocation search in
+     * {@see attemptPlace()} so every placement's score is computed the same way.
+     *
+     * @param array<string,mixed> $s
+     * @param array<string,mixed> $slot the grid slot being scored
+     * @param array<string,mixed> $occupiedSlot the actual occupied interval (ILP-truncated)
+     */
+    private function computeSlotScore(array $s, array $slot, array $occupiedSlot, bool $isIlp): int
+    {
+        $day   = $slot['day'];
+        $score = 0;
+        $score += ($slot['is_overflow'] ?? false) ? self::OVERFLOW_PENALTY : 0;
+        // Strongly avoid the same subject twice on the same day for a section.
+        $score += ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) * 10000;
+        if ($isIlp) {
+            // Spread a section's ILP sessions evenly across the week — this
+            // outweighs the generic day-spread preference below.
+            $score += ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) * 1000;
+        }
+        // Spread a faculty's OWN classes evenly across the week too, not
+        // just the section's.
+        $score += ($this->facultyDayCount[$s['faculty_id']][$day] ?? 0) * 300;
+        // Spread a section's classes evenly across the week.
+        $score += ($this->sectionDayCount[$s['section_id']][$day] ?? 0) * 100;
+        // Nudge cognitively-heavy subjects (Math/Science/CS) away from the
+        // afternoon fatigue window.
+        if (! $isIlp && $slot['start_min'] >= SchedulingConstants::PM_START_MIN
+            && $this->isHeavySubject($s['subject_code'] ?? '')) {
+            $score += 50;
+        }
+        // Fill idle gaps in the faculty's own day without exceeding the
+        // fatigue-streak guideline.
+        $score += $this->facultyDayGapPenalty($s['faculty_id'], $day, $occupiedSlot);
+        // Slight preference for earlier days/times for determinism + compactness.
+        $score += array_search($day, self::DAYS, true) * 2;
+        $score += intdiv($slot['start_min'], 30);
+
+        return $score;
     }
 
     /**
@@ -958,15 +1035,7 @@ class DeterministicSchedulingService
                 continue;
             }
 
-            $score = 0;
-            $score += ($slot['is_overflow'] ?? false) ? self::OVERFLOW_PENALTY : 0;
-            $score += ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) * 10000;
-            if ($isIlp) {
-                $score += ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) * 1000;
-            }
-            $score += ($this->sectionDayCount[$s['section_id']][$day] ?? 0) * 100;
-            $score += array_search($day, self::DAYS, true) * 2;
-            $score += intdiv($slot['start_min'], 30);
+            $score = $this->computeSlotScore($s, $slot, $occupiedSlot, $isIlp);
 
             $endMin  = $isIlp ? min($slot['end_min'], $slot['start_min'] + self::ILP_MINUTES) : $slot['end_min'];
             $found[] = [
@@ -997,7 +1066,7 @@ class DeterministicSchedulingService
         // Direct placement onto a slot that is free for both section and faculty.
         $slot = $this->findBestSlot($s, $reserved);
         if ($slot !== null) {
-            $this->commit($s, $slot);
+            $this->commit($s, $slot, null, $this->lastSlotScore);
             return true;
         }
 
@@ -1045,18 +1114,19 @@ class DeterministicSchedulingService
                 continue;
             }
             $blocked  = $this->placements[$blockIdx];
+            $score    = $this->computeSlotScore($s, $slot, $occupiedSlot, $isIlp);
 
             // Free the blocker and try to re-place it elsewhere — it (and any
             // class it displaces in turn) must avoid every slot this chain has
             // reserved, including the one we are reserving now for $s.
             $this->uncommit($blockIdx);
             if ($this->attemptPlace($blocked['s'], $depth - 1, array_merge($reserved, [$occupiedSlot]))) {
-                $this->commit($s, $slot);
+                $this->commit($s, $slot, null, $score);
                 return true;
             }
 
             // Restore the blocker at its original slot/index and keep searching.
-            $this->commit($blocked['s'], $blocked['slot'], $blockIdx);
+            $this->commit($blocked['s'], $blocked['slot'], $blockIdx, $blocked['score'] ?? 0);
         }
 
         return false;
@@ -1128,10 +1198,10 @@ class DeterministicSchedulingService
      * @param array<string,mixed> $s
      * @param array<string,mixed> $slot
      */
-    private function commit(array $s, array $slot, ?int $reuseIdx = null): int
+    private function commit(array $s, array $slot, ?int $reuseIdx = null, ?int $score = null): int
     {
         $idx = $reuseIdx ?? count($this->placements);
-        $this->placements[$idx] = ['s' => $s, 'slot' => $slot];
+        $this->placements[$idx] = ['s' => $s, 'slot' => $slot, 'score' => $score ?? 0];
 
         $day   = $slot['day'];
         $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
@@ -1146,6 +1216,9 @@ class DeterministicSchedulingService
             ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) + 1;
         if ($isIlp) {
             $this->sectionIlpDayCount[$s['section_id']][$day] = ($this->sectionIlpDayCount[$s['section_id']][$day] ?? 0) + 1;
+        }
+        if ($s['faculty_id'] >= 0) {
+            $this->facultyDayCount[$s['faculty_id']][$day] = ($this->facultyDayCount[$s['faculty_id']][$day] ?? 0) + 1;
         }
 
         return $idx;
@@ -1164,6 +1237,9 @@ class DeterministicSchedulingService
         $this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day]--;
         if (($s['session_type'] ?? 'regular') === 'ilp') {
             $this->sectionIlpDayCount[$s['section_id']][$day]--;
+        }
+        if ($s['faculty_id'] >= 0) {
+            $this->facultyDayCount[$s['faculty_id']][$day]--;
         }
 
         $this->placements[$idx] = null;
@@ -1191,6 +1267,66 @@ class DeterministicSchedulingService
     {
         foreach ($this->facultyBusy[$facultyId][$slot['day']] ?? [] as [$start, $end]) {
             if ($slot['start_min'] < $end && $slot['end_min'] > $start) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Soft penalty from the faculty's OWN day, evaluated against a candidate
+     * slot: rewards filling idle gaps between a teacher's other classes that
+     * day, but flips to a mild penalty once the resulting contiguous run
+     * would exceed the fatigue guideline (SchedulingConstants::MAX_STREAK_MIN)
+     * — so the generator doesn't over-pack a teacher into one long block just
+     * to look "compact". TBA/placeholder sentinels (negative faculty id) have
+     * no real person's day to optimize, so they score 0.
+     *
+     * @param array<string,mixed> $slot the occupied interval being scored (start_min/end_min)
+     */
+    private function facultyDayGapPenalty(int $facultyId, string $day, array $slot): int
+    {
+        if ($facultyId < 0) {
+            return 0;
+        }
+
+        $intervals = [[$slot['start_min'], $slot['end_min']]];
+        foreach ($this->facultyBusy[$facultyId][$day] ?? [] as [$start, $end]) {
+            $intervals[] = [$start, $end];
+        }
+        if (count($intervals) < 2) {
+            return 0;
+        }
+        usort($intervals, fn ($a, $b) => $a[0] <=> $b[0]);
+
+        $runStart   = $intervals[0][0];
+        $runEnd     = $intervals[0][1];
+        $longestRun = 0;
+        $idleMin    = 0;
+        foreach (array_slice($intervals, 1) as [$start, $end]) {
+            $gap = $start - $runEnd;
+            if ($gap <= SchedulingConstants::STREAK_JOIN_GAP_MIN) {
+                $runEnd = max($runEnd, $end);
+                continue;
+            }
+            $longestRun = max($longestRun, $runEnd - $runStart);
+            $idleMin   += $gap;
+            $runStart   = $start;
+            $runEnd     = $end;
+        }
+        $longestRun = max($longestRun, $runEnd - $runStart);
+
+        return $longestRun > SchedulingConstants::MAX_STREAK_MIN
+            ? 20
+            : intdiv($idleMin, 15);
+    }
+
+    /** True if a subject code matches one of the cognitively-heavy prefixes. */
+    private function isHeavySubject(string $subjectCode): bool
+    {
+        $code = strtoupper($subjectCode);
+        foreach (SchedulingConstants::HEAVY_SUBJECT_PREFIXES as $prefix) {
+            if (str_starts_with($code, $prefix)) {
                 return true;
             }
         }

@@ -22,10 +22,10 @@ class ScheduleAnalyticsService
     private const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
     /** Two class intervals closer than this are one continuous teaching streak. */
-    private const STREAK_JOIN_GAP_MIN = 15;
+    private const STREAK_JOIN_GAP_MIN = SchedulingConstants::STREAK_JOIN_GAP_MIN;
 
     /** Streaks beyond 3 contiguous hours are flagged (fatigue rule of thumb). */
-    private const MAX_STREAK_MIN = 180;
+    private const MAX_STREAK_MIN = SchedulingConstants::MAX_STREAK_MIN;
 
     /** A single day with more than 5 teaching hours is flagged as heavy. */
     private const HEAVY_DAY_MIN = 300;
@@ -34,15 +34,13 @@ class ScheduleAnalyticsService
     private const LUNCH_WINDOW = [690, 810]; // 11:30–13:30
     private const LUNCH_ALLOWANCE_MIN = 60;
 
-    /** Afternoon boundary for the cognitive-load placement metric. */
-    private const PM_START_MIN = 780; // 13:00
-
     /**
-     * Subjects treated as cognitively heavy for the PM-placement metric,
-     * matched by uppercase code prefix (MATH1, BIO3L2, CHEM4L2, PHY3, CS1,
-     * STEMR2, SCI…). Heuristic — subjects carry no explicit difficulty flag.
+     * Afternoon boundary and heavy-subject prefixes for the cognitive-load
+     * placement metric — shared with DeterministicSchedulingService via
+     * SchedulingConstants so both stay in sync on what counts as "heavy"/"PM".
      */
-    private const HEAVY_CODE_PREFIXES = ['MATH', 'BIO', 'CHEM', 'PHY', 'SCI', 'CS', 'STEM'];
+    private const PM_START_MIN = SchedulingConstants::PM_START_MIN;
+    private const HEAVY_CODE_PREFIXES = SchedulingConstants::HEAVY_SUBJECT_PREFIXES;
 
     /** Heatmap hour buckets (24h clock, inclusive start of each 1-hour cell). */
     private const HEAT_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16];

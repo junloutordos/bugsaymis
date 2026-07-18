@@ -39,7 +39,10 @@ class LoadBalancingService
     // Score cap so we don't waste time on marginal improvements
     private const MIN_IMPROVEMENT = 0.5; // units
 
-    public function __construct(private readonly LoadComputationService $loadService) {}
+    public function __construct(
+        private readonly LoadComputationService $loadService,
+        private readonly ConflictDetectionService $conflictService,
+    ) {}
 
     // ── Public API ────────────────────────────────────────────────────────
 
@@ -201,6 +204,8 @@ class LoadBalancingService
             throw new \RuntimeException('Target faculty load is locked and cannot receive assignments.');
         }
 
+        $this->assertTargetFreeForAssignment($targetFacultyId, $assignment);
+
         DB::transaction(function () use ($assignment, $targetLoad, $targetFacultyId) {
             // Move the assignment
             $assignment->update([
@@ -252,6 +257,11 @@ class LoadBalancingService
         $userA = $assignmentA->user_id;
         $userB = $assignmentB->user_id;
 
+        // Each assignment's existing class_schedule slots must be free on the
+        // OTHER faculty's calendar — a swap moves A's slots to B and vice versa.
+        $this->assertTargetFreeForAssignment((int) $userB, $assignmentA);
+        $this->assertTargetFreeForAssignment((int) $userA, $assignmentB);
+
         DB::transaction(function () use ($assignmentA, $assignmentB, $loadA, $loadB, $userA, $userB) {
             // Swap user_id and faculty_load_id
             $assignmentA->update(['user_id' => $userB, 'faculty_load_id' => $loadB->id]);
@@ -268,6 +278,41 @@ class LoadBalancingService
         return [
             'message' => "Assignments #{$assignmentAId} and #{$assignmentBId} swapped successfully.",
         ];
+    }
+
+    /**
+     * Guard against a transfer/swap silently creating a real H1 teacher
+     * double-booking: check every class_schedule slot linked to $assignment
+     * against the RECEIVING faculty's existing calendar before it's moved.
+     *
+     * @throws \RuntimeException if the target faculty is already booked at
+     *         any of the assignment's existing slots
+     */
+    private function assertTargetFreeForAssignment(int $targetFacultyId, LoadAssignment $assignment): void
+    {
+        $rows = ClassSchedule::where('load_assignment_id', $assignment->id)->get();
+
+        foreach ($rows as $row) {
+            $conflicts = $this->conflictService->detectFacultyConflict(
+                $targetFacultyId,
+                $row->day_of_week,
+                $row->start_time,
+                $row->end_time,
+                $row->academic_term_id,
+                excludeId: $row->id,
+            );
+
+            if ($conflicts->isNotEmpty()) {
+                $conflict = $conflicts->first();
+                throw new \RuntimeException(sprintf(
+                    'Cannot move assignment #%d: the receiving faculty is already booked %s %s–%s.',
+                    $assignment->id,
+                    $conflict->day_of_week,
+                    substr((string) $conflict->start_time, 0, 5),
+                    substr((string) $conflict->end_time, 0, 5),
+                ));
+            }
+        }
     }
 
     // ── Profile Builder ───────────────────────────────────────────────────

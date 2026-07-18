@@ -386,6 +386,27 @@ class SchedulingConstants
     /** Days on which Science Core blocks may be placed */
     public const SCIENCE_CORE_DAYS = ['Monday', 'Wednesday', 'Thursday', 'Friday'];
 
+    // ── Cognitive-load placement ─────────────────────────────────────────────
+    // Shared by ScheduleAnalyticsService (measures PM-heavy placement) and
+    // DeterministicSchedulingService (scores against it during placement) so
+    // the two never drift apart on what counts as "heavy" or "PM".
+
+    /**
+     * Subjects treated as cognitively heavy, matched by uppercase code prefix
+     * (MATH1, BIO3L2, CHEM4L2, PHY3, CS1, STEMR2, SCI…). Heuristic — subjects
+     * carry no explicit difficulty flag.
+     */
+    public const HEAVY_SUBJECT_PREFIXES = ['MATH', 'BIO', 'CHEM', 'PHY', 'SCI', 'CS', 'STEM'];
+
+    /** Afternoon boundary (minutes from midnight) for the PM-placement metric. */
+    public const PM_START_MIN = 780; // 13:00
+
+    /** Two class intervals closer than this (minutes) are one continuous teaching streak. */
+    public const STREAK_JOIN_GAP_MIN = 15;
+
+    /** Streaks beyond this many contiguous minutes are flagged (fatigue guideline). */
+    public const MAX_STREAK_MIN = 180;
+
     // ── Elective Windows ──────────────────────────────────────────────────────
 
     public const ELECTIVE_WINDOWS_G10 = [
