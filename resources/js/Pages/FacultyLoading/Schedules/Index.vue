@@ -149,6 +149,16 @@
                 {{ facultyUnitLabel(groupId) }}
               </div>
 
+              <!-- Electives divider (By Section view) — separates cross-section
+                   elective offerings from the homeroom sections above -->
+              <div v-if="shouldShowElectiveHeader(groupId)"
+                class="mt-3 flex items-center gap-2 border-t border-amber-200 pt-3 px-1">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-100">
+                  Electives
+                </span>
+                <span class="text-xs text-slate-400">Cross-section offerings — students attend during the elective window</span>
+              </div>
+
               <ScheduleCalendarCard
                 :title="cardTitle(groupId)"
                 :title-badge="viewBy === 'section' ? ('Grade ' + groupHeaderInfo(groupId).grade_level) : null"
@@ -968,6 +978,11 @@ const groupsWithSchedules = computed(() => {
     seen.sort((a, b) => a - b)
   } else if (viewBy.value === 'subject') {
     seen.sort((a, b) => subjectLabel(a).localeCompare(subjectLabel(b)))
+  } else if (viewBy.value === 'section') {
+    // Homeroom sections keep their grade+name order; synthetic elective
+    // (ELEC-*) sections drop to the bottom under their own heading. Array.sort
+    // is stable, so the 0-comparison preserves the backend order within groups.
+    seen.sort((a, b) => (isElectiveGroup(a) ? 1 : 0) - (isElectiveGroup(b) ? 1 : 0))
   } else if (viewBy.value === 'faculty') {
     // Group by Division/Office (the live Data Management assignment) instead
     // of leaving faculty in whatever order their first schedule row happened
@@ -1005,6 +1020,15 @@ function shouldShowUnitHeader(facultyId) {
   const list = groupsWithSchedules.value
   const idx  = list.indexOf(facultyId)
   return idx === 0 || facultyUnitLabel(list[idx - 1]) !== facultyUnitLabel(facultyId)
+}
+
+/** True on the first elective (ELEC-*) card in By-Section view — renders the
+ *  "Electives" divider that separates them from the homeroom sections above. */
+function shouldShowElectiveHeader(groupId) {
+  if (!isElectiveGroup(groupId)) return false
+  const list = groupsWithSchedules.value
+  const idx  = list.indexOf(groupId)
+  return idx === 0 || !isElectiveGroup(list[idx - 1])
 }
 
 /** { groupId: [unplacedLoads] } — grouped the same way calendar cards are.
@@ -1060,6 +1084,7 @@ function groupHeaderInfo(groupId) {
       grade_level:  fromSchedule.grade_level,
       section_name: fromSchedule.section_name,
       faculty_name: fromSchedule.faculty?.name ?? 'Unassigned / TBA',
+      is_elective_section: fromSchedule.is_elective_section ?? false,
     }
   }
   const fromLoad = props.unplacedLoads.find(l =>
@@ -1069,7 +1094,13 @@ function groupHeaderInfo(groupId) {
     grade_level:  fromLoad?.grade_level,
     section_name: fromLoad?.section_name,
     faculty_name: fromLoad?.faculty?.name ?? 'Unassigned / TBA',
+    is_elective_section: (fromLoad?.section_name ?? '').startsWith('ELEC-'),
   }
+}
+
+/** True when a By-Section group is a synthetic elective (ELEC-*) section. */
+function isElectiveGroup(groupId) {
+  return viewBy.value === 'section' && groupHeaderInfo(groupId).is_elective_section === true
 }
 
 /** Blocked-period/class-hours config for a column's day, resolved by that
@@ -1198,8 +1229,16 @@ function cardEventsByDay(groupId) {
 
 /** { Monday: {start,end,blocked}, ... } for one card. */
 function dayConfigsForGroup(groupId) {
+  // The "Electives" band marks the released elective window on a homeroom
+  // section card only. Everywhere else it's wrong or redundant: elective cards
+  // and the Year-Level / By-Subject overviews already show the real elective
+  // classes in that window, and a faculty card isn't a section at all.
+  const showBand = viewBy.value === 'section' && !isElectiveGroup(groupId)
   const out = {}
-  for (const day of WEEKDAYS) out[day] = dayConfigFor(groupId, day)
+  for (const day of WEEKDAYS) {
+    const cfg = dayConfigFor(groupId, day)
+    out[day] = !showBand && cfg ? { ...cfg, electives: [] } : cfg
+  }
   return out
 }
 

@@ -211,6 +211,7 @@ class ClassSchedule extends Model
             'section_id'   => $this->section_id,
             'section_name' => $this->section?->sectionname ?? ($this->section_id ? "Section {$this->section_id}" : null),
             'grade_level'  => $this->section?->levelid ?? null,
+            'is_elective_section' => str_starts_with((string) ($this->section?->sectionname ?? ''), 'ELEC-'),
             'is_locked'    => $isLocked,
             'can_edit'     => $canEdit,
         ];

@@ -342,6 +342,9 @@ class ClassScheduleController extends Controller
             ->map(fn ($schedule) => $schedule->toCalendarArray())
             ->values();
 
+        // A synthetic elective (ELEC-*) section prints its real elective classes,
+        // so it gets no elective band (homeroom sections do).
+        $isElectiveSection = str_starts_with((string) ($owner['name'] ?? ''), 'ELEC-');
         $dayConfigs = [];
         if ($gradeLevel !== null) {
             foreach (SchedulingConstants::DAYS as $day) {
@@ -350,7 +353,7 @@ class ClassScheduleController extends Controller
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
                     'blocked' => SchedulingConstants::getDisplayBlockedSlots($gradeLevel, $day),
-                    'electives' => SchedulingConstants::getElectiveWindows($gradeLevel, $day),
+                    'electives' => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($gradeLevel, $day),
                 ];
             }
         }

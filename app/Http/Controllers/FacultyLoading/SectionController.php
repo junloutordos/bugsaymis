@@ -138,6 +138,10 @@ class SectionController extends Controller
             ->get()
             ->map(fn ($s) => $s->toCalendarArray());
 
+        // The elective band marks the released window on a homeroom section; a
+        // synthetic elective (ELEC-*) section already shows its real elective
+        // classes there, so it gets no band.
+        $isElectiveSection = str_starts_with((string) $section->sectionname, 'ELEC-');
         $dayConfigs = [];
         foreach (SchedulingConstants::DAYS as $day) {
             $window = SchedulingConstants::getEffectiveClassWindow($section->levelid, $day);
@@ -145,7 +149,7 @@ class SectionController extends Controller
                 'start'     => $window['start'] ?? null,
                 'end'       => $window['end'] ?? null,
                 'blocked'   => SchedulingConstants::getDisplayBlockedSlots($section->levelid, $day),
-                'electives' => SchedulingConstants::getElectiveWindows($section->levelid, $day),
+                'electives' => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($section->levelid, $day),
             ];
         }
 
