@@ -24,13 +24,14 @@ class CreateIctEquipmentsTable extends Migration
             $table->date('date_acquired')->nullable();
             $table->decimal('amount', 12, 2)->nullable();
             $table->string('status')->nullable();
-            $table->unsignedBigInteger('room_id')->nullable()->index();
+            // room_id + its FK are added by 2026_01_21_071557_update_location_to_room_id_in_ict_equipments
+            // (dated after create_rooms_table) — not here, since `rooms` doesn't exist yet
+            // at this migration's timestamp on a fresh database.
             $table->text('remarks')->nullable();
             $table->string('qr_code_path')->nullable();
             $table->timestamps();
 
             $table->foreign('owner_id')->references('id')->on('users')->onDelete('set null');
-            $table->foreign('room_id')->references('id')->on('rooms')->onDelete('set null');
         });
     }
 

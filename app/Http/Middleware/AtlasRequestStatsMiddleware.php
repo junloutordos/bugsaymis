@@ -77,7 +77,10 @@ class AtlasRequestStatsMiddleware
             return;
         }
 
-        $durationMs  = (int) ((microtime(true) - LARAVEL_START) * 1000);
+        // LARAVEL_START is only defined by public/index.php for real HTTP
+        // requests — absent under PHPUnit, which never boots through it.
+        $startedAt   = defined('LARAVEL_START') ? LARAVEL_START : microtime(true);
+        $durationMs  = (int) ((microtime(true) - $startedAt) * 1000);
         $isError     = $response->getStatusCode() >= 500;
         $hourBucket  = now()->startOfHour()->toDateTimeString();
         $route       = substr($routeName, 0, 200);
