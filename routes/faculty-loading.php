@@ -21,6 +21,7 @@ use App\Http\Controllers\FacultyLoading\ScheduleVersionController;
 use App\Http\Controllers\FacultyLoading\CommitteeAssignmentController;
 use App\Http\Controllers\FacultyLoading\FacultyLoadController;
 use App\Http\Controllers\FacultyLoading\LoadAssignmentController;
+use App\Http\Controllers\FacultyLoading\LoadAssignmentVersionController;
 use App\Http\Controllers\FacultyLoading\OverloadComputationController;
 use App\Http\Controllers\FacultyLoading\ReportController;
 use App\Http\Controllers\FacultyLoading\ResearchAdvisoryController;
@@ -204,6 +205,15 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::post('/sync-loads',              [LoadAssignmentController::class, 'syncAllLoads'])->name('sync-loads');
                     Route::put('/{loadAssignment}',         [LoadAssignmentController::class, 'update'])->name('update');
                     Route::delete('/{loadAssignment}',      [LoadAssignmentController::class, 'destroy'])->name('destroy');
+                });
+
+                // Load Assignment Versions (save/compare/restore drafts)
+                Route::prefix('assignments/versions')->name('assignments.versions.')->group(function () {
+                    Route::get('/',                     [LoadAssignmentVersionController::class, 'index'])->name('index');
+                    Route::post('/',                    [LoadAssignmentVersionController::class, 'store'])->name('store');
+                    Route::post('/compare',              [LoadAssignmentVersionController::class, 'compare'])->name('compare');
+                    Route::post('/{loadAssignmentVersion}/restore', [LoadAssignmentVersionController::class, 'restore'])->name('restore');
+                    Route::delete('/{loadAssignmentVersion}',  [LoadAssignmentVersionController::class, 'destroy'])->name('destroy');
                 });
 
                 // Research Advisories

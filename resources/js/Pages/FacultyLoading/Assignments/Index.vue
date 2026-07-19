@@ -14,6 +14,9 @@
           <AppButton variant="secondary" @click="openReassignTba()">
             <ArrowsRightLeftIcon class="h-4 w-4 text-amber-500" /> Reassign TBA
           </AppButton>
+          <AppButton variant="secondary" @click="openVersions">
+            <ArchiveBoxIcon class="h-4 w-4" /> Versions
+          </AppButton>
           <AppButton @click="openForm()">
             <PlusIcon class="h-4 w-4" /> Add Assignment
           </AppButton>
@@ -570,6 +573,102 @@
       </template>
     </AppModal>
 
+    <!-- ── Load Assignment Versions: save/compare/restore checkpoints ── -->
+    <AppModal :show="versionsModal" title="Load Assignment Versions" size="xl" @close="closeVersions">
+      <div class="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div class="max-h-[560px] space-y-2 overflow-y-auto border-r border-slate-200 pr-3">
+          <AppButton size="sm" class="w-full justify-center" @click="saveVersionModal = true">
+            <ArchiveBoxIcon class="h-4 w-4" /> Save Current as Version
+          </AppButton>
+
+          <div v-if="versionsLoading" class="py-10 text-center text-sm text-slate-500">Loading versions...</div>
+          <div v-else-if="!versions.length" class="py-10 text-center text-sm text-slate-500">No saved versions for this term yet.</div>
+
+          <div v-for="v in versions" :key="v.id"
+            class="w-full border p-3 text-left transition-colors"
+            :class="selectedVersionIds.includes(v.id) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'">
+            <button type="button" class="w-full text-left" @click="toggleVersionSelect(v.id)">
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-sm font-semibold text-slate-800">{{ v.label }}</span>
+                <span v-if="v.restored_at" class="text-[11px] font-medium uppercase text-indigo-600">Restored</span>
+              </div>
+              <p v-if="v.notes" class="mt-1 text-xs text-slate-600">{{ v.notes }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ v.assignment_count }} assignment(s) · {{ v.created_by_name }}</p>
+            </button>
+            <div class="mt-2 flex items-center gap-2">
+              <AppButton size="sm" variant="secondary" @click="compareVersion(v)">
+                <MagnifyingGlassIcon class="h-4 w-4" /> Compare vs Current
+              </AppButton>
+              <AppButton size="sm" variant="secondary" @click="restoreVersion(v)">
+                <ArrowPathIcon class="h-4 w-4" /> Restore
+              </AppButton>
+              <AppButton size="sm" variant="danger" @click="deleteVersion(v)">
+                <TrashIcon class="h-4 w-4" />
+              </AppButton>
+            </div>
+          </div>
+
+          <AppButton v-if="selectedVersionIds.length === 2" class="w-full justify-center" @click="compareSelected">
+            <MagnifyingGlassIcon class="h-4 w-4" /> Compare Selected
+          </AppButton>
+        </div>
+
+        <div class="min-w-0">
+          <div v-if="compareLoading" class="py-10 text-center text-sm text-slate-500">Comparing...</div>
+          <div v-else-if="!compareResult" class="py-10 text-center text-sm text-slate-500">
+            Select a version's "Compare vs Current," or select two versions and "Compare Selected."
+          </div>
+          <div v-else class="space-y-4">
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div class="border border-slate-200 p-3">
+                <p class="text-xs font-semibold uppercase text-slate-500">{{ compareLabelA }}</p>
+                <p class="mt-1 text-slate-800">{{ compareResult.summary.a.total_assignments }} assignments · {{ compareResult.summary.a.total_units }}u</p>
+              </div>
+              <div class="border border-slate-200 p-3">
+                <p class="text-xs font-semibold uppercase text-slate-500">{{ compareLabelB }}</p>
+                <p class="mt-1 text-slate-800">{{ compareResult.summary.b.total_assignments }} assignments · {{ compareResult.summary.b.total_units }}u</p>
+              </div>
+            </div>
+
+            <div v-if="!compareResult.diff.length" class="py-6 text-center text-sm text-slate-500">
+              No differences — every assignment matches on both sides.
+            </div>
+            <div v-else class="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              <div v-for="entry in compareResult.diff" :key="entry.key" class="border border-slate-200 p-3">
+                <p class="text-sm font-semibold text-slate-800">{{ entry.label }}</p>
+                <p v-if="entry.status === 'removed'" class="mt-1 text-xs text-rose-700">
+                  − {{ entry.from.faculty_name }} ({{ entry.from.load_units }}u)
+                </p>
+                <p v-if="entry.status === 'added'" class="mt-1 text-xs text-emerald-700">
+                  + {{ entry.to.faculty_name }} ({{ entry.to.load_units }}u)
+                </p>
+                <template v-if="entry.status === 'changed'">
+                  <p class="mt-1 text-xs text-rose-700">− {{ entry.from.faculty_name }} ({{ entry.from.load_units }}u)</p>
+                  <p class="text-xs text-emerald-700">+ {{ entry.to.faculty_name }} ({{ entry.to.load_units }}u)</p>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeVersions">Close</AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal :show="saveVersionModal" title="Save Current Assignments as Version" size="sm" @close="saveVersionModal = false">
+      <div class="space-y-4">
+        <AppInput v-model="versionForm.label" label="Label" required maxlength="100" placeholder="e.g. Before Auto-Assign rerun" />
+        <AppTextarea v-model="versionForm.notes" label="Notes (optional)" :rows="3" />
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="saveVersionModal = false">Cancel</AppButton>
+        <AppButton :loading="versionForm.processing" @click="submitVersion">
+          <ArchiveBoxIcon class="h-4 w-4" /> Save Version
+        </AppButton>
+      </template>
+    </AppModal>
+
   </AdminLayout>
 </template>
 
@@ -586,10 +685,11 @@ import AppFilterBar from '@/Components/AppFilterBar.vue'
 import AppTable from '@/Components/AppTable.vue'
 import AppModal from '@/Components/AppModal.vue'
 import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
-import { confirmDelete } from '@/Composables/useConfirm.js'
+import { confirmDelete, confirmAction } from '@/Composables/useConfirm.js'
 import {
-  AcademicCapIcon, ArrowPathIcon, ArrowsRightLeftIcon, CheckCircleIcon, CheckIcon, ClipboardDocumentListIcon,
+  AcademicCapIcon, ArchiveBoxIcon, ArrowPathIcon, ArrowsRightLeftIcon, CheckCircleIcon, CheckIcon, ClipboardDocumentListIcon,
   EyeIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -1200,5 +1300,121 @@ function scoreLabel(score) {
   if (score >= 6) return '★ High'
   if (score >= 3) return '◆ Med'
   return '◇ Low'
+}
+
+// ── Load Assignment Versions ──────────────────────────────────────────────────
+
+const versionsModal      = ref(false)
+const versions            = ref([])
+const versionsLoading     = ref(false)
+const selectedVersionIds  = ref([])
+const compareResult       = ref(null)
+const compareLoading      = ref(false)
+const compareLabelA       = ref('')
+const compareLabelB       = ref('')
+const saveVersionModal    = ref(false)
+const versionForm = useForm({ academic_term_id: null, label: '', notes: '' })
+
+async function openVersions() {
+  versionsModal.value = true
+  compareResult.value = null
+  selectedVersionIds.value = []
+  await fetchVersions()
+}
+
+function closeVersions() {
+  versionsModal.value = false
+  compareResult.value = null
+  selectedVersionIds.value = []
+}
+
+async function fetchVersions() {
+  if (!filters.term_id) return
+  versionsLoading.value = true
+  try {
+    const { data } = await axios.get(route('faculty-loading.assignments.versions.index'), {
+      params: { academic_term_id: filters.term_id },
+    })
+    versions.value = data
+  } finally {
+    versionsLoading.value = false
+  }
+}
+
+function submitVersion() {
+  versionForm.academic_term_id = filters.term_id
+  versionForm.post(route('faculty-loading.assignments.versions.store'), {
+    preserveScroll: true,
+    onSuccess: async () => {
+      saveVersionModal.value = false
+      versionForm.reset()
+      await fetchVersions()
+    },
+  })
+}
+
+function toggleVersionSelect(id) {
+  const i = selectedVersionIds.value.indexOf(id)
+  if (i !== -1) {
+    selectedVersionIds.value.splice(i, 1)
+    return
+  }
+  if (selectedVersionIds.value.length >= 2) {
+    selectedVersionIds.value.shift()
+  }
+  selectedVersionIds.value.push(id)
+}
+
+async function runCompare(versionAId, versionBId, labelA, labelB) {
+  compareLoading.value = true
+  compareResult.value = null
+  try {
+    const { data } = await axios.post(route('faculty-loading.assignments.versions.compare'), {
+      academic_term_id: filters.term_id,
+      version_a_id: versionAId,
+      version_b_id: versionBId,
+    })
+    compareResult.value = data
+    compareLabelA.value = labelA
+    compareLabelB.value = labelB
+  } finally {
+    compareLoading.value = false
+  }
+}
+
+function compareVersion(v) {
+  selectedVersionIds.value = [v.id]
+  runCompare(v.id, null, v.label, 'Current (live)')
+}
+
+function compareSelected() {
+  if (selectedVersionIds.value.length !== 2) return
+  const [aId, bId] = selectedVersionIds.value
+  const a = versions.value.find(x => x.id === aId)
+  const b = versions.value.find(x => x.id === bId)
+  runCompare(aId, bId, a?.label ?? 'A', b?.label ?? 'B')
+}
+
+async function restoreVersion(v) {
+  const confirmed = await confirmAction({
+    title: `Restore "${v.label}"?`,
+    text: 'This reconciles the current load assignments to match this version. Assignments for faculty whose load is locked are skipped.',
+    confirmText: 'Restore',
+    icon: 'warning',
+  })
+  if (!confirmed) return
+  router.post(route('faculty-loading.assignments.versions.restore', v.id), {}, {
+    preserveScroll: true,
+    onSuccess: () => { closeVersions(); router.reload({ only: ['facultyLoads'] }) },
+  })
+}
+
+async function deleteVersion(v) {
+  const confirmed = await confirmDelete(`This only removes the saved checkpoint "${v.label}" — it does not change live assignments.`)
+  if (!confirmed) return
+  router.delete(route('faculty-loading.assignments.versions.destroy', v.id), {
+    preserveScroll: true,
+    onSuccess: fetchVersions,
+  })
 }
 </script>
