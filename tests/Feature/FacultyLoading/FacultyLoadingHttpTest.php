@@ -82,6 +82,16 @@ class FacultyLoadingHttpTest extends TestCase
         ], $overrides));
     }
 
+    /**
+     * Reuse whichever school year the current test already created (school_years.name
+     * is unique, so makeSubject()/makeClassroom() must not blindly create a second
+     * '2025-2026') — only creates one if the test genuinely hasn't made one yet.
+     */
+    private function anySchoolYearId(): int
+    {
+        return SchoolYear::query()->latest('id')->value('id') ?? $this->makeSchoolYear()->id;
+    }
+
     private function makeTerm(SchoolYear $sy, array $overrides = []): AcademicTerm
     {
         return AcademicTerm::create(array_merge([
@@ -100,6 +110,7 @@ class FacultyLoadingHttpTest extends TestCase
         $i++;
 
         return Subject::create(array_merge([
+            'school_year_id' => $this->anySchoolYearId(),
             'code' => "SUBJ{$i}",
             'name' => "Subject {$i}",
             'credit_units' => 3,
@@ -119,6 +130,7 @@ class FacultyLoadingHttpTest extends TestCase
         $j++;
 
         return Classroom::create(array_merge([
+            'school_year_id' => $this->anySchoolYearId(),
             'name' => "Room {$j}",
             'code' => "R{$j}",
             'classroom_type' => 'lecture',
@@ -637,9 +649,10 @@ class FacultyLoadingHttpTest extends TestCase
         $term = $this->makeTerm($sy);
         $subject = $this->makeSubject();
         $room = $this->makeClassroom();
+        $section = $this->makeSection($sy);
 
         $schedule = ClassSchedule::create([
-            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => 1,
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
             'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
             'day_of_week' => 'Monday', 'start_time' => '08:00:00', 'end_time' => '10:00:00', 'status' => 'active',
         ]);
@@ -649,6 +662,28 @@ class FacultyLoadingHttpTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('class_schedules', ['id' => $schedule->id, 'status' => 'cancelled']);
+    }
+
+    public function test_cid_can_permanently_delete_an_already_cancelled_schedule(): void
+    {
+        $faculty = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $subject = $this->makeSubject();
+        $room = $this->makeClassroom();
+        $section = $this->makeSection($sy);
+
+        $schedule = ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday', 'start_time' => '08:00:00', 'end_time' => '10:00:00', 'status' => 'cancelled',
+        ]);
+
+        $this->actingAs($this->cidUser())
+            ->delete(route('faculty-loading.schedules.destroy', $schedule))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('class_schedules', ['id' => $schedule->id]);
     }
 
     public function test_unauthorized_user_cannot_manage_schedules(): void

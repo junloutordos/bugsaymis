@@ -54,6 +54,9 @@
           <AppButton v-if="canConforme" variant="primary" @click="signConforme">
             <PencilSquareIcon class="h-4 w-4" /> Sign Conforme
           </AppButton>
+          <AppButton v-if="isManage || isReview" variant="secondary" @click="openVersions">
+            <ArchiveBoxIcon class="h-4 w-4" /> Versions
+          </AppButton>
           <AppButton v-if="!isReview" :variant="isManage ? 'secondary' : 'primary'" :disabled="scheduleLocked" @click="openNonTeachingForm()">
             <ClockIcon class="h-4 w-4" /> Add Non-teaching
           </AppButton>
@@ -321,6 +324,94 @@
       <template #footer>
         <AppButton v-if="selectedSwapRequest && ['pending', 'recommended'].includes(selectedSwapRequest.status)" variant="danger" @click="declineSwapRequest">Decline</AppButton>
         <AppButton variant="ghost" @click="closeSwapReview">Close</AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Schedule Versions: save/compare/restore checkpoints of the current tentative schedule -->
+    <AppModal :show="versionsModal" title="Schedule Versions" size="xl" @close="closeVersions">
+      <div class="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div class="max-h-[560px] space-y-2 overflow-y-auto border-r border-slate-200 pr-3">
+          <AppButton v-if="isManage" size="sm" class="w-full justify-center" @click="saveVersionModal = true">
+            <ArchiveBoxIcon class="h-4 w-4" /> Save Current as Version
+          </AppButton>
+
+          <div v-if="versionsLoading" class="py-10 text-center text-sm text-slate-500">Loading versions...</div>
+          <div v-else-if="!versions.length" class="py-10 text-center text-sm text-slate-500">No saved versions for this term yet.</div>
+
+          <div v-for="v in versions" :key="v.id"
+            class="w-full border p-3 text-left transition-colors"
+            :class="selectedVersionIds.includes(v.id) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'">
+            <button type="button" class="w-full text-left" @click="toggleVersionSelect(v.id)">
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-sm font-semibold text-slate-800">{{ v.label }}</span>
+                <span v-if="v.restored_at" class="text-[11px] font-medium uppercase text-indigo-600">Restored</span>
+              </div>
+              <p v-if="v.notes" class="mt-1 text-xs text-slate-600">{{ v.notes }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ v.session_count }} session(s) · {{ v.created_by_name }}</p>
+            </button>
+            <div class="mt-2 flex items-center gap-2">
+              <AppButton size="sm" variant="secondary" @click="compareVersion(v)">
+                <ScaleIcon class="h-4 w-4" /> Compare vs Current
+              </AppButton>
+              <AppButton v-if="isManage" size="sm" variant="secondary" @click="restoreVersion(v)">
+                <ArrowUturnLeftIcon class="h-4 w-4" /> Restore
+              </AppButton>
+              <AppButton v-if="isManage" size="sm" variant="danger" @click="deleteVersion(v)">
+                <TrashIcon class="h-4 w-4" />
+              </AppButton>
+            </div>
+          </div>
+
+          <AppButton v-if="selectedVersionIds.length === 2" class="w-full justify-center" @click="compareSelected">
+            <ScaleIcon class="h-4 w-4" /> Compare Selected
+          </AppButton>
+        </div>
+
+        <div class="min-w-0">
+          <div v-if="compareLoading" class="py-10 text-center text-sm text-slate-500">Comparing...</div>
+          <div v-else-if="!compareResult" class="py-10 text-center text-sm text-slate-500">
+            Select a version's "Compare vs Current," or select two versions and "Compare Selected."
+          </div>
+          <div v-else class="space-y-4">
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div class="border border-slate-200 p-3">
+                <p class="text-xs font-semibold uppercase text-slate-500">{{ compareLabelA }}</p>
+                <p class="mt-1 text-slate-800">{{ compareResult.summary.a.total_sessions }} sessions · {{ compareResult.summary.a.sections_used }} sections</p>
+              </div>
+              <div class="border border-slate-200 p-3">
+                <p class="text-xs font-semibold uppercase text-slate-500">{{ compareLabelB }}</p>
+                <p class="mt-1 text-slate-800">{{ compareResult.summary.b.total_sessions }} sessions · {{ compareResult.summary.b.sections_used }} sections</p>
+              </div>
+            </div>
+
+            <div v-if="!compareResult.diff.length" class="py-6 text-center text-sm text-slate-500">
+              No differences — every teaching assignment lands on the same day/time in both.
+            </div>
+            <div v-else class="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              <div v-for="entry in compareResult.diff" :key="entry.load_assignment_id" class="border border-slate-200 p-3">
+                <p class="text-sm font-semibold text-slate-800">{{ entry.label }}</p>
+                <p v-for="slot in entry.removed" :key="'r-'+slot" class="mt-1 text-xs text-rose-700">− {{ slot }}</p>
+                <p v-for="slot in entry.added" :key="'a-'+slot" class="mt-1 text-xs text-emerald-700">+ {{ slot }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeVersions">Close</AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal :show="saveVersionModal" title="Save Current Schedule as Version" size="sm" @close="saveVersionModal = false">
+      <div class="space-y-4">
+        <AppInput v-model="versionForm.label" label="Label" required maxlength="100" placeholder="e.g. AI draft — before manual tweaks" />
+        <AppTextarea v-model="versionForm.notes" label="Notes (optional)" :rows="3" />
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="saveVersionModal = false">Cancel</AppButton>
+        <AppButton :loading="versionForm.processing" @click="submitVersion">
+          <ArchiveBoxIcon class="h-4 w-4" /> Save Version
+        </AppButton>
       </template>
     </AppModal>
 
@@ -620,6 +711,10 @@
             <AppButton v-if="form.id && form.entry_type === 'non_teaching'" variant="danger" @click="removeNonTeaching">
               <TrashIcon class="h-4 w-4" /> Remove
             </AppButton>
+            <AppButton v-if="form.id && form.status === 'cancelled' && form.entry_type !== 'non_teaching'"
+              variant="danger" @click="deletePermanently">
+              <TrashIcon class="h-4 w-4" /> Delete Permanently
+            </AppButton>
           </div>
           <div class="flex gap-2">
             <AppButton variant="ghost" @click="modal = false">Cancel</AppButton>
@@ -651,8 +746,8 @@ import AutoPlacePreviewModal from '@/Components/FacultyLoading/AutoPlacePreviewM
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
-  ArrowsRightLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ChevronDownIcon, ClockIcon, ExclamationCircleIcon,
-  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, PrinterIcon, SparklesIcon, TrashIcon,
+  ArchiveBoxIcon, ArrowsRightLeftIcon, ArrowUturnLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ChevronDownIcon, ClockIcon, ExclamationCircleIcon,
+  ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, PrinterIcon, ScaleIcon, SparklesIcon, TrashIcon,
   WrenchScrewdriverIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -832,6 +927,133 @@ function closeSwapReview() {
   selectedSwapRequest.value = null
   swapCandidates.value = []
   swapCandidatesLoaded.value = false
+}
+
+// ── Schedule Versions ────────────────────────────────────────────────────────
+
+const versionsModal      = ref(false)
+const versions            = ref([])
+const versionsLoading     = ref(false)
+const selectedVersionIds  = ref([])
+const compareResult       = ref(null)
+const compareLoading      = ref(false)
+const compareLabelA       = ref('')
+const compareLabelB       = ref('')
+const saveVersionModal    = ref(false)
+const versionForm = useForm({ academic_term_id: null, label: '', notes: '' })
+
+async function openVersions() {
+  versionsModal.value = true
+  compareResult.value = null
+  selectedVersionIds.value = []
+  await fetchVersions()
+}
+
+function closeVersions() {
+  versionsModal.value = false
+  compareResult.value = null
+  selectedVersionIds.value = []
+}
+
+async function fetchVersions() {
+  if (!filters.term_id) return
+  versionsLoading.value = true
+  try {
+    const { data } = await axios.get(route('faculty-loading.schedules.versions.index'), {
+      params: { academic_term_id: filters.term_id },
+    })
+    versions.value = data
+  } finally {
+    versionsLoading.value = false
+  }
+}
+
+function submitVersion() {
+  versionForm.academic_term_id = filters.term_id
+  versionForm.post(route('faculty-loading.schedules.versions.store'), {
+    preserveScroll: true,
+    onSuccess: async () => {
+      saveVersionModal.value = false
+      versionForm.reset()
+      await fetchVersions()
+    },
+  })
+}
+
+function toggleVersionSelect(id) {
+  const i = selectedVersionIds.value.indexOf(id)
+  if (i !== -1) {
+    selectedVersionIds.value.splice(i, 1)
+    return
+  }
+  if (selectedVersionIds.value.length >= 2) {
+    selectedVersionIds.value.shift()
+  }
+  selectedVersionIds.value.push(id)
+}
+
+async function runCompare(versionAId, versionBId, labelA, labelB) {
+  compareLoading.value = true
+  compareResult.value = null
+  try {
+    const { data } = await axios.post(route('faculty-loading.schedules.versions.compare'), {
+      academic_term_id: filters.term_id,
+      version_a_id: versionAId,
+      version_b_id: versionBId,
+    })
+    compareResult.value = data
+    compareLabelA.value = labelA
+    compareLabelB.value = labelB
+  } finally {
+    compareLoading.value = false
+  }
+}
+
+function compareVersion(v) {
+  selectedVersionIds.value = [v.id]
+  runCompare(v.id, null, v.label, 'Current (live)')
+}
+
+function compareSelected() {
+  if (selectedVersionIds.value.length !== 2) return
+  const [aId, bId] = selectedVersionIds.value
+  const a = versions.value.find((v) => v.id === aId)
+  const b = versions.value.find((v) => v.id === bId)
+  runCompare(aId, bId, a?.label ?? 'A', b?.label ?? 'B')
+}
+
+function restoreVersion(v) {
+  Swal.fire({
+    icon: 'warning',
+    title: `Restore "${v.label}"?`,
+    text: 'This replaces the current tentative schedule with this version. Any changes since not saved in a version will be lost.',
+    showCancelButton: true,
+    confirmButtonText: 'Restore',
+    confirmButtonColor: '#dc2626',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.post(route('faculty-loading.schedules.versions.restore', v.id), {}, {
+      preserveScroll: true,
+      onSuccess: () => { closeVersions(); router.reload({ only: ['schedules'] }) },
+    })
+  })
+}
+
+function deleteVersion(v) {
+  Swal.fire({
+    icon: 'warning',
+    title: `Delete "${v.label}"?`,
+    text: 'This only removes the saved checkpoint — it does not change the live schedule.',
+    showCancelButton: true,
+    confirmButtonText: 'Delete',
+    confirmButtonColor: '#dc2626',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.delete(route('faculty-loading.schedules.versions.destroy', v.id), {
+      preserveScroll: true,
+      onSuccess: fetchVersions,
+    })
+  })
 }
 
 function swapStatusLabel(status) {
@@ -2055,6 +2277,24 @@ function removeNonTeaching() {
     text: 'The non-teaching block will be removed from the calendar.',
     showCancelButton: true,
     confirmButtonText: 'Remove',
+    confirmButtonColor: '#dc2626',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.delete(route('faculty-loading.schedules.destroy', form.id), {
+      preserveScroll: true,
+      onSuccess: () => { modal.value = false; validationResult.value = null },
+    })
+  })
+}
+
+function deletePermanently() {
+  if (!form.id) return
+  Swal.fire({
+    icon: 'warning',
+    title: 'Permanently delete this schedule?',
+    text: 'This cannot be undone.',
+    showCancelButton: true,
+    confirmButtonText: 'Delete Permanently',
     confirmButtonColor: '#dc2626',
   }).then((res) => {
     if (!res.isConfirmed) return

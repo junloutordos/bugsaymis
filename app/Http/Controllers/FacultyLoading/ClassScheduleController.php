@@ -1042,6 +1042,16 @@ class ClassScheduleController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
         }
 
+        // Already cancelled — this is a second, deliberate "delete" on a row
+        // nothing depends on anymore (excluded everywhere via occupying()/
+        // status='active' filters), so remove it for good instead of no-op
+        // re-cancelling it.
+        if ($classSchedule->status === 'cancelled') {
+            $classSchedule->delete();
+
+            return back()->with('success', 'Schedule permanently deleted.');
+        }
+
         $classSchedule->update(['status' => 'cancelled']);
 
         return back()->with('success', 'Schedule cancelled.');

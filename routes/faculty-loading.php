@@ -17,6 +17,7 @@ use App\Http\Controllers\FacultyLoading\BellScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleSwapController;
+use App\Http\Controllers\FacultyLoading\ScheduleVersionController;
 use App\Http\Controllers\FacultyLoading\CommitteeAssignmentController;
 use App\Http\Controllers\FacultyLoading\FacultyLoadController;
 use App\Http\Controllers\FacultyLoading\LoadAssignmentController;
@@ -139,6 +140,18 @@ Route::middleware(['web', 'auth', 'verified'])
             ->name('schedules.approval.return');
         Route::post('/schedules/approvals/{batch}/conforme', [ClassScheduleApprovalController::class, 'conforme'])
             ->name('schedules.approval.conforme');
+
+        // ── Schedule Versions (save/compare/restore drafts) ────────────────
+        // Save/Restore/Delete are CID/admin-only, Compare is also open to OCD —
+        // enforced per-action inside ScheduleVersionController.
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.approve')
+            ->prefix('schedules/versions')->name('schedules.versions.')->group(function () {
+                Route::get('/',                     [ScheduleVersionController::class, 'index'])->name('index');
+                Route::post('/',                    [ScheduleVersionController::class, 'store'])->name('store');
+                Route::post('/compare',              [ScheduleVersionController::class, 'compare'])->name('compare');
+                Route::post('/{scheduleVersion}/restore', [ScheduleVersionController::class, 'restore'])->name('restore');
+                Route::delete('/{scheduleVersion}',  [ScheduleVersionController::class, 'destroy'])->name('destroy');
+            });
 
         Route::middleware('permission:faculty_loading.manage')
             ->group(function () {
