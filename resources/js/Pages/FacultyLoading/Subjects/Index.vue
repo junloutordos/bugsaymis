@@ -37,6 +37,12 @@ function applyFilters() {
   router.get(route('faculty-loading.subjects.index'), filters, { preserveState: true })
 }
 
+let debounceTimer = null
+function debouncedApplyFilters() {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(applyFilters, 400)
+}
+
 function typeBadge(type) {
   return {
     lecture:     'blue',
@@ -138,7 +144,7 @@ function doCopy() {
         </div>
         <div class="w-56">
           <AppInput :model-value="filters.search" type="search" placeholder="Search code or name..."
-            @update:model-value="v => { filters.search = v; applyFilters() }" />
+            @update:model-value="v => { filters.search = v; debouncedApplyFilters() }" />
         </div>
         <div class="w-40">
           <AppSelect :model-value="filters.grade_level" :show-blank="false"

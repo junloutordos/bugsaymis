@@ -784,6 +784,14 @@ function openDetail(fl) {
   detail.open    = true
 }
 
+// After a facultyLoads reload, `detail.faculty` still points at the pre-reload
+// object — re-point it at the fresh one so the open slide-over reflects changes.
+function refreshDetailFaculty() {
+  if (!detail.faculty) return
+  const updated = props.facultyLoads.find(fl => fl.faculty_id === detail.faculty.faculty_id)
+  if (updated) detail.faculty = updated
+}
+
 // Single assignment reassign (faculty → faculty), from the detail panel
 const reassign = reactive({
   open:           false,
@@ -877,14 +885,20 @@ function openForm(a = null, prefillFacultyId = null) {
 function save() {
   if (form.id) {
     form.put(route('faculty-loading.assignments.update', form.id), {
-      onSuccess: () => { modal.value = false; router.reload({ only: ['assignments'] }) },
+      onSuccess: () => {
+        modal.value = false
+        router.reload({ only: ['facultyLoads'], onSuccess: refreshDetailFaculty })
+      },
     })
   } else {
     // Always re-derive school_year_id from the selected term before submitting
     const t = props.terms.find(t => t.id === Number(form.academic_term_id))
     if (t) form.school_year_id = t.school_year_id
     form.post(route('faculty-loading.assignments.store'), {
-      onSuccess: () => { modal.value = false; router.reload({ only: ['assignments'] }) },
+      onSuccess: () => {
+        modal.value = false
+        router.reload({ only: ['facultyLoads'], onSuccess: refreshDetailFaculty })
+      },
     })
   }
 }
@@ -905,7 +919,7 @@ function syncLoads() {
 async function remove(a) {
   if (! await confirmDelete(`Remove "${assignmentLabel(a)}" assignment?`)) return
   useForm({}).delete(route('faculty-loading.assignments.destroy', a.id), {
-    onSuccess: () => router.reload({ only: ['assignments'] }),
+    onSuccess: () => router.reload({ only: ['facultyLoads'], onSuccess: refreshDetailFaculty }),
   })
 }
 
