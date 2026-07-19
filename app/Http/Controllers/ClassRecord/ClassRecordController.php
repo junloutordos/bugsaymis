@@ -49,7 +49,12 @@ class ClassRecordController extends Controller
             $query->where('user_id', Auth::id());
         }
 
-        $assignments = $query->get();
+        // A faculty can legitimately hold the same subject+section across both
+        // terms of one school year (load_assignments' uniqueness is scoped per
+        // term) — ClassRecord itself has no term concept, so collapse those
+        // into the one card a teacher should see per subject+section.
+        $assignments = $query->get()
+            ->unique(fn ($la) => "{$la->user_id}_{$la->subject_id}_{$la->section_id}");
 
         // Flag assignments that already have a class record this SY
         $existingQuery = ClassRecord::where('school_year_id', $currentSY->id)
