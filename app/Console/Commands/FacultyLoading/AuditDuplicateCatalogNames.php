@@ -54,24 +54,31 @@ class AuditDuplicateCatalogNames extends Command
 
     private function auditSubjects(int $schoolYearId): void
     {
-        $duplicateNames = Subject::where('school_year_id', $schoolYearId)
-            ->select('name')
-            ->groupBy('name')
+        // Group by (name, grade_level) — the same course name legitimately
+        // recurs across grade levels with a different code each time (e.g.
+        // "Biology 2" as BIO2-G9 and BIO2-G10). Only a collision WITHIN the
+        // same grade level is a genuine duplicate-catalog-row problem.
+        $duplicateGroups = Subject::where('school_year_id', $schoolYearId)
+            ->select('name', 'grade_level')
+            ->groupBy('name', 'grade_level')
             ->havingRaw('COUNT(*) > 1')
-            ->pluck('name');
+            ->get();
 
-        if ($duplicateNames->isEmpty()) {
-            $this->line('No duplicate subject names found.');
+        if ($duplicateGroups->isEmpty()) {
+            $this->line('No duplicate subject names found within the same grade level.');
             return;
         }
 
-        foreach ($duplicateNames as $name) {
-            $subjects = Subject::where('school_year_id', $schoolYearId)->where('name', $name)->get();
-            $this->warn("\"{$name}\" — {$subjects->count()} rows:");
+        foreach ($duplicateGroups as $group) {
+            $subjects = Subject::where('school_year_id', $schoolYearId)
+                ->where('name', $group->name)->where('grade_level', $group->grade_level)->get();
+            $this->warn("G{$group->grade_level} \"{$group->name}\" — {$subjects->count()} rows:");
 
             $rows = [];
             foreach ($subjects as $subject) {
                 $assignments = LoadAssignment::where('subject_id', $subject->id)
+                    ->where('assignment_type', 'teaching')
+                    ->whereNotNull('section_id')
                     ->with(['faculty:id,name', 'academicTerm:id,name', 'section:id,sectionname'])
                     ->get();
 
