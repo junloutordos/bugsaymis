@@ -112,7 +112,7 @@ class SubjectController extends Controller
         );
 
         $data = $request->validate([
-            'school_year_id'       => 'required|exists:school_years,id',
+            'school_year_id'       => 'nullable|exists:school_years,id',
             'code'                 => "required|string|max:20|unique:subjects,code,NULL,id,school_year_id,{$schoolYearId}",
             'name'                 => 'required|string|max:150',
             'description'          => 'nullable|string',
@@ -129,6 +129,11 @@ class SubjectController extends Controller
             'is_active'            => 'boolean',
             'has_ilp'              => 'boolean',
         ]);
+
+        // The uniqueness rule above is scoped to $schoolYearId (falls back to
+        // the current school year when omitted) — save under that same value
+        // so the row's actual scope always matches what was just checked.
+        $data['school_year_id'] = $schoolYearId;
 
         Subject::create($data);
 

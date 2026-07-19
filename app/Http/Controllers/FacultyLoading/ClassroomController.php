@@ -70,7 +70,7 @@ class ClassroomController extends Controller
         );
 
         $data = $request->validate([
-            'school_year_id' => 'required|exists:school_years,id',
+            'school_year_id' => 'nullable|exists:school_years,id',
             'name'           => 'required|string|max:100',
             'code'           => "required|string|max:20|unique:classrooms,code,NULL,id,school_year_id,{$schoolYearId}",
             'classroom_type' => 'required|in:lecture,laboratory,science_lab,physics_lab,chemistry_lab,biology_lab,mathematics_lab,ict_lab,language_lab,seminar,gymnasium,other',
@@ -80,6 +80,11 @@ class ClassroomController extends Controller
             'is_available'   => 'boolean',
             'remarks'        => 'nullable|string',
         ]);
+
+        // The uniqueness rule above is scoped to $schoolYearId (falls back to
+        // the current school year when omitted) — save under that same value
+        // so the row's actual scope always matches what was just checked.
+        $data['school_year_id'] = $schoolYearId;
 
         Classroom::create($data);
 
