@@ -386,9 +386,11 @@ class CoreSubjectPlacementServiceTest extends TestCase
         $this->assertSame(36, $this->service->getCapacity(7));
     }
 
-    public function test_get_capacity_returns_36_for_g8(): void
+    public function test_get_capacity_returns_40_for_g8(): void
     {
-        $this->assertSame(36, $this->service->getCapacity(8));
+        // G8 gained overflow periods (SchedulingConstants::GRADE8_OVERFLOW_SLOTS)
+        // after this test was written; 40 is the current real capacity.
+        $this->assertSame(40, $this->service->getCapacity(8));
     }
 
     public function test_get_capacity_returns_35_for_g9(): void

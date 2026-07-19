@@ -7,6 +7,7 @@ use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\ScheduleValidationService;
@@ -38,6 +39,8 @@ class ScheduleValidationTest extends TestCase
     private Classroom  $labRoom;
     private SchoolYear $schoolYear;
     private AcademicTerm $term;
+    private Section     $section;
+    private Section     $otherSection;
 
     protected function setUp(): void
     {
@@ -49,11 +52,14 @@ class ScheduleValidationTest extends TestCase
         $this->schoolYear   = SchoolYear::create(['name' => '2025-2026', 'start_date' => '2025-08-01', 'end_date' => '2026-06-30', 'is_current' => true, 'status' => 'active']);
         $this->term         = AcademicTerm::create(['school_year_id' => $this->schoolYear->id, 'name' => '1st Semester', 'term_type' => '1st_semester', 'start_date' => '2025-08-01', 'end_date' => '2025-12-31', 'is_current' => true]);
 
-        $this->lectureSubject = Subject::create(['code' => 'MATH9', 'name' => 'Mathematics 9', 'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture', 'grade_level' => 9, 'sessions_per_week' => 4, 'minutes_per_session' => 60, 'is_active' => true]);
-        $this->labSubject     = Subject::create(['code' => 'CHEM9', 'name' => 'Chemistry 9',   'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 4, 'subject_type' => 'lecture_lab', 'grade_level' => 9, 'sessions_per_week' => 3, 'minutes_per_session' => 60, 'is_active' => true]);
+        $this->lectureSubject = Subject::create(['school_year_id' => $this->schoolYear->id, 'code' => 'MATH9', 'name' => 'Mathematics 9', 'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture', 'grade_level' => 9, 'sessions_per_week' => 4, 'minutes_per_session' => 60, 'is_active' => true]);
+        $this->labSubject     = Subject::create(['school_year_id' => $this->schoolYear->id, 'code' => 'CHEM9', 'name' => 'Chemistry 9',   'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 4, 'subject_type' => 'lecture_lab', 'grade_level' => 9, 'sessions_per_week' => 3, 'minutes_per_session' => 60, 'is_active' => true]);
 
-        $this->lectureRoom = Classroom::create(['name' => 'Room 101', 'code' => 'R101', 'classroom_type' => 'lecture',      'capacity' => 45, 'is_available' => true]);
-        $this->labRoom     = Classroom::create(['name' => 'Chem Lab', 'code' => 'CHL1', 'classroom_type' => 'chemistry_lab', 'capacity' => 35, 'is_available' => true]);
+        $this->lectureRoom = Classroom::create(['school_year_id' => $this->schoolYear->id, 'name' => 'Room 101', 'code' => 'R101', 'classroom_type' => 'lecture',      'capacity' => 45, 'is_available' => true]);
+        $this->labRoom     = Classroom::create(['school_year_id' => $this->schoolYear->id, 'name' => 'Chem Lab', 'code' => 'CHL1', 'classroom_type' => 'chemistry_lab', 'capacity' => 35, 'is_available' => true]);
+
+        $this->section      = Section::create(['levelid' => 9, 'sectionname' => 'Diamond', 'syid' => $this->schoolYear->id, 'school_year_id' => $this->schoolYear->id, 'is_active' => true]);
+        $this->otherSection = Section::create(['levelid' => 9, 'sectionname' => 'Opal',    'syid' => $this->schoolYear->id, 'school_year_id' => $this->schoolYear->id, 'is_active' => true]);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -64,7 +70,7 @@ class ScheduleValidationTest extends TestCase
         return array_merge([
             'faculty_id'       => $this->faculty->id,
             'subject_id'       => $this->lectureSubject->id,
-            'section_id'       => 1,
+            'section_id'       => $this->section->id,
             'classroom_id'     => $this->lectureRoom->id,
             'school_year_id'   => $this->schoolYear->id,
             'academic_term_id' => $this->term->id,
@@ -80,7 +86,7 @@ class ScheduleValidationTest extends TestCase
         return ClassSchedule::create(array_merge([
             'user_id'          => $this->faculty->id,
             'subject_id'       => $this->lectureSubject->id,
-            'section_id'       => 1,
+            'section_id'       => $this->section->id,
             'classroom_id'     => $this->lectureRoom->id,
             'school_year_id'   => $this->schoolYear->id,
             'academic_term_id' => $this->term->id,
@@ -198,14 +204,14 @@ class ScheduleValidationTest extends TestCase
         // Different faculty, same section, overlapping slot
         $this->seedSchedule([
             'user_id'    => $otherFaculty->id,
-            'section_id' => 99,
+            'section_id' => $this->otherSection->id,
             'start_time' => '08:00:00',
             'end_time'   => '10:00:00',
         ]);
 
         $result = $this->svc->validate($this->validData([
             'faculty_id'  => $this->faculty->id,
-            'section_id'  => 99,
+            'section_id'  => $this->otherSection->id,
             'start_time'  => '09:00:00',
             'end_time'    => '11:00:00',
         ]));

@@ -56,31 +56,33 @@ class FixedSlotServiceTest extends TestCase
         $this->assertNotContains('HOMEROOM', $types, 'G11 Monday must NOT have HOMEROOM');
     }
 
-    public function test_friday_g7_contains_ila_slots(): void
+    public function test_friday_g7_has_no_ila_slots(): void
     {
+        // SchedulingConstants::FRIDAY_ILA_GRADES is now empty — every grade,
+        // including G7, has in-person Friday classes, so no ILA block exists.
         $slots = FixedSlotService::fixedSlotsForDay(7, 'G7G8', 'Friday');
         $types = array_column($slots, 'type');
 
-        $this->assertContains('ILA', $types, 'G7 Friday must contain ILA blocks');
+        $this->assertNotContains('ILA', $types, 'G7 Friday must not contain ILA blocks (ILA is no longer used)');
     }
 
-    public function test_friday_g7_has_no_class_windows_unblocked(): void
+    public function test_friday_g7_class_windows_are_schedulable(): void
     {
-        // Every time window in the Tue-Fri timetable for G7 must be
-        // either a structural non-CLASS slot OR an ILA block — nothing unblocked.
+        // With FRIDAY_ILA_GRADES empty, G7's Friday class windows are real,
+        // schedulable class time — not blocked by any fixed slot.
         $classSlotsInTimetable = SC::getClassSlots(7, 'Friday');
         $fixedSlots            = FixedSlotService::fixedSlotsForDay(7, 'G7G8', 'Friday');
 
         foreach ($classSlotsInTimetable as $cs) {
-            $covered = false;
+            $blocked = false;
             foreach ($fixedSlots as $fs) {
-                if ($fs['start'] <= $cs['start'] && $fs['end'] >= $cs['end']) {
-                    $covered = true;
+                if ($fs['start'] < $cs['end'] && $fs['end'] > $cs['start']) {
+                    $blocked = true;
                     break;
                 }
             }
-            $this->assertTrue($covered,
-                "G7 Friday class window {$cs['start']}–{$cs['end']} is not covered by any fixed slot"
+            $this->assertFalse($blocked,
+                "G7 Friday class window {$cs['start']}–{$cs['end']} should be open, not blocked by a fixed slot"
             );
         }
     }
@@ -187,12 +189,13 @@ class FixedSlotServiceTest extends TestCase
         );
     }
 
-    public function test_overlaps_constant_detects_g7_friday_ila(): void
+    public function test_overlaps_constant_does_not_detect_g7_friday_ila(): void
     {
-        // Any CLASS window on G7 Friday should be blocked by ILA
-        $this->assertTrue(
+        // FRIDAY_ILA_GRADES is now empty — G7's Friday CLASS windows are no
+        // longer blocked by ILA.
+        $this->assertFalse(
             FixedSlotService::overlapsConstant(7, 'Friday', '07:30', '08:20'),
-            'G7 Friday first CLASS window must be blocked by ILA'
+            'G7 Friday first CLASS window should not be blocked (ILA no longer applies)'
         );
     }
 

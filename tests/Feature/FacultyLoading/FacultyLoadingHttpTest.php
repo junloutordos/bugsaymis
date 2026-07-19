@@ -260,8 +260,11 @@ class FacultyLoadingHttpTest extends TestCase
 
     public function test_cid_can_create_subject(): void
     {
+        $sy = $this->makeSchoolYear();
+
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.subjects.store'), [
+                'school_year_id' => $sy->id,
                 'code' => 'SCI901',
                 'name' => 'Science 9',
                 'credit_units' => 3,
@@ -346,8 +349,11 @@ class FacultyLoadingHttpTest extends TestCase
 
     public function test_cid_can_create_classroom(): void
     {
+        $sy = $this->makeSchoolYear();
+
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.classrooms.store'), [
+                'school_year_id' => $sy->id,
                 'name' => 'Rm 201',
                 'code' => 'RM201',
                 'classroom_type' => 'lecture',
@@ -558,12 +564,13 @@ class FacultyLoadingHttpTest extends TestCase
         $term = $this->makeTerm($sy);
         $subject = $this->makeSubject();
         $room = $this->makeClassroom();
+        $section = $this->makeSection($sy);
 
         $this->actingAs($this->cidUser())
             ->post(route('faculty-loading.schedules.store'), [
                 'faculty_id' => $faculty->id,
                 'subject_id' => $subject->id,
-                'section_id' => 1,
+                'section_id' => $section->id,
                 'classroom_id' => $room->id,
                 'school_year_id' => $sy->id,
                 'academic_term_id' => $term->id,
@@ -588,10 +595,11 @@ class FacultyLoadingHttpTest extends TestCase
         $term = $this->makeTerm($sy);
         $subject = $this->makeSubject();
         $room = $this->makeClassroom();
+        $section = $this->makeSection($sy);
 
         // First schedule
         ClassSchedule::create([
-            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => 1,
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
             'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
             'day_of_week' => 'Monday', 'start_time' => '08:00:00', 'end_time' => '10:00:00', 'status' => 'active',
         ]);
@@ -601,7 +609,7 @@ class FacultyLoadingHttpTest extends TestCase
             ->post(route('faculty-loading.schedules.store'), [
                 'faculty_id' => $faculty->id,
                 'subject_id' => $subject->id,
-                'section_id' => 1,
+                'section_id' => $section->id,
                 'classroom_id' => $room->id,
                 'school_year_id' => $sy->id,
                 'academic_term_id' => $term->id,

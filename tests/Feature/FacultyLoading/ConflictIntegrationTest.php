@@ -6,6 +6,7 @@ use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\ConflictDetectionService;
@@ -32,6 +33,9 @@ class ConflictIntegrationTest extends TestCase
     private Classroom  $room;
     private SchoolYear $schoolYear;
     private AcademicTerm $term;
+    private Section $section1;
+    private Section $section3;
+    private Section $section5;
 
     protected function setUp(): void
     {
@@ -41,8 +45,12 @@ class ConflictIntegrationTest extends TestCase
         $this->faculty    = User::factory()->create(['email_verified_at' => now()]);
         $this->schoolYear = SchoolYear::create(['name' => '2025-2026', 'start_date' => '2025-08-01', 'end_date' => '2026-06-30', 'is_current' => true, 'status' => 'active']);
         $this->term       = AcademicTerm::create(['school_year_id' => $this->schoolYear->id, 'name' => '1st Semester', 'term_type' => '1st_semester', 'start_date' => '2025-08-01', 'end_date' => '2025-12-31', 'is_current' => true]);
-        $this->subject    = Subject::create(['code' => 'MATH101', 'name' => 'Math', 'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture', 'grade_level' => 9, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true]);
-        $this->room       = Classroom::create(['name' => 'Room 101', 'code' => 'R101', 'classroom_type' => 'lecture', 'capacity' => 40, 'is_available' => true]);
+        $this->subject    = Subject::create(['school_year_id' => $this->schoolYear->id, 'code' => 'MATH101', 'name' => 'Math', 'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture', 'grade_level' => 9, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true]);
+        $this->room       = Classroom::create(['school_year_id' => $this->schoolYear->id, 'name' => 'Room 101', 'code' => 'R101', 'classroom_type' => 'lecture', 'capacity' => 40, 'is_available' => true]);
+
+        $this->section1 = Section::create(['levelid' => 9, 'sectionname' => 'Diamond',  'syid' => $this->schoolYear->id, 'school_year_id' => $this->schoolYear->id, 'is_active' => true]);
+        $this->section3 = Section::create(['levelid' => 9, 'sectionname' => 'Opal',     'syid' => $this->schoolYear->id, 'school_year_id' => $this->schoolYear->id, 'is_active' => true]);
+        $this->section5 = Section::create(['levelid' => 9, 'sectionname' => 'Turquoise','syid' => $this->schoolYear->id, 'school_year_id' => $this->schoolYear->id, 'is_active' => true]);
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
@@ -52,7 +60,7 @@ class ConflictIntegrationTest extends TestCase
         return ClassSchedule::create(array_merge([
             'user_id'          => $this->faculty->id,
             'subject_id'       => $this->subject->id,
-            'section_id'       => 1,
+            'section_id'       => $this->section1->id,
             'classroom_id'     => $this->room->id,
             'school_year_id'   => $this->schoolYear->id,
             'academic_term_id' => $this->term->id,
@@ -170,7 +178,7 @@ class ConflictIntegrationTest extends TestCase
     /** @test */
     public function it_does_not_flag_room_conflict_for_different_room(): void
     {
-        $otherRoom = Classroom::create(['name' => 'Room 102', 'code' => 'R102', 'classroom_type' => 'lecture', 'capacity' => 40, 'is_available' => true]);
+        $otherRoom = Classroom::create(['school_year_id' => $this->schoolYear->id, 'name' => 'Room 102', 'code' => 'R102', 'classroom_type' => 'lecture', 'capacity' => 40, 'is_available' => true]);
         $this->makeSchedule(['classroom_id' => $otherRoom->id]);
 
         $conflicts = $this->service->detectRoomConflict(
@@ -185,10 +193,10 @@ class ConflictIntegrationTest extends TestCase
     /** @test */
     public function it_detects_section_conflict_on_overlapping_slot(): void
     {
-        $this->makeSchedule(['section_id' => 5, 'start_time' => '08:00:00', 'end_time' => '10:00:00']);
+        $this->makeSchedule(['section_id' => $this->section5->id, 'start_time' => '08:00:00', 'end_time' => '10:00:00']);
 
         $conflicts = $this->service->detectSectionConflict(
-            5, 'Monday', '09:00:00', '11:00:00', $this->term->id
+            $this->section5->id, 'Monday', '09:00:00', '11:00:00', $this->term->id
         );
 
         $this->assertCount(1, $conflicts);
@@ -197,7 +205,7 @@ class ConflictIntegrationTest extends TestCase
     /** @test */
     public function it_does_not_flag_section_conflict_for_different_section(): void
     {
-        $this->makeSchedule(['section_id' => 5]);
+        $this->makeSchedule(['section_id' => $this->section5->id]);
 
         $conflicts = $this->service->detectSectionConflict(
             6, 'Monday', '08:00:00', '10:00:00', $this->term->id
@@ -211,12 +219,12 @@ class ConflictIntegrationTest extends TestCase
     /** @test */
     public function detect_all_conflicts_returns_all_three_axes(): void
     {
-        $this->makeSchedule(['start_time' => '08:00:00', 'end_time' => '10:00:00', 'section_id' => 3]);
+        $this->makeSchedule(['start_time' => '08:00:00', 'end_time' => '10:00:00', 'section_id' => $this->section3->id]);
 
         $result = $this->service->detectAllConflicts([
             'faculty_id'       => $this->faculty->id,
             'classroom_id'     => $this->room->id,
-            'section_id'       => 3,
+            'section_id'       => $this->section3->id,
             'day_of_week'      => 'Monday',
             'start_time'       => '09:00:00',
             'end_time'         => '11:00:00',
@@ -238,7 +246,7 @@ class ConflictIntegrationTest extends TestCase
         $result = $this->service->detectAllConflicts([
             'faculty_id'       => $this->faculty->id,
             'classroom_id'     => $this->room->id,
-            'section_id'       => 1,
+            'section_id'       => $this->section1->id,
             'day_of_week'      => 'Tuesday',  // different day
             'start_time'       => '08:00:00',
             'end_time'         => '10:00:00',
@@ -331,15 +339,19 @@ class ConflictIntegrationTest extends TestCase
     }
 
     /** @test */
-    public function tentative_schedule_is_not_included_in_conflict_check(): void
+    public function tentative_schedule_is_included_in_conflict_check(): void
     {
-        // Only 'active' schedules are checked — tentative are skipped intentionally
+        // findConflicts() queries via ClassSchedule::scopeOccupying(), which
+        // intentionally includes both 'tentative' and 'active' rows (only
+        // 'cancelled' is excluded — see it_ignores_cancelled_schedules_in_
+        // faculty_conflict_check above) — a tentative AI-proposed slot must
+        // still conflict-check against everything else.
         $this->makeSchedule(['status' => 'tentative']);
 
         $conflicts = $this->service->detectFacultyConflict(
             $this->faculty->id, 'Monday', '08:00:00', '10:00:00', $this->term->id
         );
 
-        $this->assertCount(0, $conflicts);
+        $this->assertCount(1, $conflicts);
     }
 }

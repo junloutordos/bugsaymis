@@ -284,17 +284,21 @@ class HardConstraintCheckerTest extends TestCase
     // H12 — G7/G8 Friday ILA
     // =========================================================================
 
-    public function test_h12_fails_for_g7_on_friday(): void
+    public function test_h12_passes_for_g7_on_friday(): void
     {
-        $this->assertFails(
+        // SchedulingConstants::FRIDAY_ILA_GRADES is now empty — every grade,
+        // including G7, has in-person Friday classes.
+        $this->assertPasses(
             HC::checkFridayILA(7, 'Friday'),
             'G7 Friday'
         );
     }
 
-    public function test_h12_fails_for_g8_on_friday(): void
+    public function test_h12_passes_for_g8_on_friday(): void
     {
-        $this->assertFails(
+        // SchedulingConstants::FRIDAY_ILA_GRADES is now empty — every grade,
+        // including G8, has in-person Friday classes.
+        $this->assertPasses(
             HC::checkFridayILA(8, 'Friday'),
             'G8 Friday'
         );
@@ -341,11 +345,11 @@ class HardConstraintCheckerTest extends TestCase
         );
     }
 
-    public function test_composite_fails_on_h12_for_g7_friday(): void
+    public function test_composite_passes_on_h12_for_g7_friday(): void
     {
+        // FRIDAY_ILA_GRADES is now empty — H12 never fires for any grade.
         $result = HC::checkSpecialDayLocks(7, 'Friday', '08:20', '09:10');
-        $this->assertFails($result, 'G7 Friday — H12 should fire');
-        $this->assertStringContainsString('H12', $result['reason']);
+        $this->assertPasses($result, 'G7 Friday — H12 no longer applies to any grade');
     }
 
     public function test_composite_fails_on_h11_for_wednesday_wellness(): void

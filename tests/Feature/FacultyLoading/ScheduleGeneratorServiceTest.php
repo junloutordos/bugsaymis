@@ -7,6 +7,7 @@ use App\Services\FacultyLoading\CoreSubjectPlacementService;
 use App\Services\FacultyLoading\ElectiveAdvisoryPlacementService;
 use App\Services\FacultyLoading\ScienceCorePlacementService;
 use App\Services\FacultyLoading\SchedulingConstants;
+use App\Services\FacultyLoading\RotationGridBuilder;
 use Tests\TestCase;
 
 /**
@@ -35,6 +36,7 @@ class ScheduleGeneratorServiceTest extends TestCase
             app(CoreSubjectPlacementService::class),
             new ElectiveAdvisoryPlacementService(),
             new ScienceCorePlacementService(),
+            new RotationGridBuilder(),
         );
     }
 
@@ -579,12 +581,13 @@ class ScheduleGeneratorServiceTest extends TestCase
     /** @test */
     public function test_unresolved_appears_when_capacity_exceeded(): void
     {
-        // G7 capacity = 28 slots; 30 sessions exceeds it
+        // G7 capacity is 36 slots (CoreSubjectPlacementService::getCapacity(7));
+        // 39 sessions exceeds it.
         $subjects = [
-            ['name' => 'Math',    'type' => 'core', 'sessions_per_week' => 10],
-            ['name' => 'English', 'type' => 'core', 'sessions_per_week' => 10],
-            ['name' => 'Science', 'type' => 'core', 'sessions_per_week' => 10],
-        ];  // 30 total > 28 capacity
+            ['name' => 'Math',    'type' => 'core', 'sessions_per_week' => 13],
+            ['name' => 'English', 'type' => 'core', 'sessions_per_week' => 13],
+            ['name' => 'Science', 'type' => 'core', 'sessions_per_week' => 13],
+        ];  // 39 total > 36 capacity
 
         $result = $this->generator->generateSlotPlan(7, $subjects, SchedulingConstants::GRADE_SECTIONS[7]);
 

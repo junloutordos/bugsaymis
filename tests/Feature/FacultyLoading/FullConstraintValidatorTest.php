@@ -131,8 +131,11 @@ class FullConstraintValidatorTest extends TestCase
 
     public function test_check_constant_passes_h9_for_g9_monday_same_window(): void
     {
-        // G9 has Period 1 at 08:50–09:40 — no dead zone
-        $result = $this->validator->checkConstant(9, 'Monday', '08:50', '09:40');
+        // H9 (dead zone) is G7-only. G9's Monday homeroom now extends to
+        // 09:40 (absorbs the first teaching period), so 08:50–09:40 is HOMEROOM
+        // (H5) for G9, not a free window — use G9's actual first free period
+        // (10:00–10:50) to verify H9 specifically doesn't fire for this grade.
+        $result = $this->validator->checkConstant(9, 'Monday', '10:00', '10:50');
         $this->assertTrue($result['passes']);
     }
 
@@ -189,11 +192,12 @@ class FullConstraintValidatorTest extends TestCase
     // checkConstant — H12 (Friday ILA)
     // =========================================================================
 
-    public function test_check_constant_fails_h12_for_g7_friday(): void
+    public function test_check_constant_passes_h12_for_g7_friday(): void
     {
+        // SchedulingConstants::FRIDAY_ILA_GRADES is now empty — H12 never
+        // fires for any grade, including G7.
         $result = $this->validator->checkConstant(7, 'Friday', '07:30', '08:20');
-        $this->assertFalse($result['passes']);
-        $this->assertSame('H12', $result['violations'][0]['code']);
+        $this->assertTrue($result['passes']);
     }
 
     public function test_check_constant_passes_h12_for_g9_friday(): void
@@ -236,7 +240,9 @@ class FullConstraintValidatorTest extends TestCase
 
     public function test_violations_have_code_and_reason_keys(): void
     {
-        $result = $this->validator->checkConstant(7, 'Friday', '07:30', '08:20');
+        // Monday 07:30–08:00 is FLAG for all grades — a reliable violation
+        // to check shape against (Friday ILA/H12 no longer fires for any grade).
+        $result = $this->validator->checkConstant(7, 'Monday', '07:30', '08:00');
         $this->assertNotEmpty($result['violations']);
 
         foreach ($result['violations'] as $v) {
@@ -564,35 +570,40 @@ class FullConstraintValidatorTest extends TestCase
 
     public function test_check_fails_constant_when_slot_is_g7_friday(): void
     {
+        // FRIDAY_ILA_GRADES is now empty, so H12 never fires for any grade —
+        // Friday Flag Retreat (16:00–17:00, all grades) is the reliable
+        // constant violation left on a Friday slot (its reason has no
+        // assigned Hxx number in the original catalog, so it reports as "H?").
         $result = $this->validator->check([
             'grade'       => 7,
             'day_of_week' => 'Friday',
-            'start_time'  => '07:30',
-            'end_time'    => '08:20',
+            'start_time'  => '16:00',
+            'end_time'    => '16:50',
         ]);
 
         $this->assertFalse($result['passes']);
         $codes = array_column($result['violations'], 'code');
-        $this->assertContains('H12', $codes);
+        $this->assertContains('H?', $codes);
     }
 
     public function test_check_collects_both_constant_and_db_violations(): void
     {
-        // Constant violation: G7 Friday (H12)
-        // DB violation: H3 (class before default early shift — use 07:00 start)
-        // Use a non-Friday + H3 combo: G7 Monday dead zone + H3 outside shift
+        // Constant violation: H4 (Flag Ceremony, Monday 07:30–08:00, all grades)
+        // DB violation: H3 (07:15 start is before the default 07:30 official time)
+        // FRIDAY_ILA_GRADES is now empty, so H12 no longer fires for any grade —
+        // H4+H3 on Monday is the reliable pairing to verify both axes collect.
         $result = $this->validator->check([
             'grade'       => 7,
-            'day_of_week' => 'Friday',   // H12 fires
-            'start_time'  => '07:00',    // also before 07:30 → H3 fires
-            'end_time'    => '07:30',
+            'day_of_week' => 'Monday',
+            'start_time'  => '07:15',
+            'end_time'    => '08:00',
             'faculty_id'  => self::DUMMY_ID,  // trigger H3 check
         ]);
 
         $this->assertFalse($result['passes']);
         $codes = array_column($result['violations'], 'code');
-        $this->assertContains('H12', $codes, 'H12 (Friday ILA) should fire');
-        $this->assertContains('H3',  $codes, 'H3 (official time) should fire');
+        $this->assertContains('H4', $codes, 'H4 (Flag Ceremony) should fire');
+        $this->assertContains('H3', $codes, 'H3 (official time) should fire');
     }
 
     public function test_check_excludes_schedule_id_for_update_scenario(): void

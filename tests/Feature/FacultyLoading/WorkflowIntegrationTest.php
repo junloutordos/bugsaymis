@@ -99,6 +99,7 @@ class WorkflowIntegrationTest extends TestCase
             'is_current'     => true,
         ]);
         $this->subject = Subject::create([
+            'school_year_id'      => $this->sy->id,
             'code'                => 'SCI-101',
             'name'                => 'General Science',
             'subject_type'        => 'lecture',
