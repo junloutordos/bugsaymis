@@ -90,6 +90,39 @@ class ImportStudentIntake extends Command
     private const COL_FATHER_OFC_ADDR = 'AZ';
     private const COL_FATHER_ALUMNUS = 'BA';
 
+    /**
+     * Production's students table was created out-of-band before its migration existed
+     * (see the migration's guard comment) and drifted from it: these columns are
+     * NOT NULL with no default in prod, even though the migration (and dev's copy, built
+     * from that migration) declares DEFAULT ''. None of the form data maps to them, so
+     * without this they fail the insert outright. Confirmed against prod's live
+     * `SHOW COLUMNS` (2026-07-20) — not guessed from the migration text.
+     */
+    private const NOT_NULL_NO_DEFAULT_FILLERS = [
+        'ethnic' => '',
+        'mbirthday' => '',
+        'fbirthday' => '',
+        'meduc' => '',
+        'feduc' => '',
+        'mschool' => '',
+        'fschool' => '',
+        'parentsstatus' => '',
+        'zipcode' => '',
+        'schooladdress' => '',
+        'contact_address1' => '',
+        'contact_ofc_address1' => '',
+        'contact_ofc_telno1' => '',
+        'contactperson2' => '',
+        'relation2' => '',
+        'contact_address2' => '',
+        'contactno2' => '',
+        'contact_ofc_address2' => '',
+        'contact_ofc_telno2' => '',
+        'socioeconomic' => '',
+        'schoolType1' => '',
+        'schoolType2' => '',
+    ];
+
     public function handle(): int
     {
         $sourcePath = $this->resolveSourcePath();
@@ -133,7 +166,7 @@ class ImportStudentIntake extends Command
             $batch      = $year + 13 - $gradeLevel;
             $pisaysId   = $skip ? null : sprintf('%d-%d-%03d', $campus, $year, $seq);
 
-            $record = array_merge($u['mapped'], [
+            $record = array_merge(self::NOT_NULL_NO_DEFAULT_FILLERS, $u['mapped'], [
                 'lastname'      => $u['lastname'],
                 'firstname'     => $u['firstname'],
                 'middlename'    => $u['middlename'],
