@@ -1,5 +1,12 @@
+<script>
+// Module-level (not per-instance) so it survives AdminLayout remounting on
+// every Inertia navigation — the layout isn't a persistent layout, so the
+// sidebar's DOM (and its scrollTop) is torn down and rebuilt on every page.
+let savedSidebarScroll = 0;
+</script>
+
 <script setup>
-import { ref, computed, markRaw, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, markRaw, onMounted, onUnmounted, onBeforeUnmount, watch } from "vue";
 import { sessionExpired } from "@/Composables/useSession.js";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
@@ -20,6 +27,7 @@ import { menuItems } from './navigation.js';
 // --- State ---
 const collapsed = ref(false);
 const mobileOpen = ref(false);
+const sidebarNav = ref(null);
 
 const expanded = ref({});
 const showVersionModal = ref(false);
@@ -116,6 +124,11 @@ onMounted(() => {
   ) {
     showSignatureSetupModal.value = true;
   }
+
+  if (sidebarNav.value) sidebarNav.value.scrollTop = savedSidebarScroll;
+});
+onBeforeUnmount(() => {
+  if (sidebarNav.value) savedSidebarScroll = sidebarNav.value.scrollTop;
 });
 onUnmounted(() => {
   if (removeStartListener) removeStartListener();
@@ -364,7 +377,7 @@ filteredMenu.value.forEach((item) => {
       </div>
 
       <!-- Navigation -->
-      <nav class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+      <nav ref="sidebarNav" class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         <template v-for="item in filteredMenu" :key="item.label">
 
           <!-- Section label -->
