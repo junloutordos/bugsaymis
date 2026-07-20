@@ -193,7 +193,7 @@
                   <div :class="['font-bold leading-tight truncate', eventFontSizeClass(s)]">
                     {{ s.entry_type === 'non_teaching' ? s.title : (s.subject?.name ?? s.subject?.code) }}{{ s.session_type === 'ilp' ? ' (ILP)' : '' }}
                   </div>
-                  <div v-if="eventDisplayMode(s) !== 'compact'" :class="['leading-tight truncate opacity-75', eventFontSizeClass(s)]">
+                  <div v-if="eventDisplayMode(s) !== 'compact' || s.session_type === 'ilp'" :class="['leading-tight truncate opacity-75', eventFontSizeClass(s)]">
                     {{ s.secondary_label }}
                   </div>
                   <div v-if="eventDisplayMode(s) === 'full'" :class="['leading-tight opacity-55 tabular-nums', eventFontSizeClass(s)]">
