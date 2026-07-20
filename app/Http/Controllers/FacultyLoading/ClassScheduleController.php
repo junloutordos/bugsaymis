@@ -1186,6 +1186,65 @@ class ClassScheduleController extends Controller
         return back()->with('success', 'Schedule cancelled.');
     }
 
+    /**
+     * Bring a cancelled class row back to active — the recovery path for a
+     * wrongfully removed schedule. Re-validated against the calendar as it
+     * stands now (something else may have taken the slot while this row sat
+     * cancelled); a real conflict blocks the restore instead of silently
+     * double-booking.
+     */
+    public function restore(ClassSchedule $classSchedule): RedirectResponse
+    {
+        if ($classSchedule->entry_type !== 'class' || $classSchedule->status !== 'cancelled') {
+            return back()->withErrors(['schedule' => 'Only a removed class schedule can be restored.']);
+        }
+
+        $cap = $this->scheduleCapability();
+        if (! $this->canTouchClass($cap, $classSchedule->user_id ? (int) $classSchedule->user_id : null)) {
+            abort(403);
+        }
+
+        if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)) {
+            return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
+        }
+
+        $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
+            ->where('academic_term_id', $classSchedule->academic_term_id)
+            ->first();
+        if ($facultyLoad?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
+
+        $data = [
+            'faculty_id' => $classSchedule->user_id,
+            'subject_id' => $classSchedule->subject_id,
+            'section_id' => $classSchedule->section_id,
+            'classroom_id' => $classSchedule->classroom_id,
+            'school_year_id' => $classSchedule->school_year_id,
+            'academic_term_id' => $classSchedule->academic_term_id,
+            'day_of_week' => $classSchedule->day_of_week,
+            'start_time' => substr((string) $classSchedule->start_time, 0, 5),
+            'end_time' => substr((string) $classSchedule->end_time, 0, 5),
+        ];
+
+        $validation = $this->validation->validate($data, $classSchedule->id);
+        if (! empty($validation['errors'])) {
+            return back()->withErrors(array_merge(
+                ["Its original slot is no longer free — edit the day/time before restoring."],
+                $validation['errors']
+            ));
+        }
+
+        $classSchedule->update(['status' => 'active']);
+
+        $msg = 'Schedule restored.';
+        if (! empty($validation['warnings'])) {
+            $msg .= ' Note: '.implode(' ', $validation['warnings']);
+        }
+
+        return back()->with('success', $msg);
+    }
+
     // Presentation mapping moved to ClassSchedule::toCalendarArray() — shared
     // with any other page that renders a schedule calendar (e.g. Section Show).
 }

@@ -205,6 +205,14 @@
                   class="absolute top-0 right-0 bottom-0 w-0.5 bg-amber-400" />
                 <LockClosedIcon v-if="s.is_locked"
                   class="absolute top-0.5 right-0.5 h-3 w-3 text-slate-400" title="Locked — drag disabled" />
+                <button v-if="editable && s.can_edit && s.status !== 'cancelled'"
+                  type="button"
+                  class="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-white/90 text-slate-400 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center print:hidden"
+                  title="Remove from schedule"
+                  @mousedown.stop
+                  @click.stop="$emit('event-remove', s)">
+                  <XMarkIcon class="h-3 w-3" />
+                </button>
                 <div v-if="s.status === 'cancelled'"
                   class="absolute inset-0 bg-white/60 flex items-center justify-center">
                   <span class="text-xs text-slate-400 font-medium">Cancelled</span>
@@ -219,11 +227,16 @@
     </div>
 
     <!-- Legend -->
-    <div v-if="legend.length" class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5 shrink-0">
+    <div v-if="legend.length || typeLegend.length" class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5 shrink-0">
       <div v-for="sub in legend" :key="sub.id"
-        :style="subjectColorStyle(sub.id)"
+        :style="scheduleColorStyle(sub)"
         class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
         {{ sub.code }}
+      </div>
+      <div v-for="t in typeLegend" :key="t.id"
+        :style="t.style"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
+        {{ t.code }}
       </div>
     </div>
 
@@ -237,7 +250,7 @@
 import { onBeforeUnmount, onMounted, ref, computed } from 'vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import {
-  ArrowsPointingInIcon, ArrowsPointingOutIcon, LockClosedIcon, PrinterIcon,
+  ArrowsPointingInIcon, ArrowsPointingOutIcon, LockClosedIcon, PrinterIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -268,7 +281,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click',
+  'column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click', 'event-remove',
   'blocked-mousedown', 'blocked-click',
 ])
 
@@ -466,12 +479,46 @@ function subjectColorStyle(subjectId) {
   return { backgroundColor: p.bg, borderColor: p.border, color: p.color }
 }
 
+const ELECTIVE_STYLE = { backgroundColor: '#fef3c7', borderColor: '#f59e0b', color: '#92400e' }
+const SCIENCE_CORE_STYLE = { backgroundColor: '#ede9fe', borderColor: '#8b5cf6', color: '#5b21b6' }
+
+/** True for elective/science-core sessions, whether flagged on the subject
+ *  itself or placed on a synthetic ELEC- / SCI- prefixed section. Accepts
+ *  either a schedule row ({ subject: {...}, is_elective_section, ... }) or a
+ *  bare subject object (legend entries — { id, code, is_elective, ... }). */
+function isElectiveEvent(s) {
+  return !!(s.subject?.is_elective || s.is_elective || s.is_elective_section)
+}
+function isScienceCoreEvent(s) {
+  return !!(s.subject?.is_science_core || s.is_science_core || s.is_science_core_section)
+}
+
+/** Shared by event blocks and legend chips so both agree on color — electives
+ *  and Science Core get a fixed amber/violet fill (matching the window-band
+ *  colors used on homeroom section cards) instead of the per-subject palette. */
+function scheduleColorStyle(s) {
+  if (isElectiveEvent(s)) return ELECTIVE_STYLE
+  if (isScienceCoreEvent(s)) return SCIENCE_CORE_STYLE
+  return subjectColorStyle(s.subject?.id ?? s.id)
+}
+
 function eventColorStyle(s) {
   if (s.entry_type === 'non_teaching') {
     return { backgroundColor: '#f1f5f9', borderColor: '#94a3b8', color: '#334155' }
   }
-  return subjectColorStyle(s.subject?.id)
+  return scheduleColorStyle(s)
 }
+
+/** Fixed "Elective"/"Science Core" legend keys, shown whenever the card has
+ *  at least one such session — needed on Faculty/My Schedule cards, which
+ *  have no section divider pills to explain the color. */
+const typeLegend = computed(() => {
+  const rows = Object.values(props.eventsByDay).flat()
+  const out = []
+  if (rows.some(isElectiveEvent)) out.push({ id: 'legend-elective', code: 'Elective', style: ELECTIVE_STYLE })
+  if (rows.some(isScienceCoreEvent)) out.push({ id: 'legend-science-core', code: 'Science Core', style: SCIENCE_CORE_STYLE })
+  return out
+})
 
 function dropPreviewStyle() {
   if (!props.dropPreview) return {}

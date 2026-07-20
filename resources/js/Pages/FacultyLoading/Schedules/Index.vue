@@ -57,6 +57,10 @@
           <AppButton v-if="isManage || isReview" variant="secondary" @click="openVersions">
             <ArchiveBoxIcon class="h-4 w-4" /> Versions
           </AppButton>
+          <AppButton v-if="isManage || isUnit" variant="secondary" :disabled="!recentlyRemoved.length" @click="removedModal = true">
+            <TrashIcon class="h-4 w-4" /> Removed
+            <span v-if="recentlyRemoved.length" class="ml-1 rounded-full bg-rose-100 px-1.5 text-xs text-rose-700">{{ recentlyRemoved.length }}</span>
+          </AppButton>
           <AppButton v-if="!isReview" :variant="isManage ? 'secondary' : 'primary'" :disabled="scheduleLocked" @click="openNonTeachingForm()">
             <ClockIcon class="h-4 w-4" /> Add Non-teaching
           </AppButton>
@@ -195,6 +199,7 @@
                 @event-dragstart="(s, e) => onDragStartEvent(e, s)"
                 @event-dragend="onDragEnd"
                 @event-click="onEventClick"
+                @event-remove="onEventRemove"
                 @blocked-mousedown="(day, band, edge, e) => onBlockedMouseDown(e, groupId, day, band, edge)"
                 @blocked-click="(day, band, e) => onBlockedClick(e, groupId, day, band)">
 
@@ -426,6 +431,35 @@
         <AppButton :loading="versionForm.processing" @click="submitVersion">
           <ArchiveBoxIcon class="h-4 w-4" /> Save Version
         </AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Recently Removed: recovery for a wrongfully dropped schedule. A row that
+         was removed with the "x" on the calendar sits here as cancelled until
+         it's restored or permanently deleted. -->
+    <AppModal :show="removedModal" title="Recently Removed" size="lg" @close="removedModal = false">
+      <div v-if="!recentlyRemoved.length" class="py-10 text-center text-sm text-slate-500">
+        Nothing removed for this view.
+      </div>
+      <div v-else class="max-h-[480px] space-y-2 overflow-y-auto pr-1">
+        <div v-for="s in recentlyRemoved" :key="s.id" class="flex items-start justify-between gap-3 border border-slate-200 p-3">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-800 truncate">{{ s.subject?.name ?? s.subject?.code ?? 'Class' }}</p>
+            <p class="mt-0.5 text-xs text-slate-600">{{ s.section_name }}{{ s.grade_level ? ' · G' + s.grade_level : '' }} · {{ s.faculty?.name ?? 'TBA' }}</p>
+            <p class="mt-0.5 text-xs text-slate-500">{{ s.day_of_week }} {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <AppButton size="sm" variant="secondary" @click="restoreSchedule(s)">
+              <ArrowUturnLeftIcon class="h-4 w-4" /> Restore
+            </AppButton>
+            <AppButton size="sm" variant="danger" @click="deleteScheduleForever(s)">
+              <TrashIcon class="h-4 w-4" />
+            </AppButton>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="removedModal = false">Close</AppButton>
       </template>
     </AppModal>
 
@@ -1008,6 +1042,50 @@ const compareLabelB       = ref('')
 const saveVersionModal    = ref(false)
 const versionForm = useForm({ academic_term_id: null, label: '', notes: '' })
 
+// ── Recently Removed (recovery for a wrongfully dropped schedule) ────────────
+
+const removedModal = ref(false)
+
+/** The "x" on a placed block — soft-removes it (backend cancels first, it's
+ *  only hard-deleted the second time), so this is always recoverable from
+ *  the "Removed" panel until someone explicitly deletes it permanently. */
+function onEventRemove(s) {
+  if (scheduleLocked.value || !s.can_edit) return
+  const scienceCoreNote = s.is_science_core_section
+    ? ' This is a shared Science Core slot — other sections keep their own schedule and won\'t be affected.'
+    : ''
+  Swal.fire({
+    icon: 'warning',
+    title: 'Remove this schedule?',
+    text: `${s.subject?.name ?? s.subject?.code ?? 'This class'} · ${s.day_of_week} ${fmtTime(s.start_time)}–${fmtTime(s.end_time)} `
+      + `will come off the calendar. You can restore it from "Removed" before it's permanently deleted.${scienceCoreNote}`,
+    showCancelButton: true,
+    confirmButtonText: 'Remove',
+    confirmButtonColor: '#dc2626',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.delete(route('faculty-loading.schedules.destroy', s.id), { preserveScroll: true })
+  })
+}
+
+function restoreSchedule(s) {
+  router.post(route('faculty-loading.schedules.restore', s.id), {}, { preserveScroll: true })
+}
+
+function deleteScheduleForever(s) {
+  Swal.fire({
+    icon: 'warning',
+    title: 'Permanently delete this schedule?',
+    text: 'This cannot be undone.',
+    showCancelButton: true,
+    confirmButtonText: 'Delete Permanently',
+    confirmButtonColor: '#dc2626',
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    router.delete(route('faculty-loading.schedules.destroy', s.id), { preserveScroll: true })
+  })
+}
+
 async function openVersions() {
   versionsModal.value = true
   compareResult.value = null
@@ -1208,22 +1286,34 @@ function setViewBy(mode) {
 // ── Grouping ─────────────────────────────────────────────────────────────────
 
 /** Schedules feeding the grouping logic. "By Year Level" narrows to elective
- *  sessions only (and optionally one grade) — a cross-section elective
- *  overview. "By Subject" narrows to teaching sessions of one subject (all,
- *  not just electives) — non-teaching blocks have no subject and are excluded. */
+ *  and Science Core sessions only (and optionally one grade) — a cross-
+ *  section overview of both. "By Subject" narrows to teaching sessions of one
+ *  subject (all, not just electives) — non-teaching blocks have no subject
+ *  and are excluded. */
 const displaySchedules = computed(() => {
+  // Cancelled rows (removed via the calendar's "x") no longer occupy a grid
+  // slot — they live in the "Removed" recovery list instead, see recentlyRemoved.
+  const base = props.schedules.filter(s => s.status !== 'cancelled')
   if (viewBy.value === 'grade') {
-    return props.schedules.filter(s =>
-      s.subject?.is_elective && (gradeFilter.value == null || s.grade_level === gradeFilter.value)
+    return base.filter(s =>
+      (s.subject?.is_elective || s.is_elective_section || s.subject?.is_science_core || s.is_science_core_section)
+      && (gradeFilter.value == null || s.grade_level === gradeFilter.value)
     )
   }
   if (viewBy.value === 'subject') {
-    return props.schedules.filter(s =>
+    return base.filter(s =>
       s.entry_type !== 'non_teaching' && s.subject && (subjectFilter.value == null || s.subject.id === subjectFilter.value)
     )
   }
-  return props.schedules
+  return base
 })
+
+/** Cancelled class rows for the current filtered view — the recovery list
+ *  behind the "Removed" button. Non-teaching blocks are hard-deleted on
+ *  removal (no load/audit linkage to keep), so they never appear here. */
+const recentlyRemoved = computed(() =>
+  props.schedules.filter(s => s.entry_type === 'class' && s.status === 'cancelled')
+)
 
 /** Group key for a schedule row, depending on the active view mode. */
 function groupKeyOf(s) {
@@ -1479,7 +1569,7 @@ function timeToMin(t) {
 
 /** Card heading text for a group, matching the old inline template branches. */
 function cardTitle(groupId) {
-  if (viewBy.value === 'grade') return `Grade ${groupId} — Electives`
+  if (viewBy.value === 'grade') return `Grade ${groupId} — Electives & Science Core`
   if (viewBy.value === 'subject') return subjectLabel(groupId)
   return viewBy.value === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name
 }

@@ -199,6 +199,7 @@ class ClassSchedule extends Model
                 'code'        => $this->subject->code,
                 'name'        => $this->subject->name,
                 'is_elective' => $this->subject->grade_level === 0 || $this->subject->subject_type === 'elective',
+                'is_science_core' => $this->subject->subject_type === 'science_core',
             ] : null,
             'classroom'    => $this->classroom ? [
                 'id'   => $this->classroom->id,
