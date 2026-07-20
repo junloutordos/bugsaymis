@@ -13,6 +13,7 @@ use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\HeadAdvisoryService;
 use App\Services\FacultyLoading\SchedulingConstants;
+use App\Services\FacultyLoading\ScienceCoreService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,7 @@ class SectionController extends Controller
 
     // ── View section detail ───────────────────────────────────────────────────
 
-    public function show(Request $request, Section $section): Response
+    public function show(Request $request, Section $section, ScienceCoreService $scienceCore): Response
     {
         $this->authorize('faculty_loading.manage');
 
@@ -138,18 +139,20 @@ class SectionController extends Controller
             ->get()
             ->map(fn ($s) => $s->toCalendarArray());
 
-        // The elective band marks the released window on a homeroom section; a
-        // synthetic elective (ELEC-*) section already shows its real elective
-        // classes there, so it gets no band.
-        $isElectiveSection = str_starts_with((string) $section->sectionname, 'ELEC-');
+        // The elective/science-core bands mark released windows on a homeroom
+        // section; a synthetic elective (ELEC-*) or Science Core (SCI-*)
+        // section already shows its real classes there, so it gets no band.
+        $isElectiveSection    = str_starts_with((string) $section->sectionname, 'ELEC-');
+        $isScienceCoreSection = $scienceCore->isScienceCoreSection($section);
         $dayConfigs = [];
         foreach (SchedulingConstants::DAYS as $day) {
             $window = SchedulingConstants::getEffectiveClassWindow($section->levelid, $day);
             $dayConfigs[$day] = [
-                'start'     => $window['start'] ?? null,
-                'end'       => $window['end'] ?? null,
-                'blocked'   => SchedulingConstants::getDisplayBlockedSlots($section->levelid, $day),
-                'electives' => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($section->levelid, $day),
+                'start'        => $window['start'] ?? null,
+                'end'          => $window['end'] ?? null,
+                'blocked'      => SchedulingConstants::getDisplayBlockedSlots($section->levelid, $day),
+                'electives'    => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($section->levelid, $day),
+                'scienceCore'  => ($isElectiveSection || $isScienceCoreSection || ! $termId) ? [] : $scienceCore->getScienceCoreWindows($section->school_year_id, $termId, $section->levelid, $day),
             ];
         }
 

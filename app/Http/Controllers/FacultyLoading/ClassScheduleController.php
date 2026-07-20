@@ -22,6 +22,7 @@ use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\FacultyLoading\ScheduleValidationService;
 use App\Services\FacultyLoading\SchedulingConstants;
+use App\Services\FacultyLoading\ScienceCoreService;
 use App\Services\PersonNameFormatter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +41,7 @@ class ClassScheduleController extends Controller
         private readonly DigitalSignatureService $signatures,
         private readonly PersonNameFormatter $names,
         private readonly ConflictDetectionService $conflicts,
+        private readonly ScienceCoreService $scienceCore,
     ) {}
 
     /**
@@ -344,9 +346,11 @@ class ClassScheduleController extends Controller
             ->map(fn ($schedule) => $schedule->toCalendarArray())
             ->values();
 
-        // A synthetic elective (ELEC-*) section prints its real elective classes,
-        // so it gets no elective band (homeroom sections do).
-        $isElectiveSection = str_starts_with((string) ($owner['name'] ?? ''), 'ELEC-');
+        // A synthetic elective (ELEC-*) or Science Core (SCI-*) section prints
+        // its real classes, so it gets no band (homeroom sections do).
+        $ownerName             = (string) ($owner['name'] ?? '');
+        $isElectiveSection     = str_starts_with($ownerName, 'ELEC-');
+        $isScienceCoreSection  = str_starts_with($ownerName, ScienceCoreService::SECTION_PREFIX);
         $dayConfigs = [];
         if ($gradeLevel !== null) {
             foreach (SchedulingConstants::DAYS as $day) {
@@ -356,6 +360,9 @@ class ClassScheduleController extends Controller
                     'end' => $window['end'] ?? null,
                     'blocked' => SchedulingConstants::getDisplayBlockedSlots($gradeLevel, $day),
                     'electives' => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($gradeLevel, $day),
+                    'scienceCore' => ($isElectiveSection || $isScienceCoreSection)
+                        ? []
+                        : $this->scienceCore->getScienceCoreWindows($term->school_year_id, $term->id, $gradeLevel, $day),
                 ];
             }
         }
@@ -587,6 +594,9 @@ class ClassScheduleController extends Controller
                     'end' => $window['end'] ?? null,
                     'blocked' => $blocked,
                     'electives' => SchedulingConstants::getElectiveWindows($grade, $day),
+                    'scienceCore' => ($syId && $termId)
+                        ? $this->scienceCore->getScienceCoreWindows($syId, (int) $termId, $grade, $day)
+                        : [],
                 ];
             }
         }

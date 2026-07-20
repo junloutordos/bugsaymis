@@ -150,6 +150,22 @@
                 </span>
               </div>
 
+              <!-- Science Core window band — G11/G12 leveled science (Biology/Chemistry/
+                   Physics), a grade-wide synchronized block distinct from generic electives -->
+              <div v-for="sc in (dayConfigs[day]?.scienceCore ?? [])" :key="`sci-${sc.start}`"
+                :style="blockedStyle(sc)"
+                class="absolute inset-x-0 pointer-events-none z-[2] flex items-center justify-center">
+                <div class="absolute inset-0 rounded-sm border border-violet-200 bg-violet-50/80" />
+                <span class="relative w-full text-violet-700 font-semibold px-1 text-center leading-tight select-none">
+                  <span :class="['block truncate', blockedDurationMin(sc) >= 40 ? 'text-xs' : 'text-[10px]']">
+                    {{ sc.label || 'Science Core' }}
+                  </span>
+                  <span :class="['block tabular-nums opacity-80', blockedDurationMin(sc) >= 40 ? 'text-[10px]' : 'text-[9px]']">
+                    {{ fmtTimeRange(sc.start, sc.end) }}
+                  </span>
+                </span>
+              </div>
+
               <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
               <div v-if="dayConfigs[day] && timeToMin(dayConfigs[day].end) <= 12 * 60"
                 :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"

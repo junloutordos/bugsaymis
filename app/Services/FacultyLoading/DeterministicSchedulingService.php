@@ -370,6 +370,21 @@ class DeterministicSchedulingService
             }
             $loadsConsidered++;
 
+            // Science Core sessions must be placed together as a synchronized
+            // group (see placeScienceCoreGroups()) — this incremental pass
+            // places one load at a time and can't safely do that, so it
+            // defers to a full Generate instead of placing them independently
+            // (which would silently reintroduce the "true to all sections"
+            // bug this feature exists to fix).
+            if ($req['is_science_core'] ?? false) {
+                $failures[] = $this->describeFailure($req, $stillNeeded, [
+                    'reason_code'  => 'science_core_needs_full_generate',
+                    'reason'       => "{$req['subject_name']} is a Science Core subject — its sessions must be placed together with its sibling subjects via a full Generate for Grade {$req['grade']}, not placed individually.",
+                    'can_reassign' => false,
+                ]);
+                continue;
+            }
+
             if (in_array((int) $req['real_user_id'], $lockedUserIds, true)) {
                 $failures[] = $this->describeFailure($req, $stillNeeded, [
                     'reason_code'  => 'faculty_locked',
@@ -576,9 +591,34 @@ class DeterministicSchedulingService
             $this->seedBusyFromDb($termId, ['active', 'tentative'], $scopedSectionIds);
         }
 
+        // Science Core: a grade-wide synchronized group (e.g. Biology/Chemistry/
+        // Physics Level 2) must all land on the exact same day+period, reserved
+        // across every homeroom in the grade — so it's placed first, before any
+        // other core subject can claim that slot. Deduplicated to one entry per
+        // load assignment (the flattened $sessions array has one row per
+        // still-needed session; the group placer decides its own session count
+        // and slots internally). Runs deterministically on every call —
+        // including every restart attempt — since resetState() above wipes it
+        // each time and there's no benefit to randomizing a handful of
+        // faculty/grade-wide slot searches.
+        $scienceCoreReqs = [];
+        $regular         = [];
+        $seenLoadIds     = [];
+        foreach ($sessions as $s) {
+            if (! ($s['is_science_core'] ?? false)) {
+                $regular[] = $s;
+                continue;
+            }
+            if (! isset($seenLoadIds[$s['load_assignment_id']])) {
+                $scienceCoreReqs[]                        = $s;
+                $seenLoadIds[$s['load_assignment_id']] = true;
+            }
+        }
+        $unplaceable = $this->placeScienceCoreGroups($scienceCoreReqs, $schoolYearId);
+
         // Pass 1 — greedy placement.
         $deferred = [];
-        foreach ($sessions as $s) {
+        foreach ($regular as $s) {
             $slot = $this->findBestSlot($s);
             if ($slot === null) {
                 $deferred[] = $s;
@@ -588,7 +628,6 @@ class DeterministicSchedulingService
         }
 
         // Pass 2 — recursive relocation (bounded augmenting-path search).
-        $unplaceable = [];
         foreach ($deferred as $s) {
             if (! $this->attemptPlace($s, self::RELOCATION_DEPTH)) {
                 $unplaceable[] = $this->describeSession($s);
@@ -605,6 +644,142 @@ class DeterministicSchedulingService
         }
 
         return ['placed' => $placed, 'unplaceable' => $unplaceable, 'quality_score' => $qualityScore];
+    }
+
+    /**
+     * Place every grade's Science Core group (subjects flagged
+     * subject_type='science_core') — a grade-wide synchronized block, not a
+     * per-subject placement. See class-level notes on
+     * {@see placeScienceCoreGroupForGrade()} for the algorithm.
+     *
+     * @param array<int,array<string,mixed>> $requirements is_science_core requirements only, deduped by load_assignment_id
+     * @return array<int,array<string,mixed>> unplaceable session descriptions
+     */
+    private function placeScienceCoreGroups(array $requirements, int $schoolYearId): array
+    {
+        if ($requirements === []) {
+            return [];
+        }
+
+        $byGrade = [];
+        foreach ($requirements as $req) {
+            $byGrade[$req['grade']][] = $req;
+        }
+
+        $unplaceable = [];
+        foreach ($byGrade as $grade => $group) {
+            $unplaceable = array_merge($unplaceable, $this->placeScienceCoreGroupForGrade((int) $grade, $group, $schoolYearId));
+        }
+
+        return $unplaceable;
+    }
+
+    /**
+     * Place one grade's Science Core group. Unlike a generic elective (a
+     * single fixed bell-schedule period), there's no pre-reserved window for
+     * this — each weekly round searches for a day+period that is simultaneously
+     * free for every sibling subject's faculty, every synthetic Science Core
+     * section in the group, AND every homeroom section in the grade (since —
+     * like electives — the whole grade must be free to attend whichever class
+     * matches their track, not just the group's own sections). Once found, all
+     * of the group's classes for that round are committed to the shared slot,
+     * and the slot is reserved on every homeroom so normal core-subject
+     * placement (which runs after this) never lands there.
+     *
+     * Least-used-day-first, mirroring how regular subjects spread across the
+     * week. If a round's shared slot can't be found (over-subscribed grade),
+     * that round's sessions are reported unplaceable and the search continues
+     * with the remaining rounds rather than giving up on the whole group.
+     *
+     * @param array<int,array<string,mixed>> $group this grade's science_core requirements
+     * @return array<int,array<string,mixed>> unplaceable session descriptions
+     */
+    private function placeScienceCoreGroupForGrade(int $grade, array $group, int $schoolYearId): array
+    {
+        $grid = array_values(array_filter(
+            $this->gridByGrade[$grade] ?? [],
+            fn ($slot) => ! $slot['is_elective'] && ! $slot['is_overflow'] && ! $slot['is_ilp_only']
+        ));
+
+        $homeroomIds = Section::where('school_year_id', $schoolYearId)
+            ->where('levelid', $grade)
+            ->where('sectionname', 'not like', 'ELEC-%')
+            ->where('sectionname', 'not like', ScienceCoreService::SECTION_PREFIX . '%')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $sessionsNeeded = max(array_column($group, 'sessions_needed'));
+        $facultyIds     = array_unique(array_column($group, 'faculty_id'));
+        $sectionIds     = array_unique(array_column($group, 'section_id'));
+
+        $unplaceable  = [];
+        $usedDayCount = [];
+
+        for ($round = 0; $round < $sessionsNeeded; $round++) {
+            // Least-used-day-first, then earliest period — spreads the group
+            // across the week the same way a normal subject prefers to.
+            $candidates = $grid;
+            usort($candidates, function ($a, $b) use ($usedDayCount) {
+                return [$usedDayCount[$a['day']] ?? 0, $a['start_min']]
+                    <=> [$usedDayCount[$b['day']] ?? 0, $b['start_min']];
+            });
+
+            $chosen = null;
+            foreach ($candidates as $slot) {
+                $free = true;
+                foreach ($homeroomIds as $sid) {
+                    if ($this->sectionBusyAt($sid, $slot)) { $free = false; break; }
+                }
+                if ($free) {
+                    foreach ($sectionIds as $sid) {
+                        if ($this->sectionBusyAt($sid, $slot)) { $free = false; break; }
+                    }
+                }
+                if ($free) {
+                    foreach ($facultyIds as $fid) {
+                        if ($this->facultyBusyAt($fid, $slot)) { $free = false; break; }
+                    }
+                }
+                if ($free) {
+                    $chosen = $slot;
+                    break;
+                }
+            }
+
+            if ($chosen === null) {
+                foreach ($group as $req) {
+                    $unplaceable[] = $this->describeSession(array_merge($req, ['session_type' => 'regular']));
+                }
+                continue;
+            }
+
+            $usedDayCount[$chosen['day']] = ($usedDayCount[$chosen['day']] ?? 0) + 1;
+
+            foreach ($group as $req) {
+                $this->commit(array_merge($req, ['session_type' => 'regular']), $chosen, null, 0);
+            }
+
+            foreach ($homeroomIds as $sid) {
+                $this->reserveGradeSlot($sid, $chosen);
+            }
+        }
+
+        return $unplaceable;
+    }
+
+    /**
+     * Mark a section busy at a slot with no real placement behind it — used to
+     * reserve Science Core's grade-wide window on every homeroom that isn't
+     * itself part of the group, so normal core-subject placement (which runs
+     * after placeScienceCoreGroups()) avoids it. Sentinel index -1, same
+     * convention as seedBusyFromDb()'s immovable intervals — never
+     * uncommitted, since Science Core placement doesn't participate in the
+     * relocation search.
+     */
+    private function reserveGradeSlot(int $sectionId, array $slot): void
+    {
+        $this->sectionBusy[$sectionId][$slot['day']][] = [$slot['start_min'], $slot['end_min'], -1];
     }
 
     // ── Requirements ────────────────────────────────────────────────────────
@@ -690,6 +865,7 @@ class DeterministicSchedulingService
                 'faculty_name'       => $facultyName,
                 'sessions_needed'    => $sessions,
                 'is_elective'        => $isElectiveSection || $la->subject->subject_type === 'elective',
+                'is_science_core'    => $la->subject->subject_type === 'science_core',
                 'has_ilp'            => (bool) ($la->subject->has_ilp ?? false),
             ];
         }

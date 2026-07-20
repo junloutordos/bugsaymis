@@ -3,6 +3,7 @@
 namespace App\Models\FacultyLoading;
 
 use App\Models\User;
+use App\Services\FacultyLoading\ScienceCoreService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -212,6 +213,7 @@ class ClassSchedule extends Model
             'section_name' => $this->section?->sectionname ?? ($this->section_id ? "Section {$this->section_id}" : null),
             'grade_level'  => $this->section?->levelid ?? null,
             'is_elective_section' => str_starts_with((string) ($this->section?->sectionname ?? ''), 'ELEC-'),
+            'is_science_core_section' => str_starts_with((string) ($this->section?->sectionname ?? ''), ScienceCoreService::SECTION_PREFIX),
             'is_locked'    => $isLocked,
             'can_edit'     => $canEdit,
         ];

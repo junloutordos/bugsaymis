@@ -152,8 +152,18 @@
                 {{ facultyUnitLabel(groupId) }}
               </div>
 
+              <!-- Science Core divider (By Section view) — separates G11/G12
+                   leveled-science offerings from the homeroom sections above -->
+              <div v-if="shouldShowScienceCoreHeader(groupId)"
+                class="mt-3 flex items-center gap-2 border-t border-violet-200 pt-3 px-1">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-violet-700 ring-1 ring-violet-100">
+                  Science Core
+                </span>
+                <span class="text-xs text-slate-400">Grade-wide offerings — students attend whichever matches their track</span>
+              </div>
+
               <!-- Electives divider (By Section view) — separates cross-section
-                   elective offerings from the homeroom sections above -->
+                   elective offerings from the sections above -->
               <div v-if="shouldShowElectiveHeader(groupId)"
                 class="mt-3 flex items-center gap-2 border-t border-amber-200 pt-3 px-1">
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-100">
@@ -1257,10 +1267,13 @@ const groupsWithSchedules = computed(() => {
   } else if (viewBy.value === 'subject') {
     seen.sort((a, b) => subjectLabel(a).localeCompare(subjectLabel(b)))
   } else if (viewBy.value === 'section') {
-    // Homeroom sections keep their grade+name order; synthetic elective
-    // (ELEC-*) sections drop to the bottom under their own heading. Array.sort
-    // is stable, so the 0-comparison preserves the backend order within groups.
-    seen.sort((a, b) => (isElectiveGroup(a) ? 1 : 0) - (isElectiveGroup(b) ? 1 : 0))
+    // Homeroom sections keep their grade+name order; synthetic Science Core
+    // (SCI-*) sections drop below them, and synthetic elective (ELEC-*)
+    // sections drop to the very bottom, each under their own heading.
+    // Array.sort is stable, so the 0-comparison preserves the backend order
+    // within groups.
+    const tierOf = (g) => isElectiveGroup(g) ? 2 : (isScienceCoreGroup(g) ? 1 : 0)
+    seen.sort((a, b) => tierOf(a) - tierOf(b))
   } else if (viewBy.value === 'faculty') {
     // Group by Division/Office (the live Data Management assignment) instead
     // of leaving faculty in whatever order their first schedule row happened
@@ -1301,12 +1314,22 @@ function shouldShowUnitHeader(facultyId) {
 }
 
 /** True on the first elective (ELEC-*) card in By-Section view — renders the
- *  "Electives" divider that separates them from the homeroom sections above. */
+ *  "Electives" divider that separates them from the cards above. */
 function shouldShowElectiveHeader(groupId) {
   if (!isElectiveGroup(groupId)) return false
   const list = groupsWithSchedules.value
   const idx  = list.indexOf(groupId)
   return idx === 0 || !isElectiveGroup(list[idx - 1])
+}
+
+/** True on the first Science Core (SCI-*) card in By-Section view — renders
+ *  the "Science Core" divider that separates them from the homeroom sections
+ *  above (and from Electives below, which sort after Science Core). */
+function shouldShowScienceCoreHeader(groupId) {
+  if (!isScienceCoreGroup(groupId)) return false
+  const list = groupsWithSchedules.value
+  const idx  = list.indexOf(groupId)
+  return idx === 0 || !isScienceCoreGroup(list[idx - 1])
 }
 
 /** { groupId: [unplacedLoads] } — grouped the same way calendar cards are.
@@ -1363,6 +1386,7 @@ function groupHeaderInfo(groupId) {
       section_name: fromSchedule.section_name,
       faculty_name: fromSchedule.faculty?.name ?? 'Unassigned / TBA',
       is_elective_section: fromSchedule.is_elective_section ?? false,
+      is_science_core_section: fromSchedule.is_science_core_section ?? false,
     }
   }
   const fromLoad = props.unplacedLoads.find(l =>
@@ -1373,12 +1397,18 @@ function groupHeaderInfo(groupId) {
     section_name: fromLoad?.section_name,
     faculty_name: fromLoad?.faculty?.name ?? 'Unassigned / TBA',
     is_elective_section: (fromLoad?.section_name ?? '').startsWith('ELEC-'),
+    is_science_core_section: (fromLoad?.section_name ?? '').startsWith('SCI-'),
   }
 }
 
 /** True when a By-Section group is a synthetic elective (ELEC-*) section. */
 function isElectiveGroup(groupId) {
   return viewBy.value === 'section' && groupHeaderInfo(groupId).is_elective_section === true
+}
+
+/** True when a By-Section group is a synthetic Science Core (SCI-*) section. */
+function isScienceCoreGroup(groupId) {
+  return viewBy.value === 'section' && groupHeaderInfo(groupId).is_science_core_section === true
 }
 
 /** Blocked-period/class-hours config for a column's day, resolved by that
@@ -1507,15 +1537,15 @@ function cardEventsByDay(groupId) {
 
 /** { Monday: {start,end,blocked}, ... } for one card. */
 function dayConfigsForGroup(groupId) {
-  // The "Electives" band marks the released elective window on a homeroom
-  // section card only. Everywhere else it's wrong or redundant: elective cards
-  // and the Year-Level / By-Subject overviews already show the real elective
-  // classes in that window, and a faculty card isn't a section at all.
-  const showBand = viewBy.value === 'section' && !isElectiveGroup(groupId)
+  // The "Electives"/"Science Core" bands mark the released window on a
+  // homeroom section card only. Everywhere else it's wrong or redundant:
+  // elective/science-core cards themselves already show the real classes in
+  // that window, and a faculty card isn't a section at all.
+  const showBand = viewBy.value === 'section' && !isElectiveGroup(groupId) && !isScienceCoreGroup(groupId)
   const out = {}
   for (const day of WEEKDAYS) {
     const cfg = dayConfigFor(groupId, day)
-    out[day] = !showBand && cfg ? { ...cfg, electives: [] } : cfg
+    out[day] = !showBand && cfg ? { ...cfg, electives: [], scienceCore: [] } : cfg
   }
   return out
 }
