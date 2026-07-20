@@ -26,7 +26,7 @@ class BellScheduleController extends Controller
 {
     /** Block types the editor accepts. Only CLASS/ILP_ONLY are teachable. */
     private const TYPES = [
-        'CLASS', 'ILP_ONLY', 'FLAG', 'HOMEROOM', 'ADVISING',
+        'CLASS', 'ILP_ONLY', 'FLAG', 'HOMEROOM', 'ADVISING', 'DEAD',
         'RECESS', 'LUNCH', 'CONSULT', 'ACTIVITY', 'WELLNESS', 'OTHER',
     ];
 

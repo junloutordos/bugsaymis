@@ -177,12 +177,16 @@
                 :can-quick-create="canQuickCreate(groupId)"
                 :is-draggable="canDrag"
                 :print-url="printUrlForGroup(groupId)"
+                :blocked-editable="canEditBlockedFor(groupId)"
+                :blocked-drag-preview="blockedDrag && blockedDrag.groupId === groupId ? blockedDragPreview : null"
                 @column-mousedown="(day, e) => onColumnMouseDown(e, groupId, day)"
                 @column-dragover="(day, e) => onDragOverColumn(e, groupId, day)"
                 @column-drop="(day, e) => onDropColumn(e, groupId, day)"
                 @event-dragstart="(s, e) => onDragStartEvent(e, s)"
                 @event-dragend="onDragEnd"
-                @event-click="onEventClick">
+                @event-click="onEventClick"
+                @blocked-mousedown="(day, band, edge, e) => onBlockedMouseDown(e, groupId, day, band, edge)"
+                @blocked-click="(day, band, e) => onBlockedClick(e, groupId, day, band)">
 
                 <template #header-actions>
                   <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
@@ -521,6 +525,49 @@
       </div>
     </div>
 
+    <!-- Activity/ALP band editor — composite bell-schedule setting, so it gets
+         explicit fields instead of an ambiguous single drag. -->
+    <div v-if="activityPopover" ref="activityEl"
+      class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: activityPopover.x + 'px', top: activityPopover.y + 'px' }">
+
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          Grade {{ activityPopover.grade }} — {{ activityPopover.day }} Activity/ALP
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeActivityPopover">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="px-4 pb-3 space-y-3">
+        <p class="text-xs text-slate-500">
+          Changes apply to every Grade {{ activityPopover.grade }} section — future generations only.
+        </p>
+
+        <div v-if="!activityPopover.fullWed">
+          <label class="block text-xs font-medium text-slate-600 mb-1">No more regular classes after</label>
+          <input v-model="activityPopover.cutoff" type="time"
+            class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Activity Proper / ALP block</label>
+          <div class="flex items-center gap-2">
+            <input v-model="activityPopover.alpStart" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+            <span class="text-slate-400 text-xs">to</span>
+            <input v-model="activityPopover.alpEnd" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end px-4 py-3 border-t border-slate-100">
+        <AppButton size="sm" :loading="activityPopover.saving" @click="saveActivityPopover">Save</AppButton>
+      </div>
+    </div>
+
     <!-- Suggested-slots popover (click an unplaced chip) -->
     <div v-if="chipSuggest" ref="chipSuggestEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
@@ -777,6 +824,9 @@ const props = defineProps({
   canSubmitSchedule: { type: Boolean, default: false },
   swapRequests: { type: Array, default: () => [] },
   canRequestSwap: { type: Boolean, default: false },
+  canEditBellSchedule: { type: Boolean, default: false },
+  bellScheduleSettings: { type: Object, default: null },
+  bellScheduleTimetables: { type: Object, default: null },
 })
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
@@ -1462,6 +1512,230 @@ function dayConfigsForGroup(groupId) {
     out[day] = !showBand && cfg ? { ...cfg, electives: [] } : cfg
   }
   return out
+}
+
+// ── Blocked-band bell-schedule editing (drag/resize + Activity popover) ──────
+//
+// The gray "blocked" bands (Flag Ceremony, Homeroom, Recess, Lunch,
+// Consultation, Wellness, Flag Retreat, Activity/ALP) are shared per grade+day
+// timetables, not per-card data — dragging one on a Section/Faculty/Subject
+// card edits the SAME underlying constant every other section of that grade
+// shares. Server attaches a `write` descriptor to each band (only when the
+// signed-in user may edit it) telling us exactly what to PATCH:
+//   { kind: 'timetable', key }              — literal row, PATCH the full array
+//   { kind: 'setting', key }                — single window setting
+//   { kind: 'activity', grade, group, full_wed } — composite, needs a popover
+//
+// canEditBlockedFor() additionally only allows it when the card resolves to
+// exactly one grade — Grade-Level and Section cards always do; Faculty/
+// Subject cards only when every schedule in the group agrees on grade_level
+// (a teacher who teaches two grades would otherwise silently edit whichever
+// grade happened to be first).
+
+const BLOCKED_SNAP_MIN = 5
+
+function singleGradeFor(groupId) {
+  if (viewBy.value === 'grade') return Number(groupId)
+  if (viewBy.value === 'section') return groupHeaderInfo(groupId).grade_level ?? null
+
+  const rows = byGroup.value[groupId] ?? []
+  if (!rows.length) return groupHeaderInfo(groupId).grade_level ?? null
+  const grades = new Set(rows.map(s => s.grade_level))
+  return grades.size === 1 ? [...grades][0] : null
+}
+
+function canEditBlockedFor(groupId) {
+  return props.canEditBellSchedule && singleGradeFor(groupId) !== null
+}
+
+/** { groupId, grade, day, band, edge, rect, origStart, origEnd, grabOffsetMin, startMin, endMin } */
+const blockedDrag = ref(null)
+const blockedSaving = ref(false)
+
+const blockedDragPreview = computed(() => {
+  const d = blockedDrag.value
+  if (!d) return null
+  return { day: d.day, start: minToTime(d.startMin), end: minToTime(d.endMin) }
+})
+
+function snapBlocked(min) {
+  return Math.round(min / BLOCKED_SNAP_MIN) * BLOCKED_SNAP_MIN
+}
+
+function onBlockedMouseDown(e, groupId, day, band, edge) {
+  if (e.button !== 0 || blockedSaving.value) return
+  const grade = singleGradeFor(groupId)
+  if (grade === null || !band.write) return
+
+  const columnEl = e.target.closest('[data-daycol]')
+  if (!columnEl) return
+  const rect = columnEl.getBoundingClientRect()
+
+  const origStart = timeToMin(band.start)
+  const origEnd   = timeToMin(band.end)
+  const pointerMin = CAL_START + (e.clientY - rect.top) / SCALE
+
+  blockedDrag.value = {
+    groupId, grade, day, band, edge, rect, origStart, origEnd,
+    // 'move': offset between the pointer and the band's current start, so the
+    // band doesn't jump to be centered on the pointer the instant it's grabbed.
+    grabOffsetMin: edge === 'move' ? pointerMin - origStart : 0,
+    startMin: origStart,
+    endMin:   origEnd,
+  }
+  window.addEventListener('mousemove', onBlockedDragMove)
+  window.addEventListener('mouseup', onBlockedDragEnd)
+}
+
+function onBlockedDragMove(e) {
+  const d = blockedDrag.value
+  if (!d) return
+  const pointerMin = CAL_START + (e.clientY - d.rect.top) / SCALE
+
+  if (d.edge === 'move') {
+    const duration = d.origEnd - d.origStart
+    let newStart = snapBlocked(pointerMin - d.grabOffsetMin)
+    newStart = Math.max(CAL_START, Math.min(CAL_END - duration, newStart))
+    d.startMin = newStart
+    d.endMin   = newStart + duration
+  } else if (d.edge === 'top') {
+    d.startMin = Math.max(CAL_START, Math.min(d.origEnd - BLOCKED_SNAP_MIN, snapBlocked(pointerMin)))
+  } else {
+    d.endMin = Math.min(CAL_END, Math.max(d.origStart + BLOCKED_SNAP_MIN, snapBlocked(pointerMin)))
+  }
+}
+
+async function onBlockedDragEnd() {
+  window.removeEventListener('mousemove', onBlockedDragMove)
+  window.removeEventListener('mouseup', onBlockedDragEnd)
+  const d = blockedDrag.value
+  blockedDrag.value = null
+  if (!d) return
+
+  const newStart = minToTime(d.startMin)
+  const newEnd   = minToTime(d.endMin)
+  if (newStart === d.band.start && newEnd === d.band.end) return
+
+  await commitBlockedChange(d.grade, d.day, d.band, newStart, newEnd)
+}
+
+async function commitBlockedChange(grade, day, band, newStart, newEnd) {
+  const confirmed = await Swal.fire({
+    title: `Move "${band.label}"?`,
+    html: `This changes <b>Grade ${grade}'s ${day}</b> schedule for <b>every section</b> — `
+      + `future generations only, already-placed classes won't move.<br><br>`
+      + `New time: <b>${newStart}–${newEnd}</b>`,
+    icon: 'warning', showCancelButton: true, confirmButtonText: 'Save',
+  })
+  if (!confirmed.isConfirmed) return
+
+  blockedSaving.value = true
+  try {
+    if (band.write.kind === 'timetable') {
+      await saveTimetableBand(band, newStart, newEnd)
+    } else if (band.write.kind === 'setting') {
+      await axios.post(route('faculty-loading.bell-schedule.setting.update'), {
+        setting_key: band.write.key,
+        value: { start: newStart, end: newEnd },
+      })
+    }
+    await router.reload({ only: ['dayConfigsByGrade', 'bellScheduleTimetables'], preserveScroll: true })
+    Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Could not save', err.response?.data?.message ?? err.message ?? 'Please try again.', 'error')
+  } finally {
+    blockedSaving.value = false
+  }
+}
+
+/** Locates the matching row in the full timetable and splices in the new time. */
+async function saveTimetableBand(band, newStart, newEnd) {
+  const key = band.write.key
+  const rows = (props.bellScheduleTimetables?.[key] ?? []).map(r => ({ ...r }))
+  const idx = rows.findIndex(r => r.type === band.type && r.start === band.start && r.end === band.end)
+  if (idx === -1) {
+    throw new Error('Could not locate that block in the current bell schedule — please refresh and try again.')
+  }
+  rows[idx] = { ...rows[idx], start: newStart, end: newEnd }
+
+  await axios.post(route('faculty-loading.bell-schedule.update'), { timetable_key: key, rows })
+}
+
+// ── Activity/ALP band — composite, edited via a small popover instead of a
+// single ambiguous drag (its displayed start is min(cutoff, ALP start), which
+// can legitimately be two different stored values — see bandWriteDescriptor()).
+
+const activityPopover = ref(null)
+const activityEl = ref(null)
+
+function onBlockedClick(e, groupId, day, band) {
+  const grade = singleGradeFor(groupId)
+  if (grade === null || band.write?.kind !== 'activity' || blockedSaving.value) return
+
+  const { group, full_wed: fullWed } = band.write
+  const cutoffMap  = props.bellScheduleSettings?.WEDNESDAY_ACTIVITY_START ?? {}
+  const alpByGrade = props.bellScheduleSettings?.WEDNESDAY_ALP_BY_GRADE ?? {}
+  const alpDefault = props.bellScheduleSettings?.WEDNESDAY_ALP ?? { start: '15:10', end: '17:00' }
+  const alp = alpByGrade[grade] ?? alpDefault
+
+  const W = 300, H = 280
+  activityPopover.value = {
+    x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
+    y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
+    grade, group, day, fullWed,
+    cutoff:   cutoffMap[group] ?? band.start,
+    alpStart: alp.start,
+    alpEnd:   alp.end,
+    saving: false,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownActivity, true)
+  window.addEventListener('keydown', onActivityKeydown)
+}
+
+function closeActivityPopover() {
+  activityPopover.value = null
+  window.removeEventListener('mousedown', onWindowMouseDownActivity, true)
+  window.removeEventListener('keydown', onActivityKeydown)
+}
+
+function onWindowMouseDownActivity(e) {
+  if (activityEl.value && activityEl.value.contains(e.target)) return
+  closeActivityPopover()
+}
+
+function onActivityKeydown(e) {
+  if (e.key === 'Escape') closeActivityPopover()
+}
+
+async function saveActivityPopover() {
+  const p = activityPopover.value
+  if (!p) return
+  p.saving = true
+  try {
+    if (!p.fullWed) {
+      const cutoffMap = { ...(props.bellScheduleSettings?.WEDNESDAY_ACTIVITY_START ?? {}) }
+      cutoffMap[p.group] = p.cutoff
+      await axios.post(route('faculty-loading.bell-schedule.setting.update'), {
+        setting_key: 'WEDNESDAY_ACTIVITY_START',
+        value: cutoffMap,
+      })
+    }
+
+    const alpByGrade = { ...(props.bellScheduleSettings?.WEDNESDAY_ALP_BY_GRADE ?? {}) }
+    alpByGrade[p.grade] = { start: p.alpStart, end: p.alpEnd }
+    await axios.post(route('faculty-loading.bell-schedule.setting.update'), {
+      setting_key: 'WEDNESDAY_ALP_BY_GRADE',
+      value: alpByGrade,
+    })
+
+    closeActivityPopover()
+    await router.reload({ only: ['dayConfigsByGrade', 'bellScheduleSettings'], preserveScroll: true })
+    Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
+  } finally {
+    if (activityPopover.value) activityPopover.value.saving = false
+  }
 }
 
 // ── Drag and drop ────────────────────────────────────────────────────────────

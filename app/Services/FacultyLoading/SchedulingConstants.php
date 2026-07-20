@@ -679,6 +679,58 @@ class SchedulingConstants
     private const G10_ELECTIVE_START = '13:50';
 
     /**
+     * The EDITABLE_TIMETABLES key backing a grade's literal rows for a day —
+     * same grade→key mapping getMondayTimetable()/getTueFriTimetable() use
+     * internally, surfaced so callers (the schedule calendar's inline bell-
+     * schedule editing) can know which key to PATCH without duplicating the
+     * branching logic.
+     */
+    public static function timetableKeyFor(int $grade, string $day): string
+    {
+        if ($day === 'Monday') {
+            if ($grade === 7)  return 'MONDAY_G7G8';
+            if ($grade === 8)  return 'MONDAY_G8';
+            if ($grade === 9)  return 'MONDAY_G9';
+            if ($grade === 10) return 'MONDAY_G9G10';
+            return 'MONDAY_G11G12';
+        }
+
+        if ($grade <= 8)  return 'TUEFRI_730_G7G8';
+        if ($grade <= 10) return 'TUEFRI_730_G9G10';
+        return 'TUEFRI_730_G11G12';
+    }
+
+    /**
+     * How a blocked band of the given type should be persisted if the calendar
+     * lets an admin/CID Chief drag it directly. Types that are literal rows in
+     * an EDITABLE_TIMETABLES timetable (FLAG/HOMEROOM/ADVISING/RECESS/LUNCH/
+     * CONSULT/DEAD) resolve to that timetable key. WELLNESS and FLAG_RETREAT
+     * are synthetic overlays backed by a single window setting. ACTIVITY is a
+     * merged display of TWO settings (the Wednesday activity cutoff and the
+     * ALP window, see getDisplayBlockedSlots()) that can legitimately differ,
+     * so it's flagged 'activity' for the frontend to resolve via an explicit
+     * two-field editor rather than a single ambiguous drag.
+     *
+     * @return array{kind:string,key?:string,shape?:string,grade?:int,group?:string,full_wed?:bool}|null
+     */
+    public static function bandWriteDescriptor(string $type, int $grade, string $day): ?array
+    {
+        return match ($type) {
+            'WELLNESS'     => ['kind' => 'setting', 'key' => 'WEDNESDAY_WELLNESS', 'shape' => 'window'],
+            'FLAG_RETREAT' => ['kind' => 'setting', 'key' => 'FRIDAY_FLAG_RETREAT', 'shape' => 'window'],
+            'ACTIVITY'     => [
+                'kind'     => 'activity',
+                'grade'    => $grade,
+                'group'    => self::getGradeGroup($grade),
+                'full_wed' => in_array($grade, self::wednesdayFullGrades(), true),
+            ],
+            'FLAG', 'HOMEROOM', 'ADVISING', 'RECESS', 'LUNCH', 'CONSULT', 'DEAD' =>
+                ['kind' => 'timetable', 'key' => self::timetableKeyFor($grade, $day)],
+            default => null,
+        };
+    }
+
+    /**
      * Append "(Elective)" to the CLASS row that starts at $start, so it reads as
      * an elective window. No-op if the row isn't found (e.g. an editor override
      * moved it) or is already tagged.

@@ -74,6 +74,7 @@
 
             <!-- Day columns -->
             <div v-for="day in WEEKDAYS" :key="day"
+              data-daycol
               :class="['flex-1 relative border-l border-slate-100 overflow-hidden',
                 editable && canQuickCreate ? 'cursor-crosshair' : '']"
               @mousedown="$emit('column-mousedown', day, $event)"
@@ -102,7 +103,12 @@
               <!-- Blocked period overlays -->
               <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="`${bp.label}-${bp.start}`"
                 :style="blockedStyle(bp)"
-                class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
+                :class="['absolute inset-x-0 z-[1] flex items-center justify-center group',
+                  isBandDraggable(bp) ? 'pointer-events-auto cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-indigo-300 hover:ring-inset'
+                    : isBandClickable(bp) ? 'pointer-events-auto cursor-pointer hover:ring-2 hover:ring-teal-300 hover:ring-inset'
+                    : 'pointer-events-none']"
+                @mousedown="onBandMouseDown(day, bp, $event)"
+                @click.stop="isBandClickable(bp) && $emit('blocked-click', day, bp, $event)">
                 <div class="absolute inset-0 bg-slate-100/70" />
                 <span class="relative w-full text-slate-400 font-medium px-1 text-center leading-tight select-none">
                   <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
@@ -111,6 +117,21 @@
                   <span :class="['block tabular-nums opacity-80', blockedDurationMin(bp) >= 40 ? 'text-[10px]' : 'text-[9px]']">
                     {{ fmtTimeRange(bp.start, bp.end) }}
                   </span>
+                </span>
+                <template v-if="isBandDraggable(bp)">
+                  <div class="absolute inset-x-0 top-0 h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 bg-indigo-400/50"
+                    @mousedown="onBandMouseDown(day, bp, $event, 'top')" />
+                  <div class="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 bg-indigo-400/50"
+                    @mousedown="onBandMouseDown(day, bp, $event, 'bottom')" />
+                </template>
+              </div>
+
+              <!-- Blocked-band drag preview -->
+              <div v-if="blockedDragPreview && blockedDragPreview.day === day"
+                :style="blockedStyle(blockedDragPreview)"
+                class="absolute inset-x-0.5 rounded-md border-2 border-indigo-400 bg-indigo-100/85 z-30 pointer-events-none flex items-center justify-center px-1 overflow-hidden">
+                <span class="text-xs font-semibold text-indigo-700 truncate select-none tabular-nums">
+                  {{ fmtTimeRange(blockedDragPreview.start, blockedDragPreview.end) }}
                 </span>
               </div>
 
@@ -222,9 +243,35 @@ const props = defineProps({
   canQuickCreate: { type: Boolean, default: false },
   isDraggable:    { type: Function, default: () => false },
   printUrl:       { type: String, default: null },
+  /** True if the calendar owner (permission + single-grade resolution) may
+   *  edit this card's bell-schedule blocked bands. Individual bands still
+   *  only become interactive when they carry a `write` descriptor. */
+  blockedEditable:    { type: Boolean, default: false },
+  /** Live position while a blocked band is being dragged: { day, start, end }. */
+  blockedDragPreview: { type: Object, default: null },
 })
 
-defineEmits(['column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click'])
+const emit = defineEmits([
+  'column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click',
+  'blocked-mousedown', 'blocked-click',
+])
+
+/** Move/resize-draggable: a literal timetable row or a single-window setting. */
+function isBandDraggable(bp) {
+  return props.blockedEditable && (bp.write?.kind === 'timetable' || bp.write?.kind === 'setting')
+}
+
+/** Click-to-edit: composite bands (e.g. ACTIVITY) that can't be reduced to one drag. */
+function isBandClickable(bp) {
+  return props.blockedEditable && bp.write?.kind === 'activity'
+}
+
+/** Stops the mousedown from also triggering the day column's own
+ *  quick-create-ghost handler before deciding whether to start a band drag. */
+function onBandMouseDown(day, bp, e, edge = 'move') {
+  e.stopPropagation()
+  if (isBandDraggable(bp)) emit('blocked-mousedown', day, bp, edge, e)
+}
 
 // ── Calendar constants (mirrors the values the parent used to own) ───────────
 

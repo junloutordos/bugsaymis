@@ -556,6 +556,11 @@ class ClassScheduleController extends Controller
             ->orderBy('sectionname')
             ->get(['id', 'sectionname', 'levelid']);
 
+        // Administrator/CID Chief may edit the bell-schedule blocked bands
+        // directly from the calendar (same authority BellScheduleController
+        // already requires for the standalone editor).
+        $canEditBellSchedule = Auth::user()->hasRole('CID Chief') || Auth::user()->isSuperAdmin();
+
         // Per-grade, per-day school config for calendar rendering (blocked
         // periods, class hours) — derived directly from SchedulingConstants
         // so it can never drift out of sync with what the generator actually
@@ -565,14 +570,45 @@ class ClassScheduleController extends Controller
         foreach (array_keys(SchedulingConstants::GRADE_SECTIONS) as $grade) {
             foreach (SchedulingConstants::DAYS as $day) {
                 $window = SchedulingConstants::getEffectiveClassWindow($grade, $day);
+                $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day);
+
+                if ($canEditBellSchedule) {
+                    $blocked = array_map(function ($band) use ($grade, $day) {
+                        $band['write'] = SchedulingConstants::bandWriteDescriptor($band['type'], $grade, $day);
+
+                        return $band;
+                    }, $blocked);
+                }
+
                 $dayConfigsByGrade[$grade][$day] = [
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
-                    'blocked' => SchedulingConstants::getDisplayBlockedSlots($grade, $day),
+                    'blocked' => $blocked,
                     'electives' => SchedulingConstants::getElectiveWindows($grade, $day),
                 ];
             }
         }
+
+        // Full current values for the settings an ACTIVITY band's popover can
+        // touch — bell-schedule.setting.update replaces the whole stored value
+        // (no server-side merge), so the frontend needs every group/grade's
+        // current value on hand to round-trip a single-field edit correctly.
+        $bellScheduleSettings = $canEditBellSchedule ? [
+            'WEDNESDAY_ACTIVITY_START' => SchedulingConstants::setting('WEDNESDAY_ACTIVITY_START'),
+            'WEDNESDAY_ALP'            => SchedulingConstants::setting('WEDNESDAY_ALP'),
+            'WEDNESDAY_ALP_BY_GRADE'   => SchedulingConstants::setting('WEDNESDAY_ALP_BY_GRADE'),
+        ] : null;
+
+        // Full raw rows for every editable timetable — a literal-band drag
+        // (Flag/Homeroom/Recess/Lunch/Consult/Dead) has to PATCH the WHOLE row
+        // array (including the CLASS periods, which never appear in the
+        // display-filtered `blocked` list above), so the frontend needs the
+        // authoritative source on hand, not just the calendar's trimmed view.
+        $bellScheduleTimetables = $canEditBellSchedule
+            ? collect(SchedulingConstants::EDITABLE_TIMETABLES)->keys()
+                ->mapWithKeys(fn ($key) => [$key => SchedulingConstants::effectiveTimetableRows($key)])
+                ->all()
+            : null;
 
         // The unplaced-subjects tray is a teaching-placement tool — CID/admin
         // see all loads; unit heads see only their own faculty's unplaced loads.
@@ -647,9 +683,12 @@ class ClassScheduleController extends Controller
                 'locked' => in_array($approvalBatch->status, ['pending_ocd', 'approved'], true),
                 'conforme_signed' => $conformeSigned,
             ] : null,
-            'canSubmitSchedule' => Auth::user()->hasRole('CID Chief') || Auth::user()->isSuperAdmin(),
+            'canSubmitSchedule' => $canEditBellSchedule,
             'swapRequests' => $swapRequests,
             'canRequestSwap' => $cap['level'] !== 'review',
+            'canEditBellSchedule' => $canEditBellSchedule,
+            'bellScheduleSettings' => $bellScheduleSettings,
+            'bellScheduleTimetables' => $bellScheduleTimetables,
         ]);
     }
 
