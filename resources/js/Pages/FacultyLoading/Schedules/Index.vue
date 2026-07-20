@@ -831,7 +831,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -2161,6 +2161,31 @@ async function undoLastMove() {
   moveHistory.value.pop()
   await commitMove(live, entry.day, entry.startTime, entry.endTime, { recordHistory: false })
 }
+
+/** Ctrl+Z / Cmd+Z triggers undoLastMove — but never when the user is typing
+ * in a field (native text-undo must keep working) or a modal/popover is open. */
+function isEditableTarget(el) {
+  if (!el) return false
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
+}
+
+function anyModalOpen() {
+  return modal.value || swapRequestModal.value || swapReviewModal.value || versionsModal.value
+    || saveVersionModal.value || removedModal.value || autoPlace.show
+    || !!activityPopover.value || !!quickCreate.value
+}
+
+function onGlobalKeydown(e) {
+  if (e.key !== 'z' || e.shiftKey || !(e.ctrlKey || e.metaKey)) return
+  if (!(isManage.value || isUnit.value) || isReview.value) return
+  if (isEditableTarget(document.activeElement) || anyModalOpen()) return
+  if (!moveHistory.value.length || dragBusy.value) return
+  e.preventDefault()
+  undoLastMove()
+}
+
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
 // ── Click/drag-to-create (Google Calendar-style) ─────────────────────────────
 //
