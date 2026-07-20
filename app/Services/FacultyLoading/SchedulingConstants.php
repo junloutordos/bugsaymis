@@ -369,7 +369,21 @@ class SchedulingConstants
         'Barium'     => 'Salang',
     ];
 
-    // ── Science Core (G11/G12 parallel blocks) ────────────────────────────────
+    // ── Science Core — VESTIGIAL, belongs to the never-applied "Slot Plan" ────
+    // prototype (ScheduleGeneratorService/ScienceCorePlacementService, driven
+    // by SlotPlanController — preview() only returns JSON, no apply route
+    // exists, confirmed nothing here ever reaches class_schedules). Also
+    // encodes a DIFFERENT, simpler model than what's actually needed (one
+    // Science Core subject per homeroom section, all sharing one slot) —
+    // doesn't match production data, where e.g. Biology 3 Level 2 alone needs
+    // 3 parallel classes/faculty cutting across homerooms, not one.
+    //
+    // The real, live Science Core feature (2026-07-20) is driven by
+    // subjects.subject_type='science_core' + ScienceCoreService, placed by
+    // DeterministicSchedulingService::placeScienceCoreGroups() — the engine
+    // AutoScheduleController actually persists schedules through. Do not
+    // extend these constants; they're kept only because SlotPlanController's
+    // preview-only route still references them.
 
     public const SCIENCE_CORE_G11 = [
         'Venus'   => 'Physics 3',
@@ -671,12 +685,22 @@ class SchedulingConstants
     {
         if ($grade <= 8)  return self::timetable('TUEFRI_730_G7G8');
         if ($grade === 9) return self::timetable('TUEFRI_730_G9G10');
-        if ($grade === 10) return self::tagElectivePeriod(self::timetable('TUEFRI_730_G9G10'), self::G10_ELECTIVE_START);
+        if ($grade === 10) return self::tagElectivePeriod(self::timetable('TUEFRI_730_G9G10'), self::G10_ELECTIVE_LABEL);
         return self::timetable('TUEFRI_730_G11G12');
     }
 
-    /** Grade 10's fixed Tue–Fri elective period start (matches Period 7). */
-    private const G10_ELECTIVE_START = '13:50';
+    /**
+     * Grade 10's fixed Tue–Fri elective period, identified by its period
+     * label ("Period 7" in the default timetable) rather than a start time —
+     * an admin editing G10's Tue–Fri bell schedule via the calendar's inline
+     * editor (BellScheduleController::update()) shifts period start/end times
+     * but always resubmits the existing label unchanged, so the label is the
+     * stable identifier. Matching by a hardcoded start time ('13:50') instead
+     * silently broke the elective tag the moment an edit shifted that period
+     * even slightly — found 2026-07-20 when a live G10 override had every
+     * period shifted ~30min and no row started at '13:50' anymore.
+     */
+    private const G10_ELECTIVE_LABEL = 'Period 7';
 
     /**
      * The EDITABLE_TIMETABLES key backing a grade's literal rows for a day —
@@ -731,15 +755,17 @@ class SchedulingConstants
     }
 
     /**
-     * Append "(Elective)" to the CLASS row that starts at $start, so it reads as
-     * an elective window. No-op if the row isn't found (e.g. an editor override
-     * moved it) or is already tagged.
+     * Append "(Elective)" to the CLASS row whose label equals $label, so it
+     * reads as an elective window. Matches by label rather than start time —
+     * an editor override changes times but preserves labels (see
+     * G10_ELECTIVE_LABEL). No-op if the row isn't found (e.g. an editor
+     * override renamed it) or is already tagged.
      */
-    private static function tagElectivePeriod(array $rows, string $start): array
+    private static function tagElectivePeriod(array $rows, string $label): array
     {
         foreach ($rows as &$row) {
             if (($row['type'] ?? '') === 'CLASS'
-                && ($row['start'] ?? null) === $start
+                && trim((string) ($row['label'] ?? '')) === $label
                 && ! str_contains((string) ($row['label'] ?? ''), 'Elective')) {
                 $row['label'] = trim(($row['label'] ?? '').' (Elective)');
             }
