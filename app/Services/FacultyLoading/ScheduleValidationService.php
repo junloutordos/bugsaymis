@@ -132,6 +132,12 @@ class ScheduleValidationService
                 . "section '{$section->sectionname}' capacity ({$section->capacity}).";
         }
 
+        // ── 9. Day-pattern consistency (soft — never blocks) ─────────────────
+        $patternWarning = $this->checkDayPatternConsistency($data, $excludeScheduleId);
+        if ($patternWarning) {
+            $warnings[] = $patternWarning;
+        }
+
         return [
             'valid'       => empty($errors),
             'errors'      => $errors,
@@ -364,6 +370,47 @@ class ScheduleValidationService
         }
 
         return null;
+    }
+
+    /**
+     * Warn (never block) when the proposed day diverges from the established
+     * weekday pattern of the SAME faculty teaching the SAME subject to other
+     * sections. DeterministicSchedulingService keeps AI-generated placements
+     * aligned to this pattern (see its assignSubjectDays()/
+     * resolveGroupDayPlan()); this surfaces the same expectation for manual
+     * edits and swaps — via ClassScheduleController::validateSchedule()/
+     * store()/update() and ClassScheduleSwapService::validateProposal(),
+     * which all funnel through validate() — without forcing it, since a
+     * genuine one-off override (e.g. dodging a room conflict) can be
+     * legitimate. See ClassScheduleController::realign() for the one-click
+     * fix this warning points to.
+     */
+    private function checkDayPatternConsistency(array $data, int|array|null $excludeScheduleId): ?string
+    {
+        if (empty($data['faculty_id']) || empty($data['subject_id']) || empty($data['section_id'])) {
+            return null;
+        }
+
+        $siblingDays = $this->conflicts->findSiblingPatternDays(
+            (int) $data['faculty_id'],
+            (int) $data['subject_id'],
+            (int) $data['academic_term_id'],
+            (int) $data['section_id'],
+            $excludeScheduleId
+        );
+
+        if ($siblingDays === [] || in_array($data['day_of_week'], $siblingDays, true)) {
+            return null;
+        }
+
+        $subjectName = Subject::find($data['subject_id'])?->name ?? 'This subject';
+        $dayList     = implode('/', $siblingDays);
+
+        // "Day pattern:" is a stable prefix the frontend matches on to offer
+        // the one-click realign action — keep it if this message ever changes.
+        return "Day pattern: {$subjectName} lands on {$dayList} for this faculty's other sections, but this "
+            . "section is on {$data['day_of_week']} instead. Sections usually stay on the same weekday(s) so the "
+            . "pattern is easy to follow — realign unless this is an intentional exception.";
     }
 
     /**

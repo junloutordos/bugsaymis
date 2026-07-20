@@ -155,6 +155,51 @@
           </div>
         </AppCard>
 
+        <!-- ── Day-pattern consistency ─────────────────────────────────── -->
+        <AppCard v-if="patternGroups.length" :padded="false" class="overflow-hidden">
+          <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-700">Day-Pattern Consistency</h2>
+              <p class="text-xs text-slate-500 mt-0.5">
+                A faculty teaching the same subject to multiple sections should land on the same weekday(s)
+                for each session.
+              </p>
+            </div>
+            <AppBadge :color="inconsistentPatternCount === 0 ? 'green' : 'amber'">
+              {{ inconsistentPatternCount === 0 ? 'All consistent' : `${inconsistentPatternCount} to review` }}
+            </AppBadge>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-50 text-sm">
+              <thead>
+                <tr class="text-xs text-slate-400 uppercase tracking-wide bg-slate-50">
+                  <th class="px-4 py-2.5 text-left">Faculty</th>
+                  <th class="px-4 py-2.5 text-left">Subject</th>
+                  <th class="px-4 py-2.5 text-left">Sections &amp; Days</th>
+                  <th class="px-4 py-2.5 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">
+                <tr v-for="(g, gi) in patternGroups" :key="gi"
+                  :class="['hover:bg-slate-50/50', !g.consistent ? 'bg-warning-50/40' : '']">
+                  <td class="px-4 py-2 text-slate-700">{{ g.faculty }}</td>
+                  <td class="px-4 py-2 text-slate-600">{{ g.subject }}</td>
+                  <td class="px-4 py-2 text-slate-500 text-xs">
+                    <span v-for="(sec, si) in g.sections" :key="si" class="inline-block mr-3">
+                      {{ sec.name }}: {{ sec.days.join('/') || '—' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-2 text-center">
+                    <AppBadge :color="g.consistent ? 'green' : 'amber'">
+                      {{ g.consistent ? 'Consistent' : 'Inconsistent' }}
+                    </AppBadge>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </AppCard>
+
         <!-- ── Unplaced sessions ──────────────────────────────────────── -->
         <AppCard v-if="unplaceable.length" :padded="false" class="overflow-hidden">
           <div class="px-5 py-3 bg-warning-50 border-b border-warning-100 flex items-start gap-2">
@@ -609,6 +654,45 @@ function applyFix(reqId, alt, conflictIndex) {
 
   resolvedConflicts.value.add(reqId)
 }
+
+// ── Day-pattern consistency ──────────────────────────────────────────────────
+
+/**
+ * Groups the previewed schedule by (faculty, subject) and reports whether
+ * every section in that group shares the same set of weekdays — the
+ * expectation DeterministicSchedulingService's assignSubjectDays() enforces
+ * for a full generate(). Computed client-side from the preview data already
+ * on hand (no extra request). classroom_id is used to exclude cross-section
+ * elective groups (see ClassSchedule's docblock: electives have no fixed
+ * room, unlike homeroom sections), since those are intentionally NOT
+ * day-synced across sections.
+ */
+const patternGroups = computed(() => {
+  if (!result.value?.schedules) return []
+
+  const groups = {}
+  for (const s of result.value.schedules) {
+    if (s.classroom_id == null || s.user_id == null || s.subject_id == null) continue
+    const key = `${s.user_id}:${s.subject_id}`
+    if (!groups[key]) groups[key] = { faculty: s._faculty_name, subject: s._subject_name, sections: {} }
+    const sec = (groups[key].sections[s.section_id] ??= { name: s._section_name, days: new Set() })
+    sec.days.add(s.day_of_week)
+  }
+
+  return Object.values(groups)
+    .map((g) => {
+      const sections = Object.values(g.sections).map((sec) => ({
+        name: sec.name,
+        days: [...sec.days].sort((a, b) => days.indexOf(a) - days.indexOf(b)),
+      }))
+      const signatures = new Set(sections.map((sec) => sec.days.join(',')))
+      return { faculty: g.faculty, subject: g.subject, sections, consistent: signatures.size <= 1 }
+    })
+    .filter((g) => g.sections.length > 1) // nothing to compare with only one section
+    .sort((a, b) => Number(a.consistent) - Number(b.consistent)) // inconsistent groups first
+})
+
+const inconsistentPatternCount = computed(() => patternGroups.value.filter((g) => !g.consistent).length)
 
 // ── Preview / Filters ───────────────────────────────────────────────────────
 

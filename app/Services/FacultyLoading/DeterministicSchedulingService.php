@@ -194,11 +194,14 @@ class DeterministicSchedulingService
         // sections of that grade).
         $this->buildGrids(array_unique(array_column($remainingRequirements, 'grade')));
 
-        // Same-weekday-across-sections: for each grade+subject, decide which
-        // weekday each session index lands on — shared by every section of
-        // that grade offering the subject (e.g. "Math G7 session 1" is
-        // Monday for every G7 section). Electives are exempt — they already
-        // use their own cross-section elective windows.
+        // Same-weekday-across-sections: for each grade+subject+faculty, decide
+        // which weekday each session index lands on — shared by every section
+        // that faculty teaches the subject to (e.g. "English 7 session 1" is
+        // Monday for every section Teacher X teaches it to). Keyed by faculty
+        // as well as subject so that when a grade's subject is split across
+        // multiple teachers, each teacher's sections get their own pattern
+        // instead of being force-coupled onto one shared day. Electives are
+        // exempt — they already use their own cross-section elective windows.
         $subjectDayAssignment = $this->assignSubjectDays($remainingRequirements);
 
         // Flatten requirements into individual session instances. A subject
@@ -210,7 +213,7 @@ class DeterministicSchedulingService
             $ilpEligible = ($req['has_ilp'] ?? false)
                 && $req['total_sessions_needed'] >= 2
                 && $req['committed_ilp_count'] === 0;
-            $forcedDays  = $subjectDayAssignment[$req['grade']][$req['subject_id']] ?? null;
+            $forcedDays  = $subjectDayAssignment[$req['grade']][$req['subject_id']][$req['faculty_id']] ?? null;
             for ($i = 0; $i < $req['sessions_needed']; $i++) {
                 $session = $req;
                 $session['session_type'] = ($ilpEligible && $i === $req['sessions_needed'] - 1) ? 'ilp' : 'regular';
@@ -343,6 +346,19 @@ class DeterministicSchedulingService
         $this->resetState();
         $this->seedBusyFromDb($termId);
 
+        // Same-weekday-across-sections for this incremental pass: one shared
+        // day list per (faculty, subject), seeded from whatever days are
+        // ALREADY committed in the DB for that group and — unlike
+        // assignSubjectDays(), which only runs against a full generate() —
+        // extended with freshly-invented least-loaded days when the group
+        // still needs more days than are established yet. This covers both
+        // "join an already-scheduled subject" (existing days win) and
+        // "place a brand-new load with no prior rows at all" (every section
+        // in this batch still lands on the same invented days), which a
+        // pure DB-lookup would miss for loads that have never been through
+        // a full Generate.
+        $groupDayPlan = $this->resolveGroupDayPlan($requirements, $termId);
+
         $sessions        = [];
         $failures        = [];
         $loadsConsidered = 0;
@@ -368,9 +384,24 @@ class DeterministicSchedulingService
             $ilpEligible = ($req['has_ilp'] ?? false)
                 && $req['sessions_needed'] >= 2
                 && (int) ($row->ilp_cnt ?? 0) === 0;
+
+            // This section's share of the group's day plan: the plan's days
+            // minus whatever day(s) this specific load already occupies for
+            // the subject (so we never force a duplicate day onto a section
+            // that's already partially placed).
+            $forcedDays = [];
+            $plan       = $groupDayPlan[$req['faculty_id']][$req['subject_id']] ?? [];
+            if ($plan !== []) {
+                $ownDays    = $this->loadOwnDays($termId, $req['load_assignment_id']);
+                $forcedDays = array_values(array_diff($plan, $ownDays));
+            }
+
             for ($i = 0; $i < $stillNeeded; $i++) {
                 $session                 = $req;
                 $session['session_type'] = ($ilpEligible && $i === $stillNeeded - 1) ? 'ilp' : 'regular';
+                if (isset($forcedDays[$i])) {
+                    $session['forced_day'] = $forcedDays[$i];
+                }
                 $sessions[]              = $session;
             }
         }
@@ -383,10 +414,13 @@ class DeterministicSchedulingService
             ]];
         }
 
-        // Most-constrained-first, same comparator as generate(). No forced_day /
-        // assignSubjectDays() here: existing DB rows already fixed each subject's
-        // days, so re-imposing the shared-weekday rule against a partially-filled
-        // week would only manufacture infeasibility.
+        // Most-constrained-first, same comparator as generate(). Sessions
+        // built above already carry a forced_day sourced from
+        // resolveGroupDayPlan() when one applies. If a plan day happens to
+        // be infeasible for a particular section, its forced_day is simply
+        // absent for that session index and placement proceeds
+        // unconstrained, exactly as before this rule existed — this can
+        // never make a session harder to place than it already was.
         usort($sessions, function ($a, $b) {
             return [$b['faculty_total'], $b['sessions_needed'], $a['section_id']]
                 <=> [$a['faculty_total'], $a['sessions_needed'], $b['section_id']];
@@ -690,20 +724,27 @@ class DeterministicSchedulingService
     }
 
     /**
-     * Assign each (grade, subject)'s weekly session indices to a shared
-     * weekday, so every section of that grade offering the subject lands on
-     * the same day for a given session index. Runs before per-section period
-     * placement, which still independently picks the period/room/faculty
-     * slot within the assigned day.
+     * Assign each (grade, subject, faculty)'s weekly session indices to a
+     * shared weekday, so every section that faculty teaches the subject to
+     * lands on the same day for a given session index. Keyed by faculty (not
+     * just grade+subject) so that when a grade's subject is split across
+     * multiple teachers — e.g. two different teachers each covering half of
+     * Grade 7's English sections — each teacher's own sections get a
+     * consistent pattern without being force-coupled to the other teacher's
+     * days. Placeholder/TBA faculty (negative sentinel ids, unique per load
+     * assignment — see {@see buildRequirements()}) never share a group with
+     * each other, since there's no real person's day to keep consistent.
+     * Runs before per-section period placement, which still independently
+     * picks the period/room slot within the assigned day.
      *
      * Days are chosen greedily, least-used-day-first per grade, so a grade's
      * subjects spread across the week rather than piling onto one day. If a
-     * subject needs more sessions than there are available weekdays, later
+     * group needs more sessions than there are available weekdays, later
      * sessions reuse the least-loaded day rather than being left unassigned
      * (every session index still needs a consistent day across sections).
      *
      * @param array<int,array<string,mixed>> $requirements
-     * @return array<int,array<int,array<int,string>>> [grade][subject_id][sessionIndex] => day
+     * @return array<int,array<int,array<int,array<int,string>>>> [grade][subject_id][faculty_id][sessionIndex] => day
      */
     private function assignSubjectDays(array $requirements): array
     {
@@ -714,23 +755,26 @@ class DeterministicSchedulingService
             }
             $grade     = $req['grade'];
             $subjectId = $req['subject_id'];
-            $groups[$grade][$subjectId] = max($groups[$grade][$subjectId] ?? 0, $req['sessions_needed']);
+            $facultyId = $req['faculty_id'];
+            $key       = $subjectId . ':' . $facultyId;
+            $groups[$grade][$key] = max($groups[$grade][$key] ?? 0, $req['sessions_needed']);
         }
 
         $dayLoad    = [];
         $assignment = [];
 
-        foreach ($groups as $grade => $subjects) {
+        foreach ($groups as $grade => $groupSessions) {
             $availableDays = array_values(array_unique(array_column($this->gridByGrade[$grade] ?? [], 'day')));
             if (empty($availableDays)) {
                 continue;
             }
 
-            // Most-constrained-first: subjects needing the most sessions pick
+            // Most-constrained-first: groups needing the most sessions pick
             // days while the week still has the most room.
-            arsort($subjects);
+            arsort($groupSessions);
 
-            foreach ($subjects as $subjectId => $sessionsNeeded) {
+            foreach ($groupSessions as $key => $sessionsNeeded) {
+                [$subjectId, $facultyId] = array_map('intval', explode(':', (string) $key));
                 $chosenDays = [];
                 $usedDays   = [];
                 for ($i = 0; $i < $sessionsNeeded; $i++) {
@@ -742,11 +786,91 @@ class DeterministicSchedulingService
                     $usedDays[]   = $day;
                     $dayLoad[$grade][$day] = ($dayLoad[$grade][$day] ?? 0) + 1;
                 }
-                $assignment[$grade][$subjectId] = $chosenDays;
+                $assignment[$grade][$subjectId][$facultyId] = $chosenDays;
             }
         }
 
         return $assignment;
+    }
+
+    /**
+     * Companion to {@see assignSubjectDays()} for {@see placeRemaining()}.
+     * Builds one shared target day list per (faculty, subject) group across
+     * every requirement in this incremental pass: seeded from whatever days
+     * are ALREADY committed in the DB for that group (so sections joining
+     * an already-scheduled subject line up with it), then extended with
+     * freshly-invented least-loaded days — sharing the same day-load
+     * counters across groups, like assignSubjectDays() does — when the
+     * group needs more days than are established yet. This is what lets a
+     * batch of brand-new loads (no prior schedule rows at all) still land
+     * every section on the same shared days, not just loads that are
+     * topping up an existing partial schedule.
+     *
+     * @param array<int,array<string,mixed>> $requirements
+     * @return array<int,array<int,array<int,string>>> [faculty_id][subject_id][sessionIndex] => day
+     */
+    private function resolveGroupDayPlan(array $requirements, int $termId): array
+    {
+        $groups = [];
+        foreach ($requirements as $req) {
+            if ($req['is_elective'] || $req['faculty_id'] < 0) {
+                continue;
+            }
+            $key = $req['faculty_id'] . ':' . $req['subject_id'];
+            $groups[$key]['grade']           = $req['grade'];
+            $groups[$key]['real_user_id']    = $req['real_user_id'];
+            $groups[$key]['sessions_needed'] = max($groups[$key]['sessions_needed'] ?? 0, $req['sessions_needed']);
+        }
+
+        $dayLoad = [];
+        $plan    = [];
+        foreach ($groups as $key => $g) {
+            [$facultyId, $subjectId] = array_map('intval', explode(':', (string) $key));
+            $grade         = $g['grade'];
+            $availableDays = array_values(array_unique(array_column($this->gridByGrade[$grade] ?? [], 'day')));
+            if (empty($availableDays)) {
+                continue;
+            }
+
+            $chosenDays = ClassSchedule::occupying()
+                ->classes()
+                ->where('academic_term_id', $termId)
+                ->where('user_id', $g['real_user_id'])
+                ->where('subject_id', $subjectId)
+                ->distinct()
+                ->pluck('day_of_week')
+                ->all();
+            usort($chosenDays, fn ($a, $b) => array_search($a, self::DAYS, true) <=> array_search($b, self::DAYS, true));
+            foreach ($chosenDays as $day) {
+                $dayLoad[$grade][$day] = ($dayLoad[$grade][$day] ?? 0) + 1;
+            }
+
+            for ($i = count($chosenDays); $i < $g['sessions_needed']; $i++) {
+                $candidates = array_values(array_diff($availableDays, $chosenDays)) ?: $availableDays;
+                usort($candidates, fn ($a, $b) => ($dayLoad[$grade][$a] ?? 0) <=> ($dayLoad[$grade][$b] ?? 0));
+                $day = $candidates[0];
+
+                $chosenDays[]          = $day;
+                $dayLoad[$grade][$day] = ($dayLoad[$grade][$day] ?? 0) + 1;
+            }
+
+            $plan[$facultyId][$subjectId] = $chosenDays;
+        }
+
+        return $plan;
+    }
+
+    /** Weekday(s) this specific load assignment's own sessions already occupy for its subject. */
+    private function loadOwnDays(int $termId, int $loadAssignmentId): array
+    {
+        return ClassSchedule::occupying()
+            ->classes()
+            ->where('academic_term_id', $termId)
+            ->where('load_assignment_id', $loadAssignmentId)
+            ->pluck('day_of_week')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     // ── Shared state helpers ────────────────────────────────────────────────

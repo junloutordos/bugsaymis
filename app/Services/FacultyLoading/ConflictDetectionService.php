@@ -189,6 +189,50 @@ class ConflictDetectionService
         return $c->subject?->name ?? $c->title ?? 'another entry';
     }
 
+    // ── Day-pattern consistency ──────────────────────────────────────────────
+
+    /**
+     * Weekday(s) OTHER sections already use for this same faculty+subject this
+     * term — the "sibling pattern" DeterministicSchedulingService keeps
+     * AI-generated placements aligned to (see its assignSubjectDays() and
+     * resolveGroupDayPlan()). Used to warn on manual edits/swaps that diverge
+     * from it, and to pick a realign target. Empty when there's nothing to
+     * compare against: a single section, a TBA/placeholder faculty (each
+     * placeholder assignment is its own unrelated vacancy, not a real
+     * person's pattern), or no sibling sections scheduled yet.
+     *
+     * @param int|array<int>|null $excludeId ClassSchedule ids to skip (e.g.
+     *        the row being edited)
+     * @return array<int,string> sibling day names, Monday-first
+     */
+    public function findSiblingPatternDays(
+        int $facultyId,
+        int $subjectId,
+        int $termId,
+        int $sectionId,
+        int|array|null $excludeId = null
+    ): array {
+        if ($this->isPlaceholderFaculty($facultyId)) {
+            return [];
+        }
+
+        $query = ClassSchedule::occupying()
+            ->classes()
+            ->where('user_id', $facultyId)
+            ->where('subject_id', $subjectId)
+            ->where('academic_term_id', $termId)
+            ->where('section_id', '!=', $sectionId);
+
+        if ($excludeId) {
+            $query->whereNotIn('id', (array) $excludeId);
+        }
+
+        $days = $query->distinct()->pluck('day_of_week')->all();
+        usort($days, fn ($a, $b) => array_search($a, SchedulingConstants::DAYS, true) <=> array_search($b, SchedulingConstants::DAYS, true));
+
+        return $days;
+    }
+
     // ── Teaching Hours Per Day ───────────────────────────────────────────────
 
     /**

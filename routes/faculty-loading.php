@@ -96,6 +96,7 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/validate',          [ClassScheduleController::class, 'validateSchedule'])->name('validate');
                 Route::post('/',                  [ClassScheduleController::class, 'store'])->name('store');
                 Route::put('/{classSchedule}',    [ClassScheduleController::class, 'update'])->name('update');
+                Route::post('/{classSchedule}/realign', [ClassScheduleController::class, 'realign'])->name('realign');
                 Route::delete('/{classSchedule}', [ClassScheduleController::class, 'destroy'])->name('destroy');
                 Route::post('/{classSchedule}/swap-requests', [ClassScheduleSwapController::class, 'store'])->name('swap-requests.store');
                 Route::post('/swap-requests/{swapRequest}/cancel', [ClassScheduleSwapController::class, 'cancel'])->name('swap-requests.cancel');

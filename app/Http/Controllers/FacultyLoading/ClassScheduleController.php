@@ -18,6 +18,7 @@ use App\Models\Office;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
+use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\FacultyLoading\ScheduleValidationService;
 use App\Services\FacultyLoading\SchedulingConstants;
@@ -38,6 +39,7 @@ class ClassScheduleController extends Controller
         private readonly LoadComputationService $loads,
         private readonly DigitalSignatureService $signatures,
         private readonly PersonNameFormatter $names,
+        private readonly ConflictDetectionService $conflicts,
     ) {}
 
     /**
@@ -994,6 +996,84 @@ class ClassScheduleController extends Controller
         ]);
 
         return back()->with('success', 'Schedule updated.');
+    }
+
+    /**
+     * One-click "realign to pattern": move this class session onto the same
+     * weekday its faculty's OTHER sections already use for this subject,
+     * keeping the same period and room. This is the fix action offered
+     * alongside the day-pattern warning from ScheduleValidationService — it
+     * never forces anything: if the target day's period isn't actually free
+     * (a real conflict, not just "different from the pattern"), the realign
+     * is refused with the same validation messages a normal edit would show.
+     */
+    public function realign(ClassSchedule $classSchedule): RedirectResponse
+    {
+        if ($classSchedule->entry_type !== 'class' || ! $classSchedule->subject_id || ! $classSchedule->user_id) {
+            return back()->withErrors(["Only teaching sessions can be realigned to a pattern."]);
+        }
+
+        $cap = $this->scheduleCapability();
+        if (! $this->canTouchClass($cap, (int) $classSchedule->user_id)) {
+            abort(403);
+        }
+
+        if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)) {
+            return back()->withErrors(["This term schedule is locked for OCD approval."]);
+        }
+
+        $siblingDays = $this->conflicts->findSiblingPatternDays(
+            (int) $classSchedule->user_id,
+            (int) $classSchedule->subject_id,
+            (int) $classSchedule->academic_term_id,
+            (int) $classSchedule->section_id,
+            $classSchedule->id
+        );
+
+        // Don't pick a sibling day this section already uses for the same
+        // subject via one of its OTHER sessions — that would just create a
+        // same-subject-twice-in-one-day duplicate instead of a real fix.
+        $ownDays = ClassSchedule::occupying()
+            ->classes()
+            ->where('section_id', $classSchedule->section_id)
+            ->where('subject_id', $classSchedule->subject_id)
+            ->where('id', '!=', $classSchedule->id)
+            ->pluck('day_of_week')
+            ->unique()
+            ->all();
+
+        $target = collect($siblingDays)->first(fn ($day) => ! in_array($day, $ownDays, true));
+
+        if (! $target) {
+            return back()->withErrors([
+                "No established pattern day found to realign to — this section may already use every day "
+                . "the faculty's other sections use for this subject.",
+            ]);
+        }
+
+        $data = [
+            'faculty_id' => $classSchedule->user_id,
+            'subject_id' => $classSchedule->subject_id,
+            'section_id' => $classSchedule->section_id,
+            'classroom_id' => $classSchedule->classroom_id,
+            'school_year_id' => $classSchedule->school_year_id,
+            'academic_term_id' => $classSchedule->academic_term_id,
+            'day_of_week' => $target,
+            'start_time' => substr((string) $classSchedule->start_time, 0, 5),
+            'end_time' => substr((string) $classSchedule->end_time, 0, 5),
+        ];
+
+        $validation = $this->validation->validate($data, $classSchedule->id);
+        if (! empty($validation['errors'])) {
+            return back()->withErrors(array_merge(
+                ["Couldn't realign to {$target} — the same period isn't free that day."],
+                $validation['errors']
+            ));
+        }
+
+        $classSchedule->update(['day_of_week' => $target]);
+
+        return back()->with('success', "Realigned to {$target} to match this faculty's other {$classSchedule->subject?->name} sections.");
     }
 
     /** Update a non-teaching block — capability-checked, lock-exempt. */

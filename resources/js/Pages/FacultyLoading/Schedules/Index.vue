@@ -662,7 +662,13 @@
         </div>
         <div v-for="w in validationResult.warnings ?? []" :key="w"
           class="bg-warning-50 border border-warning-100 text-warning-700 rounded-lg px-3 py-2 text-xs flex items-start gap-1.5">
-          <ExclamationTriangleIcon class="h-4 w-4 shrink-0 mt-0.5" /> {{ w }}
+          <ExclamationTriangleIcon class="h-4 w-4 shrink-0 mt-0.5" />
+          <span class="flex-1">{{ w }}</span>
+          <button v-if="w === patternWarning && form.id" type="button" :disabled="realigning"
+            class="shrink-0 font-medium underline decoration-dotted hover:text-warning-900 disabled:opacity-50"
+            @click="realignToPattern">
+            {{ realigning ? 'Realigning…' : 'Realign to pattern' }}
+          </button>
         </div>
       </div>
 
@@ -2463,6 +2469,14 @@ function fmtTime(t) {
 
 const modal            = ref(false)
 const validationResult = ref(null)
+const realigning       = ref(false)
+
+// "Day pattern:" is the stable prefix ScheduleValidationService uses for the
+// day-pattern-divergence warning — matched here (not on the full message) so
+// the realign button survives future wording tweaks to the message itself.
+const patternWarning = computed(() =>
+  (validationResult.value?.warnings ?? []).find((w) => w.startsWith('Day pattern:')) ?? null
+)
 
 const form = useForm({
   id: null, entry_type: 'class', title: '', category: '',
@@ -2601,6 +2615,17 @@ async function checkConflicts() {
   } catch (e) {
     console.error(e)
   }
+}
+
+/** One-click fix for the "Day pattern:" warning — only available on an existing row. */
+function realignToPattern() {
+  if (!form.id || realigning.value) return
+  realigning.value = true
+  router.post(route('faculty-loading.schedules.realign', form.id), {}, {
+    preserveScroll: true,
+    onSuccess: () => { modal.value = false; validationResult.value = null },
+    onFinish: () => { realigning.value = false },
+  })
 }
 
 function save() {
