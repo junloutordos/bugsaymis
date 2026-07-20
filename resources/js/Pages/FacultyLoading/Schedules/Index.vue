@@ -61,6 +61,12 @@
             <TrashIcon class="h-4 w-4" /> Removed
             <span v-if="recentlyRemoved.length" class="ml-1 rounded-full bg-rose-100 px-1.5 text-xs text-rose-700">{{ recentlyRemoved.length }}</span>
           </AppButton>
+          <AppButton v-if="(isManage || isUnit) && !isReview" variant="secondary" :disabled="!moveHistory.length || dragBusy"
+            :title="moveHistory.length ? `Undo last move (${moveHistory.length} available)` : 'No moves to undo'"
+            @click="undoLastMove">
+            <ArrowUturnLeftIcon class="h-4 w-4" /> Undo
+            <span v-if="moveHistory.length > 1" class="ml-1 rounded-full bg-indigo-100 px-1.5 text-xs text-indigo-700">{{ moveHistory.length }}</span>
+          </AppButton>
           <AppButton v-if="!isReview" :variant="isManage ? 'secondary' : 'primary'" :disabled="scheduleLocked" @click="openNonTeachingForm()">
             <ClockIcon class="h-4 w-4" /> Add Non-teaching
           </AppButton>
@@ -1248,6 +1254,7 @@ const filters = reactive({
 })
 
 function applyFilters() {
+  moveHistory.value = []
   const target = isMyPage.value ? 'faculty-loading.my-schedule' : 'faculty-loading.schedules.index'
   router.get(route(target), filters, { preserveState: true })
 }
@@ -1873,6 +1880,9 @@ const dragPayload = ref(null)
 /** Live drop preview for the column currently under the pointer */
 const dropTarget  = ref(null)
 const dragBusy     = ref(false)
+/** Stack of pre-move positions for drag moves in this session — most recent last. */
+const MAX_UNDO_HISTORY = 10
+const moveHistory = ref([])
 
 function canDrag(s) {
   return !scheduleLocked.value && !isOverviewMode.value && s.status !== 'cancelled' && !!s.can_edit
@@ -2047,12 +2057,19 @@ async function onDropColumn(e, groupId, day) {
   }
 }
 
-async function commitMove(schedule, day, startTime, endTime) {
+async function commitMove(schedule, day, startTime, endTime, { recordHistory = true } = {}) {
   if (dragBusy.value) return
   if (schedule.day_of_week === day
       && schedule.start_time?.slice(0, 5) === startTime
       && schedule.end_time?.slice(0, 5) === endTime) {
     return
+  }
+
+  const prevPosition = {
+    id:        schedule.id,
+    day:       schedule.day_of_week,
+    startTime: schedule.start_time?.slice(0, 5),
+    endTime:   schedule.end_time?.slice(0, 5),
   }
 
   dragBusy.value = true
@@ -2115,6 +2132,11 @@ async function commitMove(schedule, day, startTime, endTime) {
         onError:   (errors) => reject(errors),
       })
     })
+
+    if (recordHistory) {
+      moveHistory.value.push(prevPosition)
+      if (moveHistory.value.length > MAX_UNDO_HISTORY) moveHistory.value.shift()
+    }
   } catch (errors) {
     const message = errors && typeof errors === 'object'
       ? Object.values(errors).flat().join('\n')
@@ -2123,6 +2145,21 @@ async function commitMove(schedule, day, startTime, endTime) {
   } finally {
     dragBusy.value = false
   }
+}
+
+/** Steps back through moveHistory one entry at a time — each undo is itself a
+ * normal validated move, so it can be blocked/warned if the old slot was
+ * taken in the meantime, and does not push a new history entry. */
+async function undoLastMove() {
+  if (!moveHistory.value.length || dragBusy.value) return
+  const entry = moveHistory.value[moveHistory.value.length - 1]
+  const live = props.schedules.find(s => s.id === entry.id)
+  if (!live) {
+    moveHistory.value.pop()
+    return
+  }
+  moveHistory.value.pop()
+  await commitMove(live, entry.day, entry.startTime, entry.endTime, { recordHistory: false })
 }
 
 // ── Click/drag-to-create (Google Calendar-style) ─────────────────────────────
