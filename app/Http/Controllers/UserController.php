@@ -140,6 +140,7 @@ class UserController extends Controller
         // role_id and badge_id are intentionally left null; System Administrator will assign them later
         $data['role_id'] = null;
         $data['badge_id'] = null;
+        $data['account_type'] = 'employee';
 
         $user = User::create($data);
         if (empty($user->employee_no)) {
@@ -155,7 +156,7 @@ class UserController extends Controller
      */
     public function selectList(Request $request)
     {
-        $query = User::query()->select('id', 'name', 'badge_id', 'office_id')
+        $query = User::query()->employees()->select('id', 'name', 'badge_id', 'office_id')
             ->with('office:id,name')
             ->where('status', '<>', 'inactive');
 
@@ -197,6 +198,8 @@ class UserController extends Controller
             'division_id'    => 'nullable|exists:divisions,id',
             'office_id'      => 'nullable|exists:offices,id',
         ]);
+
+        $data['account_type'] = 'employee';
 
         $user = User::create($data);
         if (empty($user->employee_no)) {

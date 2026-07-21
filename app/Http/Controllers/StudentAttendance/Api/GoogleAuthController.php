@@ -156,11 +156,12 @@ class GoogleAuthController extends Controller
 
         if (! $user) {
             $user = User::create([
-                'name'     => $name,
-                'email'    => $email,
-                'password' => bcrypt(Str::random(40)),
-                'status'   => 'active',
-                'role_id'  => $studentRole?->id,
+                'name'         => $name,
+                'email'        => $email,
+                'password'     => bcrypt(Str::random(40)),
+                'status'       => 'active',
+                'role_id'      => $studentRole?->id,
+                'account_type' => 'student',
             ]);
         } elseif ($studentRole && (string) $user->role_id !== (string) $studentRole->id) {
             // Existing account (e.g. legacy OTP registration) — make sure it

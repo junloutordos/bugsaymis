@@ -20,6 +20,7 @@ class User extends Authenticatable
         'badge_id',
         'biometric_id',
         'status',
+        'account_type',
         'email',
         'password',
         'role_id',
@@ -295,10 +296,23 @@ class User extends Authenticatable
     /**
      * Exclude mobile-app-only accounts (Parent/Student) — for staff/employee
      * dropdowns, issuance recipients, and any other employee-facing list.
+     *
+     * Prefers the explicit account_type column (set at creation time, so it
+     * can't be knocked out by a later role change — e.g. a staff member who
+     * is also tagged Parent because their own child is enrolled). Falls back
+     * to the role-based check for rows backfill hasn't reached yet, so this
+     * stays correct immediately after the account_type column ships, with no
+     * dependency on backfill ordering.
      */
     public function scopeEmployees($query)
     {
-        return $query->whereDoesntHave('roles', fn($q) => $q->whereIn('name', ['Student', 'Parent']));
+        return $query->where(function ($q) {
+            $q->where('account_type', 'employee')
+                ->orWhere(function ($q2) {
+                    $q2->whereNull('account_type')
+                        ->whereDoesntHave('roles', fn ($r) => $r->whereIn('name', ['Student', 'Parent']));
+                });
+        });
     }
 
     // ─── HR / Payroll Relationships ────────────────────────────────────────────

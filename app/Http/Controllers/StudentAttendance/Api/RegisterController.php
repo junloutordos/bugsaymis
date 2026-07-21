@@ -30,11 +30,12 @@ class RegisterController extends Controller
         $parentRole = Role::where('name', 'Parent')->firstOrFail();
 
         $user = User::create([
-            'name'     => $validated['name'],
-            'email'    => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'status'   => 'pending_verification',
-            'role_id'  => (string) $parentRole->id,
+            'name'         => $validated['name'],
+            'email'        => $validated['email'],
+            'password'     => Hash::make($validated['password']),
+            'status'       => 'pending_verification',
+            'role_id'      => (string) $parentRole->id,
+            'account_type' => 'parent',
         ]);
 
         $user->roles()->syncWithoutDetaching([$parentRole->id]);
@@ -123,11 +124,12 @@ class RegisterController extends Controller
         $name = trim("{$student->firstname} {$student->lastname}");
 
         $user = User::create([
-            'name'     => $name,
-            'email'    => $validated['student_email'],
-            'password' => Hash::make($validated['password']),
-            'status'   => 'pending_verification',
-            'role_id'  => (string) $studentRole->id,
+            'name'         => $name,
+            'email'        => $validated['student_email'],
+            'password'     => Hash::make($validated['password']),
+            'status'       => 'pending_verification',
+            'role_id'      => (string) $studentRole->id,
+            'account_type' => 'student',
         ]);
 
         $user->roles()->syncWithoutDetaching([$studentRole->id]);
