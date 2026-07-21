@@ -187,7 +187,7 @@ class DocumentTrackingController extends Controller
             'documentTypes'   => DocumentType::where('is_active', true)->orderBy('name')
                                     ->with(['routingSteps.office', 'routingSteps.assignedUser'])
                                     ->get(['id', 'name', 'code', 'routing_type', 'applicable_to', 'lead_time_hours']),
-            'users'           => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'email', 'office_id']),
+            'users'           => User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'email', 'office_id']),
             'offices'         => \App\Models\Office::orderBy('name')->get(['id', 'name']),
             'canLogExternal'  => $isAdmin || $isRecords,
             'canSeeExternal'  => $isAdmin || $isRecords,
@@ -458,7 +458,7 @@ class DocumentTrackingController extends Controller
 
         return Inertia::render('DocumentTracking/Show', [
             'document'              => $this->formatDoc($document),
-            'users'                 => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'email', 'office_id']),
+            'users'                 => User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'email', 'office_id']),
             'offices'               => \App\Models\Office::orderBy('name')->get(['id', 'name']),
             'documentTypes'         => DocumentType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'applicable_to']),
             'isAdmin'               => $isAdmin,

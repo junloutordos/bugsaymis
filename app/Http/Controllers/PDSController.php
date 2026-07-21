@@ -41,7 +41,7 @@ class PDSController extends Controller
         $search = trim((string) $request->input('search', ''));
         $status = $request->input('status', '');
 
-        $query = User::where('status', '!=', 'inactive')
+        $query = User::employees()->where('status', '!=', 'inactive')
             ->with(['pds:id,user_id,submitted_at,created_at'])
             ->select('id', 'name', 'email');
 
@@ -61,11 +61,11 @@ class PDSController extends Controller
         $employees = $query->orderBy('name')->paginate(20)->withQueryString();
 
         $counts = [
-            'total'       => User::where('status', '!=', 'inactive')->count(),
-            'not_started' => User::where('status', '!=', 'inactive')->whereDoesntHave('pds')->count(),
-            'in_progress' => User::where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNull('submitted_at'))->count(),
-            'submitted'   => User::where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '>=', now()->subYear()))->count(),
-            'overdue'     => User::where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '<', now()->subYear()))->count(),
+            'total'       => User::employees()->where('status', '!=', 'inactive')->count(),
+            'not_started' => User::employees()->where('status', '!=', 'inactive')->whereDoesntHave('pds')->count(),
+            'in_progress' => User::employees()->where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNull('submitted_at'))->count(),
+            'submitted'   => User::employees()->where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '>=', now()->subYear()))->count(),
+            'overdue'     => User::employees()->where('status', '!=', 'inactive')->whereHas('pds', fn ($q) => $q->whereNotNull('submitted_at')->where('submitted_at', '<', now()->subYear()))->count(),
         ];
 
         return Inertia::render('PDS/Index', [

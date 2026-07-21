@@ -60,7 +60,7 @@ class TravelController extends Controller
         return Inertia::render('Travel/Index', [
             'travels' => $travels,
             'filters' => $request->only(['search', 'per_page']),
-            'travelers' => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'position', 'division_id']),
+            'travelers' => User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'position', 'division_id']),
             'divisionChiefs' => User::havingRole('DivisionChief')->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
             'currentUser' => $this->formatUser($request->user()),
         ]);

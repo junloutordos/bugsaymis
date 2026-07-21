@@ -26,7 +26,7 @@ class PropertyItemController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'type', 'account_code', 'useful_life_years']);
 
-        $officers = User::where('status', '<>', 'inactive')
+        $officers = User::employees()->where('status', '<>', 'inactive')
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -151,7 +151,7 @@ class PropertyItemController extends Controller
         }
 
         $categoryMap = PropertyCategory::pluck('id', 'name')->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
-        $officerMap  = User::where('status', '<>', 'inactive')->pluck('id', 'name')
+        $officerMap  = User::employees()->where('status', '<>', 'inactive')->pluck('id', 'name')
             ->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
         $existingNumbers = PropertyItem::pluck('id', 'property_number')->toArray();
 
@@ -217,7 +217,7 @@ class PropertyItemController extends Controller
         $headers = array_map('trim', $rows[0]);
 
         $categoryMap = PropertyCategory::pluck('id', 'name')->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
-        $officerMap  = User::where('status', '<>', 'inactive')->pluck('id', 'name')
+        $officerMap  = User::employees()->where('status', '<>', 'inactive')->pluck('id', 'name')
             ->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
         $userId = $request->user()->id;
 

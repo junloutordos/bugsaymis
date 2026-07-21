@@ -122,7 +122,7 @@ class LaboratoryController extends Controller
 
     private function staffOptions()
     {
-        return User::where('status', '<>', 'inactive')
+        return User::employees()->where('status', '<>', 'inactive')
             ->orderBy('name')->limit(1000)->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
     }

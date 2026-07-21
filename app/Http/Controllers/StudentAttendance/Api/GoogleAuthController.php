@@ -169,6 +169,10 @@ class GoogleAuthController extends Controller
             $user->save();
         }
 
+        if ($studentRole) {
+            $user->roles()->syncWithoutDetaching([$studentRole->id]);
+        }
+
         StudentMobileLink::updateOrCreate(
             ['user_id' => $user->id],
             ['student_id' => $student->id]

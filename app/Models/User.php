@@ -292,6 +292,15 @@ class User extends Authenticatable
         return $query->whereHas('roles', fn($q) => $q->where('name', $roleName));
     }
 
+    /**
+     * Exclude mobile-app-only accounts (Parent/Student) — for staff/employee
+     * dropdowns, issuance recipients, and any other employee-facing list.
+     */
+    public function scopeEmployees($query)
+    {
+        return $query->whereDoesntHave('roles', fn($q) => $q->whereIn('name', ['Student', 'Parent']));
+    }
+
     // ─── HR / Payroll Relationships ────────────────────────────────────────────
 
     public function employeeProfile()

@@ -452,7 +452,8 @@ class ChatController extends Controller
     {
         $search = $request->input('search', '');
 
-        $users = User::where('id', '!=', Auth::id())
+        $users = User::employees()
+            ->where('id', '!=', Auth::id())
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->select('id', 'name', 'profile_picture', 'position', 'division_id')
             ->orderBy('name')

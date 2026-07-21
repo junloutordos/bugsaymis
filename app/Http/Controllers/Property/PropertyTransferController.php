@@ -33,7 +33,7 @@ class PropertyTransferController extends Controller
 
         return Inertia::render('Property/Transfers/Index', [
             'transfers' => $transfers,
-            'officers'  => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
+            'officers'  => User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
             'propertyItems' => PropertyItem::where('status', 'serviceable')
                 ->orderBy('property_number')
                 ->get(['id', 'property_number', 'description', 'current_officer_id']),

@@ -45,7 +45,7 @@ class AnnouncementController extends Controller
         return Inertia::render('Administration/Announcements/Index', [
             'announcements' => $announcements,
             'employees'     => $canManage
-                ? User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'position'])
+                ? User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'position'])
                 : [],
             'canManage'     => $canManage,
         ]);

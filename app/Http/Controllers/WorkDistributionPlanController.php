@@ -29,7 +29,7 @@ class WorkDistributionPlanController extends Controller
                                 'specialAssignments.coordinator',
                             ]))->latest()->get(),
             'indicators'  => $fyFilter(PerformanceIndicator::query())->get(),
-            'users'       => User::select('id', 'name')->get(),
+            'users'       => User::employees()->select('id', 'name')->get(),
             'offices'     => Office::select('id', 'name', 'unit_head', 'division_id')->orderBy('name')->get(),
             'committees'  => Committee::with('head')->orderBy('name')->get(['id', 'name', 'head_id']),
             'assignments' => SpecialAssignment::with('coordinator')->orderBy('name')->get(['id', 'name', 'coordinator_id']),

@@ -21,7 +21,7 @@ class OfficeController extends Controller
             ->orderBy('name')
             ->get();
         $divisions = \App\Models\Division::where('status', 'active')->orderBy('division_name')->get();
-        $users = User::select('id', 'name')->orderBy('name')->get();
+        $users = User::employees()->select('id', 'name')->orderBy('name')->get();
         return inertia('DataManagement/Offices/Index', compact('offices', 'divisions', 'users'));
     }
 

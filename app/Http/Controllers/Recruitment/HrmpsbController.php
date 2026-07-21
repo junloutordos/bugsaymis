@@ -34,7 +34,8 @@ class HrmpsbController extends Controller
 
         if ($search->isNotEmpty()) {
             $memberIds = $members->pluck('id');
-            $results = User::where(fn ($q) =>
+            $results = User::employees()
+                ->where(fn ($q) =>
                     $q->where('name',     'like', "%{$search}%")
                       ->orWhere('email',  'like', "%{$search}%")
                       ->orWhere('badge_id', 'like', "%{$search}%")

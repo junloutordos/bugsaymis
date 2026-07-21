@@ -62,7 +62,7 @@ class IssuanceService
         $issuance->recipients()->delete();
 
         if ($issuance->recipient_type === 'all') {
-            $users = User::where('status', '<>', 'inactive')->pluck('id');
+            $users = User::employees()->where('status', '<>', 'inactive')->pluck('id');
             $rows  = $users->map(fn($uid) => [
                 'issuance_id' => $issuance->id,
                 'user_id'     => $uid,
@@ -73,7 +73,8 @@ class IssuanceService
 
         } elseif ($issuance->recipient_type === 'office') {
             $officeIds = $data['office_ids'] ?? [];
-            $users = User::whereIn('office_id', $officeIds)
+            $users = User::employees()
+                ->whereIn('office_id', $officeIds)
                 ->where('status', '<>', 'inactive')
                 ->pluck('id');
             $rows  = $users->map(fn($uid) => [
@@ -86,7 +87,8 @@ class IssuanceService
 
         } elseif ($issuance->recipient_type === 'individual') {
             $userIds = $data['user_ids'] ?? [];
-            $rows    = collect($userIds)->map(fn($uid) => [
+            $userIds = User::employees()->whereIn('id', $userIds)->pluck('id');
+            $rows    = $userIds->map(fn($uid) => [
                 'issuance_id' => $issuance->id,
                 'user_id'     => $uid,
                 'created_at'  => now(),
@@ -96,7 +98,8 @@ class IssuanceService
 
         } elseif ($issuance->recipient_type === 'division') {
             $divisionIds = $data['division_ids'] ?? [];
-            $users = User::whereIn('division_id', $divisionIds)
+            $users = User::employees()
+                ->whereIn('division_id', $divisionIds)
                 ->where('status', '<>', 'inactive')
                 ->pluck('id');
             $rows  = $users->map(fn($uid) => [

@@ -121,7 +121,7 @@ class EmployeeDocumentController extends Controller
             ->toArray();
 
         $employees = User::with(['employeeProfile', 'roles'])
-            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['Student', 'Parent']))
+            ->employees()
             ->where('status', '!=', 'inactive')
             ->orderBy('name')
             ->get()

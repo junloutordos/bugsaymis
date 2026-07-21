@@ -73,7 +73,7 @@ class ICTEquipmentController extends Controller
         }
 
         $equipments = $query->paginate($perPage)->withQueryString();
-        $users = User::all();
+        $users = User::employees()->get();
         $rooms = Room::orderBy('name')->get();
 
         return Inertia::render('ITJobRequests/ICTEquipments', [

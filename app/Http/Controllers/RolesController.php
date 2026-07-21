@@ -89,7 +89,7 @@ class RolesController extends Controller
             ->select('id', 'division_name', 'acronym', 'division_chief_id', 'year', 'status', 'signature_path', 'created_at')
             ->get();
 
-        $users = User::select('id', 'name', 'email')->get();
+        $users = User::employees()->select('id', 'name', 'email')->get();
 
         return Inertia::render('Roles/Division', [
             'divisions' => $divisions,
@@ -128,7 +128,7 @@ class RolesController extends Controller
     public function showDivision($id)
     {
         $division = Division::with('divisionchief')->findOrFail($id);
-        $users = User::select('id', 'name', 'email')->get();
+        $users = User::employees()->select('id', 'name', 'email')->get();
 
         return Inertia::render('Divisions/Show', [
             'division' => $division,

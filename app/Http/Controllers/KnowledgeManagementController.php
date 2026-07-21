@@ -57,7 +57,7 @@ class KnowledgeManagementController extends Controller
                 ? OedIssuanceCategory::orderBy('label')->get(['code', 'label', 'description', 'is_active'])
                 : [],
             'canManage'        => $canManage,
-            'totalActiveUsers' => User::where('status', '<>', 'inactive')->count(),
+            'totalActiveUsers' => User::employees()->where('status', '<>', 'inactive')->count(),
             'filters'          => ['search' => $search],
         ]);
     }
@@ -75,7 +75,7 @@ class KnowledgeManagementController extends Controller
                 ->get(['id', 'title', 'reference_no', 'issued_date']),
             'offices'   => Office::orderBy('name')->get(['id', 'name']),
             'divisions' => Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']),
-            'users'     => User::where('status', '<>', 'inactive')
+            'users'     => User::employees()->where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'division_id']),
         ]);
     }
@@ -144,7 +144,7 @@ class KnowledgeManagementController extends Controller
         $ackStats = null;
         if ($canManage) {
             $total = $oedIssuance->recipient_type === 'all'
-                ? User::where('status', '<>', 'inactive')->count()
+                ? User::employees()->where('status', '<>', 'inactive')->count()
                 : $oedIssuance->recipients()->count();
             $acknowledged = $oedIssuance->acknowledgments()->count();
 
@@ -193,7 +193,7 @@ class KnowledgeManagementController extends Controller
             'categories' => OedIssuanceCategory::where('is_active', true)->orderBy('label')->get(['code', 'label']),
             'offices'    => Office::orderBy('name')->get(['id', 'name']),
             'divisions'  => Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']),
-            'users'      => User::where('status', '<>', 'inactive')
+            'users'      => User::employees()->where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'division_id']),
         ]);
     }

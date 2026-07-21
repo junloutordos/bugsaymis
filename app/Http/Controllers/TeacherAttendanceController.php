@@ -73,7 +73,7 @@ class TeacherAttendanceController extends Controller
             ->orderBy('name')
             ->get();
 
-        $teachers = User::select('id', 'name')
+        $teachers = User::employees()->select('id', 'name')
             ->where('status', '<>', 'inactive')
             ->when($scopedUnitId, function ($q) use ($scopedUnitId) {
                 $q->whereHas('loadAssignments.subject', fn ($sq) =>

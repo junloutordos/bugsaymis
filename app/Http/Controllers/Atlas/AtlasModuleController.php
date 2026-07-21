@@ -86,7 +86,7 @@ class AtlasModuleController extends Controller
         $settings = AtlasModuleSetting::with('owner:id,name')->find($key)
             ?? new AtlasModuleSetting(['module_key' => $key, 'version' => '1.0.0']);
 
-        $users = User::where('status', '<>', 'inactive')
+        $users = User::employees()->where('status', '<>', 'inactive')
             ->orderBy('name')
             ->get(['id', 'name']);
 

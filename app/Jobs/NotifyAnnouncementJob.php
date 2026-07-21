@@ -34,7 +34,7 @@ class NotifyAnnouncementJob implements ShouldQueue
         }
 
         $users = $announcement->audience === 'all'
-            ? User::where('status', '<>', 'inactive')->get()
+            ? User::employees()->where('status', '<>', 'inactive')->get()
             : $announcement->targets()->where('status', '<>', 'inactive')->get();
 
         $sent = 0;

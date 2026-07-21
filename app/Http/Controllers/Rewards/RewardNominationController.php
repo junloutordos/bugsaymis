@@ -65,7 +65,7 @@ class RewardNominationController extends Controller
 
         return Inertia::render('Rewards/Nominations/Create', [
             'rewardTypes' => RewardType::where('is_active', true)->orderBy('name')->get(),
-            'employees'   => User::orderBy('name')->get(['id', 'name', 'email']),
+            'employees'   => User::employees()->orderBy('name')->get(['id', 'name', 'email']),
         ]);
     }
 

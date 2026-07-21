@@ -39,7 +39,7 @@ class AcademicUnitController extends Controller
                 'is_active'    => $u->is_active,
             ]);
 
-        $facultyOptions = User::where('status', '<>', 'inactive')
+        $facultyOptions = User::employees()->where('status', '<>', 'inactive')
             ->orderBy('name')
             ->get(['id', 'name']);
 

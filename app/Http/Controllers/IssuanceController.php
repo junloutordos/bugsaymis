@@ -94,7 +94,7 @@ class IssuanceController extends Controller
             'typeLabels' => Issuance::typeLabels(),
             'offices'    => Office::orderBy('name')->get(['id', 'name']),
             'divisions'  => Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']),
-            'users'      => User::where('status', '<>', 'inactive')
+            'users'      => User::employees()->where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'position']),
             'hasPin'     => ! empty(auth()->user()->signature_pin),
             'signatureUri' => $this->sigService->getSignatureDataUri(auth()->user()),

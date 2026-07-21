@@ -76,7 +76,7 @@ class LoadAssignmentController extends Controller
             ->get()
             ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current, 'school_year_id' => $t->school_year_id]);
 
-        $faculty = User::where('status', '<>', 'inactive')
+        $faculty = User::employees()->where('status', '<>', 'inactive')
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
             ->orderBy('name')->get(['id', 'name', 'position']);
 

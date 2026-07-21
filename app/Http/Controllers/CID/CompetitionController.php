@@ -31,7 +31,7 @@ class CompetitionController extends Controller
             ->get()
             ->map(fn ($c) => $this->mapCompetition($c));
 
-        $employees = User::where('status', '<>', 'inactive')
+        $employees = User::employees()->where('status', '<>', 'inactive')
             ->orderBy('name')
             ->get(['id', 'name', 'position']);
 

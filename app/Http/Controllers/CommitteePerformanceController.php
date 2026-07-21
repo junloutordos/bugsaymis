@@ -94,7 +94,7 @@ class CommitteePerformanceController extends Controller
 
         return Inertia::render('PerformanceManagement/Committees/Index', [
             'committees'         => $committees,
-            'users'              => User::select('id', 'name', 'position')->orderBy('name')->get(),
+            'users'              => User::employees()->select('id', 'name', 'position')->orderBy('name')->get(),
             'plans'              => WorkDistributionPlan::select('id', 'success_indicator', 'rated_by')
                                        ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY))
                                        ->orderBy('success_indicator')->get(),

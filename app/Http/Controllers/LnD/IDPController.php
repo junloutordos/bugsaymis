@@ -61,7 +61,7 @@ class IDPController extends Controller
 
         return Inertia::render('LnD/IDP/Index', [
             'idps'      => $idps,
-            'employees' => User::orderBy('name')->get(['id', 'name']),
+            'employees' => User::employees()->orderBy('name')->get(['id', 'name']),
             'programs'  => LearningProgram::active()->orderBy('title')->get(['id', 'title']),
             'filters'   => $request->only([
                 'employee_id', 'supervisor_id', 'year',

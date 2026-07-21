@@ -32,8 +32,8 @@ class NotifyOedIssuanceUpload implements ShouldQueue
         }
 
         $users = $issuance->recipient_type === 'all'
-            ? User::where('status', '<>', 'inactive')->get()
-            : User::where('status', '<>', 'inactive')
+            ? User::employees()->where('status', '<>', 'inactive')->get()
+            : User::employees()->where('status', '<>', 'inactive')
                 ->whereIn('id', $issuance->recipients->pluck('user_id'))
                 ->get();
 

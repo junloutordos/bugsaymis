@@ -29,13 +29,15 @@ class RegisterController extends Controller
 
         $parentRole = Role::where('name', 'Parent')->firstOrFail();
 
-        User::create([
+        $user = User::create([
             'name'     => $validated['name'],
             'email'    => $validated['email'],
             'password' => Hash::make($validated['password']),
             'status'   => 'pending_verification',
             'role_id'  => (string) $parentRole->id,
         ]);
+
+        $user->roles()->syncWithoutDetaching([$parentRole->id]);
 
         $this->sendOtp($validated['email'], $validated['name']);
 
@@ -120,13 +122,15 @@ class RegisterController extends Controller
         $studentRole = Role::where('name', 'Student')->firstOrFail();
         $name = trim("{$student->firstname} {$student->lastname}");
 
-        User::create([
+        $user = User::create([
             'name'     => $name,
             'email'    => $validated['student_email'],
             'password' => Hash::make($validated['password']),
             'status'   => 'pending_verification',
             'role_id'  => (string) $studentRole->id,
         ]);
+
+        $user->roles()->syncWithoutDetaching([$studentRole->id]);
 
         $this->sendOtp($validated['student_email'], $name);
 

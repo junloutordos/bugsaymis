@@ -89,7 +89,7 @@ class OrgUnitController extends Controller
         ]);
 
         // ── Employees from users table via division_id / office_id linkage ──────
-        $employeeQuery = \App\Models\User::where('status', '!=', 'inactive')
+        $employeeQuery = \App\Models\User::employees()->where('status', '!=', 'inactive')
             ->whereNotNull('emp_category')
             ->where('emp_category', '!=', '')
             ->orderBy('name');
@@ -441,7 +441,7 @@ class OrgUnitController extends Controller
         $this->authorize('org.reports');
 
         // ── Employee roster from users table (division_id / office_id) ──────────
-        $employees = \App\Models\User::where('status', '!=', 'inactive')
+        $employees = \App\Models\User::employees()->where('status', '!=', 'inactive')
             ->whereNotNull('division_id')
             ->whereNotNull('emp_category')
             ->where('emp_category', '!=', '')

@@ -73,7 +73,7 @@ class DtrRecordController extends Controller
         return Inertia::render('HR/DTR/Index', [
             'summaries'         => $rows,
             'pennedSubmissions' => $pennedSubmissions,
-            'users'             => User::where('status', 'active')
+            'users'             => User::employees()->where('status', 'active')
                 ->select('id', 'name', 'badge_id')
                 ->orderBy('name')
                 ->get(),
@@ -479,7 +479,7 @@ class DtrRecordController extends Controller
             'date_to'   => 'required|date|after_or_equal:date_from',
         ]);
 
-        $query = User::where('status', 'active');
+        $query = User::employees()->where('status', 'active');
 
         if (!empty($data['user_id'])) {
             $query->where('id', $data['user_id']);
@@ -520,7 +520,7 @@ class DtrRecordController extends Controller
             ->keyBy(fn ($h) => \Carbon\Carbon::parse($h->holiday_date)->format('Y-m-d'));
 
         // Resolve which users to print
-        $usersQuery = User::where('status', 'active')->with('employeeProfile');
+        $usersQuery = User::employees()->where('status', 'active')->with('employeeProfile');
         if ($request->user_id) {
             $usersQuery->where('id', $request->user_id);
         } elseif ($request->category) {

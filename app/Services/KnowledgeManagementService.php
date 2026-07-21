@@ -60,9 +60,9 @@ class KnowledgeManagementService
         }
 
         $userIds = match ($recipientType) {
-            'individual' => User::where('status', '<>', 'inactive')->whereIn('id', $ids)->pluck('id'),
-            'office'     => User::where('status', '<>', 'inactive')->whereIn('office_id', $ids)->pluck('id'),
-            'division'   => User::where('status', '<>', 'inactive')->whereIn('division_id', $ids)->pluck('id'),
+            'individual' => User::employees()->where('status', '<>', 'inactive')->whereIn('id', $ids)->pluck('id'),
+            'office'     => User::employees()->where('status', '<>', 'inactive')->whereIn('office_id', $ids)->pluck('id'),
+            'division'   => User::employees()->where('status', '<>', 'inactive')->whereIn('division_id', $ids)->pluck('id'),
             default      => collect(),
         };
 

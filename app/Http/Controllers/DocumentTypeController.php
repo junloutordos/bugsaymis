@@ -39,7 +39,7 @@ class DocumentTypeController extends Controller
         return Inertia::render('DocumentTracking/Types/Index', [
             'documentTypes' => $types,
             'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
-            'users'         => \App\Models\User::where('status', '<>', 'inactive')
+            'users'         => \App\Models\User::employees()->where('status', '<>', 'inactive')
                                 ->orderBy('name')
                                 ->get(['id', 'name', 'email', 'office_id']),
         ]);

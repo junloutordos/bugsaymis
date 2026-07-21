@@ -314,7 +314,7 @@ class PayrollCashierController extends Controller
             ->get()
             ->groupBy('match_status');
 
-        $users = User::where('status', '<>', 'inactive')
+        $users = User::employees()->where('status', '<>', 'inactive')
             ->orderBy('name')
             ->get(['id', 'name', 'employee_no', 'position']);
 

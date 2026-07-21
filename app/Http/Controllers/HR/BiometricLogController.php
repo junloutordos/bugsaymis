@@ -36,7 +36,7 @@ class BiometricLogController extends Controller
         return Inertia::render('HR/Biometric/Index', [
             'logs'    => $query->paginate(50)->withQueryString(),
             'stats'   => $stats,
-            'users'   => User::where('status', 'active')
+            'users'   => User::employees()->where('status', 'active')
                 ->select('id', 'name', 'badge_id')
                 ->orderBy('name')
                 ->get(),

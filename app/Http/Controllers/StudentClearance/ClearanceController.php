@@ -62,7 +62,7 @@ class ClearanceController extends Controller
                 ->orderBy('requirement_label')
                 ->get()
                 ->map(fn ($setting) => $this->serializeRequirementSetting($setting)),
-            'users' => User::where('status', '<>', 'inactive')
+            'users' => User::employees()->where('status', '<>', 'inactive')
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'permissionOptions' => Permission::orderBy('name')->pluck('name'),

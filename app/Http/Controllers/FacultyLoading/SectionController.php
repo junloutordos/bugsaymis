@@ -41,7 +41,7 @@ class SectionController extends Controller
             ->map(fn ($s) => $this->mapSection($s));
 
         $schoolYears = SchoolYear::orderByDesc('start_date')->get(['id', 'name', 'is_current']);
-        $faculty     = User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']);
+        $faculty     = User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']);
         $classrooms  = Classroom::orderBy('name')->get(['id', 'name', 'code', 'classroom_type']);
 
         return Inertia::render('FacultyLoading/Sections/Index', [

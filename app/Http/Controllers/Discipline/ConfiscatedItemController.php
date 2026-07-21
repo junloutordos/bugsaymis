@@ -40,7 +40,7 @@ class ConfiscatedItemController extends Controller
         return Inertia::render('Discipline/Confiscated/Index', [
             'items'   => $items,
             'filters' => ['status' => $status, 'search' => $search],
-            'staff'   => \App\Models\User::orderBy('name')->get(['id', 'name']),
+            'staff'   => \App\Models\User::employees()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

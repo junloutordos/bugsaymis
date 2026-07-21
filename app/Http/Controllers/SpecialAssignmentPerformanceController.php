@@ -37,7 +37,7 @@ class SpecialAssignmentPerformanceController extends Controller
 
         return Inertia::render('PerformanceManagement/SpecialAssignments/Index', [
             'assignments'        => $query->orderBy('name')->get(),
-            'users'              => User::select('id', 'name', 'position')->orderBy('name')->get(),
+            'users'              => User::employees()->select('id', 'name', 'position')->orderBy('name')->get(),
             'plans'              => WorkDistributionPlan::select('id', 'success_indicator', 'rated_by')
                                        ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY))
                                        ->orderBy('success_indicator')->get(),

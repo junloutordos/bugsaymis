@@ -52,7 +52,7 @@ class DisposalController extends Controller
             'bsrs'          => $bsrs,
             'disposals'     => $disposals,
             'unserviceable' => $unserviceable,
-            'officers'      => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
+            'officers'      => User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

@@ -59,7 +59,7 @@ class TrainingNeedsController extends Controller
 
         return Inertia::render('LnD/TrainingNeeds/Index', [
             'needs'     => $needs,
-            'employees' => User::orderBy('name')->get(['id', 'name']),
+            'employees' => User::employees()->orderBy('name')->get(['id', 'name']),
             'filters'   => $request->only(['search', 'employee_id', 'year', 'priority', 'status', 'source']),
         ]);
     }

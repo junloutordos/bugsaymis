@@ -56,7 +56,7 @@ class CommitteeController extends Controller
 
         return Inertia::render('DataManagement/Committees/Index', [
             'committees' => $committees,
-            'users'      => User::select('id', 'name', 'position')->orderBy('name')->get(),
+            'users'      => User::employees()->select('id', 'name', 'position')->orderBy('name')->get(),
             'terms'      => $terms,
         ]);
     }

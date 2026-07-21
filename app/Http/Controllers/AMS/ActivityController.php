@@ -714,7 +714,7 @@ class ActivityController extends Controller
 
     private function employeeList(): array
     {
-        return User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name'])->toArray();
+        return User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name'])->toArray();
     }
 
     private function sectionList(): array

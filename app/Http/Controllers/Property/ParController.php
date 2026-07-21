@@ -39,7 +39,7 @@ class ParController extends Controller
                 ->with('category:id,name,type')
                 ->orderBy('description')
                 ->get(['id', 'property_number', 'description', 'unit', 'unit_cost', 'quantity', 'category_id']),
-            'officers'  => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
+            'officers'  => User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
             'divisions' => Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name']),
         ]);
     }

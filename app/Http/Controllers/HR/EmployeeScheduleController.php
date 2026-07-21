@@ -23,13 +23,13 @@ class EmployeeScheduleController extends Controller
 
         return Inertia::render('HR/Schedules/Index', [
             'presets'    => SchedulePreset::orderBy('name')->get(),
-            'employees'  => User::where('status', 'active')
+            'employees'  => User::employees()->where('status', 'active')
                 ->select('id', 'name', 'emp_category', 'badge_id')
                 ->orderBy('emp_category')
                 ->orderBy('name')
                 ->get()
                 ->groupBy('emp_category'),
-            'categories' => User::where('status', 'active')
+            'categories' => User::employees()->where('status', 'active')
                 ->whereNotNull('emp_category')
                 ->where('emp_category', '!=', '')
                 ->distinct()

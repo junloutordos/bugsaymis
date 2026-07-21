@@ -13,7 +13,7 @@ class SpecialAssignmentController extends Controller
     {
         return Inertia::render('DataManagement/SpecialAssignments/Index', [
             'assignments' => SpecialAssignment::with(['coordinator', 'members'])->orderBy('name')->get(),
-            'users'       => User::select('id', 'name', 'position')->orderBy('name')->get(),
+            'users'       => User::employees()->select('id', 'name', 'position')->orderBy('name')->get(),
         ]);
     }
 

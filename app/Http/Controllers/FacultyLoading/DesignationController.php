@@ -82,7 +82,7 @@ class DesignationController extends Controller
             ->get()
             ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
 
-        $faculty = User::where('status', '<>', 'inactive')
+        $faculty = User::employees()->where('status', '<>', 'inactive')
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
             ->orderBy('name')
             ->get(['id', 'name', 'position']);

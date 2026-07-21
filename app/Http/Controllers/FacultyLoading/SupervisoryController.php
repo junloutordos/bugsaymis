@@ -87,7 +87,7 @@ class SupervisoryController extends Controller
             ];
         });
 
-        $users = User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']);
+        $users = User::employees()->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']);
 
         $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
 

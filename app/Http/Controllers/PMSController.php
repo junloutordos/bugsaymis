@@ -67,7 +67,7 @@ class PMSController extends Controller
 
         $pmsSchedules = $query->paginate(15)->withQueryString();
 
-        $users = User::select('id','name')->orderBy('name')->get();
+        $users = User::employees()->select('id','name')->orderBy('name')->get();
 
         $equipments = ICTEquipment::with([
             'room:id,name,code',

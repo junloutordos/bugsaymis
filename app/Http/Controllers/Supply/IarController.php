@@ -49,7 +49,7 @@ class IarController extends Controller
             ->orderBy('description')
             ->get(['id', 'item_code', 'description', 'unit', 'estimated_unit_cost', 'category_id']);
 
-        $officers = User::where('status', '<>', 'inactive')
+        $officers = User::employees()->where('status', '<>', 'inactive')
             ->orderBy('name')
             ->get(['id', 'name']);
 
