@@ -226,10 +226,12 @@ class ScheduleValidationTest extends TestCase
     {
         $this->seedSchedule(['start_time' => '08:00:00', 'end_time' => '10:00:00']);
 
-        // Consecutive (10:00 → 12:00) — should not conflict
+        // Consecutive (10:00 → 10:50) — should not conflict. Ends right at
+        // Grade 9's Monday lunch break (10:50-11:50) rather than running
+        // into it, so this stays a pure conflict-detection test.
         $result = $this->svc->validate($this->validData([
             'start_time' => '10:00:00',
-            'end_time'   => '12:00:00',
+            'end_time'   => '10:50:00',
         ]));
 
         $this->assertTrue($result['valid']);

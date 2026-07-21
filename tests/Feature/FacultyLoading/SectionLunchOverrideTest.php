@@ -249,19 +249,44 @@ class SectionLunchOverrideTest extends TestCase
     {
         $this->bootValidationFixtures();
         $section = $this->makeSection([
-            'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00',
             'lunch_start_mon' => '11:00:00', 'lunch_end_mon' => '11:45:00',
         ]);
 
-        // Tuesday still uses the regular 12:00-13:00 lunch — unaffected by
-        // the Monday-only override.
+        // Tuesday has no override of its own, so it falls back to the
+        // grade-level default lunch window (G7_TueFri, 10:20-11:20) —
+        // unaffected by the Monday-only override.
         $result = $this->svc->validate($this->scheduleData($section, [
-            'day_of_week' => 'Tuesday', 'start_time' => '12:00:00', 'end_time' => '13:00:00',
+            'day_of_week' => 'Tuesday', 'start_time' => '10:20:00', 'end_time' => '11:20:00',
         ]));
 
         $this->assertFalse($result['valid']);
         $breakErrors = array_filter($result['errors'], fn ($e) => str_contains($e, 'lunch break'));
         $this->assertNotEmpty($breakErrors);
+    }
+
+    /**
+     * Regression test for the reported bug: a section with no per-day lunch
+     * override for a given weekday must fall back to the same grade-level
+     * default the calendar grid renders — never to the legacy generic
+     * lunch_start/lunch_end columns, which predate per-day overrides, can
+     * hold stale unrelated values, and are never shown on the calendar.
+     */
+    public function test_break_time_check_ignores_stale_generic_lunch_columns_when_no_day_override_exists(): void
+    {
+        $this->bootValidationFixtures();
+        $section = $this->makeSection([
+            'lunch_start' => '10:00:00', 'lunch_end' => '10:50:00',
+        ]);
+
+        // Grade 7 Monday has no per-day override, so validation must use the
+        // grade default (11:40-12:40), leaving the stale 10:00-10:50 window
+        // unenforced.
+        $result = $this->svc->validate($this->scheduleData($section, [
+            'day_of_week' => 'Monday', 'start_time' => '10:00:00', 'end_time' => '10:50:00',
+        ]));
+
+        $breakErrors = array_filter($result['errors'], fn ($e) => str_contains($e, 'lunch break'));
+        $this->assertEmpty($breakErrors);
     }
 
     public function test_lunch_override_does_not_affect_a_sibling_section(): void
