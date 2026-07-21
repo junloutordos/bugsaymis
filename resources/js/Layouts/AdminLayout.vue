@@ -1,12 +1,10 @@
 <script>
-// Module-level (not per-instance) so it survives AdminLayout remounting on
-// every Inertia navigation — the layout isn't a persistent layout, so the
-// sidebar's DOM (and its scrollTop) is torn down and rebuilt on every page.
-let savedSidebarScroll = 0;
+// In-memory fallback for browsers where sessionStorage is unavailable.
+const savedSidebarScrollByUser = new Map();
 </script>
 
 <script setup>
-import { ref, computed, markRaw, onMounted, onUnmounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, markRaw, nextTick, onMounted, onUnmounted, onBeforeUnmount, watch } from "vue";
 import { sessionExpired } from "@/Composables/useSession.js";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
@@ -89,6 +87,8 @@ let removeFinishListener;
 onMounted(() => {
   // Only show skeleton for GET navigations (page changes), not POST/PUT/PATCH/DELETE (saves)
   removeStartListener = router.on('start', (event) => {
+    rememberSidebarScroll();
+
     if (event.detail.visit.method === 'get') {
       navTimer = setTimeout(() => { isNavigating.value = true; }, 150);
     }
@@ -125,10 +125,14 @@ onMounted(() => {
     showSignatureSetupModal.value = true;
   }
 
-  if (sidebarNav.value) sidebarNav.value.scrollTop = savedSidebarScroll;
+  restoreSidebarScroll();
 });
 onBeforeUnmount(() => {
-  if (sidebarNav.value) savedSidebarScroll = sidebarNav.value.scrollTop;
+  if (scrollSaveFrame !== null) {
+    window.cancelAnimationFrame(scrollSaveFrame);
+    scrollSaveFrame = null;
+  }
+  rememberSidebarScroll();
 });
 onUnmounted(() => {
   if (removeStartListener) removeStartListener();
@@ -164,6 +168,67 @@ const hasPerm = (...perms) => perms.some(p => userPermissions.has(p));
 // Also expose hasPerm for use in template (e.g. version modal button)
 const isAdmin = hasPerm('roles.assign');
 
+// ─── Sidebar position ────────────────────────────────────────────────────────
+const sidebarUserKey = user.id ?? 'guest';
+const sidebarStorageKey = `atlas.sidebar.scroll.${sidebarUserKey}`;
+let scrollSaveFrame = null;
+
+const rememberSidebarScroll = () => {
+  if (!sidebarNav.value) return;
+
+  const position = sidebarNav.value.scrollTop;
+  savedSidebarScrollByUser.set(sidebarUserKey, position);
+  try {
+    window.sessionStorage.setItem(sidebarStorageKey, String(position));
+  } catch {
+    // The module-level value still preserves position during this page session.
+  }
+};
+
+const scheduleSidebarScrollSave = () => {
+  if (scrollSaveFrame !== null) return;
+
+  scrollSaveFrame = window.requestAnimationFrame(() => {
+    scrollSaveFrame = null;
+    rememberSidebarScroll();
+  });
+};
+
+const ensureActiveSidebarLinkVisible = () => {
+  const nav = sidebarNav.value;
+  const activeLink = nav?.querySelector('[data-sidebar-active="true"]');
+  if (!nav || !activeLink) return;
+
+  const navRect = nav.getBoundingClientRect();
+  const linkRect = activeLink.getBoundingClientRect();
+  const edgePadding = 12;
+
+  if (linkRect.top < navRect.top + edgePadding) {
+    nav.scrollTop -= navRect.top + edgePadding - linkRect.top;
+  } else if (linkRect.bottom > navRect.bottom - edgePadding) {
+    nav.scrollTop += linkRect.bottom - (navRect.bottom - edgePadding);
+  }
+
+  rememberSidebarScroll();
+};
+
+const restoreSidebarScroll = async () => {
+  await nextTick();
+  if (!sidebarNav.value) return;
+
+  let position = savedSidebarScrollByUser.get(sidebarUserKey) ?? 0;
+  try {
+    const stored = window.sessionStorage.getItem(sidebarStorageKey);
+    if (stored !== null && Number.isFinite(Number(stored))) {
+      position = Number(stored);
+    }
+  } catch {
+    // Use the module-level fallback.
+  }
+
+  sidebarNav.value.scrollTop = Math.max(0, position);
+  window.requestAnimationFrame(ensureActiveSidebarLinkVisible);
+};
 
 // --- Helpers ---
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
@@ -333,10 +398,20 @@ const toggleExpand = (label) => (expanded.value[label] = !expanded.value[label])
 // Display-only: does this group contain the currently active route?
 const groupHasActive = (item) => item.children?.some((c) => isActive(c.routeName)) ?? false;
 
-filteredMenu.value.forEach((item) => {
-  if (item.children?.some((c) => isActive(c.routeName))) {
-    expanded.value[item.label] = true;
-  }
+const expandActiveSidebarGroup = () => {
+  filteredMenu.value.forEach((item) => {
+    if (item.children?.some((c) => isActive(c.routeName))) {
+      expanded.value[item.label] = true;
+    }
+  });
+};
+
+expandActiveSidebarGroup();
+
+watch(() => page.url, async () => {
+  expandActiveSidebarGroup();
+  await nextTick();
+  window.requestAnimationFrame(ensureActiveSidebarLinkVisible);
 });
 </script>
 
@@ -378,7 +453,11 @@ filteredMenu.value.forEach((item) => {
       </div>
 
       <!-- Navigation -->
-      <nav ref="sidebarNav" class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+      <nav
+        ref="sidebarNav"
+        class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5"
+        @scroll.passive="scheduleSidebarScrollSave"
+      >
         <template v-for="item in filteredMenu" :key="item.label">
 
           <!-- Section label -->

@@ -26,6 +26,8 @@ const badgeLabel = computed(() => badgeCount.value > 0 ? String(badgeCount.value
     :target="target"
     :rel="target === '_blank' ? 'noopener noreferrer' : null"
     :title="collapsed ? label : null"
+    :aria-current="active ? 'page' : null"
+    :data-sidebar-active="active ? 'true' : null"
     class="group relative flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
     :class="[
       active
