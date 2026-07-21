@@ -196,7 +196,7 @@
                   <div v-if="eventDisplayMode(s) !== 'compact' || s.session_type === 'ilp'" :class="['leading-tight truncate opacity-75', eventFontSizeClass(s)]">
                     {{ s.secondary_label }}
                   </div>
-                  <div v-if="eventDisplayMode(s) === 'full'" :class="['leading-tight opacity-55 tabular-nums', eventFontSizeClass(s)]">
+                  <div v-if="eventDisplayMode(s) === 'full' || s.session_type === 'ilp'" :class="['leading-tight opacity-55 tabular-nums', eventFontSizeClass(s)]">
                     {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
                   </div>
                 </div>
