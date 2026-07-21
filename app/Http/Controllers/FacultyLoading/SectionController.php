@@ -313,6 +313,48 @@ class SectionController extends Controller
         ]);
     }
 
+    /**
+     * Set (or clear) a single section's own recess time for ONE weekday — used
+     * by the calendar's per-section recess popover so one section can move its
+     * recess on that day without touching the shared grade-wide bell schedule,
+     * any other section, or its own recess time on any other day. Falls back
+     * to the grade default (SchedulingConstants::getRecess) whenever left null.
+     */
+    public function updateDayRecess(Request $request, Section $section, string $day): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+
+        if (! array_key_exists($day, Section::RECESS_OVERRIDE_COLUMNS)) {
+            return response()->json(['message' => 'Invalid day.'], 422);
+        }
+
+        [$startField, $endField] = Section::RECESS_OVERRIDE_COLUMNS[$day];
+
+        $request->merge($this->normaliseBreakTimes($request, [$startField, $endField]));
+
+        $data = $request->validate([
+            $startField => 'nullable|date_format:H:i',
+            $endField   => "nullable|date_format:H:i|after:{$startField}",
+        ]);
+
+        $startIsNull = ($data[$startField] ?? null) === null;
+        $endIsNull   = ($data[$endField] ?? null) === null;
+        if ($startIsNull !== $endIsNull) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => [$endField => ['Provide both a start and end time, or leave both blank to clear the override.']],
+            ], 422);
+        }
+
+        $section->update($data);
+
+        return response()->json([
+            'message'    => $data[$startField] ? "{$day} recess updated for {$section->sectionname}." : "{$day} recess override cleared for {$section->sectionname}.",
+            $startField  => $section->$startField,
+            $endField    => $section->$endField,
+        ]);
+    }
+
     // ── Delete a section ──────────────────────────────────────────────────────
 
     public function destroy(Section $section): RedirectResponse

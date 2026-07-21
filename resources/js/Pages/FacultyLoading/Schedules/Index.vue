@@ -663,6 +663,51 @@
       </div>
     </div>
 
+    <!-- Per-section, per-day Recess popover — edits ONE section's recess on
+         ONE weekday only, never the grade-wide bell schedule. -->
+    <div v-if="sectionRecessPopover" ref="sectionRecessEl"
+      class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: sectionRecessPopover.x + 'px', top: sectionRecessPopover.y + 'px' }">
+
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          {{ sectionRecessPopover.sectionName }} — {{ sectionRecessPopover.day }} Recess
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeSectionRecessPopover">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="px-4 pb-3 space-y-3">
+        <p class="text-xs text-slate-500">
+          This section only — every other Grade {{ groupHeaderInfo(sectionRecessPopover.sectionId).grade_level }} section
+          keeps the grade default<span v-if="sectionRecessPopover.gradeDefaultLabel"> ({{ sectionRecessPopover.gradeDefaultLabel }})</span>.
+        </p>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Recess</label>
+          <div class="flex items-center gap-2">
+            <input v-model="sectionRecessPopover.start" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+            <span class="text-slate-400 text-xs">to</span>
+            <input v-model="sectionRecessPopover.end" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+        <button v-if="sectionRecessPopover.hasOverride" type="button"
+          class="text-xs font-medium text-slate-500 hover:text-rose-600"
+          :disabled="sectionRecessPopover.saving"
+          @click="saveSectionRecessPopover(true)">
+          Reset to grade default
+        </button>
+        <span v-else />
+        <AppButton size="sm" :loading="sectionRecessPopover.saving" @click="saveSectionRecessPopover(false)">Save</AppButton>
+      </div>
+    </div>
+
     <!-- Suggested-slots popover (click an unplaced chip) -->
     <div v-if="chipSuggest" ref="chipSuggestEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
@@ -1570,8 +1615,8 @@ function isScienceCoreGroup(groupId) {
 function dayConfigFor(groupId, day) {
   const grade = viewBy.value === 'grade' ? groupId : groupHeaderInfo(groupId).grade_level
 
-  // By-Section cards, any weekday, get their Lunch band tagged as
-  // section-editable (own popover, not the grade-wide drag) regardless of
+  // By-Section cards, any weekday, get their Lunch and Recess bands tagged
+  // as section-editable (own popover, not the grade-wide drag) regardless of
   // whether this section has an override yet on that day — clicking it is
   // how one gets set for the first time. Every other band/view is unaffected.
   if (viewBy.value === 'section') {
@@ -1579,7 +1624,7 @@ function dayConfigFor(groupId, day) {
     if (!base) return base
     return {
       ...base,
-      blocked: (base.blocked ?? []).map(b => b.type === 'LUNCH' ? { ...b, sectionEditable: groupId } : b),
+      blocked: (base.blocked ?? []).map(b => (b.type === 'LUNCH' || b.type === 'RECESS') ? { ...b, sectionEditable: groupId } : b),
     }
   }
 
@@ -1873,7 +1918,11 @@ const activityEl = ref(null)
 
 function onBlockedClick(e, groupId, day, band) {
   if (band.sectionEditable) {
-    openSectionLunchPopover(e, groupId, band, day)
+    if (band.type === 'RECESS') {
+      openSectionRecessPopover(e, groupId, band, day)
+    } else {
+      openSectionLunchPopover(e, groupId, band, day)
+    }
     return
   }
 
@@ -2011,6 +2060,74 @@ async function saveSectionLunchPopover(clear = false) {
     Swal.fire('Could not save', err.response?.data?.errors?.[`lunch_end_${suffix}`]?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
   } finally {
     if (sectionLunchPopover.value) sectionLunchPopover.value.saving = false
+  }
+}
+
+// ── Per-section, per-day Recess popover ───────────────────────────────────────
+// Mirrors the Lunch popover above: writes to ONE section's own
+// recess_start_{day}/recess_end_{day}, never the shared timetable — see
+// Section::RECESS_OVERRIDE_COLUMNS on the backend.
+const RECESS_OVERRIDE_SUFFIX_BY_DAY = { Monday: 'mon', Tuesday: 'tue', Wednesday: 'wed', Thursday: 'thu', Friday: 'fri' }
+
+const sectionRecessPopover = ref(null)
+const sectionRecessEl = ref(null)
+
+function openSectionRecessPopover(e, sectionId, band, day) {
+  if (blockedSaving.value) return
+  const suffix = RECESS_OVERRIDE_SUFFIX_BY_DAY[day]
+  const section = props.sections.find(s => s.id === sectionId)
+  const grade = groupHeaderInfo(sectionId).grade_level
+  const gradeDefault = props.dayConfigsByGrade?.[grade]?.[day]?.blocked?.find(b => b.type === 'RECESS')
+
+  const W = 300, H = 260
+  sectionRecessPopover.value = {
+    x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
+    y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
+    sectionId,
+    day,
+    sectionName: groupHeaderInfo(sectionId).section_name,
+    hasOverride: !!(section?.[`recess_start_${suffix}`] && section?.[`recess_end_${suffix}`]),
+    start: section?.[`recess_start_${suffix}`]?.slice(0, 5) || band.start,
+    end:   section?.[`recess_end_${suffix}`]?.slice(0, 5)   || band.end,
+    gradeDefaultLabel: gradeDefault ? `${gradeDefault.start}–${gradeDefault.end}` : null,
+    saving: false,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownSectionRecess, true)
+  window.addEventListener('keydown', onSectionRecessKeydown)
+}
+
+function closeSectionRecessPopover() {
+  sectionRecessPopover.value = null
+  window.removeEventListener('mousedown', onWindowMouseDownSectionRecess, true)
+  window.removeEventListener('keydown', onSectionRecessKeydown)
+}
+
+function onWindowMouseDownSectionRecess(e) {
+  if (sectionRecessEl.value && sectionRecessEl.value.contains(e.target)) return
+  closeSectionRecessPopover()
+}
+
+function onSectionRecessKeydown(e) {
+  if (e.key === 'Escape') closeSectionRecessPopover()
+}
+
+async function saveSectionRecessPopover(clear = false) {
+  const p = sectionRecessPopover.value
+  if (!p) return
+  const suffix = RECESS_OVERRIDE_SUFFIX_BY_DAY[p.day]
+  p.saving = true
+  try {
+    await axios.patch(route('faculty-loading.sections.recess', { section: p.sectionId, day: p.day }), {
+      [`recess_start_${suffix}`]: clear ? '' : p.start,
+      [`recess_end_${suffix}`]:   clear ? '' : p.end,
+    })
+    closeSectionRecessPopover()
+    await router.reload({ only: ['dayConfigsBySection', 'sections'], preserveScroll: true })
+    Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Could not save', err.response?.data?.errors?.[`recess_end_${suffix}`]?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
+  } finally {
+    if (sectionRecessPopover.value) sectionRecessPopover.value.saving = false
   }
 }
 
@@ -2315,7 +2432,7 @@ function isEditableTarget(el) {
 function anyModalOpen() {
   return modal.value || swapRequestModal.value || swapReviewModal.value || versionsModal.value
     || saveVersionModal.value || removedModal.value || autoPlace.show
-    || !!activityPopover.value || !!quickCreate.value || !!sectionLunchPopover.value
+    || !!activityPopover.value || !!quickCreate.value || !!sectionLunchPopover.value || !!sectionRecessPopover.value
 }
 
 function onGlobalKeydown(e) {

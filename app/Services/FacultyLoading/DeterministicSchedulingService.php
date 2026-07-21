@@ -1079,28 +1079,45 @@ class DeterministicSchedulingService
             }
         }
 
-        // Sections with their own lunch time on any weekday get their own grid
-        // variant; every other section keeps sharing the grade's grid above.
-        $overrideColumns = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
+        // Sections with their own lunch or recess time on any weekday get
+        // their own grid variant; every other section keeps sharing the
+        // grade's grid above.
+        $lunchColumns     = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
+        $recessColumns    = array_merge(...array_values(Section::RECESS_OVERRIDE_COLUMNS));
+        $overrideColumns  = array_merge($lunchColumns, $recessColumns);
         $overriddenSections = Section::whereIn('levelid', $grades)
             ->where(function ($q) {
                 foreach (Section::LUNCH_OVERRIDE_COLUMNS as [$startCol, $endCol]) {
+                    $q->orWhere(fn ($q2) => $q2->whereNotNull($startCol)->whereNotNull($endCol));
+                }
+                foreach (Section::RECESS_OVERRIDE_COLUMNS as [$startCol, $endCol]) {
                     $q->orWhere(fn ($q2) => $q2->whereNotNull($startCol)->whereNotNull($endCol));
                 }
             })
             ->get(array_merge(['id', 'levelid'], $overrideColumns));
 
         foreach ($overriddenSections as $section) {
-            $overridesByDay = [];
+            $lunchOverridesByDay  = [];
+            $recessOverridesByDay = [];
             foreach (self::DAYS as $day) {
                 if ($override = $section->lunchOverrideFor($day)) {
-                    $overridesByDay[$day] = [
+                    $lunchOverridesByDay[$day] = [
+                        'start' => substr((string) $override['start'], 0, 5),
+                        'end'   => substr((string) $override['end'], 0, 5),
+                    ];
+                }
+                if ($override = $section->recessOverrideFor($day)) {
+                    $recessOverridesByDay[$day] = [
                         'start' => substr((string) $override['start'], 0, 5),
                         'end'   => substr((string) $override['end'], 0, 5),
                     ];
                 }
             }
-            $this->gridBySection[(int) $section->id] = $this->buildSlotGrid((int) $section->levelid, $overridesByDay);
+            $this->gridBySection[(int) $section->id] = $this->buildSlotGrid(
+                (int) $section->levelid,
+                $lunchOverridesByDay,
+                $recessOverridesByDay,
+            );
         }
     }
 
@@ -1208,13 +1225,20 @@ class DeterministicSchedulingService
      * section's own per-day lunch override (Section::LUNCH_OVERRIDE_COLUMNS),
      * applied only on the day(s) present in the map.
      *
+     * $recessOverridesByDay: same idea for recess (Section::RECESS_OVERRIDE_COLUMNS).
+     *
      * @return array<int,array{day:string,start:string,end:string,start_min:int,end_min:int}>
      */
-    private function buildSlotGrid(int $grade, array $lunchOverridesByDay = []): array
+    private function buildSlotGrid(int $grade, array $lunchOverridesByDay = [], array $recessOverridesByDay = []): array
     {
         $slots = [];
         foreach (self::DAYS as $day) {
-            foreach (SchedulingConstants::getSchedulableTeachingSlots($grade, $day, $lunchOverridesByDay[$day] ?? null) as $row) {
+            foreach (SchedulingConstants::getSchedulableTeachingSlots(
+                $grade,
+                $day,
+                $lunchOverridesByDay[$day] ?? null,
+                $recessOverridesByDay[$day] ?? null,
+            ) as $row) {
                 $slots[] = [
                     'day'         => $day,
                     'start'       => $row['start'],

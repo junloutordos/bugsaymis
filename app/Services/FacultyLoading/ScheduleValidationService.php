@@ -328,22 +328,30 @@ class ScheduleValidationService
 
     /**
      * Block if the proposed time overlaps with the section's recess or lunch break.
-     * A section's own per-day lunch override (Section::LUNCH_OVERRIDE_COLUMNS,
-     * if set for $day) takes priority; otherwise falls back to the same
-     * grade-level default (SchedulingConstants::getLunch) the calendar grid
-     * renders for that section+day, so validation can never disagree with
-     * what's shown on screen. The section's generic lunch_start/lunch_end
+     * A section's own per-day override (Section::LUNCH_OVERRIDE_COLUMNS /
+     * RECESS_OVERRIDE_COLUMNS, if set for $day) takes priority; otherwise
+     * falls back to the same grade-level default (SchedulingConstants::getLunch /
+     * getRecess) the calendar grid renders for that section+day, so
+     * validation can never disagree with what's shown on screen. The
+     * section's generic recess_start/recess_end and lunch_start/lunch_end
      * columns predate per-day overrides and are intentionally not used here.
      */
     private function checkBreakTimeConflict(Section $section, string $day, string $start, string $end): ?string
     {
-        if ($section->recess_start && $section->recess_end) {
-            if ($this->conflicts->timesOverlap($start, $end, $section->recess_start, $section->recess_end)) {
-                return "Schedule ({$start}–{$end}) overlaps with the section's recess break ({$section->recess_start}–{$section->recess_end}).";
+        $grade = (int) $section->levelid;
+
+        $recessOverride = $section->recessOverrideFor($day);
+        $recessWindows  = $recessOverride ? [$recessOverride] : SchedulingConstants::getRecess($grade, $day);
+
+        foreach ($recessWindows as $recess) {
+            $recessStart = $recess['start'] ?? null;
+            $recessEnd   = $recess['end'] ?? null;
+            if ($recessStart && $recessEnd && $this->conflicts->timesOverlap($start, $end, $recessStart, $recessEnd)) {
+                return "Schedule ({$start}–{$end}) overlaps with the section's recess break ({$recessStart}–{$recessEnd}).";
             }
         }
 
-        $lunch      = $section->lunchOverrideFor($day) ?? SchedulingConstants::getLunch((int) $section->levelid, $day);
+        $lunch      = $section->lunchOverrideFor($day) ?? SchedulingConstants::getLunch($grade, $day);
         $lunchStart = $lunch['start'] ?? null;
         $lunchEnd   = $lunch['end'] ?? null;
 

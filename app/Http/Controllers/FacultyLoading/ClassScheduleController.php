@@ -592,13 +592,14 @@ class ClassScheduleController extends Controller
 
         // Sections filtered to the term's school year (fall back to all active sections)
         $syId = $selectedTerm?->school_year_id ?? $currentTerm?->school_year_id;
-        $lunchOverrideColumns = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
+        $lunchOverrideColumns  = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
+        $recessOverrideColumns = array_merge(...array_values(Section::RECESS_OVERRIDE_COLUMNS));
         $sections = Section::when($syId, fn ($q) => $q->where('school_year_id', $syId))
             ->where('is_active', true)
             ->when($advisorySectionIds !== null, fn ($q) => $q->whereIn('id', $advisorySectionIds))
             ->orderBy('levelid')
             ->orderBy('sectionname')
-            ->get(array_merge(['id', 'sectionname', 'levelid'], $lunchOverrideColumns));
+            ->get(array_merge(['id', 'sectionname', 'levelid'], $lunchOverrideColumns, $recessOverrideColumns));
 
         // Administrator/CID Chief may edit the bell-schedule blocked bands
         // directly from the calendar (same authority BellScheduleController
@@ -636,24 +637,34 @@ class ClassScheduleController extends Controller
             }
         }
 
-        // Sections with their own lunch time on a given weekday get a
-        // day-scoped override of the grade's dayConfig for that one day only
-        // (every other day, electives, science core stay grade-shared). The
-        // calendar picks this up per-card+day so only that one section's card
-        // shows the shifted band; every other section keeps the grade default.
+        // Sections with their own lunch and/or recess time on a given weekday
+        // get a day-scoped override of the grade's dayConfig for that one day
+        // only (every other day, electives, science core stay grade-shared).
+        // The calendar picks this up per-card+day so only that one section's
+        // card shows the shifted band(s); every other section keeps the
+        // grade default.
         $dayConfigsBySection = [];
         foreach ($sections as $section) {
             $grade = (int) $section->levelid;
             foreach (SchedulingConstants::DAYS as $day) {
-                $override = $section->lunchOverrideFor($day);
-                if (! $override) {
+                $lunchOverride  = $section->lunchOverrideFor($day);
+                $recessOverride = $section->recessOverrideFor($day);
+                if (! $lunchOverride && ! $recessOverride) {
                     continue;
                 }
-                $override = [
-                    'start' => substr((string) $override['start'], 0, 5),
-                    'end'   => substr((string) $override['end'], 0, 5),
-                ];
-                $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day, $override);
+                if ($lunchOverride) {
+                    $lunchOverride = [
+                        'start' => substr((string) $lunchOverride['start'], 0, 5),
+                        'end'   => substr((string) $lunchOverride['end'], 0, 5),
+                    ];
+                }
+                if ($recessOverride) {
+                    $recessOverride = [
+                        'start' => substr((string) $recessOverride['start'], 0, 5),
+                        'end'   => substr((string) $recessOverride['end'], 0, 5),
+                    ];
+                }
+                $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day, $lunchOverride, $recessOverride);
                 if ($canEditBellSchedule) {
                     $blocked = array_map(function ($band) use ($grade, $day) {
                         $band['write'] = SchedulingConstants::bandWriteDescriptor($band['type'], $grade, $day);

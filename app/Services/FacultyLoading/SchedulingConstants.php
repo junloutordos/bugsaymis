@@ -876,8 +876,12 @@ class SchedulingConstants
      * section a different lunch time than the rest of its grade on this one
      * day (Section::LUNCH_OVERRIDE_COLUMNS). The caller is responsible for
      * only passing this when the override actually applies to $day.
+     *
+     * $recessOverride: same idea, for the RECESS row (Section::RECESS_OVERRIDE_COLUMNS).
+     * Every grade+day timetable literal carries exactly one RECESS row, so
+     * this replaces it the same way $lunchOverride replaces LUNCH.
      */
-    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null): array
+    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
@@ -888,6 +892,16 @@ class SchedulingConstants
                 if ($row['type'] === 'LUNCH') {
                     $row['start'] = $lunchOverride['start'];
                     $row['end']   = $lunchOverride['end'];
+                }
+                return $row;
+            }, $timetable);
+        }
+
+        if ($recessOverride !== null) {
+            $timetable = array_map(static function ($row) use ($recessOverride) {
+                if ($row['type'] === 'RECESS') {
+                    $row['start'] = $recessOverride['start'];
+                    $row['end']   = $recessOverride['end'];
                 }
                 return $row;
             }, $timetable);
@@ -972,7 +986,7 @@ class SchedulingConstants
      * capacity/placement math: restoring the G8 consult band there would
      * filter the overflow periods out of the schedulable grid.
      */
-    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null): array
+    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
@@ -983,6 +997,16 @@ class SchedulingConstants
                 if ($row['type'] === 'LUNCH') {
                     $row['start'] = $lunchOverride['start'];
                     $row['end']   = $lunchOverride['end'];
+                }
+                return $row;
+            }, $timetable);
+        }
+
+        if ($recessOverride !== null) {
+            $timetable = array_map(static function ($row) use ($recessOverride) {
+                if ($row['type'] === 'RECESS') {
+                    $row['start'] = $recessOverride['start'];
+                    $row['end']   = $recessOverride['end'];
                 }
                 return $row;
             }, $timetable);
@@ -1102,7 +1126,7 @@ class SchedulingConstants
     }
 
     /** Canonical regular and ILP-only periods after applying fixed blocks. */
-    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null): array
+    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null): array
     {
         if ($day === 'Friday' && in_array($grade, self::fridayIlaGrades(), true)) {
             return [];
@@ -1110,16 +1134,16 @@ class SchedulingConstants
 
         return array_values(array_filter(
             self::getTeachingSlots($grade, $day),
-            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride),
+            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride, $recessOverride),
         ));
     }
 
     /**
      * True if a proposed time window overlaps any blocked slot for the grade/day.
      */
-    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null): bool
+    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null, ?array $recessOverride = null): bool
     {
-        foreach (self::getBlockedSlots($grade, $day, $lunchOverride) as $blocked) {
+        foreach (self::getBlockedSlots($grade, $day, $lunchOverride, $recessOverride) as $blocked) {
             if ($start < $blocked['end'] && $end > $blocked['start']) {
                 return true;
             }

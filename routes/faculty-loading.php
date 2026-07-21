@@ -257,6 +257,9 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::patch('/{section}/lunch/{day}', [SectionController::class, 'updateDayLunch'])
                         ->name('lunch')
                         ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
+                    Route::patch('/{section}/recess/{day}', [SectionController::class, 'updateDayRecess'])
+                        ->name('recess')
+                        ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
                 });
             });
 

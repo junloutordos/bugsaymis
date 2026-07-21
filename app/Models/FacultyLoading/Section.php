@@ -52,6 +52,16 @@ class Section extends Model
         'lunch_end_thu',
         'lunch_start_fri',
         'lunch_end_fri',
+        'recess_start_mon',
+        'recess_end_mon',
+        'recess_start_tue',
+        'recess_end_tue',
+        'recess_start_wed',
+        'recess_end_wed',
+        'recess_start_thu',
+        'recess_end_thu',
+        'recess_start_fri',
+        'recess_end_fri',
         'afternoon_break_start',
         'afternoon_break_end',
         'adviser',
@@ -75,6 +85,20 @@ class Section extends Model
         'Wednesday' => ['lunch_start_wed', 'lunch_end_wed'],
         'Thursday'  => ['lunch_start_thu', 'lunch_end_thu'],
         'Friday'    => ['lunch_start_fri', 'lunch_end_fri'],
+    ];
+
+    /**
+     * Day name → [start column, end column] for this section's own per-day
+     * recess override. Mirrors LUNCH_OVERRIDE_COLUMNS — same single-map
+     * pattern so validation, the scheduling grid, the calendar controller,
+     * and the popover endpoint can never drift out of sync with each other.
+     */
+    public const RECESS_OVERRIDE_COLUMNS = [
+        'Monday'    => ['recess_start_mon', 'recess_end_mon'],
+        'Tuesday'   => ['recess_start_tue', 'recess_end_tue'],
+        'Wednesday' => ['recess_start_wed', 'recess_end_wed'],
+        'Thursday'  => ['recess_start_thu', 'recess_end_thu'],
+        'Friday'    => ['recess_start_fri', 'recess_end_fri'],
     ];
 
     protected $casts = [
@@ -169,6 +193,24 @@ class Section extends Model
     public function lunchOverrideFor(string $day): ?array
     {
         [$startCol, $endCol] = self::LUNCH_OVERRIDE_COLUMNS[$day] ?? [null, null];
+        if (! $startCol || ! $this->$startCol || ! $this->$endCol) {
+            return null;
+        }
+
+        return ['start' => $this->$startCol, 'end' => $this->$endCol];
+    }
+
+    /**
+     * This section's own recess override for the given weekday, or null if
+     * unset (falls back to the grade default) — see RECESS_OVERRIDE_COLUMNS.
+     * When set, this single window replaces every RECESS block the grade
+     * default has for that day (a grade can have more than one).
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public function recessOverrideFor(string $day): ?array
+    {
+        [$startCol, $endCol] = self::RECESS_OVERRIDE_COLUMNS[$day] ?? [null, null];
         if (! $startCol || ! $this->$startCol || ! $this->$endCol) {
             return null;
         }
