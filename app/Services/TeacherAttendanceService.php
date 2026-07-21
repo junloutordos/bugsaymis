@@ -9,6 +9,7 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\TeacherTapLog;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -35,7 +36,7 @@ class TeacherAttendanceService
     public function tap(string $nfcUuid, User $teacher): array
     {
         $currentSyId = SchoolYear::where('is_current', true)->value('id');
-        $classroom   = Classroom::where('nfc_uuid', $nfcUuid)
+        $classroom = Classroom::where('nfc_uuid', $nfcUuid)
             ->where('school_year_id', $currentSyId)
             ->first();
 
@@ -43,7 +44,7 @@ class TeacherAttendanceService
             return ['status' => 'room_not_found', 'tap' => null, 'schedule' => null, 'classroom' => null];
         }
 
-        $now       = Carbon::now();
+        $now = Carbon::now();
         $dayOfWeek = $now->format('l'); // "Monday", "Tuesday", etc.
 
         $schedule = $this->findMatchingSchedule($teacher->id, $classroom->id, $dayOfWeek, $now);
@@ -51,13 +52,13 @@ class TeacherAttendanceService
         if (! $schedule) {
             // Log the no-match tap so we have an audit trail
             $tap = TeacherTapLog::create([
-                'user_id'           => $teacher->id,
-                'classroom_id'      => $classroom->id,
+                'user_id' => $teacher->id,
+                'classroom_id' => $classroom->id,
                 'class_schedule_id' => null,
-                'tapped_at'         => $now,
-                'status'            => 'no_match',
-                'is_late'           => false,
-                'late_minutes'      => 0,
+                'tapped_at' => $now,
+                'status' => 'no_match',
+                'is_late' => false,
+                'late_minutes' => 0,
             ]);
 
             return ['status' => 'no_match', 'tap' => $tap, 'schedule' => null, 'classroom' => $classroom];
@@ -74,19 +75,19 @@ class TeacherAttendanceService
             return ['status' => 'already_tapped', 'tap' => $existing, 'schedule' => $schedule, 'classroom' => $classroom];
         }
 
-        $classStart   = Carbon::parse($now->toDateString() . ' ' . $schedule->start_time);
-        $lateMinutes  = (int) max(0, $classStart->diffInMinutes($now, false));
-        $isLate       = $lateMinutes > self::GRACE_PERIOD_MINUTES;
-        $tapStatus    = $isLate ? 'late' : 'on_time';
+        $classStart = Carbon::parse($now->toDateString().' '.$schedule->start_time);
+        $lateMinutes = (int) max(0, $classStart->diffInMinutes($now, false));
+        $isLate = $lateMinutes > self::GRACE_PERIOD_MINUTES;
+        $tapStatus = $isLate ? 'late' : 'on_time';
 
         $tap = TeacherTapLog::create([
-            'user_id'           => $teacher->id,
-            'classroom_id'      => $classroom->id,
+            'user_id' => $teacher->id,
+            'classroom_id' => $classroom->id,
             'class_schedule_id' => $schedule->id,
-            'tapped_at'         => $now,
-            'status'            => $tapStatus,
-            'is_late'           => $isLate,
-            'late_minutes'      => $lateMinutes,
+            'tapped_at' => $now,
+            'status' => $tapStatus,
+            'is_late' => $isLate,
+            'late_minutes' => $lateMinutes,
         ]);
 
         return ['status' => $tapStatus, 'tap' => $tap, 'schedule' => $schedule, 'classroom' => $classroom];
@@ -126,7 +127,7 @@ class TeacherAttendanceService
     public function todaySchedules(?int $academicUnitId = null): Collection
     {
         $dayOfWeek = Carbon::now()->format('l');
-        $now       = Carbon::now();
+        $now = Carbon::now();
 
         $currentTermId = DB::table('academic_terms')
             ->join('school_years', 'academic_terms.school_year_id', '=', 'school_years.id')
@@ -137,12 +138,12 @@ class TeacherAttendanceService
         $query = ClassSchedule::with([
             'faculty:id,name',
             'subject:id,name,code',
-            'section:id,name',
+            'section:id,sectionname',
             'classroom:id,name,code',
         ])
-        ->where('entry_type', 'class')
-        ->where('day_of_week', $dayOfWeek)
-        ->where('status', 'active');
+            ->where('entry_type', 'class')
+            ->where('day_of_week', $dayOfWeek)
+            ->where('status', 'active');
 
         if ($currentTermId) {
             $query->where('academic_term_id', $currentTermId);
@@ -165,8 +166,8 @@ class TeacherAttendanceService
         return $schedules->map(function (ClassSchedule $cs) use ($tapLogs, $now) {
             $tap = $tapLogs->get($cs->id);
 
-            $startTime = Carbon::parse(today()->toDateString() . ' ' . $cs->start_time);
-            $endTime   = Carbon::parse(today()->toDateString() . ' ' . $cs->end_time);
+            $startTime = Carbon::parse(today()->toDateString().' '.$cs->start_time);
+            $endTime = Carbon::parse(today()->toDateString().' '.$cs->end_time);
 
             if ($tap) {
                 $displayStatus = $tap->is_late ? 'late' : 'on_time';
@@ -179,15 +180,15 @@ class TeacherAttendanceService
             }
 
             return [
-                'id'           => $cs->id,
-                'faculty'      => ['id' => $cs->faculty?->id, 'name' => $cs->faculty?->name],
-                'subject'      => ['name' => $cs->subject?->name, 'code' => $cs->subject?->code],
-                'section'      => ['name' => $cs->section?->name ?? '—'],
-                'classroom'    => ['name' => $cs->classroom?->name, 'code' => $cs->classroom?->code],
-                'start_time'   => $cs->start_time,
-                'end_time'     => $cs->end_time,
-                'tap_status'   => $displayStatus,
-                'tapped_at'    => $tap?->tapped_at?->format('H:i'),
+                'id' => $cs->id,
+                'faculty' => ['id' => $cs->faculty?->id, 'name' => $cs->faculty?->name],
+                'subject' => ['name' => $cs->subject?->name, 'code' => $cs->subject?->code],
+                'section' => ['name' => $cs->section?->sectionname ?? '—'],
+                'classroom' => ['name' => $cs->classroom?->name, 'code' => $cs->classroom?->code],
+                'start_time' => $cs->start_time,
+                'end_time' => $cs->end_time,
+                'tap_status' => $displayStatus,
+                'tapped_at' => $tap?->tapped_at?->format('H:i'),
                 'late_minutes' => $tap?->late_minutes ?? 0,
             ];
         });
@@ -196,13 +197,13 @@ class TeacherAttendanceService
     /**
      * Return paginated tap log history for the given filters.
      */
-    public function history(array $filters, ?int $academicUnitId = null): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    public function history(array $filters, ?int $academicUnitId = null): LengthAwarePaginator
     {
         $query = TeacherTapLog::with([
             'teacher:id,name',
             'classroom:id,name,code',
             'classSchedule.subject:id,name,code',
-            'classSchedule.section:id,name',
+            'classSchedule.section:id,sectionname',
         ]);
 
         if (! empty($filters['date'])) {
@@ -224,8 +225,7 @@ class TeacherAttendanceService
         }
 
         if ($academicUnitId) {
-            $query->whereHas('classSchedule.subject', fn ($q) =>
-                $q->where('academic_unit_id', $academicUnitId)
+            $query->whereHas('classSchedule.subject', fn ($q) => $q->where('academic_unit_id', $academicUnitId)
             );
         }
 

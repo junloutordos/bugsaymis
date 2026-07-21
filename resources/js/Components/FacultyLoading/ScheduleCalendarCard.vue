@@ -9,7 +9,10 @@
         <span v-if="titleBadge" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full shrink-0">
           {{ titleBadge }}
         </span>
-        <h3 class="text-sm font-semibold text-slate-800 truncate">{{ title }}</h3>
+        <div class="min-w-0">
+          <h3 class="text-sm font-semibold text-slate-800 truncate">{{ title }}</h3>
+          <p v-if="subtitle" class="text-xs text-slate-500 truncate">{{ subtitle }}</p>
+        </div>
         <span v-if="meta" class="text-xs text-slate-400 shrink-0">{{ meta }}</span>
       </div>
       <div class="flex items-center gap-1 shrink-0 print:hidden">
@@ -255,6 +258,7 @@ import {
 
 const props = defineProps({
   title:          { type: String, required: true },
+  subtitle:       { type: String, default: null },
   titleBadge:     { type: [String, Number], default: null },
   meta:           { type: String, default: '' },
   /** { Monday: [scheduleRow, ...], ... } — each row may carry a pre-resolved `secondary_label`. */

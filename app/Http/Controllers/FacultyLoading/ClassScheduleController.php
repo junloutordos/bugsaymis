@@ -20,6 +20,7 @@ use App\Services\DigitalSignatureService;
 use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
 use App\Services\FacultyLoading\ConflictDetectionService;
+use App\Services\FacultyLoading\DeterministicSchedulingService;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\FacultyLoading\ScheduleValidationService;
 use App\Services\FacultyLoading\SchedulingConstants;
@@ -170,7 +171,10 @@ class ClassScheduleController extends Controller
                 || ($cap['level'] === 'advisory' && in_array((int) $section->id, $cap['section_ids'] ?? [], true)),
             403,
         );
-        $section->loadMissing(['flSchoolYear', 'adviserUser:id,name', 'classroom:id,name,code']);
+        $section->loadMissing(['flSchoolYear', 'classroom:id,name,code']);
+        $adviserName = $this->advisoryScope
+            ->adviserNamesBySection((int) $term->id, [$section->id])
+            ->get((int) $section->id);
 
         return $this->renderPrintSchedule(
             'section',
@@ -178,7 +182,7 @@ class ClassScheduleController extends Controller
                 'id' => $section->id,
                 'name' => $section->sectionname,
                 'grade_level' => $section->levelid,
-                'adviser' => $section->adviserUser?->name,
+                'adviser_name' => $adviserName,
                 'classroom' => $section->classroom?->code ?? $section->classroom?->name,
             ],
             $term,
@@ -370,9 +374,9 @@ class ClassScheduleController extends Controller
 
         // A synthetic elective (ELEC-*) or Science Core (SCI-*) section prints
         // its real classes, so it gets no band (homeroom sections do).
-        $ownerName             = (string) ($owner['name'] ?? '');
-        $isElectiveSection     = str_starts_with($ownerName, 'ELEC-');
-        $isScienceCoreSection  = str_starts_with($ownerName, ScienceCoreService::SECTION_PREFIX);
+        $ownerName = (string) ($owner['name'] ?? '');
+        $isElectiveSection = str_starts_with($ownerName, 'ELEC-');
+        $isScienceCoreSection = str_starts_with($ownerName, ScienceCoreService::SECTION_PREFIX);
         $dayConfigs = [];
         if ($gradeLevel !== null) {
             foreach (SchedulingConstants::DAYS as $day) {
@@ -451,12 +455,18 @@ class ClassScheduleController extends Controller
                 ->orderBy('sectionname')
                 ->get();
 
+            $adviserNames = $this->advisoryScope->adviserNamesBySection(
+                (int) $term->id,
+                $sections->pluck('id'),
+            );
+
             foreach ($sections as $section) {
                 $sheets[] = $this->buildPrintSheet(
                     [
                         'id' => $section->id,
                         'name' => $section->sectionname,
                         'grade_level' => $section->levelid,
+                        'adviser_name' => $adviserNames->get((int) $section->id),
                     ],
                     $term,
                     ClassSchedule::where('section_id', $section->id),
@@ -592,7 +602,7 @@ class ClassScheduleController extends Controller
 
         // Sections filtered to the term's school year (fall back to all active sections)
         $syId = $selectedTerm?->school_year_id ?? $currentTerm?->school_year_id;
-        $lunchOverrideColumns  = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
+        $lunchOverrideColumns = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
         $recessOverrideColumns = array_merge(...array_values(Section::RECESS_OVERRIDE_COLUMNS));
         $sections = Section::when($syId, fn ($q) => $q->where('school_year_id', $syId))
             ->where('is_active', true)
@@ -600,6 +610,14 @@ class ClassScheduleController extends Controller
             ->orderBy('levelid')
             ->orderBy('sectionname')
             ->get(array_merge(['id', 'sectionname', 'levelid'], $lunchOverrideColumns, $recessOverrideColumns));
+
+        $adviserNames = $termId
+            ? $this->advisoryScope->adviserNamesBySection((int) $termId, $sections->pluck('id'))
+            : collect();
+        $sections->each(fn (Section $section) => $section->setAttribute(
+            'adviser_name',
+            $adviserNames->get((int) $section->id),
+        ));
 
         // Administrator/CID Chief may edit the bell-schedule blocked bands
         // directly from the calendar (same authority BellScheduleController
@@ -647,7 +665,7 @@ class ClassScheduleController extends Controller
         foreach ($sections as $section) {
             $grade = (int) $section->levelid;
             foreach (SchedulingConstants::DAYS as $day) {
-                $lunchOverride  = $section->lunchOverrideFor($day);
+                $lunchOverride = $section->lunchOverrideFor($day);
                 $recessOverride = $section->recessOverrideFor($day);
                 if (! $lunchOverride && ! $recessOverride) {
                     continue;
@@ -655,19 +673,20 @@ class ClassScheduleController extends Controller
                 if ($lunchOverride) {
                     $lunchOverride = [
                         'start' => substr((string) $lunchOverride['start'], 0, 5),
-                        'end'   => substr((string) $lunchOverride['end'], 0, 5),
+                        'end' => substr((string) $lunchOverride['end'], 0, 5),
                     ];
                 }
                 if ($recessOverride) {
                     $recessOverride = [
                         'start' => substr((string) $recessOverride['start'], 0, 5),
-                        'end'   => substr((string) $recessOverride['end'], 0, 5),
+                        'end' => substr((string) $recessOverride['end'], 0, 5),
                     ];
                 }
                 $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day, $lunchOverride, $recessOverride);
                 if ($canEditBellSchedule) {
                     $blocked = array_map(function ($band) use ($grade, $day) {
                         $band['write'] = SchedulingConstants::bandWriteDescriptor($band['type'], $grade, $day);
+
                         return $band;
                     }, $blocked);
                 }
@@ -684,8 +703,8 @@ class ClassScheduleController extends Controller
         // current value on hand to round-trip a single-field edit correctly.
         $bellScheduleSettings = $canEditBellSchedule ? [
             'WEDNESDAY_ACTIVITY_START' => SchedulingConstants::setting('WEDNESDAY_ACTIVITY_START'),
-            'WEDNESDAY_ALP'            => SchedulingConstants::setting('WEDNESDAY_ALP'),
-            'WEDNESDAY_ALP_BY_GRADE'   => SchedulingConstants::setting('WEDNESDAY_ALP_BY_GRADE'),
+            'WEDNESDAY_ALP' => SchedulingConstants::setting('WEDNESDAY_ALP'),
+            'WEDNESDAY_ALP_BY_GRADE' => SchedulingConstants::setting('WEDNESDAY_ALP_BY_GRADE'),
         ] : null;
 
         // Full raw rows for every editable timetable — a literal-band drag
@@ -703,8 +722,8 @@ class ClassScheduleController extends Controller
         // see all loads; unit heads see only their own faculty's unplaced loads.
         $unplacedLoads = match ($cap['level']) {
             'manage' => $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections),
-            'unit'   => $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections, $cap['faculty_ids']),
-            default  => [],
+            'unit' => $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections, $cap['faculty_ids']),
+            default => [],
         };
 
         $approvalBatch = null;
@@ -876,7 +895,7 @@ class ClassScheduleController extends Controller
     /**
      * Authoritative session_type + duration for the NEXT session of a load
      * assignment being manually placed — mirrors the rule
-     * {@see \App\Services\FacultyLoading\DeterministicSchedulingService::suggestSlotsForLoad()}
+     * {@see DeterministicSchedulingService::suggestSlotsForLoad()}
      * uses, so a manually dragged/picked placement can never disagree with
      * what the auto-scheduler/suggestions popover would have tagged it as.
      *
@@ -1176,7 +1195,7 @@ class ClassScheduleController extends Controller
     public function realign(ClassSchedule $classSchedule): RedirectResponse
     {
         if ($classSchedule->entry_type !== 'class' || ! $classSchedule->subject_id || ! $classSchedule->user_id) {
-            return back()->withErrors(["Only teaching sessions can be realigned to a pattern."]);
+            return back()->withErrors(['Only teaching sessions can be realigned to a pattern.']);
         }
 
         $cap = $this->scheduleCapability();
@@ -1185,7 +1204,7 @@ class ClassScheduleController extends Controller
         }
 
         if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)) {
-            return back()->withErrors(["This term schedule is locked for OCD approval."]);
+            return back()->withErrors(['This term schedule is locked for OCD approval.']);
         }
 
         $siblingDays = $this->conflicts->findSiblingPatternDays(
@@ -1212,8 +1231,8 @@ class ClassScheduleController extends Controller
 
         if (! $target) {
             return back()->withErrors([
-                "No established pattern day found to realign to — this section may already use every day "
-                . "the faculty's other sections use for this subject.",
+                'No established pattern day found to realign to — this section may already use every day '
+                ."the faculty's other sections use for this subject.",
             ]);
         }
 
@@ -1386,7 +1405,7 @@ class ClassScheduleController extends Controller
         $validation = $this->validation->validate($data, $classSchedule->id);
         if (! empty($validation['errors'])) {
             return back()->withErrors(array_merge(
-                ["Its original slot is no longer free — edit the day/time before restoring."],
+                ['Its original slot is no longer free — edit the day/time before restoring.'],
                 $validation['errors']
             ));
         }

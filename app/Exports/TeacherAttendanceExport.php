@@ -31,7 +31,7 @@ class TeacherAttendanceExport implements FromArray, WithHeadings, WithStyles
                 $log->teacher?->name ?? '—',
                 $log->classroom?->name ?? '—',
                 $log->classSchedule?->subject?->name ?? '—',
-                $log->classSchedule?->section?->name ?? '—',
+                $log->classSchedule?->section?->sectionname ?? '—',
                 $log->tapped_at?->format('Y-m-d H:i') ?? '—',
                 ucfirst(str_replace('_', ' ', $log->status)),
                 $log->late_minutes ?? 0,

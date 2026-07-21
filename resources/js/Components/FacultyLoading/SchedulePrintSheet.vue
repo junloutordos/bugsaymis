@@ -5,6 +5,9 @@
     <main class="schedule-print-body">
       <div class="schedule-print-heading">
         <h1>{{ documentTitle }}</h1>
+        <p v-if="scheduleType === 'section' && owner.adviser_name" class="schedule-print-adviser">
+          {{ owner.adviser_name }}
+        </p>
         <p class="schedule-print-sy">S.Y. {{ schoolYearLabel }}</p>
 
         <div v-if="scheduleType === 'faculty'" class="schedule-print-facultymeta">
@@ -372,6 +375,13 @@ function lunchTimeLabel(day) {
   font-size: 13pt;
   font-weight: 800;
   letter-spacing: 0.06em;
+}
+
+.schedule-print-adviser {
+  margin: 0.4mm 0 0;
+  font-size: 8.5pt;
+  font-weight: 700;
+  color: #334155;
 }
 
 .schedule-print-sy {

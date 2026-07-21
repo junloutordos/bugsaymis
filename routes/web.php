@@ -1017,6 +1017,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/computer-labs/bookings/{booking}/cancel', [ComputerLabController::class, 'cancelBooking'])
         ->middleware('permission:computer_labs.book|computer_labs.manage|faculty_loading.manage')
         ->name('computer-labs.bookings.cancel');
+    Route::patch('/computer-labs/bookings/{booking}/room', [ComputerLabController::class, 'moveBooking'])
+        ->middleware('permission:computer_labs.manage|faculty_loading.manage')
+        ->name('computer-labs.bookings.move');
     Route::post('/computer-labs/synchronize', [ComputerLabController::class, 'synchronize'])
         ->middleware('permission:computer_labs.manage|faculty_loading.manage')
         ->name('computer-labs.synchronize');

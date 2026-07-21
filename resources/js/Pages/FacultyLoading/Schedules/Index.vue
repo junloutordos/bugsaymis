@@ -184,6 +184,7 @@
 
               <ScheduleCalendarCard
                 :title="cardTitle(groupId)"
+                :subtitle="sectionAdviserName(groupId)"
                 :title-badge="viewBy === 'section' ? ('Grade ' + groupHeaderInfo(groupId).grade_level) : null"
                 :meta="'· ' + (byGroup[groupId]?.length ?? 0) + ' slot(s)'"
                 :events-by-day="cardEventsByDay(groupId)"
@@ -1694,6 +1695,11 @@ function cardTitle(groupId) {
   if (viewBy.value === 'grade') return `Grade ${groupId} — Electives & Science Core`
   if (viewBy.value === 'subject') return subjectLabel(groupId)
   return viewBy.value === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name
+}
+
+function sectionAdviserName(groupId) {
+  if (viewBy.value !== 'section') return null
+  return props.sections.find(section => String(section.id) === String(groupId))?.adviser_name ?? null
 }
 
 /** Batch print — every section (or faculty) with schedules this term, one

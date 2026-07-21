@@ -557,6 +557,7 @@ class FacultyLoadingHttpTest extends TestCase
                 ->where('capability.level', 'advisory')
                 ->has('sections', 1)
                 ->where('sections.0.id', $assigned->id)
+                ->where('sections.0.adviser_name', $adviser->name)
                 ->has('schedules', 1)
                 ->where('schedules.0.id', $visible->id)
                 ->where('canRequestSwap', false));
@@ -620,7 +621,9 @@ class FacultyLoadingHttpTest extends TestCase
 
         $this->actingAs($adviser)
             ->get(route('faculty-loading.schedules.sections.print', ['section' => $assigned, 'term_id' => $term->id]))
-            ->assertOk();
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('owner.adviser_name', $adviser->name));
 
         $this->actingAs($adviser)
             ->get(route('faculty-loading.schedules.sections.print', ['section' => $other, 'term_id' => $term->id]))
@@ -679,6 +682,35 @@ class FacultyLoadingHttpTest extends TestCase
                 'term_id' => $otherTerm->id,
             ]))
             ->assertNotFound();
+    }
+
+    public function test_batch_section_print_includes_the_term_designation_adviser_name(): void
+    {
+        $adviser = User::factory()->create(['email_verified_at' => now()]);
+        $faculty = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $section = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Diamond']);
+        $subject = $this->makeSubject();
+        $room = $this->makeClassroom();
+
+        $this->assignDesignation($adviser, $sy, $term, 'HR_ADV', 'HRA-G8-DIAMOND', 'HR Adviser — G8 Diamond', $section);
+        ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.schedules.print-batch', [
+                'type' => 'section',
+                'term_id' => $term->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('FacultyLoading/Schedules/PrintBatch')
+                ->has('sheets', 1)
+                ->where('sheets.0.owner.adviser_name', $adviser->name));
     }
 
     public function test_faculty_can_print_only_their_own_schedule(): void

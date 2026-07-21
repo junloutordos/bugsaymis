@@ -186,6 +186,25 @@ class ComputerLabController extends Controller
         return back()->with('success', 'Computer laboratory booking cancelled.');
     }
 
+    public function moveBooking(
+        Request $request,
+        ComputerLabBooking $booking,
+        ComputerLabSchedulingService $scheduler,
+    ): RedirectResponse {
+        abort_unless($this->canManage($request), 403);
+
+        $data = $request->validate([
+            'room_id' => [
+                'required',
+                Rule::exists('rooms', 'id')->where(fn ($query) => $query->where('room_type', 'Computer Laboratory')),
+            ],
+        ]);
+
+        $scheduler->moveToRoom($booking, (int) $data['room_id']);
+
+        return back()->with('success', 'Computer laboratory schedule moved successfully.');
+    }
+
     public function synchronize(
         Request $request,
         ComputerLabSchedulingService $scheduler,
@@ -328,6 +347,9 @@ class ComputerLabController extends Controller
             'can_cancel' => ! $booking->isPriorityClass()
                 && ($this->canManage(request()) || (int) $booking->requested_by === (int) Auth::id())
                 && ! in_array($booking->status, ['rejected', 'cancelled'], true),
+            'can_move' => $this->canManage(request())
+                && (($booking->isPriorityClass() && $booking->status === 'confirmed')
+                    || (! $booking->isPriorityClass() && $booking->status === 'approved')),
         ];
     }
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import AppButton from '@/Components/AppButton.vue'
@@ -28,6 +28,7 @@ const STATUSES = [
   { value: 'unexcused_tardy',   code: 'UT', label: 'Unexcused Tardy',   cls: 'bg-orange-100 text-orange-700' },
 ]
 const STATUS_BY_VALUE = Object.fromEntries(STATUSES.map(s => [s.value, s]))
+const STATUS_CYCLE = [null, ...STATUSES.map(status => status.value)]
 
 // Tally groups for the totals columns.
 const ABSENCE_SET = new Set(['absent', 'unexcused_absence', 'excused_absence', 'cut_class'])
@@ -49,7 +50,6 @@ const saving         = ref(false)
 const showAddDate    = ref(false)
 const newDateInput   = ref('')
 const addingDate     = ref(false)
-const picker         = ref(null)  // { studentId, dateId, x, y }
 
 const students = computed(() =>
   (props.quarterData?.students ?? []).filter(s => s.is_active !== false)
@@ -80,46 +80,21 @@ async function load() {
 onMounted(load)
 watch(() => props.quarterNumber, load)
 
-// ── Status picker popover ────────────────────────────────────────────────────
+// ── Attendance toggle ────────────────────────────────────────────────────────
 
-function openPicker(e, studentId, dateId) {
+function cycleAttendance(studentId, dateId) {
   if (props.isLocked) return
-  const rect = e.currentTarget.getBoundingClientRect()
-  picker.value = {
-    studentId, dateId,
-    x: Math.min(rect.left, window.innerWidth - 250),
-    y: Math.min(rect.bottom + 6, window.innerHeight - 350),
-  }
-}
-
-function pickStatus(value) {
-  const { studentId, dateId } = picker.value
   const key  = `${studentId}_${dateId}`
   const prev = records.value[key] ?? { status: null, uniform: null }
-  const next = { ...prev, status: value }
+  const idx  = STATUS_CYCLE.indexOf(prev.status ?? null)
+  const next = { ...prev, status: STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length] }
   if (next.status === null && next.uniform === null) {
     delete records.value[key]
   } else {
     records.value[key] = next
   }
   pendingChanges.add(key)
-  picker.value = null
 }
-
-function onWindowMousedown(e) {
-  if (picker.value && !e.target.closest('[data-att-picker]')) picker.value = null
-}
-function onWindowKeydown(e) {
-  if (e.key === 'Escape') picker.value = null
-}
-onMounted(() => {
-  window.addEventListener('mousedown', onWindowMousedown, true)
-  window.addEventListener('keydown', onWindowKeydown)
-})
-onBeforeUnmount(() => {
-  window.removeEventListener('mousedown', onWindowMousedown, true)
-  window.removeEventListener('keydown', onWindowKeydown)
-})
 
 // ── Uniform toggle (3 states — cycling stays comfortable) ────────────────────
 
@@ -252,7 +227,7 @@ function presentCountForDate(dateId) {
     <!-- Toolbar -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <p class="text-xs text-slate-500">
-        Click an <span class="font-semibold">Att</span> cell to pick a status ·
+        Click an <span class="font-semibold">Att</span> cell to cycle attendance ·
         click a <span class="font-semibold">Unif</span> cell to cycle — → CU → IU
       </p>
       <div class="flex items-center gap-2 shrink-0">
@@ -335,8 +310,7 @@ function presentCountForDate(dateId) {
             <template v-for="d in dates" :key="d.id">
               <td class="px-0.5 py-1.5 text-center border-r border-slate-100">
                 <button
-                  data-att-picker
-                  @click="openPicker($event, student.id, d.id)"
+                  @click="cycleAttendance(student.id, d.id)"
                   :class="[
                     'min-w-[30px] h-6 px-1 rounded-md text-[11px] font-bold transition-colors',
                     cell(student.id, d.id)?.status
@@ -348,7 +322,7 @@ function presentCountForDate(dateId) {
                   :disabled="isLocked"
                   :title="cell(student.id, d.id)?.status
                     ? STATUS_BY_VALUE[cell(student.id, d.id).status]?.label
-                    : (isLocked ? '' : 'Set attendance status')">
+                    : (isLocked ? '' : 'Cycle attendance status')">
                   {{ cell(student.id, d.id)?.status ? STATUS_BY_VALUE[cell(student.id, d.id).status]?.code : '—' }}
                 </button>
               </td>
@@ -431,28 +405,5 @@ function presentCountForDate(dateId) {
         </span>
       </div>
     </div>
-
-    <!-- Status picker popover -->
-    <Teleport to="body">
-      <div v-if="picker" data-att-picker
-        class="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white shadow-xl p-2"
-        :style="{ left: picker.x + 'px', top: picker.y + 'px' }">
-        <p class="px-1.5 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Attendance status</p>
-        <div class="grid grid-cols-1 gap-0.5">
-          <button v-for="s in STATUSES" :key="s.value" type="button" @click="pickStatus(s.value)"
-            class="flex items-center gap-2 rounded-lg px-1.5 py-1 text-left text-xs text-slate-600 hover:bg-slate-50">
-            <span :class="['inline-flex items-center justify-center min-w-[26px] h-5 px-1 rounded-md text-[11px] font-bold', s.cls]">
-              {{ s.code }}
-            </span>
-            {{ s.label }}
-          </button>
-          <button type="button" @click="pickStatus(null)"
-            class="flex items-center gap-2 rounded-lg px-1.5 py-1 text-left text-xs text-slate-400 hover:bg-slate-50 border-t border-slate-100 mt-0.5 pt-1.5">
-            <span class="inline-flex items-center justify-center min-w-[26px] h-5 px-1 rounded-md text-[11px] font-bold bg-slate-100 text-slate-400">—</span>
-            Clear
-          </button>
-        </div>
-      </div>
-    </Teleport>
   </template>
 </template>

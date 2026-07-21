@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\TeacherAttendanceExport;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\User;
 use App\Services\TeacherAttendanceService;
@@ -27,19 +28,19 @@ class TeacherAttendanceController extends Controller
         $result = $this->service->tap($uuid, $teacher);
 
         return Inertia::render('RoomTap', [
-            'tapStatus'   => $result['status'],
-            'tappedAt'    => $result['tap']?->tapped_at?->format('H:i'),
+            'tapStatus' => $result['status'],
+            'tappedAt' => $result['tap']?->tapped_at?->format('H:i'),
             'lateMinutes' => $result['tap']?->late_minutes ?? 0,
-            'classroom'   => $result['classroom'] ? [
+            'classroom' => $result['classroom'] ? [
                 'name' => $result['classroom']->name,
                 'code' => $result['classroom']->code,
             ] : null,
-            'schedule'    => $result['schedule'] ? [
-                'subject'    => $result['schedule']->subject?->name,
-                'subjectCode'=> $result['schedule']->subject?->code,
-                'section'    => $result['schedule']->section?->name ?? '—',
-                'startTime'  => $result['schedule']->start_time,
-                'endTime'    => $result['schedule']->end_time,
+            'schedule' => $result['schedule'] ? [
+                'subject' => $result['schedule']->subject?->name,
+                'subjectCode' => $result['schedule']->subject?->code,
+                'section' => $result['schedule']->section?->sectionname ?? '—',
+                'startTime' => $result['schedule']->start_time,
+                'endTime' => $result['schedule']->end_time,
             ] : null,
             'teacherName' => $teacher->name,
         ]);
@@ -55,8 +56,8 @@ class TeacherAttendanceController extends Controller
 
         $this->authorizeAccess($user);
 
-        $headedUnit    = $this->service->getHeadedAcademicUnit($user);
-        $scopedUnitId  = $headedUnit?->id; // null = full view (CID Chief / Admin)
+        $headedUnit = $this->service->getHeadedAcademicUnit($user);
+        $scopedUnitId = $headedUnit?->id; // null = full view (CID Chief / Admin)
 
         // Supervisors with class-attendance.view may override their unit scope
         if ($user->isSuperAdmin() || $user->hasPermission('class-attendance.view')) {
@@ -76,8 +77,7 @@ class TeacherAttendanceController extends Controller
         $teachers = User::employees()->select('id', 'name')
             ->where('status', '<>', 'inactive')
             ->when($scopedUnitId, function ($q) use ($scopedUnitId) {
-                $q->whereHas('loadAssignments.subject', fn ($sq) =>
-                    $sq->where('academic_unit_id', $scopedUnitId)
+                $q->whereHas('loadAssignments.subject', fn ($sq) => $sq->where('academic_unit_id', $scopedUnitId)
                 );
             })
             ->orderBy('name')
@@ -85,11 +85,11 @@ class TeacherAttendanceController extends Controller
 
         return Inertia::render('TeacherAttendance/Index', [
             'todaySchedules' => $todaySchedules->values(),
-            'history'        => $history,
-            'classrooms'     => $classrooms,
-            'teachers'       => $teachers,
-            'filters'        => $filters,
-            'scopedUnit'     => $headedUnit ? ['id' => $headedUnit->id, 'name' => $headedUnit->name] : null,
+            'history' => $history,
+            'classrooms' => $classrooms,
+            'teachers' => $teachers,
+            'filters' => $filters,
+            'scopedUnit' => $headedUnit ? ['id' => $headedUnit->id, 'name' => $headedUnit->name] : null,
         ]);
     }
 
@@ -103,18 +103,18 @@ class TeacherAttendanceController extends Controller
 
         $this->authorizeAccess($user);
 
-        $headedUnit   = $this->service->getHeadedAcademicUnit($user);
+        $headedUnit = $this->service->getHeadedAcademicUnit($user);
         $scopedUnitId = ($user->isSuperAdmin() || $user->hasPermission('class-attendance.view'))
             ? null
             : $headedUnit?->id;
 
         $filters = $request->only(['date', 'teacher_id', 'classroom_id', 'status']);
-        $rows    = $this->service->history($filters, $scopedUnitId)->items();
+        $rows = $this->service->history($filters, $scopedUnitId)->items();
 
-        $date     = $filters['date'] ?? today()->toDateString();
+        $date = $filters['date'] ?? today()->toDateString();
         $filename = "teacher-attendance-{$date}.xlsx";
 
-        return Excel::download(new \App\Exports\TeacherAttendanceExport($rows), $filename);
+        return Excel::download(new TeacherAttendanceExport($rows), $filename);
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

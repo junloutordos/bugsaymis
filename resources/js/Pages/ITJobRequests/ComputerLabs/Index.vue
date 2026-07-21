@@ -10,10 +10,11 @@ import AppInput from '@/Components/AppInput.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import LabScheduleTimeline from '@/Components/ComputerLabs/LabScheduleTimeline.vue'
 import { confirmAction } from '@/Composables/useConfirm.js'
 import {
   ArrowLeftIcon, ArrowPathIcon, ArrowRightIcon, CalendarDaysIcon,
-  CheckIcon, ClockIcon, ComputerDesktopIcon, ExclamationTriangleIcon,
+  CheckIcon, ComputerDesktopIcon, ExclamationTriangleIcon,
   PlusIcon, SignalIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -52,19 +53,11 @@ function moveWeek(days) {
   applyFilters()
 }
 
-function cellBookings(date, roomId) {
-  return props.bookings.filter(booking => booking.date === date && booking.room_id === roomId)
-}
-
 function formatTime(time) {
   if (!time) return ''
   const [hour, minute] = time.split(':').map(Number)
   return new Intl.DateTimeFormat('en-PH', { hour: 'numeric', minute: '2-digit' })
     .format(new Date(2000, 0, 1, hour, minute))
-}
-
-function statusColor(status) {
-  return { confirmed: 'indigo', approved: 'green', pending: 'orange', unassigned: 'red' }[status] ?? 'slate'
 }
 
 const bookingModal = ref(false)
@@ -117,6 +110,18 @@ async function reject(booking) {
 async function cancel(booking) {
   if (!await confirmAction(`Cancel the booking “${booking.title}”?`)) return
   useForm({}).post(route('computer-labs.bookings.cancel', booking.id), { preserveScroll: true })
+}
+
+const movingBookingId = ref(null)
+
+function moveBooking({ booking, roomId }) {
+  if (movingBookingId.value) return
+  movingBookingId.value = booking.id
+
+  router.patch(route('computer-labs.bookings.move', booking.id), { room_id: roomId }, {
+    preserveScroll: true,
+    onFinish: () => { movingBookingId.value = null },
+  })
 }
 </script>
 
@@ -191,44 +196,17 @@ async function cancel(booking) {
           </div>
         </div>
 
-        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table class="min-w-[920px] w-full border-collapse">
-            <thead>
-              <tr class="bg-slate-50">
-                <th class="w-28 border-b border-r border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Day</th>
-                <th v-for="lab in visibleLabs" :key="lab.room.id" class="border-b border-r border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 last:border-r-0">
-                  {{ lab.room.name }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="day in days" :key="day.date">
-                <th class="border-b border-r border-slate-200 bg-slate-50/60 px-3 py-3 text-left align-top">
-                  <p class="text-sm font-semibold text-slate-700">{{ day.name }}</p>
-                  <p class="text-xs text-slate-400">{{ day.label }}</p>
-                </th>
-                <td v-for="lab in visibleLabs" :key="lab.room.id" class="min-w-48 border-b border-r border-slate-200 p-2 align-top last:border-r-0">
-                  <div class="min-h-24 space-y-2">
-                    <div v-for="booking in cellBookings(day.date, lab.room.id)" :key="booking.id"
-                      class="rounded-lg border p-2 text-xs"
-                      :class="booking.booking_type === 'priority_class' ? 'border-indigo-200 bg-indigo-50' : booking.status === 'approved' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'">
-                      <div class="flex items-start justify-between gap-1">
-                        <p class="font-semibold text-slate-800">{{ booking.title }}</p>
-                        <AppBadge :color="statusColor(booking.status)">{{ booking.status }}</AppBadge>
-                      </div>
-                      <p class="mt-1 flex items-center gap-1 text-slate-500"><ClockIcon class="h-3.5 w-3.5" /> {{ formatTime(booking.start_time) }}–{{ formatTime(booking.end_time) }}</p>
-                      <p v-if="booking.faculty" class="mt-1 text-slate-500">{{ booking.faculty }}</p>
-                      <button v-if="booking.can_cancel" type="button" class="mt-1 text-red-600 hover:underline" @click="cancel(booking)">Cancel</button>
-                    </div>
-                    <button v-if="capabilities.canBook" type="button" class="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-indigo-300 hover:text-indigo-600" @click="openBooking(day.date, lab.room.id)">
-                      <PlusIcon class="h-3.5 w-3.5" /> Request this period
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <LabScheduleTimeline
+          :days="days"
+          :labs="visibleLabs"
+          :bookings="bookings"
+          :can-manage="capabilities.canManage"
+          :can-book="capabilities.canBook"
+          :moving-booking-id="movingBookingId"
+          @move="moveBooking"
+          @cancel="cancel"
+          @request="({ date, roomId }) => openBooking(date, roomId)"
+        />
 
         <div v-if="unassigned.length" class="rounded-xl border border-red-200 bg-red-50 p-4">
           <div class="flex items-center gap-2 text-sm font-semibold text-red-800">

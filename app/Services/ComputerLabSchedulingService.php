@@ -13,6 +13,52 @@ use Illuminate\Validation\ValidationException;
 
 class ComputerLabSchedulingService
 {
+    public function moveToRoom(ComputerLabBooking $booking, int $roomId): void
+    {
+        DB::transaction(function () use ($booking, $roomId) {
+            $locked = ComputerLabBooking::with('academicTerm')
+                ->whereKey($booking->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $movable = ($locked->isPriorityClass() && $locked->status === 'confirmed')
+                || (! $locked->isPriorityClass() && $locked->status === 'approved');
+
+            if (! $movable) {
+                throw ValidationException::withMessages([
+                    'booking' => 'Only confirmed priority classes and approved bookings can be moved.',
+                ]);
+            }
+
+            $room = Room::whereKey($roomId)
+                ->where('room_type', 'Computer Laboratory')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $room) {
+                throw ValidationException::withMessages([
+                    'room_id' => 'Select a valid computer laboratory.',
+                ]);
+            }
+
+            if ((int) $locked->room_id === $roomId) {
+                return;
+            }
+
+            $conflict = $this->moveConflicts($locked, $roomId)->first();
+            if ($conflict) {
+                throw ValidationException::withMessages([
+                    'booking' => "{$room->name} is already occupied by {$conflict->title} during this period.",
+                ]);
+            }
+
+            $locked->update([
+                'room_id' => $roomId,
+                'conflict_note' => null,
+            ]);
+        });
+    }
+
     /**
      * Mirror priority subjects from the official timetable into the separate
      * computer-lab calendar. Official class rows are never edited here.
@@ -221,6 +267,49 @@ class ComputerLabSchedulingService
             ->where('start_time', '<', $booking->end_time)
             ->where('end_time', '>', $booking->start_time)
             ->get();
+    }
+
+    private function moveConflicts(ComputerLabBooking $booking, int $roomId): Collection
+    {
+        $candidates = ComputerLabBooking::query()
+            ->where('room_id', $roomId)
+            ->where('academic_term_id', $booking->academic_term_id)
+            ->whereKeyNot($booking->id)
+            ->occupying()
+            ->where('start_time', '<', $booking->end_time)
+            ->where('end_time', '>', $booking->start_time)
+            ->lockForUpdate()
+            ->get();
+
+        if ($booking->isPriorityClass()) {
+            $term = $booking->academicTerm;
+
+            return $candidates->filter(function (ComputerLabBooking $candidate) use ($booking, $term) {
+                if ($candidate->isPriorityClass()) {
+                    return $candidate->day_of_week === $booking->day_of_week;
+                }
+
+                if (! $candidate->booking_date || $candidate->booking_date->format('l') !== $booking->day_of_week) {
+                    return false;
+                }
+
+                return ! $term?->start_date || ! $term?->end_date
+                    || $candidate->booking_date->betweenIncluded($term->start_date, $term->end_date);
+            })->values();
+        }
+
+        $date = $booking->booking_date;
+        if (! $date) {
+            return collect();
+        }
+
+        return $candidates->filter(function (ComputerLabBooking $candidate) use ($date) {
+            if ($candidate->isPriorityClass()) {
+                return $candidate->day_of_week === $date->format('l');
+            }
+
+            return $candidate->booking_date?->isSameDay($date) ?? false;
+        })->values();
     }
 
     private function overlapsAllocated(array $occupied, int $roomId, ClassSchedule $schedule): bool
