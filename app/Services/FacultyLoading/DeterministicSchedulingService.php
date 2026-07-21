@@ -21,12 +21,14 @@ use App\Models\User;
  *   • a section is never double-booked (one class per period per section)
  *   • a faculty member is never double-booked (no two classes at overlapping
  *     clock times on the same day, even across different grades)
+ *   • a classroom is never double-booked — most sections use their own fixed
+ *     room (sections.classroom_id) so this rarely binds, but cross-section
+ *     electives have no room of their own and get one assigned per session,
+ *     which can otherwise collide with that room's owning section
  *   • placements only ever land on real CLASS periods — flag ceremony, homeroom
  *     / advising, recess, lunch and consultation windows are never used
  *   • Wednesday activity/ALP windows and configured Friday ILA days are
  *     excluded automatically
- *   • each section uses its own fixed room (sections.classroom_id), so room
- *     clashes are structurally impossible for homeroom sections
  *
  * Because placement is constraint-first, the output is conflict-free by
  * construction. When the weekly load exceeds the available periods (e.g. an
@@ -74,6 +76,8 @@ class DeterministicSchedulingService
     private array $sectionBusy = [];
     /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> */
     private array $facultyBusy = [];
+    /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> keyed by classroom_id; entries with a null classroom are never tracked */
+    private array $roomBusy = [];
     /** @var array<int,array<string,int>> */
     private array $sectionDayCount = [];
     /** @var array<int,array<int,array<string,int>>> */
@@ -1112,6 +1116,7 @@ class DeterministicSchedulingService
     {
         $this->sectionBusy        = [];
         $this->facultyBusy        = [];
+        $this->roomBusy           = [];
         $this->sectionDayCount    = [];
         $this->sectionSubjDays    = [];
         $this->sectionIlpDayCount = [];
@@ -1135,7 +1140,7 @@ class DeterministicSchedulingService
     {
         $rows = ClassSchedule::whereIn('status', $statuses)
             ->where('academic_term_id', $termId)
-            ->get(['id', 'user_id', 'section_id', 'subject_id', 'day_of_week',
+            ->get(['id', 'user_id', 'section_id', 'classroom_id', 'subject_id', 'day_of_week',
                 'start_time', 'end_time', 'entry_type', 'session_type', 'status']);
 
         if ($rows->isEmpty()) {
@@ -1166,6 +1171,9 @@ class DeterministicSchedulingService
             }
             if ($row->user_id && ! $isPlaceholderFaculty) {
                 $this->facultyBusy[(int) $row->user_id][$day][] = [$start, $end, -1];
+            }
+            if ($row->classroom_id) {
+                $this->roomBusy[(int) $row->classroom_id][$day][] = [$start, $end, -1];
             }
 
             // Keep the soft-scoring counters coherent with what is already on
@@ -1279,6 +1287,9 @@ class DeterministicSchedulingService
             if ($this->facultyBusyAt($s['faculty_id'], $occupiedSlot)) {
                 continue;
             }
+            if ($this->roomBusyAt($s['classroom_id'] ?? null, $occupiedSlot)) {
+                continue;
+            }
 
             // SOFT scoring (lower is better).
             $score = $this->computeSlotScore($s, $slot, $occupiedSlot, $isIlp);
@@ -1372,6 +1383,9 @@ class DeterministicSchedulingService
             if ($this->facultyBusyAt($s['faculty_id'], $occupiedSlot)) {
                 continue;
             }
+            if ($this->roomBusyAt($s['classroom_id'] ?? null, $occupiedSlot)) {
+                continue;
+            }
 
             $score = $this->computeSlotScore($s, $slot, $occupiedSlot, $isIlp);
 
@@ -1433,11 +1447,14 @@ class DeterministicSchedulingService
             if ($isIlp && $slot['start_min'] === ($this->firstPeriodByGrade[$s['grade']][$slot['day']] ?? null)) {
                 continue;
             }
-            // Section must be free here; only the faculty is (singly) blocked.
+            // Section and room must be free here; only the faculty is (singly) blocked.
             if (! $this->officialTimeAllows($s, $occupiedSlot)) {
                 continue;
             }
             if ($this->sectionBusyAt($s['section_id'], $occupiedSlot)) {
+                continue;
+            }
+            if ($this->roomBusyAt($s['classroom_id'] ?? null, $occupiedSlot)) {
                 continue;
             }
             $blockers = $this->facultyBlockersAt($s['faculty_id'], $occupiedSlot);
@@ -1549,6 +1566,9 @@ class DeterministicSchedulingService
 
         $this->sectionBusy[$s['section_id']][$day][] = [$slot['start_min'], $busyEndMin, $idx];
         $this->facultyBusy[$s['faculty_id']][$day][] = [$slot['start_min'], $busyEndMin, $idx];
+        if (! empty($s['classroom_id'])) {
+            $this->roomBusy[$s['classroom_id']][$day][] = [$slot['start_min'], $busyEndMin, $idx];
+        }
         $this->sectionDayCount[$s['section_id']][$day] = ($this->sectionDayCount[$s['section_id']][$day] ?? 0) + 1;
         $this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] =
             ($this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day] ?? 0) + 1;
@@ -1571,6 +1591,9 @@ class DeterministicSchedulingService
 
         $this->sectionBusy[$s['section_id']][$day] = $this->dropByIdx($this->sectionBusy[$s['section_id']][$day], $idx);
         $this->facultyBusy[$s['faculty_id']][$day] = $this->dropByIdx($this->facultyBusy[$s['faculty_id']][$day], $idx);
+        if (! empty($s['classroom_id'])) {
+            $this->roomBusy[$s['classroom_id']][$day] = $this->dropByIdx($this->roomBusy[$s['classroom_id']][$day], $idx);
+        }
         $this->sectionDayCount[$s['section_id']][$day]--;
         $this->sectionSubjDays[$s['section_id']][$s['subject_id']][$day]--;
         if (($s['session_type'] ?? 'regular') === 'ilp') {
@@ -1593,6 +1616,27 @@ class DeterministicSchedulingService
     private function sectionBusyAt(int $sectionId, array $slot): bool
     {
         foreach ($this->sectionBusy[$sectionId][$slot['day']] ?? [] as [$start, $end]) {
+            if ($slot['start_min'] < $end && $slot['end_min'] > $start) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Room availability — only meaningful when the session has an assigned
+     * classroom. Most sections' own regular slots never need this (their
+     * room is exclusively theirs), but cross-section electives borrow a
+     * room from one of their home sections, which this catches.
+     *
+     * @param array<string,mixed> $slot
+     */
+    private function roomBusyAt(?int $classroomId, array $slot): bool
+    {
+        if (! $classroomId) {
+            return false;
+        }
+        foreach ($this->roomBusy[$classroomId][$slot['day']] ?? [] as [$start, $end]) {
             if ($slot['start_min'] < $end && $slot['end_min'] > $start) {
                 return true;
             }
@@ -1749,6 +1793,7 @@ class DeterministicSchedulingService
 
         $sectionFree    = 0;
         $facultyBlocked = 0;
+        $roomBlocked    = 0;
         foreach ($grid as $slot) {
             if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
                 continue;
@@ -1766,6 +1811,10 @@ class DeterministicSchedulingService
             if ($this->sectionBusyAt($s['section_id'], $occupiedSlot)) {
                 continue;
             }
+            if ($this->roomBusyAt($s['classroom_id'] ?? null, $occupiedSlot)) {
+                $roomBlocked++;
+                continue;
+            }
             $sectionFree++;
             if ($this->facultyBusyAt($s['faculty_id'], $occupiedSlot)) {
                 $facultyBlocked++;
@@ -1773,6 +1822,14 @@ class DeterministicSchedulingService
         }
 
         if ($sectionFree === 0) {
+            if ($roomBlocked > 0) {
+                return [
+                    'reason_code'  => 'room_busy_everywhere',
+                    'reason'       => "{$roomBlocked} period(s) are otherwise free for {$s['section_name']}, but the assigned room is already booked (likely a cross-section elective sharing this room) at every one.",
+                    'can_reassign' => false,
+                ];
+            }
+
             $capacity = count($grid);
 
             return [
