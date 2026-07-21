@@ -5,9 +5,11 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\Room;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -49,6 +51,7 @@ class ClassroomController extends Controller
             'remarks'        => $c->remarks,
             'nfc_uuid'       => $c->nfc_uuid,
             'nfc_url'        => $c->nfc_uuid ? url('/class-tap/' . $c->nfc_uuid) : null,
+            'room_id'        => $c->room_id,
         ]);
 
         $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
@@ -58,6 +61,9 @@ class ClassroomController extends Controller
             'schoolYears'         => $schoolYears,
             'currentSchoolYearId' => $schoolYearId,
             'filters'             => $request->only(['search', 'classroom_type', 'available', 'school_year_id']),
+            'physicalComputerLabs' => Room::where('room_type', 'Computer Laboratory')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'capacity']),
         ]);
     }
 
@@ -79,6 +85,7 @@ class ClassroomController extends Controller
             'floor'          => 'nullable|integer',
             'is_available'   => 'boolean',
             'remarks'        => 'nullable|string',
+            'room_id'        => ['nullable', Rule::exists('rooms', 'id')->where(fn ($query) => $query->where('room_type', 'Computer Laboratory'))],
         ]);
 
         // The uniqueness rule above is scoped to $schoolYearId (falls back to
@@ -106,6 +113,7 @@ class ClassroomController extends Controller
             'floor'          => 'nullable|integer',
             'is_available'   => 'boolean',
             'remarks'        => 'nullable|string',
+            'room_id'        => ['nullable', Rule::exists('rooms', 'id')->where(fn ($query) => $query->where('room_type', 'Computer Laboratory'))],
         ]);
 
         $classroom->update($data);

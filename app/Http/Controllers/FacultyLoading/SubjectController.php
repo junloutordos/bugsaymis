@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncComputerLabBookings;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
@@ -88,6 +89,7 @@ class SubjectController extends Controller
             'minutes_per_session' => $s->minutes_per_session,
             'is_active'           => $s->is_active,
             'has_ilp'             => $s->has_ilp,
+            'requires_computer_lab' => $s->requires_computer_lab,
             'faculty'             => $assignmentsBySubject->get($s->id, collect())->all(),
         ]);
 
@@ -121,13 +123,14 @@ class SubjectController extends Controller
             'lecture_hours'        => 'required|numeric|min:0',
             'lab_hours'            => 'nullable|numeric|min:0',
             'load_units'           => 'required|numeric|min:0',
-            'subject_type'         => 'required|in:lecture,laboratory,lecture_lab,research,special',
+            'subject_type'         => 'required|in:lecture,laboratory,lecture_lab,research,elective,science_core',
             'grade_level'          => 'required|integer|min:0|max:12',
-            'semester'             => 'nullable|in:1st,2nd,both',
+            'semester'             => 'required|in:first,second,both',
             'sessions_per_week'    => 'required|integer|min:1',
             'minutes_per_session'  => 'required|integer|min:1',
             'is_active'            => 'boolean',
             'has_ilp'              => 'boolean',
+            'requires_computer_lab' => 'boolean',
         ]);
 
         // The uniqueness rule above is scoped to $schoolYearId (falls back to
@@ -155,16 +158,24 @@ class SubjectController extends Controller
             'lecture_hours'        => 'required|numeric|min:0',
             'lab_hours'            => 'nullable|numeric|min:0',
             'load_units'           => 'required|numeric|min:0',
-            'subject_type'         => 'required|in:lecture,laboratory,lecture_lab,research,special',
+            'subject_type'         => 'required|in:lecture,laboratory,lecture_lab,research,elective,science_core',
             'grade_level'          => 'required|integer|min:0|max:12',
-            'semester'             => 'nullable|in:1st,2nd,both',
+            'semester'             => 'required|in:first,second,both',
             'sessions_per_week'    => 'required|integer|min:1',
             'minutes_per_session'  => 'required|integer|min:1',
             'is_active'            => 'boolean',
             'has_ilp'              => 'boolean',
+            'requires_computer_lab' => 'boolean',
         ]);
 
         $subject->update($data);
+
+        if ($subject->wasChanged('requires_computer_lab')) {
+            $subject->classSchedules()
+                ->distinct()
+                ->pluck('academic_term_id')
+                ->each(fn ($termId) => SyncComputerLabBookings::dispatch((int) $termId));
+        }
 
         return back()->with('success', 'Subject updated.');
     }
@@ -225,6 +236,7 @@ class SubjectController extends Controller
                 'academic_unit_id'    => $s->academic_unit_id,
                 'is_active'           => $s->is_active,
                 'has_ilp'             => $s->has_ilp,
+                'requires_computer_lab' => $s->requires_computer_lab,
             ]);
             $copied++;
         }

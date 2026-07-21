@@ -149,6 +149,14 @@
         <div class="col-span-2">
           <AppTextarea v-model="form.remarks" label="Remarks" :rows="2" />
         </div>
+        <div v-if="form.classroom_type === 'ict_lab'" class="col-span-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Physical Computer Laboratory</label>
+          <select v-model="form.room_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">Not linked</option>
+            <option v-for="lab in physicalComputerLabs" :key="lab.id" :value="lab.id">{{ lab.name }} ({{ lab.code }})</option>
+          </select>
+          <p class="text-xs text-slate-400 mt-1">Links the Faculty Loading room to the physical lab and its equipment inventory.</p>
+        </div>
         <div class="flex items-center gap-2">
           <input v-model="form.is_available" type="checkbox" id="room-avail" class="rounded text-indigo-600" />
           <label for="room-avail" class="text-sm text-slate-600">Available for scheduling</label>
@@ -217,6 +225,7 @@ const props = defineProps({
   schoolYears:         { type: Array,  default: () => [] },
   currentSchoolYearId: { type: Number, default: null },
   filters:             { type: Object, default: () => ({}) },
+  physicalComputerLabs: { type: Array, default: () => [] },
 })
 
 const filters = reactive({
@@ -243,7 +252,7 @@ const modal = ref(false)
 const form  = useForm({
   id: null, school_year_id: props.currentSchoolYearId,
   name: '', code: '', classroom_type: 'lecture',
-  capacity: 40, building: '', floor: null, is_available: true, remarks: '',
+  capacity: 40, building: '', floor: null, is_available: true, remarks: '', room_id: null,
 })
 
 function openForm(c = null) {
@@ -251,12 +260,13 @@ function openForm(c = null) {
     Object.assign(form, { id: c.id, school_year_id: props.currentSchoolYearId,
       name: c.name, code: c.code, classroom_type: c.classroom_type,
       capacity: c.capacity, building: c.building ?? '', floor: c.floor,
-      is_available: c.is_available, remarks: c.remarks ?? '' })
+      is_available: c.is_available, remarks: c.remarks ?? '', room_id: c.room_id ?? null })
   } else {
     form.reset()
     form.id = null
     form.school_year_id = props.currentSchoolYearId
     form.classroom_type = 'lecture'; form.capacity = 40; form.is_available = true
+    form.room_id = null
   }
   modal.value = true
 }

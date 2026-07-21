@@ -1003,8 +1003,23 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('ict-equipments.merge');
 
     Route::get('/computer-labs', [ComputerLabController::class, 'index'])
-        ->middleware('permission:it.equipment.view')
+        ->middleware('permission:it.equipment.view|computer_labs.book|computer_labs.manage')
         ->name('computer-labs.index');
+    Route::post('/computer-labs/bookings', [ComputerLabController::class, 'storeBooking'])
+        ->middleware('permission:computer_labs.book|computer_labs.manage')
+        ->name('computer-labs.bookings.store');
+    Route::post('/computer-labs/bookings/{booking}/approve', [ComputerLabController::class, 'approveBooking'])
+        ->middleware('permission:computer_labs.manage|faculty_loading.manage')
+        ->name('computer-labs.bookings.approve');
+    Route::post('/computer-labs/bookings/{booking}/reject', [ComputerLabController::class, 'rejectBooking'])
+        ->middleware('permission:computer_labs.manage|faculty_loading.manage')
+        ->name('computer-labs.bookings.reject');
+    Route::post('/computer-labs/bookings/{booking}/cancel', [ComputerLabController::class, 'cancelBooking'])
+        ->middleware('permission:computer_labs.book|computer_labs.manage|faculty_loading.manage')
+        ->name('computer-labs.bookings.cancel');
+    Route::post('/computer-labs/synchronize', [ComputerLabController::class, 'synchronize'])
+        ->middleware('permission:computer_labs.manage|faculty_loading.manage')
+        ->name('computer-labs.synchronize');
     Route::get('/computer-labs/{room}', [ComputerLabController::class, 'show'])
         ->middleware('permission:it.equipment.view')
         ->name('computer-labs.show');

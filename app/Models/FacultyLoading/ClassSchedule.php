@@ -2,10 +2,12 @@
 
 namespace App\Models\FacultyLoading;
 
+use App\Jobs\SyncComputerLabBookings;
 use App\Models\User;
 use App\Services\FacultyLoading\ScienceCoreService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ClassSchedule extends Model
 {
@@ -34,6 +36,21 @@ class ClassSchedule extends Model
     protected $casts = [
         'section_id' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function (ClassSchedule $schedule) {
+            if ($schedule->subject_id && $schedule->academic_term_id) {
+                SyncComputerLabBookings::dispatch((int) $schedule->academic_term_id);
+            }
+        });
+
+        static::deleted(function (ClassSchedule $schedule) {
+            if ($schedule->academic_term_id) {
+                SyncComputerLabBookings::dispatch((int) $schedule->academic_term_id);
+            }
+        });
+    }
 
     // ── Relationships ────────────────────────────────────────────────────────
 
@@ -75,6 +92,11 @@ class ClassSchedule extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function computerLabBooking(): HasOne
+    {
+        return $this->hasOne(\App\Models\ComputerLabBooking::class);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

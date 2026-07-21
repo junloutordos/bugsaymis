@@ -31,6 +31,7 @@ class RolePermissionSeeder extends Seeder
             'users.view',
             'it.requests.view', 'it.requests.manage',
             'it.equipment.view', 'it.equipment.manage',
+            'computer_labs.book', 'computer_labs.manage',
             'atlas.modules.view',
             'atlas.watchtower.view', 'atlas.watchtower.manage',
             'facilities.view', 'facilities.manage',
@@ -50,7 +51,7 @@ class RolePermissionSeeder extends Seeder
             'InformationOfficer', 'Dorm Manager',
         ];
         foreach ($employeeRoles as $roleName) {
-            $assign($roleName, ['saln.create', 'saln.submit']);
+            $assign($roleName, ['saln.create', 'saln.submit', 'computer_labs.book']);
         }
 
         // HR gets full filing & reporting access
@@ -219,6 +220,8 @@ class RolePermissionSeeder extends Seeder
             'faculty_loading.vacancies',
             'faculty_loading.training',
             'faculty_loading.training.verify',
+            'computer_labs.book',
+            'computer_labs.manage',
         ]);
 
         // Campus Director: approve overloads + view everything

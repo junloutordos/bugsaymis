@@ -49,7 +49,8 @@ function typeBadge(type) {
     laboratory:  'purple',
     lecture_lab: 'indigo',
     research:    'green',
-    special:     'orange',
+    elective:    'orange',
+    science_core: 'purple',
   }[type] ?? 'slate'
 }
 
@@ -59,7 +60,8 @@ const form  = useForm({
   code: '', name: '', description: '', specialization_tags: '',
   credit_units: 3, load_units: 3,
   lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', grade_level: 7,
-  semester: null, sessions_per_week: 5, minutes_per_session: 60, is_active: true, has_ilp: false,
+  semester: 'both', sessions_per_week: 5, minutes_per_session: 60, is_active: true, has_ilp: false,
+  requires_computer_lab: false,
 })
 
 function openForm(s = null) {
@@ -70,7 +72,8 @@ function openForm(s = null) {
       credit_units: s.credit_units, load_units: s.load_units, lecture_hours: s.lecture_hours,
       lab_hours: s.lab_hours ?? 0, subject_type: s.subject_type, grade_level: s.grade_level,
       semester: s.semester, sessions_per_week: s.sessions_per_week,
-      minutes_per_session: s.minutes_per_session, is_active: s.is_active, has_ilp: s.has_ilp })
+      minutes_per_session: s.minutes_per_session, is_active: s.is_active, has_ilp: s.has_ilp,
+      requires_computer_lab: s.requires_computer_lab })
   } else {
     form.reset()
     form.id = null
@@ -79,6 +82,8 @@ function openForm(s = null) {
     form.credit_units = 3; form.load_units = 3; form.lecture_hours = 3
     form.sessions_per_week = 5; form.minutes_per_session = 60; form.is_active = true
     form.has_ilp = false
+    form.requires_computer_lab = false
+    form.semester = 'both'
   }
   modal.value = true
 }
@@ -161,7 +166,8 @@ function doCopy() {
             <option value="laboratory">Laboratory</option>
             <option value="lecture_lab">Lecture + Lab</option>
             <option value="research">Research</option>
-            <option value="special">Special</option>
+            <option value="elective">Elective</option>
+            <option value="science_core">Science Core</option>
           </AppSelect>
         </div>
         <div class="w-56">
@@ -206,7 +212,10 @@ function doCopy() {
             <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
           </td>
           <td class="px-4 py-3 text-center">
-            <AppBadge :color="s.is_active ? 'green' : 'slate'">{{ s.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+            <div class="flex flex-col items-center gap-1">
+              <AppBadge :color="s.is_active ? 'green' : 'slate'">{{ s.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+              <AppBadge v-if="s.requires_computer_lab" color="indigo">ComLab priority</AppBadge>
+            </div>
           </td>
           <td class="px-4 py-3 text-right">
             <div class="flex items-center justify-end gap-1">
@@ -259,6 +268,14 @@ function doCopy() {
           <div class="col-span-2">
             <AppTextarea v-model="form.description" label="Description" :rows="2" />
           </div>
+          <div class="col-span-2 rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+            <div class="flex items-center gap-2">
+              <input v-model="form.requires_computer_lab" type="checkbox" id="sub-comlab"
+                class="rounded text-indigo-600" />
+              <label for="sub-comlab" class="text-sm font-medium text-slate-700">Priority use of a Computer Laboratory</label>
+            </div>
+            <p class="text-xs text-slate-500 mt-1 ml-6">The separate Computer Laboratory calendar will reserve an available lab at this subject's official class time. This does not constrain class placement.</p>
+          </div>
           <div class="col-span-2">
             <AppInput v-model="form.specialization_tags" label="Specialization Tags" placeholder="e.g. mathematics, algebra, calculus" />
             <p class="text-xs text-slate-400 mt-0.5">Comma-separated keywords used for auto-assignment matching.</p>
@@ -268,7 +285,8 @@ function doCopy() {
             <option value="laboratory">Laboratory</option>
             <option value="lecture_lab">Lecture + Lab</option>
             <option value="research">Research</option>
-            <option value="special">Special</option>
+            <option value="elective">Elective</option>
+            <option value="science_core">Science Core</option>
           </AppSelect>
           <AppSelect v-model.number="form.grade_level" label="Grade Level" :show-blank="false">
             <option :value="0">Cross-grade</option>
@@ -281,9 +299,8 @@ function doCopy() {
           <AppInput v-model.number="form.sessions_per_week" type="number" min="1" label="Sessions/week" required />
           <AppInput v-model.number="form.minutes_per_session" type="number" min="1" label="Minutes/session" required />
           <AppSelect v-model="form.semester" label="Semester" :show-blank="false">
-            <option :value="null">Any</option>
-            <option value="1st">1st</option>
-            <option value="2nd">2nd</option>
+            <option value="first">1st</option>
+            <option value="second">2nd</option>
             <option value="both">Both</option>
           </AppSelect>
           <div class="flex items-center gap-2 pt-6">

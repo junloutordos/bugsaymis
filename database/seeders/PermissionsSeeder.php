@@ -79,6 +79,8 @@ class PermissionsSeeder extends Seeder
             ['module' => 'IT',       'name' => 'it.requests.manage', 'description' => 'Manage all IT job requests'],
             ['module' => 'IT',       'name' => 'it.equipment.view',  'description' => 'View ICT equipment'],
             ['module' => 'IT',       'name' => 'it.equipment.manage','description' => 'Manage ICT equipment & PMS'],
+            ['module' => 'Computer Laboratories', 'name' => 'computer_labs.book', 'description' => 'Request use of an available computer laboratory'],
+            ['module' => 'Computer Laboratories', 'name' => 'computer_labs.manage', 'description' => 'Manage computer laboratory schedules and booking requests'],
 
             // ── Atlas Module Monitor ──────────────────────────────────────────
             ['module' => 'Atlas',    'name' => 'atlas.modules.view', 'description' => 'View the Atlas Module Monitor dashboard (health, maturity, and ecosystem of all software modules)'],

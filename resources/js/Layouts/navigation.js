@@ -196,7 +196,7 @@ export const menuItems = [
   {
     label: "MIS",
     icon: ServerStackIcon,
-    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "OCD"],
+    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "OCD", "HR", "MIS", "Payroll Officer", "HRMPSB", "Recruitment Officer", "PMT", "Registrar", "Records", "Librarian", "Nurse", "Guidance", "GSU Head", "InformationOfficer", "Dorm Manager", "CID Chief"],
     children: [
       {
         label: "MIS Dashboard",
@@ -244,7 +244,7 @@ export const menuItems = [
         routeName: "computer-labs.index",
         href: route("computer-labs.index"),
         icon: ComputerDesktopIcon,
-        permissions: ["it.equipment.view"],
+        permissions: ["it.equipment.view", "computer_labs.book", "computer_labs.manage"],
       },
       {
         label: "Sentinel",

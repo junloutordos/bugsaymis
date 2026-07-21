@@ -40,6 +40,10 @@ Schedule::command('backup:verify')->dailyAt('06:30')->withoutOverlapping();
 // ── PDS: notify employees whose PDS is overdue for its annual update ─────
 Schedule::command('pds:notify-annual-update')->dailyAt('07:00')->withoutOverlapping();
 
+// ── Computer Laboratories: reconcile priority reservations with any class
+//    schedule changes made through bulk imports/restores that bypass model events.
+Schedule::command('computer-labs:sync')->everyThirtyMinutes()->withoutOverlapping();
+
 // ── Atlas Sentinel: expire manual "Fix Now" requests stuck 'delivered' with
 //    no result reported (device went offline/crashed mid-flight) ─────────
 Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinutes()->withoutOverlapping();
@@ -55,4 +59,3 @@ Schedule::command('atlas-sentinel:expire-remote-help')->everyMinute()->withoutOv
 
 // NOTE: no pulse:trim schedule — the command does not exist. Pulse trims old
 // entries itself from the pulse:work daemon (per pulse.storage.trim.keep).
-

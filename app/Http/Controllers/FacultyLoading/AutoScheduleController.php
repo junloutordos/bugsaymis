@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FacultyLoading;
 
+use App\Jobs\SyncComputerLabBookings;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AiScheduleJob;
 use App\Models\FacultyLoading\ClassSchedule;
@@ -249,6 +250,8 @@ class AutoScheduleController extends Controller
             ClassSchedule::insert($rows);
         });
 
+        SyncComputerLabBookings::dispatch((int) $aiScheduleJob->academic_term_id);
+
         return response()->json([
             'message' => count($schedules).' schedules saved as tentative successfully.',
         ]);
@@ -298,6 +301,8 @@ class AutoScheduleController extends Controller
 
             $aiScheduleJob->update(['restored_at' => now()]);
         });
+
+        SyncComputerLabBookings::dispatch((int) $aiScheduleJob->academic_term_id);
 
         return response()->json([
             'message' => count($snapshot).' schedule(s) restored from the pre-apply snapshot.',

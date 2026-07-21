@@ -14,6 +14,7 @@ const props = defineProps({
   rows: Number,
   cols: Number,
   latestAgentVersion: { type: String, default: null },
+  scheduleUrl: { type: String, required: true },
 })
 
 const equipmentList = ref(props.equipments.map(eq => ({ ...eq })))
@@ -121,6 +122,11 @@ function openSpecs(eq) {
       <AppButton as="link" variant="ghost" size="sm" :href="route('computer-labs.index')">
         <ArrowLeftIcon class="w-4 h-4" /> Back to Computer Laboratories
       </AppButton>
+
+      <div class="flex border-b border-slate-200">
+        <Link :href="scheduleUrl" class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-indigo-600">Schedule</Link>
+        <span class="border-b-2 border-indigo-600 px-4 py-2 text-sm font-semibold text-indigo-700">Equipment Layout</span>
+      </div>
 
       <div class="flex flex-wrap items-center gap-3 text-xs">
         <span v-for="(label, key) in statusLabels" :key="key" class="inline-flex items-center gap-1.5">

@@ -23,4 +23,9 @@ class Room extends Model
     {
         return $this->belongsTo(Office::class, 'office_id');
     }
+
+    public function computerLabBookings()
+    {
+        return $this->hasMany(ComputerLabBooking::class);
+    }
 }
