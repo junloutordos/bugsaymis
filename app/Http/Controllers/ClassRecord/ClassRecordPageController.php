@@ -70,6 +70,8 @@ class ClassRecordPageController extends Controller
         $currentSY   = SchoolYear::where('is_current', true)->first();
         $isCurrentSY = $currentSY && $classRecord->school_year_id === $currentSY->id;
 
+        $classRecord->setAttribute('can_change_grading_option', $classRecord->canChangeGradingOption($this->isAdmin()));
+
         // Weekdays this subject meets this section per the class schedule —
         // drives the Setup datepicker's disabled days. Empty = no schedule
         // plotted yet, so the picker disables nothing (fail-open, mirrors
@@ -95,6 +97,7 @@ class ClassRecordPageController extends Controller
         return Inertia::render('ClassRecord/Show', [
             'classRecord'        => $classRecord,
             'isAdmin'            => $this->isAdmin(),
+            'gradingOptions'     => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
             'stanineLookup'      => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
             'isCurrentSY'        => $isCurrentSY,
             'currentSYName'      => $currentSY?->name,

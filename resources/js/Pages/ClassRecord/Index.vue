@@ -216,6 +216,8 @@
           <option v-for="opt in gradingOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
         </select>
         <p v-if="createErrors.grading_option_id" class="text-xs text-red-500 mt-1">{{ createErrors.grading_option_id[0] }}</p>
+
+        <GradingOptionDetails :option="selectedGradingOption" class="mt-3" />
       </div>
 
       <template #footer>
@@ -332,6 +334,7 @@ import AppFilterBar from '@/Components/AppFilterBar.vue'
 import AppTable from '@/Components/AppTable.vue'
 import AppModal from '@/Components/AppModal.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import GradingOptionDetails from './components/GradingOptionDetails.vue'
 import { confirmDelete } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
 import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon } from '@heroicons/vue/24/outline'
@@ -380,6 +383,10 @@ const creating        = ref(false)
 const createErrors    = ref({})
 const selectedLoad    = ref(null)   // the chosen load assignment object
 const gradingOptionId = ref('')
+
+const selectedGradingOption = computed(() =>
+  props.gradingOptions.find(o => o.id === gradingOptionId.value) ?? null
+)
 
 // Teaching load list
 const myLoad       = ref([])

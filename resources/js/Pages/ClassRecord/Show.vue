@@ -29,11 +29,13 @@ import AppDatePicker from '@/Components/AppDatePicker.vue'
 import ScoreGrid from './components/ScoreGrid.vue'
 import AttendanceGrid from './components/AttendanceGrid.vue'
 import SectionAssessmentCalendar from './components/SectionAssessmentCalendar.vue'
+import GradingOptionDetails from './components/GradingOptionDetails.vue'
 import { adjectivalColor } from '@/Utils/ClassRecord/gradeUtils.js'
 
 const props = defineProps({
   classRecord:        Object,
   isAdmin:            { type: Boolean, default: false },
+  gradingOptions:     { type: Array, default: () => [] },
   stanineLookup:      { type: Array, default: () => [] },
   isCurrentSY:        { type: Boolean, default: true },
   currentSYName:      { type: String, default: null },
@@ -453,6 +455,38 @@ async function checkRecord() {
   }
 }
 
+// ── Change grading option ────────────────────────────────────────────────────
+const showChangeGradingOptionModal = ref(false)
+const changeGradingOptionId        = ref(null)
+const changingGradingOption        = ref(false)
+const changeGradingOptionError     = ref(null)
+
+const changeGradingOptionSelected = computed(() =>
+  props.gradingOptions.find(o => o.id === changeGradingOptionId.value) ?? null
+)
+
+function openChangeGradingOptionModal() {
+  changeGradingOptionId.value    = props.classRecord.grading_option_id
+  changeGradingOptionError.value = null
+  showChangeGradingOptionModal.value = true
+}
+
+async function saveGradingOptionChange() {
+  changingGradingOption.value    = true
+  changeGradingOptionError.value = null
+  try {
+    await axios.put(route('class-records.update', props.classRecord.id), {
+      grading_option_id: changeGradingOptionId.value,
+    })
+    showChangeGradingOptionModal.value = false
+    router.reload()
+  } catch (err) {
+    changeGradingOptionError.value = err.response?.data?.message ?? 'Failed to change grading option.'
+  } finally {
+    changingGradingOption.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -471,6 +505,9 @@ async function checkRecord() {
           <AppBadge :color="statusBadge(classRecord.status)">
             {{ classRecord.status === 'checked' ? 'Checked ✓' : classRecord.status.charAt(0).toUpperCase() + classRecord.status.slice(1) }}
           </AppBadge>
+          <AppButton v-if="classRecord.can_change_grading_option" variant="secondary" @click="openChangeGradingOptionModal">
+            <Cog6ToothIcon class="h-4 w-4" /> Change Grading Option
+          </AppButton>
           <AppButton variant="secondary" as="a" :href="route('class-records.export', classRecord.id)">
             <ArrowDownTrayIcon class="h-4 w-4" /> Export All
           </AppButton>
@@ -846,6 +883,28 @@ async function checkRecord() {
       <AppButton variant="secondary" @click="showCopyFromRecordModal = false">Cancel</AppButton>
       <AppButton :loading="copyingFromRecord" :disabled="!copyFromRecordId || copyingFromRecord" @click="copyFromRecord">
         {{ copyingFromRecord ? 'Copying…' : 'Copy Assessments' }}
+      </AppButton>
+    </template>
+  </AppModal>
+
+  <!-- Change grading option modal -->
+  <AppModal :show="showChangeGradingOptionModal" title="Change Grading Option"
+    subtitle="Only available before any assessments or scores are entered for this record."
+    size="md" @close="showChangeGradingOptionModal = false">
+    <div class="space-y-3">
+      <select v-model="changeGradingOptionId"
+        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option v-for="opt in gradingOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
+      </select>
+      <GradingOptionDetails :option="changeGradingOptionSelected" />
+      <p v-if="changeGradingOptionError" class="text-xs text-red-500">{{ changeGradingOptionError }}</p>
+    </div>
+    <template #footer>
+      <AppButton variant="secondary" @click="showChangeGradingOptionModal = false">Cancel</AppButton>
+      <AppButton :loading="changingGradingOption"
+        :disabled="!changeGradingOptionId || changeGradingOptionId === classRecord.grading_option_id"
+        @click="saveGradingOptionChange">
+        {{ changingGradingOption ? 'Saving…' : 'Save Change' }}
       </AppButton>
     </template>
   </AppModal>

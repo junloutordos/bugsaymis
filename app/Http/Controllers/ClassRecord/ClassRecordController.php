@@ -184,6 +184,7 @@ class ClassRecordController extends Controller
             'gradingOption.categories',
             'quarters',
         ]);
+        $classRecord->setAttribute('can_change_grading_option', $classRecord->canChangeGradingOption($this->isAdmin()));
 
         return response()->json($classRecord);
     }
@@ -206,26 +207,30 @@ class ClassRecordController extends Controller
             'year_level_section' => 'sometimes|string|max:255',
         ]);
 
-        // Block grading option change after scores have been entered
+        // Block grading option change once assessments or scores already exist under it
         if (isset($validated['grading_option_id'])
             && $validated['grading_option_id'] != $classRecord->grading_option_id) {
-            $hasScores = \App\Models\ClassRecord\ClassRecordScore::whereHas(
-                'student.quarter.classRecord', fn ($q) => $q->where('id', $classRecord->id)
-            )->exists();
+            if ($classRecord->hasScores()) {
+                $message = 'Cannot change grading option after scores have been entered.';
+            } elseif ($classRecord->hasAssessments()) {
+                $message = 'Cannot change grading option while assessments already exist for this record. Remove them first.';
+            }
 
-            if ($hasScores) {
+            if (isset($message)) {
                 return response()->json([
-                    'message' => 'Cannot change grading option after scores have been entered.',
-                    'errors'  => ['grading_option_id' => ['Cannot change grading option after scores have been entered.']],
+                    'message' => $message,
+                    'errors'  => ['grading_option_id' => [$message]],
                 ], 422);
             }
         }
 
         $classRecord->update($validated);
+        $classRecord->refresh()->load('gradingOption.categories');
+        $classRecord->setAttribute('can_change_grading_option', $classRecord->canChangeGradingOption($this->isAdmin()));
 
         return response()->json([
             'message' => 'Class record updated.',
-            'data'    => $classRecord->fresh(),
+            'data'    => $classRecord,
         ]);
     }
 

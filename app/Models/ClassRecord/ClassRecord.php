@@ -45,6 +45,37 @@ class ClassRecord extends Model
         return $this->schoolYear?->is_current === true;
     }
 
+    public function hasScores(): bool
+    {
+        return ClassRecordScore::whereHas(
+            'student.quarter.classRecord', fn ($q) => $q->where('id', $this->id)
+        )->exists();
+    }
+
+    public function hasAssessments(): bool
+    {
+        return ClassRecordAssessment::whereHas(
+            'quarter', fn ($q) => $q->where('class_record_id', $this->id)
+        )->exists();
+    }
+
+    /**
+     * Grading option may only be swapped while the record is still empty —
+     * once assessments or scores exist under the current option, its
+     * categories are load-bearing for already-entered data.
+     */
+    public function canChangeGradingOption(bool $isAdmin): bool
+    {
+        if (! $this->isCurrentSchoolYear()) {
+            return false;
+        }
+        if ($this->status === 'submitted' && ! $isAdmin) {
+            return false;
+        }
+
+        return ! $this->hasScores() && ! $this->hasAssessments();
+    }
+
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
