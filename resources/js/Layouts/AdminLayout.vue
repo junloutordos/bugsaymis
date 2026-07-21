@@ -153,6 +153,7 @@ const roleNames = [
   ...baseRoleNames,
   ...(page.props.isPMRater ? ['PMRater'] : []),
   ...(page.props.isAUH    ? ['AUH']     : []),
+  ...(page.props.hasAdvisoryScheduleScope ? ['ScheduleAdvisory'] : []),
 ];
 
 // Permission set — populated by HandleInertiaRequests via shared Inertia props

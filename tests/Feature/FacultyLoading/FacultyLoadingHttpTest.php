@@ -5,7 +5,10 @@ namespace Tests\Feature\FacultyLoading;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\FacultyLoad;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
@@ -148,6 +151,48 @@ class FacultyLoadingHttpTest extends TestCase
             'school_year_id' => $sy->id,
             'is_active' => true,
         ], $overrides));
+    }
+
+    private function assignDesignation(
+        User $user,
+        SchoolYear $schoolYear,
+        AcademicTerm $term,
+        string $categoryCode,
+        string $code,
+        string $name,
+        ?Section $section = null,
+    ): LoadAssignment {
+        $category = DesignationCategory::create([
+            'code' => $categoryCode,
+            'name' => $categoryCode,
+            'is_active' => true,
+        ]);
+        $designation = Designation::create([
+            'designation_category_id' => $category->id,
+            'section_id' => $section?->id,
+            'code' => $code,
+            'name' => $name,
+            'load_units' => 3,
+            'assignment_type' => 'admin',
+            'is_active' => true,
+        ]);
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $user->id,
+            'school_year_id' => $schoolYear->id,
+            'academic_term_id' => $term->id,
+        ]);
+
+        return LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id,
+            'user_id' => $user->id,
+            'school_year_id' => $schoolYear->id,
+            'academic_term_id' => $term->id,
+            'assignment_type' => 'admin',
+            'section_id' => $section?->id,
+            'load_units' => 3,
+            'description' => $name,
+            'designation_id' => $designation->id,
+        ]);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -479,6 +524,111 @@ class FacultyLoadingHttpTest extends TestCase
             ->get(route('faculty-loading.schedules.index'))
             ->assertOk()
             ->assertInertia(fn ($p) => $p->component('FacultyLoading/Schedules/Index'));
+    }
+
+    public function test_hr_adviser_sees_only_the_assigned_section_schedule(): void
+    {
+        $adviser = User::factory()->create(['email_verified_at' => now()]);
+        $faculty = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $assigned = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Diamond']);
+        $other = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Emerald']);
+        $subject = $this->makeSubject();
+        $room = $this->makeClassroom();
+
+        $this->assignDesignation($adviser, $sy, $term, 'HR_ADV', 'HRA-G8-DIAMOND', 'HR Adviser — G8 Diamond', $assigned);
+
+        $visible = ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $assigned->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $other->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'active',
+        ]);
+
+        $this->actingAs($adviser)
+            ->get(route('faculty-loading.schedules.index', ['term_id' => $term->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('capability.level', 'advisory')
+                ->has('sections', 1)
+                ->where('sections.0.id', $assigned->id)
+                ->has('schedules', 1)
+                ->where('schedules.0.id', $visible->id)
+                ->where('canRequestSwap', false));
+
+        $this->actingAs($adviser)
+            ->get(route('faculty-loading.schedules.index', ['term_id' => $term->id, 'section_id' => $other->id]))
+            ->assertForbidden();
+    }
+
+    public function test_hr_coordinator_sees_every_homeroom_section_in_the_designated_grade_range(): void
+    {
+        $coordinator = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $grade7 = $this->makeSection($sy, ['levelid' => 7, 'sectionname' => 'Diamond']);
+        $grade8 = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Emerald']);
+        $this->makeSection($sy, ['levelid' => 9, 'sectionname' => 'Ruby']);
+        $this->makeSection($sy, ['levelid' => 7, 'sectionname' => 'ELEC-G7']);
+        $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'SCI-G8']);
+
+        $this->assignDesignation(
+            $coordinator,
+            $sy,
+            $term,
+            'COORD',
+            'COORD-HRG7&8',
+            'HR Coordinator (G7-G8)',
+        );
+
+        $this->actingAs($coordinator)
+            ->get(route('faculty-loading.schedules.index', ['term_id' => $term->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('capability.level', 'advisory')
+                ->has('sections', 2)
+                ->where('sections.0.id', $grade7->id)
+                ->where('sections.1.id', $grade8->id));
+    }
+
+    public function test_unrecognized_coordinator_designation_does_not_grant_schedule_access(): void
+    {
+        $coordinator = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $this->makeSection($sy, ['levelid' => 7]);
+        $this->assignDesignation($coordinator, $sy, $term, 'COORD', 'COORD-RESEARCH', 'Research Coordinator');
+
+        $this->actingAs($coordinator)
+            ->get(route('faculty-loading.schedules.index', ['term_id' => $term->id]))
+            ->assertForbidden();
+    }
+
+    public function test_advisory_viewer_can_print_only_an_assigned_section_and_cannot_mutate_schedules(): void
+    {
+        $adviser = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $assigned = $this->makeSection($sy, ['levelid' => 11, 'sectionname' => 'Diamond']);
+        $other = $this->makeSection($sy, ['levelid' => 11, 'sectionname' => 'Emerald']);
+        $this->assignDesignation($adviser, $sy, $term, 'HR_ACAD', 'HAC-G11-DIAMOND', 'HR/Academic Adviser — G11 Diamond', $assigned);
+
+        $this->actingAs($adviser)
+            ->get(route('faculty-loading.schedules.sections.print', ['section' => $assigned, 'term_id' => $term->id]))
+            ->assertOk();
+
+        $this->actingAs($adviser)
+            ->get(route('faculty-loading.schedules.sections.print', ['section' => $other, 'term_id' => $term->id]))
+            ->assertForbidden();
+
+        $this->actingAs($adviser)
+            ->post(route('faculty-loading.schedules.store'), [])
+            ->assertForbidden();
     }
 
     public function test_cid_can_print_one_section_schedule_for_its_term(): void

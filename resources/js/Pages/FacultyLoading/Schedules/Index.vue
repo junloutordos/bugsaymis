@@ -67,7 +67,7 @@
             <ArrowUturnLeftIcon class="h-4 w-4" /> Undo
             <span v-if="moveHistory.length > 1" class="ml-1 rounded-full bg-indigo-100 px-1.5 text-xs text-indigo-700">{{ moveHistory.length }}</span>
           </AppButton>
-          <AppButton v-if="!isReview" :variant="isManage ? 'secondary' : 'primary'" :disabled="scheduleLocked" @click="openNonTeachingForm()">
+          <AppButton v-if="!isReview && !isAdvisory" :variant="isManage ? 'secondary' : 'primary'" :disabled="scheduleLocked" @click="openNonTeachingForm()">
             <ClockIcon class="h-4 w-4" /> Add Non-teaching
           </AppButton>
         </template>
@@ -95,7 +95,7 @@
 
       <!-- Filters -->
       <AppFilterBar>
-        <div v-if="!isSelf" class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
+        <div v-if="!isSelf && !isAdvisory" class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
           <button type="button" @click="setViewBy('section')"
             :class="['px-3 py-1.5 font-medium transition-colors', viewBy === 'section' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
             By Section
@@ -188,7 +188,7 @@
                 :meta="'· ' + (byGroup[groupId]?.length ?? 0) + ' slot(s)'"
                 :events-by-day="cardEventsByDay(groupId)"
                 :day-configs="dayConfigsForGroup(groupId)"
-                :editable="!isOverviewMode && !scheduleLocked"
+                :editable="!isReadOnly && !isOverviewMode && !scheduleLocked"
                 :pack-lanes="isOverviewMode"
                 :legend="subjectsInGroup(groupId)"
                 :drop-preview="dropTarget?.groupId === groupId ? dropTarget : null"
@@ -943,6 +943,8 @@ const isManage = computed(() => props.capability.level === 'manage')
 const isUnit   = computed(() => props.capability.level === 'unit')
 const isSelf   = computed(() => props.capability.level === 'self')
 const isReview = computed(() => props.capability.level === 'review')
+const isAdvisory = computed(() => props.capability.level === 'advisory')
+const isReadOnly = computed(() => isReview.value || isAdvisory.value)
 
 // Class plotting/adjusting is open to CID/admin AND Academic Unit Heads — the
 // server scopes a unit head to their own faculty. School-wide tools (AI
@@ -1270,9 +1272,11 @@ function swapStatusClass(status) {
 }
 
 const pageTitle = computed(() =>
-  isMyPage.value ? 'My Faculty Schedule' : (isSelf.value ? 'My Schedule' : 'Class Schedules'))
+  isMyPage.value ? 'My Faculty Schedule' : (isSelf.value ? 'My Schedule' : (isAdvisory.value ? 'Section Schedules' : 'Class Schedules')))
 const pageSubtitle = computed(() =>
-  scheduleLocked.value
+  isAdvisory.value
+    ? 'Read-only schedules for your assigned advisory sections'
+    : scheduleLocked.value
     ? 'Official term schedule — editing is locked during or after OCD approval'
     : isMyPage.value
     ? 'Your weekly timetable — plotted classes are view-only; click a free slot to add your own blocks'
@@ -1662,7 +1666,7 @@ function printAll() {
 function printUrlForGroup(groupId) {
   if (!filters.term_id) return null
 
-  if (viewBy.value === 'section' && isManage.value && groupId) {
+  if (viewBy.value === 'section' && (isManage.value || isAdvisory.value) && groupId) {
     return route('faculty-loading.schedules.sections.print', {
       section: groupId,
       term_id: filters.term_id,

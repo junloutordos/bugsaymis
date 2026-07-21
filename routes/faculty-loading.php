@@ -88,10 +88,13 @@ Route::middleware(['web', 'auth', 'verified'])
 
         // Schedules calendar — CID/AUH manage everything; faculty_loading.view_own
         // holders get self-mode access to add non-teaching blocks to their own
-        // calendar. Per-action capability checks live in ClassScheduleController.
+        // calendar. Advisory designation holders receive a section-scoped,
+        // read-only capability even when they do not hold a loading permission.
+        // Per-action capability checks live in ClassScheduleController.
+        Route::get('/schedules', [ClassScheduleController::class, 'index'])->name('schedules.index');
+
         Route::middleware('permission:faculty_loading.manage|faculty_loading.view_own|faculty_loading.approve')
             ->prefix('schedules')->name('schedules.')->group(function () {
-                Route::get('/',                   [ClassScheduleController::class, 'index'])->name('index');
                 Route::get('/faculty/{faculty}/print', [ClassScheduleController::class, 'printFaculty'])->name('faculty.print');
                 Route::post('/validate',          [ClassScheduleController::class, 'validateSchedule'])->name('validate');
                 Route::post('/',                  [ClassScheduleController::class, 'store'])->name('store');
@@ -110,8 +113,7 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/{swapRequest}/decline', [ClassScheduleSwapController::class, 'decline'])->name('decline');
             });
 
-        Route::middleware('permission:faculty_loading.manage')
-            ->get('/schedules/sections/{section}/print', [ClassScheduleController::class, 'printSection'])
+        Route::get('/schedules/sections/{section}/print', [ClassScheduleController::class, 'printSection'])
             ->name('schedules.sections.print');
 
         Route::middleware('permission:faculty_loading.manage')

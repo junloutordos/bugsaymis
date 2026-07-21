@@ -1376,6 +1376,7 @@ export const menuItems = [
       "faculty_loading.setup", "faculty_loading.vacancies",
       "faculty_loading.training",
     ],
+    orRoles: ["ScheduleAdvisory"],
     children: [
       // ── Setup ───────────────────────────────────────────────────────────────
       {
@@ -1469,7 +1470,7 @@ export const menuItems = [
         permissions: ["faculty_loading.manage"],
         // Academic Unit Heads reach the calendar too — the controller scopes
         // them to their own unit's faculty (capability level "unit").
-        orRoles: ["AUH"],
+        orRoles: ["AUH", "ScheduleAdvisory"],
       },
       // Personal calendar for everyone — faculty AND managers see their own
       // schedule here; CID-plotted classes are read-only on this page.

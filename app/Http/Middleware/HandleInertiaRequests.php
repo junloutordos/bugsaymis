@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\VehicleRequest;
 use App\Models\WorkRequest;
 use App\Services\ApprovalInboxService;
+use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -272,6 +273,18 @@ class HandleInertiaRequests extends Middleware
 
                 return Cache::remember('badge.auh.u'.$user->id, 300, fn () => AcademicUnit::where('head_user_id', $user->id)->where('is_active', true)->exists()
                 );
+            },
+            'hasAdvisoryScheduleScope' => function () use ($request) {
+                $user = $request->user();
+                if (! $user) {
+                    return false;
+                }
+
+                try {
+                    return app(AdvisoryScheduleScopeService::class)->hasCurrentScope($user);
+                } catch (\Throwable) {
+                    return false;
+                }
             },
             'isPMRater' => function () use ($request) {
                 $user = $request->user();

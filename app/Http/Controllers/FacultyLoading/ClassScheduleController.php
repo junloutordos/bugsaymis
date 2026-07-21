@@ -17,6 +17,7 @@ use App\Models\FacultyLoading\TeacherOfficialTime;
 use App\Models\Office;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
+use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
 use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\LoadComputationService;
@@ -43,6 +44,7 @@ class ClassScheduleController extends Controller
         private readonly PersonNameFormatter $names,
         private readonly ConflictDetectionService $conflicts,
         private readonly ScienceCoreService $scienceCore,
+        private readonly AdvisoryScheduleScopeService $advisoryScope,
     ) {}
 
     /**
@@ -55,9 +57,9 @@ class ClassScheduleController extends Controller
      *   self   — any other faculty_loading.view_own holder: own non-teaching
      *            blocks only.
      *
-     * @return array{level: string, faculty_ids: array<int>|null}
+     * @return array{level: string, faculty_ids: array<int>|null, section_ids?: array<int>}
      */
-    private function scheduleCapability(): array
+    private function scheduleCapability(?int $academicTermId = null): array
     {
         $user = Auth::user();
 
@@ -85,6 +87,17 @@ class ClassScheduleController extends Controller
                 ->all();
 
             return ['level' => 'unit', 'faculty_ids' => $facultyIds];
+        }
+
+        if ($academicTermId) {
+            $sectionIds = $this->advisoryScope->sectionIds($user, $academicTermId);
+            if ($sectionIds !== []) {
+                return ['level' => 'advisory', 'faculty_ids' => null, 'section_ids' => $sectionIds];
+            }
+        }
+
+        if (! $user->hasPermission('faculty_loading.view_own')) {
+            return ['level' => 'none', 'faculty_ids' => [], 'section_ids' => []];
         }
 
         return ['level' => 'self', 'faculty_ids' => [(int) $user->id]];
@@ -125,7 +138,11 @@ class ClassScheduleController extends Controller
 
     public function index(Request $request): Response
     {
-        return $this->renderCalendar($request, $this->scheduleCapability(), 'admin');
+        $termId = $request->integer('term_id') ?: AcademicTerm::where('is_current', true)->value('id');
+        $cap = $this->scheduleCapability($termId ? (int) $termId : null);
+        abort_if($cap['level'] === 'none', 403);
+
+        return $this->renderCalendar($request, $cap, 'admin');
     }
 
     /**
@@ -146,9 +163,13 @@ class ClassScheduleController extends Controller
 
     public function printSection(Request $request, Section $section): Response
     {
-        $this->authorize('faculty_loading.manage');
-
         $term = $this->resolvePrintTerm($request, $section->school_year_id);
+        $cap = $this->scheduleCapability((int) $term->id);
+        abort_unless(
+            $cap['level'] === 'manage'
+                || ($cap['level'] === 'advisory' && in_array((int) $section->id, $cap['section_ids'] ?? [], true)),
+            403,
+        );
         $section->loadMissing(['flSchoolYear', 'adviserUser:id,name', 'classroom:id,name,code']);
 
         return $this->renderPrintSchedule(
@@ -494,6 +515,14 @@ class ClassScheduleController extends Controller
         $sectionId = $request->input('section_id');
         $facultyId = $request->input('faculty_id');
 
+        $selectedTerm = $termId ? AcademicTerm::find($termId) : null;
+        $advisorySectionIds = $cap['level'] === 'advisory' ? ($cap['section_ids'] ?? []) : null;
+
+        if ($advisorySectionIds !== null) {
+            abort_if($sectionId && ! in_array((int) $sectionId, $advisorySectionIds, true), 403);
+            $facultyId = null;
+        }
+
         // Self mode is pinned to the user's own calendar.
         if ($cap['level'] === 'self') {
             $facultyId = Auth::id();
@@ -511,6 +540,7 @@ class ClassScheduleController extends Controller
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId))
             ->when($facultyId, fn ($q) => $q->where('class_schedules.user_id', $facultyId))
+            ->when($advisorySectionIds !== null, fn ($q) => $q->whereIn('class_schedules.section_id', $advisorySectionIds))
             // Unit heads only see their own unit's faculty calendars.
             ->when($cap['level'] === 'unit', fn ($q) => $q->whereIn('class_schedules.user_id', $cap['faculty_ids']));
 
@@ -529,6 +559,7 @@ class ClassScheduleController extends Controller
             ->map(fn ($s) => $s->toCalendarArray($lockedFacultyIds, $cap));
 
         $terms = AcademicTerm::with('schoolYear')
+            ->when($cap['level'] === 'advisory', fn ($q) => $q->whereIn('id', $this->advisoryScope->termIds(Auth::user())))
             ->orderByDesc('start_date')
             ->get()
             ->map(fn ($t) => [
@@ -542,6 +573,7 @@ class ClassScheduleController extends Controller
         // by UserController whenever an admin edits a faculty member's unit) —
         // used to group the "By Faculty" calendar view by org unit.
         $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
+            ->when($cap['level'] === 'advisory', fn ($q) => $q->whereRaw('1 = 0'))
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
             ->when($cap['faculty_ids'] !== null, fn ($q) => $q->whereIn('id', $cap['faculty_ids']))
             ->with(['division:id,division_name', 'office:id,name'])
@@ -559,10 +591,11 @@ class ClassScheduleController extends Controller
         $classrooms = Classroom::available()->orderBy('name')->get(['id', 'name', 'code', 'classroom_type', 'capacity']);
 
         // Sections filtered to the term's school year (fall back to all active sections)
-        $syId = $currentTerm?->school_year_id;
+        $syId = $selectedTerm?->school_year_id ?? $currentTerm?->school_year_id;
         $lunchOverrideColumns = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
         $sections = Section::when($syId, fn ($q) => $q->where('school_year_id', $syId))
             ->where('is_active', true)
+            ->when($advisorySectionIds !== null, fn ($q) => $q->whereIn('id', $advisorySectionIds))
             ->orderBy('levelid')
             ->orderBy('sectionname')
             ->get(array_merge(['id', 'sectionname', 'levelid'], $lunchOverrideColumns));
@@ -731,7 +764,7 @@ class ClassScheduleController extends Controller
             ] : null,
             'canSubmitSchedule' => $canEditBellSchedule,
             'swapRequests' => $swapRequests,
-            'canRequestSwap' => $cap['level'] !== 'review',
+            'canRequestSwap' => ! in_array($cap['level'], ['review', 'advisory'], true),
             'canEditBellSchedule' => $canEditBellSchedule,
             'bellScheduleSettings' => $bellScheduleSettings,
             'bellScheduleTimetables' => $bellScheduleTimetables,
