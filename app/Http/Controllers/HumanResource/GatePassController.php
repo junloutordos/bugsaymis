@@ -200,11 +200,22 @@ class GatePassController extends Controller
 
         // badgeNumber: use current authenticated user's badge_id from users table when available
         if ($request->user()) {
-            $insert['badgeNumber'] = $request->user()->badge_id ?? $request->user()->badgeNumber ?? $request->user()->badgeID ?? null;
+            $badgeNumber = $request->user()->badge_id ?? $request->user()->badgeNumber ?? $request->user()->badgeID ?? null;
         } else {
             // fallback to provided badgeID if user not authenticated (unlikely)
-            $insert['badgeNumber'] = $data['badgeID'] ?? null;
+            $badgeNumber = $data['badgeID'] ?? null;
         }
+
+        // gatepass.badgeNumber is NOT NULL — fail with a clear message instead of
+        // a raw DB constraint violation when the requester has no badge on file.
+        if ($badgeNumber === null) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => ['badgeNumber' => ['Your account has no Badge ID on file. Please contact HR/GSU to have one assigned before filing a Gate Pass.']],
+            ], 422);
+        }
+
+        $insert['badgeNumber'] = $badgeNumber;
 
         // other fields - ensure keys exist (DB columns are non-nullable in migration)
         $insert['gatepass_type'] = $data['gatepass_type'] ?? '';
