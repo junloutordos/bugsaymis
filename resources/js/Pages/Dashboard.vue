@@ -48,6 +48,12 @@ const greeting = computed(() => {
   return 'Good evening'
 })
 
+const greetingName = computed(() =>
+  props.profile?.nickname?.trim()
+  || props.profile?.first_name?.trim()
+  || 'there'
+)
+
 const today = computed(() =>
   new Date().toLocaleDateString('en-PH', {
     weekday: 'long',
@@ -286,7 +292,7 @@ function statusClass(status) {
             <div class="min-w-0">
               <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">{{ today }}</span>
               <h1 class="mt-1.5 truncate font-heading text-xl font-semibold text-slate-900 sm:text-2xl">
-                {{ greeting }}, {{ (profile.name || authUser?.name || 'there').split(' ')[0] }}
+                {{ greeting }}, {{ greetingName }}
               </h1>
               <p class="mt-1 truncate text-sm text-slate-500">{{ profileLine }}</p>
             </div>

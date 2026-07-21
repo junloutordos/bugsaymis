@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\Division;
 use App\Models\Office;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class ProfileController extends Controller
             'profile' => [
                 'id'              => $user->id,
                 'name'            => $user->name,
+                'nickname'        => $user->nickname,
                 'email'           => $user->email,
                 'position'        => $user->position,
                 'specialization'  => $user->specialization,
@@ -41,18 +43,18 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function update(Request $request)
+    public function update(ProfileUpdateRequest $request)
     {
-        $validated = $request->validate([
-            'name'                => 'required|string|max:255',
-            'specialization'      => 'nullable|string|max:255',
-            'profile_photo_base64'=> 'nullable|string',
-            'profile_photo_mime'  => 'nullable|string|in:image/jpeg,image/jpg,image/png',
-        ]);
+        $validated = $request->validated();
 
         $user = $request->user();
         $user->name            = $validated['name'];
         $user->specialization  = $validated['specialization'] ?? $user->specialization;
+
+        if (array_key_exists('nickname', $validated)) {
+            $nickname = trim((string) $validated['nickname']);
+            $user->nickname = $nickname !== '' ? $nickname : null;
+        }
 
         if (! empty($validated['profile_photo_base64'])) {
             $raw  = base64_decode(preg_replace('/^data:[^;]+;base64,/', '', $validated['profile_photo_base64']));

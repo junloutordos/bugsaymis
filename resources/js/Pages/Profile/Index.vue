@@ -42,6 +42,7 @@ function onPhotoSelect(e) {
 
 // ── Form ───────────────────────────────────────────────────────────────────
 const name           = ref(props.profile.name ?? '')
+const nickname       = ref(props.profile.nickname ?? '')
 const specialization = ref(props.profile.specialization ?? '')
 const submitting     = ref(false)
 const errors         = ref({})
@@ -51,6 +52,7 @@ function save() {
   errors.value     = {}
   router.patch(route('profile.update'), {
     name:                 name.value,
+    nickname:             nickname.value,
     specialization:       specialization.value,
     profile_photo_base64: photoBase64.value,
     profile_photo_mime:   photoMime.value,
@@ -135,6 +137,10 @@ const empCategoryLabel = {
 
         <div class="space-y-4">
           <AppInput v-model="name" label="Full Name" :required="true" :error="errors.name" placeholder="Your full name" />
+          <div>
+            <AppInput v-model="nickname" label="Nickname" :error="errors.nickname" placeholder="e.g. Jun" maxlength="50" />
+            <p class="mt-1 text-xs text-slate-400">Used in your dashboard greeting. Leave blank to use your first name.</p>
+          </div>
           <AppInput v-model="specialization" label="Specialization / Field" :error="errors.specialization" placeholder="e.g. Biology, Mathematics, Guidance Counseling" />
 
           <!-- Email (read-only — HR managed) -->

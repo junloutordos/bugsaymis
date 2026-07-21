@@ -21,6 +21,29 @@ class ProfileTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_nickname_can_be_saved_and_cleared(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'nickname' => 'Jun',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('Jun', $user->refresh()->nickname);
+
+        $this->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'nickname' => '',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($user->refresh()->nickname);
+    }
+
     public function test_profile_information_can_be_updated(): void
     {
         $user = User::factory()->create();

@@ -21,6 +21,10 @@ use Illuminate\Support\Facades\DB;
 
 class PersonalDashboardService
 {
+    public function __construct(
+        private readonly PersonNameFormatter $names,
+    ) {}
+
     public function payload(User $user): array
     {
         $approvalTabs = $this->rescue('approval inbox', fn () => (new ApprovalInboxService($user))->getPendingItems(), []);
@@ -96,6 +100,8 @@ class PersonalDashboardService
 
         return [
             'name' => $user->name,
+            'nickname' => $user->nickname,
+            'first_name' => $this->names->givenName($user),
             'position' => $user->position,
             'division' => $divisionName,
             'office' => $officeName,
