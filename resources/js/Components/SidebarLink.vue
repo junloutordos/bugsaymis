@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { Link } from '@inertiajs/vue3'
 
 const props = defineProps({
   href:      String,
@@ -20,7 +21,7 @@ const badgeLabel = computed(() => badgeCount.value > 0 ? String(badgeCount.value
 </script>
 
 <template>
-  <a
+  <Link
     :href="href"
     :target="target"
     :rel="target === '_blank' ? 'noopener noreferrer' : null"
@@ -54,5 +55,5 @@ const badgeLabel = computed(() => badgeCount.value > 0 ? String(badgeCount.value
       class="absolute top-1 right-1 h-1.5 w-1.5 rounded-full"
       :class="active ? 'bg-white' : 'bg-amber-400'"
     ></span>
-  </a>
+  </Link>
 </template>
