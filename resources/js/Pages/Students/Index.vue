@@ -17,6 +17,7 @@ import PaginationControl from '@/Components/PaginationControl.vue'
 const props = defineProps({
   students: Object,
   columns: Array,
+  writable_columns: { type: Array, default: () => [] },
   editing: Number,
   can_manage_students: Boolean,
 })
@@ -25,6 +26,8 @@ const students = ref(props.students?.data ?? props.students ?? [])
 const columns = ref(props.columns || [])
 const showModal = ref(false)
 const form = ref({})
+const originalForm = ref({})
+const formError = ref('')
 const editing = ref(props.editing ?? null)
 const showViewModal = ref(false)
 const viewStudent = ref(null)
@@ -40,18 +43,45 @@ const performSearch = () => {
   router.get(route('students.index'), { q: searchQuery.value }, { replace: true, preserveState: false })
 }
 
-const EXCLUDED_FROM_EDIT = ['id', 'img', 'created_at', 'updated_at', 'pisaysystemid', 'pisaysystemID', 'pisay_system_id', 'pisay_id', 'pisayid']
+const writableColumnSet = computed(() => new Set(props.writable_columns))
 const editableColumns = computed(() => columns.value.filter(c => {
   const field = c.Field ?? c.field ?? c.name
-  return field && !EXCLUDED_FROM_EDIT.includes(field)
+  return field && writableColumnSet.value.has(field)
 }))
+
+const dateFields = new Set(['birthday', 'dateofgraduation', 'mbirthday', 'fbirthday'])
+const emailFields = new Set(['student_email', 'memailaddress', 'femailaddress'])
+const numberFields = new Set(['noofgraduates', 'average', 'math', 'verbal', 'science', 'abtract'])
+const inputType = (field) => dateFields.has(field) ? 'date' : emailFields.has(field) ? 'email' : numberFields.has(field) ? 'number' : 'text'
+const fieldLabel = (field) => field
+  .replace(/([a-z])([A-Z])/g, '$1 $2')
+  .replaceAll('_', ' ')
+  .replace(/\b\w/g, char => char.toUpperCase())
 
 const isSaving = ref(false)
 const submitEdit = () => {
+  formError.value = ''
+  const changes = Object.fromEntries(
+    Object.entries(form.value).filter(([field, value]) => String(value ?? '') !== String(originalForm.value[field] ?? ''))
+  )
+
+  if (Object.keys(changes).length === 0) {
+    formError.value = 'No changes to save.'
+    return
+  }
+
   isSaving.value = true
-  router.put(route('students.update', editing.value), form.value, {
+  router.put(route('students.update', editing.value), changes, {
     onFinish: () => { isSaving.value = false },
-    onSuccess: () => { showModal.value = false },
+    onSuccess: () => {
+      const index = students.value.findIndex(student => student.id === editing.value)
+      if (index !== -1) students.value[index] = { ...students.value[index], ...changes }
+      if (viewStudent.value?.id === editing.value) viewStudent.value = { ...viewStudent.value, ...changes }
+      originalForm.value = { ...form.value }
+      showModal.value = false
+      formError.value = ''
+    },
+    onError: (errors) => { formError.value = Object.values(errors)[0] ?? 'Unable to update the student.' },
   })
 }
 
@@ -65,11 +95,11 @@ onMounted(() => {
 // initialize form with column keys
 const initForm = (record = {}) => {
   form.value = {}
-  columns.value.forEach(c => {
-    const field = c.Field ?? c.field ?? c.name
-    if (!field) return
+  props.writable_columns.forEach(field => {
     form.value[field] = record[field] ?? ''
   })
+  originalForm.value = { ...form.value }
+  formError.value = ''
 }
 
 if (editing.value && students.value.length > 0) {
@@ -389,9 +419,17 @@ const confirmCrop = async () => {
       <AppModal :show="showModal" title="Edit Student" size="2xl" @close="showModal = false">
         <div class="max-h-[55vh] overflow-auto pr-1">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <AppInput v-for="col in editableColumns" :key="col.Field" v-model="form[col.Field]" :label="col.Field" type="text" />
+            <AppInput
+              v-for="col in editableColumns"
+              :key="col.Field"
+              v-model="form[col.Field]"
+              :label="fieldLabel(col.Field)"
+              :type="inputType(col.Field)"
+            />
           </div>
         </div>
+
+        <p v-if="formError" class="mt-3 text-sm text-danger-600">{{ formError }}</p>
 
         <template #footer>
           <AppButton variant="secondary" @click="showModal = false">Cancel</AppButton>

@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StudentUpdateRequest;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
+use App\Services\StudentProfileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Picqer\Barcode\BarcodeGeneratorSVG;
 
@@ -16,6 +20,7 @@ class StudentController extends Controller
 {
     public function __construct(
         private DigitalSignatureService $sigService,
+        private StudentProfileService $studentProfileService,
     ) {}
 
     public function index(Request $request)
@@ -102,6 +107,7 @@ class StudentController extends Controller
         return Inertia::render('Students/Index', [
             'students' => $students,
             'columns' => $columns,
+            'writable_columns' => $this->studentProfileService->writableColumns($allCols),
             'q' => $search,
             'can_manage_students' => auth()->user()->hasPermission('manage-students') || auth()->user()->isSuperAdmin(),
         ]);
@@ -113,32 +119,19 @@ class StudentController extends Controller
         return Inertia::render('Students/Index', [
             'students' => [],
             'columns' => $columns,
+            'writable_columns' => $this->studentProfileService->writableColumns(
+                collect($columns)->pluck('Field')->all()
+            ),
         ]);
     }
-
-    // Columns that may be written via the form — anything not in this list is ignored.
-    private const WRITABLE_COLUMNS = [
-        'student_id', 'lrn', 'first_name', 'last_name', 'middle_name', 'suffix',
-        'firstname', 'lastname', 'middlename', 'fname', 'lname', 'mname',
-        'given_name', 'surname', 'name', 'full_name',
-        'sex', 'gender', 'birthday', 'birthdate', 'birth_date', 'age',
-        'grade_level', 'grade', 'year_level', 'strand', 'track', 'section', 'section_id',
-        'address', 'barangay', 'city', 'municipality', 'province', 'zip',
-        'contact_no', 'phone', 'mobile', 'email',
-        'parent_name', 'guardian_name', 'parent_contact', 'guardian_contact',
-        'school_year', 'sy', 'semester',
-        'status', 'student_status', 'enrollment_status',
-        'campus', 'campus_id',
-    ];
 
     public function store(Request $request)
     {
         $this->authorize('manage-students');
 
-        $allowedColumns = collect(DB::select("SHOW COLUMNS FROM students"))
-            ->map(fn($c) => $c->Field)
-            ->intersect(self::WRITABLE_COLUMNS)
-            ->all();
+        $allowedColumns = $this->studentProfileService->writableColumns(
+            collect(DB::select('SHOW COLUMNS FROM students'))->pluck('Field')->all()
+        );
 
         $data = [];
         foreach ($allowedColumns as $col) {
@@ -162,29 +155,39 @@ class StudentController extends Controller
         return Inertia::render('Students/Index', [
             'students' => [$student],
             'columns' => $columns,
+            'writable_columns' => $this->studentProfileService->writableColumns(
+                collect($columns)->pluck('Field')->all()
+            ),
             'editing' => $id,
         ]);
     }
 
-    public function update(Request $request, $id)
+    public function update(StudentUpdateRequest $request, $id)
     {
-        $this->authorize('manage-students');
+        $student = DB::table('students')->where('id', $id)->first();
+        abort_if(! $student, 404);
 
-        $allowedColumns = collect(DB::select("SHOW COLUMNS FROM students"))
-            ->map(fn($c) => $c->Field)
-            ->intersect(self::WRITABLE_COLUMNS)
-            ->all();
-
-        $data = [];
-        foreach ($allowedColumns as $col) {
-            if ($request->has($col)) {
-                $data[$col] = $request->input($col);
-            }
+        $columns = collect(DB::select('SHOW COLUMNS FROM students'));
+        $data = $this->studentProfileService->normalizeForStorage($request->validated(), $columns);
+        if ($data === []) {
+            throw ValidationException::withMessages([
+                'student' => 'No editable student information was submitted.',
+            ]);
         }
 
-        DB::table('students')->where('id', $id)->update($data);
+        $changes = $this->studentProfileService->changedValues($student, $data);
 
-        return redirect()->route('students.index')->with('success', 'Student updated.');
+        if ($changes === []) {
+            return back()->with('success', 'No changes detected.');
+        }
+
+        if (Schema::hasColumn('students', 'date_updated')) {
+            $changes['date_updated'] = now()->format('Y-m-d');
+        }
+
+        DB::table('students')->where('id', $id)->update($changes);
+
+        return back()->with('success', 'Student updated.');
     }
 
     public function destroy($id)
