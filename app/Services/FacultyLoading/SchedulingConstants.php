@@ -49,6 +49,12 @@ class SchedulingConstants
 
     public const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+    // ── Canonical session lengths ────────────────────────────────────────────
+    // Every CLASS period in the timetables below is 50 minutes; a has_ilp
+    // subject's Independent Learning Period session is always 30 minutes.
+    public const REGULAR_SESSION_MINUTES = 50;
+    public const ILP_SESSION_MINUTES = 30;
+
     // ── Grade Sections ────────────────────────────────────────────────────────
 
     public const GRADE_SECTIONS = [

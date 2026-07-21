@@ -24,6 +24,7 @@ use App\Services\FacultyLoading\ScheduleValidationService;
 use App\Services\FacultyLoading\SchedulingConstants;
 use App\Services\FacultyLoading\ScienceCoreService;
 use App\Services\PersonNameFormatter;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -554,7 +555,7 @@ class ClassScheduleController extends Controller
                 'office_name' => $u->office?->name,
             ]);
 
-        $subjects = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);
+        $subjects = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units', 'has_ilp']);
         $classrooms = Classroom::available()->orderBy('name')->get(['id', 'name', 'code', 'classroom_type', 'capacity']);
 
         // Sections filtered to the term's school year (fall back to all active sections)
@@ -721,7 +722,7 @@ class ClassScheduleController extends Controller
             return [];
         }
 
-        $loads = LoadAssignment::with(['subject:id,code,name,load_units,grade_level,subject_type', 'faculty:id,name'])
+        $loads = LoadAssignment::with(['subject:id,code,name,load_units,grade_level,subject_type,has_ilp', 'faculty:id,name'])
             ->where('academic_term_id', $termId)
             ->where('assignment_type', 'teaching')
             ->whereNotNull('section_id')
@@ -738,16 +739,19 @@ class ClassScheduleController extends Controller
 
         $scheduledCounts = ClassSchedule::occupying()
             ->whereIn('load_assignment_id', $loads->pluck('id'))
-            ->selectRaw('load_assignment_id, COUNT(*) as cnt')
+            ->selectRaw("load_assignment_id, COUNT(*) as cnt, SUM(session_type = 'ilp') as ilp_cnt")
             ->groupBy('load_assignment_id')
-            ->pluck('cnt', 'load_assignment_id');
+            ->get()
+            ->keyBy('load_assignment_id');
 
         $sectionsById = $sections->keyBy('id');
 
         return $loads
             ->map(function ($la) use ($scheduledCounts, $sectionsById, $lockedFacultyIds) {
                 $required = max(1, (int) round((float) ($la->subject->load_units ?? 1)));
-                $scheduled = (int) ($scheduledCounts[$la->id] ?? 0);
+                $counts = $scheduledCounts[$la->id] ?? null;
+                $scheduled = (int) ($counts->cnt ?? 0);
+                $ilpScheduled = (int) ($counts->ilp_cnt ?? 0);
                 $stillNeeded = max(0, $required - $scheduled);
 
                 if ($stillNeeded === 0) {
@@ -756,6 +760,13 @@ class ClassScheduleController extends Controller
 
                 $section = $sectionsById->get($la->section_id);
 
+                // Same rule the auto-scheduler uses: a has_ilp subject's LAST
+                // still-needed weekly session is the 30-min ILP session,
+                // every other session is a regular 50-min period.
+                $hasIlp = (bool) ($la->subject->has_ilp ?? false);
+                $ilpEligible = $hasIlp && $required >= 2 && $ilpScheduled === 0;
+                $nextSessionType = ($ilpEligible && $stillNeeded === 1) ? 'ilp' : 'regular';
+
                 return [
                     'load_assignment_id' => $la->id,
                     'subject' => $la->subject ? [
@@ -763,6 +774,7 @@ class ClassScheduleController extends Controller
                         'code' => $la->subject->code,
                         'name' => $la->subject->name,
                         'is_elective' => $la->subject->grade_level === 0 || $la->subject->subject_type === 'elective',
+                        'has_ilp' => $hasIlp,
                     ] : null,
                     'faculty' => $la->faculty ? [
                         'id' => $la->faculty->id,
@@ -773,11 +785,48 @@ class ClassScheduleController extends Controller
                     'grade_level' => $section?->levelid,
                     'still_needed' => $stillNeeded,
                     'is_locked' => in_array((int) $la->user_id, $lockedFacultyIds, true),
+                    'next_session_type' => $nextSessionType,
+                    'next_session_minutes' => $nextSessionType === 'ilp'
+                        ? SchedulingConstants::ILP_SESSION_MINUTES
+                        : SchedulingConstants::REGULAR_SESSION_MINUTES,
                 ];
             })
             ->filter()
             ->values()
             ->all();
+    }
+
+    /**
+     * Authoritative session_type + duration for the NEXT session of a load
+     * assignment being manually placed — mirrors the rule
+     * {@see \App\Services\FacultyLoading\DeterministicSchedulingService::suggestSlotsForLoad()}
+     * uses, so a manually dragged/picked placement can never disagree with
+     * what the auto-scheduler/suggestions popover would have tagged it as.
+     *
+     * @return array{session_type:string,minutes:int}
+     */
+    private function resolveManualSessionType(LoadAssignment $la): array
+    {
+        $la->loadMissing('subject:id,load_units,has_ilp');
+        $required = max(1, (int) round((float) ($la->subject->load_units ?? 1)));
+        $counts = ClassSchedule::occupying()
+            ->where('load_assignment_id', $la->id)
+            ->selectRaw("COUNT(*) as cnt, SUM(session_type = 'ilp') as ilp_cnt")
+            ->first();
+        $scheduled = (int) ($counts->cnt ?? 0);
+        $ilpScheduled = (int) ($counts->ilp_cnt ?? 0);
+        $stillNeeded = max(0, $required - $scheduled);
+
+        $hasIlp = (bool) ($la->subject->has_ilp ?? false);
+        $ilpEligible = $hasIlp && $required >= 2 && $ilpScheduled === 0;
+        $sessionType = ($ilpEligible && $stillNeeded === 1) ? 'ilp' : 'regular';
+
+        return [
+            'session_type' => $sessionType,
+            'minutes' => $sessionType === 'ilp'
+                ? SchedulingConstants::ILP_SESSION_MINUTES
+                : SchedulingConstants::REGULAR_SESSION_MINUTES,
+        ];
     }
 
     /**
@@ -796,9 +845,22 @@ class ClassScheduleController extends Controller
             'start_time' => 'required|string',
             'end_time' => 'required|string',
             'exclude_id' => 'nullable|integer',
+            'load_assignment_id' => 'nullable|integer',
         ]);
         if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return response()->json(['message' => 'This term schedule is locked for OCD approval.'], 423);
+        }
+
+        // A brand-new placement against an unplaced load (not an edit of an
+        // existing row) always gets its duration forced to the subject's
+        // canonical session length, so this preflight check reflects exactly
+        // what store() is about to save — see resolveManualSessionType().
+        if (empty($data['exclude_id']) && ! empty($data['load_assignment_id']) && ($data['entry_type'] ?? 'class') !== 'non_teaching') {
+            $la = LoadAssignment::find($data['load_assignment_id']);
+            if ($la) {
+                $resolved = $this->resolveManualSessionType($la);
+                $data['end_time'] = Carbon::parse($data['start_time'])->addMinutes($resolved['minutes'])->format('H:i');
+            }
         }
 
         $result = ($data['entry_type'] ?? 'class') === 'non_teaching'
@@ -844,6 +906,22 @@ class ClassScheduleController extends Controller
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
 
+        // Placing a session against an unplaced load: the duration and
+        // session_type are never taken from the request — they're derived
+        // authoritatively from the subject's has_ilp flag and how many
+        // sessions are already placed, so a manual drag/pick can't disagree
+        // with what the auto-scheduler/suggestions popover would have tagged
+        // it as (see resolveManualSessionType()).
+        $sessionType = 'regular';
+        if (! empty($data['load_assignment_id'])) {
+            $la = LoadAssignment::find($data['load_assignment_id']);
+            if ($la) {
+                $resolved = $this->resolveManualSessionType($la);
+                $sessionType = $resolved['session_type'];
+                $data['end_time'] = Carbon::parse($data['start_time'])->addMinutes($resolved['minutes'])->format('H:i');
+            }
+        }
+
         $validation = $this->validation->validate($data);
 
         // Hard block: errors must be resolved. Warnings never block — `force`
@@ -868,6 +946,7 @@ class ClassScheduleController extends Controller
             'classroom_id' => $data['classroom_id'],
             'school_year_id' => $data['school_year_id'],
             'academic_term_id' => $data['academic_term_id'],
+            'session_type' => $sessionType,
             'day_of_week' => $data['day_of_week'],
             'start_time' => $data['start_time'],
             'end_time' => $data['end_time'],

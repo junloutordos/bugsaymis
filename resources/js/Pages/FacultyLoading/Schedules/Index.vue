@@ -785,7 +785,13 @@
           <option v-for="d in WEEKDAYS" :key="d" :value="d">{{ d }}</option>
         </AppSelect>
         <AppInput v-model="form.start_time" type="time" label="Start Time" required />
-        <AppInput v-model="form.end_time" type="time" label="End Time" required />
+        <div>
+          <AppInput v-model="form.end_time" type="time" label="End Time" required :disabled="isNewPlacement" />
+          <p v-if="isNewPlacement" class="mt-1 text-xs"
+            :class="form.session_type === 'ilp' ? 'text-violet-600 font-medium' : 'text-slate-500'">
+            {{ form.session_type === 'ilp' ? '30 min · ILP session (auto-tagged)' : '50 min · Regular session' }}
+          </p>
+        </div>
         <AppSelect v-model="form.status" label="Status" :show-blank="false">
           <option value="active">Active</option>
           <option value="tentative">Tentative</option>
@@ -2012,7 +2018,7 @@ function processPendingDragOver() {
   const startMin = minutesFromPointerY(clientY, rect)
   const isMove   = dragPayload.value.kind === 'move'
   const item     = isMove ? dragPayload.value.schedule : dragPayload.value.load
-  const duration = isMove ? durationOf(item) : 60
+  const duration = isMove ? durationOf(item) : sessionMinutesFor(item.next_session_type)
   const endMin   = Math.min(CAL_END, startMin + duration)
   const startTime = minToTime(startMin)
   const endTime   = minToTime(endMin)
@@ -2464,10 +2470,14 @@ onBeforeUnmount(() => {
 
 /** Open the edit modal prefilled from an "unplaced subjects" tray chip —
  *  via drag-onto-a-slot or a picked suggestion (which also prefills the
- *  section's own classroom; store() requires one). */
-function openPlaceForm(load, day, startTime, endTime, classroomId = null) {
+ *  section's own classroom; store() requires one). End time is always
+ *  derived from the subject's session_type — 30 min for its ILP session,
+ *  50 min regular — never taken from the caller's `endTime` guess, so it
+ *  can't drift from what the server will actually enforce on save. */
+function openPlaceForm(load, day, startTime, endTime, classroomId = null, sessionType = null) {
   validationResult.value = null
   form.reset()
+  const resolvedType = sessionType ?? load.next_session_type ?? 'regular'
   Object.assign(form, {
     id:                 null,
     load_assignment_id: load.load_assignment_id,
@@ -2479,7 +2489,8 @@ function openPlaceForm(load, day, startTime, endTime, classroomId = null) {
     academic_term_id:   filters.term_id,
     day_of_week:        day,
     start_time:         startTime,
-    end_time:           endTime,
+    end_time:           minToTime(timeToMin(startTime) + sessionMinutesFor(resolvedType)),
+    session_type:       resolvedType,
     status:             'active',
     remarks:            '',
     force:              false,
@@ -2592,8 +2603,9 @@ function onChipKeydown(e) {
 function pickSuggestedSlot(slot) {
   const load        = chipSuggest.value.load
   const classroomId = chipSuggest.value.data?.classroom_id ?? null
+  const sessionType = chipSuggest.value.data?.session_type ?? null
   closeChipSuggestions()
-  openPlaceForm(load, slot.day_of_week, slot.start_time.slice(0, 5), slot.end_time.slice(0, 5), classroomId)
+  openPlaceForm(load, slot.day_of_week, slot.start_time.slice(0, 5), slot.end_time.slice(0, 5), classroomId, sessionType)
 }
 
 // ── Reassign to another faculty (reuses load-balance transfer) ───────────────
@@ -2664,7 +2676,7 @@ const form = useForm({
   id: null, entry_type: 'class', title: '', category: '',
   load_assignment_id: null, faculty_id: null, subject_id: null, section_id: null, classroom_id: null,
   school_year_id: null, academic_term_id: null, day_of_week: '',
-  start_time: '', end_time: '', status: 'active', remarks: '', force: false,
+  start_time: '', end_time: '', session_type: null, status: 'active', remarks: '', force: false,
 })
 
 // School year is fully derivable from the term — the old visible dropdown was
@@ -2672,6 +2684,24 @@ const form = useForm({
 // wrong values when touched. Now auto-derived, no user-facing field.
 watch(() => form.academic_term_id, (termId) => {
   form.school_year_id = schoolYearIdForTerm(termId)
+})
+
+// Canonical session length — mirrors SchedulingConstants::ILP_SESSION_MINUTES
+// / REGULAR_SESSION_MINUTES. The server recomputes and enforces this on save
+// regardless of what's submitted; this just keeps the modal's preview in sync.
+function sessionMinutesFor(sessionType) {
+  return sessionType === 'ilp' ? 30 : 50
+}
+
+// True only while placing a brand-new session against an unplaced load (not
+// editing an existing row, not an ad-hoc non-teaching block) — that's the
+// only case where duration is derived rather than freely typed.
+const isNewPlacement = computed(() => !form.id && !!form.load_assignment_id && form.entry_type !== 'non_teaching')
+
+watch(() => form.start_time, (v) => {
+  if (isNewPlacement.value && v) {
+    form.end_time = minToTime(timeToMin(v) + sessionMinutesFor(form.session_type))
+  }
 })
 
 const modalTitle = computed(() => {
