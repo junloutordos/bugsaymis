@@ -618,15 +618,15 @@
       </div>
     </div>
 
-    <!-- Per-section Wednesday Lunch popover — edits ONE section only, never
-         the grade-wide bell schedule. -->
+    <!-- Per-section, per-day Lunch popover — edits ONE section's lunch on
+         ONE weekday only, never the grade-wide bell schedule. -->
     <div v-if="sectionLunchPopover" ref="sectionLunchEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
       :style="{ left: sectionLunchPopover.x + 'px', top: sectionLunchPopover.y + 'px' }">
 
       <div class="flex items-center justify-between px-4 pt-3 pb-2">
         <span class="text-sm font-semibold text-slate-800">
-          {{ sectionLunchPopover.sectionName }} — Wednesday Lunch
+          {{ sectionLunchPopover.sectionName }} — {{ sectionLunchPopover.day }} Lunch
         </span>
         <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeSectionLunchPopover">
           <XMarkIcon class="h-4 w-4" />
@@ -1566,12 +1566,12 @@ function isScienceCoreGroup(groupId) {
 function dayConfigFor(groupId, day) {
   const grade = viewBy.value === 'grade' ? groupId : groupHeaderInfo(groupId).grade_level
 
-  // By-Section Wednesday cards get their Lunch band tagged as
+  // By-Section cards, any weekday, get their Lunch band tagged as
   // section-editable (own popover, not the grade-wide drag) regardless of
-  // whether this section has an override yet — clicking it is how one gets
-  // set for the first time. Every other band/day/view is unaffected.
-  if (viewBy.value === 'section' && day === 'Wednesday') {
-    const base = props.dayConfigsBySection?.[groupId] ?? props.dayConfigsByGrade?.[grade]?.[day]
+  // whether this section has an override yet on that day — clicking it is
+  // how one gets set for the first time. Every other band/view is unaffected.
+  if (viewBy.value === 'section') {
+    const base = props.dayConfigsBySection?.[groupId]?.[day] ?? props.dayConfigsByGrade?.[grade]?.[day]
     if (!base) return base
     return {
       ...base,
@@ -1869,7 +1869,7 @@ const activityEl = ref(null)
 
 function onBlockedClick(e, groupId, day, band) {
   if (band.sectionEditable) {
-    openSectionLunchPopover(e, groupId, band)
+    openSectionLunchPopover(e, groupId, band, day)
     return
   }
 
@@ -1942,28 +1942,32 @@ async function saveActivityPopover() {
   }
 }
 
-// ── Per-section Wednesday Lunch popover ──────────────────────────────────────
+// ── Per-section, per-day Lunch popover ────────────────────────────────────────
 // Deliberately separate from the grade-wide band editor above: this writes to
-// ONE section's own lunch_start_wed/lunch_end_wed, never the shared timetable.
+// ONE section's own lunch_start_{day}/lunch_end_{day}, never the shared
+// timetable — mirrors Section::LUNCH_OVERRIDE_COLUMNS on the backend.
+const LUNCH_OVERRIDE_SUFFIX_BY_DAY = { Monday: 'mon', Tuesday: 'tue', Wednesday: 'wed', Thursday: 'thu', Friday: 'fri' }
 
 const sectionLunchPopover = ref(null)
 const sectionLunchEl = ref(null)
 
-function openSectionLunchPopover(e, sectionId, band) {
+function openSectionLunchPopover(e, sectionId, band, day) {
   if (blockedSaving.value) return
+  const suffix = LUNCH_OVERRIDE_SUFFIX_BY_DAY[day]
   const section = props.sections.find(s => s.id === sectionId)
   const grade = groupHeaderInfo(sectionId).grade_level
-  const gradeDefault = props.dayConfigsByGrade?.[grade]?.Wednesday?.blocked?.find(b => b.type === 'LUNCH')
+  const gradeDefault = props.dayConfigsByGrade?.[grade]?.[day]?.blocked?.find(b => b.type === 'LUNCH')
 
   const W = 300, H = 260
   sectionLunchPopover.value = {
     x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
     y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
     sectionId,
+    day,
     sectionName: groupHeaderInfo(sectionId).section_name,
-    hasOverride: !!(section?.lunch_start_wed && section?.lunch_end_wed),
-    start: section?.lunch_start_wed?.slice(0, 5) || band.start,
-    end:   section?.lunch_end_wed?.slice(0, 5)   || band.end,
+    hasOverride: !!(section?.[`lunch_start_${suffix}`] && section?.[`lunch_end_${suffix}`]),
+    start: section?.[`lunch_start_${suffix}`]?.slice(0, 5) || band.start,
+    end:   section?.[`lunch_end_${suffix}`]?.slice(0, 5)   || band.end,
     gradeDefaultLabel: gradeDefault ? `${gradeDefault.start}–${gradeDefault.end}` : null,
     saving: false,
   }
@@ -1989,17 +1993,18 @@ function onSectionLunchKeydown(e) {
 async function saveSectionLunchPopover(clear = false) {
   const p = sectionLunchPopover.value
   if (!p) return
+  const suffix = LUNCH_OVERRIDE_SUFFIX_BY_DAY[p.day]
   p.saving = true
   try {
-    await axios.patch(route('faculty-loading.sections.wednesday-lunch', p.sectionId), {
-      lunch_start_wed: clear ? '' : p.start,
-      lunch_end_wed:   clear ? '' : p.end,
+    await axios.patch(route('faculty-loading.sections.lunch', { section: p.sectionId, day: p.day }), {
+      [`lunch_start_${suffix}`]: clear ? '' : p.start,
+      [`lunch_end_${suffix}`]:   clear ? '' : p.end,
     })
     closeSectionLunchPopover()
     await router.reload({ only: ['dayConfigsBySection', 'sections'], preserveScroll: true })
     Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
   } catch (err) {
-    Swal.fire('Could not save', err.response?.data?.errors?.lunch_end_wed?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
+    Swal.fire('Could not save', err.response?.data?.errors?.[`lunch_end_${suffix}`]?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
   } finally {
     if (sectionLunchPopover.value) sectionLunchPopover.value.saving = false
   }

@@ -42,8 +42,16 @@ class Section extends Model
         'recess_end',
         'lunch_start',
         'lunch_end',
+        'lunch_start_mon',
+        'lunch_end_mon',
+        'lunch_start_tue',
+        'lunch_end_tue',
         'lunch_start_wed',
         'lunch_end_wed',
+        'lunch_start_thu',
+        'lunch_end_thu',
+        'lunch_start_fri',
+        'lunch_end_fri',
         'afternoon_break_start',
         'afternoon_break_end',
         'adviser',
@@ -52,6 +60,21 @@ class Section extends Model
         'permission',
         'asstadviser',
         'school_year_id',
+    ];
+
+    /**
+     * Day name → [start column, end column] for this section's own per-day
+     * lunch override. Every layer that needs to resolve a section+day to its
+     * override columns (validation, the scheduling grid, the calendar
+     * controller, the popover endpoint) goes through this single map so they
+     * can never drift out of sync with each other.
+     */
+    public const LUNCH_OVERRIDE_COLUMNS = [
+        'Monday'    => ['lunch_start_mon', 'lunch_end_mon'],
+        'Tuesday'   => ['lunch_start_tue', 'lunch_end_tue'],
+        'Wednesday' => ['lunch_start_wed', 'lunch_end_wed'],
+        'Thursday'  => ['lunch_start_thu', 'lunch_end_thu'],
+        'Friday'    => ['lunch_start_fri', 'lunch_end_fri'],
     ];
 
     protected $casts = [
@@ -134,5 +157,22 @@ class Section extends Model
     public function getFullLabelAttribute(): string
     {
         return "Grade {$this->grade_level} — {$this->sectionname}";
+    }
+
+    /**
+     * This section's own lunch override for the given weekday, or null if
+     * unset (falls back to the section's regular lunch_start/lunch_end, or
+     * ultimately the grade default) — see LUNCH_OVERRIDE_COLUMNS.
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public function lunchOverrideFor(string $day): ?array
+    {
+        [$startCol, $endCol] = self::LUNCH_OVERRIDE_COLUMNS[$day] ?? [null, null];
+        if (! $startCol || ! $this->$startCol || ! $this->$endCol) {
+            return null;
+        }
+
+        return ['start' => $this->$startCol, 'end' => $this->$endCol];
     }
 }

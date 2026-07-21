@@ -64,7 +64,7 @@ class DeterministicSchedulingService
 
     /** @var array<int,array<int,array<string,mixed>>> available slots per grade */
     private array $gridByGrade = [];
-    /** @var array<int,array<int,array<string,mixed>>> available slots per section — only populated for sections with a Wednesday lunch override (sections.lunch_start_wed/lunch_end_wed); everything else uses the shared grade grid */
+    /** @var array<int,array<int,array<string,mixed>>> available slots per section — only populated for sections with their own lunch override on at least one weekday (Section::LUNCH_OVERRIDE_COLUMNS); everything else uses the shared grade grid */
     private array $gridBySection = [];
     /** @var array<int,array<string,int>> earliest start_min per grade+day (the day's first period) */
     private array $firstPeriodByGrade = [];
@@ -1075,22 +1075,32 @@ class DeterministicSchedulingService
             }
         }
 
-        // Sections with their own Wednesday lunch time get their own grid
+        // Sections with their own lunch time on any weekday get their own grid
         // variant; every other section keeps sharing the grade's grid above.
+        $overrideColumns = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
         $overriddenSections = Section::whereIn('levelid', $grades)
-            ->whereNotNull('lunch_start_wed')
-            ->whereNotNull('lunch_end_wed')
-            ->get(['id', 'levelid', 'lunch_start_wed', 'lunch_end_wed']);
+            ->where(function ($q) {
+                foreach (Section::LUNCH_OVERRIDE_COLUMNS as [$startCol, $endCol]) {
+                    $q->orWhere(fn ($q2) => $q2->whereNotNull($startCol)->whereNotNull($endCol));
+                }
+            })
+            ->get(array_merge(['id', 'levelid'], $overrideColumns));
 
         foreach ($overriddenSections as $section) {
-            $this->gridBySection[(int) $section->id] = $this->buildSlotGrid((int) $section->levelid, [
-                'start' => substr((string) $section->lunch_start_wed, 0, 5),
-                'end'   => substr((string) $section->lunch_end_wed, 0, 5),
-            ]);
+            $overridesByDay = [];
+            foreach (self::DAYS as $day) {
+                if ($override = $section->lunchOverrideFor($day)) {
+                    $overridesByDay[$day] = [
+                        'start' => substr((string) $override['start'], 0, 5),
+                        'end'   => substr((string) $override['end'], 0, 5),
+                    ];
+                }
+            }
+            $this->gridBySection[(int) $section->id] = $this->buildSlotGrid((int) $section->levelid, $overridesByDay);
         }
     }
 
-    /** The slot grid to use for a section — its own Wednesday-lunch-aware
+    /** The slot grid to use for a section — its own per-day-lunch-aware
      * variant if it has one, otherwise the shared grade grid. */
     private function gridFor(int $sectionId, int $grade): array
     {
@@ -1186,13 +1196,17 @@ class DeterministicSchedulingService
      * the fixed Friday Flag Retreat block (16:00 onward, all grades), and
      * Friday ILA (no in-person) for any grade still listed.
      *
+     * $lunchOverridesByDay: optional [day => ['start'=>..,'end'=>..]] — a
+     * section's own per-day lunch override (Section::LUNCH_OVERRIDE_COLUMNS),
+     * applied only on the day(s) present in the map.
+     *
      * @return array<int,array{day:string,start:string,end:string,start_min:int,end_min:int}>
      */
-    private function buildSlotGrid(int $grade, ?array $wedLunchOverride = null): array
+    private function buildSlotGrid(int $grade, array $lunchOverridesByDay = []): array
     {
         $slots = [];
         foreach (self::DAYS as $day) {
-            foreach (SchedulingConstants::getSchedulableTeachingSlots($grade, $day, $wedLunchOverride) as $row) {
+            foreach (SchedulingConstants::getSchedulableTeachingSlots($grade, $day, $lunchOverridesByDay[$day] ?? null) as $row) {
                 $slots[] = [
                     'day'         => $day,
                     'start'       => $row['start'],

@@ -328,8 +328,8 @@ class ScheduleValidationService
 
     /**
      * Block if the proposed time overlaps with the section's recess or lunch break.
-     * On Wednesday, a section's lunch_start_wed/lunch_end_wed override (if set)
-     * takes priority over its regular lunch_start/lunch_end.
+     * A section's own per-day lunch override (Section::LUNCH_OVERRIDE_COLUMNS,
+     * if set for $day) takes priority over its regular lunch_start/lunch_end.
      */
     private function checkBreakTimeConflict(Section $section, string $day, string $start, string $end): ?string
     {
@@ -339,12 +339,9 @@ class ScheduleValidationService
             }
         }
 
-        $lunchStart = $section->lunch_start;
-        $lunchEnd   = $section->lunch_end;
-        if ($day === 'Wednesday' && $section->lunch_start_wed && $section->lunch_end_wed) {
-            $lunchStart = $section->lunch_start_wed;
-            $lunchEnd   = $section->lunch_end_wed;
-        }
+        $override   = $section->lunchOverrideFor($day);
+        $lunchStart = $override['start'] ?? $section->lunch_start;
+        $lunchEnd   = $override['end'] ?? $section->lunch_end;
 
         if ($lunchStart && $lunchEnd) {
             if ($this->conflicts->timesOverlap($start, $end, $lunchStart, $lunchEnd)) {
