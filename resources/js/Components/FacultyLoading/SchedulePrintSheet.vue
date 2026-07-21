@@ -63,6 +63,15 @@
                   <span class="schedule-print-blocked-time">{{ formatTimeRange(el.start, el.end) }}</span>
                 </div>
                 <div
+                  v-for="sc in dayConfigs[day].scienceCore ?? []"
+                  :key="`${day}-sci-${sc.start}`"
+                  class="schedule-print-science-core"
+                  :style="rangeStyle(sc.start, sc.end)"
+                >
+                  <span>{{ sc.label || 'Science Core' }}</span>
+                  <span class="schedule-print-blocked-time">{{ formatTimeRange(sc.start, sc.end) }}</span>
+                </div>
+                <div
                   v-if="timeToMinutes(dayConfigs[day].end) <= NOON"
                   class="schedule-print-no-classes"
                   :style="rangeStyle(dayConfigs[day].end, minutesToTime(CAL_END))"
@@ -494,6 +503,7 @@ function lunchTimeLabel(day) {
 
 .schedule-print-blocked,
 .schedule-print-elective,
+.schedule-print-science-core,
 .schedule-print-no-classes {
   position: absolute;
   left: 0;
@@ -525,6 +535,16 @@ function lunchTimeLabel(day) {
   border-bottom: 0.12mm solid #fcd34d;
   background: #fef3c7;
   color: #b45309;
+}
+
+/* Science Core band — violet, matches the interactive calendar's G11/G12
+   leveled-science band and stays distinct from the amber elective band. */
+.schedule-print-science-core {
+  z-index: 2;
+  border-top: 0.12mm solid #c4b5fd;
+  border-bottom: 0.12mm solid #c4b5fd;
+  background: #ede9fe;
+  color: #6d28d9;
 }
 
 .schedule-print-blocked-time {
