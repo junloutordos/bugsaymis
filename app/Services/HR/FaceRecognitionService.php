@@ -239,22 +239,6 @@ class FaceRecognitionService
 
         $this->currentAttemptNumber = $existingForSlot->count() + 1;
 
-        $sequenceIndex = array_search($punchType, self::PUNCH_SEQUENCE, true);
-        if ($sequenceIndex > 0) {
-            $previousType = self::PUNCH_SEQUENCE[$sequenceIndex - 1];
-            $hasPrevious  = OnlineTimePunch::where('user_id', $user->id)
-                ->where('work_date', $today)
-                ->where('punch_type', $previousType)
-                ->where('match_status', 'verified')
-                ->exists();
-
-            if (! $hasPrevious) {
-                throw ValidationException::withMessages([
-                    'punch_type' => 'You must record "' . str_replace('_', ' ', $previousType) . '" first.',
-                ]);
-            }
-        }
-
         $enrollment = FaceEnrollment::where('user_id', $user->id)
             ->where('status', 'approved')
             ->where('is_active', true)

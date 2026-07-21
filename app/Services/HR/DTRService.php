@@ -119,26 +119,18 @@ class DTRService
                         && $dateStr <= Carbon::parse($l->date_to)->toDateString()
             );
 
-            // Parse punches
-            [$timeInAm, $timeOutAm, $timeInPm, $timeOutPm] = $this->parsePunches(
-                $logsForDay,
-                $dateStr,
-                $schedule
-            );
-
-            // Online Time Punch fallback: ranks above WFH (algorithmically
-            // face-verified) but below a physical biometric device punch.
-            // Only used when no biometric logs exist for this date.
             $onlineForDay   = $onlinePunches->get($dateStr, collect());
             $hasOnlinePunch = $onlineForDay->isNotEmpty();
 
-            if ($hasOnlinePunch && $logsForDay->isEmpty()) {
-                $byPunchType = $onlineForDay->keyBy('punch_type');
-                $timeInAm    = $byPunchType->get('time_in_am')?->punched_at?->format('H:i:s');
-                $timeOutAm   = $byPunchType->get('time_out_am')?->punched_at?->format('H:i:s');
-                $timeInPm    = $byPunchType->get('time_in_pm')?->punched_at?->format('H:i:s');
-                $timeOutPm   = $byPunchType->get('time_out_pm')?->punched_at?->format('H:i:s');
-            }
+            // Merge physical and verified online punches. Online punches are
+            // explicit slot anchors, while physical logs fill the other slots
+            // using the existing chronological parsing rules.
+            [$timeInAm, $timeOutAm, $timeInPm, $timeOutPm] = $this->mergePunches(
+                $logsForDay,
+                $onlineForDay,
+                $dateStr,
+                $schedule
+            );
 
             // WFH fallback: when there are no biometric logs or online punches
             // for this date but the employee has a WFH attendance record, map
@@ -572,6 +564,65 @@ class DTRService
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Merge physical biometric logs with explicitly labelled online punches.
+     *
+     * The combined timeline lets a later online punch disambiguate earlier
+     * physical logs (for example 08:00 physical, 12:00 physical, 17:00 online).
+     * A value inferred solely from an online timestamp is then removed from any
+     * slot other than the slot the employee explicitly selected.
+     */
+    private function mergePunches(
+        \Illuminate\Support\Collection $biometricLogs,
+        \Illuminate\Support\Collection $onlinePunches,
+        string $dateStr,
+        ?EmployeeSchedule $schedule
+    ): array {
+        if ($onlinePunches->isEmpty()) {
+            return $this->parsePunches($biometricLogs, $dateStr, $schedule);
+        }
+
+        $fields = ['time_in_am', 'time_out_am', 'time_in_pm', 'time_out_pm'];
+        $onlineByType = $onlinePunches
+            ->sortBy('punched_at')
+            ->keyBy('punch_type');
+
+        if ($biometricLogs->isEmpty()) {
+            return array_map(
+                fn (string $field) => $onlineByType->get($field)?->punched_at?->format('H:i:s'),
+                $fields
+            );
+        }
+
+        $combinedLogs = $biometricLogs->values();
+        foreach ($onlineByType as $punch) {
+            $combinedLogs->push(new BiometricLog([
+                'log_datetime' => $punch->punched_at,
+            ]));
+        }
+
+        $merged = $this->parsePunches($combinedLogs, $dateStr, $schedule);
+        $physicalTimes = $biometricLogs
+            ->map(fn ($log) => Carbon::parse($log->log_datetime)->format('H:i:s'))
+            ->flip();
+
+        foreach ($fields as $index => $field) {
+            $onlinePunch = $onlineByType->get($field);
+            if ($onlinePunch) {
+                $merged[$index] = $onlinePunch->punched_at->format('H:i:s');
+                continue;
+            }
+
+            // Do not let an explicitly labelled online event also populate a
+            // second slot merely because it appeared in the combined timeline.
+            if ($merged[$index] && ! $physicalTimes->has($merged[$index])) {
+                $merged[$index] = null;
+            }
+        }
+
+        return $merged;
+    }
 
     private function getDayType(
         string $dateStr,

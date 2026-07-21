@@ -269,7 +269,7 @@ async function load(page = 1) {
 }
 
 function punchLabel(type) {
-  return { time_in_am: 'Time In AM', time_out_am: 'Time Out AM', time_in_pm: 'Time In PM', time_out_pm: 'Time Out PM' }[type] ?? type
+  return { time_in_am: 'AM Time In', time_out_am: 'AM Time Out', time_in_pm: 'PM Time In', time_out_pm: 'PM Time Out' }[type] ?? type
 }
 
 function statusPillClass(status) {

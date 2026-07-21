@@ -160,10 +160,10 @@ const props = defineProps({
 const punches = ref(props.todayPunches)
 
 const punchSlots = [
-  { type: 'time_in_am',  label: 'Time In AM' },
-  { type: 'time_out_am', label: 'Time Out AM' },
-  { type: 'time_in_pm',  label: 'Time In PM' },
-  { type: 'time_out_pm', label: 'Time Out PM' },
+  { type: 'time_in_am',  label: 'AM Time In' },
+  { type: 'time_out_am', label: 'AM Time Out' },
+  { type: 'time_in_pm',  label: 'PM Time In' },
+  { type: 'time_out_pm', label: 'PM Time Out' },
 ]
 
 const maxAttempts = ref(3)
@@ -189,11 +189,7 @@ function attemptsExhausted(type) {
 function canPunch(type) {
   const latest = punchFor(type)
   if (latest && ['verified', 'manual_review'].includes(latest.match_status)) return false
-  if (attemptsExhausted(type)) return false
-  const idx = punchSlots.findIndex(s => s.type === type)
-  if (idx === 0) return true
-  const prev = punchSlots[idx - 1]
-  return punchFor(prev.type)?.match_status === 'verified'
+  return !attemptsExhausted(type)
 }
 
 function slotClass(type) {
