@@ -564,7 +564,7 @@ class ClassScheduleController extends Controller
             ->where('is_active', true)
             ->orderBy('levelid')
             ->orderBy('sectionname')
-            ->get(['id', 'sectionname', 'levelid']);
+            ->get(['id', 'sectionname', 'levelid', 'lunch_start_wed', 'lunch_end_wed']);
 
         // Administrator/CID Chief may edit the bell-schedule blocked bands
         // directly from the calendar (same authority BellScheduleController
@@ -600,6 +600,34 @@ class ClassScheduleController extends Controller
                         : [],
                 ];
             }
+        }
+
+        // Sections with their own Wednesday lunch time get a Wednesday-only
+        // override of the grade's dayConfig (everything else — Monday-Friday
+        // besides Wednesday, electives, science core — stays grade-shared).
+        // The calendar picks this up per-card so only that one section's card
+        // shows the shifted band; every other section keeps the grade default.
+        $dayConfigsBySection = [];
+        foreach ($sections as $section) {
+            if (! $section->lunch_start_wed || ! $section->lunch_end_wed) {
+                continue;
+            }
+            $grade = (int) $section->levelid;
+            $override = [
+                'start' => substr((string) $section->lunch_start_wed, 0, 5),
+                'end'   => substr((string) $section->lunch_end_wed, 0, 5),
+            ];
+            $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, 'Wednesday', $override);
+            if ($canEditBellSchedule) {
+                $blocked = array_map(function ($band) use ($grade) {
+                    $band['write'] = SchedulingConstants::bandWriteDescriptor($band['type'], $grade, 'Wednesday');
+                    return $band;
+                }, $blocked);
+            }
+            $dayConfigsBySection[$section->id] = [
+                ...($dayConfigsByGrade[$grade]['Wednesday'] ?? []),
+                'blocked' => $blocked,
+            ];
         }
 
         // Full current values for the settings an ACTIVITY band's popover can
@@ -681,6 +709,7 @@ class ClassScheduleController extends Controller
             'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
             'filters' => $request->only(['term_id', 'section_id', 'faculty_id']),
             'dayConfigsByGrade' => $dayConfigsByGrade,
+            'dayConfigsBySection' => $dayConfigsBySection,
             'unplacedLoads' => $unplacedLoads,
             'capability' => ['level' => $cap['level']],
             'pageMode' => $pageMode,

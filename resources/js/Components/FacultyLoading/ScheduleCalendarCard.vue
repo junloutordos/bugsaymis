@@ -285,14 +285,18 @@ const emit = defineEmits([
   'blocked-mousedown', 'blocked-click',
 ])
 
-/** Move/resize-draggable: a literal timetable row or a single-window setting. */
+/** Move/resize-draggable: a literal timetable row or a single-window setting.
+ *  A section-scoped Lunch band (bp.sectionEditable) opts out of the
+ *  grade-wide drag — dragging it here would silently move every other
+ *  section's lunch too, which defeats the point of a per-section override. */
 function isBandDraggable(bp) {
-  return props.blockedEditable && (bp.write?.kind === 'timetable' || bp.write?.kind === 'setting')
+  return props.blockedEditable && !bp.sectionEditable && (bp.write?.kind === 'timetable' || bp.write?.kind === 'setting')
 }
 
-/** Click-to-edit: composite bands (e.g. ACTIVITY) that can't be reduced to one drag. */
+/** Click-to-edit: composite bands (e.g. ACTIVITY) that can't be reduced to one
+ *  drag, plus a By-Section Wednesday Lunch band (its own section-only popover). */
 function isBandClickable(bp) {
-  return props.blockedEditable && bp.write?.kind === 'activity'
+  return props.blockedEditable && (bp.write?.kind === 'activity' || !!bp.sectionEditable)
 }
 
 /** Stops the mousedown from also triggering the day column's own

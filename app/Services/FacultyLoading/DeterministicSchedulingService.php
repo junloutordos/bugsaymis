@@ -64,6 +64,8 @@ class DeterministicSchedulingService
 
     /** @var array<int,array<int,array<string,mixed>>> available slots per grade */
     private array $gridByGrade = [];
+    /** @var array<int,array<int,array<string,mixed>>> available slots per section — only populated for sections with a Wednesday lunch override (sections.lunch_start_wed/lunch_end_wed); everything else uses the shared grade grid */
+    private array $gridBySection = [];
     /** @var array<int,array<string,int>> earliest start_min per grade+day (the day's first period) */
     private array $firstPeriodByGrade = [];
     /** @var array<int,array<string,int>> ILP placements so far per section+day (for even weekly spread) */
@@ -1059,9 +1061,10 @@ class DeterministicSchedulingService
     private function buildGrids(array $grades): void
     {
         $this->gridByGrade        = [];
+        $this->gridBySection      = [];
         $this->firstPeriodByGrade = [];
+        $grades                   = array_map('intval', $grades);
         foreach ($grades as $grade) {
-            $grade                     = (int) $grade;
             $this->gridByGrade[$grade] = $this->buildSlotGrid($grade);
             foreach ($this->gridByGrade[$grade] as $slot) {
                 $day = $slot['day'];
@@ -1071,6 +1074,27 @@ class DeterministicSchedulingService
                 }
             }
         }
+
+        // Sections with their own Wednesday lunch time get their own grid
+        // variant; every other section keeps sharing the grade's grid above.
+        $overriddenSections = Section::whereIn('levelid', $grades)
+            ->whereNotNull('lunch_start_wed')
+            ->whereNotNull('lunch_end_wed')
+            ->get(['id', 'levelid', 'lunch_start_wed', 'lunch_end_wed']);
+
+        foreach ($overriddenSections as $section) {
+            $this->gridBySection[(int) $section->id] = $this->buildSlotGrid((int) $section->levelid, [
+                'start' => substr((string) $section->lunch_start_wed, 0, 5),
+                'end'   => substr((string) $section->lunch_end_wed, 0, 5),
+            ]);
+        }
+    }
+
+    /** The slot grid to use for a section — its own Wednesday-lunch-aware
+     * variant if it has one, otherwise the shared grade grid. */
+    private function gridFor(int $sectionId, int $grade): array
+    {
+        return $this->gridBySection[$sectionId] ?? $this->gridByGrade[$grade] ?? [];
     }
 
     /** Reset all mutable scheduling state (busy maps, counters, placements). */
@@ -1164,11 +1188,11 @@ class DeterministicSchedulingService
      *
      * @return array<int,array{day:string,start:string,end:string,start_min:int,end_min:int}>
      */
-    private function buildSlotGrid(int $grade): array
+    private function buildSlotGrid(int $grade, ?array $wedLunchOverride = null): array
     {
         $slots = [];
         foreach (self::DAYS as $day) {
-            foreach (SchedulingConstants::getSchedulableTeachingSlots($grade, $day) as $row) {
+            foreach (SchedulingConstants::getSchedulableTeachingSlots($grade, $day, $wedLunchOverride) as $row) {
                 $slots[] = [
                     'day'         => $day,
                     'start'       => $row['start'],
@@ -1205,7 +1229,7 @@ class DeterministicSchedulingService
         $isIlp     = ($s['session_type'] ?? 'regular') === 'ilp';
         $forcedDay = $s['forced_day'] ?? null;
 
-        foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
+        foreach ($this->gridFor((int) $s['section_id'], (int) $s['grade']) as $slot) {
             $day = $slot['day'];
             $occupiedSlot = $this->occupiedSlot($s, $slot);
 
@@ -1312,7 +1336,7 @@ class DeterministicSchedulingService
         $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
         $found = [];
 
-        foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
+        foreach ($this->gridFor((int) $s['section_id'], (int) $s['grade']) as $slot) {
             $day = $slot['day'];
             $occupiedSlot = $this->occupiedSlot($s, $slot);
 
@@ -1377,7 +1401,7 @@ class DeterministicSchedulingService
         $isIlp     = ($s['session_type'] ?? 'regular') === 'ilp';
         $forcedDay = $s['forced_day'] ?? null;
 
-        foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
+        foreach ($this->gridFor((int) $s['section_id'], (int) $s['grade']) as $slot) {
             $occupiedSlot = $this->occupiedSlot($s, $slot);
             if ($forcedDay !== null && $slot['day'] !== $forcedDay) {
                 continue;
@@ -1697,7 +1721,7 @@ class DeterministicSchedulingService
     private function diagnoseFailure(array $s): array
     {
         $grade = $s['grade'];
-        $grid  = $this->gridByGrade[$grade] ?? [];
+        $grid  = $this->gridFor((int) $s['section_id'], (int) $grade);
         $isIlp = ($s['session_type'] ?? 'regular') === 'ilp';
 
         if (($s['is_elective'] ?? false)

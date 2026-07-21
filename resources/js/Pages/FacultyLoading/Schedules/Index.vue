@@ -618,6 +618,51 @@
       </div>
     </div>
 
+    <!-- Per-section Wednesday Lunch popover — edits ONE section only, never
+         the grade-wide bell schedule. -->
+    <div v-if="sectionLunchPopover" ref="sectionLunchEl"
+      class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: sectionLunchPopover.x + 'px', top: sectionLunchPopover.y + 'px' }">
+
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          {{ sectionLunchPopover.sectionName }} — Wednesday Lunch
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeSectionLunchPopover">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="px-4 pb-3 space-y-3">
+        <p class="text-xs text-slate-500">
+          This section only — every other Grade {{ groupHeaderInfo(sectionLunchPopover.sectionId).grade_level }} section
+          keeps the grade default<span v-if="sectionLunchPopover.gradeDefaultLabel"> ({{ sectionLunchPopover.gradeDefaultLabel }})</span>.
+        </p>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Lunch</label>
+          <div class="flex items-center gap-2">
+            <input v-model="sectionLunchPopover.start" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+            <span class="text-slate-400 text-xs">to</span>
+            <input v-model="sectionLunchPopover.end" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+        <button v-if="sectionLunchPopover.hasOverride" type="button"
+          class="text-xs font-medium text-slate-500 hover:text-rose-600"
+          :disabled="sectionLunchPopover.saving"
+          @click="saveSectionLunchPopover(true)">
+          Reset to grade default
+        </button>
+        <span v-else />
+        <AppButton size="sm" :loading="sectionLunchPopover.saving" @click="saveSectionLunchPopover(false)">Save</AppButton>
+      </div>
+    </div>
+
     <!-- Suggested-slots popover (click an unplaced chip) -->
     <div v-if="chipSuggest" ref="chipSuggestEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
@@ -879,6 +924,7 @@ const props = defineProps({
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
   dayConfigsByGrade: { type: Object, default: () => ({}) },
+  dayConfigsBySection: { type: Object, default: () => ({}) },
   unplacedLoads: { type: Array, default: () => [] },
   capability:  { type: Object, default: () => ({ level: 'manage' }) },
   pageMode:    { type: String, default: 'admin' }, // 'admin' | 'my'
@@ -1519,6 +1565,20 @@ function isScienceCoreGroup(groupId) {
  *  grade, so this can't be a single flat per-day overlay. */
 function dayConfigFor(groupId, day) {
   const grade = viewBy.value === 'grade' ? groupId : groupHeaderInfo(groupId).grade_level
+
+  // By-Section Wednesday cards get their Lunch band tagged as
+  // section-editable (own popover, not the grade-wide drag) regardless of
+  // whether this section has an override yet — clicking it is how one gets
+  // set for the first time. Every other band/day/view is unaffected.
+  if (viewBy.value === 'section' && day === 'Wednesday') {
+    const base = props.dayConfigsBySection?.[groupId] ?? props.dayConfigsByGrade?.[grade]?.[day]
+    if (!base) return base
+    return {
+      ...base,
+      blocked: (base.blocked ?? []).map(b => b.type === 'LUNCH' ? { ...b, sectionEditable: groupId } : b),
+    }
+  }
+
   return props.dayConfigsByGrade?.[grade]?.[day]
 }
 
@@ -1808,6 +1868,11 @@ const activityPopover = ref(null)
 const activityEl = ref(null)
 
 function onBlockedClick(e, groupId, day, band) {
+  if (band.sectionEditable) {
+    openSectionLunchPopover(e, groupId, band)
+    return
+  }
+
   const grade = singleGradeFor(groupId)
   if (grade === null || band.write?.kind !== 'activity' || blockedSaving.value) return
 
@@ -1874,6 +1939,69 @@ async function saveActivityPopover() {
     Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
   } finally {
     if (activityPopover.value) activityPopover.value.saving = false
+  }
+}
+
+// ── Per-section Wednesday Lunch popover ──────────────────────────────────────
+// Deliberately separate from the grade-wide band editor above: this writes to
+// ONE section's own lunch_start_wed/lunch_end_wed, never the shared timetable.
+
+const sectionLunchPopover = ref(null)
+const sectionLunchEl = ref(null)
+
+function openSectionLunchPopover(e, sectionId, band) {
+  if (blockedSaving.value) return
+  const section = props.sections.find(s => s.id === sectionId)
+  const grade = groupHeaderInfo(sectionId).grade_level
+  const gradeDefault = props.dayConfigsByGrade?.[grade]?.Wednesday?.blocked?.find(b => b.type === 'LUNCH')
+
+  const W = 300, H = 260
+  sectionLunchPopover.value = {
+    x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
+    y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
+    sectionId,
+    sectionName: groupHeaderInfo(sectionId).section_name,
+    hasOverride: !!(section?.lunch_start_wed && section?.lunch_end_wed),
+    start: section?.lunch_start_wed?.slice(0, 5) || band.start,
+    end:   section?.lunch_end_wed?.slice(0, 5)   || band.end,
+    gradeDefaultLabel: gradeDefault ? `${gradeDefault.start}–${gradeDefault.end}` : null,
+    saving: false,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownSectionLunch, true)
+  window.addEventListener('keydown', onSectionLunchKeydown)
+}
+
+function closeSectionLunchPopover() {
+  sectionLunchPopover.value = null
+  window.removeEventListener('mousedown', onWindowMouseDownSectionLunch, true)
+  window.removeEventListener('keydown', onSectionLunchKeydown)
+}
+
+function onWindowMouseDownSectionLunch(e) {
+  if (sectionLunchEl.value && sectionLunchEl.value.contains(e.target)) return
+  closeSectionLunchPopover()
+}
+
+function onSectionLunchKeydown(e) {
+  if (e.key === 'Escape') closeSectionLunchPopover()
+}
+
+async function saveSectionLunchPopover(clear = false) {
+  const p = sectionLunchPopover.value
+  if (!p) return
+  p.saving = true
+  try {
+    await axios.patch(route('faculty-loading.sections.wednesday-lunch', p.sectionId), {
+      lunch_start_wed: clear ? '' : p.start,
+      lunch_end_wed:   clear ? '' : p.end,
+    })
+    closeSectionLunchPopover()
+    await router.reload({ only: ['dayConfigsBySection', 'sections'], preserveScroll: true })
+    Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Could not save', err.response?.data?.errors?.lunch_end_wed?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
+  } finally {
+    if (sectionLunchPopover.value) sectionLunchPopover.value.saving = false
   }
 }
 
@@ -2178,7 +2306,7 @@ function isEditableTarget(el) {
 function anyModalOpen() {
   return modal.value || swapRequestModal.value || swapReviewModal.value || versionsModal.value
     || saveVersionModal.value || removedModal.value || autoPlace.show
-    || !!activityPopover.value || !!quickCreate.value
+    || !!activityPopover.value || !!quickCreate.value || !!sectionLunchPopover.value
 }
 
 function onGlobalKeydown(e) {

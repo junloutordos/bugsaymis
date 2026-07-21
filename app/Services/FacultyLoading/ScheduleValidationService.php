@@ -97,7 +97,7 @@ class ScheduleValidationService
         // ── 5. Section break-time check ──────────────────────────────────────
         $section = Section::find($data['section_id']);
         if ($section) {
-            $breakError = $this->checkBreakTimeConflict($section, $data['start_time'], $data['end_time']);
+            $breakError = $this->checkBreakTimeConflict($section, $data['day_of_week'], $data['start_time'], $data['end_time']);
             if ($breakError) {
                 $errors[] = $breakError;
             }
@@ -328,8 +328,10 @@ class ScheduleValidationService
 
     /**
      * Block if the proposed time overlaps with the section's recess or lunch break.
+     * On Wednesday, a section's lunch_start_wed/lunch_end_wed override (if set)
+     * takes priority over its regular lunch_start/lunch_end.
      */
-    private function checkBreakTimeConflict(Section $section, string $start, string $end): ?string
+    private function checkBreakTimeConflict(Section $section, string $day, string $start, string $end): ?string
     {
         if ($section->recess_start && $section->recess_end) {
             if ($this->conflicts->timesOverlap($start, $end, $section->recess_start, $section->recess_end)) {
@@ -337,9 +339,16 @@ class ScheduleValidationService
             }
         }
 
-        if ($section->lunch_start && $section->lunch_end) {
-            if ($this->conflicts->timesOverlap($start, $end, $section->lunch_start, $section->lunch_end)) {
-                return "Schedule ({$start}–{$end}) overlaps with the section's lunch break ({$section->lunch_start}–{$section->lunch_end}).";
+        $lunchStart = $section->lunch_start;
+        $lunchEnd   = $section->lunch_end;
+        if ($day === 'Wednesday' && $section->lunch_start_wed && $section->lunch_end_wed) {
+            $lunchStart = $section->lunch_start_wed;
+            $lunchEnd   = $section->lunch_end_wed;
+        }
+
+        if ($lunchStart && $lunchEnd) {
+            if ($this->conflicts->timesOverlap($start, $end, $lunchStart, $lunchEnd)) {
+                return "Schedule ({$start}–{$end}) overlaps with the section's lunch break ({$lunchStart}–{$lunchEnd}).";
             }
         }
 

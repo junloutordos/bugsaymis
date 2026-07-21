@@ -870,12 +870,27 @@ class SchedulingConstants
      * Injecting them here keeps the calendar's rendering in lockstep with
      * what the generator actually treats as blocked, instead of drifting out
      * of sync with a separately-maintained schedule.
+     *
+     * $wedLunchOverride: optional ['start'=>'HH:MM','end'=>'HH:MM'] that
+     * replaces the LUNCH row's time for this call only — used to give one
+     * section a different Wednesday lunch time than the rest of its grade
+     * (sections.lunch_start_wed/lunch_end_wed). Ignored on every other day.
      */
-    public static function getBlockedSlots(int $grade, string $day): array
+    public static function getBlockedSlots(int $grade, string $day, ?array $wedLunchOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
             : self::getTueFriTimetable($grade);
+
+        if ($day === 'Wednesday' && $wedLunchOverride !== null) {
+            $timetable = array_map(static function ($row) use ($wedLunchOverride) {
+                if ($row['type'] === 'LUNCH') {
+                    $row['start'] = $wedLunchOverride['start'];
+                    $row['end']   = $wedLunchOverride['end'];
+                }
+                return $row;
+            }, $timetable);
+        }
 
         $blocked = array_values(
             array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
@@ -956,11 +971,21 @@ class SchedulingConstants
      * capacity/placement math: restoring the G8 consult band there would
      * filter the overflow periods out of the schedulable grid.
      */
-    public static function getDisplayBlockedSlots(int $grade, string $day): array
+    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $wedLunchOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
             : self::getTueFriTimetable($grade);
+
+        if ($day === 'Wednesday' && $wedLunchOverride !== null) {
+            $timetable = array_map(static function ($row) use ($wedLunchOverride) {
+                if ($row['type'] === 'LUNCH') {
+                    $row['start'] = $wedLunchOverride['start'];
+                    $row['end']   = $wedLunchOverride['end'];
+                }
+                return $row;
+            }, $timetable);
+        }
 
         $blocked = array_values(
             array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
@@ -1076,7 +1101,7 @@ class SchedulingConstants
     }
 
     /** Canonical regular and ILP-only periods after applying fixed blocks. */
-    public static function getSchedulableTeachingSlots(int $grade, string $day): array
+    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $wedLunchOverride = null): array
     {
         if ($day === 'Friday' && in_array($grade, self::fridayIlaGrades(), true)) {
             return [];
@@ -1084,16 +1109,16 @@ class SchedulingConstants
 
         return array_values(array_filter(
             self::getTeachingSlots($grade, $day),
-            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end']),
+            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $wedLunchOverride),
         ));
     }
 
     /**
      * True if a proposed time window overlaps any blocked slot for the grade/day.
      */
-    public static function overlapsBlocked(int $grade, string $day, string $start, string $end): bool
+    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $wedLunchOverride = null): bool
     {
-        foreach (self::getBlockedSlots($grade, $day) as $blocked) {
+        foreach (self::getBlockedSlots($grade, $day, $wedLunchOverride) as $blocked) {
             if ($start < $blocked['end'] && $end > $blocked['start']) {
                 return true;
             }

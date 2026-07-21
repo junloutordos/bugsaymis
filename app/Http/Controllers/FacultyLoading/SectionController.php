@@ -270,6 +270,42 @@ class SectionController extends Controller
         return back()->with('success', 'Section updated.');
     }
 
+    /**
+     * Set (or clear) a single section's own Wednesday lunch time — used by the
+     * calendar's per-section Wednesday-lunch popover so one section can move
+     * its lunch without touching the shared grade-wide bell schedule or any
+     * other section. Falls back to the section's regular lunch_start/lunch_end
+     * (and ultimately the grade default) whenever these are left null.
+     */
+    public function updateWednesdayLunch(Request $request, Section $section): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+
+        $request->merge($this->normaliseBreakTimes($request, ['lunch_start_wed', 'lunch_end_wed']));
+
+        $data = $request->validate([
+            'lunch_start_wed' => 'nullable|date_format:H:i',
+            'lunch_end_wed'   => 'nullable|date_format:H:i|after:lunch_start_wed',
+        ]);
+
+        $startIsNull = ($data['lunch_start_wed'] ?? null) === null;
+        $endIsNull   = ($data['lunch_end_wed'] ?? null) === null;
+        if ($startIsNull !== $endIsNull) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => ['lunch_end_wed' => ['Provide both a start and end time, or leave both blank to clear the override.']],
+            ], 422);
+        }
+
+        $section->update($data);
+
+        return response()->json([
+            'message'         => $data['lunch_start_wed'] ? "Wednesday lunch updated for {$section->sectionname}." : "Wednesday lunch override cleared for {$section->sectionname}.",
+            'lunch_start_wed' => $section->lunch_start_wed,
+            'lunch_end_wed'   => $section->lunch_end_wed,
+        ]);
+    }
+
     // ── Delete a section ──────────────────────────────────────────────────────
 
     public function destroy(Section $section): RedirectResponse
@@ -296,9 +332,8 @@ class SectionController extends Controller
      * - Empty strings → null (HTML time inputs submit "" when blank)
      * - "HH:MM:SS" → "HH:MM" (MySQL TIME columns include seconds on round-trip)
      */
-    private function normaliseBreakTimes(Request $request): array
+    private function normaliseBreakTimes(Request $request, array $fields = ['recess_start', 'recess_end', 'lunch_start', 'lunch_end']): array
     {
-        $fields = ['recess_start', 'recess_end', 'lunch_start', 'lunch_end'];
         $patch  = [];
         foreach ($fields as $field) {
             $val = $request->input($field);

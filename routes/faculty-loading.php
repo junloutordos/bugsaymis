@@ -252,6 +252,7 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::post('/',               [SectionController::class, 'store'])->name('store');
                     Route::put('/{section}',       [SectionController::class, 'update'])->name('update');
                     Route::delete('/{section}',    [SectionController::class, 'destroy'])->name('destroy');
+                    Route::patch('/{section}/wednesday-lunch', [SectionController::class, 'updateWednesdayLunch'])->name('wednesday-lunch');
                 });
             });
 
