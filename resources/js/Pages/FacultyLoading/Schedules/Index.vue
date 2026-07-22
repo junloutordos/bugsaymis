@@ -208,7 +208,8 @@
                 @event-click="onEventClick"
                 @event-remove="onEventRemove"
                 @blocked-mousedown="(day, band, edge, e) => onBlockedMouseDown(e, groupId, day, band, edge)"
-                @blocked-click="(day, band, e) => onBlockedClick(e, groupId, day, band)">
+                @blocked-click="(day, band, e) => onBlockedClick(e, groupId, day, band)"
+                @add-white-space="(day, e) => openWhiteSpacePopover(e, groupId, null, day)">
 
                 <template #header-actions>
                   <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
@@ -709,6 +710,65 @@
       </div>
     </div>
 
+    <!-- White Space popover — a free/flexible block with no grade default of
+         its own. Scope choice decides who it applies to: this section only,
+         every section in the grade, or every section campus-wide. -->
+    <div v-if="whiteSpacePopover" ref="whiteSpaceEl"
+      class="fixed z-50 w-[320px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: whiteSpacePopover.x + 'px', top: whiteSpacePopover.y + 'px' }">
+
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          White Space — {{ whiteSpacePopover.day }}
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeWhiteSpacePopover">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="px-4 pb-3 space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Applies to</label>
+          <div class="flex flex-col gap-1.5">
+            <label v-if="whiteSpacePopover.isSectionView" class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="section" v-model="whiteSpacePopover.scope" @change="onWhiteSpaceScopeChange('section')" />
+              This section only ({{ whiteSpacePopover.sectionName }})
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="grade" v-model="whiteSpacePopover.scope" @change="onWhiteSpaceScopeChange('grade')" />
+              Every section, Grade {{ whiteSpacePopover.grade }}
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="campus" v-model="whiteSpacePopover.scope" @change="onWhiteSpaceScopeChange('campus')" />
+              Every section, every grade level
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Time</label>
+          <div class="flex items-center gap-2">
+            <input v-model="whiteSpacePopover.start" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+            <span class="text-slate-400 text-xs">to</span>
+            <input v-model="whiteSpacePopover.end" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+        <button v-if="whiteSpaceHasCurrentOverride" type="button"
+          class="text-xs font-medium text-slate-500 hover:text-rose-600"
+          :disabled="whiteSpacePopover.saving"
+          @click="saveWhiteSpacePopover(true)">
+          Clear
+        </button>
+        <span v-else />
+        <AppButton size="sm" :loading="whiteSpacePopover.saving" @click="saveWhiteSpacePopover(false)">Save</AppButton>
+      </div>
+    </div>
+
     <!-- Suggested-slots popover (click an unplaced chip) -->
     <div v-if="chipSuggest" ref="chipSuggestEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
@@ -981,6 +1041,8 @@ const props = defineProps({
   canEditBellSchedule: { type: Boolean, default: false },
   bellScheduleSettings: { type: Object, default: null },
   bellScheduleTimetables: { type: Object, default: null },
+  whiteSpaceByGrade: { type: Object, default: () => ({}) },
+  whiteSpaceCampus: { type: Object, default: () => ({}) },
 })
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
@@ -1627,7 +1689,7 @@ function dayConfigFor(groupId, day) {
     return {
       ...base,
       blocked: (base.blocked ?? []).map(b => {
-        if (b.type === 'LUNCH' || b.type === 'RECESS') {
+        if (b.type === 'LUNCH' || b.type === 'RECESS' || b.type === 'WHITE_SPACE') {
           return { ...b, sectionEditable: groupId }
         }
         if ((b.type === 'HOMEROOM' || b.type === 'ADVISING') && adviserName) {
@@ -1932,6 +1994,11 @@ const activityPopover = ref(null)
 const activityEl = ref(null)
 
 function onBlockedClick(e, groupId, day, band) {
+  if (band.type === 'WHITE_SPACE') {
+    openWhiteSpacePopover(e, groupId, band, day)
+    return
+  }
+
   if (band.sectionEditable) {
     if (band.type === 'RECESS') {
       openSectionRecessPopover(e, groupId, band, day)
@@ -2143,6 +2210,122 @@ async function saveSectionRecessPopover(clear = false) {
     Swal.fire('Could not save', err.response?.data?.errors?.[`recess_end_${suffix}`]?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
   } finally {
     if (sectionRecessPopover.value) sectionRecessPopover.value.saving = false
+  }
+}
+
+// ── White Space popover ───────────────────────────────────────────────────────
+// A free/flexible block with NO grade default — unlike Lunch/Recess, it may
+// not exist at all yet, so this also opens from a "+" button on the day
+// header (band === null), not just from clicking an existing band. Three
+// scopes, narrowest wins: this section only (Section::WHITE_SPACE_OVERRIDE_COLUMNS),
+// this grade (WHITE_SPACE_BY_GRADE), or campus-wide (WHITE_SPACE_CAMPUS) — see
+// SchedulingConstants::getWhiteSpaceWindow() on the backend.
+const WHITE_SPACE_SUFFIX_BY_DAY = { Monday: 'mon', Tuesday: 'tue', Wednesday: 'wed', Thursday: 'thu', Friday: 'fri' }
+
+const whiteSpacePopover = ref(null)
+const whiteSpaceEl = ref(null)
+
+const whiteSpaceHasCurrentOverride = computed(() => {
+  const p = whiteSpacePopover.value
+  if (!p) return false
+  const current = p.scope === 'section' ? p.sectionOverride : p.scope === 'grade' ? p.gradeOverride : p.campusOverride
+  return !!current
+})
+
+function openWhiteSpacePopover(e, groupId, band, day) {
+  if (blockedSaving.value) return
+  const isSectionView = viewBy.value === 'section'
+  const grade = singleGradeFor(groupId)
+  if (grade === null || grade === undefined) return
+  const sectionId = isSectionView ? groupId : null
+  const suffix = WHITE_SPACE_SUFFIX_BY_DAY[day]
+  const section = sectionId ? props.sections.find(s => s.id === sectionId) : null
+
+  const sectionOverride = (section?.[`white_space_start_${suffix}`] && section?.[`white_space_end_${suffix}`])
+    ? { start: section[`white_space_start_${suffix}`].slice(0, 5), end: section[`white_space_end_${suffix}`].slice(0, 5) }
+    : null
+  const gradeOverride = props.whiteSpaceByGrade?.[grade]?.[day] ?? null
+  const campusOverride = props.whiteSpaceCampus?.[day] ?? null
+
+  let scope
+  if (isSectionView && sectionOverride) scope = 'section'
+  else if (gradeOverride) scope = 'grade'
+  else if (campusOverride) scope = 'campus'
+  else scope = isSectionView ? 'section' : 'grade'
+
+  const current = scope === 'section' ? sectionOverride : scope === 'grade' ? gradeOverride : campusOverride
+
+  const W = 320, H = 320
+  whiteSpacePopover.value = {
+    x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
+    y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
+    groupId, sectionId, grade, day,
+    isSectionView,
+    sectionName: isSectionView ? groupHeaderInfo(groupId).section_name : null,
+    scope,
+    start: current?.start ?? (band?.start ?? ''),
+    end:   current?.end   ?? (band?.end   ?? ''),
+    sectionOverride, gradeOverride, campusOverride,
+    saving: false,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownWhiteSpace, true)
+  window.addEventListener('keydown', onWhiteSpaceKeydown)
+}
+
+function closeWhiteSpacePopover() {
+  whiteSpacePopover.value = null
+  window.removeEventListener('mousedown', onWindowMouseDownWhiteSpace, true)
+  window.removeEventListener('keydown', onWhiteSpaceKeydown)
+}
+
+function onWindowMouseDownWhiteSpace(e) {
+  if (whiteSpaceEl.value && whiteSpaceEl.value.contains(e.target)) return
+  closeWhiteSpacePopover()
+}
+
+function onWhiteSpaceKeydown(e) {
+  if (e.key === 'Escape') closeWhiteSpacePopover()
+}
+
+/** Switching scope shows whatever is already set at THAT scope, not the
+ *  previously-selected scope's values. */
+function onWhiteSpaceScopeChange(scope) {
+  const p = whiteSpacePopover.value
+  if (!p) return
+  const current = scope === 'section' ? p.sectionOverride : scope === 'grade' ? p.gradeOverride : p.campusOverride
+  p.start = current?.start ?? ''
+  p.end   = current?.end   ?? ''
+}
+
+async function saveWhiteSpacePopover(clear = false) {
+  const p = whiteSpacePopover.value
+  if (!p) return
+  p.saving = true
+  try {
+    if (p.scope === 'section') {
+      const suffix = WHITE_SPACE_SUFFIX_BY_DAY[p.day]
+      await axios.patch(route('faculty-loading.sections.white-space', { section: p.sectionId, day: p.day }), {
+        [`white_space_start_${suffix}`]: clear ? '' : p.start,
+        [`white_space_end_${suffix}`]:   clear ? '' : p.end,
+      })
+    } else if (p.scope === 'grade') {
+      await axios.patch(route('faculty-loading.bell-schedule.white-space.grade', { grade: p.grade, day: p.day }), {
+        start: clear ? null : p.start,
+        end:   clear ? null : p.end,
+      })
+    } else {
+      await axios.patch(route('faculty-loading.bell-schedule.white-space.campus', { day: p.day }), {
+        start: clear ? null : p.start,
+        end:   clear ? null : p.end,
+      })
+    }
+    closeWhiteSpacePopover()
+    await router.reload({ only: ['dayConfigsBySection', 'dayConfigsByGrade', 'sections', 'whiteSpaceByGrade', 'whiteSpaceCampus'], preserveScroll: true })
+    Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
+  } finally {
+    if (whiteSpacePopover.value) whiteSpacePopover.value.saving = false
   }
 }
 

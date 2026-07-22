@@ -37,13 +37,19 @@
         <div class="flex border-b border-slate-100">
           <div class="shrink-0 border-r border-slate-100" :style="{ width: GUTTER + 'px' }" />
           <div v-for="day in WEEKDAYS" :key="day"
-            class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0">
+            class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0 group/daycol relative">
             <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               {{ day.slice(0, 3) }}
             </span>
             <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
               {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
             </span>
+            <button v-if="blockedEditable" type="button"
+              title="Set White Space for this day"
+              class="absolute top-1 right-1 p-0.5 rounded opacity-0 group-hover/daycol:opacity-100 text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-opacity print:hidden"
+              @click="$emit('add-white-space', day, $event)">
+              <PlusIcon class="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
 
@@ -112,8 +118,8 @@
                     : 'pointer-events-none']"
                 @mousedown="onBandMouseDown(day, bp, $event)"
                 @click.stop="isBandClickable(bp) && $emit('blocked-click', day, bp, $event)">
-                <div class="absolute inset-0 bg-slate-100/70" />
-                <span class="relative w-full text-slate-400 font-medium px-1 text-center leading-tight select-none">
+                <div :class="['absolute inset-0', bp.type === 'WHITE_SPACE' ? 'bg-violet-50/80 border border-violet-200' : 'bg-slate-100/70']" />
+                <span :class="['relative w-full font-medium px-1 text-center leading-tight select-none', bp.type === 'WHITE_SPACE' ? 'text-violet-600' : 'text-slate-400']">
                   <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
                     {{ bp.label }}
                   </span>
@@ -256,7 +262,7 @@
 import { onBeforeUnmount, onMounted, ref, computed } from 'vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import {
-  ArrowsPointingInIcon, ArrowsPointingOutIcon, LockClosedIcon, PrinterIcon, XMarkIcon,
+  ArrowsPointingInIcon, ArrowsPointingOutIcon, LockClosedIcon, PlusIcon, PrinterIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -289,7 +295,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click', 'event-remove',
-  'blocked-mousedown', 'blocked-click',
+  'blocked-mousedown', 'blocked-click', 'add-white-space',
 ])
 
 /** Move/resize-draggable: a literal timetable row or a single-window setting.
@@ -301,9 +307,13 @@ function isBandDraggable(bp) {
 }
 
 /** Click-to-edit: composite bands (e.g. ACTIVITY) that can't be reduced to one
- *  drag, plus a By-Section Wednesday Lunch band (its own section-only popover). */
+ *  drag, plus a By-Section Wednesday Lunch band (its own section-only popover).
+ *  White Space is always clickable when editable — it has no literal timetable
+ *  row to drag, and (unlike Lunch/Recess) may be showing a grade-wide or
+ *  campus-wide value rather than a section override, so it isn't always
+ *  tagged sectionEditable. */
 function isBandClickable(bp) {
-  return props.blockedEditable && (bp.write?.kind === 'activity' || !!bp.sectionEditable)
+  return props.blockedEditable && (bp.write?.kind === 'activity' || !!bp.sectionEditable || bp.type === 'WHITE_SPACE')
 }
 
 /** Stops the mousedown from also triggering the day column's own

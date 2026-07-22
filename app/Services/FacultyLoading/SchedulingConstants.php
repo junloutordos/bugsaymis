@@ -302,6 +302,21 @@ class SchedulingConstants
         8 => ['start' => '15:00', 'end' => '17:00'],
     ];
 
+    // ── White Space ───────────────────────────────────────────────────────────
+    // A free/flexible block that (unlike every other block type here) has NO
+    // hardcoded default anywhere — it exists only where an admin explicitly
+    // sets it, at one of three scopes, narrowest wins:
+    //   1. Section::WHITE_SPACE_OVERRIDE_COLUMNS  — this section only
+    //   2. WHITE_SPACE_BY_GRADE[grade][day]        — every section of one grade
+    //   3. WHITE_SPACE_CAMPUS[day]                 — every section, every grade
+    // See getWhiteSpaceWindow() for the resolution order.
+
+    /** Campus-wide White Space window per weekday. Empty = none set. */
+    public const WHITE_SPACE_CAMPUS = [];
+
+    /** Per-grade White Space window per weekday: [grade => [day => window]]. Empty = none set. */
+    public const WHITE_SPACE_BY_GRADE = [];
+
     // ── Friday Special ────────────────────────────────────────────────────────
 
     /**
@@ -560,6 +575,8 @@ class SchedulingConstants
             'FRIDAY_FLAG_RETREAT'      => self::FRIDAY_FLAG_RETREAT,
             'FRIDAY_ILA_GRADES'        => self::FRIDAY_ILA_GRADES,
             'GRADE8_OVERFLOW_SLOTS'    => self::GRADE8_OVERFLOW_SLOTS,
+            'WHITE_SPACE_CAMPUS'       => self::WHITE_SPACE_CAMPUS,
+            'WHITE_SPACE_BY_GRADE'     => self::WHITE_SPACE_BY_GRADE,
             default                    => null,
         };
     }
@@ -626,6 +643,28 @@ class SchedulingConstants
             fn ($r) => ['start' => $r['start'], 'end' => $r['end'], 'type' => $r['type'], 'label' => $r['label']],
             self::setting('GRADE8_OVERFLOW_SLOTS')[$day] ?? []
         );
+    }
+
+    /**
+     * The grade-wide or campus-wide White Space window for a grade+day, or
+     * null if neither is set. A per-section override (if any) takes priority
+     * over both and is applied by the caller — see resolveWhiteSpaceBlock().
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public static function getWhiteSpaceWindow(int $grade, string $day): ?array
+    {
+        $byGrade = self::setting('WHITE_SPACE_BY_GRADE')[$grade][$day] ?? null;
+        if ($byGrade !== null) {
+            return ['start' => $byGrade['start'], 'end' => $byGrade['end']];
+        }
+
+        $campus = self::setting('WHITE_SPACE_CAMPUS')[$day] ?? null;
+        if ($campus !== null) {
+            return ['start' => $campus['start'], 'end' => $campus['end']];
+        }
+
+        return null;
     }
 
     /** Drop the request-scoped override caches (call after saving an edit). */
@@ -882,8 +921,15 @@ class SchedulingConstants
      * $recessOverride: same idea, for the RECESS row (Section::RECESS_OVERRIDE_COLUMNS).
      * Every grade+day timetable literal carries exactly one RECESS row, so
      * this replaces it the same way $lunchOverride replaces LUNCH.
+     *
+     * $whiteSpaceOverride: optional ['start'=>'HH:MM','end'=>'HH:MM'] for a
+     * section's own White Space block (Section::WHITE_SPACE_OVERRIDE_COLUMNS).
+     * Unlike lunch/recess, White Space has no literal row in the timetable to
+     * replace — when null, the grade-wide/campus-wide setting is used instead
+     * (see getWhiteSpaceWindow()), and the block is only added if one exists
+     * at any scope.
      */
-    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null): array
+    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
@@ -972,9 +1018,30 @@ class SchedulingConstants
             $blocked[] = $flagBlock;
         }
 
+        if ($whiteSpace = self::resolveWhiteSpaceBlock($grade, $day, $whiteSpaceOverride)) {
+            $blocked[] = $whiteSpace;
+        }
+
         usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
 
         return array_values($blocked);
+    }
+
+    /**
+     * The effective White Space block for a grade+day, or null if none is
+     * set at any scope. Precedence: an explicit per-section override (passed
+     * by the caller) beats the grade-wide setting, which beats the
+     * campus-wide setting — see Section::whiteSpaceOverrideFor() for the
+     * section scope and getWhiteSpaceWindow() for the other two.
+     */
+    private static function resolveWhiteSpaceBlock(int $grade, string $day, ?array $override): ?array
+    {
+        $window = $override ?? self::getWhiteSpaceWindow($grade, $day);
+        if ($window === null) {
+            return null;
+        }
+
+        return ['start' => $window['start'], 'end' => $window['end'], 'type' => 'WHITE_SPACE', 'label' => 'White Space'];
     }
 
     /**
@@ -988,7 +1055,7 @@ class SchedulingConstants
      * capacity/placement math: restoring the G8 consult band there would
      * filter the overflow periods out of the schedulable grid.
      */
-    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null): array
+    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
@@ -1057,6 +1124,11 @@ class SchedulingConstants
 
             $blocked   = self::trimAround($blocked, $flagBlock['start'], $flagBlock['end'], ['CONSULT']);
             $blocked[] = $flagBlock;
+        }
+
+        if ($whiteSpace = self::resolveWhiteSpaceBlock($grade, $day, $whiteSpaceOverride)) {
+            $blocked   = self::trimAround($blocked, $whiteSpace['start'], $whiteSpace['end'], ['CONSULT']);
+            $blocked[] = $whiteSpace;
         }
 
         usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
@@ -1128,7 +1200,7 @@ class SchedulingConstants
     }
 
     /** Canonical regular and ILP-only periods after applying fixed blocks. */
-    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null): array
+    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): array
     {
         if ($day === 'Friday' && in_array($grade, self::fridayIlaGrades(), true)) {
             return [];
@@ -1136,16 +1208,16 @@ class SchedulingConstants
 
         return array_values(array_filter(
             self::getTeachingSlots($grade, $day),
-            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride, $recessOverride),
+            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride, $recessOverride, $whiteSpaceOverride),
         ));
     }
 
     /**
      * True if a proposed time window overlaps any blocked slot for the grade/day.
      */
-    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null, ?array $recessOverride = null): bool
+    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): bool
     {
-        foreach (self::getBlockedSlots($grade, $day, $lunchOverride, $recessOverride) as $blocked) {
+        foreach (self::getBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride) as $blocked) {
             if ($start < $blocked['end'] && $end > $blocked['start']) {
                 return true;
             }

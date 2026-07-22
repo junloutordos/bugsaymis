@@ -189,6 +189,103 @@ class BellScheduleController extends Controller
         ]);
     }
 
+    // ── White Space ───────────────────────────────────────────────────────────
+    // Section scope lives on Section::WHITE_SPACE_OVERRIDE_COLUMNS (see
+    // SectionController::updateDayWhiteSpace()) — these two cover the other
+    // two scopes, both stored in bell_schedule_settings. Unlike updateSetting()
+    // (which replaces a setting's entire value), these merge a single
+    // grade+day or day into whatever's already saved, since the calendar
+    // popover only ever edits one day at a time.
+
+    public function updateWhiteSpaceGrade(Request $request, int $grade, string $day): JsonResponse
+    {
+        $this->authorizeEditor();
+
+        if ($grade < 7 || $grade > 12) {
+            return response()->json(['message' => 'Invalid grade.'], 422);
+        }
+        if (! in_array($day, SchedulingConstants::DAYS, true)) {
+            return response()->json(['message' => 'Invalid day.'], 422);
+        }
+
+        [$ok, $start, $end, $error] = $this->validateWhiteSpaceTimes($request);
+        if (! $ok) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        $value = SchedulingConstants::setting('WHITE_SPACE_BY_GRADE');
+        if ($start === null) {
+            unset($value[$grade][$day]);
+            if (empty($value[$grade])) {
+                unset($value[$grade]);
+            }
+        } else {
+            $value[$grade][$day] = ['start' => $start, 'end' => $end];
+        }
+
+        BellScheduleSetting::updateOrCreate(
+            ['setting_key' => 'WHITE_SPACE_BY_GRADE'],
+            ['value' => $value, 'updated_by' => Auth::id()],
+        );
+        SchedulingConstants::flushOverrideCache();
+
+        return response()->json([
+            'message' => $start === null
+                ? "White Space cleared for Grade {$grade} on {$day}."
+                : "White Space set for Grade {$grade} on {$day} ({$start}–{$end}).",
+        ]);
+    }
+
+    public function updateWhiteSpaceCampus(Request $request, string $day): JsonResponse
+    {
+        $this->authorizeEditor();
+
+        if (! in_array($day, SchedulingConstants::DAYS, true)) {
+            return response()->json(['message' => 'Invalid day.'], 422);
+        }
+
+        [$ok, $start, $end, $error] = $this->validateWhiteSpaceTimes($request);
+        if (! $ok) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        $value = SchedulingConstants::setting('WHITE_SPACE_CAMPUS');
+        if ($start === null) {
+            unset($value[$day]);
+        } else {
+            $value[$day] = ['start' => $start, 'end' => $end];
+        }
+
+        BellScheduleSetting::updateOrCreate(
+            ['setting_key' => 'WHITE_SPACE_CAMPUS'],
+            ['value' => $value, 'updated_by' => Auth::id()],
+        );
+        SchedulingConstants::flushOverrideCache();
+
+        return response()->json([
+            'message' => $start === null
+                ? "Campus-wide White Space cleared for {$day}."
+                : "Campus-wide White Space set for {$day} ({$start}–{$end}).",
+        ]);
+    }
+
+    /** @return array{0:bool,1:?string,2:?string,3:?string} [ok, start, end, error] */
+    private function validateWhiteSpaceTimes(Request $request): array
+    {
+        $data = $request->validate([
+            'start' => 'nullable|date_format:H:i',
+            'end'   => 'nullable|date_format:H:i|after:start',
+        ]);
+
+        $startIsNull = ($data['start'] ?? null) === null;
+        $endIsNull   = ($data['end'] ?? null) === null;
+        if ($startIsNull !== $endIsNull) {
+            return [false, null, null, 'Provide both a start and end time, or leave both blank to clear.'];
+        }
+
+        return [true, $data['start'] ?? null, $data['end'] ?? null, null];
+    }
+
     /**
      * Per-shape validation + normalisation for a special-window setting.
      *

@@ -62,6 +62,16 @@ class Section extends Model
         'recess_end_thu',
         'recess_start_fri',
         'recess_end_fri',
+        'white_space_start_mon',
+        'white_space_end_mon',
+        'white_space_start_tue',
+        'white_space_end_tue',
+        'white_space_start_wed',
+        'white_space_end_wed',
+        'white_space_start_thu',
+        'white_space_end_thu',
+        'white_space_start_fri',
+        'white_space_end_fri',
         'afternoon_break_start',
         'afternoon_break_end',
         'adviser',
@@ -99,6 +109,22 @@ class Section extends Model
         'Wednesday' => ['recess_start_wed', 'recess_end_wed'],
         'Thursday'  => ['recess_start_thu', 'recess_end_thu'],
         'Friday'    => ['recess_start_fri', 'recess_end_fri'],
+    ];
+
+    /**
+     * Day name → [start column, end column] for this section's own per-day
+     * White Space block — a free/flexible period, scoped to just this
+     * section (the narrowest of the three White Space scopes; see
+     * SchedulingConstants::getWhiteSpaceWindow() for the grade-wide and
+     * campus-wide scopes, which live in bell_schedule_settings instead of
+     * per-section columns since they apply beyond one section).
+     */
+    public const WHITE_SPACE_OVERRIDE_COLUMNS = [
+        'Monday'    => ['white_space_start_mon', 'white_space_end_mon'],
+        'Tuesday'   => ['white_space_start_tue', 'white_space_end_tue'],
+        'Wednesday' => ['white_space_start_wed', 'white_space_end_wed'],
+        'Thursday'  => ['white_space_start_thu', 'white_space_end_thu'],
+        'Friday'    => ['white_space_start_fri', 'white_space_end_fri'],
     ];
 
     protected $casts = [
@@ -211,6 +237,25 @@ class Section extends Model
     public function recessOverrideFor(string $day): ?array
     {
         [$startCol, $endCol] = self::RECESS_OVERRIDE_COLUMNS[$day] ?? [null, null];
+        if (! $startCol || ! $this->$startCol || ! $this->$endCol) {
+            return null;
+        }
+
+        return ['start' => $this->$startCol, 'end' => $this->$endCol];
+    }
+
+    /**
+     * This section's own White Space block for the given weekday, or null if
+     * unset — see WHITE_SPACE_OVERRIDE_COLUMNS. Unlike lunch/recess (which
+     * always have a grade default to fall back to), White Space has no
+     * default at all: SchedulingConstants::getWhiteSpaceWindow() falls back
+     * to a grade-wide, then campus-wide, setting, then null (no block).
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public function whiteSpaceOverrideFor(string $day): ?array
+    {
+        [$startCol, $endCol] = self::WHITE_SPACE_OVERRIDE_COLUMNS[$day] ?? [null, null];
         if (! $startCol || ! $this->$startCol || ! $this->$endCol) {
             return null;
         }

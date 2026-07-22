@@ -355,6 +355,49 @@ class SectionController extends Controller
         ]);
     }
 
+    /**
+     * Set (or clear) a single section's own White Space time for ONE weekday
+     * — the "this section only" scope of the White Space popover. Unlike
+     * lunch/recess there is no grade default to fall back to: clearing this
+     * removes the block entirely for this section on this day unless a
+     * grade-wide or campus-wide White Space setting also applies (see
+     * SchedulingConstants::getWhiteSpaceWindow()).
+     */
+    public function updateDayWhiteSpace(Request $request, Section $section, string $day): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+
+        if (! array_key_exists($day, Section::WHITE_SPACE_OVERRIDE_COLUMNS)) {
+            return response()->json(['message' => 'Invalid day.'], 422);
+        }
+
+        [$startField, $endField] = Section::WHITE_SPACE_OVERRIDE_COLUMNS[$day];
+
+        $request->merge($this->normaliseBreakTimes($request, [$startField, $endField]));
+
+        $data = $request->validate([
+            $startField => 'nullable|date_format:H:i',
+            $endField   => "nullable|date_format:H:i|after:{$startField}",
+        ]);
+
+        $startIsNull = ($data[$startField] ?? null) === null;
+        $endIsNull   = ($data[$endField] ?? null) === null;
+        if ($startIsNull !== $endIsNull) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => [$endField => ['Provide both a start and end time, or leave both blank to clear the override.']],
+            ], 422);
+        }
+
+        $section->update($data);
+
+        return response()->json([
+            'message'    => $data[$startField] ? "{$day} White Space updated for {$section->sectionname}." : "{$day} White Space cleared for {$section->sectionname}.",
+            $startField  => $section->$startField,
+            $endField    => $section->$endField,
+        ]);
+    }
+
     // ── Delete a section ──────────────────────────────────────────────────────
 
     public function destroy(Section $section): RedirectResponse

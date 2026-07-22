@@ -101,6 +101,11 @@ class ScheduleValidationService
             if ($breakError) {
                 $errors[] = $breakError;
             }
+
+            $whiteSpaceError = $this->checkWhiteSpaceConflict($section, $data['day_of_week'], $data['start_time'], $data['end_time']);
+            if ($whiteSpaceError) {
+                $errors[] = $whiteSpaceError;
+            }
         }
 
         // ── 5b. Teacher official-time check ──────────────────────────────────
@@ -359,6 +364,31 @@ class ScheduleValidationService
             if ($this->conflicts->timesOverlap($start, $end, $lunchStart, $lunchEnd)) {
                 return "Schedule ({$start}–{$end}) overlaps with the section's lunch break ({$lunchStart}–{$lunchEnd}).";
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * Block if the proposed time overlaps this section's effective White
+     * Space window for the day — a section override, if set, beats the
+     * grade-wide/campus-wide setting, same precedence as the auto-generator
+     * (SchedulingConstants::getWhiteSpaceWindow()). Unlike lunch/recess there
+     * is no grade default: most sections have no White Space window at all.
+     */
+    private function checkWhiteSpaceConflict(Section $section, string $day, string $start, string $end): ?string
+    {
+        $grade = (int) $section->levelid;
+
+        $whiteSpace = $section->whiteSpaceOverrideFor($day) ?? SchedulingConstants::getWhiteSpaceWindow($grade, $day);
+        if (! $whiteSpace) {
+            return null;
+        }
+
+        $wsStart = $whiteSpace['start'] ?? null;
+        $wsEnd   = $whiteSpace['end'] ?? null;
+        if ($wsStart && $wsEnd && $this->conflicts->timesOverlap($start, $end, $wsStart, $wsEnd)) {
+            return "Schedule ({$start}–{$end}) overlaps with the section's White Space block ({$wsStart}–{$wsEnd}).";
         }
 
         return null;
