@@ -207,9 +207,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.self-scan-root { min-height: 100vh; background: radial-gradient(circle at top, #1e1b4b, #020617 68%); color: white; display: flex; flex-direction: column; overflow: hidden; }
-.self-scan-header { min-height: 82px; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,.08); }
-.self-scan-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+.self-scan-root { position: relative; isolation: isolate; min-height: 100vh; background: #0f172a; color: white; display: flex; flex-direction: column; overflow: hidden; }
+.self-scan-root::before { position: absolute; inset: 0; z-index: -2; background: url('/images/bg.jpg') center / cover no-repeat; content: ''; }
+.self-scan-root::after { position: absolute; inset: 0; z-index: -1; background: linear-gradient(160deg, rgba(15,23,42,.75) 0%, rgba(15,23,42,.8) 50%, rgba(30,27,75,.88) 100%); content: ''; }
+.self-scan-header { min-height: 82px; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: rgba(15,23,42,.3); border-bottom: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(4px); }
+.self-scan-stage { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .ready-panel, .processing-panel, .offline-panel { text-align: center; }
 .ready-panel h1, .offline-panel h1 { font-size: clamp(2rem, 5vw, 4rem); line-height: 1; font-weight: 900; }
 .ready-panel p, .offline-panel p { margin-top: 1.25rem; color: #cbd5e1; font-size: clamp(1rem, 2vw, 1.5rem); }
