@@ -119,6 +119,16 @@
       </div>
     </div>
 
+    <div
+      v-if="showSavedLocationFallback"
+      class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+    >
+      <span class="font-medium">Saved location:</span> {{ savedLocationSummary }}
+      <span v-if="!readonly" class="block text-xs text-amber-700">
+        Select the region again to refresh this address using the PSGC list.
+      </span>
+    </div>
+
     <!-- Zip code -->
     <div class="w-40">
       <label class="block text-xs font-medium text-slate-600 mb-1">Zip Code</label>
@@ -160,6 +170,7 @@ const loadingRegions   = ref(false)
 const loadingProvinces = ref(false)
 const loadingCities    = ref(false)
 const loadingBarangays = ref(false)
+const initializing = ref(true)
 
 const selectedRegionCode   = ref('')
 const selectedProvinceCode = ref('')
@@ -175,6 +186,17 @@ const activeCityCode = computed(() =>
   selectedProvinceIsHUC.value ? selectedProvinceCode.value : selectedCityCode.value
 )
 
+const savedLocationSummary = computed(() => [
+  props.modelValue.barangay ? `Brgy. ${props.modelValue.barangay}` : '',
+  props.modelValue.city,
+  props.modelValue.province,
+  props.modelValue.region,
+].filter(Boolean).join(', '))
+
+const showSavedLocationFallback = computed(() =>
+  !initializing.value && !!savedLocationSummary.value && !selectedRegionCode.value
+)
+
 onMounted(async () => {
   loadingRegions.value = true
   try {
@@ -183,6 +205,7 @@ onMounted(async () => {
     await tryInitFromValue()
   } finally {
     loadingRegions.value = false
+    initializing.value = false
   }
 })
 

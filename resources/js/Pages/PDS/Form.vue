@@ -121,6 +121,7 @@ const form = useForm(
         residential_barangay: '',
         residential_city: '',
         residential_province: '',
+        residential_region: '',
         residential_zip_code: '',
         permanent_house: '',
         permanent_street: '',
@@ -128,6 +129,7 @@ const form = useForm(
         permanent_barangay: '',
         permanent_city: '',
         permanent_province: '',
+        permanent_region: '',
         permanent_zip_code: '',
       }),
       date_of_birth: normalizeDate(props.pds?.personal_info?.date_of_birth),
@@ -259,6 +261,7 @@ const copyResidentialToPermanent = () => {
   form.personal_info.permanent_barangay = form.personal_info.residential_barangay
   form.personal_info.permanent_city = form.personal_info.residential_city
   form.personal_info.permanent_province = form.personal_info.residential_province
+  form.personal_info.permanent_region = form.personal_info.residential_region
   form.personal_info.permanent_zip_code = form.personal_info.residential_zip_code
 }
 
@@ -271,6 +274,7 @@ watch(
     form.personal_info.residential_barangay,
     form.personal_info.residential_city,
     form.personal_info.residential_province,
+    form.personal_info.residential_region,
     form.personal_info.residential_zip_code,
   ],
   () => { if (sameAsResidential.value) copyResidentialToPermanent() }
@@ -284,7 +288,7 @@ const residentialAddress = computed({
     barangay:    form.personal_info.residential_barangay    ?? '',
     city:        form.personal_info.residential_city        ?? '',
     province:    form.personal_info.residential_province    ?? '',
-    region:      '',
+    region:      form.personal_info.residential_region      ?? '',
     zip:         form.personal_info.residential_zip_code    ?? '',
   }),
   set: (val) => {
@@ -294,6 +298,7 @@ const residentialAddress = computed({
     form.personal_info.residential_barangay    = val.barangay     ?? ''
     form.personal_info.residential_city        = val.city         ?? ''
     form.personal_info.residential_province    = val.province     ?? ''
+    form.personal_info.residential_region      = val.region       ?? ''
     form.personal_info.residential_zip_code    = val.zip          ?? ''
   },
 })
@@ -306,7 +311,7 @@ const permanentAddress = computed({
     barangay:    form.personal_info.permanent_barangay    ?? '',
     city:        form.personal_info.permanent_city        ?? '',
     province:    form.personal_info.permanent_province    ?? '',
-    region:      '',
+    region:      form.personal_info.permanent_region      ?? '',
     zip:         form.personal_info.permanent_zip_code    ?? '',
   }),
   set: (val) => {
@@ -316,6 +321,7 @@ const permanentAddress = computed({
     form.personal_info.permanent_barangay    = val.barangay     ?? ''
     form.personal_info.permanent_city        = val.city         ?? ''
     form.personal_info.permanent_province    = val.province     ?? ''
+    form.personal_info.permanent_region      = val.region       ?? ''
     form.personal_info.permanent_zip_code    = val.zip          ?? ''
   },
 })
