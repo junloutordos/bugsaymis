@@ -69,6 +69,11 @@ function removeSpeaker(i) {
 
 const MAX_MEAL_DAYS = 60
 
+function toLocalISODate(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 const mealDays = computed(() => {
   if (!form.value.start_date || !form.value.end_date) return []
   const start = new Date(form.value.start_date + 'T00:00:00')
@@ -78,7 +83,7 @@ const mealDays = computed(() => {
   const days = []
   const cursor = new Date(start)
   while (cursor <= end && days.length < MAX_MEAL_DAYS) {
-    days.push(cursor.toISOString().slice(0, 10))
+    days.push(toLocalISODate(cursor))
     cursor.setDate(cursor.getDate() + 1)
   }
   return days
