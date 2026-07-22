@@ -84,6 +84,24 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(120)->by($request->user()?->id.'|'.hash('sha256', $deviceToken));
         });
 
+        RateLimiter::for('student-attendance-directory', function (Request $request) {
+            $deviceToken = $request->cookie(\App\Http\Middleware\EnsureStudentAttendanceDevice::COOKIE, 'unpaired');
+            $operatorId = $request->session()->get(\App\Services\StudentAttendance\KioskAccessService::OPERATOR_ID)
+                ?? $request->user()?->id
+                ?? 'locked';
+
+            return Limit::perMinute(45)->by($operatorId.'|'.hash('sha256', $deviceToken));
+        });
+
+        RateLimiter::for('student-attendance-contact-reveal', function (Request $request) {
+            $deviceToken = $request->cookie(\App\Http\Middleware\EnsureStudentAttendanceDevice::COOKIE, 'unpaired');
+            $operatorId = $request->session()->get(\App\Services\StudentAttendance\KioskAccessService::OPERATOR_ID)
+                ?? $request->user()?->id
+                ?? 'locked';
+
+            return Limit::perMinute(15)->by($operatorId.'|'.hash('sha256', $deviceToken));
+        });
+
         // ── Student Attendance: notify parents on each gate scan ───────────────
         Event::listen(AttendanceScanEvent::class, NotifyParentsOnScan::class);
 
@@ -104,6 +122,8 @@ class AppServiceProvider extends ServiceProvider
             $model = $payload[0] ?? null;
             if ($model
                 && ! ($model instanceof \App\Models\AuditLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceDevice)
                 && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskOperator)
                 && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskAccessLog)) {
                 AuditLogger::logModelEvent($model, 'created');
@@ -114,6 +134,8 @@ class AppServiceProvider extends ServiceProvider
             $model = $payload[0] ?? null;
             if ($model
                 && ! ($model instanceof \App\Models\AuditLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceDevice)
                 && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskOperator)
                 && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskAccessLog)) {
                 AuditLogger::logModelEvent($model, 'updated');
@@ -124,6 +146,8 @@ class AppServiceProvider extends ServiceProvider
             $model = $payload[0] ?? null;
             if ($model
                 && ! ($model instanceof \App\Models\AuditLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceDevice)
                 && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskOperator)
                 && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskAccessLog)) {
                 AuditLogger::logModelEvent($model, 'deleted');

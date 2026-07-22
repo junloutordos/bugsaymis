@@ -5,6 +5,7 @@ namespace Tests\Feature\StudentAttendance;
 use App\Events\AttendanceScanEvent;
 use App\Http\Middleware\EnsureStudentAttendanceDevice;
 use App\Jobs\StudentAttendance\SendAttendanceSmsJob;
+use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\StudentAttendance\StudentAttendanceDevice;
 use App\Models\StudentAttendance\StudentAttendanceKioskOperator;
@@ -106,6 +107,9 @@ class CameraKioskTest extends TestCase
             'paired_by' => $administrator->id,
             'is_active' => true,
         ]);
+
+        $audit = AuditLog::where('action', 'admin.guard_device.paired')->latest()->firstOrFail();
+        $this->assertArrayNotHasKey('token_hash', $audit->new_values);
     }
 
     public function test_administrator_sets_a_hashed_pin_only_for_security_guards(): void
@@ -124,6 +128,10 @@ class CameraKioskTest extends TestCase
         $credential = StudentAttendanceKioskOperator::where('user_id', $guard->id)->firstOrFail();
         $this->assertNotSame('123456', $credential->pin_hash);
         $this->assertTrue(Hash::check('123456', $credential->pin_hash));
+
+        $audit = AuditLog::where('action', 'admin.guard_pin.set')->latest()->firstOrFail();
+        $this->assertArrayNotHasKey('pin', $audit->new_values);
+        $this->assertArrayNotHasKey('pin_hash', $audit->new_values);
 
         $this->actingAs($administrator)
             ->put(route('student-attendance.operators.pin', $staff), [

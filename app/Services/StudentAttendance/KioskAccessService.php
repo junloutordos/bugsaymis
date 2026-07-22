@@ -14,6 +14,8 @@ class KioskAccessService
     public const UNLOCKED_AT = 'attendance_kiosk.unlocked_at';
     public const LAST_ACTIVITY_AT = 'attendance_kiosk.last_activity_at';
 
+    public function __construct(private GuardActivityLogger $activityLogger) {}
+
     public function currentOperator(
         Request $request,
         StudentAttendanceDevice $device,
@@ -124,5 +126,14 @@ class KioskAccessService
                 : null,
             'occurred_at' => now(),
         ]);
+
+        $this->activityLogger->log(
+            $request,
+            "guard.kiosk.{$event}",
+            \App\Models\User::class,
+            $userId,
+            ['reason' => $reason],
+            $userId,
+        );
     }
 }

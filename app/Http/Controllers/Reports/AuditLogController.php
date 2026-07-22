@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\StudentAttendance\StudentAttendanceDevice;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -23,6 +25,20 @@ class AuditLogController extends Controller
 
         if ($request->filled('action')) {
             $query->where('action', $request->query('action'));
+        }
+
+        if ($request->boolean('guard_activity')) {
+            $query->where(fn ($guardQuery) => $guardQuery
+                ->where('action', 'like', 'guard.%')
+                ->orWhere('action', 'like', 'admin.guard_%'));
+        }
+
+        if ($request->filled('guard_id')) {
+            $query->where('user_id', $request->integer('guard_id'));
+        }
+
+        if ($request->filled('kiosk_device_id')) {
+            $query->where('new_values->kiosk_device_id', $request->integer('kiosk_device_id'));
         }
 
         // Simple search across user name, action, auditable_type, auditable_id and ip
@@ -48,6 +64,11 @@ class AuditLogController extends Controller
 
         return Inertia::render('Reports/AuditLogs/Index', [
             'auditLogs' => $auditLogs,
+            'guards' => User::whereHas('roles', fn ($roleQuery) => $roleQuery->where('name', 'Security Guard'))
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'kioskDevices' => StudentAttendanceDevice::orderBy('name')->get(['id', 'name']),
+            'filters' => $request->only(['q', 'guard_activity', 'guard_id', 'kiosk_device_id']),
         ]);
     }
 }

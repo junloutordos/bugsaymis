@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StudentAttendance;
 use App\Http\Controllers\Controller;
 use App\Models\StudentAttendance\StudentAttendanceKioskOperator;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -29,6 +30,13 @@ class KioskOperatorController extends Controller
             ],
         );
 
+        AuditLogger::log([
+            'action' => 'admin.guard_pin.set',
+            'auditable_type' => User::class,
+            'auditable_id' => $user->id,
+            'new_values' => ['is_active' => true],
+        ]);
+
         return back()->with('success', "Gate scanner PIN set for {$user->name}.");
     }
 
@@ -37,6 +45,13 @@ class KioskOperatorController extends Controller
         $validated = $request->validate(['is_active' => ['required', 'boolean']]);
         $credential = StudentAttendanceKioskOperator::where('user_id', $user->id)->firstOrFail();
         $credential->update(['is_active' => $validated['is_active']]);
+
+        AuditLogger::log([
+            'action' => 'admin.guard_pin.status',
+            'auditable_type' => User::class,
+            'auditable_id' => $user->id,
+            'new_values' => ['is_active' => $validated['is_active']],
+        ]);
 
         return back()->with('success', $validated['is_active']
             ? "Gate scanner access enabled for {$user->name}."

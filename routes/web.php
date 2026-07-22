@@ -2210,6 +2210,25 @@ Route::prefix('student-attendance')->name('student-attendance.')->group(function
         ->whereNumber('id')
         ->middleware(['attendance.device', 'attendance.scanner'])
         ->name('student.photo');
+    Route::get('/directory/search', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'search'])
+        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-directory'])
+        ->name('directory.search');
+    Route::get('/directory/students/{student}', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'student'])
+        ->whereNumber('student')
+        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-directory'])
+        ->name('directory.students.show');
+    Route::post('/directory/students/{student}/reveal-contacts', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'revealContacts'])
+        ->whereNumber('student')
+        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-contact-reveal'])
+        ->name('directory.students.contacts');
+    Route::get('/directory/employees/{employee}', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'employee'])
+        ->whereNumber('employee')
+        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-directory'])
+        ->name('directory.employees.show');
+    Route::get('/directory/employees/{employee}/photo', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'employeePhoto'])
+        ->whereNumber('employee')
+        ->middleware(['attendance.device', 'attendance.scanner'])
+        ->name('employee.photo');
 });
 
 // Student link confirmation remains public — accessed via emailed link.

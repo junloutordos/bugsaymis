@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureStudentAttendanceDevice;
 use App\Models\StudentAttendance\StudentAttendanceDevice;
 use App\Models\StudentAttendance\StudentAttendanceKioskAccessLog;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -72,10 +73,20 @@ class DeviceController extends Controller
 
         $token = Str::random(80);
 
-        StudentAttendanceDevice::create([
+        $device = StudentAttendanceDevice::create([
             ...$validated,
             'token_hash' => hash('sha256', $token),
             'paired_by' => $request->user()->id,
+        ]);
+
+        AuditLogger::log([
+            'action' => 'admin.guard_device.paired',
+            'auditable_type' => StudentAttendanceDevice::class,
+            'auditable_id' => $device->id,
+            'new_values' => [
+                'name' => $device->name,
+                'gate_location' => $device->gate_location,
+            ],
         ]);
 
         return back()
@@ -96,6 +107,17 @@ class DeviceController extends Controller
     public function revoke(Request $request, StudentAttendanceDevice $device): RedirectResponse
     {
         $device->update(['is_active' => false]);
+
+        AuditLogger::log([
+            'action' => 'admin.guard_device.revoked',
+            'auditable_type' => StudentAttendanceDevice::class,
+            'auditable_id' => $device->id,
+            'new_values' => [
+                'name' => $device->name,
+                'gate_location' => $device->gate_location,
+                'is_active' => false,
+            ],
+        ]);
 
         $response = back()->with('success', 'Kiosk access revoked.');
         $token = $request->cookie(EnsureStudentAttendanceDevice::COOKIE);

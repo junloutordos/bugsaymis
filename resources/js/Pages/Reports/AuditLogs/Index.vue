@@ -9,8 +9,20 @@
         <div class="flex-1 min-w-[200px]">
           <AppInput v-model="search" type="text" placeholder="Search audit logs..." />
         </div>
+        <label class="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+          <input v-model="guardActivity" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+          Guard activity
+        </label>
+        <select v-model="guardId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All guards</option>
+          <option v-for="guard in guards" :key="guard.id" :value="String(guard.id)">{{ guard.name }}</option>
+        </select>
+        <select v-model="deviceId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All kiosk devices</option>
+          <option v-for="device in kioskDevices" :key="device.id" :value="String(device.id)">{{ device.name }}</option>
+        </select>
         <template #actions>
-          <AppButton v-if="search" variant="secondary" size="sm" @click="clearSearch">Clear</AppButton>
+          <AppButton v-if="search || guardActivity || guardId || deviceId" variant="secondary" size="sm" @click="clearSearch">Clear</AppButton>
         </template>
       </AppFilterBar>
 
@@ -77,11 +89,21 @@ import AppBadge from '@/Components/AppBadge.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import { ref, watch, onBeforeUnmount } from 'vue'
 
-const props = defineProps({ auditLogs: Object });
+const props = defineProps({
+  auditLogs: Object,
+  guards: { type: Array, default: () => [] },
+  kioskDevices: { type: Array, default: () => [] },
+  filters: { type: Object, default: () => ({}) },
+});
 const auditLogs = props.auditLogs;
+const guards = props.guards;
+const kioskDevices = props.kioskDevices;
 const urlParams = new URLSearchParams(window.location.search);
 const searchInit = urlParams.get('q') || '';
 const search = ref(searchInit);
+const guardActivity = ref(Boolean(Number(props.filters.guard_activity ?? 0)));
+const guardId = ref(props.filters.guard_id ? String(props.filters.guard_id) : '');
+const deviceId = ref(props.filters.kiosk_device_id ? String(props.filters.kiosk_device_id) : '');
 let debounceTimer = null;
 
 watch(search, (val) => {
@@ -92,6 +114,8 @@ watch(search, (val) => {
   }, 500);
 });
 
+watch([guardActivity, guardId, deviceId], () => doSearch());
+
 onBeforeUnmount(() => clearTimeout(debounceTimer));
 
 function goto(url) { window.location.href = url; }
@@ -101,12 +125,18 @@ function doSearch() {
   const base = window.location.pathname;
   const qs = new URLSearchParams(window.location.search);
   if (q) qs.set('q', q); else qs.delete('q');
+  if (guardActivity.value) qs.set('guard_activity', '1'); else qs.delete('guard_activity');
+  if (guardId.value) qs.set('guard_id', guardId.value); else qs.delete('guard_id');
+  if (deviceId.value) qs.set('kiosk_device_id', deviceId.value); else qs.delete('kiosk_device_id');
   const target = base + (qs.toString() ? ('?' + qs.toString()) : '');
   window.location.href = target;
 }
 
 function clearSearch() {
   search.value = '';
+  guardActivity.value = false;
+  guardId.value = '';
+  deviceId.value = '';
   doSearch();
 }
 </script>

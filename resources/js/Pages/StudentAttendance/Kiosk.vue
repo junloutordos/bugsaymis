@@ -26,6 +26,15 @@ const selectedGuard = ref(null)
 const pin = ref('')
 const unlockError = ref('')
 const unlocking = ref(false)
+const workspaceMode = ref('scanner')
+const directoryType = ref('student')
+const directoryQuery = ref('')
+const directoryResults = ref([])
+const directoryDetail = ref(null)
+const directoryLoading = ref(false)
+const directoryError = ref('')
+const directoryPhotoError = ref(false)
+const contactsRevealed = ref(false)
 
 const pairForm = useForm({
   name: '',
@@ -121,6 +130,9 @@ function expireScannerAccess(message) {
   pin.value = ''
   unlockError.value = message
   scannerState.value = 'stopped'
+  directoryResults.value = []
+  directoryDetail.value = null
+  workspaceMode.value = 'scanner'
 }
 
 function selectGuard(guard) {
@@ -180,7 +192,127 @@ async function endShift() {
     lastScan.value = null
     scanStatus.value = ''
     unlockError.value = 'Shift ended. Select the next guard to continue.'
+    directoryResults.value = []
+    directoryDetail.value = null
+    workspaceMode.value = 'scanner'
   }
+}
+
+function switchWorkspace(mode) {
+  if (mode === 'directory') stopScanner()
+  workspaceMode.value = mode
+  cameraError.value = ''
+}
+
+function resetDirectory() {
+  directoryDetail.value = null
+  directoryResults.value = []
+  directoryError.value = ''
+  directoryPhotoError.value = false
+  contactsRevealed.value = false
+}
+
+function changeDirectoryType(type) {
+  directoryType.value = type
+  directoryQuery.value = ''
+  resetDirectory()
+}
+
+async function searchDirectory() {
+  const query = directoryQuery.value.trim()
+  if (query.length < 3 || directoryLoading.value) {
+    directoryError.value = 'Enter at least three characters or an exact ID number.'
+    return
+  }
+
+  directoryLoading.value = true
+  directoryError.value = ''
+  directoryDetail.value = null
+  directoryPhotoError.value = false
+  contactsRevealed.value = false
+
+  try {
+    const { data } = await axios.get(route('student-attendance.directory.search'), {
+      params: { type: directoryType.value, q: query },
+    })
+    directoryResults.value = data.data ?? []
+    if (!directoryResults.value.length) directoryError.value = 'No active record matched your search.'
+  } catch (error) {
+    handleDirectoryError(error)
+  } finally {
+    directoryLoading.value = false
+  }
+}
+
+async function openDirectoryRecord(record) {
+  directoryLoading.value = true
+  directoryError.value = ''
+  directoryPhotoError.value = false
+  contactsRevealed.value = false
+
+  try {
+    const routeName = directoryType.value === 'student'
+      ? 'student-attendance.directory.students.show'
+      : 'student-attendance.directory.employees.show'
+    const { data } = await axios.get(route(routeName, record.id))
+    directoryDetail.value = data.data
+  } catch (error) {
+    handleDirectoryError(error)
+  } finally {
+    directoryLoading.value = false
+  }
+}
+
+async function revealParentContacts() {
+  if (!directoryDetail.value || contactsRevealed.value) return
+  if (!window.confirm('Confirm that you verified the inquirer’s identity. Revealing contact information will be recorded in the audit log.')) return
+
+  directoryLoading.value = true
+  try {
+    const { data } = await axios.post(route(
+      'student-attendance.directory.students.contacts',
+      directoryDetail.value.id,
+    ))
+    directoryDetail.value.parents = data.data ?? []
+    contactsRevealed.value = true
+  } catch (error) {
+    handleDirectoryError(error)
+  } finally {
+    directoryLoading.value = false
+  }
+}
+
+function handleDirectoryError(error) {
+  if ([401, 403, 419].includes(error.response?.status)) {
+    expireScannerAccess('Your kiosk session expired. Enter your PIN again to continue.')
+    return
+  }
+  if (error.response?.status === 429) {
+    directoryError.value = 'Too many directory requests. Please wait briefly and try again.'
+    return
+  }
+  directoryError.value = error.response?.status === 404
+    ? 'This record is no longer active or available.'
+    : 'The directory could not be loaded. Check the connection and try again.'
+}
+
+function formatScheduleTime(value) {
+  if (!value) return '—'
+  const [hour, minute] = value.split(':').map(Number)
+  return new Date(2000, 0, 1, hour, minute).toLocaleTimeString('en-PH', {
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
+function formatDateTime(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('en-PH', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
+function directoryInitials(name) {
+  return (name ?? '?').split(/[\s,]+/).filter(Boolean).map(word => word[0]).slice(0, 2).join('').toUpperCase()
 }
 
 async function submitScan(barcode, captureMethod = 'camera') {
@@ -342,6 +474,18 @@ onUnmounted(() => {
         </p>
         <div v-if="activeOperator" class="mt-1 flex items-center justify-end gap-2">
           <span class="text-xs text-slate-300">Operator: {{ activeOperator.name }}</span>
+          <button
+            type="button"
+            class="mode-button"
+            :class="{ 'mode-button-active': workspaceMode === 'scanner' }"
+            @click="switchWorkspace('scanner')"
+          >Scanner</button>
+          <button
+            type="button"
+            class="mode-button"
+            :class="{ 'mode-button-active': workspaceMode === 'directory' }"
+            @click="switchWorkspace('directory')"
+          >Directory</button>
           <Link
             v-if="activeOperator.is_administrator"
             :href="route('student-attendance.devices.finish-setup')"
@@ -433,6 +577,167 @@ onUnmounted(() => {
       </div>
     </main>
 
+    <main v-else-if="workspaceMode === 'directory'" class="directory-stage">
+      <section class="directory-shell">
+        <div class="directory-heading">
+          <div>
+            <h1 class="text-2xl font-bold text-white">Guard Directory</h1>
+            <p class="mt-1 text-sm text-slate-400">Scheduled locations are guidance only and do not confirm a person’s live location.</p>
+          </div>
+          <button type="button" class="secondary-button" @click="switchWorkspace('scanner')">Return to Scanner</button>
+        </div>
+
+        <div class="privacy-notice">
+          Verify the inquirer’s identity before sharing schedules or contact information. Every search and record view is audited.
+        </div>
+
+        <div class="directory-tabs">
+          <button type="button" :class="{ active: directoryType === 'student' }" @click="changeDirectoryType('student')">Students</button>
+          <button type="button" :class="{ active: directoryType === 'employee' }" @click="changeDirectoryType('employee')">Employees</button>
+        </div>
+
+        <form class="directory-search" @submit.prevent="searchDirectory">
+          <input
+            v-model="directoryQuery"
+            maxlength="80"
+            :placeholder="directoryType === 'student' ? 'Student name or PSHS ID' : 'Employee name or employee ID'"
+            aria-label="Directory search"
+          />
+          <button class="primary-button" :disabled="directoryLoading || directoryQuery.trim().length < 3">
+            {{ directoryLoading ? 'Searching…' : 'Search' }}
+          </button>
+        </form>
+
+        <p v-if="directoryError" class="mt-4 rounded-xl bg-red-500/15 p-3 text-sm text-red-200">{{ directoryError }}</p>
+
+        <div v-if="!directoryDetail" class="directory-results">
+          <button
+            v-for="record in directoryResults"
+            :key="record.id"
+            type="button"
+            class="directory-result"
+            @click="openDirectoryRecord(record)"
+          >
+            <div class="directory-result-avatar">{{ directoryInitials(record.name) }}</div>
+            <div class="min-w-0 flex-1 text-left">
+              <p class="truncate font-bold text-white">{{ record.name }}</p>
+              <p class="truncate text-sm text-slate-400">
+                <template v-if="directoryType === 'student'">Grade {{ record.grade_level }} · {{ record.section || 'No section' }} · {{ record.student_number }}</template>
+                <template v-else>{{ record.position || 'Employee' }}<span v-if="record.office"> · {{ record.office }}</span></template>
+              </p>
+            </div>
+            <span class="text-indigo-300">View →</span>
+          </button>
+        </div>
+
+        <article v-else class="directory-detail">
+          <div class="flex items-center justify-between gap-4">
+            <button type="button" class="secondary-button" @click="directoryDetail = null">← Search results</button>
+            <span class="expected-badge">Expected / scheduled information</span>
+          </div>
+
+          <div class="profile-summary">
+            <img
+              v-if="directoryDetail.photo_url && !directoryPhotoError"
+              :src="directoryDetail.photo_url"
+              :alt="directoryDetail.name"
+              class="profile-photo"
+              @error="directoryPhotoError = true"
+            />
+            <div v-else class="profile-photo profile-initials">{{ directoryInitials(directoryDetail.name) }}</div>
+            <div>
+              <h2 class="text-2xl font-extrabold text-white">{{ directoryDetail.name }}</h2>
+              <p v-if="directoryDetail.nickname" class="text-slate-400">Known as {{ directoryDetail.nickname }}</p>
+              <template v-if="directoryType === 'student'">
+                <p class="mt-2 text-slate-200">Grade {{ directoryDetail.grade_level }} · {{ directoryDetail.section || 'No section' }}</p>
+                <p class="text-sm text-slate-400">PSHS ID: {{ directoryDetail.student_number || '—' }}</p>
+                <p class="text-sm text-slate-400">Adviser: {{ directoryDetail.adviser?.name || 'Not assigned' }}</p>
+              </template>
+              <template v-else>
+                <p class="mt-2 text-slate-200">{{ directoryDetail.position || 'Employee' }}</p>
+                <p class="text-sm text-slate-400">{{ directoryDetail.unit || directoryDetail.office || directoryDetail.division || 'Office not assigned' }}</p>
+                <p v-if="directoryDetail.employee_number" class="text-sm text-slate-400">Employee ID: {{ directoryDetail.employee_number }}</p>
+              </template>
+            </div>
+          </div>
+
+          <div class="directory-grid">
+            <section class="info-card">
+              <h3>Expected location now</h3>
+              <template v-if="directoryDetail.current_or_next">
+                <p class="mt-3 text-lg font-bold text-white">
+                  {{ directoryDetail.current_or_next.status === 'current' ? 'Current class' : 'Next class' }}:
+                  {{ directoryDetail.current_or_next.subject || 'Scheduled class' }}
+                </p>
+                <p class="mt-1 text-slate-300">
+                  {{ formatScheduleTime(directoryDetail.current_or_next.start_time) }}–{{ formatScheduleTime(directoryDetail.current_or_next.end_time) }}
+                  <span v-if="directoryDetail.current_or_next.room"> · {{ directoryDetail.current_or_next.room }}</span>
+                </p>
+                <p v-if="directoryType === 'student' && directoryDetail.current_or_next.teacher" class="text-sm text-slate-400">Teacher: {{ directoryDetail.current_or_next.teacher }}</p>
+                <p v-if="directoryType === 'employee' && directoryDetail.current_or_next.section" class="text-sm text-slate-400">Section: {{ directoryDetail.current_or_next.section }}</p>
+              </template>
+              <p v-else class="mt-3 text-slate-400">No remaining scheduled class for today.</p>
+
+              <template v-if="directoryType === 'student'">
+                <div class="mt-5 border-t border-slate-700 pt-4">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest gate record</p>
+                  <p v-if="directoryDetail.gate_status" class="mt-2 text-slate-200">{{ directoryDetail.gate_status.label }}</p>
+                  <p v-if="directoryDetail.gate_status" class="text-sm text-slate-400">{{ formatDateTime(directoryDetail.gate_status.scan_time) }}</p>
+                  <p v-else class="mt-2 text-slate-400">No gate scan recorded.</p>
+                </div>
+              </template>
+              <template v-else-if="directoryDetail.official_hours_today">
+                <div class="mt-5 border-t border-slate-700 pt-4">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Official hours today</p>
+                  <p class="mt-2 text-slate-200">{{ formatScheduleTime(directoryDetail.official_hours_today.time_in) }}–{{ formatScheduleTime(directoryDetail.official_hours_today.time_out) }}</p>
+                </div>
+              </template>
+            </section>
+
+            <section v-if="directoryType === 'student'" class="info-card">
+              <div class="flex items-center justify-between gap-3">
+                <h3>Parents / guardians</h3>
+                <button
+                  v-if="directoryDetail.parents?.some(parent => parent.has_contact_details) && !contactsRevealed"
+                  type="button"
+                  class="reveal-button"
+                  :disabled="directoryLoading"
+                  @click="revealParentContacts"
+                >Reveal contact</button>
+              </div>
+              <div v-if="directoryDetail.parents?.length" class="mt-3 space-y-3">
+                <div v-for="parent in directoryDetail.parents" :key="parent.id" class="parent-row">
+                  <p class="font-semibold text-white">{{ parent.name }}</p>
+                  <p class="text-xs uppercase tracking-wide text-slate-500">{{ parent.relationship || 'Guardian' }}</p>
+                  <p v-if="parent.mobile_phone" class="mt-1 text-sm text-slate-300">{{ parent.mobile_phone }}</p>
+                  <p v-if="parent.email" class="text-sm text-slate-300">{{ parent.email }}</p>
+                </div>
+              </div>
+              <p v-else class="mt-3 text-slate-400">No linked parent contact is on file.</p>
+            </section>
+          </div>
+
+          <section class="schedule-card">
+            <h3>Weekly {{ directoryType === 'student' ? 'class' : 'teaching' }} schedule</h3>
+            <div v-if="Object.keys(directoryDetail.schedule || {}).length" class="schedule-days">
+              <div v-for="(slots, day) in directoryDetail.schedule" :key="day" class="schedule-day">
+                <p class="schedule-day-name">{{ day }}</p>
+                <div v-for="slot in slots" :key="slot.id" class="schedule-slot">
+                  <p class="font-semibold text-white">{{ formatScheduleTime(slot.start_time) }}–{{ formatScheduleTime(slot.end_time) }} · {{ slot.subject || 'Class' }}</p>
+                  <p class="text-xs text-slate-400">
+                    <span v-if="directoryType === 'student' && slot.teacher">{{ slot.teacher }}</span>
+                    <span v-if="directoryType === 'employee' && slot.section">{{ slot.section }}</span>
+                    <span v-if="slot.room"> · {{ slot.room }}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p v-else class="mt-3 text-slate-400">No active schedule is published for the current term.</p>
+          </section>
+        </article>
+      </section>
+    </main>
+
     <main v-else class="scanner-stage">
       <video ref="video" class="camera-preview" playsinline muted />
       <div class="camera-shade" />
@@ -450,6 +755,7 @@ onUnmounted(() => {
           <button class="primary-button mt-6" :disabled="scannerState === 'starting' || !online" @click="startScanner">
             {{ scannerState === 'starting' ? 'Starting Camera…' : 'Start Camera Scanner' }}
           </button>
+          <button type="button" class="secondary-button mt-3 w-full" @click="switchWorkspace('directory')">Search Student or Employee</button>
           <Link v-if="canPairDevice" :href="route('student-attendance.devices.index')" class="mt-4 block text-sm text-indigo-300 hover:text-indigo-200">
             Manage registered iPads
           </Link>
@@ -505,6 +811,38 @@ onUnmounted(() => {
 .setup-input { margin-top: .4rem; width: 100%; border-radius: .75rem; border: 1px solid #475569; background: #1e293b; color: white; padding: .75rem; }
 .primary-button { border-radius: .75rem; background: #4f46e5; color: white; padding: .8rem 1.25rem; font-weight: 700; }
 .primary-button:disabled { opacity: .5; cursor: not-allowed; }
+.secondary-button { border: 1px solid #475569; border-radius: .75rem; background: #1e293b; color: #e2e8f0; padding: .7rem 1rem; font-weight: 700; }
+.secondary-button:hover { background: #334155; }
+.mode-button { border-radius: .5rem; border: 1px solid #475569; padding: .25rem .55rem; color: #cbd5e1; font-size: .75rem; font-weight: 700; }
+.mode-button-active { border-color: #818cf8; background: #3730a3; color: white; }
+.directory-stage { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem; background: radial-gradient(circle at top, #1e1b4b, #020617 65%); }
+.directory-shell { width: min(1100px, 100%); margin: 0 auto; }
+.directory-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.privacy-notice { margin-top: 1rem; border: 1px solid rgba(251,191,36,.3); border-radius: .9rem; background: rgba(245,158,11,.1); padding: .8rem 1rem; color: #fde68a; font-size: .85rem; }
+.directory-tabs { display: inline-flex; gap: .35rem; margin-top: 1.25rem; border-radius: .8rem; background: #0f172a; padding: .3rem; }
+.directory-tabs button { border-radius: .6rem; padding: .55rem 1.25rem; color: #94a3b8; font-weight: 700; }
+.directory-tabs button.active { background: #4f46e5; color: white; }
+.directory-search { display: flex; gap: .75rem; margin-top: .85rem; }
+.directory-search input { min-width: 0; flex: 1; border: 1px solid #475569; border-radius: .75rem; background: #0f172a; color: white; padding: .8rem 1rem; }
+.directory-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: 1.25rem; }
+.directory-result { display: flex; align-items: center; gap: .85rem; border: 1px solid #334155; border-radius: 1rem; background: rgba(15,23,42,.9); padding: 1rem; }
+.directory-result:hover { border-color: #818cf8; background: #1e293b; }
+.directory-result-avatar { display: flex; width: 46px; height: 46px; flex: 0 0 46px; align-items: center; justify-content: center; border-radius: 999px; background: #3730a3; font-weight: 800; }
+.directory-detail { margin-top: 1.25rem; }
+.expected-badge { border-radius: 999px; background: rgba(99,102,241,.15); padding: .35rem .75rem; color: #c7d2fe; font-size: .75rem; font-weight: 700; }
+.profile-summary { display: flex; align-items: center; gap: 1.25rem; margin-top: 1rem; border: 1px solid #334155; border-radius: 1rem; background: rgba(15,23,42,.9); padding: 1.25rem; }
+.profile-photo { width: 100px; height: 100px; flex: 0 0 100px; border: 3px solid #475569; border-radius: 999px; object-fit: cover; }
+.profile-initials { display: flex; align-items: center; justify-content: center; background: #3730a3; font-size: 1.75rem; font-weight: 800; }
+.directory-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.info-card, .schedule-card { border: 1px solid #334155; border-radius: 1rem; background: rgba(15,23,42,.9); padding: 1.25rem; }
+.info-card h3, .schedule-card h3 { color: #94a3b8; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.reveal-button { border-radius: .6rem; background: #b45309; padding: .45rem .7rem; color: white; font-size: .75rem; font-weight: 800; }
+.parent-row { border-radius: .7rem; background: #1e293b; padding: .75rem; }
+.schedule-card { margin-top: 1rem; }
+.schedule-days { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+.schedule-day { border-radius: .8rem; background: #1e293b; padding: .8rem; }
+.schedule-day-name { color: #a5b4fc; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.schedule-slot { margin-top: .65rem; border-top: 1px solid #334155; padding-top: .65rem; font-size: .85rem; }
 .camera-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #020617; }
 .camera-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to bottom, rgba(2,6,23,.25), transparent 35%, transparent 65%, rgba(2,6,23,.5)); }
 .start-panel, .processing-panel, .result-panel { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; text-align: center; background: rgba(2,6,23,.68); backdrop-filter: blur(5px); }
@@ -536,5 +874,9 @@ onUnmounted(() => {
   .manual-entry input { flex: 1; width: auto; }
   .guard-login-card { padding: 1.25rem; }
   .guard-grid { grid-template-columns: 1fr; }
+  .directory-stage { padding: 1rem; }
+  .directory-heading, .profile-summary { align-items: flex-start; flex-direction: column; }
+  .directory-results, .directory-grid, .schedule-days { grid-template-columns: 1fr; }
+  .directory-search { flex-direction: column; }
 }
 </style>
