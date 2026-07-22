@@ -1,9 +1,9 @@
 <template>
-  <Head title="My Faculty Load" />
-  <AdminLayout title="My Faculty Load">
+  <Head title="My Load Assignments" />
+  <AdminLayout title="My Load Assignments">
     <div class="space-y-5">
 
-      <AppPageHeader title="My Faculty Load" subtitle="Your teaching load summary for the selected term">
+      <AppPageHeader title="My Load Assignments" subtitle="Your teaching load summary for the selected term">
         <template #actions>
           <AppSelect v-model="selectedTermId" :show-blank="false" class="min-w-[200px]" @change="applyFilter">
             <option v-for="t in terms" :key="t.id" :value="t.id">

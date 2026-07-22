@@ -466,6 +466,70 @@ class FacultyLoadingHttpTest extends TestCase
             ->assertInertia(fn ($p) => $p->component('FacultyLoading/MyLoad'));
     }
 
+    public function test_view_own_faculty_receives_current_load_assignments_and_schedule(): void
+    {
+        $faculty = $this->facultyUser();
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $section = $this->makeSection($sy);
+        $subject = $this->makeSubject();
+        $room = $this->makeClassroom();
+
+        $load = FacultyLoad::create([
+            'user_id' => $faculty->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'teaching_units' => 3,
+            'total_units' => 3,
+            'full_load_threshold' => 18,
+            'load_status' => 'underload',
+        ]);
+        $assignment = LoadAssignment::create([
+            'faculty_load_id' => $load->id,
+            'user_id' => $faculty->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'assignment_type' => 'teaching',
+            'subject_id' => $subject->id,
+            'section_id' => $section->id,
+            'load_units' => 3,
+        ]);
+        $schedule = ClassSchedule::create([
+            'load_assignment_id' => $assignment->id,
+            'user_id' => $faculty->id,
+            'subject_id' => $subject->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '08:00:00',
+            'end_time' => '09:00:00',
+            'status' => 'tentative',
+        ]);
+
+        $this->actingAs($faculty)
+            ->get(route('faculty-loading.my-load'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('FacultyLoading/MyLoad')
+                ->where('currentTerm.id', $term->id)
+                ->where('load.id', $load->id)
+                ->has('load.assignments', 1)
+                ->where('load.assignments.0.id', $assignment->id));
+
+        $this->actingAs($faculty)
+            ->get(route('faculty-loading.my-schedule'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('FacultyLoading/Schedules/Index')
+                ->where('pageMode', 'my')
+                ->where('capability.level', 'self')
+                ->where('currentTerm.id', $term->id)
+                ->has('schedules', 1)
+                ->where('schedules.0.id', $schedule->id));
+    }
+
     public function test_guest_cannot_view_my_load(): void
     {
         $this->get(route('faculty-loading.my-load'))->assertRedirect(route('login'));

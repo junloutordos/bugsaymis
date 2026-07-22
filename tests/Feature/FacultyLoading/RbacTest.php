@@ -76,6 +76,16 @@ class RbacTest extends TestCase
             ->assertOk();
     }
 
+    public function test_view_own_allows_my_schedule(): void
+    {
+        $this->seedTerm();
+        $user = $this->userWith('faculty_loading.view_own');
+
+        $this->actingAs($user)
+            ->get(route('faculty-loading.my-schedule'))
+            ->assertOk();
+    }
+
     public function test_view_own_denies_faculty_loads_index(): void
     {
         $user = $this->userWith('faculty_loading.view_own');

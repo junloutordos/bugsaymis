@@ -1479,6 +1479,7 @@ export const menuItems = [
         routeName: "faculty-loading.my-schedule",
         href: route("faculty-loading.my-schedule"),
         icon: CalendarDaysIcon,
+        pinToTop: true,
         roles: [],
         permissions: ["faculty_loading.view_own", "faculty_loading.manage"],
       },
@@ -1584,10 +1585,11 @@ export const menuItems = [
       },
       // ── Personal ────────────────────────────────────────────────────────────
       {
-        label: "My Load",
+        label: "My Load Assignments",
         routeName: "faculty-loading.my-load",
         href: route("faculty-loading.my-load"),
         icon: DocumentTextIcon,
+        pinToTop: true,
         roles: [],
         permissions: ["faculty_loading.view_own"],
       },

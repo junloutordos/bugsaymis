@@ -352,15 +352,20 @@ const generateHealthStats = ({ start, end }) => {
 
 // --- Filter Menu by Role ---
 
-// Children render alphabetically, with dashboard entries (any label
-// containing "Dashboard", e.g. "MIS Dashboard") pinned first — several
-// pinned dashboards sort alphabetically among themselves. Applies only to
-// children — the TOP-LEVEL array keeps its curated order (section headers
-// interleave it; sorting would destroy the grouping). navigation.js stays
-// append-friendly: new entries land in the right spot automatically.
+// Children render alphabetically, with explicitly pinned self-service entries
+// first, followed by dashboard entries (any label containing "Dashboard",
+// e.g. "MIS Dashboard"). Items within the same tier sort alphabetically.
+// Applies only to children — the TOP-LEVEL array keeps its curated order
+// (section headers interleave it; sorting would destroy the grouping).
+const childSortTier = (item) => {
+  if (item.pinToTop) return 0;
+  if (item.label.includes("Dashboard")) return 1;
+  return 2;
+};
+
 const sortChildren = (items) =>
   items.sort((a, b) =>
-    (a.label.includes("Dashboard") ? 0 : 1) - (b.label.includes("Dashboard") ? 0 : 1)
+    childSortTier(a) - childSortTier(b)
     || a.label.localeCompare(b.label)
   );
 
