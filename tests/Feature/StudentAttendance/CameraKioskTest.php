@@ -192,6 +192,48 @@ class CameraKioskTest extends TestCase
         Queue::assertPushed(SendAttendanceSmsJob::class, 1);
     }
 
+    public function test_guard_usb_scan_requires_pin_and_records_hardware_capture_method(): void
+    {
+        Carbon::setTestNow('2026-07-22 07:20:00');
+        $guard = $this->userWithRole('Security Guard');
+        [$device, $token] = $this->registeredDevice($guard, 'main_gate');
+        $this->setPin($guard);
+        $studentId = $this->student('20260000011');
+
+        $payload = [
+            'barcode' => '20260000011',
+            'scan_uuid' => (string) Str::uuid(),
+            'device_scan_time' => now()->toIso8601String(),
+            'capture_method' => 'hardware_barcode',
+        ];
+
+        $this->withCookie(EnsureStudentAttendanceDevice::COOKIE, $token)
+            ->withCredentials()
+            ->postJson(route('student-attendance.scan'), $payload)
+            ->assertForbidden();
+
+        $this->unlock($guard, $token)->assertOk();
+
+        $this->withCookie(EnsureStudentAttendanceDevice::COOKIE, $token)
+            ->withCredentials()
+            ->postJson(route('student-attendance.scan'), $payload)
+            ->assertOk()
+            ->assertJsonPath('data.type', 'in');
+
+        $this->assertDatabaseHas('student_attendance_logs', [
+            'student_id' => $studentId,
+            'recorded_by' => $guard->id,
+            'kiosk_device_id' => $device->id,
+            'gate_location' => 'main_gate',
+            'capture_method' => 'hardware_barcode',
+        ]);
+
+        $audit = AuditLog::where('action', 'guard.attendance.scan')->latest()->firstOrFail();
+        $this->assertSame($guard->id, $audit->user_id);
+        $this->assertSame($device->id, $audit->new_values['kiosk_device_id']);
+        $this->assertSame('hardware_barcode', $audit->new_values['capture_method']);
+    }
+
     public function test_scans_alternate_in_out_and_back_in_after_duplicate_window(): void
     {
         Carbon::setTestNow('2026-07-22 07:15:00');

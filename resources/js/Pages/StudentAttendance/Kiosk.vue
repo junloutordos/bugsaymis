@@ -15,6 +15,7 @@ const props = defineProps({
 
 const video = ref(null)
 const scannerState = ref('stopped') // stopped | starting | scanning | submitting | result
+const scannerInputMode = ref(null) // null | camera | hardware
 const cameraError = ref('')
 const online = ref(navigator.onLine)
 const lastScan = ref(null)
@@ -56,6 +57,8 @@ let clockTimer = null
 let audioContext = null
 let lastDetectedBarcode = ''
 let lastDetectedAt = 0
+let hardwareBarcodeBuffer = ''
+let hardwareBufferTimer = null
 
 function updateClock() {
   clock.value = new Date().toLocaleTimeString('en-PH', {
@@ -71,6 +74,7 @@ async function startScanner() {
   if (!props.device || !activeOperator.value || scannerState.value === 'starting' || scannerState.value === 'scanning') return
 
   cameraError.value = ''
+  scannerInputMode.value = 'camera'
   scannerState.value = 'starting'
 
   try {
@@ -106,9 +110,9 @@ async function startScanner() {
     }
 
     if (error?.name === 'NotAllowedError') {
-      cameraError.value = 'Camera access was denied. Allow camera access for this site in Safari settings.'
+      cameraError.value = 'Camera access was denied. Allow camera access for this site in your browser settings.'
     } else if (error?.name === 'NotFoundError') {
-      cameraError.value = 'No camera was found on this iPad.'
+      cameraError.value = 'No camera was found on this device.'
     } else {
       cameraError.value = 'The camera could not start. Check the connection and camera permission, then try again.'
     }
@@ -122,7 +126,65 @@ function stopScanner() {
     video.value.srcObject.getTracks().forEach(track => track.stop())
     video.value.srcObject = null
   }
+  clearTimeout(hardwareBufferTimer)
+  hardwareBarcodeBuffer = ''
+  scannerInputMode.value = null
   scannerState.value = 'stopped'
+}
+
+function startHardwareScanner() {
+  if (!props.device || !activeOperator.value || !online.value) return
+
+  scannerControls?.stop()
+  scannerControls = null
+  if (video.value?.srcObject) {
+    video.value.srcObject.getTracks().forEach(track => track.stop())
+    video.value.srcObject = null
+  }
+
+  const BrowserAudioContext = window.AudioContext || window.webkitAudioContext
+  if (BrowserAudioContext) audioContext ??= new BrowserAudioContext()
+
+  cameraError.value = ''
+  hardwareBarcodeBuffer = ''
+  scannerInputMode.value = 'hardware'
+  scannerState.value = 'scanning'
+}
+
+function handleHardwareKeydown(event) {
+  if (
+    scannerInputMode.value !== 'hardware'
+    || scannerState.value !== 'scanning'
+    || workspaceMode.value !== 'scanner'
+    || !online.value
+    || event.ctrlKey
+    || event.metaKey
+    || event.altKey
+  ) return
+
+  const target = event.target
+  if (target instanceof HTMLElement && (
+    target.matches('input, textarea, select')
+    || target.isContentEditable
+  )) return
+
+  if (event.key === 'Enter' || event.key === 'Tab') {
+    event.preventDefault()
+    flushHardwareBarcode()
+    return
+  }
+
+  if (event.key.length !== 1) return
+  hardwareBarcodeBuffer += event.key
+  clearTimeout(hardwareBufferTimer)
+  hardwareBufferTimer = setTimeout(flushHardwareBarcode, 100)
+}
+
+function flushHardwareBarcode() {
+  clearTimeout(hardwareBufferTimer)
+  const barcode = hardwareBarcodeBuffer.trim()
+  hardwareBarcodeBuffer = ''
+  if (barcode) submitScan(barcode, 'hardware_barcode')
 }
 
 function expireScannerAccess(message) {
@@ -355,7 +417,7 @@ async function submitScan(barcode, captureMethod = 'camera') {
     resultTimer = setTimeout(() => {
       lastScan.value = null
       scanStatus.value = ''
-      scannerState.value = online.value ? 'scanning' : 'stopped'
+      scannerState.value = online.value && scannerInputMode.value ? 'scanning' : 'stopped'
     }, 2500)
   }
 }
@@ -385,7 +447,7 @@ async function verifySession() {
     await axios.get(route('student-attendance.kiosk.status'))
   } catch (error) {
     if ([401, 403, 419].includes(error.response?.status)) {
-      expireScannerAccess('Scanner access expired or this iPad was revoked. Enter your PIN again to continue.')
+      expireScannerAccess('Scanner access expired or this device was revoked. Enter your PIN again to continue.')
     }
   }
 }
@@ -441,6 +503,7 @@ onMounted(() => {
   clockTimer = setInterval(updateClock, 1000)
   heartbeatTimer = setInterval(verifySession, 60000)
   document.addEventListener('visibilitychange', handleVisibility)
+  window.addEventListener('keydown', handleHardwareKeydown)
   window.addEventListener('offline', handleOffline)
   window.addEventListener('online', handleOnline)
 })
@@ -448,17 +511,19 @@ onMounted(() => {
 onUnmounted(() => {
   stopScanner()
   clearTimeout(resultTimer)
+  clearTimeout(hardwareBufferTimer)
   clearInterval(heartbeatTimer)
   clearInterval(clockTimer)
   audioContext?.close()
   document.removeEventListener('visibilitychange', handleVisibility)
+  window.removeEventListener('keydown', handleHardwareKeydown)
   window.removeEventListener('offline', handleOffline)
   window.removeEventListener('online', handleOnline)
 })
 </script>
 
 <template>
-  <Head :title="device?.device_mode === 'student_self_scan' ? 'Student Gate Scanner' : 'Gate Camera Scanner'" />
+  <Head title="Student Gate Scanner" />
 
   <StudentSelfScan v-if="device?.device_mode === 'student_self_scan'" :device="device" />
 
@@ -517,7 +582,7 @@ onUnmounted(() => {
           <label class="block text-sm text-slate-200">
             Device type
             <select v-model="pairForm.device_mode" required class="setup-input">
-              <option value="guard_camera">Guard iPad — camera, PIN, and directory</option>
+              <option value="guard_camera">Guard Station — USB scanner, camera, PIN, and directory</option>
               <option value="student_self_scan">Student Self-Scan — USB/Bluetooth scanner</option>
             </select>
           </label>
@@ -534,7 +599,7 @@ onUnmounted(() => {
         </form>
 
         <p v-else class="mt-6 rounded-xl bg-amber-500/10 p-4 text-sm text-amber-200">
-          Please ask an Administrator to sign in on this iPad and complete registration.
+          Please ask an Administrator to sign in on this device and complete registration.
         </p>
         <a v-if="!canPairDevice" :href="route('student-attendance.kiosk.admin-setup')" class="primary-button mt-5 inline-block">Administrator Sign In</a>
       </div>
@@ -750,25 +815,47 @@ onUnmounted(() => {
     </main>
 
     <main v-else class="scanner-stage">
-      <video ref="video" class="camera-preview" playsinline muted />
+      <video v-show="scannerInputMode === 'camera'" ref="video" class="camera-preview" playsinline muted />
       <div class="camera-shade" />
 
-      <div v-if="scannerState === 'scanning'" class="scan-guide-wrap">
+      <div v-if="scannerState === 'scanning' && scannerInputMode === 'camera'" class="scan-guide-wrap">
         <div class="scan-guide"><div class="scan-line" /></div>
         <p>Hold the ID barcode horizontally inside the frame</p>
       </div>
 
+      <div v-if="scannerState === 'scanning' && scannerInputMode === 'hardware'" class="hardware-ready-panel">
+        <div class="hardware-id-icon">▥</div>
+        <h1>USB Barcode Scanner Ready</h1>
+        <p>Scan the student ID using the barcode scanner connected to this computer.</p>
+        <div class="ready-pulse" />
+      </div>
+
       <div v-if="scannerState === 'stopped' || scannerState === 'starting'" class="start-panel">
-        <div class="start-card">
-          <h1 class="text-3xl font-bold text-white">Camera Scanner</h1>
-          <p class="mt-2 text-slate-300">Camera access starts only after you press the button.</p>
+        <div class="scanner-choice-card">
+          <h1 class="text-3xl font-bold text-white">Choose Scanner</h1>
+          <p class="mt-2 text-slate-300">Use the scanner connected to this computer, or start the camera on an iPad.</p>
           <p v-if="cameraError" class="mt-4 rounded-xl bg-red-500/15 p-3 text-sm text-red-200">{{ cameraError }}</p>
-          <button class="primary-button mt-6" :disabled="scannerState === 'starting' || !online" @click="startScanner">
-            {{ scannerState === 'starting' ? 'Starting Camera…' : 'Start Camera Scanner' }}
-          </button>
+
+          <div class="scanner-options">
+            <button type="button" class="scanner-option scanner-option-primary" :disabled="scannerState === 'starting' || !online" @click="startHardwareScanner">
+              <span class="scanner-option-icon">▥</span>
+              <span>
+                <strong>USB Barcode Scanner</strong>
+                <small>For the guardhouse desktop computer</small>
+              </span>
+            </button>
+            <button type="button" class="scanner-option" :disabled="scannerState === 'starting' || !online" @click="startScanner">
+              <span class="scanner-option-icon">◉</span>
+              <span>
+                <strong>{{ scannerState === 'starting' ? 'Starting Camera…' : 'Camera Scanner' }}</strong>
+                <small>Camera permission is requested only when selected</small>
+              </span>
+            </button>
+          </div>
+
           <button type="button" class="secondary-button mt-3 w-full" @click="switchWorkspace('directory')">Search Student or Employee</button>
           <Link v-if="canPairDevice" :href="route('student-attendance.devices.index')" class="mt-4 block text-sm text-indigo-300 hover:text-indigo-200">
-            Manage registered iPads
+            Manage registered devices
           </Link>
         </div>
       </div>
@@ -796,6 +883,10 @@ onUnmounted(() => {
         <input v-model="manualBarcode" maxlength="50" placeholder="Manual ID entry" aria-label="Manual student ID entry" />
         <button>Submit</button>
       </form>
+
+      <button v-if="scannerState === 'scanning'" type="button" class="change-scanner-button" @click="stopScanner">
+        Change Scanner
+      </button>
     </main>
   </div>
 </template>
@@ -804,13 +895,29 @@ onUnmounted(() => {
 .kiosk-root { min-height: 100vh; background: #020617; color: white; display: flex; flex-direction: column; overflow: hidden; }
 .kiosk-header { min-height: 76px; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,.08); z-index: 20; }
 .scanner-stage, .setup-panel { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.scanner-stage {
+  background:
+    linear-gradient(160deg, rgba(15,23,42,.76) 0%, rgba(15,23,42,.82) 50%, rgba(30,27,75,.9) 100%),
+    url('/images/bg.jpg') center / cover no-repeat;
+}
 .setup-panel {
   padding: 1.5rem;
   background:
     linear-gradient(160deg, rgba(15,23,42,.76) 0%, rgba(15,23,42,.82) 50%, rgba(30,27,75,.9) 100%),
     url('/images/bg.jpg') center / cover no-repeat;
 }
-.setup-card, .start-card { width: min(440px, 92vw); border: 1px solid rgba(255,255,255,.14); border-radius: 1.5rem; padding: 2rem; background: rgba(15,23,42,.92); box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+.setup-card { width: min(440px, 92vw); border: 1px solid rgba(255,255,255,.14); border-radius: 1.5rem; padding: 2rem; background: rgba(15,23,42,.92); box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+.scanner-choice-card { width: min(720px, 94vw); border: 1px solid rgba(255,255,255,.14); border-radius: 1.5rem; padding: 2rem; background: rgba(15,23,42,.94); box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+.scanner-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+.scanner-option { display: flex; min-height: 116px; align-items: center; gap: 1rem; border: 2px solid #475569; border-radius: 1rem; padding: 1rem; background: #1e293b; color: white; text-align: left; transition: border-color .15s, background .15s, transform .15s; }
+.scanner-option:hover { border-color: #818cf8; background: #312e81; transform: translateY(-1px); }
+.scanner-option:focus { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+.scanner-option:disabled { cursor: not-allowed; opacity: .5; transform: none; }
+.scanner-option-primary { border-color: #4f46e5; background: #312e81; }
+.scanner-option-icon { display: flex; width: 52px; height: 52px; flex: 0 0 52px; align-items: center; justify-content: center; border-radius: .9rem; background: #4f46e5; font-size: 1.8rem; }
+.scanner-option strong, .scanner-option small { display: block; }
+.scanner-option strong { font-size: 1rem; }
+.scanner-option small { margin-top: .3rem; color: #cbd5e1; font-size: .75rem; line-height: 1.25; }
 .guard-login-card { width: min(760px, 94vw); max-height: calc(100vh - 110px); overflow-y: auto; border: 1px solid rgba(255,255,255,.14); border-radius: 1.5rem; padding: 2rem; background: rgba(15,23,42,.94); box-shadow: 0 24px 80px rgba(0,0,0,.4); }
 .guard-grid { margin-top: 1.5rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
 .guard-button { display: flex; align-items: center; gap: .75rem; min-height: 64px; border: 2px solid #334155; border-radius: 1rem; padding: .75rem 1rem; background: #1e293b; text-align: left; font-weight: 700; transition: border-color .15s, background .15s; }
@@ -866,6 +973,12 @@ onUnmounted(() => {
 .scan-guide { width: min(76vw, 700px); height: min(25vw, 190px); border: 4px solid rgba(255,255,255,.9); border-radius: 1.25rem; box-shadow: 0 0 0 9999px rgba(2,6,23,.32); overflow: hidden; }
 .scan-line { width: 100%; height: 3px; background: #818cf8; box-shadow: 0 0 12px #6366f1; animation: scan 1.8s ease-in-out infinite; }
 @keyframes scan { 0%,100% { transform: translateY(15px); } 50% { transform: translateY(160px); } }
+.hardware-ready-panel { position: relative; z-index: 5; max-width: 760px; padding: 2rem; text-align: center; text-shadow: 0 2px 8px #000; }
+.hardware-ready-panel h1 { font-size: clamp(2rem, 5vw, 4rem); line-height: 1; font-weight: 900; }
+.hardware-ready-panel p { margin-top: 1.25rem; color: #cbd5e1; font-size: clamp(1rem, 2vw, 1.5rem); }
+.hardware-id-icon { display: flex; width: 130px; height: 96px; margin: 0 auto 2rem; align-items: center; justify-content: center; border: 5px solid #818cf8; border-radius: 1.25rem; color: #a5b4fc; font-size: 4rem; }
+.ready-pulse { width: 18px; height: 18px; margin: 2rem auto 0; border-radius: 999px; background: #34d399; box-shadow: 0 0 0 0 rgba(52,211,153,.6); animation: ready-pulse 1.4s infinite; }
+@keyframes ready-pulse { 70% { box-shadow: 0 0 0 16px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }
 .processing-panel { flex-direction: column; gap: 1rem; font-size: 1.25rem; font-weight: 700; }
 .spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,.2); border-top-color: white; border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -883,6 +996,8 @@ onUnmounted(() => {
 .manual-entry { position: absolute; z-index: 8; bottom: 1rem; right: 1rem; display: flex; border-radius: .75rem; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.3); }
 .manual-entry input { width: 180px; border: 0; padding: .65rem .8rem; color: #0f172a; }
 .manual-entry button { background: #4f46e5; padding: .65rem 1rem; font-weight: 700; }
+.change-scanner-button { position: absolute; z-index: 8; bottom: 1rem; left: 1rem; border: 1px solid #64748b; border-radius: .75rem; background: rgba(15,23,42,.9); padding: .65rem 1rem; color: #e2e8f0; font-size: .85rem; font-weight: 700; }
+.change-scanner-button:hover { background: #334155; }
 @media (max-width: 640px) {
   .kiosk-header { padding: .75rem; }
   .student-card { flex-direction: column; gap: 1rem; padding: 1rem; }
@@ -894,5 +1009,8 @@ onUnmounted(() => {
   .directory-heading, .profile-summary { align-items: flex-start; flex-direction: column; }
   .directory-results, .directory-grid, .schedule-days { grid-template-columns: 1fr; }
   .directory-search { flex-direction: column; }
+  .scanner-choice-card { padding: 1.25rem; }
+  .scanner-options { grid-template-columns: 1fr; }
+  .change-scanner-button { bottom: 4.75rem; }
 }
 </style>

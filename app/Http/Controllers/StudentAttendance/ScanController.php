@@ -25,7 +25,7 @@ class ScanController extends Controller
             'barcode' => ['required', 'string', 'max:50'],
             'scan_uuid' => ['required', 'uuid'],
             'device_scan_time' => ['nullable', 'date'],
-            'capture_method' => ['nullable', 'string', 'in:camera,manual'],
+            'capture_method' => ['nullable', 'string', 'in:camera,hardware_barcode,manual'],
         ]);
 
         /** @var StudentAttendanceDevice $device */
