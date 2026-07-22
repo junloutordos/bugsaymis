@@ -771,9 +771,8 @@
       </div>
     </div>
 
-    <!-- Wellness popover — mirrors White Space exactly (same three scopes),
-         except a full-Wednesday grade never gets Wellness on Wednesday at any
-         scope, so that combination isn't offered as a scope option there. -->
+    <!-- Wellness popover — mirrors White Space with the same three scopes.
+         Full-Wednesday grades may deliberately set a grade/section override. -->
     <div v-if="wellnessPopover" ref="wellnessEl"
       class="fixed z-50 w-[320px] bg-white rounded-xl shadow-2xl border border-slate-200"
       :style="{ left: wellnessPopover.x + 'px', top: wellnessPopover.y + 'px' }">
@@ -799,11 +798,14 @@
               <input type="radio" value="grade" v-model="wellnessPopover.scope" @change="onWellnessScopeChange('grade')" />
               Every section, Grade {{ wellnessPopover.grade }}
             </label>
-            <label class="flex items-center gap-2 text-sm text-slate-700">
+            <label v-if="!wellnessPopover.isFullWednesday" class="flex items-center gap-2 text-sm text-slate-700">
               <input type="radio" value="campus" v-model="wellnessPopover.scope" @change="onWellnessScopeChange('campus')" />
               Every section, every grade level
             </label>
           </div>
+          <p v-if="wellnessPopover.isFullWednesday" class="mt-2 text-xs text-slate-500">
+            This grade does not inherit the campus Wednesday Wellness block. Set it for this section or Grade {{ wellnessPopover.grade }}.
+          </p>
         </div>
 
         <div>
@@ -2465,11 +2467,9 @@ async function saveWhiteSpacePopover(clear = false) {
 }
 
 // ── Wellness popover ───────────────────────────────────────────────────────────
-// Mirrors the White Space popover exactly (same three scopes, same merge-one-
-// day-at-a-time endpoints) — the one difference is the full-Wednesday-grade
-// exemption: those grades never get Wellness on Wednesday at any scope (see
-// SchedulingConstants::resolveWellnessBlock()), so the popover doesn't open
-// for that specific grade+day combination.
+// Mirrors the White Space popover (same three scopes and merge-one-day-at-a-
+// time endpoints). A full-Wednesday grade does not inherit the campus default,
+// but this editor can deliberately add a section- or grade-scoped block.
 const WELLNESS_SUFFIX_BY_DAY = { Monday: 'mon', Tuesday: 'tue', Wednesday: 'wed', Thursday: 'thu', Friday: 'fri' }
 
 const wellnessPopover = ref(null)
@@ -2488,15 +2488,6 @@ function openWellnessPopover(e, groupId, band, day) {
   const grade = singleGradeFor(groupId)
   if (grade === null || grade === undefined) return
 
-  if (day === 'Wednesday' && props.wednesdayFullGrades.includes(grade)) {
-    Swal.fire({
-      icon: 'info', title: 'Not available',
-      text: `Grade ${grade} runs a full Wednesday schedule and never has a Wellness block that day.`,
-      timer: 2200, showConfirmButton: false,
-    })
-    return
-  }
-
   const sectionId = isSectionView ? groupId : null
   const suffix = WELLNESS_SUFFIX_BY_DAY[day]
   const section = sectionId ? props.sections.find(s => s.id === sectionId) : null
@@ -2506,10 +2497,12 @@ function openWellnessPopover(e, groupId, band, day) {
     : null
   const gradeOverride = props.wellnessByGrade?.[grade]?.[day] ?? null
   const campusOverride = props.wellnessCampus?.[day] ?? null
+  const isFullWednesday = day === 'Wednesday' && props.wednesdayFullGrades.includes(grade)
 
   let scope
   if (isSectionView && sectionOverride) scope = 'section'
   else if (gradeOverride) scope = 'grade'
+  else if (isFullWednesday) scope = isSectionView ? 'section' : 'grade'
   else if (campusOverride) scope = 'campus'
   else scope = isSectionView ? 'section' : 'grade'
 
@@ -2520,7 +2513,7 @@ function openWellnessPopover(e, groupId, band, day) {
     x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
     y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
     groupId, sectionId, grade, day,
-    isSectionView,
+    isSectionView, isFullWednesday,
     sectionName: isSectionView ? groupHeaderInfo(groupId).section_name : null,
     scope,
     start: current?.start ?? (band?.start ?? ''),

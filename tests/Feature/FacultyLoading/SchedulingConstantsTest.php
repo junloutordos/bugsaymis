@@ -359,8 +359,8 @@ class SchedulingConstantsTest extends TestCase
 
     public function test_get_blocked_slots_full_wednesday_grade_has_no_wellness_but_has_alp(): void
     {
-        // G8 is a full-Wednesday grade — not excluded from Wellness during
-        // placement, so it shouldn't show as blocked; ALP still applies.
+        // G8 is a full-Wednesday grade, so it ignores the campus Wellness
+        // default unless an explicit grade/section override exists.
         $blocked = SC::getBlockedSlots(8, 'Wednesday');
         $types   = array_column($blocked, 'type');
         $this->assertNotContains('WELLNESS', $types);

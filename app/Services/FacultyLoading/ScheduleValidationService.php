@@ -402,18 +402,18 @@ class ScheduleValidationService
     /**
      * Block if the proposed time overlaps this section's effective Wellness
      * window for the day — same precedence as checkWhiteSpaceConflict(). A
-     * full-Wednesday grade is structurally exempt from Wellness on Wednesday
-     * at any scope, matching SchedulingConstants::resolveWellnessBlock().
+     * full-Wednesday grade ignores the campus default but honors an explicit
+     * section or grade-wide Wellness override.
      */
     private function checkWellnessConflict(Section $section, string $day, string $start, string $end): ?string
     {
         $grade = (int) $section->levelid;
 
-        if ($day === 'Wednesday' && in_array($grade, SchedulingConstants::wednesdayFullGrades(), true)) {
-            return null;
-        }
-
-        $wellness = $section->wellnessOverrideFor($day) ?? SchedulingConstants::getWellnessWindow($grade, $day);
+        $wellness = SchedulingConstants::getEffectiveWellnessWindow(
+            $grade,
+            $day,
+            $section->wellnessOverrideFor($day),
+        );
         if (! $wellness) {
             return null;
         }

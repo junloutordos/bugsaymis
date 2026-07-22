@@ -23,8 +23,8 @@ use Tests\TestCase;
  * WEDNESDAY_WELLNESS setting (retired). Two differences from White Space:
  *   1. It DOES have one hardcoded default — the historical Wednesday
  *      9:50-10:20 window, preserved as WELLNESS_CAMPUS's Wednesday value.
- *   2. A full-Wednesday grade (wednesdayFullGrades(), currently [8]) is
- *      structurally exempt from Wellness on Wednesday at any scope.
+ *   2. A full-Wednesday grade (wednesdayFullGrades(), currently [8]) ignores
+ *      the campus Wednesday default but accepts an explicit grade/section block.
  *
  * Covers:
  *   1. Section model: WELLNESS_OVERRIDE_COLUMNS map + wellnessOverrideFor()
@@ -32,8 +32,7 @@ use Tests\TestCase;
  *   3. SchedulingConstants::getBlockedSlots() applying a section override,
  *      any day (not just Wednesday)
  *   4. SchedulingConstants::getWellnessWindow() precedence + Wednesday default
- *   5. Full-Wednesday-grade exemption at every layer (resolveWellnessBlock,
- *      HardConstraintChecker H11, ScheduleValidationService)
+ *   5. Full-Wednesday-grade default exemption and explicit override behavior
  *   6. ScheduleValidationService blocking a manual placement inside the window
  *   7. PATCH .../sections/{section}/wellness/{day} (section scope)
  *   8. PATCH .../bell-schedule/wellness/grade/{grade}/{day} and .../campus/{day}
@@ -244,7 +243,7 @@ class SectionWellnessOverrideTest extends TestCase
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 5. Full-Wednesday-grade exemption — every layer
+    // 5. Full-Wednesday-grade default exception + explicit overrides
     // ═══════════════════════════════════════════════════════════════════════
 
     public function test_grade_8_gets_no_wellness_block_on_wednesday(): void
@@ -254,12 +253,28 @@ class SectionWellnessOverrideTest extends TestCase
         $this->assertNull(collect($blocked)->firstWhere('type', 'WELLNESS'));
     }
 
-    public function test_grade_8_exemption_holds_even_with_an_explicit_override(): void
+    public function test_grade_8_accepts_an_explicit_section_wellness_override_on_wednesday(): void
     {
-        $override = ['start' => '08:00', 'end' => '08:30'];
+        $override = ['start' => '13:00', 'end' => '13:30'];
         $blocked  = SchedulingConstants::getBlockedSlots(8, 'Wednesday', null, null, null, $override);
+        $wellness = collect($blocked)->firstWhere('type', 'WELLNESS');
 
-        $this->assertNull(collect($blocked)->firstWhere('type', 'WELLNESS'));
+        $this->assertSame('13:00', $wellness['start']);
+        $this->assertSame('13:30', $wellness['end']);
+    }
+
+    public function test_grade_8_accepts_an_explicit_grade_wide_wellness_override_on_wednesday(): void
+    {
+        BellScheduleSetting::create([
+            'setting_key' => 'WELLNESS_BY_GRADE',
+            'value' => [8 => ['Wednesday' => ['start' => '13:00', 'end' => '13:30']]],
+        ]);
+
+        $wellness = collect(SchedulingConstants::getBlockedSlots(8, 'Wednesday'))
+            ->firstWhere('type', 'WELLNESS');
+
+        $this->assertSame('13:00', $wellness['start']);
+        $this->assertSame('13:30', $wellness['end']);
     }
 
     public function test_grade_8_still_gets_wellness_on_a_non_wednesday_day_with_an_override(): void
@@ -346,6 +361,23 @@ class SectionWellnessOverrideTest extends TestCase
 
         $wellnessErrors = array_filter($result['errors'], fn ($e) => str_contains($e, 'Wellness'));
         $this->assertEmpty($wellnessErrors);
+    }
+
+    public function test_manual_placement_respects_grade_8_section_wellness_override_on_wednesday(): void
+    {
+        $this->bootValidationFixtures();
+        $section = $this->makeSection([
+            'levelid' => 8,
+            'wellness_start_wed' => '13:00:00',
+            'wellness_end_wed' => '13:30:00',
+        ]);
+
+        $result = $this->svc->validate($this->scheduleData($section, [
+            'day_of_week' => 'Wednesday', 'start_time' => '13:00:00', 'end_time' => '13:30:00',
+        ]));
+
+        $wellnessErrors = array_filter($result['errors'], fn ($e) => str_contains($e, 'Wellness'));
+        $this->assertNotEmpty($wellnessErrors);
     }
 
     public function test_wellness_override_does_not_affect_a_sibling_section(): void

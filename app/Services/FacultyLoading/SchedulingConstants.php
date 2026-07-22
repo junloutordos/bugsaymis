@@ -321,9 +321,8 @@ class SchedulingConstants
     // window (formerly the standalone WEDNESDAY_WELLNESS setting), preserved
     // here as the campus-wide Wednesday default so nothing changes for anyone
     // until an admin actively sets an override. A full-Wednesday grade (see
-    // wednesdayFullGrades()) never gets Wellness on Wednesday at any scope —
-    // that exemption is structural, not a preference, and is enforced in
-    // resolveWellnessBlock() regardless of what's configured here.
+    // wednesdayFullGrades()) ignores that campus default, but an administrator
+    // may still deliberately add Wellness for one grade or one section.
 
     /** Campus-wide Wellness window per weekday. */
     public const WELLNESS_CAMPUS = [
@@ -696,8 +695,8 @@ class SchedulingConstants
     /**
      * The grade-wide or campus-wide Wellness window for a grade+day, or null
      * if neither is set. A per-section override (if any) takes priority over
-     * both and is applied by the caller — see resolveWellnessBlock(), which
-     * also enforces the full-Wednesday-grade exemption this function does not.
+     * both and is applied by the caller. Use getEffectiveWellnessWindow() when
+     * applying the full-Wednesday-grade campus-default exception.
      *
      * @return array{start:string,end:string}|null
      */
@@ -714,6 +713,36 @@ class SchedulingConstants
         }
 
         return null;
+    }
+
+    /**
+     * Resolve the Wellness window that actually applies to one section/grade.
+     *
+     * Full-Wednesday grades do not inherit the campus Wednesday default, which
+     * preserves their regular full-day timetable. An explicit section or
+     * grade-wide override is intentional, however, and must take effect.
+     *
+     * @param  array{start:string,end:string}|null  $sectionOverride
+     * @return array{start:string,end:string}|null
+     */
+    public static function getEffectiveWellnessWindow(int $grade, string $day, ?array $sectionOverride = null): ?array
+    {
+        if ($sectionOverride !== null) {
+            return self::window($sectionOverride);
+        }
+
+        $byGrade = self::setting('WELLNESS_BY_GRADE')[$grade][$day] ?? null;
+        if ($byGrade !== null) {
+            return self::window($byGrade);
+        }
+
+        if ($day === 'Wednesday' && in_array($grade, self::wednesdayFullGrades(), true)) {
+            return null;
+        }
+
+        $campus = self::setting('WELLNESS_CAMPUS')[$day] ?? null;
+
+        return $campus !== null ? self::window($campus) : null;
     }
 
     /**
@@ -1001,8 +1030,7 @@ class SchedulingConstants
      * at any scope.
      *
      * $wellnessOverride: same idea as $whiteSpaceOverride, for Wellness
-     * (Section::WELLNESS_OVERRIDE_COLUMNS / getWellnessWindow()) — see
-     * resolveWellnessBlock() for the full-Wednesday-grade exemption.
+     * (Section::WELLNESS_OVERRIDE_COLUMNS / getEffectiveWellnessWindow()).
      */
     public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): array
     {
@@ -1126,19 +1154,12 @@ class SchedulingConstants
 
     /**
      * The effective Wellness block for a grade+day, or null if none is set at
-     * any scope — same precedence as resolveWhiteSpaceBlock(). A full-Wednesday
-     * grade (wednesdayFullGrades()) is structurally exempt from Wellness on
-     * Wednesday regardless of what's configured at any scope, matching the
-     * legacy behavior this replaces (WEDNESDAY_WELLNESS was never shown as
-     * blocked for those grades either).
+     * an applicable scope. Full-Wednesday grades ignore the campus Wednesday
+     * default but honor an explicit section or grade-wide override.
      */
     private static function resolveWellnessBlock(int $grade, string $day, ?array $override): ?array
     {
-        if ($day === 'Wednesday' && in_array($grade, self::wednesdayFullGrades(), true)) {
-            return null;
-        }
-
-        $window = $override ?? self::getWellnessWindow($grade, $day);
+        $window = self::getEffectiveWellnessWindow($grade, $day, $override);
         if ($window === null) {
             return null;
         }

@@ -163,13 +163,11 @@ class HardConstraintChecker
      * H11: No class slot may overlap the Wellness block for this day
      * (SchedulingConstants::getWellnessWindow() — settable on any day, not
      * just Wednesday, since Wellness was generalized beyond its original
-     * Wednesday-only form). Full-Wednesday grades remain exempt on Wednesday
-     * specifically, matching the legacy behavior this replaces. Grade is
-     * optional — callers without grade context (or checking a grade-agnostic
-     * window) fall back to the campus-wide setting for the day. Note: only
-     * the grade-wide/campus-wide scopes are checked here — a section-level
-     * Wellness override is enforced by ScheduleValidationService instead,
-     * which has section context this check does not.
+     * Wednesday-only form). Full-Wednesday grades ignore the campus Wednesday
+     * default but honor an explicit grade-wide override. Grade is optional —
+     * callers without grade context fall back to the campus-wide setting for
+     * the day. A section-level override is enforced by
+     * ScheduleValidationService, which has the required section context.
      *
      * @param  string $day        Day of week
      * @param  string $classStart HH:MM
@@ -181,12 +179,8 @@ class HardConstraintChecker
         string $classEnd,
         ?int $grade = null,
     ): array {
-        if ($grade !== null && $day === 'Wednesday' && in_array($grade, SchedulingConstants::wednesdayFullGrades(), true)) {
-            return self::ok();
-        }
-
         $wellness = $grade !== null
-            ? SchedulingConstants::getWellnessWindow($grade, $day)
+            ? SchedulingConstants::getEffectiveWellnessWindow($grade, $day)
             : (SchedulingConstants::setting('WELLNESS_CAMPUS')[$day] ?? null);
 
         if ($wellness === null) {
