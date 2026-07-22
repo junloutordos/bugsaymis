@@ -72,6 +72,16 @@ class Section extends Model
         'white_space_end_thu',
         'white_space_start_fri',
         'white_space_end_fri',
+        'wellness_start_mon',
+        'wellness_end_mon',
+        'wellness_start_tue',
+        'wellness_end_tue',
+        'wellness_start_wed',
+        'wellness_end_wed',
+        'wellness_start_thu',
+        'wellness_end_thu',
+        'wellness_start_fri',
+        'wellness_end_fri',
         'afternoon_break_start',
         'afternoon_break_end',
         'adviser',
@@ -125,6 +135,20 @@ class Section extends Model
         'Wednesday' => ['white_space_start_wed', 'white_space_end_wed'],
         'Thursday'  => ['white_space_start_thu', 'white_space_end_thu'],
         'Friday'    => ['white_space_start_fri', 'white_space_end_fri'],
+    ];
+
+    /**
+     * Day name → [start column, end column] for this section's own per-day
+     * Wellness block — mirrors WHITE_SPACE_OVERRIDE_COLUMNS exactly; see
+     * SchedulingConstants::getWellnessWindow() for the grade-wide and
+     * campus-wide scopes.
+     */
+    public const WELLNESS_OVERRIDE_COLUMNS = [
+        'Monday'    => ['wellness_start_mon', 'wellness_end_mon'],
+        'Tuesday'   => ['wellness_start_tue', 'wellness_end_tue'],
+        'Wednesday' => ['wellness_start_wed', 'wellness_end_wed'],
+        'Thursday'  => ['wellness_start_thu', 'wellness_end_thu'],
+        'Friday'    => ['wellness_start_fri', 'wellness_end_fri'],
     ];
 
     protected $casts = [
@@ -256,6 +280,24 @@ class Section extends Model
     public function whiteSpaceOverrideFor(string $day): ?array
     {
         [$startCol, $endCol] = self::WHITE_SPACE_OVERRIDE_COLUMNS[$day] ?? [null, null];
+        if (! $startCol || ! $this->$startCol || ! $this->$endCol) {
+            return null;
+        }
+
+        return ['start' => $this->$startCol, 'end' => $this->$endCol];
+    }
+
+    /**
+     * This section's own Wellness block for the given weekday, or null if
+     * unset — see WELLNESS_OVERRIDE_COLUMNS. Mirrors whiteSpaceOverrideFor():
+     * no grade default lives here — SchedulingConstants::getWellnessWindow()
+     * falls back to a grade-wide, then campus-wide, setting, then null.
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public function wellnessOverrideFor(string $day): ?array
+    {
+        [$startCol, $endCol] = self::WELLNESS_OVERRIDE_COLUMNS[$day] ?? [null, null];
         if (! $startCol || ! $this->$startCol || ! $this->$endCol) {
             return null;
         }

@@ -605,12 +605,13 @@ class ClassScheduleController extends Controller
         $lunchOverrideColumns = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
         $recessOverrideColumns = array_merge(...array_values(Section::RECESS_OVERRIDE_COLUMNS));
         $whiteSpaceOverrideColumns = array_merge(...array_values(Section::WHITE_SPACE_OVERRIDE_COLUMNS));
+        $wellnessOverrideColumns = array_merge(...array_values(Section::WELLNESS_OVERRIDE_COLUMNS));
         $sections = Section::when($syId, fn ($q) => $q->where('school_year_id', $syId))
             ->where('is_active', true)
             ->when($advisorySectionIds !== null, fn ($q) => $q->whereIn('id', $advisorySectionIds))
             ->orderBy('levelid')
             ->orderBy('sectionname')
-            ->get(array_merge(['id', 'sectionname', 'levelid'], $lunchOverrideColumns, $recessOverrideColumns, $whiteSpaceOverrideColumns));
+            ->get(array_merge(['id', 'sectionname', 'levelid'], $lunchOverrideColumns, $recessOverrideColumns, $whiteSpaceOverrideColumns, $wellnessOverrideColumns));
 
         $adviserNames = $termId
             ? $this->advisoryScope->adviserNamesBySection((int) $termId, $sections->pluck('id'))
@@ -669,7 +670,8 @@ class ClassScheduleController extends Controller
                 $lunchOverride = $section->lunchOverrideFor($day);
                 $recessOverride = $section->recessOverrideFor($day);
                 $whiteSpaceOverride = $section->whiteSpaceOverrideFor($day);
-                if (! $lunchOverride && ! $recessOverride && ! $whiteSpaceOverride) {
+                $wellnessOverride = $section->wellnessOverrideFor($day);
+                if (! $lunchOverride && ! $recessOverride && ! $whiteSpaceOverride && ! $wellnessOverride) {
                     continue;
                 }
                 if ($lunchOverride) {
@@ -690,7 +692,13 @@ class ClassScheduleController extends Controller
                         'end' => substr((string) $whiteSpaceOverride['end'], 0, 5),
                     ];
                 }
-                $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride);
+                if ($wellnessOverride) {
+                    $wellnessOverride = [
+                        'start' => substr((string) $wellnessOverride['start'], 0, 5),
+                        'end' => substr((string) $wellnessOverride['end'], 0, 5),
+                    ];
+                }
+                $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride);
                 if ($canEditBellSchedule) {
                     $blocked = array_map(function ($band) use ($grade, $day) {
                         $band['write'] = SchedulingConstants::bandWriteDescriptor($band['type'], $grade, $day);
@@ -808,6 +816,9 @@ class ClassScheduleController extends Controller
             'bellScheduleTimetables' => $bellScheduleTimetables,
             'whiteSpaceByGrade' => SchedulingConstants::setting('WHITE_SPACE_BY_GRADE'),
             'whiteSpaceCampus' => SchedulingConstants::setting('WHITE_SPACE_CAMPUS'),
+            'wellnessByGrade' => SchedulingConstants::setting('WELLNESS_BY_GRADE'),
+            'wellnessCampus' => SchedulingConstants::setting('WELLNESS_CAMPUS'),
+            'wednesdayFullGrades' => SchedulingConstants::wednesdayFullGrades(),
         ]);
     }
 

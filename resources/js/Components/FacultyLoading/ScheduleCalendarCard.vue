@@ -61,6 +61,14 @@
                 <ClockIcon class="h-3 w-3" />
                 <span>Consultation</span>
               </button>
+              <button type="button"
+                :aria-label="`Set Wellness for ${day}`"
+                title="Set Wellness for this day"
+                class="inline-flex min-h-7 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1 print:hidden"
+                @click.stop="$emit('add-wellness', day, $event)">
+                <PlusIcon class="h-3 w-3" />
+                <span>Wellness</span>
+              </button>
             </div>
           </div>
         </div>
@@ -133,9 +141,10 @@
                 <div :class="['absolute inset-0',
                   bp.type === 'WHITE_SPACE' ? 'bg-violet-50/80 border border-violet-200'
                     : bp.type === 'CONSULT' ? 'bg-sky-50/80 border border-sky-200'
+                    : bp.type === 'WELLNESS' ? 'bg-emerald-50/80 border border-emerald-200'
                     : 'bg-slate-100/70']" />
                 <span :class="['relative w-full font-medium px-1 text-center leading-tight select-none',
-                  bp.type === 'WHITE_SPACE' ? 'text-violet-600' : bp.type === 'CONSULT' ? 'text-sky-600' : 'text-slate-400']">
+                  bp.type === 'WHITE_SPACE' ? 'text-violet-600' : bp.type === 'CONSULT' ? 'text-sky-600' : bp.type === 'WELLNESS' ? 'text-emerald-600' : 'text-slate-400']">
                   <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
                     {{ bp.label }}
                   </span>
@@ -311,7 +320,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click', 'event-remove',
-  'blocked-mousedown', 'blocked-click', 'add-white-space', 'edit-consultation',
+  'blocked-mousedown', 'blocked-click', 'add-white-space', 'edit-consultation', 'add-wellness',
 ])
 
 /** Move/resize-draggable: a literal timetable row or a single-window setting.
@@ -333,9 +342,10 @@ function isBandDraggable(bp) {
  *  row to drag, and (unlike Lunch/Recess) may be showing a grade-wide or
  *  campus-wide value rather than a section override, so it isn't always
  *  tagged sectionEditable. CONSULT opens the same dedicated editor as the
- *  header's "Consultation" button, for the days it happens to still render on. */
+ *  header's "Consultation" button, for the days it happens to still render on.
+ *  WELLNESS follows the same always-clickable pattern as White Space. */
 function isBandClickable(bp) {
-  return props.blockedEditable && (bp.write?.kind === 'activity' || !!bp.sectionEditable || bp.type === 'WHITE_SPACE' || bp.type === 'CONSULT')
+  return props.blockedEditable && (bp.write?.kind === 'activity' || !!bp.sectionEditable || bp.type === 'WHITE_SPACE' || bp.type === 'CONSULT' || bp.type === 'WELLNESS')
 }
 
 /** Stops the mousedown from also triggering the day column's own

@@ -106,6 +106,11 @@ class ScheduleValidationService
             if ($whiteSpaceError) {
                 $errors[] = $whiteSpaceError;
             }
+
+            $wellnessError = $this->checkWellnessConflict($section, $data['day_of_week'], $data['start_time'], $data['end_time']);
+            if ($wellnessError) {
+                $errors[] = $wellnessError;
+            }
         }
 
         // ── 5b. Teacher official-time check ──────────────────────────────────
@@ -389,6 +394,34 @@ class ScheduleValidationService
         $wsEnd   = $whiteSpace['end'] ?? null;
         if ($wsStart && $wsEnd && $this->conflicts->timesOverlap($start, $end, $wsStart, $wsEnd)) {
             return "Schedule ({$start}–{$end}) overlaps with the section's White Space block ({$wsStart}–{$wsEnd}).";
+        }
+
+        return null;
+    }
+
+    /**
+     * Block if the proposed time overlaps this section's effective Wellness
+     * window for the day — same precedence as checkWhiteSpaceConflict(). A
+     * full-Wednesday grade is structurally exempt from Wellness on Wednesday
+     * at any scope, matching SchedulingConstants::resolveWellnessBlock().
+     */
+    private function checkWellnessConflict(Section $section, string $day, string $start, string $end): ?string
+    {
+        $grade = (int) $section->levelid;
+
+        if ($day === 'Wednesday' && in_array($grade, SchedulingConstants::wednesdayFullGrades(), true)) {
+            return null;
+        }
+
+        $wellness = $section->wellnessOverrideFor($day) ?? SchedulingConstants::getWellnessWindow($grade, $day);
+        if (! $wellness) {
+            return null;
+        }
+
+        $wStart = $wellness['start'] ?? null;
+        $wEnd   = $wellness['end'] ?? null;
+        if ($wStart && $wEnd && $this->conflicts->timesOverlap($start, $end, $wStart, $wEnd)) {
+            return "Schedule ({$start}–{$end}) overlaps with the section's Wellness block ({$wStart}–{$wEnd}).";
         }
 
         return null;

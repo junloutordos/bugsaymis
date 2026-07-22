@@ -305,8 +305,11 @@ class SchedulingConstantsTest extends TestCase
 
     public function test_wednesday_wellness_block_defined(): void
     {
-        $this->assertSame('09:50', SC::WEDNESDAY_WELLNESS['start']);
-        $this->assertSame('10:20', SC::WEDNESDAY_WELLNESS['end']);
+        // Preserved as the campus-wide Wednesday default under the new
+        // Wellness mechanism (see SectionWellnessOverrideTest) — the standalone
+        // WEDNESDAY_WELLNESS constant/setting was retired.
+        $this->assertSame('09:50', SC::WELLNESS_CAMPUS['Wednesday']['start']);
+        $this->assertSame('10:20', SC::WELLNESS_CAMPUS['Wednesday']['end']);
     }
 
     public function test_friday_ila_grades_is_empty(): void

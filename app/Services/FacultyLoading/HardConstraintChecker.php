@@ -160,8 +160,16 @@ class HardConstraintChecker
     // =========================================================================
 
     /**
-     * H11: No class slot may overlap the 30-min Wednesday Wellness block.
-     * Full-Wednesday grades are exempt.
+     * H11: No class slot may overlap the Wellness block for this day
+     * (SchedulingConstants::getWellnessWindow() — settable on any day, not
+     * just Wednesday, since Wellness was generalized beyond its original
+     * Wednesday-only form). Full-Wednesday grades remain exempt on Wednesday
+     * specifically, matching the legacy behavior this replaces. Grade is
+     * optional — callers without grade context (or checking a grade-agnostic
+     * window) fall back to the campus-wide setting for the day. Note: only
+     * the grade-wide/campus-wide scopes are checked here — a section-level
+     * Wellness override is enforced by ScheduleValidationService instead,
+     * which has section context this check does not.
      *
      * @param  string $day        Day of week
      * @param  string $classStart HH:MM
@@ -173,21 +181,24 @@ class HardConstraintChecker
         string $classEnd,
         ?int $grade = null,
     ): array {
-        if ($day !== 'Wednesday') {
+        if ($grade !== null && $day === 'Wednesday' && in_array($grade, SchedulingConstants::wednesdayFullGrades(), true)) {
             return self::ok();
         }
 
-        if ($grade !== null && in_array($grade, SchedulingConstants::wednesdayFullGrades(), true)) {
+        $wellness = $grade !== null
+            ? SchedulingConstants::getWellnessWindow($grade, $day)
+            : (SchedulingConstants::setting('WELLNESS_CAMPUS')[$day] ?? null);
+
+        if ($wellness === null) {
             return self::ok();
         }
 
-        $wellness = SchedulingConstants::wednesdayWellness();
-        $wStart = $wellness['start']; // default 09:50
-        $wEnd   = $wellness['end'];   // default 10:20
+        $wStart = $wellness['start'];
+        $wEnd   = $wellness['end'];
 
         if (SchedulingConstants::timesOverlap($classStart, $classEnd, $wStart, $wEnd)) {
             return self::fail(
-                "H11: Wednesday Wellness block {$wStart}–{$wEnd} — "
+                "H11: Wellness block {$wStart}–{$wEnd} on {$day} — "
                 . "proposed class {$classStart}–{$classEnd} overlaps this protected window"
             );
         }

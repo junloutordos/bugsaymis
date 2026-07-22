@@ -1079,14 +1079,15 @@ class DeterministicSchedulingService
             }
         }
 
-        // Sections with their own lunch, recess, or White Space time on any
-        // weekday get their own grid variant; every other section keeps
+        // Sections with their own lunch, recess, White Space, or Wellness time
+        // on any weekday get their own grid variant; every other section keeps
         // sharing the grade's grid above (which already picks up any
-        // grade-wide/campus-wide White Space setting via getBlockedSlots()).
+        // grade-wide/campus-wide White Space/Wellness setting via getBlockedSlots()).
         $lunchColumns      = array_merge(...array_values(Section::LUNCH_OVERRIDE_COLUMNS));
         $recessColumns     = array_merge(...array_values(Section::RECESS_OVERRIDE_COLUMNS));
         $whiteSpaceColumns = array_merge(...array_values(Section::WHITE_SPACE_OVERRIDE_COLUMNS));
-        $overrideColumns   = array_merge($lunchColumns, $recessColumns, $whiteSpaceColumns);
+        $wellnessColumns   = array_merge(...array_values(Section::WELLNESS_OVERRIDE_COLUMNS));
+        $overrideColumns   = array_merge($lunchColumns, $recessColumns, $whiteSpaceColumns, $wellnessColumns);
         $overriddenSections = Section::whereIn('levelid', $grades)
             ->where(function ($q) {
                 foreach (Section::LUNCH_OVERRIDE_COLUMNS as [$startCol, $endCol]) {
@@ -1098,6 +1099,9 @@ class DeterministicSchedulingService
                 foreach (Section::WHITE_SPACE_OVERRIDE_COLUMNS as [$startCol, $endCol]) {
                     $q->orWhere(fn ($q2) => $q2->whereNotNull($startCol)->whereNotNull($endCol));
                 }
+                foreach (Section::WELLNESS_OVERRIDE_COLUMNS as [$startCol, $endCol]) {
+                    $q->orWhere(fn ($q2) => $q2->whereNotNull($startCol)->whereNotNull($endCol));
+                }
             })
             ->get(array_merge(['id', 'levelid'], $overrideColumns));
 
@@ -1105,6 +1109,7 @@ class DeterministicSchedulingService
             $lunchOverridesByDay      = [];
             $recessOverridesByDay     = [];
             $whiteSpaceOverridesByDay = [];
+            $wellnessOverridesByDay   = [];
             foreach (self::DAYS as $day) {
                 if ($override = $section->lunchOverrideFor($day)) {
                     $lunchOverridesByDay[$day] = [
@@ -1124,12 +1129,19 @@ class DeterministicSchedulingService
                         'end'   => substr((string) $override['end'], 0, 5),
                     ];
                 }
+                if ($override = $section->wellnessOverrideFor($day)) {
+                    $wellnessOverridesByDay[$day] = [
+                        'start' => substr((string) $override['start'], 0, 5),
+                        'end'   => substr((string) $override['end'], 0, 5),
+                    ];
+                }
             }
             $this->gridBySection[(int) $section->id] = $this->buildSlotGrid(
                 (int) $section->levelid,
                 $lunchOverridesByDay,
                 $recessOverridesByDay,
                 $whiteSpaceOverridesByDay,
+                $wellnessOverridesByDay,
             );
         }
     }
@@ -1246,9 +1258,12 @@ class DeterministicSchedulingService
      * White Space setting still applies if one is set (see
      * SchedulingConstants::getWhiteSpaceWindow()).
      *
+     * $wellnessOverridesByDay: same idea for Wellness
+     * (Section::WELLNESS_OVERRIDE_COLUMNS / getWellnessWindow()).
+     *
      * @return array<int,array{day:string,start:string,end:string,start_min:int,end_min:int}>
      */
-    private function buildSlotGrid(int $grade, array $lunchOverridesByDay = [], array $recessOverridesByDay = [], array $whiteSpaceOverridesByDay = []): array
+    private function buildSlotGrid(int $grade, array $lunchOverridesByDay = [], array $recessOverridesByDay = [], array $whiteSpaceOverridesByDay = [], array $wellnessOverridesByDay = []): array
     {
         $slots = [];
         foreach (self::DAYS as $day) {
@@ -1258,6 +1273,7 @@ class DeterministicSchedulingService
                 $lunchOverridesByDay[$day] ?? null,
                 $recessOverridesByDay[$day] ?? null,
                 $whiteSpaceOverridesByDay[$day] ?? null,
+                $wellnessOverridesByDay[$day] ?? null,
             ) as $row) {
                 $slots[] = [
                     'day'         => $day,

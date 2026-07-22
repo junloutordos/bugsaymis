@@ -141,6 +141,12 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::patch('/white-space/campus/{day}', [BellScheduleController::class, 'updateWhiteSpaceCampus'])
                     ->name('white-space.campus')
                     ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
+                Route::patch('/wellness/grade/{grade}/{day}', [BellScheduleController::class, 'updateWellnessGrade'])
+                    ->name('wellness.grade')
+                    ->where(['grade' => '([7-9]|1[0-2])', 'day' => 'Monday|Tuesday|Wednesday|Thursday|Friday']);
+                Route::patch('/wellness/campus/{day}', [BellScheduleController::class, 'updateWellnessCampus'])
+                    ->name('wellness.campus')
+                    ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
             });
 
         Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])
@@ -268,6 +274,9 @@ Route::middleware(['web', 'auth', 'verified'])
                         ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
                     Route::patch('/{section}/white-space/{day}', [SectionController::class, 'updateDayWhiteSpace'])
                         ->name('white-space')
+                        ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
+                    Route::patch('/{section}/wellness/{day}', [SectionController::class, 'updateDayWellness'])
+                        ->name('wellness')
                         ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
                 });
             });

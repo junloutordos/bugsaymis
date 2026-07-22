@@ -280,9 +280,6 @@ class SchedulingConstants
 
     // ── Wednesday Special ────────────────────────────────────────────────────
 
-    /** Wellness block (all grades except full-Wednesday grades, Wednesday only) */
-    public const WEDNESDAY_WELLNESS = ['start' => '09:50', 'end' => '10:20'];
-
     /**
      * After this time on Wednesday, no regular teaching classes may be scheduled.
      * Key = grade group string.
@@ -316,6 +313,25 @@ class SchedulingConstants
 
     /** Per-grade White Space window per weekday: [grade => [day => window]]. Empty = none set. */
     public const WHITE_SPACE_BY_GRADE = [];
+
+    // ── Wellness ──────────────────────────────────────────────────────────────
+    // Same three-scope mechanism as White Space (see above) — section override,
+    // then grade-wide, then campus-wide. Unlike White Space, Wellness DOES have
+    // one hardcoded default: the historical Wednesday-for-everyone 9:50-10:20
+    // window (formerly the standalone WEDNESDAY_WELLNESS setting), preserved
+    // here as the campus-wide Wednesday default so nothing changes for anyone
+    // until an admin actively sets an override. A full-Wednesday grade (see
+    // wednesdayFullGrades()) never gets Wellness on Wednesday at any scope —
+    // that exemption is structural, not a preference, and is enforced in
+    // resolveWellnessBlock() regardless of what's configured here.
+
+    /** Campus-wide Wellness window per weekday. */
+    public const WELLNESS_CAMPUS = [
+        'Wednesday' => ['start' => '09:50', 'end' => '10:20'],
+    ];
+
+    /** Per-grade Wellness window per weekday: [grade => [day => window]]. Empty = none set. */
+    public const WELLNESS_BY_GRADE = [];
 
     // ── Friday Special ────────────────────────────────────────────────────────
 
@@ -550,7 +566,6 @@ class SchedulingConstants
      * and read back here with the default as fallback.
      */
     public const SETTING_KEYS = [
-        'WEDNESDAY_WELLNESS',
         'WEDNESDAY_ALP',
         'WEDNESDAY_ALP_BY_GRADE',
         'WEDNESDAY_ACTIVITY_START',
@@ -567,7 +582,6 @@ class SchedulingConstants
     public static function defaultSetting(string $key): mixed
     {
         return match ($key) {
-            'WEDNESDAY_WELLNESS'       => self::WEDNESDAY_WELLNESS,
             'WEDNESDAY_ALP'            => self::WEDNESDAY_ALP,
             'WEDNESDAY_ALP_BY_GRADE'   => self::WEDNESDAY_ALP_BY_GRADE,
             'WEDNESDAY_ACTIVITY_START' => self::WEDNESDAY_ACTIVITY_START,
@@ -577,6 +591,8 @@ class SchedulingConstants
             'GRADE8_OVERFLOW_SLOTS'    => self::GRADE8_OVERFLOW_SLOTS,
             'WHITE_SPACE_CAMPUS'       => self::WHITE_SPACE_CAMPUS,
             'WHITE_SPACE_BY_GRADE'     => self::WHITE_SPACE_BY_GRADE,
+            'WELLNESS_CAMPUS'          => self::WELLNESS_CAMPUS,
+            'WELLNESS_BY_GRADE'        => self::WELLNESS_BY_GRADE,
             default                    => null,
         };
     }
@@ -607,11 +623,6 @@ class SchedulingConstants
     private static function window(mixed $w): array
     {
         return ['start' => $w['start'] ?? null, 'end' => $w['end'] ?? null];
-    }
-
-    public static function wednesdayWellness(): array
-    {
-        return self::window(self::setting('WEDNESDAY_WELLNESS'));
     }
 
     public static function wednesdayActivityStart(string $group): ?string
@@ -660,6 +671,29 @@ class SchedulingConstants
         }
 
         $campus = self::setting('WHITE_SPACE_CAMPUS')[$day] ?? null;
+        if ($campus !== null) {
+            return ['start' => $campus['start'], 'end' => $campus['end']];
+        }
+
+        return null;
+    }
+
+    /**
+     * The grade-wide or campus-wide Wellness window for a grade+day, or null
+     * if neither is set. A per-section override (if any) takes priority over
+     * both and is applied by the caller — see resolveWellnessBlock(), which
+     * also enforces the full-Wednesday-grade exemption this function does not.
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public static function getWellnessWindow(int $grade, string $day): ?array
+    {
+        $byGrade = self::setting('WELLNESS_BY_GRADE')[$grade][$day] ?? null;
+        if ($byGrade !== null) {
+            return ['start' => $byGrade['start'], 'end' => $byGrade['end']];
+        }
+
+        $campus = self::setting('WELLNESS_CAMPUS')[$day] ?? null;
         if ($campus !== null) {
             return ['start' => $campus['start'], 'end' => $campus['end']];
         }
@@ -773,7 +807,9 @@ class SchedulingConstants
     public static function bandWriteDescriptor(string $type, int $grade, string $day): ?array
     {
         return match ($type) {
-            'WELLNESS'     => ['kind' => 'setting', 'key' => 'WEDNESDAY_WELLNESS', 'shape' => 'window'],
+            // WELLNESS has its own dedicated scoped editor (like WHITE_SPACE) —
+            // no write descriptor means the calendar's generic drag/settings-
+            // update flow leaves it alone.
             'FLAG_RETREAT' => ['kind' => 'setting', 'key' => 'FRIDAY_FLAG_RETREAT', 'shape' => 'window'],
             'ACTIVITY'     => [
                 'kind'     => 'activity',
@@ -928,8 +964,12 @@ class SchedulingConstants
      * replace — when null, the grade-wide/campus-wide setting is used instead
      * (see getWhiteSpaceWindow()), and the block is only added if one exists
      * at any scope.
+     *
+     * $wellnessOverride: same idea as $whiteSpaceOverride, for Wellness
+     * (Section::WELLNESS_OVERRIDE_COLUMNS / getWellnessWindow()) — see
+     * resolveWellnessBlock() for the full-Wednesday-grade exemption.
      */
-    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): array
+    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
@@ -973,15 +1013,6 @@ class SchedulingConstants
             $fullWed = in_array($grade, self::wednesdayFullGrades(), true);
             $alp     = self::getWednesdayAlp($grade);
 
-            // Full-Wednesday grades are not excluded from the Wellness window
-            // during placement, so it isn't shown as blocked for them either.
-            if (! $fullWed) {
-                $blocked[] = array_merge(self::wednesdayWellness(), [
-                    'type'  => 'WELLNESS',
-                    'label' => 'Wellness Break',
-                ]);
-            }
-
             $group        = self::getGradeGroup($grade);
             $cutoffStart  = $fullWed
                 ? $alp['start']
@@ -1022,6 +1053,10 @@ class SchedulingConstants
             $blocked[] = $whiteSpace;
         }
 
+        if ($wellness = self::resolveWellnessBlock($grade, $day, $wellnessOverride)) {
+            $blocked[] = $wellness;
+        }
+
         usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
 
         return array_values($blocked);
@@ -1045,6 +1080,28 @@ class SchedulingConstants
     }
 
     /**
+     * The effective Wellness block for a grade+day, or null if none is set at
+     * any scope — same precedence as resolveWhiteSpaceBlock(). A full-Wednesday
+     * grade (wednesdayFullGrades()) is structurally exempt from Wellness on
+     * Wednesday regardless of what's configured at any scope, matching the
+     * legacy behavior this replaces (WEDNESDAY_WELLNESS was never shown as
+     * blocked for those grades either).
+     */
+    private static function resolveWellnessBlock(int $grade, string $day, ?array $override): ?array
+    {
+        if ($day === 'Wednesday' && in_array($grade, self::wednesdayFullGrades(), true)) {
+            return null;
+        }
+
+        $window = $override ?? self::getWellnessWindow($grade, $day);
+        if ($window === null) {
+            return null;
+        }
+
+        return ['start' => $window['start'], 'end' => $window['end'], 'type' => 'WELLNESS', 'label' => 'Wellness Break'];
+    }
+
+    /**
      * Blocked slots for CALENDAR/PRINT display only. Unlike getBlockedSlots()
      * (the placement/capacity source consumed by overlapsBlocked()), the
      * Consultation/Home Bound band is TRIMMED against the Wednesday ALP and
@@ -1055,7 +1112,7 @@ class SchedulingConstants
      * capacity/placement math: restoring the G8 consult band there would
      * filter the overflow periods out of the schedulable grid.
      */
-    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): array
+    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
@@ -1085,19 +1142,16 @@ class SchedulingConstants
             array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
         );
 
+        $wellness = self::resolveWellnessBlock($grade, $day, $wellnessOverride);
+
         if ($day === 'Wednesday') {
             $fullWed = in_array($grade, self::wednesdayFullGrades(), true);
             $alp     = self::getWednesdayAlp($grade);
 
-            if (! $fullWed) {
-                $wellness = self::wednesdayWellness();
+            if ($wellness) {
                 // G11/G12's Wednesday recess sits inside the Wellness window —
                 // trim it so the two bands don't render on top of each other.
-                $blocked   = self::trimAround($blocked, $wellness['start'], $wellness['end'], ['RECESS']);
-                $blocked[] = array_merge($wellness, [
-                    'type'  => 'WELLNESS',
-                    'label' => 'Wellness Break',
-                ]);
+                $blocked = self::trimAround($blocked, $wellness['start'], $wellness['end'], ['RECESS']);
             }
 
             $group       = self::getGradeGroup($grade);
@@ -1129,6 +1183,11 @@ class SchedulingConstants
         if ($whiteSpace = self::resolveWhiteSpaceBlock($grade, $day, $whiteSpaceOverride)) {
             $blocked   = self::trimAround($blocked, $whiteSpace['start'], $whiteSpace['end'], ['CONSULT']);
             $blocked[] = $whiteSpace;
+        }
+
+        if ($wellness) {
+            $blocked   = self::trimAround($blocked, $wellness['start'], $wellness['end'], ['CONSULT']);
+            $blocked[] = $wellness;
         }
 
         usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
@@ -1200,7 +1259,7 @@ class SchedulingConstants
     }
 
     /** Canonical regular and ILP-only periods after applying fixed blocks. */
-    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): array
+    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): array
     {
         if ($day === 'Friday' && in_array($grade, self::fridayIlaGrades(), true)) {
             return [];
@@ -1208,16 +1267,16 @@ class SchedulingConstants
 
         return array_values(array_filter(
             self::getTeachingSlots($grade, $day),
-            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride, $recessOverride, $whiteSpaceOverride),
+            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride),
         ));
     }
 
     /**
      * True if a proposed time window overlaps any blocked slot for the grade/day.
      */
-    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null): bool
+    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): bool
     {
-        foreach (self::getBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride) as $blocked) {
+        foreach (self::getBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride) as $blocked) {
             if ($start < $blocked['end'] && $end > $blocked['start']) {
                 return true;
             }

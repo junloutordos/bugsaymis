@@ -36,9 +36,11 @@ class BellScheduleController extends Controller
         abort_unless($user->isSuperAdmin() || $user->hasRole('CID Chief'), 403);
     }
 
-    /** Special-window settings: shape drives which sub-editor the UI renders. */
+    /** Special-window settings: shape drives which sub-editor the UI renders.
+     *  Wellness (like White Space) has its own dedicated scoped editor on the
+     *  Schedules calendar instead of an entry here — see updateWellnessGrade()/
+     *  updateWellnessCampus() below. */
     private const SETTING_META = [
-        'WEDNESDAY_WELLNESS'       => ['label' => 'Wednesday Wellness Block',       'shape' => 'window'],
         'WEDNESDAY_ALP'            => ['label' => 'Wednesday ALP (campus default)', 'shape' => 'window'],
         'WEDNESDAY_ALP_BY_GRADE'   => ['label' => 'Wednesday ALP — per-grade override', 'shape' => 'grade_windows'],
         'WEDNESDAY_ACTIVITY_START' => ['label' => 'Wednesday Activity Cutoff (per group)', 'shape' => 'group_times'],
@@ -208,7 +210,7 @@ class BellScheduleController extends Controller
             return response()->json(['message' => 'Invalid day.'], 422);
         }
 
-        [$ok, $start, $end, $error] = $this->validateWhiteSpaceTimes($request);
+        [$ok, $start, $end, $error] = $this->validateOptionalTimeRange($request);
         if (! $ok) {
             return response()->json(['message' => $error], 422);
         }
@@ -244,7 +246,7 @@ class BellScheduleController extends Controller
             return response()->json(['message' => 'Invalid day.'], 422);
         }
 
-        [$ok, $start, $end, $error] = $this->validateWhiteSpaceTimes($request);
+        [$ok, $start, $end, $error] = $this->validateOptionalTimeRange($request);
         if (! $ok) {
             return response()->json(['message' => $error], 422);
         }
@@ -269,8 +271,85 @@ class BellScheduleController extends Controller
         ]);
     }
 
+    // ── Wellness ──────────────────────────────────────────────────────────────
+    // Same merge-one-day-at-a-time shape as White Space above — section scope
+    // lives on Section::WELLNESS_OVERRIDE_COLUMNS (see
+    // SectionController::updateDayWellness()).
+
+    public function updateWellnessGrade(Request $request, int $grade, string $day): JsonResponse
+    {
+        $this->authorizeEditor();
+
+        if ($grade < 7 || $grade > 12) {
+            return response()->json(['message' => 'Invalid grade.'], 422);
+        }
+        if (! in_array($day, SchedulingConstants::DAYS, true)) {
+            return response()->json(['message' => 'Invalid day.'], 422);
+        }
+
+        [$ok, $start, $end, $error] = $this->validateOptionalTimeRange($request);
+        if (! $ok) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        $value = SchedulingConstants::setting('WELLNESS_BY_GRADE');
+        if ($start === null) {
+            unset($value[$grade][$day]);
+            if (empty($value[$grade])) {
+                unset($value[$grade]);
+            }
+        } else {
+            $value[$grade][$day] = ['start' => $start, 'end' => $end];
+        }
+
+        BellScheduleSetting::updateOrCreate(
+            ['setting_key' => 'WELLNESS_BY_GRADE'],
+            ['value' => $value, 'updated_by' => Auth::id()],
+        );
+        SchedulingConstants::flushOverrideCache();
+
+        return response()->json([
+            'message' => $start === null
+                ? "Wellness cleared for Grade {$grade} on {$day}."
+                : "Wellness set for Grade {$grade} on {$day} ({$start}–{$end}).",
+        ]);
+    }
+
+    public function updateWellnessCampus(Request $request, string $day): JsonResponse
+    {
+        $this->authorizeEditor();
+
+        if (! in_array($day, SchedulingConstants::DAYS, true)) {
+            return response()->json(['message' => 'Invalid day.'], 422);
+        }
+
+        [$ok, $start, $end, $error] = $this->validateOptionalTimeRange($request);
+        if (! $ok) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        $value = SchedulingConstants::setting('WELLNESS_CAMPUS');
+        if ($start === null) {
+            unset($value[$day]);
+        } else {
+            $value[$day] = ['start' => $start, 'end' => $end];
+        }
+
+        BellScheduleSetting::updateOrCreate(
+            ['setting_key' => 'WELLNESS_CAMPUS'],
+            ['value' => $value, 'updated_by' => Auth::id()],
+        );
+        SchedulingConstants::flushOverrideCache();
+
+        return response()->json([
+            'message' => $start === null
+                ? "Campus-wide Wellness cleared for {$day}."
+                : "Campus-wide Wellness set for {$day} ({$start}–{$end}).",
+        ]);
+    }
+
     /** @return array{0:bool,1:?string,2:?string,3:?string} [ok, start, end, error] */
-    private function validateWhiteSpaceTimes(Request $request): array
+    private function validateOptionalTimeRange(Request $request): array
     {
         $data = $request->validate([
             'start' => 'nullable|date_format:H:i',

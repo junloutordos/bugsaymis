@@ -210,7 +210,8 @@
                 @blocked-mousedown="(day, band, edge, e) => onBlockedMouseDown(e, groupId, day, band, edge)"
                 @blocked-click="(day, band, e) => onBlockedClick(e, groupId, day, band)"
                 @add-white-space="(day, e) => openWhiteSpacePopover(e, groupId, null, day)"
-                @edit-consultation="(day, e) => openConsultationPopover(e, groupId, day)">
+                @edit-consultation="(day, e) => openConsultationPopover(e, groupId, day)"
+                @add-wellness="(day, e) => openWellnessPopover(e, groupId, null, day)">
 
                 <template #header-actions>
                   <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
@@ -770,6 +771,65 @@
       </div>
     </div>
 
+    <!-- Wellness popover — mirrors White Space exactly (same three scopes),
+         except a full-Wednesday grade never gets Wellness on Wednesday at any
+         scope, so that combination isn't offered as a scope option there. -->
+    <div v-if="wellnessPopover" ref="wellnessEl"
+      class="fixed z-50 w-[320px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: wellnessPopover.x + 'px', top: wellnessPopover.y + 'px' }">
+
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          Wellness — {{ wellnessPopover.day }}
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeWellnessPopover">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="px-4 pb-3 space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Applies to</label>
+          <div class="flex flex-col gap-1.5">
+            <label v-if="wellnessPopover.isSectionView" class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="section" v-model="wellnessPopover.scope" @change="onWellnessScopeChange('section')" />
+              This section only ({{ wellnessPopover.sectionName }})
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="grade" v-model="wellnessPopover.scope" @change="onWellnessScopeChange('grade')" />
+              Every section, Grade {{ wellnessPopover.grade }}
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="campus" v-model="wellnessPopover.scope" @change="onWellnessScopeChange('campus')" />
+              Every section, every grade level
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Time</label>
+          <div class="flex items-center gap-2">
+            <input v-model="wellnessPopover.start" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+            <span class="text-slate-400 text-xs">to</span>
+            <input v-model="wellnessPopover.end" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+        <button v-if="wellnessHasCurrentOverride" type="button"
+          class="text-xs font-medium text-slate-500 hover:text-rose-600"
+          :disabled="wellnessPopover.saving"
+          @click="saveWellnessPopover(true)">
+          Clear
+        </button>
+        <span v-else />
+        <AppButton size="sm" :loading="wellnessPopover.saving" @click="saveWellnessPopover(false)">Save</AppButton>
+      </div>
+    </div>
+
     <!-- Consultation / Home Bound popover — edits the literal bell-schedule
          row directly (not the calendar's display-trimmed band, which can
          differ from the stored row on Wed/Fri), and auto-shrinks the
@@ -1083,6 +1143,9 @@ const props = defineProps({
   bellScheduleTimetables: { type: Object, default: null },
   whiteSpaceByGrade: { type: Object, default: () => ({}) },
   whiteSpaceCampus: { type: Object, default: () => ({}) },
+  wellnessByGrade: { type: Object, default: () => ({}) },
+  wellnessCampus: { type: Object, default: () => ({}) },
+  wednesdayFullGrades: { type: Array, default: () => [] },
 })
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
@@ -1729,7 +1792,7 @@ function dayConfigFor(groupId, day) {
     return {
       ...base,
       blocked: (base.blocked ?? []).map(b => {
-        if (b.type === 'LUNCH' || b.type === 'RECESS' || b.type === 'WHITE_SPACE') {
+        if (b.type === 'LUNCH' || b.type === 'RECESS' || b.type === 'WHITE_SPACE' || b.type === 'WELLNESS') {
           return { ...b, sectionEditable: groupId }
         }
         if ((b.type === 'HOMEROOM' || b.type === 'ADVISING') && adviserName) {
@@ -1740,7 +1803,21 @@ function dayConfigFor(groupId, day) {
     }
   }
 
-  return props.dayConfigsByGrade?.[grade]?.[day]
+  const base = props.dayConfigsByGrade?.[grade]?.[day]
+
+  // The faculty-grouped calendar (By Faculty, and "My Schedule" — both use
+  // viewBy 'faculty', see the ref below) must not show Wellness/White Space/
+  // Consultation: those are section/grade bell-schedule concepts a CID Chief
+  // sets, not a faculty member's own — faculty have (or will have) their own
+  // separate mechanism for this instead. Every other band is unaffected.
+  if (viewBy.value === 'faculty' && base) {
+    return {
+      ...base,
+      blocked: (base.blocked ?? []).filter(b => ! ['WHITE_SPACE', 'WELLNESS', 'CONSULT'].includes(b.type)),
+    }
+  }
+
+  return base
 }
 
 /** { groupId: { day: [schedules] } } */
@@ -2041,6 +2118,11 @@ function onBlockedClick(e, groupId, day, band) {
 
   if (band.type === 'CONSULT') {
     openConsultationPopover(e, groupId, day)
+    return
+  }
+
+  if (band.type === 'WELLNESS') {
+    openWellnessPopover(e, groupId, band, day)
     return
   }
 
@@ -2371,6 +2453,129 @@ async function saveWhiteSpacePopover(clear = false) {
     Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
   } finally {
     if (whiteSpacePopover.value) whiteSpacePopover.value.saving = false
+  }
+}
+
+// ── Wellness popover ───────────────────────────────────────────────────────────
+// Mirrors the White Space popover exactly (same three scopes, same merge-one-
+// day-at-a-time endpoints) — the one difference is the full-Wednesday-grade
+// exemption: those grades never get Wellness on Wednesday at any scope (see
+// SchedulingConstants::resolveWellnessBlock()), so the popover doesn't open
+// for that specific grade+day combination.
+const WELLNESS_SUFFIX_BY_DAY = { Monday: 'mon', Tuesday: 'tue', Wednesday: 'wed', Thursday: 'thu', Friday: 'fri' }
+
+const wellnessPopover = ref(null)
+const wellnessEl = ref(null)
+
+const wellnessHasCurrentOverride = computed(() => {
+  const p = wellnessPopover.value
+  if (!p) return false
+  const current = p.scope === 'section' ? p.sectionOverride : p.scope === 'grade' ? p.gradeOverride : p.campusOverride
+  return !!current
+})
+
+function openWellnessPopover(e, groupId, band, day) {
+  if (blockedSaving.value) return
+  const isSectionView = viewBy.value === 'section'
+  const grade = singleGradeFor(groupId)
+  if (grade === null || grade === undefined) return
+
+  if (day === 'Wednesday' && props.wednesdayFullGrades.includes(grade)) {
+    Swal.fire({
+      icon: 'info', title: 'Not available',
+      text: `Grade ${grade} runs a full Wednesday schedule and never has a Wellness block that day.`,
+      timer: 2200, showConfirmButton: false,
+    })
+    return
+  }
+
+  const sectionId = isSectionView ? groupId : null
+  const suffix = WELLNESS_SUFFIX_BY_DAY[day]
+  const section = sectionId ? props.sections.find(s => s.id === sectionId) : null
+
+  const sectionOverride = (section?.[`wellness_start_${suffix}`] && section?.[`wellness_end_${suffix}`])
+    ? { start: section[`wellness_start_${suffix}`].slice(0, 5), end: section[`wellness_end_${suffix}`].slice(0, 5) }
+    : null
+  const gradeOverride = props.wellnessByGrade?.[grade]?.[day] ?? null
+  const campusOverride = props.wellnessCampus?.[day] ?? null
+
+  let scope
+  if (isSectionView && sectionOverride) scope = 'section'
+  else if (gradeOverride) scope = 'grade'
+  else if (campusOverride) scope = 'campus'
+  else scope = isSectionView ? 'section' : 'grade'
+
+  const current = scope === 'section' ? sectionOverride : scope === 'grade' ? gradeOverride : campusOverride
+
+  const W = 320, H = 320
+  wellnessPopover.value = {
+    x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
+    y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
+    groupId, sectionId, grade, day,
+    isSectionView,
+    sectionName: isSectionView ? groupHeaderInfo(groupId).section_name : null,
+    scope,
+    start: current?.start ?? (band?.start ?? ''),
+    end:   current?.end   ?? (band?.end   ?? ''),
+    sectionOverride, gradeOverride, campusOverride,
+    saving: false,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownWellness, true)
+  window.addEventListener('keydown', onWellnessKeydown)
+}
+
+function closeWellnessPopover() {
+  wellnessPopover.value = null
+  window.removeEventListener('mousedown', onWindowMouseDownWellness, true)
+  window.removeEventListener('keydown', onWellnessKeydown)
+}
+
+function onWindowMouseDownWellness(e) {
+  if (wellnessEl.value && wellnessEl.value.contains(e.target)) return
+  closeWellnessPopover()
+}
+
+function onWellnessKeydown(e) {
+  if (e.key === 'Escape') closeWellnessPopover()
+}
+
+function onWellnessScopeChange(scope) {
+  const p = wellnessPopover.value
+  if (!p) return
+  const current = scope === 'section' ? p.sectionOverride : scope === 'grade' ? p.gradeOverride : p.campusOverride
+  p.start = current?.start ?? ''
+  p.end   = current?.end   ?? ''
+}
+
+async function saveWellnessPopover(clear = false) {
+  const p = wellnessPopover.value
+  if (!p) return
+  p.saving = true
+  try {
+    if (p.scope === 'section') {
+      const suffix = WELLNESS_SUFFIX_BY_DAY[p.day]
+      await axios.patch(route('faculty-loading.sections.wellness', { section: p.sectionId, day: p.day }), {
+        [`wellness_start_${suffix}`]: clear ? '' : p.start,
+        [`wellness_end_${suffix}`]:   clear ? '' : p.end,
+      })
+    } else if (p.scope === 'grade') {
+      await axios.patch(route('faculty-loading.bell-schedule.wellness.grade', { grade: p.grade, day: p.day }), {
+        start: clear ? null : p.start,
+        end:   clear ? null : p.end,
+      })
+    } else {
+      await axios.patch(route('faculty-loading.bell-schedule.wellness.campus', { day: p.day }), {
+        start: clear ? null : p.start,
+        end:   clear ? null : p.end,
+      })
+    }
+    closeWellnessPopover()
+    await router.reload({ only: ['dayConfigsBySection', 'dayConfigsByGrade', 'sections', 'wellnessByGrade', 'wellnessCampus'], preserveScroll: true })
+    Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
+  } finally {
+    if (wellnessPopover.value) wellnessPopover.value.saving = false
   }
 }
 
