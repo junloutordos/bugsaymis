@@ -117,6 +117,9 @@
                   <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
                     {{ bp.label }}
                   </span>
+                  <span v-if="bp.adviser_name" class="block truncate text-[10px] font-semibold text-slate-500">
+                    Adviser: {{ bp.adviser_name }}
+                  </span>
                   <span :class="['block tabular-nums opacity-80', blockedDurationMin(bp) >= 40 ? 'text-[10px]' : 'text-[9px]']">
                     {{ fmtTimeRange(bp.start, bp.end) }}
                   </span>

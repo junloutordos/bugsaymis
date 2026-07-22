@@ -1623,9 +1623,18 @@ function dayConfigFor(groupId, day) {
   if (viewBy.value === 'section') {
     const base = props.dayConfigsBySection?.[groupId]?.[day] ?? props.dayConfigsByGrade?.[grade]?.[day]
     if (!base) return base
+    const adviserName = sectionAdviserName(groupId)
     return {
       ...base,
-      blocked: (base.blocked ?? []).map(b => (b.type === 'LUNCH' || b.type === 'RECESS') ? { ...b, sectionEditable: groupId } : b),
+      blocked: (base.blocked ?? []).map(b => {
+        if (b.type === 'LUNCH' || b.type === 'RECESS') {
+          return { ...b, sectionEditable: groupId }
+        }
+        if ((b.type === 'HOMEROOM' || b.type === 'ADVISING') && adviserName) {
+          return { ...b, adviser_name: adviserName }
+        }
+        return b
+      }),
     }
   }
 

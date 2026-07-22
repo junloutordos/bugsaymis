@@ -54,6 +54,9 @@
                   :style="rangeStyle(blocked.start, blocked.end)"
                 >
                   <span>{{ blocked.label }}</span>
+                  <span v-if="isAdvisoryBand(blocked)" class="schedule-print-blocked-adviser">
+                    Adviser: {{ owner.adviser_name }}
+                  </span>
                   <span class="schedule-print-blocked-time">{{ formatTimeRange(blocked.start, blocked.end) }}</span>
                 </div>
                 <div
@@ -225,6 +228,12 @@ function rangeStyle(start, end) {
 
 function durationMinutes(entry) {
   return timeToMinutes(entry.end_time) - timeToMinutes(entry.start_time)
+}
+
+function isAdvisoryBand(blocked) {
+  return props.scheduleType === 'section'
+    && !!props.owner.adviser_name
+    && (blocked.type === 'HOMEROOM' || blocked.type === 'ADVISING')
 }
 
 function formatHour(minutes) {
@@ -564,6 +573,19 @@ function lunchTimeLabel(day) {
   text-transform: none;
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
+}
+
+.schedule-print-blocked-adviser {
+  flex-basis: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 0.5mm;
+  font-size: 5pt;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .schedule-print-no-classes {

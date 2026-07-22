@@ -597,6 +597,45 @@ class FacultyLoadingHttpTest extends TestCase
                 ->where('sections.1.id', $grade8->id));
     }
 
+    public function test_schedule_index_includes_assigned_advisers_for_lower_and_upper_grade_sections(): void
+    {
+        $lowerAdviser = User::factory()->create(['email_verified_at' => now()]);
+        $upperAdviser = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $grade7 = $this->makeSection($sy, ['levelid' => 7, 'sectionname' => 'Aquamarine']);
+        $grade12 = $this->makeSection($sy, ['levelid' => 12, 'sectionname' => 'Electron']);
+
+        $this->assignDesignation(
+            $lowerAdviser,
+            $sy,
+            $term,
+            'HR_ADV',
+            'HRA-G7-AQUAMARINE',
+            'HR Adviser — G7 Aquamarine',
+            $grade7,
+        );
+        $this->assignDesignation(
+            $upperAdviser,
+            $sy,
+            $term,
+            'HR_ACAD',
+            'HAC-G12-ELECTRON',
+            'HR/Academic Adviser — G12 Electron',
+            $grade12,
+        );
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.schedules.index', ['term_id' => $term->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sections', 2)
+                ->where('sections.0.id', $grade7->id)
+                ->where('sections.0.adviser_name', $lowerAdviser->name)
+                ->where('sections.1.id', $grade12->id)
+                ->where('sections.1.adviser_name', $upperAdviser->name));
+    }
+
     public function test_unrecognized_coordinator_designation_does_not_grant_schedule_access(): void
     {
         $coordinator = User::factory()->create(['email_verified_at' => now()]);
