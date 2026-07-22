@@ -44,14 +44,24 @@
             <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
               {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
             </span>
-            <button v-if="blockedEditable" type="button"
-              :aria-label="`Set White Space for ${day}`"
-              title="Set White Space for this day"
-              class="mt-1 inline-flex min-h-7 items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700 hover:border-violet-300 hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-1 print:hidden"
-              @click.stop="$emit('add-white-space', day, $event)">
-              <PlusIcon class="h-3 w-3" />
-              <span>White Space</span>
-            </button>
+            <div v-if="blockedEditable" class="mt-1 flex items-center justify-center gap-1 flex-wrap">
+              <button type="button"
+                :aria-label="`Set White Space for ${day}`"
+                title="Set White Space for this day"
+                class="inline-flex min-h-7 items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700 hover:border-violet-300 hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-1 print:hidden"
+                @click.stop="$emit('add-white-space', day, $event)">
+                <PlusIcon class="h-3 w-3" />
+                <span>White Space</span>
+              </button>
+              <button type="button"
+                :aria-label="`Edit Consultation / Home Bound for ${day}`"
+                title="Edit Consultation / Home Bound for this day"
+                class="inline-flex min-h-7 items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-semibold text-sky-700 hover:border-sky-300 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-1 print:hidden"
+                @click.stop="$emit('edit-consultation', day, $event)">
+                <ClockIcon class="h-3 w-3" />
+                <span>Consultation</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -120,8 +130,12 @@
                     : 'pointer-events-none']"
                 @mousedown="onBandMouseDown(day, bp, $event)"
                 @click.stop="isBandClickable(bp) && $emit('blocked-click', day, bp, $event)">
-                <div :class="['absolute inset-0', bp.type === 'WHITE_SPACE' ? 'bg-violet-50/80 border border-violet-200' : 'bg-slate-100/70']" />
-                <span :class="['relative w-full font-medium px-1 text-center leading-tight select-none', bp.type === 'WHITE_SPACE' ? 'text-violet-600' : 'text-slate-400']">
+                <div :class="['absolute inset-0',
+                  bp.type === 'WHITE_SPACE' ? 'bg-violet-50/80 border border-violet-200'
+                    : bp.type === 'CONSULT' ? 'bg-sky-50/80 border border-sky-200'
+                    : 'bg-slate-100/70']" />
+                <span :class="['relative w-full font-medium px-1 text-center leading-tight select-none',
+                  bp.type === 'WHITE_SPACE' ? 'text-violet-600' : bp.type === 'CONSULT' ? 'text-sky-600' : 'text-slate-400']">
                   <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
                     {{ bp.label }}
                   </span>
@@ -264,7 +278,7 @@
 import { onBeforeUnmount, onMounted, ref, computed } from 'vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import {
-  ArrowsPointingInIcon, ArrowsPointingOutIcon, LockClosedIcon, PlusIcon, PrinterIcon, XMarkIcon,
+  ArrowsPointingInIcon, ArrowsPointingOutIcon, ClockIcon, LockClosedIcon, PlusIcon, PrinterIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -297,15 +311,20 @@ const props = defineProps({
 
 const emit = defineEmits([
   'column-mousedown', 'column-dragover', 'column-drop', 'event-dragstart', 'event-dragend', 'event-click', 'event-remove',
-  'blocked-mousedown', 'blocked-click', 'add-white-space',
+  'blocked-mousedown', 'blocked-click', 'add-white-space', 'edit-consultation',
 ])
 
 /** Move/resize-draggable: a literal timetable row or a single-window setting.
  *  A section-scoped Lunch band (bp.sectionEditable) opts out of the
  *  grade-wide drag — dragging it here would silently move every other
- *  section's lunch too, which defeats the point of a per-section override. */
+ *  section's lunch too, which defeats the point of a per-section override.
+ *  CONSULT is excluded too — dragging it here only ever moves that one row,
+ *  which either gets rejected as an overlap with the previous period (moving
+ *  it earlier) or silently disagrees with the display-trimmed band on Wed/Fri
+ *  (see the dedicated "Consultation" button instead, which handles both). */
 function isBandDraggable(bp) {
-  return props.blockedEditable && !bp.sectionEditable && (bp.write?.kind === 'timetable' || bp.write?.kind === 'setting')
+  return props.blockedEditable && !bp.sectionEditable && bp.type !== 'CONSULT'
+    && (bp.write?.kind === 'timetable' || bp.write?.kind === 'setting')
 }
 
 /** Click-to-edit: composite bands (e.g. ACTIVITY) that can't be reduced to one
@@ -313,9 +332,10 @@ function isBandDraggable(bp) {
  *  White Space is always clickable when editable — it has no literal timetable
  *  row to drag, and (unlike Lunch/Recess) may be showing a grade-wide or
  *  campus-wide value rather than a section override, so it isn't always
- *  tagged sectionEditable. */
+ *  tagged sectionEditable. CONSULT opens the same dedicated editor as the
+ *  header's "Consultation" button, for the days it happens to still render on. */
 function isBandClickable(bp) {
-  return props.blockedEditable && (bp.write?.kind === 'activity' || !!bp.sectionEditable || bp.type === 'WHITE_SPACE')
+  return props.blockedEditable && (bp.write?.kind === 'activity' || !!bp.sectionEditable || bp.type === 'WHITE_SPACE' || bp.type === 'CONSULT')
 }
 
 /** Stops the mousedown from also triggering the day column's own

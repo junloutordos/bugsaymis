@@ -209,7 +209,8 @@
                 @event-remove="onEventRemove"
                 @blocked-mousedown="(day, band, edge, e) => onBlockedMouseDown(e, groupId, day, band, edge)"
                 @blocked-click="(day, band, e) => onBlockedClick(e, groupId, day, band)"
-                @add-white-space="(day, e) => openWhiteSpacePopover(e, groupId, null, day)">
+                @add-white-space="(day, e) => openWhiteSpacePopover(e, groupId, null, day)"
+                @edit-consultation="(day, e) => openConsultationPopover(e, groupId, day)">
 
                 <template #header-actions>
                   <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
@@ -766,6 +767,45 @@
         </button>
         <span v-else />
         <AppButton size="sm" :loading="whiteSpacePopover.saving" @click="saveWhiteSpacePopover(false)">Save</AppButton>
+      </div>
+    </div>
+
+    <!-- Consultation / Home Bound popover — edits the literal bell-schedule
+         row directly (not the calendar's display-trimmed band, which can
+         differ from the stored row on Wed/Fri), and auto-shrinks the
+         adjacent period if the new start would otherwise overlap it. -->
+    <div v-if="consultationPopover" ref="consultationEl"
+      class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
+      :style="{ left: consultationPopover.x + 'px', top: consultationPopover.y + 'px' }">
+
+      <div class="flex items-center justify-between px-4 pt-3 pb-2">
+        <span class="text-sm font-semibold text-slate-800">
+          Consultation / Home Bound — {{ consultationPopover.day }}
+        </span>
+        <button type="button" class="text-slate-400 hover:text-slate-600 p-0.5" @click="closeConsultationPopover">
+          <XMarkIcon class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="px-4 pb-3 space-y-3">
+        <p class="text-xs text-slate-500">
+          Applies to every Grade {{ consultationPopover.grade }} section on {{ consultationPopover.day }}.
+        </p>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Time</label>
+          <div class="flex items-center gap-2">
+            <input v-model="consultationPopover.start" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+            <span class="text-slate-400 text-xs">to</span>
+            <input v-model="consultationPopover.end" type="time"
+              class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end px-4 py-3 border-t border-slate-100">
+        <AppButton size="sm" :loading="consultationPopover.saving" @click="saveConsultationPopover">Save</AppButton>
       </div>
     </div>
 
@@ -1999,6 +2039,11 @@ function onBlockedClick(e, groupId, day, band) {
     return
   }
 
+  if (band.type === 'CONSULT') {
+    openConsultationPopover(e, groupId, day)
+    return
+  }
+
   if (band.sectionEditable) {
     if (band.type === 'RECESS') {
       openSectionRecessPopover(e, groupId, band, day)
@@ -2326,6 +2371,116 @@ async function saveWhiteSpacePopover(clear = false) {
     Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
   } finally {
     if (whiteSpacePopover.value) whiteSpacePopover.value.saving = false
+  }
+}
+
+// ── Consultation / Home Bound popover ─────────────────────────────────────────
+// Reads and writes the literal bell-schedule row directly (bellScheduleTimetables),
+// bypassing the calendar's display-trimmed band entirely — that trim (against
+// the Wednesday ALP window and Friday Flag Retreat window) can hide the band
+// completely (Wednesday) or shorten its displayed end time (Friday) so it no
+// longer matches the stored row, which is what made the old drag-to-resize
+// interaction unreliable for this specific band. Mirrors SchedulingConstants::
+// timetableKeyFor() so the right raw timetable can be looked up client-side.
+function timetableKeyFor(grade, day) {
+  if (day === 'Monday') {
+    if (grade === 7)  return 'MONDAY_G7G8'
+    if (grade === 8)  return 'MONDAY_G8'
+    if (grade === 9)  return 'MONDAY_G9'
+    if (grade === 10) return 'MONDAY_G9G10'
+    return 'MONDAY_G11G12'
+  }
+  if (grade <= 8)  return 'TUEFRI_730_G7G8'
+  if (grade <= 10) return 'TUEFRI_730_G9G10'
+  return 'TUEFRI_730_G11G12'
+}
+
+const consultationPopover = ref(null)
+const consultationEl = ref(null)
+
+function openConsultationPopover(e, groupId, day) {
+  if (blockedSaving.value) return
+  const grade = singleGradeFor(groupId)
+  if (grade === null || grade === undefined) return
+
+  const key = timetableKeyFor(grade, day)
+  const rows = props.bellScheduleTimetables?.[key] ?? []
+  const consultRow = rows.find(r => r.type === 'CONSULT')
+  if (!consultRow) return
+
+  const W = 300, H = 240
+  consultationPopover.value = {
+    x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
+    y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
+    grade, day, key,
+    start: consultRow.start,
+    end: consultRow.end,
+    saving: false,
+  }
+  window.addEventListener('mousedown', onWindowMouseDownConsultation, true)
+  window.addEventListener('keydown', onConsultationKeydown)
+}
+
+function closeConsultationPopover() {
+  consultationPopover.value = null
+  window.removeEventListener('mousedown', onWindowMouseDownConsultation, true)
+  window.removeEventListener('keydown', onConsultationKeydown)
+}
+
+function onWindowMouseDownConsultation(e) {
+  if (consultationEl.value && consultationEl.value.contains(e.target)) return
+  closeConsultationPopover()
+}
+
+function onConsultationKeydown(e) {
+  if (e.key === 'Escape') closeConsultationPopover()
+}
+
+async function saveConsultationPopover() {
+  const p = consultationPopover.value
+  if (!p) return
+
+  const rows = (props.bellScheduleTimetables?.[p.key] ?? []).map(r => ({ ...r }))
+  const idx = rows.findIndex(r => r.type === 'CONSULT')
+  if (idx === -1) {
+    Swal.fire('Could not save', 'Could not locate the Consultation/Home Bound row — please refresh and try again.', 'error')
+    return
+  }
+
+  // The row immediately before Consultation (normally the last class period) —
+  // if moving Consultation's start earlier would now overlap it, shrink that
+  // row's end to match rather than let the save get rejected as an overlap.
+  const prevIdx = idx - 1
+  const willShrinkPrev = prevIdx >= 0 && rows[prevIdx].end > p.start
+  const html = `This changes <b>Grade ${p.grade}'s ${p.day}</b> schedule for <b>every section</b> — `
+    + `future generations only, already-placed classes won't move.<br><br>`
+    + `New time: <b>${p.start}–${p.end}</b>`
+    + (willShrinkPrev
+        ? `<br><br>This will also change <b>${rows[prevIdx].label}</b> to end at <b>${p.start}</b> `
+          + `(it currently runs until ${rows[prevIdx].end}).`
+        : '')
+
+  const confirmed = await Swal.fire({
+    title: 'Move Consultation / Home Bound?', html,
+    icon: 'warning', showCancelButton: true, confirmButtonText: 'Save',
+  })
+  if (!confirmed.isConfirmed) return
+
+  if (willShrinkPrev) {
+    rows[prevIdx] = { ...rows[prevIdx], end: p.start }
+  }
+  rows[idx] = { ...rows[idx], start: p.start, end: p.end }
+
+  p.saving = true
+  try {
+    await axios.post(route('faculty-loading.bell-schedule.update'), { timetable_key: p.key, rows })
+    closeConsultationPopover()
+    await router.reload({ only: ['dayConfigsByGrade', 'bellScheduleTimetables'], preserveScroll: true })
+    Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
+  } finally {
+    if (consultationPopover.value) consultationPopover.value.saving = false
   }
 }
 
