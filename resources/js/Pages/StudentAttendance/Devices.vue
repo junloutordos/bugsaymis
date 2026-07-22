@@ -38,7 +38,7 @@ function toggleGuard(guard) {
 }
 
 function revoke(device) {
-  if (!window.confirm(`Revoke camera scanning access for ${device.name}?`)) return
+  if (!window.confirm(`Revoke attendance scanning access for ${device.name}?`)) return
   router.post(route('student-attendance.devices.revoke', device.id), {}, { preserveScroll: true })
 }
 
@@ -60,18 +60,19 @@ function eventColor(event) {
   <AdminLayout title="Gate Attendance Devices">
     <div class="space-y-5">
       <AppPageHeader
-        title="Registered Gate iPads"
-        subtitle="Review gate assignments and revoke kiosk access. New iPads are paired from the kiosk page."
+        title="Registered Gate Devices"
+        subtitle="Review scanner types and gate assignments or revoke kiosk access. New devices are paired from the kiosk page."
       >
         <template #actions>
           <AppButton as="a" :href="route('student-attendance.kiosk')">Open Kiosk</AppButton>
         </template>
       </AppPageHeader>
 
-      <AppTable :is-empty="!devices.length" :skeleton-cols="6">
+      <AppTable :is-empty="!devices.length" :skeleton-cols="7">
         <template #head>
           <tr>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Device</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Mode</th>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Gate</th>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Paired By</th>
@@ -82,6 +83,7 @@ function eventColor(event) {
 
         <tr v-for="device in devices" :key="device.id">
           <td class="px-4 py-3 font-medium text-slate-800">{{ device.name }}</td>
+          <td class="px-4 py-3"><AppBadge :color="device.device_mode === 'student_self_scan' ? 'blue' : 'indigo'">{{ device.device_mode_label }}</AppBadge></td>
           <td class="px-4 py-3 text-slate-600">{{ device.gate_label }}</td>
           <td class="px-4 py-3">
             <AppBadge :color="device.is_active ? 'green' : 'slate'">{{ device.is_active ? 'Active' : 'Revoked' }}</AppBadge>
@@ -94,7 +96,7 @@ function eventColor(event) {
         </tr>
 
         <template #empty>
-          <EmptyState title="No registered gate iPads" description="Open the kiosk on an iPad as an Administrator to pair it." />
+          <EmptyState title="No registered gate devices" description="Open the kiosk on the device as an Administrator to pair it." />
         </template>
       </AppTable>
 

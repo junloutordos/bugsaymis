@@ -28,6 +28,8 @@ class DeviceController extends Controller
                     'name' => $device->name,
                     'gate_location' => $device->gate_location,
                     'gate_label' => config("student_attendance.gate_locations.{$device->gate_location}", $device->gate_location),
+                    'device_mode' => $device->device_mode,
+                    'device_mode_label' => $device->isStudentSelfScan() ? 'Student Self-Scan' : 'Guard Camera',
                     'is_active' => $device->is_active,
                     'paired_by' => $device->pairedBy?->name,
                     'last_seen_at' => $device->last_seen_at?->toIso8601String(),
@@ -69,28 +71,36 @@ class DeviceController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'gate_location' => ['required', Rule::in(array_keys(config('student_attendance.gate_locations', [])))],
+            'device_mode' => ['sometimes', Rule::in([
+                StudentAttendanceDevice::MODE_GUARD_CAMERA,
+                StudentAttendanceDevice::MODE_STUDENT_SELF_SCAN,
+            ])],
         ]);
 
         $token = Str::random(80);
 
         $device = StudentAttendanceDevice::create([
             ...$validated,
+            'device_mode' => $validated['device_mode'] ?? StudentAttendanceDevice::MODE_GUARD_CAMERA,
             'token_hash' => hash('sha256', $token),
             'paired_by' => $request->user()->id,
         ]);
 
         AuditLogger::log([
-            'action' => 'admin.guard_device.paired',
+            'action' => $device->isStudentSelfScan()
+                ? 'admin.self_scan_device.paired'
+                : 'admin.guard_device.paired',
             'auditable_type' => StudentAttendanceDevice::class,
             'auditable_id' => $device->id,
             'new_values' => [
                 'name' => $device->name,
                 'gate_location' => $device->gate_location,
+                'device_mode' => $device->device_mode,
             ],
         ]);
 
         return back()
-            ->with('success', 'This iPad is now registered for gate attendance.')
+            ->with('success', 'This device is now registered for gate attendance.')
             ->withCookie(cookie(
                 EnsureStudentAttendanceDevice::COOKIE,
                 $token,
@@ -109,12 +119,15 @@ class DeviceController extends Controller
         $device->update(['is_active' => false]);
 
         AuditLogger::log([
-            'action' => 'admin.guard_device.revoked',
+            'action' => $device->isStudentSelfScan()
+                ? 'admin.self_scan_device.revoked'
+                : 'admin.guard_device.revoked',
             'auditable_type' => StudentAttendanceDevice::class,
             'auditable_id' => $device->id,
             'new_values' => [
                 'name' => $device->name,
                 'gate_location' => $device->gate_location,
+                'device_mode' => $device->device_mode,
                 'is_active' => false,
             ],
         ]);

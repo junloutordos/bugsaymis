@@ -18,7 +18,7 @@ class AttendanceScanService
         string $scanUuid,
         ?Carbon $deviceScanTime,
         StudentAttendanceDevice $device,
-        User $operator,
+        ?User $operator,
         string $captureMethod = 'camera',
     ): array {
         $student = DB::table('students')->where('pisaysystemID', $barcode)->first();
@@ -83,7 +83,7 @@ class AttendanceScanService
                 'type' => $type,
                 'source' => $captureMethod === 'manual' ? 'manual' : 'gate_scanner',
                 'gate_location' => $device->gate_location,
-                'recorded_by' => $operator->id,
+                'recorded_by' => $operator?->id,
                 'kiosk_device_id' => $device->id,
                 'scan_uuid' => $scanUuid,
                 'device_scan_time' => $deviceScanTime,

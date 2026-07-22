@@ -2190,44 +2190,47 @@ Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->grou
 
 // ── Student Attendance Module ──────────────────────────────────────────────────
 
-// Camera kiosk: registered iPad + restricted guard PIN session (or Administrator login).
+// Dual-mode kiosk: student self-scan terminals and guard camera iPads are paired separately.
 Route::prefix('student-attendance')->name('student-attendance.')->group(function () {
     Route::get('/kiosk', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'index'])
         ->name('kiosk');
     Route::post('/kiosk/unlock', [\App\Http\Controllers\StudentAttendance\KioskAccessController::class, 'unlock'])
-        ->middleware('attendance.device')
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera'])
         ->name('kiosk.unlock');
     Route::post('/kiosk/lock', [\App\Http\Controllers\StudentAttendance\KioskAccessController::class, 'lock'])
-        ->middleware('attendance.device')
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera'])
         ->name('kiosk.lock');
     Route::post('/scan', [\App\Http\Controllers\StudentAttendance\ScanController::class, 'scan'])
-        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-scan'])
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera', 'attendance.scanner', 'throttle:student-attendance-scan'])
         ->name('scan');
+    Route::post('/self-scan', [\App\Http\Controllers\StudentAttendance\ScanController::class, 'selfScan'])
+        ->middleware(['attendance.device', 'attendance.device-mode:student_self_scan', 'throttle:student-attendance-scan'])
+        ->name('self-scan');
     Route::get('/kiosk/status', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'status'])
-        ->middleware(['attendance.device', 'attendance.scanner'])
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera', 'attendance.scanner'])
         ->name('kiosk.status');
     Route::get('/student/{id}/photo', [\App\Http\Controllers\StudentController::class, 'proxyPhoto'])
         ->whereNumber('id')
-        ->middleware(['attendance.device', 'attendance.scanner'])
+        ->middleware(['attendance.device', 'attendance.photo'])
         ->name('student.photo');
     Route::get('/directory/search', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'search'])
-        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-directory'])
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera', 'attendance.scanner', 'throttle:student-attendance-directory'])
         ->name('directory.search');
     Route::get('/directory/students/{student}', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'student'])
         ->whereNumber('student')
-        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-directory'])
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera', 'attendance.scanner', 'throttle:student-attendance-directory'])
         ->name('directory.students.show');
     Route::post('/directory/students/{student}/reveal-contacts', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'revealContacts'])
         ->whereNumber('student')
-        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-contact-reveal'])
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera', 'attendance.scanner', 'throttle:student-attendance-contact-reveal'])
         ->name('directory.students.contacts');
     Route::get('/directory/employees/{employee}', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'employee'])
         ->whereNumber('employee')
-        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-directory'])
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera', 'attendance.scanner', 'throttle:student-attendance-directory'])
         ->name('directory.employees.show');
     Route::get('/directory/employees/{employee}/photo', [\App\Http\Controllers\StudentAttendance\GuardDirectoryController::class, 'employeePhoto'])
         ->whereNumber('employee')
-        ->middleware(['attendance.device', 'attendance.scanner'])
+        ->middleware(['attendance.device', 'attendance.device-mode:guard_camera', 'attendance.scanner'])
         ->name('employee.photo');
 });
 

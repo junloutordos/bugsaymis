@@ -22,7 +22,7 @@ class KioskController extends Controller
             $request->cookie(EnsureStudentAttendanceDevice::COOKIE)
         );
 
-        $operator = $device
+        $operator = $device?->isGuardCamera()
             ? $this->accessService->currentOperator($request, $device)
             : null;
 
@@ -33,6 +33,7 @@ class KioskController extends Controller
                 'name' => $device->name,
                 'gate_location' => $device->gate_location,
                 'gate_label' => config("student_attendance.gate_locations.{$device->gate_location}", $device->gate_location),
+                'device_mode' => $device->device_mode,
             ] : null,
             'canPairDevice' => $request->user()?->isSuperAdmin() ?? false,
             'operator' => $operator ? [
@@ -40,7 +41,7 @@ class KioskController extends Controller
                 'name' => $operator->name,
                 'is_administrator' => $operator->isSuperAdmin(),
             ] : null,
-            'guards' => $device && ! $operator
+            'guards' => $device?->isGuardCamera() && ! $operator
                 ? StudentAttendanceKioskOperator::where('is_active', true)
                     ->whereHas('user', fn ($query) => $query
                         ->where(fn ($statusQuery) => $statusQuery

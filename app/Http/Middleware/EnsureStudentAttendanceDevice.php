@@ -17,7 +17,7 @@ class EnsureStudentAttendanceDevice
         $device = StudentAttendanceDevice::resolveToken($token);
 
         if (! $device) {
-            abort(403, 'This iPad is not registered as an active attendance kiosk.');
+            abort(403, 'This device is not registered as an active attendance kiosk.');
         }
 
         $request->attributes->set('studentAttendanceDevice', $device);

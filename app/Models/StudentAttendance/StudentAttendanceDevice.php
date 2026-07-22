@@ -9,9 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StudentAttendanceDevice extends Model
 {
+    public const MODE_GUARD_CAMERA = 'guard_camera';
+
+    public const MODE_STUDENT_SELF_SCAN = 'student_self_scan';
+
     protected $fillable = [
         'name',
         'gate_location',
+        'device_mode',
         'token_hash',
         'is_active',
         'paired_by',
@@ -44,5 +49,15 @@ class StudentAttendanceDevice extends Model
         return static::where('token_hash', hash('sha256', $token))
             ->where('is_active', true)
             ->first();
+    }
+
+    public function isGuardCamera(): bool
+    {
+        return $this->device_mode === self::MODE_GUARD_CAMERA;
+    }
+
+    public function isStudentSelfScan(): bool
+    {
+        return $this->device_mode === self::MODE_STUDENT_SELF_SCAN;
     }
 }

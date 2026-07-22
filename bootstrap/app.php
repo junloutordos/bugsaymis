@@ -34,6 +34,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'student.portal'=> \App\Http\Middleware\StudentPortalMiddleware::class,
             'ict-agent'     => \App\Http\Middleware\EnsureAtlasSentinelDevice::class,
             'attendance.device' => \App\Http\Middleware\EnsureStudentAttendanceDevice::class,
+            'attendance.device-mode' => \App\Http\Middleware\EnsureStudentAttendanceDeviceMode::class,
+            'attendance.photo' => \App\Http\Middleware\EnsureStudentAttendancePhotoAccess::class,
             'attendance.scanner' => \App\Http\Middleware\EnsureStudentAttendanceScannerAccess::class,
         ]);
     })

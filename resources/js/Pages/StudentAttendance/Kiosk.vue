@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import { BarcodeFormat, BrowserMultiFormatReader } from '@zxing/browser'
+import StudentSelfScan from '@/Components/StudentAttendance/StudentSelfScan.vue'
 
 const props = defineProps({
   gateLocations: { type: Object, default: () => ({}) },
@@ -39,6 +40,7 @@ const contactsRevealed = ref(false)
 const pairForm = useForm({
   name: '',
   gate_location: Object.keys(props.gateLocations)[0] ?? '',
+  device_mode: 'guard_camera',
 })
 
 const reader = new BrowserMultiFormatReader(undefined, {
@@ -456,9 +458,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Head title="Gate Camera Scanner" />
+  <Head :title="device?.device_mode === 'student_self_scan' ? 'Student Gate Scanner' : 'Gate Camera Scanner'" />
 
-  <div class="kiosk-root">
+  <StudentSelfScan v-if="device?.device_mode === 'student_self_scan'" :device="device" />
+
+  <div v-else class="kiosk-root">
     <header class="kiosk-header">
       <div class="flex items-center gap-3">
         <img src="/images/pshslogo.png" alt="PSHS" class="h-11 w-11 object-contain" />
@@ -468,7 +472,7 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="text-right">
-        <p class="text-sm font-semibold text-white">{{ device?.gate_label ?? 'Unregistered iPad' }}</p>
+        <p class="text-sm font-semibold text-white">{{ device?.gate_label ?? 'Unregistered device' }}</p>
         <p class="text-xs" :class="online ? 'text-emerald-400' : 'text-red-400'">
           {{ online ? '● Online' : '● Offline' }}<span v-if="device"> · {{ device.name }}</span>
         </p>
@@ -500,15 +504,22 @@ onUnmounted(() => {
 
     <main v-if="!device" class="setup-panel">
       <div class="setup-card">
-        <h1 class="text-2xl font-bold text-white">This iPad is not registered</h1>
+        <h1 class="text-2xl font-bold text-white">This attendance device is not registered</h1>
         <p class="mt-2 text-sm text-slate-300">
-          An Administrator must pair this iPad with a fixed gate before camera scanning can start.
+          An Administrator must assign this device type and its fixed gate before scanning can start.
         </p>
 
         <form v-if="canPairDevice" class="mt-6 space-y-4" @submit.prevent="pairDevice">
           <label class="block text-sm text-slate-200">
             Device name
-            <input v-model="pairForm.name" required class="setup-input" placeholder="Main Gate iPad 1" />
+            <input v-model="pairForm.name" required class="setup-input" placeholder="Main Gate Scanner 1" />
+          </label>
+          <label class="block text-sm text-slate-200">
+            Device type
+            <select v-model="pairForm.device_mode" required class="setup-input">
+              <option value="guard_camera">Guard iPad — camera, PIN, and directory</option>
+              <option value="student_self_scan">Student Self-Scan — USB/Bluetooth scanner</option>
+            </select>
           </label>
           <label class="block text-sm text-slate-200">
             Assigned gate
@@ -518,7 +529,7 @@ onUnmounted(() => {
           </label>
           <p v-if="pairForm.hasErrors" class="text-sm text-red-300">Please correct the device information.</p>
           <button class="primary-button w-full" :disabled="pairForm.processing">
-            {{ pairForm.processing ? 'Registering…' : 'Register This iPad' }}
+            {{ pairForm.processing ? 'Registering…' : 'Register This Device' }}
           </button>
         </form>
 
