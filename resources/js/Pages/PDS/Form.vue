@@ -73,6 +73,27 @@ const tabs = [
   { id: 5, label: 'WES' },
 ]
 
+const tabForError = (key) => {
+  if (/^(personal_info|family_background|children|education)/.test(key)) return 1
+  if (/^(eligibility|work_experience)/.test(key)) return 2
+  if (/^(voluntary_work|trainings|skills_hobbies|non_academic_recognition|membership_organizations)/.test(key)) return 3
+  if (/^(questions|references|other_info)/.test(key)) return 4
+  if (key.startsWith('work_experience_sheets')) return 5
+  return 1
+}
+
+const formatErrorField = (key) => {
+  const parts = key.split('.')
+  const section = parts[0].replaceAll('_', ' ')
+  const rowIndex = /^\d+$/.test(parts[1] ?? '') ? Number(parts[1]) + 1 : null
+  const field = parts.slice(rowIndex ? 2 : 1).join(' ').replaceAll('_', ' ')
+
+  return [section, rowIndex ? `row ${rowIndex}` : null, field || null]
+    .filter(Boolean)
+    .join(' — ')
+    .replace(/^./, character => character.toUpperCase())
+}
+
 // 🔹 Edit mode
 const editMode = ref(!props.pds)
 
@@ -233,6 +254,17 @@ const form = useForm(
   }
 )
 
+const errorEntries = computed(() => Object.entries(form.errors).map(([key, message]) => ({
+  key,
+  message,
+  label: formatErrorField(key),
+  tab: tabForError(key),
+})))
+
+const hasErrorPrefix = (prefix) => Object.keys(form.errors).some(key => key === prefix || key.startsWith(`${prefix}.`))
+const hasRowError = (section, index) => hasErrorPrefix(`${section}.${index}`)
+const showError = (entry) => { activeTab.value = entry.tab }
+
 /* =========================
    WATCHERS
 ========================= */
@@ -333,20 +365,21 @@ const validatePersonalInfo = () => {
   const errors = {}
 
   const p = form.personal_info
+  if (p.mobile_no) p.mobile_no = String(p.mobile_no).replace(/\D+/g, '')
 
-  if (!p.surname) errors.surname = 'Surname is required'
-  if (!p.first_name) errors.first_name = 'First name is required'
+  if (!p.surname) errors['personal_info.surname'] = 'Surname is required'
+  if (!p.first_name) errors['personal_info.first_name'] = 'First name is required'
   if (!p.date_of_birth || !/^\d{4}-\d{2}-\d{2}$/.test(p.date_of_birth))
-    errors.date_of_birth = 'Valid date of birth required'
+    errors['personal_info.date_of_birth'] = 'Valid date of birth required'
   if (p.email_address && !/^\S+@\S+\.\S+$/.test(p.email_address))
-    errors.email_address = 'Email must be valid'
+    errors['personal_info.email_address'] = 'Email must be valid'
   if (!p.mobile_no || !/^\d{10,15}$/.test(p.mobile_no))
-    errors.mobile_no = 'Mobile number must be valid'
-  if (!p.citizenship_type) errors.citizenship_type = 'Select citizenship type'
+    errors['personal_info.mobile_no'] = 'Mobile number must be valid'
+  if (!p.citizenship_type) errors['personal_info.citizenship_type'] = 'Select citizenship type'
 
   if (p.citizenship_type === 'Dual') {
-    if (!p.citizenship_dual_type) errors.citizenship_dual_type = 'Dual type required'
-    if (!p.citizenship_dual_country) errors.citizenship_dual_country = 'Country required'
+    if (!p.citizenship_dual_type) errors['personal_info.citizenship_dual_type'] = 'Dual type required'
+    if (!p.citizenship_dual_country) errors['personal_info.citizenship_dual_country'] = 'Country required'
   }
 
   return errors
@@ -357,6 +390,7 @@ const submit = () => {
 
   if (Object.keys(errors).length > 0) {
     form.setError(errors) // sets errors in form.errors
+    activeTab.value = 1
 
     // Combine all error messages into one string
     const errorMessages = Object.values(errors).join('<br>')
@@ -378,6 +412,8 @@ const submit = () => {
         Swal.fire('Success', 'PDS updated successfully', 'success')
       },
       onError: (errors) => {
+        const firstKey = Object.keys(errors)[0]
+        if (firstKey) activeTab.value = tabForError(firstKey)
         const serverErrors = Object.values(errors).join('<br>')
         Swal.fire({
           icon: 'error',
@@ -394,6 +430,8 @@ const submit = () => {
         Swal.fire('Success', 'PDS saved successfully', 'success')
       },
       onError: (errors) => {
+        const firstKey = Object.keys(errors)[0]
+        if (firstKey) activeTab.value = tabForError(firstKey)
         const serverErrors = Object.values(errors).join('<br>')
         Swal.fire({
           icon: 'error',
@@ -538,6 +576,17 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
       <AppCard :padded="false">
         <div class="p-6">
 
+        <div v-if="errorEntries.length" class="pds-error-summary" role="alert">
+          <p class="font-semibold">Please correct the following before saving:</p>
+          <ul class="mt-2 space-y-1">
+            <li v-for="entry in errorEntries" :key="entry.key">
+              <button type="button" class="text-left hover:underline" @click="showError(entry)">
+                <span class="font-medium">{{ entry.label }}:</span> {{ entry.message }}
+              </button>
+            </li>
+          </ul>
+        </div>
+
         <!-- Tabs -->
         <div class="border-b border-slate-200 mb-6 flex gap-1">
           <button
@@ -553,7 +602,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <!-- ================= TAB 1 ================= -->
         <div v-show="activeTab === 1">
-          <section>
+          <section :class="{ 'pds-row-error': hasErrorPrefix('personal_info') }">
   <h2 class="font-semibold text-lg mb-4">I. Personal Information</h2>
 
   <!-- Name Fields -->
@@ -820,6 +869,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(child, index) in form.children"
             :key="index"
             class="grid grid-cols-[1fr_1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('children', index) }"
         >
             <input
             v-model="child.child_name"
@@ -873,6 +923,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(edu, index) in form.education"
             :key="index"
             class="grid grid-cols-[1fr_3fr_3fr_1fr_1fr_1fr_1fr_1fr] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('education', index) }"
         >
             <input
             v-model="edu.level"
@@ -978,6 +1029,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(elig, index) in form.eligibility"
             :key="index"
             class="grid grid-cols-[2fr_1fr_1fr_2fr_1fr_1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('eligibility', index) }"
         >
             <input v-model="elig.eligibility" placeholder="Eligibility" class="input" :readonly="!editMode" />
             <input v-model="elig.rating" placeholder="Rating" class="input" :readonly="!editMode" />
@@ -1023,6 +1075,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(work, index) in form.work_experience"
             :key="index"
             class="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('work_experience', index) }"
         >
             <input v-model="work.position" placeholder="Position" class="input" :readonly="!editMode" />
             <input v-model="work.agency" placeholder="Department" class="input" :readonly="!editMode" />    
@@ -1069,6 +1122,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(vol, index) in form.voluntary_work"
             :key="index"
             class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('voluntary_work', index) }"
         >
             <input v-model="vol.organization" placeholder="Organization" class="input" :readonly="!editMode" />
             <input v-model="vol.nature_of_work" placeholder="Position" class="input" :readonly="!editMode" />
@@ -1141,7 +1195,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         </div>
 
         <!-- Training Rows -->
-        <div v-for="(train, index) in form.trainings" :key="index" class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 items-center">
+        <div v-for="(train, index) in form.trainings" :key="index" class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 items-center" :class="{ 'pds-row-error': hasRowError('trainings', index) }">
           <input v-model="train.training_title" placeholder="Title" class="input" :readonly="!editMode" />
           <input type="date" v-model="train.date_from" class="input" :readonly="!editMode" />
           <input type="date" v-model="train.date_to" class="input" :readonly="!editMode" />
@@ -1174,6 +1228,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(skill, index) in form.skills_hobbies"
             :key="index"
             class="grid grid-cols-[1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('skills_hobbies', index) }"
         >
             <input v-model="skill.skills_hobbies" placeholder="Skill / Hobby" class="input" :readonly="!editMode" />
 
@@ -1204,6 +1259,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(recog, index) in form.non_academic_recognition"
             :key="index"
             class="grid grid-cols-[1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('non_academic_recognition', index) }"
         >
             <input v-model="recog.recognition" placeholder="Recognition" class="input" :readonly="!editMode" />
            
@@ -1234,6 +1290,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(org, index) in form.membership_organizations"
             :key="index"
             class="grid grid-cols-[1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('membership_organizations', index) }"
         >
             <input v-model="org.organization_name" placeholder="Organization Name" class="input" :readonly="!editMode" />
 
@@ -1525,6 +1582,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             v-for="(ref, index) in form.references"
             :key="index"
             class="grid grid-cols-[1fr_2fr_1fr_auto] gap-4 mb-2 items-center"
+            :class="{ 'pds-row-error': hasRowError('references', index) }"
         >
             <input
             v-model="ref.name"
@@ -1616,7 +1674,8 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
           <!-- Entries -->
           <div v-for="(wes, wi) in form.work_experience_sheets" :key="wi"
-            class="bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm">
+            class="bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm"
+            :class="{ 'pds-row-error': hasRowError('work_experience_sheets', wi) }">
 
             <!-- Entry header -->
             <div class="flex items-center justify-between">
@@ -1756,6 +1815,8 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
 <style scoped>
 .input { @apply rounded-lg border border-slate-200 bg-white px-3 py-2 w-full text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400; }
+.pds-error-summary { @apply mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700; }
+.pds-row-error { @apply rounded-lg ring-2 ring-red-300 ring-offset-2; }
 .btn-icon { @apply bg-indigo-600 p-2 rounded-lg flex items-center justify-center; }
 .btn-success { @apply bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors; }
 </style>

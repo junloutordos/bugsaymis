@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SavePdsRequest;
 use App\Models\Pds;
 use App\Models\PDSTraining;
 use App\Models\User;
@@ -12,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing;
@@ -85,54 +87,29 @@ class PDSController extends Controller
      | CREATE
      ===================================================== */
     public function create()
-{
-    $existing = Pds::where('user_id', auth()->id())->first();
-
-    if ($existing) {
-        return redirect()->route('pds.edit', $existing->id);
-    }
-
-    return Inertia::render('PDS/NewPDS');
-}
-    public function newpds(Request $request)
-{
-    // Prevent duplicate PDS per user (important)
-    $existing = Pds::where('user_id', auth()->id())->first();
-
-    if ($existing) {
-        return redirect()->route('pds.edit', $existing->id);
-    }
-
-    $pds = Pds::create([
-        'user_id' => auth()->id(),
-    ]);
-
-    return redirect()->route('pds.edit', $pds->id);
-}
-
-
-    /* =====================================================
-     | STORE
-     ===================================================== */
-    public function store(Request $request)
     {
-        try {
-            DB::transaction(function () use ($request) {
-                $pds = Pds::create([
-                    'user_id' => auth()->id(),
-                ]);
+        $existing = Pds::where('user_id', auth()->id())->first();
 
-                $this->saveRelations($pds, $request);
-                $pds->update(['submitted_at' => now()]);
-            });
-
-            return redirect()
-                ->route('pds.my')
-                ->with('success', 'Personal Data Sheet saved successfully!');
-        } catch (\Throwable $e) {
-            report($e);
-            return back()->withErrors(['pds' => 'Failed to save PDS. Please check your entries and try again.']);
+        if ($existing) {
+            return redirect()->route('pds.edit', $existing->id);
         }
+
+        return Inertia::render('PDS/NewPDS');
+    }
+
+    public function store()
+    {
+        $existing = Pds::where('user_id', auth()->id())->first();
+
+        if ($existing) {
+            return redirect()->route('pds.edit', $existing->id);
+        }
+
+        $pds = Pds::create([
+            'user_id' => auth()->id(),
+        ]);
+
+        return redirect()->route('pds.edit', $pds->id);
     }
 
     /* =====================================================
@@ -153,20 +130,32 @@ class PDSController extends Controller
     /* =====================================================
      | UPDATE
      ===================================================== */
-    public function update(Request $request, Pds $pds)
+    public function update(SavePdsRequest $request, Pds $pds)
     {
         $this->authorizeEdit($pds);
+        $validated = $request->validated();
 
         try {
-            DB::transaction(function () use ($request, $pds) {
-                $this->saveRelations($pds, $request, true);
+            DB::transaction(function () use ($validated, $pds) {
+                $this->saveRelations($pds, $validated, true);
                 $pds->update(['submitted_at' => now()]);
             });
 
             return back()->with('success', 'Personal Data Sheet updated successfully!');
         } catch (\Throwable $e) {
-            report($e);
-            return back()->withErrors(['pds' => 'Failed to update PDS. Please check your entries and try again.']);
+            $reference = (string) Str::uuid();
+
+            logger()->error('PDS update failed', [
+                'reference' => $reference,
+                'pds_id' => $pds->id,
+                'user_id' => $request->user()->id,
+                'exception_class' => $e::class,
+                'exception_code' => (string) $e->getCode(),
+            ]);
+
+            return back()->withErrors([
+                'pds' => "The PDS could not be updated. Please contact ICT and provide reference {$reference}.",
+            ]);
         }
     }
 
@@ -182,56 +171,49 @@ class PDSController extends Controller
     /* =====================================================
      | CENTRALIZED SAVE LOGIC
      ===================================================== */
-    private function saveRelations(Pds $pds, Request $request, bool $updating = false): void
-{
-    logger()->info('PDS PERSONAL INFO PAYLOAD', $request->input('personal_info'));
+    private function saveRelations(Pds $pds, array $data, bool $updating = false): void
+    {
+        /* ---------- PERSONAL INFO (handle citizenship) ---------- */
+        $personalInfo = $data['personal_info'];
+        $isFilipino = $personalInfo['citizenship_type'] === 'Filipino';
 
-    /* ---------- PERSONAL INFO (handle citizenship) ---------- */
-    /* ---------- PERSONAL INFO (handle citizenship) ---------- */
-    $personalInfo = $request->input('personal_info', []);
+        if ($isFilipino) {
+            $personalInfo['citizenship_filipino'] = 'Yes';
+            $personalInfo['citizenship_dual'] = 'No';
+            $personalInfo['citizenship_dual_type'] = null;
+            $personalInfo['citizenship_dual_country'] = null;
+        } else {
+            $personalInfo['citizenship_filipino'] = 'No';
+            $personalInfo['citizenship_dual'] = 'Yes';
+            $personalInfo['citizenship_dual_type'] = $personalInfo['citizenship_dual_type'] ?? null;
+            $personalInfo['citizenship_dual_country'] = $personalInfo['citizenship_dual_country'] ?? null;
+        }
 
-    $isFilipino = filter_var($personalInfo['citizenship_filipino'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        unset($personalInfo['citizenship_type']);
 
-    if ($isFilipino) {
-        $personalInfo['citizenship'] = 'Filipino';
-        $personalInfo['citizenship_filipino'] = 'Yes'; // store as string
-        $personalInfo['citizenship_dual'] = 'No';      // store as string
-        $personalInfo['citizenship_dual_type'] = null;
-        $personalInfo['citizenship_dual_country'] = null;
-    } else {
-        $personalInfo['citizenship'] = 'Dual/Other';
-        $personalInfo['citizenship_filipino'] = 'No'; // store as string
-        $personalInfo['citizenship_dual'] = 'Yes';    // store as string
-        $personalInfo['citizenship_dual_type'] = $personalInfo['citizenship_dual_type'] ?? null;
-        $personalInfo['citizenship_dual_country'] = $personalInfo['citizenship_dual_country'] ?? null;
+        $pds->personalInfo()->updateOrCreate(
+            ['pds_id' => $pds->id],
+            $personalInfo
+        );
+
+        /* ---------- ONE TO ONE RELATIONS ---------- */
+        $this->syncOne($pds, 'familyBackground', $data['family_background'] ?? []);
+        $this->syncOne($pds, 'questions', $data['questions'] ?? []);
+        $this->syncOne($pds, 'otherInfo', $data['other_info'] ?? []);
+
+        /* ---------- ONE TO MANY RELATIONS ---------- */
+        $this->syncMany($pds, 'children', $data['children'] ?? [], $updating);
+        $this->syncMany($pds, 'education', $data['education'] ?? [], $updating);
+        $this->syncMany($pds, 'eligibility', $data['eligibility'] ?? [], $updating);
+        $this->syncMany($pds, 'workExperience', $data['work_experience'] ?? [], $updating);
+        $this->syncMany($pds, 'voluntaryWork', $data['voluntary_work'] ?? [], $updating);
+        $this->syncMany($pds, 'trainings', $data['trainings'] ?? [], $updating);
+        $this->syncMany($pds, 'skillsHobbies', $data['skills_hobbies'] ?? [], $updating);
+        $this->syncMany($pds, 'nonAcademicRecognition', $data['non_academic_recognition'] ?? [], $updating);
+        $this->syncMany($pds, 'membershipOrganizations', $data['membership_organizations'] ?? [], $updating);
+        $this->syncMany($pds, 'references', $data['references'] ?? [], $updating);
+        $this->syncMany($pds, 'workExperienceSheets', $data['work_experience_sheets'] ?? [], $updating);
     }
-
-    $pds->personalInfo()->updateOrCreate(
-        ['pds_id' => $pds->id],
-        $personalInfo
-    );
-
-
-    /* ---------- ONE TO ONE RELATIONS ---------- */
-    $this->syncOne($pds, 'familyBackground', $request->input('family_background', []));
-    $this->syncOne($pds, 'questions', $request->input('questions', []));
-    $this->syncOne($pds, 'otherInfo', $request->input('other_info', []));
-
-    /* ---------- ONE TO MANY RELATIONS ---------- */
-    $this->syncMany($pds, 'children', $request->input('children', []), $updating);
-    $this->syncMany($pds, 'education', $request->input('education', []), $updating);
-    $this->syncMany($pds, 'eligibility', $request->input('eligibility', []), $updating);
-    $this->syncMany($pds, 'workExperience', $request->input('work_experience', []), $updating);
-    $this->syncMany($pds, 'voluntaryWork', $request->input('voluntary_work', []), $updating);
-    $this->syncMany($pds, 'trainings', $request->input('trainings', []), $updating);
-    $this->syncMany($pds, 'skillsHobbies', $request->input('skills_hobbies', []), $updating);
-    $this->syncMany($pds, 'nonAcademicRecognition', $request->input('non_academic_recognition', []), $updating);
-    $this->syncMany($pds, 'membershipOrganizations', $request->input('membership_organizations', []), $updating);
-    $this->syncMany($pds, 'references', $request->input('references', []), $updating);
-
-    // Work Experience Sheet (CS Form 212 Attachment)
-    $this->syncMany($pds, 'workExperienceSheets', $request->input('work_experience_sheets', []), $updating);
-}
 
     /* =====================================================
      | RELATION HELPERS

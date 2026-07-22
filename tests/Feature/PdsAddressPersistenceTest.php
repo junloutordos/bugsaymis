@@ -20,6 +20,9 @@ class PdsAddressPersistenceTest extends TestCase
             'personal_info' => [
                 'surname' => 'Dela Cruz',
                 'first_name' => 'Juan',
+                'date_of_birth' => '1990-01-15',
+                'mobile_no' => '09171234567',
+                'citizenship_type' => 'Filipino',
                 'citizenship_filipino' => true,
                 'residential_house' => '12',
                 'residential_street' => 'Narrah Street',

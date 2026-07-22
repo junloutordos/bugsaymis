@@ -9,7 +9,7 @@ import Swal from 'sweetalert2'
 const form = useForm({})
 
 const createPds = () => {
-  form.post(route('pds.newpds'), {
+  form.post(route('pds.store'), {
     preserveScroll: true,
     onSuccess: () => {
       Swal.fire({

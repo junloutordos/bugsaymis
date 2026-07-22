@@ -289,10 +289,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pds/{pds}/wes/pdf', [PDSController::class, 'exportWesPdf'])
         ->name('pds.wes.pdf');
 
-    // Create PDS (only saves user_id)
-    Route::post('/pds', [PdsController::class, 'newpds'])
-        ->name('pds.newpds');
-
     Route::post('/pds/{pds}/passport-photo', [PDSController::class, 'updatePassportPhoto'])->name('pds.passport-photo');
 
     Route::post(
