@@ -24,10 +24,15 @@ class StudentAttendanceLog extends Model
         'source',
         'gate_location',
         'recorded_by',
+        'kiosk_device_id',
+        'scan_uuid',
+        'device_scan_time',
+        'capture_method',
     ];
 
     protected $casts = [
         'scan_time'  => 'datetime',
+        'device_scan_time' => 'datetime',
         'created_at' => 'datetime',
     ];
 
@@ -55,6 +60,11 @@ class StudentAttendanceLog extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function kioskDevice(): BelongsTo
+    {
+        return $this->belongsTo(StudentAttendanceDevice::class, 'kiosk_device_id');
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

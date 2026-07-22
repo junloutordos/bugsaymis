@@ -2190,14 +2190,30 @@ Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->grou
 
 // ── Student Attendance Module ──────────────────────────────────────────────────
 
-// Public: kiosk UI and scan endpoint — no login required
+// Camera kiosk: registered iPad + restricted guard PIN session (or Administrator login).
 Route::prefix('student-attendance')->name('student-attendance.')->group(function () {
     Route::get('/kiosk', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'index'])
         ->name('kiosk');
+    Route::post('/kiosk/unlock', [\App\Http\Controllers\StudentAttendance\KioskAccessController::class, 'unlock'])
+        ->middleware('attendance.device')
+        ->name('kiosk.unlock');
+    Route::post('/kiosk/lock', [\App\Http\Controllers\StudentAttendance\KioskAccessController::class, 'lock'])
+        ->middleware('attendance.device')
+        ->name('kiosk.lock');
     Route::post('/scan', [\App\Http\Controllers\StudentAttendance\ScanController::class, 'scan'])
+        ->middleware(['attendance.device', 'attendance.scanner', 'throttle:student-attendance-scan'])
         ->name('scan');
+    Route::get('/kiosk/status', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'status'])
+        ->middleware(['attendance.device', 'attendance.scanner'])
+        ->name('kiosk.status');
+    Route::get('/student/{id}/photo', [\App\Http\Controllers\StudentController::class, 'proxyPhoto'])
+        ->whereNumber('id')
+        ->middleware(['attendance.device', 'attendance.scanner'])
+        ->name('student.photo');
+});
 
-    // Student link confirmation (public — accessed via emailed link)
+// Student link confirmation remains public — accessed via emailed link.
+Route::prefix('student-attendance')->name('student-attendance.')->group(function () {
     Route::get('/link/{token}',          [\App\Http\Controllers\StudentAttendance\LinkConfirmController::class, 'show'])->name('link.show');
     Route::post('/link/{token}/confirm', [\App\Http\Controllers\StudentAttendance\LinkConfirmController::class, 'confirm'])->name('link.confirm');
     Route::post('/link/{token}/deny',    [\App\Http\Controllers\StudentAttendance\LinkConfirmController::class, 'deny'])->name('link.deny');
@@ -2205,6 +2221,30 @@ Route::prefix('student-attendance')->name('student-attendance.')->group(function
 
 // Protected: logs and parent contacts management
 Route::middleware(['auth'])->prefix('student-attendance')->name('student-attendance.')->group(function () {
+
+    Route::get('/kiosk/admin-setup', fn () => redirect()->route('student-attendance.kiosk'))
+        ->middleware('role:Administrator')
+        ->name('kiosk.admin-setup');
+
+    Route::post('/devices/pair', [\App\Http\Controllers\StudentAttendance\DeviceController::class, 'pair'])
+        ->middleware('role:Administrator')
+        ->name('devices.pair');
+    Route::post('/devices/finish-setup', [\App\Http\Controllers\StudentAttendance\KioskAccessController::class, 'finishSetup'])
+        ->middleware('role:Administrator')
+        ->name('devices.finish-setup');
+
+    Route::get('/devices', [\App\Http\Controllers\StudentAttendance\DeviceController::class, 'index'])
+        ->name('devices.index')
+        ->middleware('role:Administrator');
+    Route::post('/devices/{device}/revoke', [\App\Http\Controllers\StudentAttendance\DeviceController::class, 'revoke'])
+        ->name('devices.revoke')
+        ->middleware('role:Administrator');
+    Route::put('/operators/{user}/pin', [\App\Http\Controllers\StudentAttendance\KioskOperatorController::class, 'setPin'])
+        ->name('operators.pin')
+        ->middleware('role:Administrator');
+    Route::put('/operators/{user}/status', [\App\Http\Controllers\StudentAttendance\KioskOperatorController::class, 'updateStatus'])
+        ->name('operators.status')
+        ->middleware('role:Administrator');
 
     Route::get('/logs', [\App\Http\Controllers\StudentAttendance\AttendanceLogController::class, 'index'])
         ->name('logs.index')

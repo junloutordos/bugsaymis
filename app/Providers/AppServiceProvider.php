@@ -20,6 +20,9 @@ use App\Policies\WFHAttendancePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use App\Services\AuditLogger;
@@ -75,6 +78,12 @@ class AppServiceProvider extends ServiceProvider
         // manage-students is Administrator-only and not a named DB permission
         Gate::define('manage-students', fn (User $user) => $user->isSuperAdmin());
 
+        RateLimiter::for('student-attendance-scan', function (Request $request) {
+            $deviceToken = $request->cookie(\App\Http\Middleware\EnsureStudentAttendanceDevice::COOKIE, 'unpaired');
+
+            return Limit::perMinute(120)->by($request->user()?->id.'|'.hash('sha256', $deviceToken));
+        });
+
         // ── Student Attendance: notify parents on each gate scan ───────────────
         Event::listen(AttendanceScanEvent::class, NotifyParentsOnScan::class);
 
@@ -93,21 +102,30 @@ class AppServiceProvider extends ServiceProvider
         // Listen to Eloquent model events globally and record audit logs.
         Event::listen('eloquent.created: *', function ($eventName, $payload) {
             $model = $payload[0] ?? null;
-            if ($model && !($model instanceof \App\Models\AuditLog)) {
+            if ($model
+                && ! ($model instanceof \App\Models\AuditLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskOperator)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskAccessLog)) {
                 AuditLogger::logModelEvent($model, 'created');
             }
         });
 
         Event::listen('eloquent.updated: *', function ($eventName, $payload) {
             $model = $payload[0] ?? null;
-            if ($model && !($model instanceof \App\Models\AuditLog)) {
+            if ($model
+                && ! ($model instanceof \App\Models\AuditLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskOperator)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskAccessLog)) {
                 AuditLogger::logModelEvent($model, 'updated');
             }
         });
 
         Event::listen('eloquent.deleted: *', function ($eventName, $payload) {
             $model = $payload[0] ?? null;
-            if ($model && !($model instanceof \App\Models\AuditLog)) {
+            if ($model
+                && ! ($model instanceof \App\Models\AuditLog)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskOperator)
+                && ! ($model instanceof \App\Models\StudentAttendance\StudentAttendanceKioskAccessLog)) {
                 AuditLogger::logModelEvent($model, 'deleted');
             }
         });

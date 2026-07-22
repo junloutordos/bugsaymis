@@ -92,7 +92,7 @@ function typeBadgeColor(type) {
       </AppFilterBar>
 
       <!-- Table -->
-      <AppTable :is-empty="!logs.data.length" :skeleton-cols="6">
+      <AppTable :is-empty="!logs.data.length" :skeleton-cols="8">
         <template #head>
           <tr>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Student</th>
@@ -101,6 +101,8 @@ function typeBadgeColor(type) {
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Scan Time</th>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Gate</th>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Source</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Device</th>
+            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Operator</th>
           </tr>
         </template>
 
@@ -113,6 +115,8 @@ function typeBadgeColor(type) {
           <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ formatDateTime(log.scan_time) }}</td>
           <td class="px-4 py-3 text-slate-500">{{ log.gate_location ?? '—' }}</td>
           <td class="px-4 py-3 text-slate-400 text-xs capitalize">{{ log.source }}</td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ log.kiosk_device?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ log.recorded_by?.name ?? '—' }}</td>
         </tr>
 
         <template #mobileCard>
@@ -124,6 +128,9 @@ function typeBadgeColor(type) {
             <p class="text-xs text-slate-500 font-mono">{{ log.raw_barcode }}</p>
             <p class="text-xs text-slate-500">{{ formatDateTime(log.scan_time) }} &middot; {{ log.gate_location ?? '—' }}</p>
             <p class="text-xs text-slate-400 capitalize">{{ log.source }}</p>
+            <p v-if="log.kiosk_device || log.recorded_by" class="text-xs text-slate-400">
+              {{ log.kiosk_device?.name ?? 'Unknown device' }} · {{ log.recorded_by?.name ?? 'Unknown operator' }}
+            </p>
           </div>
         </template>
 

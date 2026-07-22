@@ -12,6 +12,14 @@ return [
     */
     'duplicate_window_minutes' => env('ATTENDANCE_DUPLICATE_WINDOW', 3),
 
+    'kiosk_session_hours' => 12,
+
+    'kiosk_background_timeout_minutes' => 5,
+
+    'kiosk_pin_attempts' => 5,
+
+    'kiosk_pin_lockout_minutes' => 15,
+
     /*
     |--------------------------------------------------------------------------
     | Gate Locations

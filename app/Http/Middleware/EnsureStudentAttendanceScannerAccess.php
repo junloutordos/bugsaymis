@@ -1,0 +1,31 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use App\Models\StudentAttendance\StudentAttendanceDevice;
+use App\Services\StudentAttendance\KioskAccessService;
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class EnsureStudentAttendanceScannerAccess
+{
+    public function __construct(private KioskAccessService $accessService) {}
+
+    public function handle(Request $request, Closure $next): Response
+    {
+        /** @var StudentAttendanceDevice|null $device */
+        $device = $request->attributes->get('studentAttendanceDevice');
+        $operator = $device
+            ? $this->accessService->currentOperator($request, $device, true)
+            : null;
+
+        if (! $operator) {
+            abort(403, 'The gate scanner is locked. Enter your Security Guard PIN to continue.');
+        }
+
+        $request->attributes->set('studentAttendanceOperator', $operator);
+
+        return $next($request);
+    }
+}

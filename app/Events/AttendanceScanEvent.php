@@ -3,7 +3,7 @@
 namespace App\Events;
 
 use App\Models\StudentAttendance\StudentAttendanceLog;
-use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -25,7 +25,7 @@ class AttendanceScanEvent implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new Channel('attendance'),
+            new PrivateChannel('attendance'),
         ];
     }
 

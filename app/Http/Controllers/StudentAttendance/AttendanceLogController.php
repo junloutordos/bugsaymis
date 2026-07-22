@@ -14,7 +14,11 @@ class AttendanceLogController extends Controller
     {
         $this->authorize('students.attendance.view');
 
-        $query = StudentAttendanceLog::with('student')
+        $query = StudentAttendanceLog::with([
+            'student',
+            'recordedBy:id,name',
+            'kioskDevice:id,name',
+        ])
             ->orderByDesc('scan_time');
 
         if ($date = $request->input('date')) {

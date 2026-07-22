@@ -30,3 +30,7 @@ Broadcast::channel('conversation.{conversationId}', function ($user, int $conver
         ->whereNull('conversation_user.left_at')
         ->exists();
 });
+
+Broadcast::channel('attendance', function ($user) {
+    return $user->isSuperAdmin() || $user->hasRole('Security Guard');
+});

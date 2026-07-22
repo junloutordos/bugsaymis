@@ -1681,6 +1681,13 @@ export const menuItems = [
         permissions: ["students.attendance.scan"],
       },
       {
+        label: "Kiosk Devices",
+        routeName: "student-attendance.devices.index",
+        href: route("student-attendance.devices.index"),
+        icon: ShieldCheckIcon,
+        roles: ["Administrator"],
+      },
+      {
         label: "Attendance Logs",
         routeName: "student-attendance.logs.index",
         href: route("student-attendance.logs.index"),
