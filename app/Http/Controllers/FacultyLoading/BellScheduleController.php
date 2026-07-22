@@ -9,6 +9,7 @@ use App\Models\FacultyLoading\BellScheduleSetting;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\SectionConsultationOverride;
 use App\Services\FacultyLoading\ScheduleBlockAvailabilityService;
+use App\Services\FacultyLoading\ClassScheduleScopeLockService;
 use App\Services\FacultyLoading\SchedulingConstants;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,10 @@ use Inertia\Response;
  */
 class BellScheduleController extends Controller
 {
-    public function __construct(private readonly ScheduleBlockAvailabilityService $availability) {}
+    public function __construct(
+        private readonly ScheduleBlockAvailabilityService $availability,
+        private readonly ClassScheduleScopeLockService $scopeLocks,
+    ) {}
 
     /** Block types the editor accepts. Only CLASS/ILP_ONLY are teachable. */
     private const TYPES = [
@@ -106,6 +110,7 @@ class BellScheduleController extends Controller
             'rows.*.type'     => 'required|in:'.implode(',', self::TYPES),
             'rows.*.label'    => 'required|string|max:60',
         ]);
+        $this->assertScheduleScopeUnlocked($this->resolveTermId($request), 'whole');
 
         // Reject overlapping blocks — the timetable must read cleanly top to bottom.
         $rows = collect($data['rows'])
@@ -145,6 +150,7 @@ class BellScheduleController extends Controller
         $data = $request->validate([
             'timetable_key' => 'required|string|in:'.implode(',', array_keys(SchedulingConstants::EDITABLE_TIMETABLES)),
         ]);
+        $this->assertScheduleScopeUnlocked($this->resolveTermId($request), 'whole');
 
         BellScheduleOverride::where('timetable_key', $data['timetable_key'])->delete();
         SchedulingConstants::flushOverrideCache();
@@ -165,6 +171,7 @@ class BellScheduleController extends Controller
             'setting_key' => 'required|string|in:'.implode(',', SchedulingConstants::SETTING_KEYS),
             'value'       => 'required',
         ]);
+        $this->assertScheduleScopeUnlocked($this->resolveTermId($request), 'whole');
 
         [$ok, $clean, $error] = $this->validateSettingValue($data['setting_key'], $data['value']);
         if (! $ok) {
@@ -187,6 +194,7 @@ class BellScheduleController extends Controller
         $data = $request->validate([
             'setting_key' => 'required|string|in:'.implode(',', SchedulingConstants::SETTING_KEYS),
         ]);
+        $this->assertScheduleScopeUnlocked($this->resolveTermId($request), 'whole');
 
         BellScheduleSetting::where('setting_key', $data['setting_key'])->delete();
         SchedulingConstants::flushOverrideCache();
@@ -222,6 +230,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'grade', $grade);
         $window = $start !== null
             ? ['start' => $start, 'end' => $end]
             : (SchedulingConstants::setting('WHITE_SPACE_CAMPUS')[$day] ?? null);
@@ -264,6 +273,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'whole');
         $window = $start !== null ? ['start' => $start, 'end' => $end] : null;
         $this->assertScopeAvailable($termId, 'campus', 'white_space', $day, $window);
 
@@ -309,6 +319,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'grade', $grade);
         $window = $start !== null ? ['start' => $start, 'end' => $end] : $this->wellnessCampusFallback($grade, $day);
         $this->assertScopeAvailable($termId, 'grade', 'wellness', $day, $window, $grade);
 
@@ -349,6 +360,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'whole');
         $window = $start !== null
             ? ['start' => $start, 'end' => $end]
             : (SchedulingConstants::defaultSetting('WELLNESS_CAMPUS')[$day] ?? null);
@@ -398,6 +410,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'grade', $grade);
         $window = $start !== null ? ['start' => $start, 'end' => $end] : $this->consultationGradeFallback($grade, $day);
         $this->assertScopeAvailable($termId, 'grade', 'consultation', $day, $window, $grade);
 
@@ -437,6 +450,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'section', null, (int) $section->id);
         $window = $start !== null
             ? ['start' => $start, 'end' => $end]
             : SchedulingConstants::getConsultationWindow((int) $section->levelid, $day);
@@ -469,6 +483,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'whole');
         $sections = $termId ? $this->availability->affectedSections($termId, 'campus', 'consultation', $day) : collect();
         if ($termId && $start !== null) {
             $this->availability->assertAvailable($sections, $termId, $day, ['start' => $start, 'end' => $end]);
@@ -502,6 +517,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'grade', $grade);
         $window = $start !== null
             ? ['start' => $start, 'end' => $end]
             : $this->breakGradeFallback($type, $grade, $day);
@@ -523,6 +539,7 @@ class BellScheduleController extends Controller
         }
 
         $termId = $this->resolveTermId($request);
+        $this->assertScheduleScopeUnlocked($termId, 'whole');
         $sections = $termId ? $this->availability->affectedSections($termId, 'campus', $type, $day) : collect();
         if ($termId && $start !== null) {
             $this->availability->assertAvailable($sections, $termId, $day, ['start' => $start, 'end' => $end]);
@@ -545,6 +562,16 @@ class BellScheduleController extends Controller
         $termId = $validated['academic_term_id'] ?? AcademicTerm::where('is_current', true)->value('id');
 
         return $termId ? (int) $termId : null;
+    }
+
+    private function assertScheduleScopeUnlocked(?int $termId, string $scopeType, ?int $grade = null, ?int $sectionId = null): void
+    {
+        if (! $termId) {
+            return;
+        }
+
+        $term = AcademicTerm::findOrFail($termId);
+        $this->scopeLocks->assertScopeUnlocked($term, $scopeType, $grade, $sectionId);
     }
 
     private function assertScopeAvailable(?int $termId, string $scope, string $type, string $day, ?array $window, ?int $grade = null, ?int $sectionId = null): void

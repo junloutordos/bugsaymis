@@ -40,7 +40,11 @@
             <AppButton :disabled="scheduleLocked" @click="openForm()">
               <PlusIcon class="h-4 w-4" /> Assign Schedule
             </AppButton>
-            <AppButton v-if="canSubmitSchedule && !scheduleLocked" :disabled="!schedules.length" @click="submitSchedule">
+            <AppButton v-if="!isMyPage" variant="secondary" :disabled="scheduleLocked" @click="openScheduleLockManager()">
+              <LockClosedIcon class="h-4 w-4" /> Section Locks
+            </AppButton>
+            <AppButton v-if="canSubmitSchedule && !scheduleLocked" :disabled="!schedules.length || scheduleScopeLocks.length"
+              :title="scheduleScopeLocks.length ? 'Release all section locks before submitting to OCD' : ''" @click="submitSchedule">
               <PaperAirplaneIcon class="h-4 w-4" /> Submit to OCD
             </AppButton>
           </template>
@@ -189,16 +193,16 @@
                 :meta="'· ' + (byGroup[groupId]?.length ?? 0) + ' slot(s)'"
                 :events-by-day="cardEventsByDay(groupId)"
                 :day-configs="dayConfigsForGroup(groupId)"
-                :editable="!isReadOnly && !isOverviewMode && !scheduleLocked"
+                :editable="!isReadOnly && !isOverviewMode && !scheduleLocked && !cardIsScopeLocked(groupId)"
                 :pack-lanes="isOverviewMode"
                 :legend="subjectsInGroup(groupId)"
                 :drop-preview="dropTarget?.groupId === groupId ? dropTarget : null"
                 :create-draft="createDraft?.groupId === groupId ? createDraft : null"
                 :dim-event-id="dragPayload?.kind === 'move' && groupKeyOf(dragPayload.schedule) === groupId ? dragPayload.schedule.id : null"
-                :can-quick-create="canQuickCreate(groupId)"
+                :can-quick-create="canQuickCreate(groupId) && !cardIsScopeLocked(groupId)"
                 :is-draggable="canDrag"
                 :print-url="printUrlForGroup(groupId)"
-                :blocked-editable="canEditBlockedFor(groupId)"
+                :blocked-editable="canEditBlockedFor(groupId) && !cardIsScopeLocked(groupId)"
                 :blocked-drag-preview="blockedDrag && blockedDrag.groupId === groupId ? blockedDragPreview : null"
                 @column-mousedown="(day, e) => onColumnMouseDown(e, groupId, day)"
                 @column-dragover="(day, e) => onDragOverColumn(e, groupId, day)"
@@ -214,12 +218,27 @@
                 @add-wellness="(day, e) => openWellnessPopover(e, groupId, null, day)">
 
                 <template #header-actions>
-                  <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked" variant="secondary" size="sm" @click="openForm({ section_id: groupId })">
+                  <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked"
+                    variant="secondary" size="sm"
+                    :disabled="scopeLockForSection(groupId) && !canUnlockScope(scopeLockForSection(groupId))"
+                    :title="scopeLockButtonTitle(groupId)"
+                    @click="toggleSectionScopeLock(groupId)">
+                    <LockClosedIcon class="h-3 w-3" /> {{ scopeLockForSection(groupId) ? 'Locked' : 'Lock' }}
+                  </AppButton>
+                  <AppButton v-if="isManage && viewBy === 'section' && !scheduleLocked" variant="secondary" size="sm"
+                    :disabled="cardIsScopeLocked(groupId)" @click="openForm({ section_id: groupId })">
                     <PlusIcon class="h-3 w-3" /> Add
                   </AppButton>
                 </template>
 
                 <template #header-extra>
+                  <div v-if="scopeLockForSection(groupId)"
+                    class="flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+                    <LockClosedIcon class="h-3.5 w-3.5 shrink-0" />
+                    <span class="font-semibold">Locked {{ scopeLockScopeLabel(scopeLockForSection(groupId)) }}</span>
+                    <span>by {{ scopeLockForSection(groupId).locked_by_name }}</span>
+                    <span class="text-amber-600">· {{ formatScopeLockTime(scopeLockForSection(groupId).locked_at) }}</span>
+                  </div>
                   <!-- Unplaced subjects for this group -->
                   <div v-if="unplacedByGroup[groupId]?.length"
                     class="px-4 py-2 bg-amber-50/70 border-b border-amber-100">
@@ -234,7 +253,7 @@
                     </div>
                     <div class="flex flex-wrap gap-1.5 mt-1.5">
                       <div v-for="load in visibleUnplaced(groupId)" :key="load.load_assignment_id"
-                        :draggable="!scheduleLocked && !isOverviewMode && !load.is_locked"
+                        :draggable="!scheduleLocked && !isOverviewMode && !load.is_locked && !isSectionScopeLocked(load.section_id)"
                         @dragstart="onDragStartLoad($event, load)"
                         @dragend="onDragEnd"
                         @click="openChipSuggestions($event, load)"
@@ -977,6 +996,59 @@
       </template>
     </AppModal>
 
+    <AppModal :show="scheduleLockManager.show" title="Schedule Section Locks" size="lg"
+      body-class="px-6 py-4 space-y-5" @close="scheduleLockManager.show = false">
+      <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+        <p class="text-sm font-semibold text-slate-800">Lock plotting scope</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <label v-for="option in scheduleLockScopes" :key="option.value"
+            class="flex cursor-pointer items-start gap-2 rounded-lg border bg-white p-3 text-sm"
+            :class="scheduleLockManager.scope_type === option.value ? 'border-indigo-400 ring-1 ring-indigo-200' : 'border-slate-200'">
+            <input v-model="scheduleLockManager.scope_type" type="radio" :value="option.value" class="mt-0.5 text-indigo-600" />
+            <span><span class="block font-medium text-slate-800">{{ option.label }}</span><span class="text-xs text-slate-500">{{ option.help }}</span></span>
+          </label>
+        </div>
+        <select v-if="scheduleLockManager.scope_type === 'grade'" v-model="scheduleLockManager.grade_level"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+          <option v-for="grade in GRADE_LEVELS" :key="grade" :value="grade">Grade {{ grade }}</option>
+        </select>
+        <select v-if="scheduleLockManager.scope_type === 'section'" v-model="scheduleLockManager.section_id"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+          <option :value="null">Select section…</option>
+          <option v-for="section in sections" :key="section.id" :value="section.id">
+            Grade {{ section.levelid }} — {{ section.sectionname }}
+          </option>
+        </select>
+        <AppButton :loading="scheduleLockManager.saving" :disabled="!canCreateSelectedScopeLock" @click="createSelectedScopeLock">
+          <LockClosedIcon class="h-4 w-4" /> Lock Scope
+        </AppButton>
+      </div>
+
+      <div>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Active locks</p>
+        <div v-if="!scheduleScopeLocks.length" class="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">
+          No collaborative schedule locks for this term.
+        </div>
+        <div v-else class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          <div v-for="lock in scheduleScopeLocks" :key="lock.id" class="flex items-center justify-between gap-3 px-4 py-3">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-slate-800">{{ scopeLockDescription(lock) }}</p>
+              <p class="truncate text-xs text-slate-500">Locked by {{ lock.locked_by_name }} · {{ formatScopeLockTime(lock.locked_at) }}</p>
+            </div>
+            <AppButton variant="secondary" size="sm" :disabled="!canUnlockScope(lock) || scheduleLockManager.saving"
+              :title="canUnlockScope(lock) ? 'Unlock this scope' : 'Only the lock owner or an Administrator can unlock this scope'"
+              @click="unlockScheduleScope(lock)">
+              Unlock
+            </AppButton>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="scheduleLockManager.show = false">Close</AppButton>
+      </template>
+    </AppModal>
+
     <!-- Schedule Form Modal -->
     <AppModal :show="modal" :title="modalTitle" size="lg"
       body-class="px-6 py-4 space-y-4" @close="modal = false">
@@ -1165,6 +1237,9 @@ const props = defineProps({
   swapRequests: { type: Array, default: () => [] },
   canRequestSwap: { type: Boolean, default: false },
   canEditBellSchedule: { type: Boolean, default: false },
+  scheduleScopeLocks: { type: Array, default: () => [] },
+  scheduleScopeLocksBySection: { type: Object, default: () => ({}) },
+  scheduleLockActor: { type: Object, default: () => ({ id: null, is_admin: false }) },
   bellScheduleSettings: { type: Object, default: null },
   bellScheduleTimetables: { type: Object, default: null },
   whiteSpaceByGrade: { type: Object, default: () => ({}) },
@@ -1207,6 +1282,147 @@ const canManageClasses = computed(() => isManage.value || isUnit.value)
 const toolItemClass = 'flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed'
 const isMyPage = computed(() => props.pageMode === 'my')
 const scheduleLocked = computed(() => !!props.approvalBatch?.locked)
+const scheduleScopeLocks = computed(() => props.scheduleScopeLocks ?? [])
+const scheduleLockScopes = [
+  { value: 'section', label: 'Section', help: 'Protect one section only.' },
+  { value: 'grade', label: 'Grade level', help: 'Protect every section in a grade.' },
+  { value: 'whole', label: 'Whole schedule', help: 'Protect all sections in this term.' },
+]
+const scheduleLockManager = reactive({
+  show: false,
+  scope_type: 'section',
+  section_id: null,
+  grade_level: 7,
+  saving: false,
+})
+const canCreateSelectedScopeLock = computed(() => !scheduleLockManager.saving
+  && (scheduleLockManager.scope_type === 'whole'
+    || (scheduleLockManager.scope_type === 'grade' && scheduleLockManager.grade_level)
+    || (scheduleLockManager.scope_type === 'section' && scheduleLockManager.section_id)))
+
+function scopeLockForSection(sectionId) {
+  return props.scheduleScopeLocksBySection?.[sectionId] ?? null
+}
+
+function isSectionScopeLocked(sectionId) {
+  return !!scopeLockForSection(sectionId)
+}
+
+function cardIsScopeLocked(groupId) {
+  if (viewBy.value === 'section') return isSectionScopeLocked(groupId)
+  return (byGroup.value?.[groupId] ?? []).some(entry => isSectionScopeLocked(entry.section_id ?? entry.section?.id))
+}
+
+function canUnlockScope(lock) {
+  return !!lock && (props.scheduleLockActor?.is_admin || Number(lock.locked_by) === Number(props.scheduleLockActor?.id))
+}
+
+function scopeLockScopeLabel(lock) {
+  return lock?.scope_type === 'whole' ? 'as part of the whole schedule'
+    : lock?.scope_type === 'grade' ? `at Grade ${lock.grade_level} level`
+      : 'for this section'
+}
+
+function scopeLockDescription(lock) {
+  if (lock.scope_type === 'whole') return 'Whole schedule'
+  if (lock.scope_type === 'grade') return `Grade ${lock.grade_level}`
+  return lock.section_grade
+    ? `Grade ${lock.section_grade} — ${lock.section_name ?? 'Section'}`
+    : (lock.section_name ?? 'Section')
+}
+
+function formatScopeLockTime(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleString('en-PH', {
+    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila',
+  })
+}
+
+function scopeLockButtonTitle(groupId) {
+  const lock = scopeLockForSection(groupId)
+  if (!lock) return 'Lock this section'
+  if (!canUnlockScope(lock)) return `Locked by ${lock.locked_by_name}; only that user or an Administrator can unlock it.`
+  if (lock.scope_type !== 'section') return `This section is covered by a ${lock.scope_type} lock. Manage it from Section Locks.`
+  return 'Unlock this section'
+}
+
+function openScheduleLockManager(sectionId = null) {
+  scheduleLockManager.section_id = sectionId ? Number(sectionId) : (Number(filters.section_id) || null)
+  scheduleLockManager.scope_type = scheduleLockManager.section_id ? 'section' : 'grade'
+  const selectedSection = props.sections.find(section => Number(section.id) === Number(scheduleLockManager.section_id))
+  scheduleLockManager.grade_level = Number(selectedSection?.levelid ?? gradeFilter.value ?? 7)
+  scheduleLockManager.show = true
+}
+
+function refreshScheduleScopeLocks() {
+  router.reload({ only: ['scheduleScopeLocks', 'scheduleScopeLocksBySection'], preserveScroll: true })
+}
+
+async function createScheduleScopeLock(scopeType, sectionId = null, gradeLevel = null) {
+  scheduleLockManager.saving = true
+  try {
+    const { data } = await axios.post(route('faculty-loading.schedules.scope-locks.store'), {
+      academic_term_id: Number(filters.term_id),
+      scope_type: scopeType,
+      section_id: scopeType === 'section' ? Number(sectionId) : null,
+      grade_level: scopeType === 'grade' ? Number(gradeLevel) : null,
+    })
+    refreshScheduleScopeLocks()
+    return data
+  } catch (error) {
+    await Swal.fire({ icon: 'error', title: 'Cannot lock schedule', text: scheduleBlockError(error) })
+    return null
+  } finally {
+    scheduleLockManager.saving = false
+  }
+}
+
+async function createSelectedScopeLock() {
+  await createScheduleScopeLock(
+    scheduleLockManager.scope_type,
+    scheduleLockManager.section_id,
+    scheduleLockManager.grade_level,
+  )
+}
+
+async function unlockScheduleScope(lock) {
+  if (!canUnlockScope(lock)) return
+  const confirmation = await Swal.fire({
+    icon: 'warning',
+    title: `Unlock ${scopeLockDescription(lock)}?`,
+    text: 'The affected section schedules can be modified again immediately.',
+    showCancelButton: true,
+    confirmButtonText: 'Unlock',
+    confirmButtonColor: '#4f46e5',
+  })
+  if (!confirmation.isConfirmed) return
+  scheduleLockManager.saving = true
+  try {
+    await axios.delete(route('faculty-loading.schedules.scope-locks.destroy', lock.id))
+    refreshScheduleScopeLocks()
+  } catch (error) {
+    await Swal.fire({ icon: 'error', title: 'Cannot unlock schedule', text: scheduleBlockError(error) })
+  } finally {
+    scheduleLockManager.saving = false
+  }
+}
+
+async function toggleSectionScopeLock(sectionId) {
+  const lock = scopeLockForSection(sectionId)
+  if (!lock) {
+    await createScheduleScopeLock('section', sectionId)
+    return
+  }
+  if (lock.scope_type !== 'section') {
+    openScheduleLockManager(sectionId)
+    return
+  }
+  if (!canUnlockScope(lock)) {
+    await Swal.fire({ icon: 'info', title: 'Section is locked', text: scopeLockButtonTitle(sectionId) })
+    return
+  }
+  await unlockScheduleScope(lock)
+}
 const canConforme = computed(() =>
   (isMyPage.value || isSelf.value)
   && props.approvalBatch?.status === 'approved'
@@ -1362,7 +1578,7 @@ const removedModal = ref(false)
  *  only hard-deleted the second time), so this is always recoverable from
  *  the "Removed" panel until someone explicitly deletes it permanently. */
 function onEventRemove(s) {
-  if (scheduleLocked.value || !s.can_edit) return
+  if (scheduleLocked.value || !s.can_edit || isSectionScopeLocked(s.section_id ?? s.section?.id)) return
   const scienceCoreNote = s.is_science_core_section
     ? ' This is a shared Science Core slot — other sections keep their own schedule and won\'t be affected.'
     : ''
@@ -2120,6 +2336,7 @@ async function commitBlockedChange(grade, day, band, newStart, newEnd) {
       await axios.post(route('faculty-loading.bell-schedule.setting.update'), {
         setting_key: band.write.key,
         value: { start: newStart, end: newEnd },
+        academic_term_id: filters.term_id,
       })
     }
     await router.reload({ only: ['dayConfigsByGrade', 'bellScheduleTimetables'], preserveScroll: true })
@@ -2141,7 +2358,11 @@ async function saveTimetableBand(band, newStart, newEnd) {
   }
   rows[idx] = { ...rows[idx], start: newStart, end: newEnd }
 
-  await axios.post(route('faculty-loading.bell-schedule.update'), { timetable_key: key, rows })
+  await axios.post(route('faculty-loading.bell-schedule.update'), {
+    timetable_key: key,
+    rows,
+    academic_term_id: filters.term_id,
+  })
 }
 
 // ── Activity/ALP band — composite, edited via a small popover instead of a
@@ -2225,6 +2446,7 @@ async function saveActivityPopover() {
       await axios.post(route('faculty-loading.bell-schedule.setting.update'), {
         setting_key: 'WEDNESDAY_ACTIVITY_START',
         value: cutoffMap,
+        academic_term_id: filters.term_id,
       })
     }
 
@@ -2233,6 +2455,7 @@ async function saveActivityPopover() {
     await axios.post(route('faculty-loading.bell-schedule.setting.update'), {
       setting_key: 'WEDNESDAY_ALP_BY_GRADE',
       value: alpByGrade,
+      academic_term_id: filters.term_id,
     })
 
     closeActivityPopover()
@@ -2818,11 +3041,12 @@ const moveHistory = ref([])
 
 function canDrag(s) {
   return !scheduleLocked.value && !isOverviewMode.value && s.status !== 'cancelled' && !!s.can_edit
+    && !isSectionScopeLocked(s.section_id ?? s.section?.id)
 }
 
 /** Blocks the modal for rows the user can't touch (e.g. faculty viewing own classes). */
 function onEventClick(s) {
-  if (scheduleLocked.value || !s.can_edit) return
+  if (scheduleLocked.value || !s.can_edit || isSectionScopeLocked(s.section_id ?? s.section?.id)) return
   openForm(s)
 }
 
@@ -2972,7 +3196,7 @@ function processPendingDragOver() {
 }
 
 async function onDropColumn(e, groupId, day) {
-  if (isOverviewMode.value) return
+  if (isOverviewMode.value || cardIsScopeLocked(groupId)) return
   const payload = dragPayload.value
   const target  = dropTarget.value
   dragPayload.value = null
@@ -3643,6 +3867,8 @@ const modalTitle = computed(() => {
  */
 function openForm(s = null) {
   if (scheduleLocked.value) return
+  const sectionId = s?.section_id ?? s?.section?.id
+  if (sectionId && isSectionScopeLocked(sectionId)) return
   validationResult.value = null
   if (s && s.id) {
     Object.assign(form, {

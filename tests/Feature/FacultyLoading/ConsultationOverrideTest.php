@@ -127,6 +127,24 @@ class ConsultationOverrideTest extends TestCase
         $this->assertNotSame('14:00', $friday['start']);
     }
 
+    public function test_display_hides_homebound_before_three_pm(): void
+    {
+        $consultation = collect(SchedulingConstants::getDisplayBlockedSlots(
+            9, 'Thursday', null, null, null, null, ['start' => '14:59', 'end' => '15:29'],
+        ))->firstWhere('type', 'CONSULT');
+
+        $this->assertSame('Consultation', $consultation['label']);
+    }
+
+    public function test_display_keeps_homebound_from_three_pm_onward(): void
+    {
+        $consultation = collect(SchedulingConstants::getDisplayBlockedSlots(
+            9, 'Thursday', null, null, null, null, ['start' => '15:00', 'end' => '15:30'],
+        ))->firstWhere('type', 'CONSULT');
+
+        $this->assertSame('Consultation / Home Bound', $consultation['label']);
+    }
+
     public function test_different_grades_do_not_affect_each_other(): void
     {
         $this->actingAs($this->cidChiefUser())

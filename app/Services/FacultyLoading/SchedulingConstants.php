@@ -1391,6 +1391,21 @@ class SchedulingConstants
             $blocked[] = $wellness;
         }
 
+        // Homebound is an after-school designation. A consultation moved to
+        // any slot before 3:00 PM remains Consultation only in both calendar
+        // and print views; the scheduling/validation semantics are unchanged.
+        $blocked = array_map(static function (array $band): array {
+            if (($band['type'] ?? null) !== 'CONSULT' || ($band['start'] ?? '') >= '15:00') {
+                return $band;
+            }
+
+            $band['label'] = str_starts_with((string) ($band['label'] ?? ''), 'Subject Consultation')
+                ? 'Subject Consultation'
+                : 'Consultation';
+
+            return $band;
+        }, $blocked);
+
         usort($blocked, static fn ($a, $b) => $a['start'] <=> $b['start']);
 
         return array_values($blocked);

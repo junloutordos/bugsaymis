@@ -5,10 +5,12 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Jobs\SyncComputerLabBookings;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AiScheduleJob;
+use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
+use App\Services\FacultyLoading\ClassScheduleScopeLockService;
 use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\DeterministicSchedulingService;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +26,7 @@ class AutoScheduleController extends Controller
     public function __construct(
         private readonly DeterministicSchedulingService $scheduler,
         private readonly ConflictDetectionService $conflicts,
+        private readonly ClassScheduleScopeLockService $scopeLocks,
     ) {}
 
     // ── Inertia Page ──────────────────────────────────────────────────────
@@ -208,6 +211,14 @@ class AutoScheduleController extends Controller
         }
 
         DB::transaction(function () use ($aiScheduleJob, $schedules, $gradeLevels, $scopedSectionIds) {
+            $term = AcademicTerm::whereKey($aiScheduleJob->academic_term_id)->lockForUpdate()->firstOrFail();
+            if ($gradeLevels === []) {
+                $this->scopeLocks->assertScopeUnlocked($term, 'whole');
+            } else {
+                foreach ($gradeLevels as $grade) {
+                    $this->scopeLocks->assertScopeUnlocked($term, 'grade', (int) $grade);
+                }
+            }
             // Remove the tentative schedules this job replaces — snapshotting
             // them first so the apply can be undone (restore endpoint).
             $deleteQuery = ClassSchedule::where('academic_term_id', $aiScheduleJob->academic_term_id)
@@ -280,6 +291,14 @@ class AutoScheduleController extends Controller
         $scopedSectionIds = $this->scopedSectionIds($aiScheduleJob, $gradeLevels);
 
         DB::transaction(function () use ($aiScheduleJob, $snapshot, $gradeLevels, $scopedSectionIds) {
+            $term = AcademicTerm::whereKey($aiScheduleJob->academic_term_id)->lockForUpdate()->firstOrFail();
+            if ($gradeLevels === []) {
+                $this->scopeLocks->assertScopeUnlocked($term, 'whole');
+            } else {
+                foreach ($gradeLevels as $grade) {
+                    $this->scopeLocks->assertScopeUnlocked($term, 'grade', (int) $grade);
+                }
+            }
             // Delete what the apply inserted (plus any tentative edits made in
             // its scope since) — same scope as the apply's own delete.
             $deleteQuery = ClassSchedule::where('academic_term_id', $aiScheduleJob->academic_term_id)

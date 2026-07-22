@@ -15,6 +15,7 @@ use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
 use App\Http\Controllers\FacultyLoading\ScheduleAnalyticsController;
 use App\Http\Controllers\FacultyLoading\BellScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
+use App\Http\Controllers\FacultyLoading\ClassScheduleScopeLockController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleSwapController;
 use App\Http\Controllers\FacultyLoading\ScheduleVersionController;
@@ -119,6 +120,12 @@ Route::middleware(['web', 'auth', 'verified'])
         Route::middleware('permission:faculty_loading.manage')
             ->get('/schedules/print-batch', [ClassScheduleController::class, 'printBatchSchedules'])
             ->name('schedules.print-batch');
+
+        Route::middleware('permission:faculty_loading.manage')
+            ->prefix('schedules/scope-locks')->name('schedules.scope-locks.')->group(function () {
+                Route::post('/', [ClassScheduleScopeLockController::class, 'store'])->name('store');
+                Route::delete('/{scheduleScopeLock}', [ClassScheduleScopeLockController::class, 'destroy'])->name('destroy');
+            });
 
         // ── Schedule Balance Analytics (read-only) ─────────────────────────
         Route::middleware('permission:faculty_loading.manage|faculty_loading.approve')

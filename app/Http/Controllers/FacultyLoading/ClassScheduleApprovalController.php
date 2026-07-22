@@ -6,16 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
+use App\Services\FacultyLoading\ClassScheduleScopeLockService;
 use Illuminate\Http\Request;
 
 class ClassScheduleApprovalController extends Controller
 {
-    public function __construct(private readonly ClassScheduleApprovalService $service) {}
+    public function __construct(
+        private readonly ClassScheduleApprovalService $service,
+        private readonly ClassScheduleScopeLockService $scopeLocks,
+    ) {}
 
     public function submit(Request $request, AcademicTerm $term)
     {
         abort_unless($request->user()->hasRole('CID Chief') || $request->user()->isSuperAdmin(), 403);
         $data = $request->validate(['pin' => 'required|string']);
+        $this->scopeLocks->assertTermHasNoLocks((int) $term->id);
         $this->service->submit($term, $request->user(), $data['pin']);
 
         return back()->with('success', 'The complete class schedule was submitted to OCD for approval.');

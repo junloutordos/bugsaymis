@@ -8,6 +8,7 @@ use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
+use App\Services\FacultyLoading\ClassScheduleScopeLockService;
 use App\Services\FacultyLoading\DeterministicSchedulingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,6 +27,7 @@ class AutoPlacementController extends Controller
 {
     public function __construct(
         private readonly DeterministicSchedulingService $scheduler,
+        private readonly ClassScheduleScopeLockService $scopeLocks,
     ) {}
 
     /**
@@ -142,6 +144,8 @@ class AutoPlacementController extends Controller
         }
 
         DB::transaction(function () use ($schedules, $termId, $schoolYearId) {
+            AcademicTerm::whereKey($termId)->lockForUpdate()->firstOrFail();
+            $this->scopeLocks->assertSectionsUnlocked($termId, collect($schedules)->pluck('section_id'));
             $now = now();
             $rows = array_map(fn ($s) => [
                 'load_assignment_id' => $s['load_assignment_id'],

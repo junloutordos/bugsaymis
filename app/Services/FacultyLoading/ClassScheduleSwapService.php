@@ -3,6 +3,7 @@
 namespace App\Services\FacultyLoading;
 
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
 use App\Models\FacultyLoading\ClassScheduleSwapRequest;
 use App\Models\FacultyLoading\FacultyLoad;
@@ -18,6 +19,7 @@ class ClassScheduleSwapService
         private readonly FullConstraintValidator $constraints,
         private readonly ScienceCorePlacementService $scienceCore,
         private readonly ClassScheduleApprovalService $approvals,
+        private readonly ClassScheduleScopeLockService $scopeLocks,
     ) {}
 
     public function candidates(ClassScheduleSwapRequest $request, int $limit = 20): array
@@ -97,12 +99,16 @@ class ClassScheduleSwapService
         return DB::transaction(function () use ($request, $candidateId, $actor, $pin) {
             $request = ClassScheduleSwapRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
             $termId = (int) $request->academic_term_id;
+            AcademicTerm::whereKey($termId)->lockForUpdate()->firstOrFail();
             ClassSchedule::where('academic_term_id', $termId)->lockForUpdate()->get(['id']);
 
             $candidate = collect($this->candidates($request, 100))->firstWhere('id', $candidateId);
             if (! $candidate) {
                 throw ValidationException::withMessages(['swap' => 'This swap is no longer available. Refresh the suggestions.']);
             }
+            $changedSchedules = ClassSchedule::whereIn('id', collect($candidate['changes'])->pluck('schedule_id'))
+                ->get(['section_id']);
+            $this->scopeLocks->assertSectionsUnlocked($termId, $changedSchedules->pluck('section_id'));
             if (ClassScheduleApprovalBatch::where('academic_term_id', $termId)->where('status', 'pending_ocd')->exists()) {
                 throw ValidationException::withMessages(['swap' => 'OCD must act on the pending schedule submission first.']);
             }

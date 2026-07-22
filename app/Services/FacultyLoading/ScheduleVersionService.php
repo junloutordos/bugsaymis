@@ -3,6 +3,7 @@
 namespace App\Services\FacultyLoading;
 
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ScheduleVersion;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
@@ -25,6 +26,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ScheduleVersionService
 {
+    public function __construct(private readonly ClassScheduleScopeLockService $scopeLocks) {}
+
     private const COLUMNS = [
         'id', 'load_assignment_id', 'user_id', 'subject_id', 'section_id', 'classroom_id',
         'school_year_id', 'academic_term_id', 'entry_type', 'session_type', 'title', 'category',
@@ -58,6 +61,8 @@ class ScheduleVersionService
         }
 
         DB::transaction(function () use ($version) {
+            $term = AcademicTerm::whereKey($version->academic_term_id)->lockForUpdate()->firstOrFail();
+            $this->scopeLocks->assertScopeUnlocked($term, 'whole');
             ClassSchedule::where('academic_term_id', $version->academic_term_id)
                 ->where('status', 'tentative')
                 ->delete();

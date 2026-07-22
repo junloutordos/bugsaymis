@@ -42,6 +42,7 @@ class LoadBalancingService
     public function __construct(
         private readonly LoadComputationService $loadService,
         private readonly ConflictDetectionService $conflictService,
+        private readonly ClassScheduleScopeLockService $scopeLocks,
     ) {}
 
     // ── Public API ────────────────────────────────────────────────────────
@@ -207,6 +208,9 @@ class LoadBalancingService
         $this->assertTargetFreeForAssignment($targetFacultyId, $assignment);
 
         DB::transaction(function () use ($assignment, $targetLoad, $targetFacultyId) {
+            AcademicTerm::whereKey($assignment->academic_term_id)->lockForUpdate()->firstOrFail();
+            $sectionIds = ClassSchedule::where('load_assignment_id', $assignment->id)->pluck('section_id');
+            $this->scopeLocks->assertSectionsUnlocked((int) $assignment->academic_term_id, $sectionIds);
             // Move the assignment
             $assignment->update([
                 'user_id'          => $targetFacultyId,
@@ -263,6 +267,9 @@ class LoadBalancingService
         $this->assertTargetFreeForAssignment((int) $userA, $assignmentB);
 
         DB::transaction(function () use ($assignmentA, $assignmentB, $loadA, $loadB, $userA, $userB) {
+            AcademicTerm::whereKey($assignmentA->academic_term_id)->lockForUpdate()->firstOrFail();
+            $sectionIds = ClassSchedule::whereIn('load_assignment_id', [$assignmentA->id, $assignmentB->id])->pluck('section_id');
+            $this->scopeLocks->assertSectionsUnlocked((int) $assignmentA->academic_term_id, $sectionIds);
             // Swap user_id and faculty_load_id
             $assignmentA->update(['user_id' => $userB, 'faculty_load_id' => $loadB->id]);
             $assignmentB->update(['user_id' => $userA, 'faculty_load_id' => $loadA->id]);

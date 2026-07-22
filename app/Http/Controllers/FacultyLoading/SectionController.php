@@ -13,6 +13,7 @@ use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\HeadAdvisoryService;
 use App\Services\FacultyLoading\ScheduleBlockAvailabilityService;
+use App\Services\FacultyLoading\ClassScheduleScopeLockService;
 use App\Services\FacultyLoading\SchedulingConstants;
 use App\Services\FacultyLoading\ScienceCoreService;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +25,8 @@ use Inertia\Response;
 
 class SectionController extends Controller
 {
+    public function __construct(private readonly ClassScheduleScopeLockService $scopeLocks) {}
+
     // ── List sections ─────────────────────────────────────────────────────────
 
     public function index(Request $request): Response
@@ -319,9 +322,8 @@ class SectionController extends Controller
         $window = $startIsNull
             ? SchedulingConstants::getEffectiveLunch((int) $section->levelid, $day)
             : ['start' => $data[$startField], 'end' => $data[$endField]];
-        $this->assertSectionBlockAvailable($request, $section, $day, 'lunch', $window, $availability);
-
-        $section->update($data);
+        $termId = $this->assertSectionBlockAvailable($request, $section, $day, 'lunch', $window, $availability);
+        $this->scopeLocks->runUnlocked([$termId => [(int) $section->id]], fn () => $section->update($data));
 
         return response()->json([
             'message'    => $data[$startField] ? "{$day} lunch updated for {$section->sectionname}." : "{$day} lunch override cleared for {$section->sectionname}.",
@@ -366,9 +368,8 @@ class SectionController extends Controller
         $window = $startIsNull
             ? (SchedulingConstants::getEffectiveRecess((int) $section->levelid, $day)[0] ?? null)
             : ['start' => $data[$startField], 'end' => $data[$endField]];
-        $this->assertSectionBlockAvailable($request, $section, $day, 'recess', $window, $availability);
-
-        $section->update($data);
+        $termId = $this->assertSectionBlockAvailable($request, $section, $day, 'recess', $window, $availability);
+        $this->scopeLocks->runUnlocked([$termId => [(int) $section->id]], fn () => $section->update($data));
 
         return response()->json([
             'message'    => $data[$startField] ? "{$day} recess updated for {$section->sectionname}." : "{$day} recess override cleared for {$section->sectionname}.",
@@ -414,9 +415,8 @@ class SectionController extends Controller
         $window = $startIsNull
             ? SchedulingConstants::getWhiteSpaceWindow((int) $section->levelid, $day)
             : ['start' => $data[$startField], 'end' => $data[$endField]];
-        $this->assertSectionBlockAvailable($request, $section, $day, 'white_space', $window, $availability);
-
-        $section->update($data);
+        $termId = $this->assertSectionBlockAvailable($request, $section, $day, 'white_space', $window, $availability);
+        $this->scopeLocks->runUnlocked([$termId => [(int) $section->id]], fn () => $section->update($data));
 
         return response()->json([
             'message'    => $data[$startField] ? "{$day} White Space updated for {$section->sectionname}." : "{$day} White Space cleared for {$section->sectionname}.",
@@ -461,9 +461,8 @@ class SectionController extends Controller
         $window = $startIsNull
             ? SchedulingConstants::getEffectiveWellnessWindow((int) $section->levelid, $day)
             : ['start' => $data[$startField], 'end' => $data[$endField]];
-        $this->assertSectionBlockAvailable($request, $section, $day, 'wellness', $window, $availability);
-
-        $section->update($data);
+        $termId = $this->assertSectionBlockAvailable($request, $section, $day, 'wellness', $window, $availability);
+        $this->scopeLocks->runUnlocked([$termId => [(int) $section->id]], fn () => $section->update($data));
 
         return response()->json([
             'message'    => $data[$startField] ? "{$day} Wellness updated for {$section->sectionname}." : "{$day} Wellness cleared for {$section->sectionname}.",
@@ -522,15 +521,20 @@ class SectionController extends Controller
         string $type,
         ?array $window,
         ScheduleBlockAvailabilityService $availability,
-    ): void {
+    ): int {
         $request->validate(['academic_term_id' => 'nullable|integer|exists:academic_terms,id']);
         $termId = (int) ($request->input('academic_term_id') ?: AcademicTerm::where('is_current', true)->value('id'));
         if (! $termId) {
-            return;
+            abort(422, 'No academic term is available.');
         }
+
+        $term = AcademicTerm::findOrFail($termId);
+        $this->scopeLocks->assertScopeUnlocked($term, 'section', null, (int) $section->id);
 
         $sections = $availability->affectedSections($termId, 'section', $type, $day, null, (int) $section->id);
         $availability->assertAvailable($sections, $termId, $day, $window);
+
+        return $termId;
     }
 
     private function mapSection(Section $s): array

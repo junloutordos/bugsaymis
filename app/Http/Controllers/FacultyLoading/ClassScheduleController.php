@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\DigitalSignatureService;
 use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
 use App\Services\FacultyLoading\ClassScheduleApprovalService;
+use App\Services\FacultyLoading\ClassScheduleScopeLockService;
 use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\DeterministicSchedulingService;
 use App\Services\FacultyLoading\LoadComputationService;
@@ -46,6 +47,7 @@ class ClassScheduleController extends Controller
         private readonly ConflictDetectionService $conflicts,
         private readonly ScienceCoreService $scienceCore,
         private readonly AdvisoryScheduleScopeService $advisoryScope,
+        private readonly ClassScheduleScopeLockService $scopeLocks,
     ) {}
 
     /**
@@ -808,6 +810,11 @@ class ClassScheduleController extends Controller
                 'created_at' => $swap->created_at?->toIso8601String(),
             ])->values() : collect();
 
+        $scheduleScopeLocks = $termId ? $this->scopeLocks->listForTerm((int) $termId) : [];
+        $scheduleScopeLocksBySection = $termId
+            ? $this->scopeLocks->locksForSections((int) $termId, $sections)
+            : [];
+
         return Inertia::render('FacultyLoading/Schedules/Index', [
             'schedules' => $schedules,
             'terms' => $terms,
@@ -838,6 +845,12 @@ class ClassScheduleController extends Controller
             'swapRequests' => $swapRequests,
             'canRequestSwap' => ! in_array($cap['level'], ['review', 'advisory'], true),
             'canEditBellSchedule' => $canEditBellSchedule,
+            'scheduleScopeLocks' => $scheduleScopeLocks,
+            'scheduleScopeLocksBySection' => $scheduleScopeLocksBySection,
+            'scheduleLockActor' => [
+                'id' => Auth::id(),
+                'is_admin' => Auth::user()->isSuperAdmin(),
+            ],
             'bellScheduleSettings' => $bellScheduleSettings,
             'bellScheduleTimetables' => $bellScheduleTimetables,
             'whiteSpaceByGrade' => SchedulingConstants::setting('WHITE_SPACE_BY_GRADE'),
@@ -1007,6 +1020,11 @@ class ClassScheduleController extends Controller
         if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return response()->json(['message' => 'This term schedule is locked for OCD approval.'], 423);
         }
+        if (! empty($data['exclude_id'])) {
+            $existing = ClassSchedule::find($data['exclude_id']);
+            $this->scopeLocks->assertSectionUnlocked((int) ($existing?->academic_term_id ?? $data['academic_term_id']), $existing?->section_id);
+        }
+        $this->scopeLocks->assertSectionUnlocked((int) $data['academic_term_id'], isset($data['section_id']) ? (int) $data['section_id'] : null);
 
         // A brand-new placement against an unplaced load (not an edit of an
         // existing row) always gets its duration forced to the subject's
@@ -1062,6 +1080,7 @@ class ClassScheduleController extends Controller
         if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
+        $this->scopeLocks->assertSectionUnlocked((int) $data['academic_term_id'], (int) $data['section_id']);
 
         // Placing a session against an unplaced load: the duration and
         // session_type are never taken from the request — they're derived
@@ -1095,22 +1114,25 @@ class ClassScheduleController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
         }
 
-        $schedule = ClassSchedule::create([
-            'load_assignment_id' => $data['load_assignment_id'] ?? null,
-            'user_id' => $data['faculty_id'],
-            'subject_id' => $data['subject_id'],
-            'section_id' => $data['section_id'],
-            'classroom_id' => $data['classroom_id'],
-            'school_year_id' => $data['school_year_id'],
-            'academic_term_id' => $data['academic_term_id'],
-            'session_type' => $sessionType,
-            'day_of_week' => $data['day_of_week'],
-            'start_time' => $data['start_time'],
-            'end_time' => $data['end_time'],
-            'status' => $data['status'] ?? 'active',
-            'remarks' => $data['remarks'] ?? null,
-            'created_by' => Auth::id(),
-        ]);
+        $schedule = $this->scopeLocks->runUnlocked(
+            [(int) $data['academic_term_id'] => [(int) $data['section_id']]],
+            fn () => ClassSchedule::create([
+                'load_assignment_id' => $data['load_assignment_id'] ?? null,
+                'user_id' => $data['faculty_id'],
+                'subject_id' => $data['subject_id'],
+                'section_id' => $data['section_id'],
+                'classroom_id' => $data['classroom_id'],
+                'school_year_id' => $data['school_year_id'],
+                'academic_term_id' => $data['academic_term_id'],
+                'session_type' => $sessionType,
+                'day_of_week' => $data['day_of_week'],
+                'start_time' => $data['start_time'],
+                'end_time' => $data['end_time'],
+                'status' => $data['status'] ?? 'active',
+                'remarks' => $data['remarks'] ?? null,
+                'created_by' => Auth::id(),
+            ]),
+        );
 
         $msg = 'Schedule created.';
         if (! empty($validation['warnings'])) {
@@ -1144,6 +1166,7 @@ class ClassScheduleController extends Controller
         if (ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
+        $this->scopeLocks->assertSectionUnlocked((int) $data['academic_term_id'], isset($data['section_id']) ? (int) $data['section_id'] : null);
 
         $cap = $this->scheduleCapability();
         if (! $this->canTouchNonTeaching($cap, $data['faculty_id'] ?? null)) {
@@ -1156,23 +1179,26 @@ class ClassScheduleController extends Controller
             return back()->withErrors($validation['errors'])->with('validation_result', $validation);
         }
 
-        ClassSchedule::create([
-            'entry_type' => 'non_teaching',
-            'title' => $data['title'],
-            'category' => $data['category'] ?? null,
-            'user_id' => $data['faculty_id'] ?? null,
-            'subject_id' => null,
-            'section_id' => $data['section_id'] ?? null,
-            'classroom_id' => $data['classroom_id'] ?? null,
-            'school_year_id' => $data['school_year_id'],
-            'academic_term_id' => $data['academic_term_id'],
-            'day_of_week' => $data['day_of_week'],
-            'start_time' => $data['start_time'],
-            'end_time' => $data['end_time'],
-            'status' => $data['status'] ?? 'active',
-            'remarks' => $data['remarks'] ?? null,
-            'created_by' => Auth::id(),
-        ]);
+        $this->scopeLocks->runUnlocked(
+            [(int) $data['academic_term_id'] => [$data['section_id'] ?? null]],
+            fn () => ClassSchedule::create([
+                'entry_type' => 'non_teaching',
+                'title' => $data['title'],
+                'category' => $data['category'] ?? null,
+                'user_id' => $data['faculty_id'] ?? null,
+                'subject_id' => null,
+                'section_id' => $data['section_id'] ?? null,
+                'classroom_id' => $data['classroom_id'] ?? null,
+                'school_year_id' => $data['school_year_id'],
+                'academic_term_id' => $data['academic_term_id'],
+                'day_of_week' => $data['day_of_week'],
+                'start_time' => $data['start_time'],
+                'end_time' => $data['end_time'],
+                'status' => $data['status'] ?? 'active',
+                'remarks' => $data['remarks'] ?? null,
+                'created_by' => Auth::id(),
+            ]),
+        );
 
         return back()->with('success', 'Non-teaching block added.');
     }
@@ -1213,6 +1239,8 @@ class ClassScheduleController extends Controller
             || ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
+        $this->scopeLocks->assertSectionUnlocked((int) $classSchedule->academic_term_id, $classSchedule->section_id);
+        $this->scopeLocks->assertSectionUnlocked((int) $data['academic_term_id'], (int) $data['section_id']);
 
         $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
             ->where('academic_term_id', $classSchedule->academic_term_id)
@@ -1227,7 +1255,11 @@ class ClassScheduleController extends Controller
             return back()->withErrors($validation['errors'])->with('validation_result', $validation);
         }
 
-        $classSchedule->update([
+        $sectionsByTerm = collect([
+            ['term' => (int) $classSchedule->academic_term_id, 'section' => $classSchedule->section_id],
+            ['term' => (int) $data['academic_term_id'], 'section' => (int) $data['section_id']],
+        ])->groupBy('term')->map(fn ($items) => $items->pluck('section')->all())->all();
+        $this->scopeLocks->runUnlocked($sectionsByTerm, fn () => $classSchedule->update([
             'user_id' => $data['faculty_id'],
             'subject_id' => $data['subject_id'],
             'section_id' => $data['section_id'],
@@ -1239,7 +1271,7 @@ class ClassScheduleController extends Controller
             'end_time' => $data['end_time'],
             'status' => $data['status'] ?? $classSchedule->status,
             'remarks' => $data['remarks'] ?? null,
-        ]);
+        ]));
 
         return back()->with('success', 'Schedule updated.');
     }
@@ -1267,6 +1299,7 @@ class ClassScheduleController extends Controller
         if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)) {
             return back()->withErrors(['This term schedule is locked for OCD approval.']);
         }
+        $this->scopeLocks->assertSectionUnlocked((int) $classSchedule->academic_term_id, $classSchedule->section_id);
 
         $siblingDays = $this->conflicts->findSiblingPatternDays(
             (int) $classSchedule->user_id,
@@ -1317,7 +1350,10 @@ class ClassScheduleController extends Controller
             ));
         }
 
-        $classSchedule->update(['day_of_week' => $target]);
+        $this->scopeLocks->runUnlocked(
+            [(int) $classSchedule->academic_term_id => [$classSchedule->section_id]],
+            fn () => $classSchedule->update(['day_of_week' => $target]),
+        );
 
         return back()->with('success', "Realigned to {$target} to match this faculty's other {$classSchedule->subject?->name} sections.");
     }
@@ -1348,6 +1384,8 @@ class ClassScheduleController extends Controller
             || ClassScheduleApprovalService::termIsLocked((int) $data['academic_term_id'])) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
+        $this->scopeLocks->assertSectionUnlocked((int) $classSchedule->academic_term_id, $classSchedule->section_id);
+        $this->scopeLocks->assertSectionUnlocked((int) $data['academic_term_id'], isset($data['section_id']) ? (int) $data['section_id'] : null);
 
         // The reassigned target must also be within reach.
         if (! $this->canTouchNonTeaching($cap, $data['faculty_id'] ?? null)) {
@@ -1359,7 +1397,11 @@ class ClassScheduleController extends Controller
             return back()->withErrors($validation['errors'])->with('validation_result', $validation);
         }
 
-        $classSchedule->update([
+        $sectionsByTerm = collect([
+            ['term' => (int) $classSchedule->academic_term_id, 'section' => $classSchedule->section_id],
+            ['term' => (int) $data['academic_term_id'], 'section' => $data['section_id'] ?? null],
+        ])->groupBy('term')->map(fn ($items) => $items->pluck('section')->all())->all();
+        $this->scopeLocks->runUnlocked($sectionsByTerm, fn () => $classSchedule->update([
             'title' => $data['title'],
             'category' => $data['category'] ?? null,
             'user_id' => $data['faculty_id'] ?? null,
@@ -1372,7 +1414,7 @@ class ClassScheduleController extends Controller
             'end_time' => $data['end_time'],
             'status' => $data['status'] ?? $classSchedule->status,
             'remarks' => $data['remarks'] ?? null,
-        ]);
+        ]));
 
         return back()->with('success', 'Non-teaching block updated.');
     }
@@ -1382,6 +1424,7 @@ class ClassScheduleController extends Controller
         if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
+        $this->scopeLocks->assertSectionUnlocked((int) $classSchedule->academic_term_id, $classSchedule->section_id);
         // Non-teaching blocks are hard-deleted (no load/audit linkage to keep).
         if ($classSchedule->entry_type === 'non_teaching') {
             $cap = $this->scheduleCapability();
@@ -1389,7 +1432,10 @@ class ClassScheduleController extends Controller
                 return back()->withErrors(['faculty_id' => 'You are not allowed to remove this non-teaching block.']);
             }
 
-            $classSchedule->delete();
+            $this->scopeLocks->runUnlocked(
+                [(int) $classSchedule->academic_term_id => [$classSchedule->section_id]],
+                fn () => $classSchedule->delete(),
+            );
 
             return back()->with('success', 'Non-teaching block removed.');
         }
@@ -1412,12 +1458,18 @@ class ClassScheduleController extends Controller
         // status='active' filters), so remove it for good instead of no-op
         // re-cancelling it.
         if ($classSchedule->status === 'cancelled') {
-            $classSchedule->delete();
+            $this->scopeLocks->runUnlocked(
+                [(int) $classSchedule->academic_term_id => [$classSchedule->section_id]],
+                fn () => $classSchedule->delete(),
+            );
 
             return back()->with('success', 'Schedule permanently deleted.');
         }
 
-        $classSchedule->update(['status' => 'cancelled']);
+        $this->scopeLocks->runUnlocked(
+            [(int) $classSchedule->academic_term_id => [$classSchedule->section_id]],
+            fn () => $classSchedule->update(['status' => 'cancelled']),
+        );
 
         return back()->with('success', 'Schedule cancelled.');
     }
@@ -1443,6 +1495,7 @@ class ClassScheduleController extends Controller
         if (ClassScheduleApprovalService::termIsLocked((int) $classSchedule->academic_term_id)) {
             return back()->withErrors(['schedule' => 'This term schedule is locked for OCD approval.']);
         }
+        $this->scopeLocks->assertSectionUnlocked((int) $classSchedule->academic_term_id, $classSchedule->section_id);
 
         $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
             ->where('academic_term_id', $classSchedule->academic_term_id)
@@ -1471,7 +1524,10 @@ class ClassScheduleController extends Controller
             ));
         }
 
-        $classSchedule->update(['status' => 'active']);
+        $this->scopeLocks->runUnlocked(
+            [(int) $classSchedule->academic_term_id => [$classSchedule->section_id]],
+            fn () => $classSchedule->update(['status' => 'active']),
+        );
 
         $msg = 'Schedule restored.';
         if (! empty($validation['warnings'])) {
