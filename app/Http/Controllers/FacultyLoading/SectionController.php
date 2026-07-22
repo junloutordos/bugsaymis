@@ -12,8 +12,10 @@ use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\HeadAdvisoryService;
+use App\Services\FacultyLoading\ScheduleBlockAvailabilityService;
 use App\Services\FacultyLoading\SchedulingConstants;
 use App\Services\FacultyLoading\ScienceCoreService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +60,7 @@ class SectionController extends Controller
     public function show(Request $request, Section $section, ScienceCoreService $scienceCore): Response
     {
         $this->authorize('faculty_loading.manage');
+        $section->load('consultationOverrides');
 
         // Academic terms for this section's school year
         $terms = AcademicTerm::where('school_year_id', $section->school_year_id)
@@ -92,6 +95,7 @@ class SectionController extends Controller
         // Merge catalog + assignments — every catalog subject appears; assigned ones show the faculty
         $subjects = $catalogSubjects->map(function ($s) use ($assignmentsBySubject) {
             $assignment = $assignmentsBySubject->get($s->id);
+
             return [
                 'id'            => $s->id,
                 'subject_code'  => $s->code,
@@ -150,7 +154,15 @@ class SectionController extends Controller
             $dayConfigs[$day] = [
                 'start'        => $window['start'] ?? null,
                 'end'          => $window['end'] ?? null,
-                'blocked'      => SchedulingConstants::getDisplayBlockedSlots($section->levelid, $day),
+                'blocked' => SchedulingConstants::getDisplayBlockedSlots(
+                    $section->levelid,
+                    $day,
+                    $section->lunchOverrideFor($day),
+                    $section->recessOverrideFor($day),
+                    $section->whiteSpaceOverrideFor($day),
+                    $section->wellnessOverrideFor($day),
+                    $section->consultationOverrideFor($day),
+                ),
                 'electives'    => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($section->levelid, $day),
                 'scienceCore'  => ($isElectiveSection || $isScienceCoreSection || ! $termId) ? [] : $scienceCore->getScienceCoreWindows($section->school_year_id, $termId, $section->levelid, $day),
             ];
@@ -278,7 +290,7 @@ class SectionController extends Controller
      * to the section's regular lunch_start/lunch_end (and ultimately the
      * grade default) whenever these are left null.
      */
-    public function updateDayLunch(Request $request, Section $section, string $day): \Illuminate\Http\JsonResponse
+    public function updateDayLunch(Request $request, Section $section, string $day, ScheduleBlockAvailabilityService $availability): JsonResponse
     {
         $this->authorize('faculty_loading.manage');
 
@@ -304,6 +316,11 @@ class SectionController extends Controller
             ], 422);
         }
 
+        $window = $startIsNull
+            ? SchedulingConstants::getEffectiveLunch((int) $section->levelid, $day)
+            : ['start' => $data[$startField], 'end' => $data[$endField]];
+        $this->assertSectionBlockAvailable($request, $section, $day, 'lunch', $window, $availability);
+
         $section->update($data);
 
         return response()->json([
@@ -320,7 +337,7 @@ class SectionController extends Controller
      * any other section, or its own recess time on any other day. Falls back
      * to the grade default (SchedulingConstants::getRecess) whenever left null.
      */
-    public function updateDayRecess(Request $request, Section $section, string $day): \Illuminate\Http\JsonResponse
+    public function updateDayRecess(Request $request, Section $section, string $day, ScheduleBlockAvailabilityService $availability): JsonResponse
     {
         $this->authorize('faculty_loading.manage');
 
@@ -346,6 +363,11 @@ class SectionController extends Controller
             ], 422);
         }
 
+        $window = $startIsNull
+            ? (SchedulingConstants::getEffectiveRecess((int) $section->levelid, $day)[0] ?? null)
+            : ['start' => $data[$startField], 'end' => $data[$endField]];
+        $this->assertSectionBlockAvailable($request, $section, $day, 'recess', $window, $availability);
+
         $section->update($data);
 
         return response()->json([
@@ -363,7 +385,7 @@ class SectionController extends Controller
      * grade-wide or campus-wide White Space setting also applies (see
      * SchedulingConstants::getWhiteSpaceWindow()).
      */
-    public function updateDayWhiteSpace(Request $request, Section $section, string $day): \Illuminate\Http\JsonResponse
+    public function updateDayWhiteSpace(Request $request, Section $section, string $day, ScheduleBlockAvailabilityService $availability): JsonResponse
     {
         $this->authorize('faculty_loading.manage');
 
@@ -389,6 +411,11 @@ class SectionController extends Controller
             ], 422);
         }
 
+        $window = $startIsNull
+            ? SchedulingConstants::getWhiteSpaceWindow((int) $section->levelid, $day)
+            : ['start' => $data[$startField], 'end' => $data[$endField]];
+        $this->assertSectionBlockAvailable($request, $section, $day, 'white_space', $window, $availability);
+
         $section->update($data);
 
         return response()->json([
@@ -405,7 +432,7 @@ class SectionController extends Controller
      * SchedulingConstants::resolveWellnessBlock()) — this endpoint doesn't
      * need to special-case that; it only ever writes the raw time.
      */
-    public function updateDayWellness(Request $request, Section $section, string $day): \Illuminate\Http\JsonResponse
+    public function updateDayWellness(Request $request, Section $section, string $day, ScheduleBlockAvailabilityService $availability): JsonResponse
     {
         $this->authorize('faculty_loading.manage');
 
@@ -431,6 +458,11 @@ class SectionController extends Controller
             ], 422);
         }
 
+        $window = $startIsNull
+            ? SchedulingConstants::getEffectiveWellnessWindow((int) $section->levelid, $day)
+            : ['start' => $data[$startField], 'end' => $data[$endField]];
+        $this->assertSectionBlockAvailable($request, $section, $day, 'wellness', $window, $availability);
+
         $section->update($data);
 
         return response()->json([
@@ -451,6 +483,7 @@ class SectionController extends Controller
 
         if ($hasSchedules) {
             $section->update(['is_active' => false]);
+
             return back()->with('success', 'Section deactivated (has existing schedules).');
         }
 
@@ -478,7 +511,26 @@ class SectionController extends Controller
                 $patch[$field] = preg_replace('/^(\d{1,2}:\d{2}):\d{2}$/', '$1', (string) $val);
             }
         }
+
         return $patch;
+    }
+
+    private function assertSectionBlockAvailable(
+        Request $request,
+        Section $section,
+        string $day,
+        string $type,
+        ?array $window,
+        ScheduleBlockAvailabilityService $availability,
+    ): void {
+        $request->validate(['academic_term_id' => 'nullable|integer|exists:academic_terms,id']);
+        $termId = (int) ($request->input('academic_term_id') ?: AcademicTerm::where('is_current', true)->value('id'));
+        if (! $termId) {
+            return;
+        }
+
+        $sections = $availability->affectedSections($termId, 'section', $type, $day, null, (int) $section->id);
+        $availability->assertAvailable($sections, $termId, $day, $window);
     }
 
     private function mapSection(Section $s): array

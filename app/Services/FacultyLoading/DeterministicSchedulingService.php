@@ -66,28 +66,40 @@ class DeterministicSchedulingService
 
     /** @var array<int,array<int,array<string,mixed>>> available slots per grade */
     private array $gridByGrade = [];
+
     /** @var array<int,array<int,array<string,mixed>>> available slots per section — only populated for sections with their own lunch override on at least one weekday (Section::LUNCH_OVERRIDE_COLUMNS); everything else uses the shared grade grid */
     private array $gridBySection = [];
+
     /** @var array<int,array<string,int>> earliest start_min per grade+day (the day's first period) */
     private array $firstPeriodByGrade = [];
+
     /** @var array<int,array<string,int>> ILP placements so far per section+day (for even weekly spread) */
     private array $sectionIlpDayCount = [];
+
     /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> */
     private array $sectionBusy = [];
+
     /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> */
     private array $facultyBusy = [];
+
     /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> keyed by classroom_id; entries with a null classroom are never tracked */
     private array $roomBusy = [];
+
     /** @var array<int,array<string,int>> */
     private array $sectionDayCount = [];
+
     /** @var array<int,array<int,array<string,int>>> */
     private array $sectionSubjDays = [];
+
     /** @var array<int,array<string,int>> teaching sessions placed so far per faculty+day (soft day-spread) */
     private array $facultyDayCount = [];
+
     /** Soft score of the slot findBestSlot() most recently returned (paired with its result). */
     private int $lastSlotScore = 0;
+
     /** @var array<int,?array{s:array<string,mixed>,slot:array<string,mixed>}> */
     private array $placements = [];
+
     /** @var array<int,array<string,array{start:int,end:int}>> */
     private array $officialTimeByFacultyDay = [];
 
@@ -249,8 +261,7 @@ class DeterministicSchedulingService
             mt_srand($attempt * 7919);
             $shuffled = $baseSessions;
             shuffle($shuffled);
-            usort($shuffled, fn ($a, $b) =>
-                [$b['faculty_total'], $b['sessions_needed']] <=> [$a['faculty_total'], $a['sessions_needed']]);
+            usort($shuffled, fn ($a, $b) => [$b['faculty_total'], $b['sessions_needed']] <=> [$a['faculty_total'], $a['sessions_needed']]);
 
             $candidate = $this->runPlacement($shuffled, $schoolYearId, $termId, $scopedSectionIds);
             if (count($candidate['unplaceable']) < count($best['unplaceable'])) {
@@ -269,8 +280,7 @@ class DeterministicSchedulingService
                 mt_srand($attempt * 7919);
                 $shuffled = $baseSessions;
                 shuffle($shuffled);
-                usort($shuffled, fn ($a, $b) =>
-                    [$b['faculty_total'], $b['sessions_needed']] <=> [$a['faculty_total'], $a['sessions_needed']]);
+                usort($shuffled, fn ($a, $b) => [$b['faculty_total'], $b['sessions_needed']] <=> [$a['faculty_total'], $a['sessions_needed']]);
 
                 $candidate = $this->runPlacement($shuffled, $schoolYearId, $termId, $scopedSectionIds);
                 if (! empty($candidate['unplaceable'])) {
@@ -388,6 +398,7 @@ class DeterministicSchedulingService
                     'reason'       => "{$req['subject_name']} is a Science Core subject — its sessions must be placed together with its sibling subjects via a full Generate for Grade {$req['grade']}, not placed individually.",
                     'can_reassign' => false,
                 ]);
+
                 continue;
             }
 
@@ -397,6 +408,7 @@ class DeterministicSchedulingService
                     'reason'       => "{$req['faculty_name']}'s faculty load is locked — unlock it before placing sessions.",
                     'can_reassign' => false,
                 ]);
+
                 continue;
             }
 
@@ -452,6 +464,7 @@ class DeterministicSchedulingService
             $slot = $this->findBestSlot($s);
             if ($slot === null) {
                 $deferred[] = $s;
+
                 continue;
             }
             $this->commit($s, $slot, null, $this->lastSlotScore);
@@ -613,6 +626,7 @@ class DeterministicSchedulingService
         foreach ($sessions as $s) {
             if (! ($s['is_science_core'] ?? false)) {
                 $regular[] = $s;
+
                 continue;
             }
             if (! isset($seenLoadIds[$s['load_assignment_id']])) {
@@ -628,6 +642,7 @@ class DeterministicSchedulingService
             $slot = $this->findBestSlot($s);
             if ($slot === null) {
                 $deferred[] = $s;
+
                 continue;
             }
             $this->commit($s, $slot, null, $this->lastSlotScore);
@@ -735,16 +750,25 @@ class DeterministicSchedulingService
             foreach ($candidates as $slot) {
                 $free = true;
                 foreach ($homeroomIds as $sid) {
-                    if ($this->sectionBusyAt($sid, $slot)) { $free = false; break; }
+                    if ($this->sectionBusyAt($sid, $slot)) {
+                        $free = false;
+                        break;
+                    }
                 }
                 if ($free) {
                     foreach ($sectionIds as $sid) {
-                        if ($this->sectionBusyAt($sid, $slot)) { $free = false; break; }
+                        if ($this->sectionBusyAt($sid, $slot)) {
+                            $free = false;
+                            break;
+                        }
                     }
                 }
                 if ($free) {
                     foreach ($facultyIds as $fid) {
-                        if ($this->facultyBusyAt($fid, $slot)) { $free = false; break; }
+                        if ($this->facultyBusyAt($fid, $slot)) {
+                            $free = false;
+                            break;
+                        }
                     }
                 }
                 if ($free) {
@@ -757,6 +781,7 @@ class DeterministicSchedulingService
                 foreach ($group as $req) {
                     $unplaceable[] = $this->describeSession(array_merge($req, ['session_type' => 'regular']));
                 }
+
                 continue;
             }
 
@@ -902,6 +927,7 @@ class DeterministicSchedulingService
                 }
             }
         }
+
         return $grades;
     }
 
@@ -1102,7 +1128,9 @@ class DeterministicSchedulingService
                 foreach (Section::WELLNESS_OVERRIDE_COLUMNS as [$startCol, $endCol]) {
                     $q->orWhere(fn ($q2) => $q2->whereNotNull($startCol)->whereNotNull($endCol));
                 }
+                $q->orWhereHas('consultationOverrides');
             })
+            ->with('consultationOverrides')
             ->get(array_merge(['id', 'levelid'], $overrideColumns));
 
         foreach ($overriddenSections as $section) {
@@ -1110,6 +1138,7 @@ class DeterministicSchedulingService
             $recessOverridesByDay     = [];
             $whiteSpaceOverridesByDay = [];
             $wellnessOverridesByDay   = [];
+            $consultationOverridesByDay = [];
             foreach (self::DAYS as $day) {
                 if ($override = $section->lunchOverrideFor($day)) {
                     $lunchOverridesByDay[$day] = [
@@ -1135,6 +1164,9 @@ class DeterministicSchedulingService
                         'end'   => substr((string) $override['end'], 0, 5),
                     ];
                 }
+                if ($override = $section->consultationOverrideFor($day)) {
+                    $consultationOverridesByDay[$day] = $override;
+                }
             }
             $this->gridBySection[(int) $section->id] = $this->buildSlotGrid(
                 (int) $section->levelid,
@@ -1142,6 +1174,7 @@ class DeterministicSchedulingService
                 $recessOverridesByDay,
                 $whiteSpaceOverridesByDay,
                 $wellnessOverridesByDay,
+                $consultationOverridesByDay,
             );
         }
     }
@@ -1263,7 +1296,7 @@ class DeterministicSchedulingService
      *
      * @return array<int,array{day:string,start:string,end:string,start_min:int,end_min:int}>
      */
-    private function buildSlotGrid(int $grade, array $lunchOverridesByDay = [], array $recessOverridesByDay = [], array $whiteSpaceOverridesByDay = [], array $wellnessOverridesByDay = []): array
+    private function buildSlotGrid(int $grade, array $lunchOverridesByDay = [], array $recessOverridesByDay = [], array $whiteSpaceOverridesByDay = [], array $wellnessOverridesByDay = [], array $consultationOverridesByDay = []): array
     {
         $slots = [];
         foreach (self::DAYS as $day) {
@@ -1274,6 +1307,7 @@ class DeterministicSchedulingService
                 $recessOverridesByDay[$day] ?? null,
                 $whiteSpaceOverridesByDay[$day] ?? null,
                 $wellnessOverridesByDay[$day] ?? null,
+                $consultationOverridesByDay[$day] ?? null,
             ) as $row) {
                 $slots[] = [
                     'day'         => $day,
@@ -1479,6 +1513,7 @@ class DeterministicSchedulingService
         $slot = $this->findBestSlot($s, $reserved);
         if ($slot !== null) {
             $this->commit($s, $slot, null, $this->lastSlotScore);
+
             return true;
         }
 
@@ -1537,6 +1572,7 @@ class DeterministicSchedulingService
             $this->uncommit($blockIdx);
             if ($this->attemptPlace($blocked['s'], $depth - 1, array_merge($reserved, [$occupiedSlot]))) {
                 $this->commit($s, $slot, null, $score);
+
                 return true;
             }
 
@@ -1562,6 +1598,7 @@ class DeterministicSchedulingService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1680,6 +1717,7 @@ class DeterministicSchedulingService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1701,6 +1739,7 @@ class DeterministicSchedulingService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1712,6 +1751,7 @@ class DeterministicSchedulingService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1749,6 +1789,7 @@ class DeterministicSchedulingService
             $gap = $start - $runEnd;
             if ($gap <= SchedulingConstants::STREAK_JOIN_GAP_MIN) {
                 $runEnd = max($runEnd, $end);
+
                 continue;
             }
             $longestRun = max($longestRun, $runEnd - $runStart);
@@ -1772,6 +1813,7 @@ class DeterministicSchedulingService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1789,6 +1831,7 @@ class DeterministicSchedulingService
                 $hits[] = $idx;
             }
         }
+
         return $hits;
     }
 
@@ -1873,6 +1916,7 @@ class DeterministicSchedulingService
             }
             if ($this->roomBusyAt($s['classroom_id'] ?? null, $occupiedSlot)) {
                 $roomBlocked++;
+
                 continue;
             }
             $sectionFree++;

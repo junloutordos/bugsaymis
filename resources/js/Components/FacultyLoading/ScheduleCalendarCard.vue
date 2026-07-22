@@ -337,20 +337,16 @@ const emit = defineEmits([
 ])
 
 /** Move/resize-draggable: a literal timetable row or a single-window setting.
- *  A section-scoped Lunch band (bp.sectionEditable) opts out of the
- *  grade-wide drag — dragging it here would silently move every other
- *  section's lunch too, which defeats the point of a per-section override.
- *  CONSULT is excluded too — dragging it here only ever moves that one row,
- *  which either gets rejected as an overlap with the previous period (moving
- *  it earlier) or silently disagrees with the display-trimmed band on Wed/Fri
- *  (see the dedicated "Consultation" button instead, which handles both). */
+ *  Lunch, Recess, and Consultation use dedicated scoped editors so every
+ *  change explicitly chooses section, grade, or campus scope and runs the
+ *  plotted-schedule availability check. */
 function isBandDraggable(bp) {
-  return props.blockedEditable && !bp.sectionEditable && bp.type !== 'CONSULT'
+  return props.blockedEditable && !bp.sectionEditable && !['LUNCH', 'RECESS', 'CONSULT'].includes(bp.type)
     && (bp.write?.kind === 'timetable' || bp.write?.kind === 'setting')
 }
 
 /** Click-to-edit: composite bands (e.g. ACTIVITY) that can't be reduced to one
- *  drag, plus a By-Section Wednesday Lunch band (its own section-only popover).
+ *  drag, plus By-Section Lunch/Recess bands (their scoped popovers).
  *  White Space is always clickable when editable — it has no literal timetable
  *  row to drag, and (unlike Lunch/Recess) may be showing a grade-wide or
  *  campus-wide value rather than a section override, so it isn't always

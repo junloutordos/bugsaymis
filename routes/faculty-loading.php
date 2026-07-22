@@ -150,6 +150,18 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::patch('/consultation/grade/{grade}/{day}', [BellScheduleController::class, 'updateConsultationGrade'])
                     ->name('consultation.grade')
                     ->where(['grade' => '([7-9]|1[0-2])', 'day' => 'Monday|Tuesday|Wednesday|Thursday|Friday']);
+                Route::patch('/consultation/section/{section}/{day}', [BellScheduleController::class, 'updateConsultationSection'])
+                    ->name('consultation.section')
+                    ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
+                Route::patch('/consultation/campus/{day}', [BellScheduleController::class, 'updateConsultationCampus'])
+                    ->name('consultation.campus')
+                    ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
+                Route::patch('/break/{type}/grade/{grade}/{day}', [BellScheduleController::class, 'updateBreakGrade'])
+                    ->name('break.grade')
+                    ->where(['type' => 'lunch|recess', 'grade' => '([7-9]|1[0-2])', 'day' => 'Monday|Tuesday|Wednesday|Thursday|Friday']);
+                Route::patch('/break/{type}/campus/{day}', [BellScheduleController::class, 'updateBreakCampus'])
+                    ->name('break.campus')
+                    ->where(['type' => 'lunch|recess', 'day' => 'Monday|Tuesday|Wednesday|Thursday|Friday']);
             });
 
         Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])

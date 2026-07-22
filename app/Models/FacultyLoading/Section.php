@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\FacultyLoading\Classroom;
 
 /**
  * Represents a student section/class at PSHS.
@@ -28,7 +27,9 @@ class Section extends Model
     use HasFactory;
 
     protected $table    = 'sections';
+
     protected $keyType  = 'int';       // INT primary key (not BigInt)
+
     public    $timestamps = false;     // legacy table has no timestamps
 
     protected $fillable = [
@@ -180,6 +181,11 @@ class Section extends Model
         return $this->belongsTo(User::class, 'adviser');
     }
 
+    public function consultationOverrides(): HasMany
+    {
+        return $this->hasMany(SectionConsultationOverride::class);
+    }
+
     /** Home classroom for this section (used by the schedule generator). */
     public function classroom(): BelongsTo
     {
@@ -303,5 +309,21 @@ class Section extends Model
         }
 
         return ['start' => $this->$startCol, 'end' => $this->$endCol];
+    }
+
+    public function consultationOverrideFor(string $day): ?array
+    {
+        $override = $this->relationLoaded('consultationOverrides')
+            ? $this->consultationOverrides->firstWhere('day_of_week', $day)
+            : $this->consultationOverrides()->where('day_of_week', $day)->first();
+
+        if (! $override) {
+            return null;
+        }
+
+        return [
+            'start' => substr((string) $override->start_time, 0, 5),
+            'end' => substr((string) $override->end_time, 0, 5),
+        ];
     }
 }

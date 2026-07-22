@@ -53,6 +53,7 @@ class SchedulingConstants
     // Every CLASS period in the timetables below is 50 minutes; a has_ilp
     // subject's Independent Learning Period session is always 30 minutes.
     public const REGULAR_SESSION_MINUTES = 50;
+
     public const ILP_SESSION_MINUTES = 30;
 
     // ── Grade Sections ────────────────────────────────────────────────────────
@@ -346,6 +347,18 @@ class SchedulingConstants
     // shared literal row says for that day).
     public const CONSULTATION_BY_GRADE_DAY = [];
 
+    /** Campus-wide Consultation window per weekday. Empty = use grade/day defaults. */
+    public const CONSULTATION_CAMPUS_DAY = [];
+
+    /** Optional grade/campus break overrides, keyed by weekday. */
+    public const LUNCH_BY_GRADE_DAY = [];
+
+    public const LUNCH_CAMPUS_DAY = [];
+
+    public const RECESS_BY_GRADE_DAY = [];
+
+    public const RECESS_CAMPUS_DAY = [];
+
     // ── Friday Special ────────────────────────────────────────────────────────
 
     /**
@@ -389,6 +402,7 @@ class SchedulingConstants
     // ── Official Time Shifts ──────────────────────────────────────────────────
 
     public const SHIFT_EARLY = ['start' => '07:30', 'end' => '16:30'];
+
     public const SHIFT_LATE  = ['start' => '08:00', 'end' => '17:00'];
 
     // ── Consultation / Homebound Start Times ─────────────────────────────────
@@ -607,6 +621,11 @@ class SchedulingConstants
             'WELLNESS_CAMPUS'          => self::WELLNESS_CAMPUS,
             'WELLNESS_BY_GRADE'        => self::WELLNESS_BY_GRADE,
             'CONSULTATION_BY_GRADE_DAY' => self::CONSULTATION_BY_GRADE_DAY,
+            'CONSULTATION_CAMPUS_DAY' => self::CONSULTATION_CAMPUS_DAY,
+            'LUNCH_BY_GRADE_DAY' => self::LUNCH_BY_GRADE_DAY,
+            'LUNCH_CAMPUS_DAY' => self::LUNCH_CAMPUS_DAY,
+            'RECESS_BY_GRADE_DAY' => self::RECESS_BY_GRADE_DAY,
+            'RECESS_CAMPUS_DAY' => self::RECESS_CAMPUS_DAY,
             default                    => null,
         };
     }
@@ -757,12 +776,61 @@ class SchedulingConstants
      */
     public static function getConsultationOverride(int $grade, string $day): ?array
     {
-        $window = self::setting('CONSULTATION_BY_GRADE_DAY')[$grade][$day] ?? null;
+        $window = self::setting('CONSULTATION_BY_GRADE_DAY')[$grade][$day]
+            ?? self::setting('CONSULTATION_CAMPUS_DAY')[$day]
+            ?? null;
         if ($window === null) {
             return null;
         }
 
         return ['start' => $window['start'], 'end' => $window['end']];
+    }
+
+    public static function getConsultationWindow(int $grade, string $day, ?array $sectionOverride = null): ?array
+    {
+        if ($sectionOverride !== null) {
+            return self::window($sectionOverride);
+        }
+
+        if ($override = self::getConsultationOverride($grade, $day)) {
+            return $override;
+        }
+
+        return self::getDefaultConsultationWindow($grade, $day);
+    }
+
+    public static function getDefaultConsultationWindow(int $grade, string $day): ?array
+    {
+        $rows = $day === 'Monday'
+            ? self::getMondayTimetable($grade)
+            : self::getTueFriTimetable($grade, $day);
+        $row = collect($rows)->firstWhere('type', 'CONSULT');
+
+        return $row ? ['start' => $row['start'], 'end' => $row['end']] : null;
+    }
+
+    public static function getEffectiveLunch(int $grade, string $day, ?array $sectionOverride = null): array
+    {
+        return self::window(
+            $sectionOverride
+            ?? self::setting('LUNCH_BY_GRADE_DAY')[$grade][$day]
+            ?? self::setting('LUNCH_CAMPUS_DAY')[$day]
+            ?? self::getLunch($grade, $day)
+        );
+    }
+
+    /** @return array<int,array{start:string,end:string}> */
+    public static function getEffectiveRecess(int $grade, string $day, ?array $sectionOverride = null): array
+    {
+        if ($sectionOverride !== null) {
+            return [self::window($sectionOverride)];
+        }
+
+        $override = self::setting('RECESS_BY_GRADE_DAY')[$grade][$day]
+            ?? self::setting('RECESS_CAMPUS_DAY')[$day]
+            ?? null;
+
+        return $override !== null ? [self::window($override)] : self::getRecess($grade, $day);
     }
 
     /** Drop the request-scoped override caches (call after saving an edit). */
@@ -775,8 +843,13 @@ class SchedulingConstants
     /** Map a grade integer to its grade group string. */
     public static function getGradeGroup(int $grade): string
     {
-        if ($grade <= 8)  return 'G7G8';
-        if ($grade <= 10) return 'G9G10';
+        if ($grade <= 8) {
+            return 'G7G8';
+        }
+        if ($grade <= 10) {
+            return 'G9G10';
+        }
+
         return 'G11G12';
     }
 
@@ -784,6 +857,7 @@ class SchedulingConstants
     public static function getLunch(int $grade, string $day): array
     {
         $suffix = ($day === 'Monday') ? 'Monday' : 'TueFri';
+
         return self::SECTION_LUNCH["G{$grade}_{$suffix}"]
             ?? ['start' => '12:00', 'end' => '13:00'];
     }
@@ -792,6 +866,7 @@ class SchedulingConstants
     public static function getRecess(int $grade, string $day): array
     {
         $suffix = ($day === 'Monday') ? 'Monday' : 'TueFri';
+
         return self::SECTION_RECESS["G{$grade}_{$suffix}"] ?? [];
     }
 
@@ -808,10 +883,19 @@ class SchedulingConstants
      */
     public static function getMondayTimetable(int $grade): array
     {
-        if ($grade === 7)  return self::timetable('MONDAY_G7G8');
-        if ($grade === 8)  return self::timetable('MONDAY_G8');
-        if ($grade === 9)  return self::timetable('MONDAY_G9');
-        if ($grade === 10) return self::timetable('MONDAY_G9G10');
+        if ($grade === 7) {
+            return self::timetable('MONDAY_G7G8');
+        }
+        if ($grade === 8) {
+            return self::timetable('MONDAY_G8');
+        }
+        if ($grade === 9) {
+            return self::timetable('MONDAY_G9');
+        }
+        if ($grade === 10) {
+            return self::timetable('MONDAY_G9G10');
+        }
+
         return self::timetable('MONDAY_G11G12');
     }
 
@@ -827,9 +911,16 @@ class SchedulingConstants
      */
     public static function getTueFriTimetable(int $grade, string $day): array
     {
-        if ($grade <= 8)  return self::timetable('TUEFRI_730_G7G8');
-        if ($grade === 9) return self::timetable('TUEFRI_730_G9G10');
-        if ($grade === 10) return self::applyG10ElectiveWindow(self::timetable('TUEFRI_730_G9G10'), $day);
+        if ($grade <= 8) {
+            return self::timetable('TUEFRI_730_G7G8');
+        }
+        if ($grade === 9) {
+            return self::timetable('TUEFRI_730_G9G10');
+        }
+        if ($grade === 10) {
+            return self::applyG10ElectiveWindow(self::timetable('TUEFRI_730_G9G10'), $day);
+        }
+
         return self::timetable('TUEFRI_730_G11G12');
     }
 
@@ -843,15 +934,29 @@ class SchedulingConstants
     public static function timetableKeyFor(int $grade, string $day): string
     {
         if ($day === 'Monday') {
-            if ($grade === 7)  return 'MONDAY_G7G8';
-            if ($grade === 8)  return 'MONDAY_G8';
-            if ($grade === 9)  return 'MONDAY_G9';
-            if ($grade === 10) return 'MONDAY_G9G10';
+            if ($grade === 7) {
+                return 'MONDAY_G7G8';
+            }
+            if ($grade === 8) {
+                return 'MONDAY_G8';
+            }
+            if ($grade === 9) {
+                return 'MONDAY_G9';
+            }
+            if ($grade === 10) {
+                return 'MONDAY_G9G10';
+            }
+
             return 'MONDAY_G11G12';
         }
 
-        if ($grade <= 8)  return 'TUEFRI_730_G7G8';
-        if ($grade <= 10) return 'TUEFRI_730_G9G10';
+        if ($grade <= 8) {
+            return 'TUEFRI_730_G7G8';
+        }
+        if ($grade <= 10) {
+            return 'TUEFRI_730_G9G10';
+        }
+
         return 'TUEFRI_730_G11G12';
     }
 
@@ -881,8 +986,7 @@ class SchedulingConstants
                 'group'    => self::getGradeGroup($grade),
                 'full_wed' => in_array($grade, self::wednesdayFullGrades(), true),
             ],
-            'FLAG', 'HOMEROOM', 'ADVISING', 'RECESS', 'LUNCH', 'CONSULT', 'DEAD' =>
-                ['kind' => 'timetable', 'key' => self::timetableKeyFor($grade, $day)],
+            'FLAG', 'HOMEROOM', 'ADVISING', 'RECESS', 'LUNCH', 'CONSULT', 'DEAD' => ['kind' => 'timetable', 'key' => self::timetableKeyFor($grade, $day)],
             default => null,
         };
     }
@@ -1032,38 +1136,50 @@ class SchedulingConstants
      * $wellnessOverride: same idea as $whiteSpaceOverride, for Wellness
      * (Section::WELLNESS_OVERRIDE_COLUMNS / getEffectiveWellnessWindow()).
      */
-    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): array
+    public static function getBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null, ?array $consultationOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
             : self::getTueFriTimetable($grade, $day);
 
-        if ($lunchOverride !== null) {
-            $timetable = array_map(static function ($row) use ($lunchOverride) {
+        $effectiveLunch = self::getEffectiveLunch($grade, $day, $lunchOverride);
+        if ($effectiveLunch !== self::getLunch($grade, $day)) {
+            $timetable = array_map(static function ($row) use ($effectiveLunch) {
                 if ($row['type'] === 'LUNCH') {
-                    $row['start'] = $lunchOverride['start'];
-                    $row['end']   = $lunchOverride['end'];
+                    $row['start'] = $effectiveLunch['start'];
+                    $row['end'] = $effectiveLunch['end'];
                 }
+
                 return $row;
             }, $timetable);
         }
 
-        if ($recessOverride !== null) {
-            $timetable = array_map(static function ($row) use ($recessOverride) {
+        $effectiveRecess = self::getEffectiveRecess($grade, $day, $recessOverride);
+        $defaultRecess = self::getRecess($grade, $day);
+        if ($effectiveRecess !== $defaultRecess && $effectiveRecess !== []) {
+            $replacement = $effectiveRecess[0];
+            $replaced = false;
+            $timetable = array_values(array_filter(array_map(static function ($row) use ($replacement, &$replaced) {
                 if ($row['type'] === 'RECESS') {
-                    $row['start'] = $recessOverride['start'];
-                    $row['end']   = $recessOverride['end'];
+                    if ($replaced) {
+                        return null;
                 }
+                    $row['start'] = $replacement['start'];
+                    $row['end'] = $replacement['end'];
+                    $replaced = true;
+                }
+
                 return $row;
-            }, $timetable);
+            }, $timetable)));
         }
 
-        if ($consultationOverride = self::getConsultationOverride($grade, $day)) {
+        if ($consultationOverride = self::getConsultationWindow($grade, $day, $consultationOverride)) {
             $timetable = array_map(static function ($row) use ($consultationOverride) {
                 if ($row['type'] === 'CONSULT') {
                     $row['start'] = $consultationOverride['start'];
                     $row['end']   = $consultationOverride['end'];
                 }
+
                 return $row;
             }, $timetable);
         }
@@ -1077,8 +1193,7 @@ class SchedulingConstants
             if ($grade !== 8) {
                 break;
             }
-            $blocked = array_values(array_filter($blocked, static fn ($b) =>
-                ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $overflow['start'], $overflow['end']))
+            $blocked = array_values(array_filter($blocked, static fn ($b) => ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $overflow['start'], $overflow['end']))
             ));
         }
 
@@ -1102,8 +1217,7 @@ class SchedulingConstants
             // The timetable's own Consultation/Home Bound slot sits inside this
             // window for every grade group — drop it so the calendar doesn't
             // render two overlapping bands for the same time range.
-            $blocked = array_values(array_filter($blocked, static fn ($b) =>
-                ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $activityBlock['start'], $activityBlock['end']))
+            $blocked = array_values(array_filter($blocked, static fn ($b) => ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $activityBlock['start'], $activityBlock['end']))
             ));
             $blocked[] = $activityBlock;
         }
@@ -1116,8 +1230,7 @@ class SchedulingConstants
 
             // Same overlap as Wednesday's ALP — Flag Retreat supersedes the
             // Consultation/Home Bound slot instead of stacking on top of it.
-            $blocked = array_values(array_filter($blocked, static fn ($b) =>
-                ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $flagBlock['start'], $flagBlock['end']))
+            $blocked = array_values(array_filter($blocked, static fn ($b) => ! ($b['type'] === 'CONSULT' && self::timesOverlap($b['start'], $b['end'], $flagBlock['start'], $flagBlock['end']))
             ));
             $blocked[] = $flagBlock;
         }
@@ -1178,38 +1291,50 @@ class SchedulingConstants
      * capacity/placement math: restoring the G8 consult band there would
      * filter the overflow periods out of the schedulable grid.
      */
-    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): array
+    public static function getDisplayBlockedSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null, ?array $consultationOverride = null): array
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
             : self::getTueFriTimetable($grade, $day);
 
-        if ($lunchOverride !== null) {
-            $timetable = array_map(static function ($row) use ($lunchOverride) {
+        $effectiveLunch = self::getEffectiveLunch($grade, $day, $lunchOverride);
+        if ($effectiveLunch !== self::getLunch($grade, $day)) {
+            $timetable = array_map(static function ($row) use ($effectiveLunch) {
                 if ($row['type'] === 'LUNCH') {
-                    $row['start'] = $lunchOverride['start'];
-                    $row['end']   = $lunchOverride['end'];
+                    $row['start'] = $effectiveLunch['start'];
+                    $row['end'] = $effectiveLunch['end'];
                 }
+
                 return $row;
             }, $timetable);
         }
 
-        if ($recessOverride !== null) {
-            $timetable = array_map(static function ($row) use ($recessOverride) {
+        $effectiveRecess = self::getEffectiveRecess($grade, $day, $recessOverride);
+        $defaultRecess = self::getRecess($grade, $day);
+        if ($effectiveRecess !== $defaultRecess && $effectiveRecess !== []) {
+            $replacement = $effectiveRecess[0];
+            $replaced = false;
+            $timetable = array_values(array_filter(array_map(static function ($row) use ($replacement, &$replaced) {
                 if ($row['type'] === 'RECESS') {
-                    $row['start'] = $recessOverride['start'];
-                    $row['end']   = $recessOverride['end'];
+                    if ($replaced) {
+                        return null;
+                    }
+                    $row['start'] = $replacement['start'];
+                    $row['end'] = $replacement['end'];
+                    $replaced = true;
                 }
+
                 return $row;
-            }, $timetable);
+            }, $timetable)));
         }
 
-        if ($consultationOverride = self::getConsultationOverride($grade, $day)) {
+        if ($consultationOverride = self::getConsultationWindow($grade, $day, $consultationOverride)) {
             $timetable = array_map(static function ($row) use ($consultationOverride) {
                 if ($row['type'] === 'CONSULT') {
                     $row['start'] = $consultationOverride['start'];
                     $row['end']   = $consultationOverride['end'];
                 }
+
                 return $row;
             }, $timetable);
         }
@@ -1283,6 +1408,7 @@ class SchedulingConstants
         foreach ($blocked as $b) {
             if (! in_array($b['type'], $types, true) || ! self::timesOverlap($b['start'], $b['end'], $start, $end)) {
                 $result[] = $b;
+
                 continue;
             }
             if ($b['start'] < $start) {
@@ -1335,7 +1461,7 @@ class SchedulingConstants
     }
 
     /** Canonical regular and ILP-only periods after applying fixed blocks. */
-    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): array
+    public static function getSchedulableTeachingSlots(int $grade, string $day, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null, ?array $consultationOverride = null): array
     {
         if ($day === 'Friday' && in_array($grade, self::fridayIlaGrades(), true)) {
             return [];
@@ -1343,20 +1469,21 @@ class SchedulingConstants
 
         return array_values(array_filter(
             self::getTeachingSlots($grade, $day),
-            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride),
+            fn ($slot) => ! self::overlapsBlocked($grade, $day, $slot['start'], $slot['end'], $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride, $consultationOverride),
         ));
     }
 
     /**
      * True if a proposed time window overlaps any blocked slot for the grade/day.
      */
-    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null): bool
+    public static function overlapsBlocked(int $grade, string $day, string $start, string $end, ?array $lunchOverride = null, ?array $recessOverride = null, ?array $whiteSpaceOverride = null, ?array $wellnessOverride = null, ?array $consultationOverride = null): bool
     {
-        foreach (self::getBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride) as $blocked) {
+        foreach (self::getBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride, $consultationOverride) as $blocked) {
             if ($start < $blocked['end'] && $end > $blocked['start']) {
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1366,6 +1493,7 @@ class SchedulingConstants
     public static function toMinutes(string $time): int
     {
         [$h, $m] = explode(':', $time);
+
         return (int) $h * 60 + (int) $m;
     }
 

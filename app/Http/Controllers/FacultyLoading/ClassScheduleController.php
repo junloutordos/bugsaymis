@@ -399,11 +399,12 @@ class ClassScheduleController extends Controller
                 $recessOverride = $trim($section?->recessOverrideFor($day));
                 $whiteSpaceOverride = $trim($section?->whiteSpaceOverrideFor($day));
                 $wellnessOverride = $trim($section?->wellnessOverrideFor($day));
+                $consultationOverride = $trim($section?->consultationOverrideFor($day));
                 $dayConfigs[$day] = [
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
                     'blocked' => SchedulingConstants::getDisplayBlockedSlots(
-                        $gradeLevel, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride,
+                        $gradeLevel, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride, $consultationOverride,
                     ),
                     'electives' => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($gradeLevel, $day),
                     'scienceCore' => ($isElectiveSection || $isScienceCoreSection)
@@ -630,6 +631,7 @@ class ClassScheduleController extends Controller
         $whiteSpaceOverrideColumns = array_merge(...array_values(Section::WHITE_SPACE_OVERRIDE_COLUMNS));
         $wellnessOverrideColumns = array_merge(...array_values(Section::WELLNESS_OVERRIDE_COLUMNS));
         $sections = Section::when($syId, fn ($q) => $q->where('school_year_id', $syId))
+            ->with('consultationOverrides')
             ->where('is_active', true)
             ->when($advisorySectionIds !== null, fn ($q) => $q->whereIn('id', $advisorySectionIds))
             ->orderBy('levelid')
@@ -694,7 +696,8 @@ class ClassScheduleController extends Controller
                 $recessOverride = $section->recessOverrideFor($day);
                 $whiteSpaceOverride = $section->whiteSpaceOverrideFor($day);
                 $wellnessOverride = $section->wellnessOverrideFor($day);
-                if (! $lunchOverride && ! $recessOverride && ! $whiteSpaceOverride && ! $wellnessOverride) {
+                $consultationOverride = $section->consultationOverrideFor($day);
+                if (! $lunchOverride && ! $recessOverride && ! $whiteSpaceOverride && ! $wellnessOverride && ! $consultationOverride) {
                     continue;
                 }
                 if ($lunchOverride) {
@@ -721,7 +724,7 @@ class ClassScheduleController extends Controller
                         'end' => substr((string) $wellnessOverride['end'], 0, 5),
                     ];
                 }
-                $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride);
+                $blocked = SchedulingConstants::getDisplayBlockedSlots($grade, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride, $consultationOverride);
                 if ($canEditBellSchedule) {
                     $blocked = array_map(function ($band) use ($grade, $day) {
                         $band['write'] = SchedulingConstants::bandWriteDescriptor($band['type'], $grade, $day);
@@ -843,6 +846,19 @@ class ClassScheduleController extends Controller
             'wellnessCampus' => SchedulingConstants::setting('WELLNESS_CAMPUS'),
             'wednesdayFullGrades' => SchedulingConstants::wednesdayFullGrades(),
             'consultationByGrade' => SchedulingConstants::setting('CONSULTATION_BY_GRADE_DAY'),
+            'consultationCampus' => SchedulingConstants::setting('CONSULTATION_CAMPUS_DAY'),
+            'consultationBySection' => $sections->mapWithKeys(fn (Section $section) => [
+                $section->id => $section->consultationOverrides->mapWithKeys(fn ($override) => [
+                    $override->day_of_week => [
+                        'start' => substr((string) $override->start_time, 0, 5),
+                        'end' => substr((string) $override->end_time, 0, 5),
+                    ],
+                ])->all(),
+            ])->all(),
+            'lunchByGrade' => SchedulingConstants::setting('LUNCH_BY_GRADE_DAY'),
+            'lunchCampus' => SchedulingConstants::setting('LUNCH_CAMPUS_DAY'),
+            'recessByGrade' => SchedulingConstants::setting('RECESS_BY_GRADE_DAY'),
+            'recessCampus' => SchedulingConstants::setting('RECESS_CAMPUS_DAY'),
         ]);
     }
 

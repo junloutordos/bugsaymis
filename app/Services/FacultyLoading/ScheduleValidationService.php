@@ -111,6 +111,11 @@ class ScheduleValidationService
             if ($wellnessError) {
                 $errors[] = $wellnessError;
             }
+
+            $consultationError = $this->checkConsultationConflict($section, $data['day_of_week'], $data['start_time'], $data['end_time']);
+            if ($consultationError) {
+                $errors[] = $consultationError;
+            }
         }
 
         // ── 5b. Teacher official-time check ──────────────────────────────────
@@ -308,6 +313,7 @@ class ScheduleValidationService
 
         if (! $load) {
             $warnings[] = 'No faculty load record found for this term. One will be created automatically.';
+
             return ['errors' => $errors, 'warnings' => $warnings];
         }
 
@@ -350,8 +356,7 @@ class ScheduleValidationService
     {
         $grade = (int) $section->levelid;
 
-        $recessOverride = $section->recessOverrideFor($day);
-        $recessWindows  = $recessOverride ? [$recessOverride] : SchedulingConstants::getRecess($grade, $day);
+        $recessWindows = SchedulingConstants::getEffectiveRecess($grade, $day, $section->recessOverrideFor($day));
 
         foreach ($recessWindows as $recess) {
             $recessStart = $recess['start'] ?? null;
@@ -361,7 +366,7 @@ class ScheduleValidationService
             }
         }
 
-        $lunch      = $section->lunchOverrideFor($day) ?? SchedulingConstants::getLunch($grade, $day);
+        $lunch = SchedulingConstants::getEffectiveLunch($grade, $day, $section->lunchOverrideFor($day));
         $lunchStart = $lunch['start'] ?? null;
         $lunchEnd   = $lunch['end'] ?? null;
 
@@ -422,6 +427,21 @@ class ScheduleValidationService
         $wEnd   = $wellness['end'] ?? null;
         if ($wStart && $wEnd && $this->conflicts->timesOverlap($start, $end, $wStart, $wEnd)) {
             return "Schedule ({$start}–{$end}) overlaps with the section's Wellness block ({$wStart}–{$wEnd}).";
+        }
+
+        return null;
+    }
+
+    private function checkConsultationConflict(Section $section, string $day, string $start, string $end): ?string
+    {
+        $window = SchedulingConstants::getConsultationWindow(
+            (int) $section->levelid,
+            $day,
+            $section->consultationOverrideFor($day),
+        );
+
+        if ($window && $this->conflicts->timesOverlap($start, $end, $window['start'], $window['end'])) {
+            return "Schedule ({$start}–{$end}) overlaps with the section's Consultation / Home Bound block ({$window['start']}–{$window['end']}).";
         }
 
         return null;

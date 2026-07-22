@@ -622,8 +622,7 @@
       </div>
     </div>
 
-    <!-- Per-section, per-day Lunch popover — edits ONE section's lunch on
-         ONE weekday only, never the grade-wide bell schedule. -->
+    <!-- Lunch scope editor: section, grade level, or campus. -->
     <div v-if="sectionLunchPopover" ref="sectionLunchEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
       :style="{ left: sectionLunchPopover.x + 'px', top: sectionLunchPopover.y + 'px' }">
@@ -638,10 +637,14 @@
       </div>
 
       <div class="px-4 pb-3 space-y-3">
-        <p class="text-xs text-slate-500">
-          This section only — every other Grade {{ groupHeaderInfo(sectionLunchPopover.sectionId).grade_level }} section
-          keeps the grade default<span v-if="sectionLunchPopover.gradeDefaultLabel"> ({{ sectionLunchPopover.gradeDefaultLabel }})</span>.
-        </p>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Applies to</label>
+          <div class="flex flex-col gap-1.5">
+            <label class="flex items-center gap-2 text-sm text-slate-700"><input type="radio" value="section" v-model="sectionLunchPopover.scope" @change="onLunchScopeChange('section')" /> This section only</label>
+            <label class="flex items-center gap-2 text-sm text-slate-700"><input type="radio" value="grade" v-model="sectionLunchPopover.scope" @change="onLunchScopeChange('grade')" /> Every Grade {{ sectionLunchPopover.grade }} section</label>
+            <label class="flex items-center gap-2 text-sm text-slate-700"><input type="radio" value="campus" v-model="sectionLunchPopover.scope" @change="onLunchScopeChange('campus')" /> Every section, every grade</label>
+          </div>
+        </div>
 
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Lunch</label>
@@ -660,15 +663,14 @@
           class="text-xs font-medium text-slate-500 hover:text-rose-600"
           :disabled="sectionLunchPopover.saving"
           @click="saveSectionLunchPopover(true)">
-          Reset to grade default
+          Clear this scope
         </button>
         <span v-else />
         <AppButton size="sm" :loading="sectionLunchPopover.saving" @click="saveSectionLunchPopover(false)">Save</AppButton>
       </div>
     </div>
 
-    <!-- Per-section, per-day Recess popover — edits ONE section's recess on
-         ONE weekday only, never the grade-wide bell schedule. -->
+    <!-- Recess scope editor: section, grade level, or campus. -->
     <div v-if="sectionRecessPopover" ref="sectionRecessEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
       :style="{ left: sectionRecessPopover.x + 'px', top: sectionRecessPopover.y + 'px' }">
@@ -683,10 +685,14 @@
       </div>
 
       <div class="px-4 pb-3 space-y-3">
-        <p class="text-xs text-slate-500">
-          This section only — every other Grade {{ groupHeaderInfo(sectionRecessPopover.sectionId).grade_level }} section
-          keeps the grade default<span v-if="sectionRecessPopover.gradeDefaultLabel"> ({{ sectionRecessPopover.gradeDefaultLabel }})</span>.
-        </p>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Applies to</label>
+          <div class="flex flex-col gap-1.5">
+            <label class="flex items-center gap-2 text-sm text-slate-700"><input type="radio" value="section" v-model="sectionRecessPopover.scope" @change="onRecessScopeChange('section')" /> This section only</label>
+            <label class="flex items-center gap-2 text-sm text-slate-700"><input type="radio" value="grade" v-model="sectionRecessPopover.scope" @change="onRecessScopeChange('grade')" /> Every Grade {{ sectionRecessPopover.grade }} section</label>
+            <label class="flex items-center gap-2 text-sm text-slate-700"><input type="radio" value="campus" v-model="sectionRecessPopover.scope" @change="onRecessScopeChange('campus')" /> Every section, every grade</label>
+          </div>
+        </div>
 
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Recess</label>
@@ -705,7 +711,7 @@
           class="text-xs font-medium text-slate-500 hover:text-rose-600"
           :disabled="sectionRecessPopover.saving"
           @click="saveSectionRecessPopover(true)">
-          Reset to grade default
+          Clear this scope
         </button>
         <span v-else />
         <AppButton size="sm" :loading="sectionRecessPopover.saving" @click="saveSectionRecessPopover(false)">Save</AppButton>
@@ -832,9 +838,7 @@
       </div>
     </div>
 
-    <!-- Consultation / Home Bound popover — a grade+day override layered on
-         top of the shared bell-schedule row, so each of Mon-Fri is genuinely
-         independent (Tue/Wed/Thu/Fri otherwise all share one literal row). -->
+    <!-- Consultation / Home Bound scope editor. Each weekday is independent. -->
     <div v-if="consultationPopover" ref="consultationEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
       :style="{ left: consultationPopover.x + 'px', top: consultationPopover.y + 'px' }">
@@ -849,10 +853,23 @@
       </div>
 
       <div class="px-4 pb-3 space-y-3">
-        <p class="text-xs text-slate-500">
-          Applies to every Grade {{ consultationPopover.grade }} section on {{ consultationPopover.day }} only —
-          every other day keeps its own time.
-        </p>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Applies to</label>
+          <div class="flex flex-col gap-1.5">
+            <label v-if="consultationPopover.isSectionView" class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="section" v-model="consultationPopover.scope" @change="onConsultationScopeChange('section')" />
+              This section only ({{ consultationPopover.sectionName }})
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="grade" v-model="consultationPopover.scope" @change="onConsultationScopeChange('grade')" />
+              Every section, Grade {{ consultationPopover.grade }}
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="campus" v-model="consultationPopover.scope" @change="onConsultationScopeChange('campus')" />
+              Every section, every grade level
+            </label>
+          </div>
+        </div>
 
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Time</label>
@@ -871,7 +888,7 @@
           class="text-xs font-medium text-slate-500 hover:text-rose-600"
           :disabled="consultationPopover.saving"
           @click="saveConsultationPopover(true)">
-          Reset to shared schedule
+          Clear this scope
         </button>
         <span v-else />
         <AppButton size="sm" :loading="consultationPopover.saving" @click="saveConsultationPopover(false)">Save</AppButton>
@@ -1156,7 +1173,21 @@ const props = defineProps({
   wellnessCampus: { type: Object, default: () => ({}) },
   wednesdayFullGrades: { type: Array, default: () => [] },
   consultationByGrade: { type: Object, default: () => ({}) },
+  consultationCampus: { type: Object, default: () => ({}) },
+  consultationBySection: { type: Object, default: () => ({}) },
+  lunchByGrade: { type: Object, default: () => ({}) },
+  lunchCampus: { type: Object, default: () => ({}) },
+  recessByGrade: { type: Object, default: () => ({}) },
+  recessCampus: { type: Object, default: () => ({}) },
 })
+
+const scheduleBlockError = (err) => {
+  const errors = err.response?.data?.errors ?? {}
+  return errors.time?.[0]
+    ?? Object.values(errors).flat().find(Boolean)
+    ?? err.response?.data?.message
+    ?? 'Please review the values.'
+}
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
 
@@ -1997,7 +2028,7 @@ function singleGradeFor(groupId) {
 }
 
 function canEditBlockedFor(groupId) {
-  return props.canEditBellSchedule && singleGradeFor(groupId) !== null
+  return props.canEditBellSchedule && !scheduleLocked.value && singleGradeFor(groupId) !== null
 }
 
 /** { groupId, grade, day, band, edge, rect, origStart, origEnd, grabOffsetMin, startMin, endMin } */
@@ -2229,18 +2260,28 @@ function openSectionLunchPopover(e, sectionId, band, day) {
   const section = props.sections.find(s => s.id === sectionId)
   const grade = groupHeaderInfo(sectionId).grade_level
   const gradeDefault = props.dayConfigsByGrade?.[grade]?.[day]?.blocked?.find(b => b.type === 'LUNCH')
+  const sectionOverride = (section?.[`lunch_start_${suffix}`] && section?.[`lunch_end_${suffix}`])
+    ? { start: section[`lunch_start_${suffix}`].slice(0, 5), end: section[`lunch_end_${suffix}`].slice(0, 5) }
+    : null
+  const gradeOverride = props.lunchByGrade?.[grade]?.[day] ?? null
+  const campusOverride = props.lunchCampus?.[day] ?? null
+  const scope = sectionOverride ? 'section' : gradeOverride ? 'grade' : campusOverride ? 'campus' : 'section'
+  const current = scope === 'section' ? sectionOverride : scope === 'grade' ? gradeOverride : campusOverride
 
   const W = 300, H = 260
   sectionLunchPopover.value = {
     x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
     y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
     sectionId,
+    grade,
     day,
     sectionName: groupHeaderInfo(sectionId).section_name,
-    hasOverride: !!(section?.[`lunch_start_${suffix}`] && section?.[`lunch_end_${suffix}`]),
-    start: section?.[`lunch_start_${suffix}`]?.slice(0, 5) || band.start,
-    end:   section?.[`lunch_end_${suffix}`]?.slice(0, 5)   || band.end,
+    scope, sectionOverride, gradeOverride, campusOverride,
+    hasOverride: !!current,
+    start: current?.start ?? band.start,
+    end: current?.end ?? band.end,
     gradeDefaultLabel: gradeDefault ? `${gradeDefault.start}–${gradeDefault.end}` : null,
+    defaultWindow: { start: band.start, end: band.end },
     saving: false,
   }
   window.addEventListener('mousedown', onWindowMouseDownSectionLunch, true)
@@ -2262,21 +2303,41 @@ function onSectionLunchKeydown(e) {
   if (e.key === 'Escape') closeSectionLunchPopover()
 }
 
+function onLunchScopeChange(scope) {
+  const p = sectionLunchPopover.value
+  if (!p) return
+  const current = scope === 'section' ? p.sectionOverride : scope === 'grade' ? p.gradeOverride : p.campusOverride
+  p.start = current?.start ?? p.defaultWindow.start
+  p.end = current?.end ?? p.defaultWindow.end
+  p.hasOverride = !!current
+}
+
 async function saveSectionLunchPopover(clear = false) {
   const p = sectionLunchPopover.value
   if (!p) return
   const suffix = LUNCH_OVERRIDE_SUFFIX_BY_DAY[p.day]
   p.saving = true
   try {
-    await axios.patch(route('faculty-loading.sections.lunch', { section: p.sectionId, day: p.day }), {
-      [`lunch_start_${suffix}`]: clear ? '' : p.start,
-      [`lunch_end_${suffix}`]:   clear ? '' : p.end,
-    })
+    if (p.scope === 'section') {
+      await axios.patch(route('faculty-loading.sections.lunch', { section: p.sectionId, day: p.day }), {
+        [`lunch_start_${suffix}`]: clear ? '' : p.start,
+        [`lunch_end_${suffix}`]: clear ? '' : p.end,
+        academic_term_id: filters.term_id,
+      })
+    } else {
+      const routeName = p.scope === 'grade' ? 'faculty-loading.bell-schedule.break.grade' : 'faculty-loading.bell-schedule.break.campus'
+      const params = p.scope === 'grade'
+        ? { type: 'lunch', grade: p.grade, day: p.day }
+        : { type: 'lunch', day: p.day }
+      await axios.patch(route(routeName, params), {
+        start: clear ? null : p.start, end: clear ? null : p.end, academic_term_id: filters.term_id,
+      })
+    }
     closeSectionLunchPopover()
-    await router.reload({ only: ['dayConfigsBySection', 'sections'], preserveScroll: true })
+    await router.reload({ only: ['dayConfigsBySection', 'dayConfigsByGrade', 'sections', 'lunchByGrade', 'lunchCampus'], preserveScroll: true })
     Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
   } catch (err) {
-    Swal.fire('Could not save', err.response?.data?.errors?.[`lunch_end_${suffix}`]?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
+    Swal.fire('Could not save', scheduleBlockError(err), 'error')
   } finally {
     if (sectionLunchPopover.value) sectionLunchPopover.value.saving = false
   }
@@ -2297,18 +2358,28 @@ function openSectionRecessPopover(e, sectionId, band, day) {
   const section = props.sections.find(s => s.id === sectionId)
   const grade = groupHeaderInfo(sectionId).grade_level
   const gradeDefault = props.dayConfigsByGrade?.[grade]?.[day]?.blocked?.find(b => b.type === 'RECESS')
+  const sectionOverride = (section?.[`recess_start_${suffix}`] && section?.[`recess_end_${suffix}`])
+    ? { start: section[`recess_start_${suffix}`].slice(0, 5), end: section[`recess_end_${suffix}`].slice(0, 5) }
+    : null
+  const gradeOverride = props.recessByGrade?.[grade]?.[day] ?? null
+  const campusOverride = props.recessCampus?.[day] ?? null
+  const scope = sectionOverride ? 'section' : gradeOverride ? 'grade' : campusOverride ? 'campus' : 'section'
+  const current = scope === 'section' ? sectionOverride : scope === 'grade' ? gradeOverride : campusOverride
 
   const W = 300, H = 260
   sectionRecessPopover.value = {
     x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
     y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
     sectionId,
+    grade,
     day,
     sectionName: groupHeaderInfo(sectionId).section_name,
-    hasOverride: !!(section?.[`recess_start_${suffix}`] && section?.[`recess_end_${suffix}`]),
-    start: section?.[`recess_start_${suffix}`]?.slice(0, 5) || band.start,
-    end:   section?.[`recess_end_${suffix}`]?.slice(0, 5)   || band.end,
+    scope, sectionOverride, gradeOverride, campusOverride,
+    hasOverride: !!current,
+    start: current?.start ?? band.start,
+    end: current?.end ?? band.end,
     gradeDefaultLabel: gradeDefault ? `${gradeDefault.start}–${gradeDefault.end}` : null,
+    defaultWindow: { start: band.start, end: band.end },
     saving: false,
   }
   window.addEventListener('mousedown', onWindowMouseDownSectionRecess, true)
@@ -2330,21 +2401,41 @@ function onSectionRecessKeydown(e) {
   if (e.key === 'Escape') closeSectionRecessPopover()
 }
 
+function onRecessScopeChange(scope) {
+  const p = sectionRecessPopover.value
+  if (!p) return
+  const current = scope === 'section' ? p.sectionOverride : scope === 'grade' ? p.gradeOverride : p.campusOverride
+  p.start = current?.start ?? p.defaultWindow.start
+  p.end = current?.end ?? p.defaultWindow.end
+  p.hasOverride = !!current
+}
+
 async function saveSectionRecessPopover(clear = false) {
   const p = sectionRecessPopover.value
   if (!p) return
   const suffix = RECESS_OVERRIDE_SUFFIX_BY_DAY[p.day]
   p.saving = true
   try {
-    await axios.patch(route('faculty-loading.sections.recess', { section: p.sectionId, day: p.day }), {
-      [`recess_start_${suffix}`]: clear ? '' : p.start,
-      [`recess_end_${suffix}`]:   clear ? '' : p.end,
-    })
+    if (p.scope === 'section') {
+      await axios.patch(route('faculty-loading.sections.recess', { section: p.sectionId, day: p.day }), {
+        [`recess_start_${suffix}`]: clear ? '' : p.start,
+        [`recess_end_${suffix}`]: clear ? '' : p.end,
+        academic_term_id: filters.term_id,
+      })
+    } else {
+      const routeName = p.scope === 'grade' ? 'faculty-loading.bell-schedule.break.grade' : 'faculty-loading.bell-schedule.break.campus'
+      const params = p.scope === 'grade'
+        ? { type: 'recess', grade: p.grade, day: p.day }
+        : { type: 'recess', day: p.day }
+      await axios.patch(route(routeName, params), {
+        start: clear ? null : p.start, end: clear ? null : p.end, academic_term_id: filters.term_id,
+      })
+    }
     closeSectionRecessPopover()
-    await router.reload({ only: ['dayConfigsBySection', 'sections'], preserveScroll: true })
+    await router.reload({ only: ['dayConfigsBySection', 'dayConfigsByGrade', 'sections', 'recessByGrade', 'recessCampus'], preserveScroll: true })
     Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
   } catch (err) {
-    Swal.fire('Could not save', err.response?.data?.errors?.[`recess_end_${suffix}`]?.[0] ?? err.response?.data?.message ?? 'Please review the values.', 'error')
+    Swal.fire('Could not save', scheduleBlockError(err), 'error')
   } finally {
     if (sectionRecessPopover.value) sectionRecessPopover.value.saving = false
   }
@@ -2444,23 +2535,26 @@ async function saveWhiteSpacePopover(clear = false) {
       await axios.patch(route('faculty-loading.sections.white-space', { section: p.sectionId, day: p.day }), {
         [`white_space_start_${suffix}`]: clear ? '' : p.start,
         [`white_space_end_${suffix}`]:   clear ? '' : p.end,
+        academic_term_id: filters.term_id,
       })
     } else if (p.scope === 'grade') {
       await axios.patch(route('faculty-loading.bell-schedule.white-space.grade', { grade: p.grade, day: p.day }), {
         start: clear ? null : p.start,
         end:   clear ? null : p.end,
+        academic_term_id: filters.term_id,
       })
     } else {
       await axios.patch(route('faculty-loading.bell-schedule.white-space.campus', { day: p.day }), {
         start: clear ? null : p.start,
         end:   clear ? null : p.end,
+        academic_term_id: filters.term_id,
       })
     }
     closeWhiteSpacePopover()
     await router.reload({ only: ['dayConfigsBySection', 'dayConfigsByGrade', 'sections', 'whiteSpaceByGrade', 'whiteSpaceCampus'], preserveScroll: true })
     Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
   } catch (err) {
-    Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
+    Swal.fire('Could not save', scheduleBlockError(err), 'error')
   } finally {
     if (whiteSpacePopover.value) whiteSpacePopover.value.saving = false
   }
@@ -2558,23 +2652,26 @@ async function saveWellnessPopover(clear = false) {
       await axios.patch(route('faculty-loading.sections.wellness', { section: p.sectionId, day: p.day }), {
         [`wellness_start_${suffix}`]: clear ? '' : p.start,
         [`wellness_end_${suffix}`]:   clear ? '' : p.end,
+        academic_term_id: filters.term_id,
       })
     } else if (p.scope === 'grade') {
       await axios.patch(route('faculty-loading.bell-schedule.wellness.grade', { grade: p.grade, day: p.day }), {
         start: clear ? null : p.start,
         end:   clear ? null : p.end,
+        academic_term_id: filters.term_id,
       })
     } else {
       await axios.patch(route('faculty-loading.bell-schedule.wellness.campus', { day: p.day }), {
         start: clear ? null : p.start,
         end:   clear ? null : p.end,
+        academic_term_id: filters.term_id,
       })
     }
     closeWellnessPopover()
     await router.reload({ only: ['dayConfigsBySection', 'dayConfigsByGrade', 'sections', 'wellnessByGrade', 'wellnessCampus'], preserveScroll: true })
     Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
   } catch (err) {
-    Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
+    Swal.fire('Could not save', scheduleBlockError(err), 'error')
   } finally {
     if (wellnessPopover.value) wellnessPopover.value.saving = false
   }
@@ -2617,13 +2714,21 @@ function openConsultationPopover(e, groupId, day) {
   const consultRow = rows.find(r => r.type === 'CONSULT')
   if (!consultRow) return
 
-  const override = props.consultationByGrade?.[grade]?.[day] ?? null
+  const isSectionView = viewBy.value === 'section'
+  const sectionId = isSectionView ? groupId : null
+  const sectionOverride = sectionId ? props.consultationBySection?.[sectionId]?.[day] ?? null : null
+  const gradeOverride = props.consultationByGrade?.[grade]?.[day] ?? null
+  const campusOverride = props.consultationCampus?.[day] ?? null
+  const scope = sectionOverride ? 'section' : gradeOverride ? 'grade' : campusOverride ? 'campus' : (isSectionView ? 'section' : 'grade')
+  const override = scope === 'section' ? sectionOverride : scope === 'grade' ? gradeOverride : campusOverride
 
   const W = 300, H = 260
   consultationPopover.value = {
     x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
     y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
-    grade, day, key,
+    grade, day, key, groupId, sectionId, isSectionView,
+    sectionName: isSectionView ? groupHeaderInfo(groupId).section_name : null,
+    scope, sectionOverride, gradeOverride, campusOverride,
     hasOverride: !!override,
     start: override?.start ?? consultRow.start,
     end: override?.end ?? consultRow.end,
@@ -2631,6 +2736,17 @@ function openConsultationPopover(e, groupId, day) {
   }
   window.addEventListener('mousedown', onWindowMouseDownConsultation, true)
   window.addEventListener('keydown', onConsultationKeydown)
+}
+
+function onConsultationScopeChange(scope) {
+  const p = consultationPopover.value
+  if (!p) return
+  const current = scope === 'section' ? p.sectionOverride : scope === 'grade' ? p.gradeOverride : p.campusOverride
+  const rows = props.bellScheduleTimetables?.[p.key] ?? []
+  const fallback = rows.find(r => r.type === 'CONSULT')
+  p.start = current?.start ?? fallback?.start ?? ''
+  p.end = current?.end ?? fallback?.end ?? ''
+  p.hasOverride = !!current
 }
 
 function closeConsultationPopover() {
@@ -2652,46 +2768,36 @@ async function saveConsultationPopover(clear = false) {
   const p = consultationPopover.value
   if (!p) return
 
-  if (!clear) {
-    // The previous period is still a SHARED row (same one Tue/Wed/Thu/Fri all
-    // read) — it can't be shrunk for just this one day, so a genuine overlap
-    // has to be rejected rather than silently "fixed" the way earlier code did.
-    const rows = props.bellScheduleTimetables?.[p.key] ?? []
-    const idx = rows.findIndex(r => r.type === 'CONSULT')
-    const prevRow = idx > 0 ? rows[idx - 1] : null
-    if (prevRow && prevRow.end > p.start) {
-      Swal.fire(
-        'Cannot save',
-        `Consultation would overlap ${prevRow.label}, which currently runs until ${prevRow.end} `
-          + `(shared across every day using this schedule). Shorten it in the Bell Schedule editor first, `
-          + `or pick a start time at or after ${prevRow.end}.`,
-        'error',
-      )
-      return
-    }
-  }
-
   const confirmed = await Swal.fire({
     title: clear ? 'Reset Consultation to the shared schedule?' : 'Set Consultation?',
     html: clear
       ? `<b>${p.day}</b> for <b>Grade ${p.grade}</b> will go back to following the shared bell schedule.`
-      : `This only changes <b>${p.day}</b> for <b>Grade ${p.grade}</b> — every other day keeps its own time. `
-        + `Future generations only; already-placed classes won't move.<br><br>New time: <b>${p.start}–${p.end}</b>`,
+      : `Scope: <b>${p.scope === 'section' ? p.sectionName : p.scope === 'grade' ? `every Grade ${p.grade} section` : 'every section campus-wide'}</b>. `
+        + `The save is allowed only when the affected calendars have no plotted schedule in this time.<br><br>New time: <b>${p.start}–${p.end}</b>`,
     icon: 'warning', showCancelButton: true, confirmButtonText: clear ? 'Reset' : 'Save',
   })
   if (!confirmed.isConfirmed) return
 
   p.saving = true
   try {
-    await axios.patch(route('faculty-loading.bell-schedule.consultation.grade', { grade: p.grade, day: p.day }), {
+    const routeName = p.scope === 'section'
+      ? 'faculty-loading.bell-schedule.consultation.section'
+      : p.scope === 'grade'
+        ? 'faculty-loading.bell-schedule.consultation.grade'
+        : 'faculty-loading.bell-schedule.consultation.campus'
+    const params = p.scope === 'section'
+      ? { section: p.sectionId, day: p.day }
+      : p.scope === 'grade' ? { grade: p.grade, day: p.day } : { day: p.day }
+    await axios.patch(route(routeName, params), {
       start: clear ? null : p.start,
       end:   clear ? null : p.end,
+      academic_term_id: filters.term_id,
     })
     closeConsultationPopover()
-    await router.reload({ only: ['dayConfigsByGrade', 'consultationByGrade'], preserveScroll: true })
+    await router.reload({ only: ['dayConfigsBySection', 'dayConfigsByGrade', 'consultationBySection', 'consultationByGrade', 'consultationCampus'], preserveScroll: true })
     Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
   } catch (err) {
-    Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')
+    Swal.fire('Could not save', scheduleBlockError(err), 'error')
   } finally {
     if (consultationPopover.value) consultationPopover.value.saving = false
   }
