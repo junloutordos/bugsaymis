@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityEvaluation;
 use App\Models\AMS\ActivityParticipant;
+use App\Models\AMS\ActivityTwsEvaluation;
+use App\Services\AMS\ActivityEvaluationEligibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +15,8 @@ use Inertia\Inertia;
 
 class MyActivityController extends Controller
 {
+    public function __construct(private ActivityEvaluationEligibilityService $evaluationEligibility) {}
+
     // ── Index — list of activities the current user participated in ────────────
 
     public function index(Request $request)
@@ -24,9 +28,16 @@ class MyActivityController extends Controller
             ->where('participant_type', 'employee')
             ->get();
 
-        // Pre-load evaluated activity IDs for this user (single query)
-        $evaluatedIds = ActivityEvaluation::where('participant_type', 'employee')
+        $activityIds = $participants->pluck('activity_id');
+        $inHouseEvaluatedIds = ActivityEvaluation::where('participant_type', 'employee')
             ->where('participant_id', $userId)
+            ->whereIn('activity_id', $activityIds)
+            ->pluck('activity_id')
+            ->flip()
+            ->all();
+        $twsEvaluatedIds = ActivityTwsEvaluation::where('participant_type', 'employee')
+            ->where('participant_id', $userId)
+            ->whereIn('activity_id', $activityIds)
             ->pluck('activity_id')
             ->flip()
             ->all();
@@ -35,9 +46,11 @@ class MyActivityController extends Controller
             ->filter(fn($p) => $p->activity !== null)
             ->sortByDesc(fn($p) => $p->activity->start_date)
             ->values()
-            ->map(function ($p) use ($evaluatedIds) {
+            ->map(function ($p) use ($inHouseEvaluatedIds, $twsEvaluatedIds) {
                 $activity  = $p->activity;
-                $evaluated = isset($evaluatedIds[$activity->id]);
+                $evaluated = $activity->isTrainingWorkshopSeminar()
+                    ? isset($twsEvaluatedIds[$activity->id])
+                    : isset($inHouseEvaluatedIds[$activity->id]);
                 $hash      = md5($p->participant_id . '-' . $activity->id);
 
                 return [
@@ -50,7 +63,7 @@ class MyActivityController extends Controller
                     'total_hours'        => $activity->total_hours,
                     'attended'           => $p->attended,          // 'yes' | 'no'
                     'evaluated'          => $evaluated,
-                    'has_certificate'    => (bool) $p->certificate_path,
+                    'has_certificate'    => $evaluated && $p->attended === 'yes' && (bool) $p->certificate_path,
                     'evaluate_url'       => route('ams.activities.evaluate.show', [$activity->id, $hash]),
                 ];
             });
@@ -71,10 +84,7 @@ class MyActivityController extends Controller
             ->where('participant_type', 'employee')
             ->firstOrFail();
 
-        $evaluated = ActivityEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', 'employee')
-            ->where('participant_id', $userId)
-            ->exists();
+        $evaluated = $this->evaluationEligibility->hasEvaluated($activity, 'employee', $userId);
 
         $hash = md5($userId . '-' . $activity->id);
 
@@ -98,7 +108,7 @@ class MyActivityController extends Controller
                 'id'              => $participant->id,
                 'attended'        => $participant->attended,
                 'hours_attended'  => $participant->hours_attended,
-                'has_certificate' => (bool) $participant->certificate_path,
+                'has_certificate' => $evaluated && $participant->attended === 'yes' && (bool) $participant->certificate_path,
             ],
             'evaluated'    => $evaluated,
             'evaluate_url' => route('ams.activities.evaluate.show', [$activity->id, $hash]),
@@ -125,10 +135,7 @@ class MyActivityController extends Controller
         }
 
         // Must have evaluated
-        $evaluated = ActivityEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', 'employee')
-            ->where('participant_id', $userId)
-            ->exists();
+        $evaluated = $this->evaluationEligibility->hasEvaluated($activity, 'employee', $userId);
 
         if (!$evaluated) {
             abort(403, 'You must complete the activity evaluation before downloading your certificate.');

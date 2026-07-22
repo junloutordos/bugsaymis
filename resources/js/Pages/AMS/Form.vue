@@ -23,6 +23,10 @@ const props = defineProps({
 
 const isEditing = computed(() => !!props.activity)
 
+function normalizeTime(value) {
+  return value ? String(value).slice(0, 5) : ''
+}
+
 const breadcrumbItems = computed(() => {
   const items = [{ label: 'Activities', href: route('ams.activities.index') }]
   if (isEditing.value) {
@@ -39,9 +43,9 @@ const form = ref({
   title:           props.activity?.title ?? '',
   activity_type:   props.activity?.activity_type ?? 'in_house',
   start_date:      props.activity?.start_date ?? '',
-  start_time:      props.activity?.start_time ?? '',
+  start_time:      normalizeTime(props.activity?.start_time),
   end_date:        props.activity?.end_date ?? '',
-  end_time:        props.activity?.end_time ?? '',
+  end_time:        normalizeTime(props.activity?.end_time),
   total_hours:     props.activity?.total_hours ?? '',
   venue:           props.activity?.venue ?? '',
   resource_person: props.activity?.resource_person ?? '',
@@ -140,6 +144,7 @@ function pickFile(event, fieldRef) {
 
 const errors = ref({})
 const submitting = ref(false)
+const errorMessages = computed(() => [...new Set(Object.values(errors.value).flat().filter(Boolean))])
 
 function submit() {
   submitting.value = true
@@ -152,7 +157,7 @@ function submit() {
   const payload = {
     ...form.value,
     meal_plans: mealPlans,
-    speakers: isTws.value ? speakers.value : [],
+    ...(isTws.value ? { speakers: speakers.value } : {}),
     banner: bannerFile.value.base64,
     special_order: specialOrderFile.value.base64,
     activity_report: activityReportFile.value.base64,
@@ -179,6 +184,13 @@ function submit() {
       <AppPageHeader :title="isEditing ? 'Edit Activity' : 'New Activity'" :breadcrumb="breadcrumbItems" />
 
       <form @submit.prevent="submit" class="space-y-6">
+
+        <div v-if="errorMessages.length" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3" role="alert">
+          <p class="text-sm font-semibold text-red-700">Please correct the following before saving:</p>
+          <ul class="mt-1 list-disc pl-5 text-xs text-red-600">
+            <li v-for="message in errorMessages" :key="message">{{ message }}</li>
+          </ul>
+        </div>
 
         <!-- Activity Type -->
         <AppCard title="Activity Type">
@@ -219,9 +231,9 @@ function submit() {
             <!-- Date/Time row -->
             <div class="grid grid-cols-2 gap-4">
               <AppInput v-model="form.start_date" type="date" label="Start Date" required :error="errors.start_date" />
-              <AppInput v-model="form.start_time" type="time" label="Start Time" />
+              <AppInput v-model="form.start_time" type="time" label="Start Time" :error="errors.start_time" />
               <AppInput v-model="form.end_date" type="date" label="End Date" required :error="errors.end_date" />
-              <AppInput v-model="form.end_time" type="time" label="End Time" />
+              <AppInput v-model="form.end_time" type="time" label="End Time" :error="errors.end_time" />
             </div>
 
             <!-- Hours / Venue -->

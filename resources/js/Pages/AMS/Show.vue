@@ -770,7 +770,7 @@ async function removeCoPro(cp) {
                       <ClipboardDocumentCheckIcon v-if="copiedId === p.id" class="w-4 h-4" />
                       <LinkIcon v-else class="w-4 h-4" />
                     </AppIconButton>
-                    <a v-if="empAttendance[p.id]?.attended === 'yes'"
+                    <a v-if="empAttendance[p.id]?.attended === 'yes' && p.evaluated && p.has_certificate"
                        :href="route('ams.activities.certificates.download.participant', [activity.id, p.id])"
                        target="_blank" class="text-indigo-500 hover:text-indigo-700 p-1 rounded hover:bg-indigo-50" title="Download certificate">
                       <DocumentArrowDownIcon class="w-4 h-4" />
@@ -813,9 +813,7 @@ async function removeCoPro(cp) {
                         <div v-if="canManage" class="flex items-center gap-2">
                           <AppButton variant="success" size="sm" @click="markAllSectionStudents(p.id, 'yes')">All Present</AppButton>
                           <AppButton variant="secondary" size="sm" @click="markAllSectionStudents(p.id, 'no')">All Absent</AppButton>
-                          <AppButton size="sm" @click="saveSectionAttendance(p)">
-                            Save Attendance &amp; Send Certificates
-                          </AppButton>
+                          <AppButton size="sm" @click="saveSectionAttendance(p)">Save Attendance</AppButton>
                         </div>
                       </div>
                       <div class="border border-slate-200 rounded-lg overflow-hidden">
@@ -825,6 +823,8 @@ async function removeCoPro(cp) {
                               <th class="text-left px-3 py-2">Student</th>
                               <th class="text-center px-3 py-2 w-28">Hours</th>
                               <th class="text-center px-3 py-2 w-28">Attendance</th>
+                              <th class="text-center px-3 py-2 w-28">Evaluated</th>
+                              <th class="text-center px-3 py-2 w-24">Certificate</th>
                             </tr>
                           </thead>
                           <tbody class="divide-y divide-slate-50">
@@ -847,6 +847,23 @@ async function removeCoPro(cp) {
                                   <CheckCircleIcon class="w-3 h-3 mr-1" />
                                   {{ student.attended === 'yes' ? 'Present' : 'Absent' }}
                                 </AppBadge>
+                              </td>
+                              <td class="px-3 py-2 text-center">
+                                <AppBadge :color="evaluatedColor(student.evaluated)">
+                                  {{ student.evaluated ? 'Evaluated' : 'Pending' }}
+                                </AppBadge>
+                              </td>
+                              <td class="px-3 py-2 text-center">
+                                <a
+                                  v-if="student.attended === 'yes' && student.evaluated && student.has_certificate"
+                                  :href="route('ams.activities.certificates.download.student', [activity.id, student.attendance_id])"
+                                  target="_blank"
+                                  class="inline-flex rounded p-1 text-indigo-500 hover:bg-indigo-50 hover:text-indigo-700"
+                                  title="Download certificate"
+                                >
+                                  <DocumentArrowDownIcon class="h-4 w-4" />
+                                </a>
+                                <span v-else class="text-xs text-slate-400">—</span>
                               </td>
                             </tr>
                           </tbody>

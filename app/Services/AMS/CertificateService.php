@@ -12,6 +12,13 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class CertificateService
 {
+    public function delete(?string $storagePath): void
+    {
+        if ($storagePath) {
+            Storage::disk('public')->delete($storagePath);
+        }
+    }
+
     /**
      * Generate a certificate PDF for one participant, save it, and return the storage path.
      */

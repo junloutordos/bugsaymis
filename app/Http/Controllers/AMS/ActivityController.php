@@ -7,7 +7,6 @@ use App\Mail\AMS\ActivityEvaluationInviteMail;
 use App\Mail\AMS\ActivityInvitationMail;
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityCoProponent;
-use App\Models\AMS\ActivityEvaluation;
 use App\Models\AMS\ActivityParticipant;
 use App\Models\AMS\ActivityStudentAttendance;
 use App\Models\FacultyLoading\Section;
@@ -15,6 +14,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Exports\AMS\ActivityEvaluationExport;
 use App\Services\AMS\ActivityEvaluationExportService;
+use App\Services\AMS\ActivityEvaluationEligibilityService;
 use App\Services\AMS\ActivityEvaluationSummaryService;
 use App\Services\AMS\ActivityFileService;
 use App\Services\AMS\CertificateService;
@@ -36,6 +36,7 @@ class ActivityController extends Controller
         private ActivityFileService $fileService,
         private ActivityEvaluationSummaryService $evalSummaryService,
         private ActivityEvaluationExportService $evalExportService,
+        private ActivityEvaluationEligibilityService $evaluationEligibility,
     ) {}
 
     // ── CRUD ─────────────────────────────────────────────────────────────────
@@ -103,9 +104,7 @@ class ActivityController extends Controller
         $employeesMap = User::whereIn('id', $employeeIds)->get(['id', 'name'])->keyBy('id');
 
         // Evaluation lookup: keyed by "type:participant_id"
-        $evaluations = ActivityEvaluation::where('activity_id', $activity->id)
-            ->get(['participant_type', 'participant_id'])
-            ->keyBy(fn($e) => $e->participant_type . ':' . $e->participant_id);
+        $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
         $participants = $activity->participants->map(function ($p) use ($sectionsMap, $employeesMap, $evaluations, $activity) {
             $evalHash      = md5($p->participant_id . '-' . $activity->id);
@@ -133,6 +132,7 @@ class ActivityController extends Controller
                 'attended'       => $p->attended,
                 'hours_attended' => $p->hours_attended,
                 'evaluated'      => isset($evaluations['employee:' . $p->participant_id]),
+                'has_certificate' => (bool) $p->certificate_path,
                 'evaluate_url'   => $evaluateUrl,
             ];
         })->values()->all();
@@ -188,10 +188,11 @@ class ActivityController extends Controller
         }
 
         $uploads = $this->handleUploads($request, $activity, $activity);
-        $activity->update(array_merge($data, $uploads));
-
-        $this->syncMealPlans($activity, $mealPlans);
-        $this->syncSpeakers($activity, $speakers);
+        DB::transaction(function () use ($activity, $data, $uploads, $mealPlans, $speakers) {
+            $activity->update(array_merge($data, $uploads));
+            $this->syncMealPlans($activity, $mealPlans);
+            $this->syncSpeakers($activity, $speakers);
+        });
 
         return redirect()->route('ams.activities.show', $activity)->with('success', 'Activity updated.');
     }
@@ -354,43 +355,30 @@ class ActivityController extends Controller
         return back()->with('success', 'Participant removed.');
     }
 
-    /**
-     * Save attendance + hours for a single employee participant.
-     * If marking present, generate certificate and email it.
-     */
+    /** Save attendance + hours for a single employee participant. */
     public function saveEmployeeAttendance(Request $request, Activity $activity, ActivityParticipant $participant)
     {
         $this->authorizeManage($activity);
+        abort_unless(
+            $participant->activity_id === $activity->id && $participant->participant_type === 'employee',
+            404
+        );
 
         $data = $request->validate([
             'attended'       => 'required|in:yes,no',
             'hours_attended' => 'nullable|numeric|min:0|max:99.99',
         ]);
 
+        if ($participant->certificate_path && (
+            ! $this->evaluationEligibility->hasEvaluated($activity, 'employee', $participant->participant_id)
+            || $this->shouldInvalidateCertificate($participant, $data)
+        )) {
+            $this->certService->delete($participant->certificate_path);
+            $data['certificate_path'] = null;
+        }
         $participant->update($data);
 
-        if ($data['attended'] === 'yes') {
-            $user = User::find($participant->participant_id);
-            if ($user) {
-                try {
-                    $path = $this->certService->buildAndSave(
-                        $activity,
-                        $user->name,
-                        $data['hours_attended'] ?? 0,
-                        $participant->participant_id
-                    );
-                    $participant->update(['certificate_path' => $path]);
-
-                    if ($user->email) {
-                        $this->certService->sendCertificateEmail($activity, $user->email, $user->name, $path);
-                    }
-                } catch (\Throwable $e) {
-                    \Log::warning("AMS: cert gen failed for user {$participant->participant_id}: " . $e->getMessage());
-                }
-            }
-        }
-
-        return back()->with('success', 'Attendance saved.');
+        return back()->with('success', 'Attendance saved. Certificate generation remains pending until evaluation is complete.');
     }
 
     // ── Student Attendance ────────────────────────────────────────────────────
@@ -398,6 +386,10 @@ class ActivityController extends Controller
     public function sectionStudents(Activity $activity, ActivityParticipant $participant)
     {
         $this->authorizeView($activity);
+        abort_unless(
+            $participant->activity_id === $activity->id && $participant->participant_type === 'section',
+            404
+        );
 
         $studentIds = DB::table('section_students')
             ->where('sectionid', $participant->participant_id)
@@ -407,6 +399,7 @@ class ActivityController extends Controller
             ->whereIn('participant_id', $studentIds)
             ->get()
             ->keyBy('participant_id');
+        $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
         $students = Student::whereIn('id', $studentIds)
             ->orderBy('lastname')
@@ -419,17 +412,20 @@ class ActivityController extends Controller
                 'attended'       => $attendance[$s->id]?->attended ?? 'no',
                 'hours_attended' => $attendance[$s->id]?->hours_attended ?? '0.00',
                 'attendance_id'  => $attendance[$s->id]?->id,
+                'evaluated'      => isset($evaluations['student:' . $s->id]),
+                'has_certificate' => (bool) $attendance[$s->id]?->certificate_path,
             ])->values()
         );
     }
 
-    /**
-     * Bulk save student attendance for a section.
-     * Generates + emails certificates for all present students.
-     */
+    /** Bulk save student attendance for a section. */
     public function saveSectionAttendance(Request $request, Activity $activity, ActivityParticipant $participant)
     {
         $this->authorizeManage($activity);
+        abort_unless(
+            $participant->activity_id === $activity->id && $participant->participant_type === 'section',
+            404
+        );
 
         $data = $request->validate([
             'students'                 => 'required|array',
@@ -439,51 +435,37 @@ class ActivityController extends Controller
             'students.*.student_id'    => 'required|integer',
         ]);
 
-        $studentMap = Student::whereIn('id', collect($data['students'])->pluck('student_id'))
-            ->get(['id', 'firstname', 'lastname', 'middlename', 'student_email'])
-            ->keyBy('id');
-
-        $errors = 0;
-
         foreach ($data['students'] as $row) {
-            $attendance = ActivityStudentAttendance::find($row['attendance_id']);
+            $attendance = ActivityStudentAttendance::where('activity_id', $activity->id)
+                ->where('id', $row['attendance_id'])
+                ->where('participant_id', $row['student_id'])
+                ->first();
             if (!$attendance) continue;
 
-            $attendance->update([
+            $attendanceData = [
                 'attended'       => $row['attended'],
                 'hours_attended' => $row['hours_attended'] ?? 0,
-            ]);
-
-            if ($row['attended'] === 'yes') {
-                $student = $studentMap[$row['student_id']] ?? null;
-                if ($student) {
-                    try {
-                        $path = $this->certService->buildAndSave(
-                            $activity,
-                            $student->full_name,
-                            $row['hours_attended'] ?? 0,
-                            $student->id
-                        );
-                        $attendance->update(['certificate_path' => $path]);
-
-                        if (!empty($student->student_email)) {
-                            $this->certService->sendCertificateEmail(
-                                $activity, $student->student_email, $student->full_name, $path
-                            );
-                        }
-                    } catch (\Throwable $e) {
-                        $errors++;
-                        \Log::warning("AMS: cert gen failed for student {$student->id}: " . $e->getMessage());
-                    }
-                }
+            ];
+            if ($attendance->certificate_path && (
+                ! $this->evaluationEligibility->hasEvaluated($activity, 'student', $attendance->participant_id)
+                || $this->shouldInvalidateCertificate($attendance, $attendanceData)
+            )) {
+                $this->certService->delete($attendance->certificate_path);
+                $attendanceData['certificate_path'] = null;
             }
+            $attendance->update($attendanceData);
         }
 
-        $msg = $errors > 0
-            ? 'Attendance saved. Some certificates could not be generated (check logs).'
-            : 'Attendance saved and certificates sent to present students.';
+        return back()->with('success', 'Attendance saved. Certificates are generated only for students who have completed the evaluation.');
+    }
 
-        return back()->with('success', $msg);
+    private function shouldInvalidateCertificate($record, array $newAttendance): bool
+    {
+        if (! $record->certificate_path) return false;
+
+        return $newAttendance['attended'] !== 'yes'
+            || $record->attended !== $newAttendance['attended']
+            || (float) $record->hours_attended !== (float) ($newAttendance['hours_attended'] ?? 0);
     }
 
     // ── Authorization ─────────────────────────────────────────────────────────
@@ -538,6 +520,16 @@ class ActivityController extends Controller
 
     private function validated(Request $request): array
     {
+        // MySQL TIME columns are returned as HH:MM:SS, while browser time
+        // inputs normally submit HH:MM. Normalize either representation before
+        // applying the single canonical validation format.
+        foreach (['start_time', 'end_time'] as $field) {
+            $value = $request->input($field);
+            if (is_string($value) && preg_match('/^\d{2}:\d{2}:00$/', $value)) {
+                $request->merge([$field => substr($value, 0, 5)]);
+            }
+        }
+
         return $request->validate([
             'title'           => 'required|string|max:255',
             'activity_type'   => 'required|in:in_house,training_workshop_seminar',
@@ -557,7 +549,7 @@ class ActivityController extends Controller
             'meal_plans.*.pm_snacks' => 'nullable|boolean',
             'meal_plans.*.dinner'    => 'nullable|boolean',
 
-            'speakers'               => 'required_if:activity_type,training_workshop_seminar|array|min:1',
+            'speakers'               => 'exclude_unless:activity_type,training_workshop_seminar|required|array|min:1',
             'speakers.*.id'          => 'nullable|integer',
             'speakers.*.name'        => 'required|string|max:255',
             'speakers.*.designation' => 'nullable|string|max:255',

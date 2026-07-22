@@ -1,0 +1,190 @@
+<?php
+
+namespace Tests\Feature\AMS;
+
+use App\Models\AMS\Activity;
+use App\Models\AMS\ActivityEvaluation;
+use App\Models\AMS\ActivityParticipant;
+use App\Models\AMS\ActivityTwsEvaluation;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\AMS\CertificateService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class CertificateEligibilityTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_saving_attendance_never_generates_or_emails_certificate(): void
+    {
+        [$owner, $attendee, $activity, $participant] = $this->employeeParticipant();
+        $certificate = $this->mock(CertificateService::class);
+        $certificate->shouldNotReceive('buildAndSave');
+        $certificate->shouldNotReceive('sendCertificateEmail');
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.participants.save-attendance', [$activity, $participant]), [
+                'attended' => 'yes',
+                'hours_attended' => 8,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('ams_activity_participants', [
+            'id' => $participant->id,
+            'attended' => 'yes',
+            'hours_attended' => 8,
+            'certificate_path' => null,
+        ]);
+    }
+
+    public function test_manual_generation_skips_present_participant_without_evaluation(): void
+    {
+        [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ]);
+        $certificate = $this->mock(CertificateService::class);
+        $certificate->shouldNotReceive('buildAndSave');
+        $certificate->shouldNotReceive('sendCertificateEmail');
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.certificates.generate', $activity))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertNull($participant->fresh()->certificate_path);
+    }
+
+    public function test_manual_generation_creates_and_emails_certificate_after_in_house_evaluation(): void
+    {
+        [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ]);
+        ActivityEvaluation::create([
+            'activity_id' => $activity->id,
+            'participant_type' => 'employee',
+            'participant_id' => $attendee->id,
+        ]);
+
+        $certificate = $this->mock(CertificateService::class);
+        $certificate->shouldReceive('buildAndSave')->once()->andReturn('ams/certificates/eligible.pdf');
+        $certificate->shouldReceive('sendCertificateEmail')->once();
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.certificates.generate', $activity))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('ams/certificates/eligible.pdf', $participant->fresh()->certificate_path);
+    }
+
+    public function test_training_evaluation_qualifies_participant_for_certificate(): void
+    {
+        [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ], Activity::TYPE_TRAINING_WORKSHOP_SEMINAR);
+        ActivityTwsEvaluation::create([
+            'activity_id' => $activity->id,
+            'participant_type' => 'employee',
+            'participant_id' => $attendee->id,
+        ]);
+
+        $certificate = $this->mock(CertificateService::class);
+        $certificate->shouldReceive('buildAndSave')->once()->andReturn('ams/certificates/tws.pdf');
+        $certificate->shouldReceive('sendCertificateEmail')->once();
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.certificates.generate', $activity))
+            ->assertRedirect();
+
+        $this->assertSame('ams/certificates/tws.pdf', $participant->fresh()->certificate_path);
+    }
+
+    public function test_attendance_change_invalidates_existing_certificate(): void
+    {
+        [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+            'certificate_path' => 'ams/certificates/old.pdf',
+        ]);
+        ActivityEvaluation::create([
+            'activity_id' => $activity->id,
+            'participant_type' => 'employee',
+            'participant_id' => $attendee->id,
+        ]);
+
+        $certificate = $this->mock(CertificateService::class);
+        $certificate->shouldReceive('delete')->once()->with('ams/certificates/old.pdf');
+        $certificate->shouldNotReceive('buildAndSave');
+        $certificate->shouldNotReceive('sendCertificateEmail');
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.participants.save-attendance', [$activity, $participant]), [
+                'attended' => 'yes',
+                'hours_attended' => 6,
+            ])
+            ->assertRedirect();
+
+        $this->assertNull($participant->fresh()->certificate_path);
+        $this->assertSame('6.00', $participant->fresh()->hours_attended);
+    }
+
+    public function test_premature_certificate_cannot_be_downloaded_or_publicly_verified(): void
+    {
+        [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+            'certificate_path' => 'ams/certificates/premature.pdf',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('ams.activities.certificates.download.participant', [$activity, $participant]))
+            ->assertForbidden();
+
+        $this->get(route('ams.certificates.verify', [
+            $activity,
+            md5($attendee->id.'-'.$activity->id),
+        ]))->assertNotFound();
+    }
+
+    private function employeeParticipant(array $participantOverrides = [], string $activityType = Activity::TYPE_IN_HOUSE): array
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $attendee = User::factory()->create(['email' => uniqid().'@example.test']);
+        $activity = Activity::create([
+            'user_id' => $owner->id,
+            'title' => 'Eligibility Test Activity',
+            'activity_type' => $activityType,
+            'start_date' => '2026-08-10',
+            'end_date' => '2026-08-10',
+        ]);
+        $participant = ActivityParticipant::create(array_merge([
+            'activity_id' => $activity->id,
+            'participant_id' => $attendee->id,
+            'participant_type' => 'employee',
+            'attended' => 'no',
+            'hours_attended' => 0,
+        ], $participantOverrides));
+
+        return [$owner, $attendee, $activity, $participant];
+    }
+
+    private function userWithPermission(string $permissionName): User
+    {
+        $permission = Permission::firstOrCreate(
+            ['name' => $permissionName],
+            ['module' => 'Activities', 'description' => $permissionName],
+        );
+        $role = Role::create(['name' => 'AMS Certificate Test '.uniqid()]);
+        $role->permissions()->attach($permission);
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $user->roles()->attach($role);
+
+        return $user;
+    }
+}

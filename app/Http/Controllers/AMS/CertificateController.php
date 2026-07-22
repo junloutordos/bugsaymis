@@ -4,49 +4,52 @@ namespace App\Http\Controllers\AMS;
 
 use App\Http\Controllers\Controller;
 use App\Models\AMS\Activity;
-use App\Models\AMS\ActivityEvaluation;
+use App\Models\AMS\ActivityCoProponent;
 use App\Models\AMS\ActivityParticipant;
 use App\Models\AMS\ActivityStudentAttendance;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\AMS\ActivityEvaluationEligibilityService;
 use App\Services\AMS\CertificateService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class CertificateController extends Controller
 {
-    public function __construct(private CertificateService $certService) {}
+    public function __construct(
+        private CertificateService $certService,
+        private ActivityEvaluationEligibilityService $evaluationEligibility,
+    ) {}
     /**
      * Generate certificates for all 'present' participants of an activity.
      * Saves each PDF to storage and updates certificate_path on the participant row.
      */
     public function generate(Activity $activity)
     {
+        $this->authorizeManage($activity);
         $activity->load('participants');
 
         $generated = 0;
         $skipped   = 0;
+        $failed    = 0;
 
-        // Pre-load evaluations for this activity
-        $evaluations = ActivityEvaluation::where('activity_id', $activity->id)
-            ->get(['participant_type', 'participant_id'])
-            ->keyBy(fn($e) => $e->participant_type . ':' . $e->participant_id);
+        $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
-        foreach ($activity->participants as $participant) {
-            if ($participant->attended !== 'yes') {
+        foreach ($activity->participants->where('participant_type', 'employee') as $participant) {
+            if ($participant->attended !== 'yes'
+                || ! isset($evaluations['employee:'.$participant->participant_id])
+                || $participant->certificate_path) {
                 $skipped++;
                 continue;
             }
 
-            if ($participant->participant_type === 'employee') {
-                // Skip if participant has not yet evaluated the activity
-                if (!isset($evaluations['employee:' . $participant->participant_id])) {
-                    $skipped++;
-                    continue;
-                }
+            $user = User::find($participant->participant_id);
+            if (! $user) {
+                $skipped++;
+                continue;
+            }
 
-                $user = User::find($participant->participant_id);
-                if (!$user) { $skipped++; continue; }
-
+            try {
                 $path = $this->certService->buildAndSave(
                     activity: $activity,
                     name: $user->name,
@@ -55,65 +58,91 @@ class CertificateController extends Controller
                 );
 
                 $participant->update(['certificate_path' => $path]);
-                $generated++;
-            }
-
-            // Sections: handled via student attendance rows
-            if ($participant->participant_type === 'section') {
-                $rows = ActivityStudentAttendance::where('activity_id', $activity->id)
-                    ->where('attended', 'yes')
-                    ->get();
-
-                foreach ($rows as $row) {
-                    // Skip students who have not yet evaluated
-                    if (!isset($evaluations['student:' . $row->participant_id])) {
-                        $skipped++;
-                        continue;
-                    }
-
-                    $student = Student::find($row->participant_id);
-                    if (!$student) continue;
-
-                    $path = $this->certService->buildAndSave(
-                        activity: $activity,
-                        name: $student->full_name,
-                        hoursAttended: $row->hours_attended,
-                        participantId: $row->participant_id
-                    );
-
-                    $row->update(['certificate_path' => $path]);
-                    $generated++;
+                if ($user->email) {
+                    $this->certService->sendCertificateEmail($activity, $user->email, $user->name, $path);
                 }
+                $generated++;
+            } catch (\Throwable $e) {
+                $failed++;
+                \Log::warning("AMS: certificate generation failed for employee {$participant->participant_id}: ".$e->getMessage());
             }
         }
 
-        return back()->with('success', "Generated {$generated} certificate(s). {$skipped} skipped (absent, not evaluated, or missing).");
+        // Student attendance rows are activity-wide. Process them once rather
+        // than once per participating section, which previously duplicated PDFs.
+        $studentRows = ActivityStudentAttendance::where('activity_id', $activity->id)->get();
+        foreach ($studentRows as $row) {
+            if ($row->attended !== 'yes'
+                || ! isset($evaluations['student:'.$row->participant_id])
+                || $row->certificate_path) {
+                $skipped++;
+                continue;
+            }
+
+            $student = Student::find($row->participant_id);
+            if (! $student) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                $path = $this->certService->buildAndSave(
+                    activity: $activity,
+                    name: $student->full_name,
+                    hoursAttended: $row->hours_attended,
+                    participantId: $row->participant_id
+                );
+
+                $row->update(['certificate_path' => $path]);
+                if ($student->student_email) {
+                    $this->certService->sendCertificateEmail($activity, $student->student_email, $student->full_name, $path);
+                }
+                $generated++;
+            } catch (\Throwable $e) {
+                $failed++;
+                \Log::warning("AMS: certificate generation failed for student {$row->participant_id}: ".$e->getMessage());
+            }
+        }
+
+        $message = "Generated {$generated} eligible certificate(s) and emailed those with an available address. {$skipped} skipped (absent, not evaluated, already generated, or missing).";
+        if ($failed) {
+            $message .= " {$failed} failed during generation.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function downloadParticipant(Activity $activity, ActivityParticipant $participant)
     {
-        if (!$participant->certificate_path) abort(404, 'Certificate not yet generated.');
-
-        $evaluated = ActivityEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', 'employee')
-            ->where('participant_id', $participant->participant_id)
-            ->exists();
-
-        if (!$evaluated) abort(403, 'You must complete the activity evaluation before downloading your certificate.');
+        abort_unless(
+            $participant->activity_id === $activity->id && $participant->participant_type === 'employee',
+            404
+        );
+        abort_unless($participant->attended === 'yes', 403, 'Certificate is only available to present participants.');
+        abort_unless(
+            $this->evaluationEligibility->hasEvaluated($activity, 'employee', $participant->participant_id),
+            403,
+            'You must complete the activity evaluation before downloading your certificate.'
+        );
+        if (! $participant->certificate_path) {
+            abort(404, 'Certificate not yet generated.');
+        }
 
         return $this->streamPdf($participant->certificate_path, $activity->title);
     }
 
     public function downloadStudent(Activity $activity, ActivityStudentAttendance $attendance)
     {
-        if (!$attendance->certificate_path) abort(404, 'Certificate not yet generated.');
-
-        $evaluated = ActivityEvaluation::where('activity_id', $activity->id)
-            ->where('participant_type', 'student')
-            ->where('participant_id', $attendance->participant_id)
-            ->exists();
-
-        if (!$evaluated) abort(403, 'You must complete the activity evaluation before downloading your certificate.');
+        abort_unless($attendance->activity_id === $activity->id, 404);
+        abort_unless($attendance->attended === 'yes', 403, 'Certificate is only available to present participants.');
+        abort_unless(
+            $this->evaluationEligibility->hasEvaluated($activity, 'student', $attendance->participant_id),
+            403,
+            'You must complete the activity evaluation before downloading your certificate.'
+        );
+        if (! $attendance->certificate_path) {
+            abort(404, 'Certificate not yet generated.');
+        }
 
         return $this->streamPdf($attendance->certificate_path, $activity->title);
     }
@@ -125,6 +154,8 @@ class CertificateController extends Controller
     {
         // Look in both participant tables for a certificate whose name hash matches
         $participant = ActivityParticipant::where('activity_id', $activity->id)
+            ->where('participant_type', 'employee')
+            ->where('attended', 'yes')
             ->whereNotNull('certificate_path')
             ->get()
             ->first(function ($p) use ($hash) {
@@ -134,6 +165,7 @@ class CertificateController extends Controller
         $studentRow = null;
         if (!$participant) {
             $studentRow = ActivityStudentAttendance::where('activity_id', $activity->id)
+                ->where('attended', 'yes')
                 ->whereNotNull('certificate_path')
                 ->get()
                 ->first(function ($r) use ($hash) {
@@ -144,6 +176,11 @@ class CertificateController extends Controller
         if (!$participant && !$studentRow) {
             abort(404, 'Certificate not found or has not been generated yet.');
         }
+
+        $eligible = $participant
+            ? $this->evaluationEligibility->hasEvaluated($activity, 'employee', $participant->participant_id)
+            : $this->evaluationEligibility->hasEvaluated($activity, 'student', $studentRow->participant_id);
+        abort_unless($eligible, 404, 'Certificate not found or has not been generated yet.');
 
         // Resolve name
         $name = null;
@@ -177,5 +214,20 @@ class CertificateController extends Controller
             'Content-Type'        => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $filename . '"',
         ]);
+    }
+
+    private function authorizeManage(Activity $activity): void
+    {
+        $user = Auth::user();
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        $isOwner = $activity->user_id === $user->id;
+        $isCoProponent = ActivityCoProponent::where('activity_id', $activity->id)
+            ->where('employee_id', $user->id)
+            ->exists();
+
+        abort_unless($isOwner || $isCoProponent, 403);
     }
 }
