@@ -6,19 +6,25 @@ use App\Models\Pds;
 use App\Models\PDSTraining;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
+use App\Services\PdsTrainingContinuationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Pdf\Mpdf as PdfWriter;
-use Carbon\Carbon;
+
 class PDSController extends Controller
 {
+    public function __construct(
+        private readonly PdsTrainingContinuationService $trainingContinuation,
+    ) {
+    }
+
     /* =====================================================
      | USER: Redirect to own PDS
      ===================================================== */
@@ -347,6 +353,7 @@ public function exportPDS(Pds $pds)
 {
     $this->authorizeAccess($pds);
     $pds = $this->loadFullPds($pds);
+    $pdsOwner = User::find($pds->user_id);
 
     $tempTemplate = tempnam(sys_get_temp_dir(), 'pds_tpl_');
     file_put_contents($tempTemplate, Storage::disk('s3')->get('templates/pds_template2025.xlsx'));
@@ -538,6 +545,12 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
      ===================================================== */
     $sheet = $spreadsheet->getSheetByName('C3');
 
+    $this->trainingContinuation->populate(
+        $spreadsheet,
+        $pds->trainings ?? [],
+        $pdsOwner?->name ?? 'Employee',
+    );
+
     /* ---------- Voluntary Work ---------- */
     $row = 6;
     foreach ($pds->voluntaryWork ?? [] as $v) {
@@ -546,20 +559,6 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
         $sheet->setCellValue("G{$row}", $v->to_date ? Carbon::parse($v->to_date)->format('m-d-Y') : '');
         $sheet->setCellValue("J{$row}", $v->hours ?? '');
         $sheet->setCellValue("H{$row}", $v->nature_of_work ?? '');
-
-        $row++;
-    }
-
-
-    /* ---------- Trainings / Seminars ---------- */
-    $row = 18;
-    foreach ($pds->trainings ?? [] as $t) {
-        $sheet->setCellValue("A{$row}", $t->training_title ?? '');
-        $sheet->setCellValue("E{$row}", $t->date_from ? Carbon::parse($t->date_from)->format('m-d-Y') : '');
-        $sheet->setCellValue("F{$row}", $t->date_to ? Carbon::parse($t->date_to)->format('m-d-Y') : '');
-        $sheet->setCellValue("G{$row}", $t->hours ?? '');
-        $sheet->setCellValue("H{$row}", $t->training_type ?? '');
-        $sheet->setCellValue("I{$row}", $t->conducted_by ?? '');
 
         $row++;
     }
@@ -771,7 +770,6 @@ foreach ($questions as $q) {
     }
 
     $signatureData = null;
-    $pdsOwner = User::find($pds->user_id);
     if ($pdsOwner) {
         $signatureDataUri = (new DigitalSignatureService())->getSignatureDataUri($pdsOwner);
         if ($signatureDataUri) {
@@ -864,6 +862,7 @@ public function exportPDSPdf(Pds $pds)
 {
     $this->authorizeAccess($pds);
     $pds = $this->loadFullPds($pds);
+    $pdsOwner = User::find($pds->user_id);
 
     $tempTemplate = tempnam(sys_get_temp_dir(), 'pds_tpl_');
     file_put_contents($tempTemplate, Storage::disk('s3')->get('templates/pds_template2025.xlsx'));
@@ -1055,6 +1054,12 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
      ===================================================== */
     $sheet = $spreadsheet->getSheetByName('C3');
 
+    $this->trainingContinuation->populate(
+        $spreadsheet,
+        $pds->trainings ?? [],
+        $pdsOwner?->name ?? 'Employee',
+    );
+
     /* ---------- Voluntary Work ---------- */
     $row = 6;
     foreach ($pds->voluntaryWork ?? [] as $v) {
@@ -1063,20 +1068,6 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
         $sheet->setCellValue("G{$row}", $v->to_date ? Carbon::parse($v->to_date)->format('m-d-Y') : '');
         $sheet->setCellValue("J{$row}", $v->hours ?? '');
         $sheet->setCellValue("H{$row}", $v->nature_of_work ?? '');
-
-        $row++;
-    }
-
-
-    /* ---------- Trainings / Seminars ---------- */
-    $row = 18;
-    foreach ($pds->trainings ?? [] as $t) {
-        $sheet->setCellValue("A{$row}", $t->training_title ?? '');
-        $sheet->setCellValue("E{$row}", $t->date_from ? Carbon::parse($t->date_from)->format('m-d-Y') : '');
-        $sheet->setCellValue("F{$row}", $t->date_to ? Carbon::parse($t->date_to)->format('m-d-Y') : '');
-        $sheet->setCellValue("G{$row}", $t->hours ?? '');
-        $sheet->setCellValue("H{$row}", $t->training_type ?? '');
-        $sheet->setCellValue("I{$row}", $t->conducted_by ?? '');
 
         $row++;
     }
