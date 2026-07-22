@@ -188,6 +188,8 @@ class ClassScheduleController extends Controller
             $term,
             ClassSchedule::where('section_id', $section->id),
             (int) $section->levelid,
+            [],
+            $section,
         );
     }
 
@@ -352,13 +354,24 @@ class ClassScheduleController extends Controller
         ];
     }
 
-    /** One sheet's worth of print props: owner + schedules + dayConfigs (+ extras). */
+    /**
+     * One sheet's worth of print props: owner + schedules + dayConfigs (+ extras).
+     *
+     * $section: when printing a specific section, pass it so its own Lunch/
+     * Recess/White Space/Wellness overrides (Section::lunchOverrideFor() etc.)
+     * apply the same way they already do on the interactive calendar
+     * (renderCalendar()) — without it, every blocked band silently falls back
+     * to the grade default, which is wrong for any section that has its own
+     * override (found 2026-07-22: a section's overridden Lunch showed
+     * correctly on the calendar but reverted to the grade default in print).
+     */
     private function buildPrintSheet(
         array $owner,
         AcademicTerm $term,
         Builder $query,
         ?int $gradeLevel = null,
         array $extra = [],
+        ?Section $section = null,
     ): array {
         $dayOrder = "FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')";
 
@@ -381,10 +394,17 @@ class ClassScheduleController extends Controller
         if ($gradeLevel !== null) {
             foreach (SchedulingConstants::DAYS as $day) {
                 $window = SchedulingConstants::getEffectiveClassWindow($gradeLevel, $day);
+                $trim = fn (?array $w) => $w ? ['start' => substr((string) $w['start'], 0, 5), 'end' => substr((string) $w['end'], 0, 5)] : null;
+                $lunchOverride = $trim($section?->lunchOverrideFor($day));
+                $recessOverride = $trim($section?->recessOverrideFor($day));
+                $whiteSpaceOverride = $trim($section?->whiteSpaceOverrideFor($day));
+                $wellnessOverride = $trim($section?->wellnessOverrideFor($day));
                 $dayConfigs[$day] = [
                     'start' => $window['start'] ?? null,
                     'end' => $window['end'] ?? null,
-                    'blocked' => SchedulingConstants::getDisplayBlockedSlots($gradeLevel, $day),
+                    'blocked' => SchedulingConstants::getDisplayBlockedSlots(
+                        $gradeLevel, $day, $lunchOverride, $recessOverride, $whiteSpaceOverride, $wellnessOverride,
+                    ),
                     'electives' => $isElectiveSection ? [] : SchedulingConstants::getElectiveWindows($gradeLevel, $day),
                     'scienceCore' => ($isElectiveSection || $isScienceCoreSection)
                         ? []
@@ -408,6 +428,7 @@ class ClassScheduleController extends Controller
         Builder $query,
         ?int $gradeLevel = null,
         array $extra = [],
+        ?Section $section = null,
     ): Response {
         return Inertia::render('FacultyLoading/Schedules/Print', [
             'scheduleType' => $scheduleType,
@@ -420,7 +441,7 @@ class ClassScheduleController extends Controller
                 $term,
                 $scheduleType === 'faculty' ? User::find($owner['id']) : null,
             ),
-            ...$this->buildPrintSheet($owner, $term, $query, $gradeLevel, $extra),
+            ...$this->buildPrintSheet($owner, $term, $query, $gradeLevel, $extra, $section),
         ]);
     }
 
@@ -471,6 +492,8 @@ class ClassScheduleController extends Controller
                     $term,
                     ClassSchedule::where('section_id', $section->id),
                     (int) $section->levelid,
+                    [],
+                    $section,
                 );
             }
         } else {
