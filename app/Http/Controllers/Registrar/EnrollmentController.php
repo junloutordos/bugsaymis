@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -407,7 +408,7 @@ class EnrollmentController extends Controller
         return back()->with('success', "{$count} student(s) assigned to {$section->sectionname}.");
     }
 
-    // ── Update enrollment (status / section transfer) ─────────────────────────
+    // ── Update enrollment status ──────────────────────────────────────────────
 
     public function update(Request $request, StudentEnrollment $enrollment): RedirectResponse
     {
@@ -416,31 +417,98 @@ class EnrollmentController extends Controller
         $data = $request->validate([
             'status'  => ['required', Rule::in(['enrolled', 'dropped', 'transferred_out', 'on_leave', 'completed'])],
             'notes'   => ['nullable', 'string', 'max:500'],
-            'section_id' => ['nullable', 'integer'],
         ]);
-
-        // If transferring to a different section within the same school year
-        if (! empty($data['section_id']) && $data['section_id'] !== $enrollment->section_id) {
-            $newSection = Section::where('id', $data['section_id'])
-                ->where('school_year_id', $enrollment->school_year_id)
-                ->firstOrFail();
-
-            $count = StudentEnrollment::where('section_id', $newSection->id)
-                ->where('school_year_id', $enrollment->school_year_id)
-                ->where('status', 'enrolled')
-                ->count();
-
-            abort_if($count >= $newSection->capacity, 422, 'Target section is at capacity.');
-
-            $enrollment->section_id  = $newSection->id;
-            $enrollment->grade_level = $newSection->levelid;
-        }
 
         $enrollment->status = $data['status'];
         $enrollment->notes  = $data['notes'];
         $enrollment->save();
 
         return back()->with('success', 'Enrollment updated.');
+    }
+
+    // ── Transfer an enrolled student to another section ──────────────────────
+
+    public function transferSection(Request $request, StudentEnrollment $enrollment): RedirectResponse
+    {
+        $this->authorize('students.enrollment.manage');
+
+        $data = $request->validate([
+            'section_id' => ['required', 'integer', 'exists:sections,id'],
+        ]);
+
+        if ($enrollment->status !== 'enrolled') {
+            throw ValidationException::withMessages([
+                'section_id' => ['Only enrolled students can be transferred between sections.'],
+            ]);
+        }
+        if ((int) $data['section_id'] === (int) $enrollment->section_id) {
+            throw ValidationException::withMessages([
+                'section_id' => ['Select a different target section.'],
+            ]);
+        }
+
+        $sourceSection = $enrollment->section;
+
+        $targetSection = DB::transaction(function () use ($data, $enrollment) {
+            $target = Section::where('id', $data['section_id'])
+                ->where('school_year_id', $enrollment->school_year_id)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $target) {
+                throw ValidationException::withMessages([
+                    'section_id' => ['Target section must be active and belong to the same school year.'],
+                ]);
+            }
+            if ((int) $target->levelid !== (int) $enrollment->grade_level) {
+                throw ValidationException::withMessages([
+                    'section_id' => ['Target section must be in the same grade level.'],
+                ]);
+            }
+
+            $currentCount = StudentEnrollment::where('section_id', $target->id)
+                ->where('school_year_id', $enrollment->school_year_id)
+                ->where('status', 'enrolled')
+                ->count();
+
+            if ($currentCount >= $target->capacity) {
+                throw ValidationException::withMessages([
+                    'section_id' => ['Target section is at capacity.'],
+                ]);
+            }
+
+            $enrollment->update([
+                'section_id' => $target->id,
+                'grade_level' => $target->levelid,
+            ]);
+
+            // Keep legacy section consumers (AMS, consultations, library, and
+            // the Faculty Loading section roster) aligned with enrollment.
+            if ($target->syid !== null) {
+                DB::table('section_students')->updateOrInsert(
+                    ['studentid' => $enrollment->student_id, 'syid' => $target->syid],
+                    ['sectionid' => $target->id, 'levelid' => $target->levelid],
+                );
+            }
+
+            // Clearance queues and reports store a section snapshot linked to
+            // this enrollment, so move that snapshot with the student.
+            StudentClearance::where('student_enrollment_id', $enrollment->id)->update([
+                'section_id' => $target->id,
+                'grade_level' => $target->levelid,
+                'adviser_id' => $target->adviserUser()->value('users.id'),
+            ]);
+
+            return $target;
+        });
+
+        $sourceName = $sourceSection?->sectionname ?? 'the previous section';
+
+        return back()->with(
+            'success',
+            "Student transferred from {$sourceName} to {$targetSection->sectionname}."
+        );
     }
 
     // ── Drop / cancel enrollment ──────────────────────────────────────────────

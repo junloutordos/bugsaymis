@@ -20,6 +20,7 @@ import {
   XMarkIcon,
   CheckCircleIcon,
   UserGroupIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
@@ -320,6 +321,43 @@ function submitStatus() {
   })
 }
 
+// ── Transfer student to another section ─────────────────────────────────────
+const transferringEnrollment = ref(null)
+const transferForm = useForm({ section_id: '' })
+
+const transferTargets = computed(() => {
+  if (!selectedSection.value) return []
+  return props.sections.filter(section =>
+    section.grade_level === selectedSection.value.grade_level
+    && section.id !== selectedSection.value.id
+  )
+})
+
+function openTransferSection(enrollment) {
+  transferringEnrollment.value = enrollment
+  transferForm.reset()
+  transferForm.clearErrors()
+  transferForm.section_id = ''
+}
+
+function closeTransferSection() {
+  transferringEnrollment.value = null
+  transferForm.reset()
+  transferForm.clearErrors()
+}
+
+function submitTransferSection() {
+  const sourceSectionId = selectedSection.value.id
+  transferForm.put(route('registrar.enrollment.transfer-section', transferringEnrollment.value.id), {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeTransferSection()
+      const refreshedSource = props.sections.find(section => section.id === sourceSectionId)
+      if (refreshedSource) openSection(refreshedSource)
+    },
+  })
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const GRADE_LABELS = { 7:'Grade 7',8:'Grade 8',9:'Grade 9',10:'Grade 10',11:'Grade 11',12:'Grade 12' }
 
@@ -556,10 +594,20 @@ function clearanceLabel(status) {
                   </p>
                 </td>
                 <td class="px-4 py-2">
-                  <button
-                    @click="openEditStatus(s)"
-                    class="text-xs text-indigo-600 hover:underline"
-                  >Edit</button>
+                  <div class="flex items-center gap-1">
+                    <AppIconButton
+                      v-if="s.status === 'enrolled'"
+                      label="Transfer section"
+                      size="sm"
+                      @click="openTransferSection(s)"
+                    >
+                      <ArrowsRightLeftIcon class="h-4 w-4" />
+                    </AppIconButton>
+                    <button
+                      @click="openEditStatus(s)"
+                      class="text-xs text-indigo-600 hover:underline"
+                    >Edit</button>
+                  </div>
                 </td>
               </tr>
 
@@ -811,6 +859,55 @@ function clearanceLabel(status) {
           :loading="bulkForm.processing"
           @click="submitBulk"
         >{{ bulkForm.processing ? 'Enrolling…' : `Enroll ${bulkParsed.length} Students` }}</AppButton>
+      </template>
+    </AppModal>
+
+    <!-- ── Transfer section modal ───────────────────────────────────────────── -->
+    <AppModal
+      :show="!!transferringEnrollment"
+      title="Transfer Section"
+      :subtitle="transferringEnrollment?.full_name"
+      size="sm"
+      @close="closeTransferSection"
+    >
+      <div class="space-y-4">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+          <p class="text-xs text-slate-500">Current section</p>
+          <p class="font-medium text-slate-800">{{ selectedSection?.name }} · Grade {{ selectedSection?.grade_level }}</p>
+        </div>
+
+        <AppSelect
+          v-model="transferForm.section_id"
+          label="Transfer to"
+          placeholder="Select target section…"
+          :error="transferForm.errors.section_id"
+          required
+        >
+          <option
+            v-for="section in transferTargets"
+            :key="section.id"
+            :value="section.id"
+            :disabled="section.enrolled >= section.capacity"
+          >
+            {{ section.name }} — {{ section.enrolled }}/{{ section.capacity }} enrolled{{ section.adviser_name ? ` · ${section.adviser_name}` : '' }}{{ section.enrolled >= section.capacity ? ' (Full)' : '' }}
+          </option>
+        </AppSelect>
+
+        <p v-if="transferTargets.length === 0" class="text-xs text-amber-700">
+          No other sections are available for this grade level.
+        </p>
+        <p class="text-xs text-slate-500">
+          The student remains enrolled. Existing class-record scores and attendance entries will not be changed.
+        </p>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeTransferSection">Cancel</AppButton>
+        <AppButton
+          :disabled="!transferForm.section_id"
+          :loading="transferForm.processing"
+          @click="submitTransferSection"
+        >{{ transferForm.processing ? 'Transferring…' : 'Transfer Student' }}</AppButton>
       </template>
     </AppModal>
 

@@ -94,6 +94,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('registrar.enrollment.update')
         ->middleware('permission:students.enrollment.manage');
 
+    Route::put('/registrar/enrollment/{enrollment}/transfer-section', [EnrollmentController::class, 'transferSection'])
+        ->name('registrar.enrollment.transfer-section')
+        ->middleware('permission:students.enrollment.manage');
+
     Route::delete('/registrar/enrollment/{enrollment}', [EnrollmentController::class, 'destroy'])
         ->name('registrar.enrollment.destroy')
         ->middleware('permission:students.enrollment.manage');
