@@ -132,6 +132,7 @@
               <!-- Blocked period overlays -->
               <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="`${bp.label}-${bp.start}`"
                 :style="blockedStyle(bp)"
+                :title="blockedTitle(bp)"
                 :class="['absolute inset-x-0 z-[1] flex items-center justify-center group',
                   isBandDraggable(bp) ? 'pointer-events-auto cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-indigo-300 hover:ring-inset'
                     : isBandClickable(bp) ? 'pointer-events-auto cursor-pointer hover:ring-2 hover:ring-teal-300 hover:ring-inset'
@@ -145,15 +146,27 @@
                     : 'bg-slate-100/70']" />
                 <span :class="['relative w-full font-medium px-1 text-center leading-tight select-none',
                   bp.type === 'WHITE_SPACE' ? 'text-violet-600' : bp.type === 'CONSULT' ? 'text-sky-600' : bp.type === 'WELLNESS' ? 'text-emerald-600' : 'text-slate-400']">
-                  <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
-                    {{ bp.label }}
-                  </span>
-                  <span v-if="bp.adviser_name" class="block truncate text-[10px] font-semibold text-slate-500">
-                    Adviser: {{ bp.adviser_name }}
-                  </span>
-                  <span :class="['block tabular-nums opacity-80', blockedDurationMin(bp) >= 40 ? 'text-[10px]' : 'text-[9px]']">
-                    {{ fmtTimeRange(bp.start, bp.end) }}
-                  </span>
+                  <!-- Very short bands (e.g. a Consultation sliver squeezed by
+                       the Wednesday ALP block) collapse to one compact line —
+                       label + time together — instead of overflowing a box
+                       barely tall enough for a single line of text. Full
+                       detail is still available via the title tooltip above. -->
+                  <template v-if="isCompactBlocked(bp)">
+                    <span class="block truncate text-[9px]">
+                      {{ bp.label }} · {{ fmtTimeRange(bp.start, bp.end) }}
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span :class="['block truncate', blockedDurationMin(bp) >= 40 ? 'text-xs' : 'text-[10px]']">
+                      {{ bp.label }}
+                    </span>
+                    <span v-if="bp.adviser_name" class="block truncate text-[10px] font-semibold text-slate-500">
+                      Adviser: {{ bp.adviser_name }}
+                    </span>
+                    <span :class="['block tabular-nums opacity-80', blockedDurationMin(bp) >= 40 ? 'text-[10px]' : 'text-[9px]']">
+                      {{ fmtTimeRange(bp.start, bp.end) }}
+                    </span>
+                  </template>
                 </span>
                 <template v-if="isBandDraggable(bp)">
                   <div class="absolute inset-x-0 top-0 h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 bg-indigo-400/50"
@@ -426,6 +439,22 @@ function blockedDurationMin(bp) {
   return timeToMin(bp.end) - timeToMin(bp.start)
 }
 
+/** Below this, even the smallest two-line layout doesn't fit the 22px
+ *  minimum height — collapse to one compact line instead. */
+const COMPACT_BLOCKED_THRESHOLD_MIN = 15
+
+function isCompactBlocked(bp) {
+  return blockedDurationMin(bp) < COMPACT_BLOCKED_THRESHOLD_MIN
+}
+
+/** Native tooltip fallback — hovering always reveals the full label/time
+ *  (and adviser, if any), regardless of how cramped the band's own text is. */
+function blockedTitle(bp) {
+  const parts = [bp.label, fmtTimeRange(bp.start, bp.end)]
+  if (bp.adviser_name) parts.push(`Adviser: ${bp.adviser_name}`)
+  return parts.join(' — ')
+}
+
 /** Greedy interval-packing so concurrent events in a day get side-by-side
  *  lanes instead of stacking. Returns Map(scheduleId -> {lane, totalLanes}). */
 function packOverlaps(events) {
@@ -521,7 +550,12 @@ function blockedStyle(bp) {
   return {
     position: 'absolute',
     top:    ((sm - CAL_START) * SCALE) + 'px',
-    height: Math.max((em - sm) * SCALE, 4) + 'px',
+    // 22px minimum — matches the 24px floor regular schedule events already
+    // use. A band this short (e.g. a 10-minute Consultation sliver squeezed
+    // by the Wednesday ALP block) would otherwise render at ~4px, nowhere
+    // near enough room for its label — see blockedDurationMin()'s compact
+    // single-line mode below for how the text itself adapts.
+    height: Math.max((em - sm) * SCALE, 22) + 'px',
     left: 0,
     right: 0,
   }
