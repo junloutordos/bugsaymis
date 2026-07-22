@@ -804,7 +804,12 @@ onUnmounted(() => {
 .kiosk-root { min-height: 100vh; background: #020617; color: white; display: flex; flex-direction: column; overflow: hidden; }
 .kiosk-header { min-height: 76px; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,.08); z-index: 20; }
 .scanner-stage, .setup-panel { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
-.setup-panel { padding: 1.5rem; background: radial-gradient(circle at top, #312e81, #020617 65%); }
+.setup-panel {
+  padding: 1.5rem;
+  background:
+    linear-gradient(160deg, rgba(15,23,42,.76) 0%, rgba(15,23,42,.82) 50%, rgba(30,27,75,.9) 100%),
+    url('/images/bg.jpg') center / cover no-repeat;
+}
 .setup-card, .start-card { width: min(440px, 92vw); border: 1px solid rgba(255,255,255,.14); border-radius: 1.5rem; padding: 2rem; background: rgba(15,23,42,.92); box-shadow: 0 24px 80px rgba(0,0,0,.4); }
 .guard-login-card { width: min(760px, 94vw); max-height: calc(100vh - 110px); overflow-y: auto; border: 1px solid rgba(255,255,255,.14); border-radius: 1.5rem; padding: 2rem; background: rgba(15,23,42,.94); box-shadow: 0 24px 80px rgba(0,0,0,.4); }
 .guard-grid { margin-top: 1.5rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }

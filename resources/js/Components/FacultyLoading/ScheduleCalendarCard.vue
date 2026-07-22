@@ -45,10 +45,12 @@
               {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
             </span>
             <button v-if="blockedEditable" type="button"
+              :aria-label="`Set White Space for ${day}`"
               title="Set White Space for this day"
-              class="absolute top-1 right-1 p-0.5 rounded opacity-0 group-hover/daycol:opacity-100 text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-opacity print:hidden"
-              @click="$emit('add-white-space', day, $event)">
-              <PlusIcon class="h-3.5 w-3.5" />
+              class="mt-1 inline-flex min-h-7 items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700 hover:border-violet-300 hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-1 print:hidden"
+              @click.stop="$emit('add-white-space', day, $event)">
+              <PlusIcon class="h-3 w-3" />
+              <span>White Space</span>
             </button>
           </div>
         </div>
