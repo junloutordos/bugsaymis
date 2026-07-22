@@ -681,32 +681,20 @@ class SchedulingConstants
     /**
      * Get the canonical Tue–Fri timetable for a grade (early 7:30 shift).
      *
-     * Grade 10 shares the G9G10 table with Grade 9, but reserves one fixed
-     * period every Tue–Fri for electives (like G11–G12). We tag that period's
-     * label with "(Elective)" for Grade 10 only, so every downstream consumer —
-     * the generator's slot grid, class/blocked-slot helpers, and the calendar
-     * elective band — treats it uniformly, without giving Grade 9 an elective.
+     * Grade 10 shares the G9G10 table with Grade 9, but reserves a fixed
+     * elective window on Wednesday/Thursday/Friday only (Tuesday stays a
+     * plain, non-elective day, identical to Grade 9) — see
+     * applyG10ElectiveWindow(). Every downstream consumer — the generator's
+     * slot grid, class/blocked-slot helpers, and the calendar elective band —
+     * goes through this method, so they all treat it uniformly.
      */
-    public static function getTueFriTimetable(int $grade): array
+    public static function getTueFriTimetable(int $grade, string $day): array
     {
         if ($grade <= 8)  return self::timetable('TUEFRI_730_G7G8');
         if ($grade === 9) return self::timetable('TUEFRI_730_G9G10');
-        if ($grade === 10) return self::tagElectivePeriod(self::timetable('TUEFRI_730_G9G10'), self::G10_ELECTIVE_LABEL);
+        if ($grade === 10) return self::applyG10ElectiveWindow(self::timetable('TUEFRI_730_G9G10'), $day);
         return self::timetable('TUEFRI_730_G11G12');
     }
-
-    /**
-     * Grade 10's fixed Tue–Fri elective period, identified by its period
-     * label ("Period 7" in the default timetable) rather than a start time —
-     * an admin editing G10's Tue–Fri bell schedule via the calendar's inline
-     * editor (BellScheduleController::update()) shifts period start/end times
-     * but always resubmits the existing label unchanged, so the label is the
-     * stable identifier. Matching by a hardcoded start time ('13:50') instead
-     * silently broke the elective tag the moment an edit shifted that period
-     * even slightly — found 2026-07-20 when a live G10 override had every
-     * period shifted ~30min and no row started at '13:50' anymore.
-     */
-    private const G10_ELECTIVE_LABEL = 'Period 7';
 
     /**
      * The EDITABLE_TIMETABLES key backing a grade's literal rows for a day —
@@ -761,19 +749,33 @@ class SchedulingConstants
     }
 
     /**
-     * Append "(Elective)" to the CLASS row whose label equals $label, so it
-     * reads as an elective window. Matches by label rather than start time —
-     * an editor override changes times but preserves labels (see
-     * G10_ELECTIVE_LABEL). No-op if the row isn't found (e.g. an editor
-     * override renamed it) or is already tagged.
+     * Grade 10's elective window: fixed at 12:10–13:10 on Wednesday, Thursday,
+     * and Friday only — Tuesday is left untouched (a plain, non-elective day,
+     * identical to Grade 9). This mirrors where G10 elective classes are
+     * actually taught in production (confirmed 2026-07-22) — previously this
+     * tagged "Period 7" as elective on all four Tue–Fri days, but no G10
+     * elective class has ever run there; the real classes sit at this
+     * Period-5-area slot on three of the four days.
+     *
+     * Matches the "Period 5" row by label rather than by its current time —
+     * consistent with the rest of this class's resilience against bell-
+     * schedule edits — but then overwrites its start/end with the fixed
+     * elective window regardless of what that edit set, since (unlike a
+     * normal class period) this window is meant to be fixed, the same way
+     * G11/G12's elective periods are literal fixed rows rather than tracking
+     * another period's time.
      */
-    private static function tagElectivePeriod(array $rows, string $label): array
+    private static function applyG10ElectiveWindow(array $rows, string $day): array
     {
+        if (! in_array($day, ['Wednesday', 'Thursday', 'Friday'], true)) {
+            return $rows;
+        }
+
         foreach ($rows as &$row) {
-            if (($row['type'] ?? '') === 'CLASS'
-                && trim((string) ($row['label'] ?? '')) === $label
-                && ! str_contains((string) ($row['label'] ?? ''), 'Elective')) {
-                $row['label'] = trim(($row['label'] ?? '').' (Elective)');
+            if (($row['type'] ?? '') === 'CLASS' && trim((string) ($row['label'] ?? '')) === 'Period 5') {
+                $row['start'] = '12:10';
+                $row['end']   = '13:10';
+                $row['label'] = 'Period 5 (Elective)';
             }
         }
         unset($row);
@@ -792,7 +794,7 @@ class SchedulingConstants
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
-            : self::getTueFriTimetable($grade);
+            : self::getTueFriTimetable($grade, $day);
 
         $periods = array_values(array_filter(
             $timetable,
@@ -826,7 +828,7 @@ class SchedulingConstants
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
-            : self::getTueFriTimetable($grade);
+            : self::getTueFriTimetable($grade, $day);
 
         $slots = array_values(
             array_filter($timetable, static fn ($s) => $s['type'] === 'CLASS')
@@ -885,7 +887,7 @@ class SchedulingConstants
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
-            : self::getTueFriTimetable($grade);
+            : self::getTueFriTimetable($grade, $day);
 
         if ($lunchOverride !== null) {
             $timetable = array_map(static function ($row) use ($lunchOverride) {
@@ -990,7 +992,7 @@ class SchedulingConstants
     {
         $timetable = ($day === 'Monday')
             ? self::getMondayTimetable($grade)
-            : self::getTueFriTimetable($grade);
+            : self::getTueFriTimetable($grade, $day);
 
         if ($lunchOverride !== null) {
             $timetable = array_map(static function ($row) use ($lunchOverride) {

@@ -103,7 +103,7 @@ class RotationGridBuilder
     {
         $timetable = ($day === 'Monday')
             ? SchedulingConstants::getMondayTimetable($grade)
-            : SchedulingConstants::getTueFriTimetable($grade);
+            : SchedulingConstants::getTueFriTimetable($grade, $day);
 
         $dayStart = min(array_column($timetable, 'start'));
         $dayEnd   = max(array_column($timetable, 'end'));
