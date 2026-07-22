@@ -10,7 +10,7 @@ import AppInput from '@/Components/AppInput.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
-import LabScheduleTimeline from '@/Components/ComputerLabs/LabScheduleTimeline.vue'
+import LabScheduleCalendarCard from '@/Components/ComputerLabs/LabScheduleCalendarCard.vue'
 import { confirmAction } from '@/Composables/useConfirm.js'
 import {
   ArrowLeftIcon, ArrowPathIcon, ArrowRightIcon, CalendarDaysIcon,
@@ -71,11 +71,13 @@ const bookingForm = useForm({
   purpose: '',
 })
 
-function openBooking(date = props.weekStart, roomId = null) {
+function openBooking(date = props.weekStart, roomId = null, startTime = '08:00', endTime = '09:00') {
   bookingForm.clearErrors()
   bookingForm.academic_term_id = props.selectedTermId
   bookingForm.booking_date = date
   bookingForm.room_id = roomId ?? visibleLabs.value[0]?.room?.id ?? props.labs[0]?.room?.id ?? null
+  bookingForm.start_time = startTime
+  bookingForm.end_time = endTime
   bookingModal.value = true
 }
 
@@ -113,6 +115,58 @@ async function cancel(booking) {
 }
 
 const movingBookingId = ref(null)
+const draggedBooking = ref(null)
+const dropTarget = ref(null)
+
+function timeToMinutes(time) {
+  if (!time) return 0
+  const [hour, minute] = time.split(':').map(Number)
+  return (hour * 60) + minute
+}
+
+function overlaps(first, second) {
+  return timeToMinutes(first.start_time) < timeToMinutes(second.end_time)
+    && timeToMinutes(first.end_time) > timeToMinutes(second.start_time)
+}
+
+function startBookingDrag(booking) {
+  draggedBooking.value = booking
+}
+
+function previewBookingMove({ event, date, roomId }) {
+  const booking = draggedBooking.value
+  if (!booking || booking.date !== date) return
+
+  const conflict = props.bookings.find(candidate =>
+    candidate.id !== booking.id
+    && candidate.date === date
+    && candidate.room_id === roomId
+    && ['confirmed', 'approved'].includes(candidate.status)
+    && overlaps(booking, candidate)
+  )
+
+  dropTarget.value = {
+    date,
+    roomId,
+    hasConflict: !!conflict,
+    message: conflict ? `Occupied by ${conflict.title}` : 'Move here',
+  }
+  event.dataTransfer.dropEffect = conflict ? 'none' : 'move'
+}
+
+function clearBookingDrag() {
+  draggedBooking.value = null
+  dropTarget.value = null
+}
+
+function dropBooking({ date, roomId }) {
+  const booking = draggedBooking.value
+  const target = dropTarget.value
+  clearBookingDrag()
+
+  if (!booking || !target || target.hasConflict || booking.date !== date || booking.room_id === roomId) return
+  moveBooking({ booking, roomId })
+}
 
 function moveBooking({ booking, roomId }) {
   if (movingBookingId.value) return
@@ -196,17 +250,26 @@ function moveBooking({ booking, roomId }) {
           </div>
         </div>
 
-        <LabScheduleTimeline
-          :days="days"
-          :labs="visibleLabs"
-          :bookings="bookings"
-          :can-manage="capabilities.canManage"
-          :can-book="capabilities.canBook"
-          :moving-booking-id="movingBookingId"
-          @move="moveBooking"
-          @cancel="cancel"
-          @request="({ date, roomId }) => openBooking(date, roomId)"
-        />
+        <div class="space-y-6">
+          <LabScheduleCalendarCard
+            v-for="lab in visibleLabs"
+            :key="lab.room.id"
+            :lab="lab"
+            :days="days"
+            :bookings="bookings.filter(booking => booking.room_id === lab.room.id)"
+            :can-manage="capabilities.canManage"
+            :can-book="capabilities.canBook"
+            :moving-booking-id="movingBookingId"
+            :dragged-booking="draggedBooking"
+            :drop-target="dropTarget"
+            @drag-start="startBookingDrag"
+            @drag-end="clearBookingDrag"
+            @drag-over="previewBookingMove"
+            @drop="dropBooking"
+            @cancel="cancel"
+            @request="({ date, roomId, startTime, endTime }) => openBooking(date, roomId, startTime, endTime)"
+          />
+        </div>
 
         <div v-if="unassigned.length" class="rounded-xl border border-red-200 bg-red-50 p-4">
           <div class="flex items-center gap-2 text-sm font-semibold text-red-800">

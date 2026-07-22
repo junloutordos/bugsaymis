@@ -310,6 +310,44 @@ class ComputerLabSchedulingTest extends TestCase
         $this->assertNotSame($targetRoom->id, $booking->refresh()->room_id);
     }
 
+    public function test_calendar_payload_contains_monday_through_friday_only(): void
+    {
+        $this->actingAs($this->userWithPermission('computer_labs.book'))
+            ->get(route('computer-labs.index', [
+                'term_id' => $this->term->id,
+                'week_start' => '2098-06-02',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('ITJobRequests/ComputerLabs/Index')
+                ->has('days', 5)
+                ->where('days.0.name', 'Monday')
+                ->where('days.4.name', 'Friday'));
+    }
+
+    public function test_weekend_computer_lab_booking_is_rejected(): void
+    {
+        $roomId = Room::where('room_type', 'Computer Laboratory')->value('id');
+        $saturday = $this->term->start_date->copy()->next(Carbon::SATURDAY);
+
+        $this->actingAs($this->userWithPermission('computer_labs.book'))
+            ->post(route('computer-labs.bookings.store'), [
+                'room_id' => $roomId,
+                'academic_term_id' => $this->term->id,
+                'booking_date' => $saturday->toDateString(),
+                'start_time' => '08:00',
+                'end_time' => '09:00',
+                'title' => 'Weekend activity',
+                'purpose' => 'This must not be hidden outside the weekday calendar.',
+            ])
+            ->assertSessionHasErrors('booking_date');
+
+        $this->assertDatabaseMissing('computer_lab_bookings', [
+            'booking_type' => 'other',
+            'booking_date' => $saturday->toDateString(),
+        ]);
+    }
+
     public function test_other_booking_cannot_be_approved_over_a_priority_class(): void
     {
         ClassSchedule::create([

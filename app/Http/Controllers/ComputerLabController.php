@@ -124,6 +124,9 @@ class ComputerLabController extends Controller
         if ($date->lt($term->start_date) || $date->gt($term->end_date)) {
             return back()->withErrors(['booking_date' => 'The booking date must fall within the selected academic term.']);
         }
+        if ($date->isWeekend()) {
+            return back()->withErrors(['booking_date' => 'Computer laboratory bookings are available Monday through Friday only.']);
+        }
 
         if ($scheduler->conflictsFor(
             (int) $data['room_id'],
@@ -256,7 +259,7 @@ class ComputerLabController extends Controller
 
     private function calendarPayload(?AcademicTerm $term, Carbon $weekStart, ?int $labId): array
     {
-        $days = collect(range(0, 5))->map(function ($offset) use ($weekStart) {
+        $days = collect(range(0, 4))->map(function ($offset) use ($weekStart) {
             $date = $weekStart->copy()->addDays($offset);
 
             return [
