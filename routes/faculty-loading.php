@@ -147,6 +147,9 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::patch('/wellness/campus/{day}', [BellScheduleController::class, 'updateWellnessCampus'])
                     ->name('wellness.campus')
                     ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
+                Route::patch('/consultation/grade/{grade}/{day}', [BellScheduleController::class, 'updateConsultationGrade'])
+                    ->name('consultation.grade')
+                    ->where(['grade' => '([7-9]|1[0-2])', 'day' => 'Monday|Tuesday|Wednesday|Thursday|Friday']);
             });
 
         Route::post('/schedules/terms/{term}/submit', [ClassScheduleApprovalController::class, 'submit'])

@@ -333,6 +333,20 @@ class SchedulingConstants
     /** Per-grade Wellness window per weekday: [grade => [day => window]]. Empty = none set. */
     public const WELLNESS_BY_GRADE = [];
 
+    // ── Consultation / Home Bound per-day override ─────────────────────────────
+    // Unlike Lunch/Recess/White Space/Wellness, Consultation has no section
+    // scope — it was always one grade-wide row. The problem this solves is
+    // structural: Grade X's Tue/Wed/Thu/Fri Consultation all come from ONE
+    // shared literal row (TUEFRI_730_* has a single array applied identically
+    // to all four days), so editing "Tuesday's" row directly also changes
+    // Wed/Thu/Fri. This setting layers a genuine per-day override on top of
+    // that shared row — the same "override layered over a shared table" idea
+    // Lunch/Recess/White Space/Wellness already use, just grade-scoped only
+    // (no section tier) since Consultation never varied by section.
+    // [grade => [day => window]]. Empty = none set (falls back to whatever the
+    // shared literal row says for that day).
+    public const CONSULTATION_BY_GRADE_DAY = [];
+
     // ── Friday Special ────────────────────────────────────────────────────────
 
     /**
@@ -593,6 +607,7 @@ class SchedulingConstants
             'WHITE_SPACE_BY_GRADE'     => self::WHITE_SPACE_BY_GRADE,
             'WELLNESS_CAMPUS'          => self::WELLNESS_CAMPUS,
             'WELLNESS_BY_GRADE'        => self::WELLNESS_BY_GRADE,
+            'CONSULTATION_BY_GRADE_DAY' => self::CONSULTATION_BY_GRADE_DAY,
             default                    => null,
         };
     }
@@ -699,6 +714,26 @@ class SchedulingConstants
         }
 
         return null;
+    }
+
+    /**
+     * A grade's per-day Consultation/Home Bound override, or null if unset for
+     * that day — see CONSULTATION_BY_GRADE_DAY. Layered on top of the shared
+     * literal CONSULT row the same way lunch/recess overrides layer on top of
+     * their shared rows (see getBlockedSlots()/getDisplayBlockedSlots()),
+     * which is what makes Tue/Wed/Thu/Fri independently settable despite all
+     * four sharing one TUEFRI_730_* table underneath.
+     *
+     * @return array{start:string,end:string}|null
+     */
+    public static function getConsultationOverride(int $grade, string $day): ?array
+    {
+        $window = self::setting('CONSULTATION_BY_GRADE_DAY')[$grade][$day] ?? null;
+        if ($window === null) {
+            return null;
+        }
+
+        return ['start' => $window['start'], 'end' => $window['end']];
     }
 
     /** Drop the request-scoped override caches (call after saving an edit). */
@@ -995,6 +1030,16 @@ class SchedulingConstants
             }, $timetable);
         }
 
+        if ($consultationOverride = self::getConsultationOverride($grade, $day)) {
+            $timetable = array_map(static function ($row) use ($consultationOverride) {
+                if ($row['type'] === 'CONSULT') {
+                    $row['start'] = $consultationOverride['start'];
+                    $row['end']   = $consultationOverride['end'];
+                }
+                return $row;
+            }, $timetable);
+        }
+
         $blocked = array_values(
             array_filter($timetable, static fn ($s) => $s['type'] !== 'CLASS')
         );
@@ -1133,6 +1178,16 @@ class SchedulingConstants
                 if ($row['type'] === 'RECESS') {
                     $row['start'] = $recessOverride['start'];
                     $row['end']   = $recessOverride['end'];
+                }
+                return $row;
+            }, $timetable);
+        }
+
+        if ($consultationOverride = self::getConsultationOverride($grade, $day)) {
+            $timetable = array_map(static function ($row) use ($consultationOverride) {
+                if ($row['type'] === 'CONSULT') {
+                    $row['start'] = $consultationOverride['start'];
+                    $row['end']   = $consultationOverride['end'];
                 }
                 return $row;
             }, $timetable);

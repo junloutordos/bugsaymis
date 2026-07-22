@@ -830,10 +830,9 @@
       </div>
     </div>
 
-    <!-- Consultation / Home Bound popover — edits the literal bell-schedule
-         row directly (not the calendar's display-trimmed band, which can
-         differ from the stored row on Wed/Fri), and auto-shrinks the
-         adjacent period if the new start would otherwise overlap it. -->
+    <!-- Consultation / Home Bound popover — a grade+day override layered on
+         top of the shared bell-schedule row, so each of Mon-Fri is genuinely
+         independent (Tue/Wed/Thu/Fri otherwise all share one literal row). -->
     <div v-if="consultationPopover" ref="consultationEl"
       class="fixed z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-200"
       :style="{ left: consultationPopover.x + 'px', top: consultationPopover.y + 'px' }">
@@ -849,7 +848,8 @@
 
       <div class="px-4 pb-3 space-y-3">
         <p class="text-xs text-slate-500">
-          Applies to every Grade {{ consultationPopover.grade }} section on {{ consultationPopover.day }}.
+          Applies to every Grade {{ consultationPopover.grade }} section on {{ consultationPopover.day }} only —
+          every other day keeps its own time.
         </p>
 
         <div>
@@ -864,8 +864,15 @@
         </div>
       </div>
 
-      <div class="flex items-center justify-end px-4 py-3 border-t border-slate-100">
-        <AppButton size="sm" :loading="consultationPopover.saving" @click="saveConsultationPopover">Save</AppButton>
+      <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+        <button v-if="consultationHasOverride" type="button"
+          class="text-xs font-medium text-slate-500 hover:text-rose-600"
+          :disabled="consultationPopover.saving"
+          @click="saveConsultationPopover(true)">
+          Reset to shared schedule
+        </button>
+        <span v-else />
+        <AppButton size="sm" :loading="consultationPopover.saving" @click="saveConsultationPopover(false)">Save</AppButton>
       </div>
     </div>
 
@@ -1146,6 +1153,7 @@ const props = defineProps({
   wellnessByGrade: { type: Object, default: () => ({}) },
   wellnessCampus: { type: Object, default: () => ({}) },
   wednesdayFullGrades: { type: Array, default: () => [] },
+  consultationByGrade: { type: Object, default: () => ({}) },
 })
 
 // ── Capability (manage = CID/admin, unit = AUH, self = own calendar only) ────
@@ -2580,13 +2588,14 @@ async function saveWellnessPopover(clear = false) {
 }
 
 // ── Consultation / Home Bound popover ─────────────────────────────────────────
-// Reads and writes the literal bell-schedule row directly (bellScheduleTimetables),
-// bypassing the calendar's display-trimmed band entirely — that trim (against
-// the Wednesday ALP window and Friday Flag Retreat window) can hide the band
-// completely (Wednesday) or shorten its displayed end time (Friday) so it no
-// longer matches the stored row, which is what made the old drag-to-resize
-// interaction unreliable for this specific band. Mirrors SchedulingConstants::
-// timetableKeyFor() so the right raw timetable can be looked up client-side.
+// Grade+day scoped override, layered on top of the shared literal bell-
+// schedule row instead of editing it directly — Tue/Wed/Thu/Fri all share ONE
+// underlying TUEFRI_730_* row, so writing to that row directly (the original
+// approach) changed all four days at once. The literal row (bellScheduleTimetables)
+// is still read for two things: prefilling when no override exists yet, and
+// checking whether a new start would overlap the previous class period (that
+// period IS still shared across days, so it can't be silently shrunk per-day —
+// see saveConsultationPopover). Mirrors SchedulingConstants::timetableKeyFor().
 function timetableKeyFor(grade, day) {
   if (day === 'Monday') {
     if (grade === 7)  return 'MONDAY_G7G8'
@@ -2603,6 +2612,8 @@ function timetableKeyFor(grade, day) {
 const consultationPopover = ref(null)
 const consultationEl = ref(null)
 
+const consultationHasOverride = computed(() => !!consultationPopover.value?.hasOverride)
+
 function openConsultationPopover(e, groupId, day) {
   if (blockedSaving.value) return
   const grade = singleGradeFor(groupId)
@@ -2613,13 +2624,16 @@ function openConsultationPopover(e, groupId, day) {
   const consultRow = rows.find(r => r.type === 'CONSULT')
   if (!consultRow) return
 
-  const W = 300, H = 240
+  const override = props.consultationByGrade?.[grade]?.[day] ?? null
+
+  const W = 300, H = 260
   consultationPopover.value = {
     x: Math.min(Math.max(e.clientX + 10, 8), window.innerWidth  - W - 8),
     y: Math.min(Math.max(e.clientY - 60, 8), window.innerHeight - H - 8),
     grade, day, key,
-    start: consultRow.start,
-    end: consultRow.end,
+    hasOverride: !!override,
+    start: override?.start ?? consultRow.start,
+    end: override?.end ?? consultRow.end,
     saving: false,
   }
   window.addEventListener('mousedown', onWindowMouseDownConsultation, true)
@@ -2641,46 +2655,47 @@ function onConsultationKeydown(e) {
   if (e.key === 'Escape') closeConsultationPopover()
 }
 
-async function saveConsultationPopover() {
+async function saveConsultationPopover(clear = false) {
   const p = consultationPopover.value
   if (!p) return
 
-  const rows = (props.bellScheduleTimetables?.[p.key] ?? []).map(r => ({ ...r }))
-  const idx = rows.findIndex(r => r.type === 'CONSULT')
-  if (idx === -1) {
-    Swal.fire('Could not save', 'Could not locate the Consultation/Home Bound row — please refresh and try again.', 'error')
-    return
+  if (!clear) {
+    // The previous period is still a SHARED row (same one Tue/Wed/Thu/Fri all
+    // read) — it can't be shrunk for just this one day, so a genuine overlap
+    // has to be rejected rather than silently "fixed" the way earlier code did.
+    const rows = props.bellScheduleTimetables?.[p.key] ?? []
+    const idx = rows.findIndex(r => r.type === 'CONSULT')
+    const prevRow = idx > 0 ? rows[idx - 1] : null
+    if (prevRow && prevRow.end > p.start) {
+      Swal.fire(
+        'Cannot save',
+        `Consultation would overlap ${prevRow.label}, which currently runs until ${prevRow.end} `
+          + `(shared across every day using this schedule). Shorten it in the Bell Schedule editor first, `
+          + `or pick a start time at or after ${prevRow.end}.`,
+        'error',
+      )
+      return
+    }
   }
 
-  // The row immediately before Consultation (normally the last class period) —
-  // if moving Consultation's start earlier would now overlap it, shrink that
-  // row's end to match rather than let the save get rejected as an overlap.
-  const prevIdx = idx - 1
-  const willShrinkPrev = prevIdx >= 0 && rows[prevIdx].end > p.start
-  const html = `This changes <b>Grade ${p.grade}'s ${p.day}</b> schedule for <b>every section</b> — `
-    + `future generations only, already-placed classes won't move.<br><br>`
-    + `New time: <b>${p.start}–${p.end}</b>`
-    + (willShrinkPrev
-        ? `<br><br>This will also change <b>${rows[prevIdx].label}</b> to end at <b>${p.start}</b> `
-          + `(it currently runs until ${rows[prevIdx].end}).`
-        : '')
-
   const confirmed = await Swal.fire({
-    title: 'Move Consultation / Home Bound?', html,
-    icon: 'warning', showCancelButton: true, confirmButtonText: 'Save',
+    title: clear ? 'Reset Consultation to the shared schedule?' : 'Set Consultation?',
+    html: clear
+      ? `<b>${p.day}</b> for <b>Grade ${p.grade}</b> will go back to following the shared bell schedule.`
+      : `This only changes <b>${p.day}</b> for <b>Grade ${p.grade}</b> — every other day keeps its own time. `
+        + `Future generations only; already-placed classes won't move.<br><br>New time: <b>${p.start}–${p.end}</b>`,
+    icon: 'warning', showCancelButton: true, confirmButtonText: clear ? 'Reset' : 'Save',
   })
   if (!confirmed.isConfirmed) return
 
-  if (willShrinkPrev) {
-    rows[prevIdx] = { ...rows[prevIdx], end: p.start }
-  }
-  rows[idx] = { ...rows[idx], start: p.start, end: p.end }
-
   p.saving = true
   try {
-    await axios.post(route('faculty-loading.bell-schedule.update'), { timetable_key: p.key, rows })
+    await axios.patch(route('faculty-loading.bell-schedule.consultation.grade', { grade: p.grade, day: p.day }), {
+      start: clear ? null : p.start,
+      end:   clear ? null : p.end,
+    })
     closeConsultationPopover()
-    await router.reload({ only: ['dayConfigsByGrade', 'bellScheduleTimetables'], preserveScroll: true })
+    await router.reload({ only: ['dayConfigsByGrade', 'consultationByGrade'], preserveScroll: true })
     Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false })
   } catch (err) {
     Swal.fire('Could not save', err.response?.data?.message ?? 'Please review the values.', 'error')

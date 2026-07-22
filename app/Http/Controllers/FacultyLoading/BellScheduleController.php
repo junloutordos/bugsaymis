@@ -348,6 +348,52 @@ class BellScheduleController extends Controller
         ]);
     }
 
+    // ── Consultation / Home Bound (per-grade-per-day override) ────────────────
+    // Grade-only — no section scope, Consultation was always one grade-wide
+    // row. This layers a genuine per-day override on top of the shared
+    // TUEFRI_730_* row so Tue/Wed/Thu/Fri stop being tied together (see
+    // SchedulingConstants::getConsultationOverride()). "Clear" removes the
+    // override, reverting to whatever the shared literal row says for that day.
+
+    public function updateConsultationGrade(Request $request, int $grade, string $day): JsonResponse
+    {
+        $this->authorizeEditor();
+
+        if ($grade < 7 || $grade > 12) {
+            return response()->json(['message' => 'Invalid grade.'], 422);
+        }
+        if (! in_array($day, SchedulingConstants::DAYS, true)) {
+            return response()->json(['message' => 'Invalid day.'], 422);
+        }
+
+        [$ok, $start, $end, $error] = $this->validateOptionalTimeRange($request);
+        if (! $ok) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        $value = SchedulingConstants::setting('CONSULTATION_BY_GRADE_DAY');
+        if ($start === null) {
+            unset($value[$grade][$day]);
+            if (empty($value[$grade])) {
+                unset($value[$grade]);
+            }
+        } else {
+            $value[$grade][$day] = ['start' => $start, 'end' => $end];
+        }
+
+        BellScheduleSetting::updateOrCreate(
+            ['setting_key' => 'CONSULTATION_BY_GRADE_DAY'],
+            ['value' => $value, 'updated_by' => Auth::id()],
+        );
+        SchedulingConstants::flushOverrideCache();
+
+        return response()->json([
+            'message' => $start === null
+                ? "Consultation reset to the shared schedule for Grade {$grade} on {$day}."
+                : "Consultation set for Grade {$grade} on {$day} ({$start}–{$end}).",
+        ]);
+    }
+
     /** @return array{0:bool,1:?string,2:?string,3:?string} [ok, start, end, error] */
     private function validateOptionalTimeRange(Request $request): array
     {

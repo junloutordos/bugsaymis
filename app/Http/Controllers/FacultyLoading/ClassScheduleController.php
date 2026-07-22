@@ -819,6 +819,7 @@ class ClassScheduleController extends Controller
             'wellnessByGrade' => SchedulingConstants::setting('WELLNESS_BY_GRADE'),
             'wellnessCampus' => SchedulingConstants::setting('WELLNESS_CAMPUS'),
             'wednesdayFullGrades' => SchedulingConstants::wednesdayFullGrades(),
+            'consultationByGrade' => SchedulingConstants::setting('CONSULTATION_BY_GRADE_DAY'),
         ]);
     }
 
