@@ -222,7 +222,7 @@ class DTRService
                     'wfh_attendance_id'    => $usedWfh ? $wfh->id : null,
                     'source'               => $source,
                     'is_advance'           => $isAdvance,
-                    'processed_by'         => Auth::id(),
+                    'processed_by'         => Auth::user() instanceof User ? Auth::id() : null,
                     'processed_at'         => now(),
                 ]
             );

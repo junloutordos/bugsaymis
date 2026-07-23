@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\ITJobRequestController;
 use App\Models\ICTEquipment;
 use App\Models\AtlasSentinelRelease;
+use App\Models\BiometricDevice;
 use App\Models\IctEquipmentAlert;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
@@ -369,6 +370,25 @@ class AtlasSentinelController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('Atlas Sentinel: backup dispatch failed during checkin', [
+                'device_id' => $device->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // A biometric bridge lookup hiccup must never take health monitoring down with it.
+        try {
+            $biometricBridge = BiometricDevice::where('ict_equipment_device_id', $device->id)
+                ->where('is_active', true)
+                ->first();
+            if ($biometricBridge) {
+                $response['biometric_bridge'] = [
+                    'device_key'    => $biometricBridge->device_key,
+                    'label'         => $biometricBridge->label,
+                    'receiver_port' => $biometricBridge->receiver_port,
+                ];
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Atlas Sentinel: biometric bridge lookup failed during checkin', [
                 'device_id' => $device->id,
                 'error' => $e->getMessage(),
             ]);

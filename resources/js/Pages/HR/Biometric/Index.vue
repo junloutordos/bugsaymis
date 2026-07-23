@@ -5,6 +5,30 @@
 
       <AppPageHeader title="Biometric Logs" subtitle="Import and resolve biometric punch records." />
 
+      <div class="rounded-lg border border-slate-200 bg-white p-4 mb-6">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Live Punch Feed</h3>
+        <p v-if="livePunches.length === 0" class="text-sm text-slate-400">
+          Waiting for punches from the guardhouse device…
+        </p>
+        <ul v-else class="divide-y divide-slate-100">
+          <li v-for="p in livePunches" :key="p.key" class="py-2 flex items-center justify-between text-sm">
+            <div class="flex items-center gap-2">
+              <span
+                class="inline-block w-2 h-2 rounded-full"
+                :class="p.is_resolved ? 'bg-indigo-600' : 'bg-amber-500'"
+              ></span>
+              <span class="font-medium text-slate-700">
+                {{ p.is_resolved ? p.user_name : `Unresolved badge ${p.device_employee_id}` }}
+              </span>
+              <span class="text-slate-400">{{ p.log_type === 'time_in' ? 'Time In' : p.log_type === 'time_out' ? 'Time Out' : 'Punch' }}</span>
+            </div>
+            <div class="text-slate-400">
+              {{ p.device_label }} · {{ formatLiveTime(p.log_datetime) }}
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Flash -->
       <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />
@@ -19,7 +43,7 @@
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         <!-- Upload Panel -->
-        <div class="lg:col-span-1 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
+        <div v-if="canManage" class="lg:col-span-1 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
           <h2 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <ArrowUpTrayIcon class="h-4 w-4 text-indigo-500" />
             Upload Biometric File
@@ -58,7 +82,7 @@
         </div>
 
         <!-- Stats Cards -->
-        <div class="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div :class="canManage ? 'lg:col-span-2' : 'lg:col-span-3'" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
             <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Total</p>
             <p class="text-2xl font-bold text-slate-800 mt-1">{{ stats.total.toLocaleString() }}</p>
@@ -134,7 +158,7 @@
           </td>
           <td class="px-4 py-3">
             <button
-              v-if="!log.is_resolved"
+              v-if="canManage && !log.is_resolved"
               @click="openResolve(log)"
               class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
             >
@@ -157,7 +181,7 @@
               <AppBadge :color="logTypeBadge(log.log_type)">{{ log.log_type.replace('_', ' ') }}</AppBadge>
               <span>{{ log.device_id ?? '—' }}</span>
             </div>
-            <div v-if="!log.is_resolved" class="flex justify-end pt-1">
+            <div v-if="canManage && !log.is_resolved" class="flex justify-end pt-1">
               <button @click="openResolve(log)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Resolve</button>
             </div>
           </div>
@@ -217,7 +241,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -234,11 +258,43 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  logs:    Object,
-  stats:   Object,
-  users:   Array,
-  filters: Object,
+  logs:      Object,
+  stats:     Object,
+  users:     Array,
+  filters:   Object,
+  canManage: Boolean,
 })
+
+// ── Live Punch Feed ────────────────────────────────────────────────────────
+
+const livePunches = ref([])
+const MAX_LIVE_PUNCHES = 25
+
+function subscribeToLiveFeed() {
+  if (!window.Echo) return
+  window.Echo.private('biometric-feed')
+    .listen('.biometric.punch.recorded', (payload) => {
+      livePunches.value.unshift({
+        key: `${payload.device_employee_id}-${payload.log_datetime}-${Date.now()}`,
+        ...payload,
+      })
+      if (livePunches.value.length > MAX_LIVE_PUNCHES) {
+        livePunches.value.pop()
+      }
+    })
+}
+
+onMounted(() => {
+  subscribeToLiveFeed()
+})
+
+onUnmounted(() => {
+  window.Echo?.leaveChannel('private-biometric-feed')
+})
+
+function formatLiveTime(iso) {
+  return new Date(iso.replace(' ', 'T')).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+}
 
 // ── Upload ─────────────────────────────────────────────────────────────────
 
