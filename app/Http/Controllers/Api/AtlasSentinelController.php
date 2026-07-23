@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\ITJobRequestController;
 use App\Models\ICTEquipment;
 use App\Models\AtlasSentinelRelease;
+use App\Models\BiometricDevice;
 use App\Models\IctEquipmentAlert;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
@@ -372,6 +373,17 @@ class AtlasSentinelController extends Controller
                 'device_id' => $device->id,
                 'error' => $e->getMessage(),
             ]);
+        }
+
+        $biometricBridge = BiometricDevice::where('ict_equipment_device_id', $device->id)
+            ->where('is_active', true)
+            ->first();
+        if ($biometricBridge) {
+            $response['biometric_bridge'] = [
+                'device_key'    => $biometricBridge->device_key,
+                'label'         => $biometricBridge->label,
+                'receiver_port' => $biometricBridge->receiver_port,
+            ];
         }
 
         $latestRelease = AtlasSentinelRelease::latestRelease();
