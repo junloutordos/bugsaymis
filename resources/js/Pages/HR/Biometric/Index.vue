@@ -5,6 +5,30 @@
 
       <AppPageHeader title="Biometric Logs" subtitle="Import and resolve biometric punch records." />
 
+      <div class="rounded-lg border border-slate-200 bg-white p-4 mb-6">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Live Punch Feed</h3>
+        <p v-if="livePunches.length === 0" class="text-sm text-slate-400">
+          Waiting for punches from the guardhouse device…
+        </p>
+        <ul v-else class="divide-y divide-slate-100">
+          <li v-for="p in livePunches" :key="p.key" class="py-2 flex items-center justify-between text-sm">
+            <div class="flex items-center gap-2">
+              <span
+                class="inline-block w-2 h-2 rounded-full"
+                :class="p.is_resolved ? 'bg-indigo-600' : 'bg-amber-500'"
+              ></span>
+              <span class="font-medium text-slate-700">
+                {{ p.is_resolved ? p.user_name : `Unresolved badge ${p.device_employee_id}` }}
+              </span>
+              <span class="text-slate-400">{{ p.log_type === 'time_in' ? 'Time In' : p.log_type === 'time_out' ? 'Time Out' : 'Punch' }}</span>
+            </div>
+            <div class="text-slate-400">
+              {{ p.device_label }} · {{ formatLiveTime(p.log_datetime) }}
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Flash -->
       <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />
@@ -217,7 +241,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -239,6 +263,37 @@ const props = defineProps({
   users:   Array,
   filters: Object,
 })
+
+// ── Live Punch Feed ────────────────────────────────────────────────────────
+
+const livePunches = ref([])
+const MAX_LIVE_PUNCHES = 25
+
+function subscribeToLiveFeed() {
+  if (!window.Echo) return
+  window.Echo.private('biometric-feed')
+    .listen('.biometric.punch.recorded', (payload) => {
+      livePunches.value.unshift({
+        key: `${payload.device_employee_id}-${payload.log_datetime}-${Date.now()}`,
+        ...payload,
+      })
+      if (livePunches.value.length > MAX_LIVE_PUNCHES) {
+        livePunches.value.pop()
+      }
+    })
+}
+
+onMounted(() => {
+  subscribeToLiveFeed()
+})
+
+onUnmounted(() => {
+  window.Echo?.leaveChannel('private-biometric-feed')
+})
+
+function formatLiveTime(iso) {
+  return new Date(iso.replace(' ', 'T')).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+}
 
 // ── Upload ─────────────────────────────────────────────────────────────────
 
