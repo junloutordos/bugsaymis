@@ -530,6 +530,81 @@ class FacultyLoadingHttpTest extends TestCase
                 ->where('schedules.0.id', $schedule->id));
     }
 
+    public function test_my_faculty_schedule_matches_the_cid_faculty_filter_and_includes_actual_elective_time(): void
+    {
+        $faculty = $this->facultyUser();
+        $otherFaculty = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $homeroom = $this->makeSection($sy, ['levelid' => 11, 'sectionname' => 'Diamond']);
+        $electiveSection = $this->makeSection($sy, ['levelid' => 11, 'sectionname' => 'ELEC-G11']);
+        $regularSubject = $this->makeSubject(['grade_level' => 11]);
+        $electiveSubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+        $room = $this->makeClassroom();
+
+        $regular = ClassSchedule::create([
+            'user_id' => $faculty->id,
+            'subject_id' => $regularSubject->id,
+            'section_id' => $homeroom->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '08:00:00',
+            'end_time' => '08:50:00',
+            'status' => 'active',
+        ]);
+        $elective = ClassSchedule::create([
+            'user_id' => $faculty->id,
+            'subject_id' => $electiveSubject->id,
+            'section_id' => $electiveSection->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '11:10:00',
+            'end_time' => '12:00:00',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => $otherFaculty->id,
+            'subject_id' => $electiveSubject->id,
+            'section_id' => $electiveSection->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'day_of_week' => 'Wednesday',
+            'start_time' => '10:20:00',
+            'end_time' => '11:10:00',
+            'status' => 'active',
+        ]);
+
+        $assertFacultyRows = fn ($page) => $page
+            ->has('schedules', 2)
+            ->where('schedules.0.id', $regular->id)
+            ->where('schedules.1.id', $elective->id)
+            ->where('schedules.1.subject.is_elective', true)
+            ->where('schedules.1.is_elective_section', true)
+            ->where('schedules.1.day_of_week', 'Tuesday')
+            ->where('schedules.1.start_time', '11:10:00')
+            ->where('schedules.1.end_time', '12:00:00');
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.schedules.index', [
+                'term_id' => $term->id,
+                'faculty_id' => $faculty->id,
+            ]))
+            ->assertOk()
+            ->assertInertia($assertFacultyRows);
+
+        $this->actingAs($faculty)
+            ->get(route('faculty-loading.my-schedule', ['term_id' => $term->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $assertFacultyRows($page)
+                ->where('pageMode', 'my')
+                ->where('capability.level', 'self'));
+    }
+
     public function test_guest_cannot_view_my_load(): void
     {
         $this->get(route('faculty-loading.my-load'))->assertRedirect(route('login'));
@@ -598,6 +673,7 @@ class FacultyLoadingHttpTest extends TestCase
         $term = $this->makeTerm($sy);
         $assigned = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Diamond']);
         $other = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Emerald']);
+        $elective = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'ELEC-G8']);
         $subject = $this->makeSubject();
         $room = $this->makeClassroom();
 
@@ -612,6 +688,11 @@ class FacultyLoadingHttpTest extends TestCase
             'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $other->id,
             'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
             'day_of_week' => 'Tuesday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $elective->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Wednesday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'active',
         ]);
 
         $this->actingAs($adviser)
@@ -639,8 +720,8 @@ class FacultyLoadingHttpTest extends TestCase
         $grade7 = $this->makeSection($sy, ['levelid' => 7, 'sectionname' => 'Diamond']);
         $grade8 = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Emerald']);
         $this->makeSection($sy, ['levelid' => 9, 'sectionname' => 'Ruby']);
-        $this->makeSection($sy, ['levelid' => 7, 'sectionname' => 'ELEC-G7']);
-        $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'SCI-G8']);
+        $grade7Elective = $this->makeSection($sy, ['levelid' => 7, 'sectionname' => 'ELEC-G7']);
+        $grade8Science = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'SCI-G8']);
 
         $this->assignDesignation(
             $coordinator,
@@ -656,9 +737,79 @@ class FacultyLoadingHttpTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('capability.level', 'advisory')
-                ->has('sections', 2)
+                ->has('sections', 4)
                 ->where('sections.0.id', $grade7->id)
-                ->where('sections.1.id', $grade8->id));
+                ->where('sections.1.id', $grade7Elective->id)
+                ->where('sections.2.id', $grade8->id)
+                ->where('sections.3.id', $grade8Science->id));
+    }
+
+    public function test_single_grade_hr_coordinator_sees_homeroom_elective_and_science_core_sections_only_for_that_grade(): void
+    {
+        $coordinator = User::factory()->create(['email_verified_at' => now()]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $homeroom = $this->makeSection($sy, ['levelid' => 11, 'sectionname' => 'Diamond']);
+        $elective = $this->makeSection($sy, ['levelid' => 11, 'sectionname' => 'ELEC-G11']);
+        $scienceCore = $this->makeSection($sy, ['levelid' => 11, 'sectionname' => 'SCI-G11']);
+        $otherGrade = $this->makeSection($sy, ['levelid' => 12, 'sectionname' => 'Electron']);
+        $faculty = User::factory()->create(['email_verified_at' => now()]);
+        $room = $this->makeClassroom();
+        $regularSubject = $this->makeSubject(['grade_level' => 11]);
+        $electiveSubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+        $scienceSubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
+
+        $visibleSchedules = collect([
+            [$homeroom, $regularSubject, 'Monday'],
+            [$elective, $electiveSubject, 'Tuesday'],
+            [$scienceCore, $scienceSubject, 'Wednesday'],
+        ])->map(fn ($row) => ClassSchedule::create([
+            'user_id' => $faculty->id,
+            'subject_id' => $row[1]->id,
+            'section_id' => $row[0]->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'day_of_week' => $row[2],
+            'start_time' => '10:20:00',
+            'end_time' => '11:10:00',
+            'status' => 'active',
+        ]));
+        ClassSchedule::create([
+            'user_id' => $faculty->id,
+            'subject_id' => $regularSubject->id,
+            'section_id' => $otherGrade->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'day_of_week' => 'Thursday',
+            'start_time' => '10:20:00',
+            'end_time' => '11:10:00',
+            'status' => 'active',
+        ]);
+
+        $this->assignDesignation(
+            $coordinator,
+            $sy,
+            $term,
+            'COORD',
+            'COORD-HRG11',
+            'HR Coordinator Grade 11',
+        );
+
+        $this->actingAs($coordinator)
+            ->get(route('faculty-loading.schedules.index', ['term_id' => $term->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('capability.level', 'advisory')
+                ->has('sections', 3)
+                ->where('sections.0.id', $homeroom->id)
+                ->where('sections.1.id', $elective->id)
+                ->where('sections.2.id', $scienceCore->id)
+                ->has('schedules', 3)
+                ->where('schedules.0.id', $visibleSchedules[0]->id)
+                ->where('schedules.1.id', $visibleSchedules[1]->id)
+                ->where('schedules.2.id', $visibleSchedules[2]->id));
     }
 
     public function test_schedule_index_includes_assigned_advisers_for_lower_and_upper_grade_sections(): void

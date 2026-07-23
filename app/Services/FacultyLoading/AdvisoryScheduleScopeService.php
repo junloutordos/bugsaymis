@@ -83,8 +83,6 @@ class AdvisoryScheduleScopeService
                     ->where('school_year_id', $term->school_year_id)
                     ->where('is_active', true)
                     ->whereIn('levelid', $grades)
-                    ->where('sectionname', 'not like', 'ELEC-%')
-                    ->where('sectionname', 'not like', ScienceCoreService::SECTION_PREFIX.'%')
                     ->pluck('id')
                     ->map(fn ($id) => (int) $id)
             );
@@ -155,6 +153,12 @@ class AdvisoryScheduleScopeService
             $end = (int) $matches[2];
 
             return range(min($start, $end), max($start, $end));
+        }
+
+        foreach ([$name, $code] as $label) {
+            if (preg_match('/(?:GRADE|G)\s*(12|11|10|9|8|7)\b/i', $label, $matches) === 1) {
+                return [(int) $matches[1]];
+            }
         }
 
         return [];
