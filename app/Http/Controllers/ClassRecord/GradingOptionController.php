@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
+use App\Services\ClassRecord\GradingOptionScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,14 +14,13 @@ use Illuminate\Support\Facades\DB;
 
 class GradingOptionController extends Controller
 {
-    /**
-     * Full class-record admins (CID Chief/Administrator) and holders of the
-     * scoped class-records.grading-options grant (AUHs) can both manage the
-     * shared grading options.
-     */
+    public function __construct(private readonly GradingOptionScopeService $scope)
+    {
+    }
+
     private function canManageOptions(): bool
     {
-        return Auth::user()->hasAnyPermission(['class-records.admin', 'class-records.grading-options']);
+        return $this->scope->canManage(Auth::user());
     }
 
     /**
@@ -29,13 +29,12 @@ class GradingOptionController extends Controller
      */
     public function index(): JsonResponse
     {
-        $query = GradingOption::with(['categories' => fn ($q) => $q->orderBy('sort_order')]);
+        $user = Auth::user();
+        $options = $this->canManageOptions()
+            ? $this->scope->manageableFor($user)
+            : $this->scope->selectableForUser($user);
 
-        if (! $this->canManageOptions()) {
-            $query->where('is_active', true);
-        }
-
-        return response()->json($query->orderBy('id')->get());
+        return response()->json($options);
     }
 
     /**
@@ -47,9 +46,10 @@ class GradingOptionController extends Controller
         abort_unless($this->canManageOptions(), 403, 'You are not allowed to create grading options.');
 
         $validated = $request->validate([
-            'name'                         => 'required|string|max:255|unique:grading_options,name',
+            'name'                         => 'required|string|max:255',
             'description'                  => 'nullable|string|max:1000',
             'is_active'                    => 'boolean',
+            'owner_designation_id'         => 'nullable|integer|exists:designations,id',
             'categories'                   => 'required|array|min:1',
             'categories.*.name'            => 'required|string|max:255',
             'categories.*.code'            => 'required|string|max:10',
@@ -57,6 +57,12 @@ class GradingOptionController extends Controller
             'categories.*.max_assessments' => 'required|integer|min:1|max:20',
             'categories.*.sort_order'      => 'required|integer|min:0',
         ]);
+
+        $ownerDesignationId = $this->scope->resolveOwnerDesignationId(
+            Auth::user(),
+            isset($validated['owner_designation_id']) ? (int) $validated['owner_designation_id'] : null,
+        );
+        $this->ensureUniqueName($validated['name'], $ownerDesignationId);
 
         $totalWeight = array_sum(array_column($validated['categories'], 'weight'));
         if (abs($totalWeight - 1.0) > 0.005) {
@@ -66,11 +72,12 @@ class GradingOptionController extends Controller
             ], 422);
         }
 
-        $option = DB::transaction(function () use ($validated) {
+        $option = DB::transaction(function () use ($validated, $ownerDesignationId) {
             $option = GradingOption::create([
-                'name'        => $validated['name'],
-                'description' => $validated['description'] ?? null,
-                'is_active'   => $validated['is_active'] ?? true,
+                'name'                 => $validated['name'],
+                'description'          => $validated['description'] ?? null,
+                'is_active'            => $validated['is_active'] ?? true,
+                'owner_designation_id' => $ownerDesignationId,
             ]);
 
             foreach ($validated['categories'] as $i => $cat) {
@@ -89,7 +96,7 @@ class GradingOptionController extends Controller
 
         return response()->json([
             'message' => 'Grading option created.',
-            'data'    => $option->fresh()->load('categories'),
+            'data'    => $option->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
         ], 201);
     }
 
@@ -99,7 +106,11 @@ class GradingOptionController extends Controller
      */
     public function destroy(GradingOption $gradingOption): JsonResponse
     {
-        abort_unless($this->canManageOptions(), 403, 'You are not allowed to delete grading options.');
+        abort_unless(
+            $this->scope->canManageOption(Auth::user(), $gradingOption),
+            403,
+            'You may only delete grading options owned by your academic unit.',
+        );
 
         $inUse = \App\Models\ClassRecord\ClassRecord::where('grading_option_id', $gradingOption->id)->exists();
         if ($inUse) {
@@ -119,19 +130,28 @@ class GradingOptionController extends Controller
      */
     public function update(Request $request, GradingOption $gradingOption): JsonResponse
     {
-        abort_unless($this->canManageOptions(), 403, 'You are not allowed to edit grading options.');
+        abort_unless(
+            $this->scope->canManageOption(Auth::user(), $gradingOption),
+            403,
+            'You may only edit grading options owned by your academic unit.',
+        );
 
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'is_active'   => 'boolean',
         ]);
+        $this->ensureUniqueName(
+            $validated['name'],
+            $gradingOption->owner_designation_id,
+            (int) $gradingOption->id,
+        );
 
         $gradingOption->update($validated);
 
         return response()->json([
             'message' => 'Grading option updated.',
-            'data'    => $gradingOption->fresh()->load('categories'),
+            'data'    => $gradingOption->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
         ]);
     }
 
@@ -142,7 +162,11 @@ class GradingOptionController extends Controller
      */
     public function updateCategories(Request $request, GradingOption $gradingOption): JsonResponse
     {
-        abort_unless($this->canManageOptions(), 403, 'You are not allowed to edit grading option categories.');
+        abort_unless(
+            $this->scope->canManageOption(Auth::user(), $gradingOption),
+            403,
+            'You may only edit grading options owned by your academic unit.',
+        );
 
         $validated = $request->validate([
             'categories'                   => 'required|array|min:1',
@@ -209,7 +233,22 @@ class GradingOptionController extends Controller
 
         return response()->json([
             'message' => 'Categories updated.',
-            'data'    => $gradingOption->fresh()->load('categories'),
+            'data'    => $gradingOption->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
         ]);
+    }
+
+    private function ensureUniqueName(string $name, ?int $ownerDesignationId, ?int $ignoreId = null): void
+    {
+        $query = GradingOption::whereRaw('LOWER(name) = ?', [mb_strtolower(trim($name))])
+            ->when(
+                $ownerDesignationId === null,
+                fn ($scopeQuery) => $scopeQuery->whereNull('owner_designation_id'),
+                fn ($scopeQuery) => $scopeQuery->where('owner_designation_id', $ownerDesignationId),
+            )
+            ->when($ignoreId, fn ($scopeQuery) => $scopeQuery->where('id', '<>', $ignoreId));
+
+        if ($query->exists()) {
+            abort(422, 'A grading option with this name already exists in the selected scope.');
+        }
     }
 }
