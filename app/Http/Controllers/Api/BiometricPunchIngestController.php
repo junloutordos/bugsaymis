@@ -38,11 +38,6 @@ class BiometricPunchIngestController extends Controller
         )->pluck('name', 'id');
 
         foreach ($stats['new_rows'] as $row) {
-            if ($row['user_id']) {
-                $date = Carbon::parse($row['log_datetime'])->toDateString();
-                $dtrService->generate((int) $row['user_id'], $date, $date);
-            }
-
             rescue(fn () => event(new BiometricPunchRecorded([
                 'user_id'            => $row['user_id'],
                 'user_name'          => $row['user_id'] ? ($userNames[$row['user_id']] ?? null) : null,
@@ -52,6 +47,28 @@ class BiometricPunchIngestController extends Controller
                 'log_datetime'       => $row['log_datetime'],
                 'is_resolved'        => $row['is_resolved'],
             ])));
+        }
+
+        // Dedupe to one DTR::generate() call per (user_id, date) pair, no
+        // matter how many punches that user had in this request — a backlog
+        // replay can otherwise trigger the same multi-table computation
+        // dozens of times for a single employee/day.
+        $affectedDates = [];
+
+        foreach ($stats['new_rows'] as $row) {
+            if (! $row['user_id']) {
+                continue;
+            }
+
+            $date = Carbon::parse($row['log_datetime'])->toDateString();
+            $affectedDates[$row['user_id'] . '|' . $date] = [
+                'user_id' => (int) $row['user_id'],
+                'date'    => $date,
+            ];
+        }
+
+        foreach ($affectedDates as $pair) {
+            $dtrService->generate($pair['user_id'], $pair['date'], $pair['date']);
         }
 
         return response()->json(['status' => 'ok'] + collect($stats)->except('new_rows')->all());

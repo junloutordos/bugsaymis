@@ -194,6 +194,89 @@ class BiometricPunchIngestTest extends TestCase
     }
 
     /**
+     * Regression test for the backlog-replay finding: DTRService::generate()
+     * must be deduped to once per (user_id, date) pair per request, not once
+     * per punch row. Send a time-in and a time-out for the SAME employee on
+     * the SAME day in a single request. If generate() is (incorrectly) called
+     * once per row that's still functionally correct for this simple case, so
+     * the stronger signal is the call-count spy below; the DTR-record
+     * correctness assertion is a real-behavior backstop.
+     */
+    public function test_multiple_punches_for_the_same_employee_and_day_only_generate_dtr_once(): void
+    {
+        Event::fake([BiometricPunchRecorded::class]);
+
+        $employee = User::factory()->create(['badge_id' => '101']);
+        $bridgeDevice = $this->makeBridgeDevice();
+        Sanctum::actingAs($bridgeDevice, ['*']);
+
+        $spy = \Mockery::mock(DTRService::class);
+        $spy->shouldReceive('generate')
+            ->once()
+            ->with($employee->id, '2026-07-23', '2026-07-23');
+        $this->app->instance(DTRService::class, $spy);
+
+        $rawBody = "101\t2026-07-23 07:58:03\t1\t0\n"
+                 . "101\t2026-07-23 17:02:11\t1\t1";
+
+        $response = $this->postJson('/api/ict-agent/biometric-punches', [
+            'raw_body' => $rawBody,
+        ]);
+
+        $response->assertOk()->assertJson([
+            'status' => 'ok',
+            'inserted' => 2,
+            'resolved' => 2,
+        ]);
+
+        Event::assertDispatchedTimes(BiometricPunchRecorded::class, 2);
+    }
+
+    /**
+     * Two different employees punching on the same day in one request must
+     * each get exactly one generate() call, and both must end up with
+     * correct, distinct DTR records (time_in_am from the morning punch,
+     * time_out_pm from the evening punch) — proving the dedupe is keyed by
+     * (user_id, date), not just date.
+     */
+    public function test_punches_for_two_different_employees_on_the_same_day_each_get_correct_distinct_dtr_records(): void
+    {
+        Event::fake([BiometricPunchRecorded::class]);
+
+        $employeeA = User::factory()->create(['badge_id' => '101']);
+        $employeeB = User::factory()->create(['badge_id' => '202']);
+        $bridgeDevice = $this->makeBridgeDevice();
+        Sanctum::actingAs($bridgeDevice, ['*']);
+
+        $rawBody = "101\t2026-07-23 07:58:03\t1\t0\n"
+                 . "101\t2026-07-23 17:02:11\t1\t1\n"
+                 . "202\t2026-07-23 08:01:15\t1\t0\n"
+                 . "202\t2026-07-23 17:05:40\t1\t1";
+
+        $response = $this->postJson('/api/ict-agent/biometric-punches', [
+            'raw_body' => $rawBody,
+        ]);
+
+        $response->assertOk()->assertJson([
+            'status' => 'ok',
+            'inserted' => 4,
+            'resolved' => 4,
+        ]);
+
+        $recordA = DtrRecord::where('user_id', $employeeA->id)->where('work_date', '2026-07-23')->first();
+        $recordB = DtrRecord::where('user_id', $employeeB->id)->where('work_date', '2026-07-23')->first();
+
+        $this->assertNotNull($recordA);
+        $this->assertNotNull($recordB);
+        $this->assertNotNull($recordA->time_in_am);
+        $this->assertNotNull($recordA->time_out_pm);
+        $this->assertNotNull($recordB->time_in_am);
+        $this->assertNotNull($recordB->time_out_pm);
+
+        Event::assertDispatchedTimes(BiometricPunchRecorded::class, 4);
+    }
+
+    /**
      * Companion non-regression check: normal User-authenticated DTR
      * generation must keep setting processed_by to the acting user's id —
      * the fix only nulls it out for non-User actors.
