@@ -300,45 +300,16 @@ function officialTimeLabel(day) {
 }
 
 /**
- * Lunch = up to 60 free minutes inside the 10:00 AM–2:00 PM window (clipped to
- * official time), taken from the longest free gap of the day's occupied blocks.
- * Like the CID Excel sheet, the slot ends when the next class starts; on a day
- * with no midday classes it defaults to the 12:00–1:00 block.
+ * Lunch = the faculty member's actual HR-approved lunch break for the day,
+ * synced from their employee_schedules submission into
+ * teacher_official_times on HR approval. Shows "—" when no lunch was
+ * recorded for that day (the field is optional on submission) — an
+ * unrecorded lunch is shown as unrecorded, not guessed from the calendar.
  */
 function lunchTimeLabel(day) {
-  const official = officialWindow(day) ?? { start: CAL_START, end: CAL_END }
-  const windowStart = Math.max(10 * 60, official.start)
-  const windowEnd = Math.min(14 * 60, official.end)
-  if (windowEnd - windowStart < 30) return '—'
-
-  const busy = (schedulesByDay.value[day] ?? [])
-    .map(entry => [timeToMinutes(entry.start_time), timeToMinutes(entry.end_time)])
-    .filter(([start, end]) => end > windowStart && start < windowEnd)
-    .map(([start, end]) => [Math.max(start, windowStart), Math.min(end, windowEnd)])
-    .sort((a, b) => a[0] - b[0])
-
-  const gaps = []
-  let cursor = windowStart
-  for (const [start, end] of busy) {
-    if (start > cursor) gaps.push([cursor, start])
-    cursor = Math.max(cursor, end)
-  }
-  if (cursor < windowEnd) gaps.push([cursor, windowEnd])
-
-  const longest = gaps.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0]
-  if (!longest || longest[1] - longest[0] < 30) return '—'
-
-  let [start, end] = longest
-  if (end < windowEnd) {
-    // Gap is bounded by an afternoon class — lunch ends when that class starts.
-    start = Math.max(start, end - 60)
-  } else if (start <= NOON && end >= 13 * 60) {
-    [start, end] = [NOON, 13 * 60]
-  } else {
-    start = Math.max(start, end - 60)
-  }
-
-  return `${formatTime(minutesToTime(start))} – ${formatTime(minutesToTime(end))}`
+  const config = props.officialTimes?.[day]
+  if (!config?.lunch_start || !config?.lunch_end) return '—'
+  return `${formatTime(config.lunch_start)} – ${formatTime(config.lunch_end)}`
 }
 </script>
 

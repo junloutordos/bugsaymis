@@ -258,7 +258,7 @@ class ClassScheduleController extends Controller
         return $parts ? implode(', ', $parts) : null;
     }
 
-    /** { Monday: {start, end}, ... } — official working time per day, defaulting to the early shift. */
+    /** { Monday: {start, end, lunch_start, lunch_end}, ... } — official working time + HR-approved lunch per day, defaulting to the early shift with no lunch recorded. */
     private function facultyOfficialTimes(int $facultyId): array
     {
         $rows = TeacherOfficialTime::forTeacher($facultyId)->get()->keyBy('day_of_week');
@@ -269,6 +269,8 @@ class ClassScheduleController extends Controller
             $times[$day] = [
                 'start' => substr($row?->start_time ?? '07:30', 0, 5),
                 'end' => substr($row?->end_time ?? '16:30', 0, 5),
+                'lunch_start' => $row?->lunch_start ? substr($row->lunch_start, 0, 5) : null,
+                'lunch_end' => $row?->lunch_end ? substr($row->lunch_end, 0, 5) : null,
             ];
         }
 
@@ -815,6 +817,11 @@ class ClassScheduleController extends Controller
             ? $this->scopeLocks->locksForSections((int) $termId, $sections)
             : [];
 
+        // Official time + HR-approved lunch — only meaningful (and only sent)
+        // on the self-pinned "My Faculty Schedule" view, mirroring what the
+        // faculty member's own print sheet shows.
+        $myOfficialTimes = $cap['level'] === 'self' ? $this->facultyOfficialTimes((int) Auth::id()) : null;
+
         return Inertia::render('FacultyLoading/Schedules/Index', [
             'schedules' => $schedules,
             'terms' => $terms,
@@ -872,6 +879,7 @@ class ClassScheduleController extends Controller
             'lunchCampus' => SchedulingConstants::setting('LUNCH_CAMPUS_DAY'),
             'recessByGrade' => SchedulingConstants::setting('RECESS_BY_GRADE_DAY'),
             'recessCampus' => SchedulingConstants::setting('RECESS_CAMPUS_DAY'),
+            'myOfficialTimes' => $myOfficialTimes,
         ]);
     }
 

@@ -21,6 +21,8 @@ class TeacherOfficialTime extends Model
         'day_of_week',
         'start_time',
         'end_time',
+        'lunch_start',
+        'lunch_end',
         'notes',
     ];
 
@@ -51,6 +53,15 @@ class TeacherOfficialTime extends Model
     {
         return $classStart >= substr($this->start_time, 0, 5)
             && $classEnd   <= substr($this->end_time,   0, 5);
+    }
+
+    /**
+     * True when both ends of the lunch break were recorded — the faculty
+     * member's HR-approved schedule may legitimately omit lunch for a day.
+     */
+    public function getHasLunchAttribute(): bool
+    {
+        return ! empty($this->lunch_start) && ! empty($this->lunch_end);
     }
 
     // ── Scopes ───────────────────────────────────────────────────────────────
