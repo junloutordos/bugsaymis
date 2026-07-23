@@ -4,9 +4,11 @@ namespace Tests\Feature\Api;
 
 use App\Events\BiometricPunchRecorded;
 use App\Models\BiometricDevice;
+use App\Models\HR\DtrRecord;
 use App\Models\ICTEquipment;
 use App\Models\IctEquipmentDevice;
 use App\Models\User;
+use App\Services\HR\DTRService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
@@ -154,5 +156,69 @@ class BiometricPunchIngestTest extends TestCase
         $response->assertOk()->assertJson(['inserted' => 0, 'duplicates' => 1]);
         $this->assertSame(1, \App\Models\HR\BiometricLog::count());
         Event::assertNotDispatched(BiometricPunchRecorded::class);
+    }
+
+    /**
+     * Regression test for the DTRService::generate() bug where 'processed_by'
+     * was unconditionally set to Auth::id(). When the actor authenticated via
+     * Sanctum is an IctEquipmentDevice (not a User) — as is the case for this
+     * device-triggered ingest endpoint — Auth::id() returns the device's own
+     * numeric id, which is not necessarily a valid users.id. Deliberately
+     * pick the employee's id far away from the device's id so the pre-fix
+     * behavior is guaranteed to hit the dtr_records.processed_by FK
+     * constraint rather than "getting lucky" because the two auto-increment
+     * sequences happened to coincide (which is what made the bug
+     * intermittent/order-dependent in the first place).
+     */
+    public function test_device_authenticated_ingestion_never_sets_dtr_processed_by_to_the_device_id(): void
+    {
+        Event::fake([BiometricPunchRecorded::class]);
+
+        $bridgeDevice = $this->makeBridgeDevice();
+        Sanctum::actingAs($bridgeDevice, ['*']);
+
+        $employee = User::factory()->create([
+            'id' => $bridgeDevice->id + 999000,
+            'badge_id' => '101',
+        ]);
+
+        $response = $this->postJson('/api/ict-agent/biometric-punches', [
+            'raw_body' => "101\t2026-07-23 07:58:03\t1\t0",
+        ]);
+
+        $response->assertOk()->assertJson(['status' => 'ok', 'inserted' => 1, 'resolved' => 1]);
+
+        $record = DtrRecord::where('user_id', $employee->id)->where('work_date', '2026-07-23')->first();
+        $this->assertNotNull($record, 'DTR record should have been generated without an FK violation.');
+        $this->assertNull($record->processed_by, 'processed_by must be null when the actor is a device, not a User.');
+    }
+
+    /**
+     * Companion non-regression check: normal User-authenticated DTR
+     * generation must keep setting processed_by to the acting user's id —
+     * the fix only nulls it out for non-User actors.
+     */
+    public function test_user_authenticated_dtr_generation_still_sets_processed_by(): void
+    {
+        $processor = User::factory()->create();
+        $employee = User::factory()->create(['badge_id' => '202']);
+        Sanctum::actingAs($processor, ['*']);
+
+        \App\Models\HR\BiometricLog::create([
+            'user_id' => $employee->id,
+            'device_employee_id' => '202',
+            'device_id' => 'guardhouse-gt200',
+            'log_datetime' => '2026-07-23 07:58:03',
+            'log_type' => 'time_in',
+            'source' => 'api',
+            'is_resolved' => true,
+            'is_duplicate' => false,
+        ]);
+
+        app(DTRService::class)->generate($employee->id, '2026-07-23', '2026-07-23');
+
+        $record = DtrRecord::where('user_id', $employee->id)->where('work_date', '2026-07-23')->first();
+        $this->assertNotNull($record);
+        $this->assertSame($processor->id, $record->processed_by);
     }
 }
