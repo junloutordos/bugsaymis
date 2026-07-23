@@ -466,6 +466,32 @@ class FacultyLoadingHttpTest extends TestCase
             ->assertInertia(fn ($p) => $p->component('FacultyLoading/MyLoad'));
     }
 
+    public function test_faculty_load_print_formats_the_faculty_name_first(): void
+    {
+        $faculty = User::factory()->create([
+            'name' => 'Dela Cruz, Juan Santos',
+            'email_verified_at' => now(),
+        ]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $load = FacultyLoad::create([
+            'user_id' => $faculty->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'total_units' => 0,
+        ]);
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.print', $load))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('FacultyLoading/Print')
+                ->has('loads', 1)
+                ->where('loads.0.faculty.name', 'JUAN S. DELA CRUZ'));
+
+        $this->assertDatabaseCount('class_schedules', 0);
+    }
+
     public function test_view_own_faculty_receives_current_load_assignments_and_schedule(): void
     {
         $faculty = $this->facultyUser();

@@ -8,6 +8,7 @@ use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
+use App\Services\PersonNameFormatter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +18,11 @@ use Inertia\Response;
 
 class FacultyLoadController extends Controller
 {
-    public function __construct(private readonly LoadComputationService $loads) {}
+    public function __construct(
+        private readonly LoadComputationService $loads,
+        private readonly PersonNameFormatter $names,
+    ) {
+    }
 
     // ── Admin/CID: all faculty loads for a term ───────────────────────────────
 
@@ -135,7 +140,7 @@ class FacultyLoadController extends Controller
     {
         $this->authorize('faculty_loading.view');
 
-        $facultyLoad->load(['faculty:id,name,position,office_id', 'faculty.office.unitHeadUser', 'academicTerm.schoolYear', 'assignments.subject']);
+        $facultyLoad->load($this->printRelations());
 
         [$sectionMap, $cidChief, $director] = $this->printDependencies();
 
@@ -152,7 +157,7 @@ class FacultyLoadController extends Controller
 
         $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
 
-        $load = FacultyLoad::with(['faculty:id,name,position,office_id', 'faculty.office.unitHeadUser', 'academicTerm.schoolYear', 'assignments.subject'])
+        $load = FacultyLoad::with($this->printRelations())
             ->where('user_id', Auth::id())
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->first();
@@ -174,7 +179,7 @@ class FacultyLoadController extends Controller
 
         $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
 
-        $loads = FacultyLoad::with(['faculty:id,name,position,office_id', 'faculty.office.unitHeadUser', 'academicTerm.schoolYear', 'assignments.subject'])
+        $loads = FacultyLoad::with($this->printRelations())
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->orderBy(User::select('name')->whereColumn('users.id', 'faculty_loads.user_id'))
             ->get();
@@ -188,21 +193,35 @@ class FacultyLoadController extends Controller
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    private function printRelations(): array
+    {
+        return [
+            'faculty:id,name,position,office_id',
+            'faculty.pds.personalInfo',
+            'faculty.office.unitHeadUser',
+            'faculty.office.unitHeadUser.pds.personalInfo',
+            'academicTerm.schoolYear',
+            'assignments.subject',
+        ];
+    }
+
     private function printDependencies(): array
     {
         $sectionMap = DB::table('sections')->pluck('sectionname', 'id')->all();
 
         $cidChief = User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))
+            ->with('pds.personalInfo')
             ->first(['id', 'name', 'position']);
 
         $director = User::where('position', 'like', '%Director%')
             ->where('position', 'not like', '%Assistant%')
+            ->with('pds.personalInfo')
             ->first(['id', 'name', 'position']);
 
         return [$sectionMap, $cidChief, $director];
     }
 
-    private function mapLoadForPrint(FacultyLoad $l, array $sectionMap, ?object $cidChief, ?object $director): array
+    private function mapLoadForPrint(FacultyLoad $l, array $sectionMap, ?User $cidChief, ?User $director): array
     {
         $assignments = $l->assignments->map(function ($a) use ($sectionMap) {
             if ($a->assignment_type === 'teaching' && $a->subject) {
@@ -224,14 +243,14 @@ class FacultyLoadController extends Controller
         $office           = $l->faculty?->office;
         $academicUnitName = $office?->name;
         $auh = $office?->unitHeadUser ? [
-            'name'     => $office->unitHeadUser->name,
+            'name'     => $this->names->formal($office->unitHeadUser),
             'position' => $office->unitHeadUser->position ?? 'Academic Unit Head',
         ] : null;
 
         return [
             'id'                 => $l->id,
             'faculty'            => $l->faculty ? [
-                'name'     => $l->faculty->name,
+                'name'     => $this->names->formal($l->faculty),
                 'position' => $l->faculty->position ?? '',
             ] : null,
             'term'               => $l->academicTerm ? [
@@ -244,9 +263,9 @@ class FacultyLoadController extends Controller
             'assignments'        => $assignments,
             'total_units'        => (float) $l->total_units,
             'signatories'        => [
-                'auh'      => $auh,
-                'cid_chief'=> $cidChief ? ['name' => $cidChief->name, 'position' => $cidChief->position ?? 'CID Chief'] : null,
-                'director' => $director  ? ['name' => $director->name,  'position' => $director->position  ?? 'Director III'] : null,
+                'auh'       => $auh,
+                'cid_chief' => $cidChief ? ['name' => $this->names->formal($cidChief), 'position' => $cidChief->position ?? 'CID Chief'] : null,
+                'director'  => $director  ? ['name' => $this->names->formal($director),  'position' => $director->position  ?? 'Director III'] : null,
             ],
         ];
     }
