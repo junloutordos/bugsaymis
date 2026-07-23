@@ -19,11 +19,12 @@
                   <PlusIcon class="h-4 w-4" /> Add New Grading Option
                 </button>
                 <p class="px-4 py-2 text-xs text-slate-400 font-semibold uppercase tracking-wide">Edit existing</p>
-                <div v-for="opt in gradingOptions" :key="opt.id"
+                <div v-for="opt in managedGradingOptions" :key="opt.id"
                   class="flex items-center justify-between px-4 py-2 hover:bg-slate-50">
                   <button @click="openManageModal(opt)"
                     class="text-left text-sm text-slate-700 flex items-center gap-2 flex-1 min-w-0">
                     <span class="truncate">{{ opt.name }}</span>
+                    <AppBadge color="indigo">{{ unitLabel(opt) }}</AppBadge>
                     <AppBadge v-if="!opt.is_active" color="slate">inactive</AppBadge>
                   </button>
                   <AppIconButton label="Delete grading option" variant="danger" size="sm" @click="deleteOption(opt, $event)">
@@ -213,7 +214,9 @@
           class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           :class="createErrors.grading_option_id ? 'border-red-400' : 'border-slate-200'">
           <option value="">— Select a grading option —</option>
-          <option v-for="opt in gradingOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
+          <option v-for="opt in gradingOptions" :key="opt.id" :value="opt.id">
+            {{ opt.name }}{{ opt.owner_designation ? ` (${unitLabel(opt)})` : '' }}
+          </option>
         </select>
         <p v-if="createErrors.grading_option_id" class="text-xs text-red-500 mt-1">{{ createErrors.grading_option_id[0] }}</p>
 
@@ -250,6 +253,25 @@
           <div class="col-span-2 flex items-center gap-2">
             <input type="checkbox" v-model="manageOptionForm.is_active" id="opt-active" class="rounded text-indigo-600" />
             <label for="opt-active" class="text-sm text-slate-700 cursor-pointer">Active (visible in dropdown)</label>
+          </div>
+
+          <!-- Unit ownership: only settable at creation time -->
+          <div v-if="managingOption === null" class="col-span-2">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Academic Unit</label>
+            <select v-if="showUnitPicker" v-model="manageOptionForm.owner_designation_id"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option v-if="isAdmin" :value="null">Campus-wide (all units)</option>
+              <option v-for="unit in gradingOptionUnits" :key="unit.id" :value="unit.id">{{ unit.name }}</option>
+            </select>
+            <p v-else class="text-sm text-slate-600 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              {{ manageOptionForm.owner_designation_id ? unitNameById(manageOptionForm.owner_designation_id) : 'Campus-wide (all units)' }}
+            </p>
+          </div>
+          <div v-else class="col-span-2">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Academic Unit</label>
+            <p class="text-sm text-slate-600 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              {{ unitLabel(managingOption) }}
+            </p>
           </div>
         </div>
 
@@ -342,10 +364,21 @@ import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon } from '@heroicons/v
 const props = defineProps({
   classRecords:      Array,
   gradingOptions:    Array,
+  managedGradingOptions: { type: Array, default: () => [] },
+  gradingOptionUnits:    { type: Array, default: () => [] },
   isAdmin:           { type: Boolean, default: false },
   canManageGradingOptions: { type: Boolean, default: false },
   currentSchoolYear: { type: String, default: null },
 })
+
+// ── Academic unit labeling ────────────────────────────────────────────────────
+function unitNameById(id) {
+  return props.gradingOptionUnits.find(u => u.id === id)?.name ?? 'Campus-wide (all units)'
+}
+function unitLabel(opt) {
+  if (!opt?.owner_designation) return 'Campus-wide'
+  return opt.owner_designation.name.replace(/^Academic Unit Head\s*-\s*/i, '')
+}
 
 // ── Search ────────────────────────────────────────────────────────────────────
 const searchQuery = ref('')
@@ -468,14 +501,23 @@ function navigateTo(record) {
 // ── Grading Option Management Modal ──────────────────────────────────────────
 const showManageModal   = ref(false)
 const managingOption    = ref(null)   // null = create mode, object = edit mode
-const manageOptionForm  = ref({ name: '', description: '', is_active: true })
+const manageOptionForm  = ref({ name: '', description: '', is_active: true, owner_designation_id: null })
 const manageCategories  = ref([])
 const manageSaving      = ref(false)
 const manageErrors      = ref({})
 
+// Admins choose any unit (or campus-wide); an AUH managing more than one unit
+// picks among their own; an AUH with exactly one unit gets it auto-assigned.
+const showUnitPicker = computed(() => props.isAdmin || props.gradingOptionUnits.length > 1)
+
 function openManageModal(option) {
   managingOption.value   = option
-  manageOptionForm.value = { name: option.name, description: option.description ?? '', is_active: option.is_active }
+  manageOptionForm.value = {
+    name: option.name,
+    description: option.description ?? '',
+    is_active: option.is_active,
+    owner_designation_id: option.owner_designation_id ?? null,
+  }
   manageCategories.value = option.categories.map(c => ({ ...c }))
   manageErrors.value     = {}
   showManageModal.value  = true
@@ -483,7 +525,15 @@ function openManageModal(option) {
 
 function openCreateOptionModal() {
   managingOption.value   = null
-  manageOptionForm.value = { name: '', description: '', is_active: true }
+  manageOptionForm.value = {
+    name: '',
+    description: '',
+    is_active: true,
+    // Non-admin AUH holding exactly one unit: auto-assign it, no picker shown.
+    owner_designation_id: (!props.isAdmin && props.gradingOptionUnits.length === 1)
+      ? props.gradingOptionUnits[0].id
+      : null,
+  }
   manageCategories.value = [{ id: null, name: '', code: '', weight: 0, max_assessments: 1, sort_order: 1 }]
   manageErrors.value     = {}
   showManageModal.value  = true
@@ -496,7 +546,7 @@ async function deleteOption(opt, event) {
   try {
     await axios.delete(route('grading-options.destroy', opt.id))
     await Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false })
-    router.reload({ only: ['gradingOptions'] })
+    router.reload({ only: ['gradingOptions', 'managedGradingOptions'] })
   } catch (err) {
     Swal.fire('Cannot Delete', err.response?.data?.message ?? 'Failed to delete.', 'error')
   }
@@ -543,7 +593,7 @@ async function saveManageOption() {
       await Swal.fire({ icon: 'success', title: 'Grading option updated!', timer: 1200, showConfirmButton: false })
     }
     showManageModal.value = false
-    router.reload({ only: ['gradingOptions'] })
+    router.reload({ only: ['gradingOptions', 'managedGradingOptions'] })
   } catch (err) {
     if (err.response?.status === 422) {
       manageErrors.value = err.response.data.errors ?? {}

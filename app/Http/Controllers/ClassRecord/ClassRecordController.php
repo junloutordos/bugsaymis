@@ -5,10 +5,12 @@ namespace App\Http\Controllers\ClassRecord;
 use App\Http\Controllers\Controller;
 use App\Mail\ClassRecord\ClassRecordCheckedMail;
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Services\ClassRecord\GradingOptionScopeService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,10 @@ use Illuminate\Support\Facades\Mail;
 
 class ClassRecordController extends Controller
 {
+    public function __construct(private readonly GradingOptionScopeService $optionScope)
+    {
+    }
+
     private function isAdmin(): bool
     {
         return Auth::user()->hasPermission('class-records.admin');
@@ -35,7 +41,8 @@ class ClassRecordController extends Controller
         $isAdmin = $this->isAdmin();
 
         $query = LoadAssignment::with([
-            'subject:id,name,subject_type,grade_level',
+            'subject:id,name,subject_type,grade_level,academic_unit_id',
+            'subject.academicUnit:id,code,name',
             'section:id,levelid,sectionname',
             'faculty:id,name',
         ])
@@ -80,6 +87,8 @@ class ClassRecordController extends Controller
                 'subject_id' => $la->subject_id,
                 'subject_name' => $la->subject?->name,
                 'subject_type' => $la->subject?->subject_type,
+                'academic_unit_id' => $la->subject?->academic_unit_id,
+                'academic_unit_code' => $la->subject?->academicUnit?->code,
                 'grade_level' => $grade,
                 'section_id' => $la->section_id,
                 'section_name' => $la->section?->sectionname,
@@ -139,6 +148,13 @@ class ClassRecordController extends Controller
         ]);
 
         $subject = Subject::findOrFail($validated['subject_id']);
+        $gradingOption = GradingOption::findOrFail($validated['grading_option_id']);
+        if (! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
+            return response()->json([
+                'message' => 'The selected grading option is not available for this subject’s academic unit.',
+                'errors' => ['grading_option_id' => ['Select a campus-wide option or one assigned to this subject’s academic unit.']],
+            ], 422);
+        }
         $isCrossSection = in_array($subject->subject_type, ['elective', 'science_core'], true);
 
         if (! $isCrossSection && empty($validated['section_id'])) {
@@ -230,6 +246,20 @@ class ClassRecordController extends Controller
             'subject_name' => 'sometimes|string|max:255',
             'year_level_section' => 'sometimes|string|max:255',
         ]);
+
+        if (isset($validated['grading_option_id'])) {
+            $subject = isset($validated['subject_id'])
+                ? Subject::find($validated['subject_id'])
+                : $classRecord->subject;
+            $gradingOption = GradingOption::find($validated['grading_option_id']);
+
+            if (! $subject || ! $gradingOption || ! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
+                return response()->json([
+                    'message' => 'The selected grading option is not available for this subject’s academic unit.',
+                    'errors' => ['grading_option_id' => ['Select a campus-wide option or one assigned to this subject’s academic unit.']],
+                ], 422);
+            }
+        }
 
         // Block grading option change once assessments or scores already exist under it
         if (isset($validated['grading_option_id'])

@@ -9,12 +9,17 @@ use App\Models\ClassRecord\StanineLookup;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Quiz\Quiz;
+use App\Services\ClassRecord\GradingOptionScopeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class ClassRecordPageController extends Controller
 {
+    public function __construct(private readonly GradingOptionScopeService $optionScope)
+    {
+    }
+
     private function isAdmin(): bool
     {
         return Auth::user()->hasPermission('class-records.admin');
@@ -39,14 +44,28 @@ class ClassRecordPageController extends Controller
         $records = $query->get();
 
         $currentSY = SchoolYear::where('is_current', true)->first();
+        $user = Auth::user();
+        $isAdmin = $this->isAdmin();
+
+        // Admins may assign any AUH's unit when creating an option; AUHs are
+        // restricted to the unit(s) their own current-term designation covers.
+        $unitDesignations = $isAdmin
+            ? $this->optionScope->allAuhDesignations()
+            : $this->optionScope->managedDesignations($user);
 
         return Inertia::render('ClassRecord/Index', [
             'classRecords' => $records,
-            'gradingOptions' => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
-            'isAdmin' => $this->isAdmin(),
-            // Grading Options management is broader than isAdmin: AUHs hold the
-            // scoped class-records.grading-options grant without full admin.
-            'canManageGradingOptions' => Auth::user()->hasAnyPermission(['class-records.admin', 'class-records.grading-options']),
+            'gradingOptions' => $this->optionScope->selectableForUser($user),
+            'managedGradingOptions' => $this->optionScope->manageableFor($user),
+            'gradingOptionUnits' => $unitDesignations
+                ->map(fn ($designation) => [
+                    'id' => $designation->id,
+                    'code' => $designation->code,
+                    'name' => preg_replace('/^Academic Unit Head\s*-\s*/i', '', $designation->name),
+                ])
+                ->values(),
+            'isAdmin' => $isAdmin,
+            'canManageGradingOptions' => $this->optionScope->canManage($user),
             'filters' => $request->only(['school_year']),
             'currentSchoolYear' => $currentSY ? $currentSY->name : null,
         ]);
@@ -61,7 +80,8 @@ class ClassRecordPageController extends Controller
 
         $classRecord->load([
             'teacher:id,name,position',
-            'subject:id,name,subject_type,grade_level',
+            'subject:id,name,subject_type,grade_level,academic_unit_id',
+            'subject.academicUnit:id,code',
             'section:id,levelid,sectionname',
             'gradingOption.categories',
             'quarters.assessments.gradingCategory',
@@ -98,7 +118,13 @@ class ClassRecordPageController extends Controller
         return Inertia::render('ClassRecord/Show', [
             'classRecord' => $classRecord,
             'isAdmin' => $this->isAdmin(),
-            'gradingOptions' => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
+            'gradingOptions' => $classRecord->subject
+                ? $this->optionScope->selectableForSubject($classRecord->subject)
+                : GradingOption::with('categories')
+                    ->whereNull('owner_designation_id')
+                    ->where('is_active', true)
+                    ->orderBy('id')
+                    ->get(),
             'stanineLookup' => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
             'isCurrentSY' => $isCurrentSY,
             'currentSYName' => $currentSY?->name,

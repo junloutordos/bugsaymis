@@ -894,7 +894,9 @@ async function saveGradingOptionChange() {
     <div class="space-y-3">
       <select v-model="changeGradingOptionId"
         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option v-for="opt in gradingOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
+        <option v-for="opt in gradingOptions" :key="opt.id" :value="opt.id">
+          {{ opt.name }}{{ opt.owner_designation ? ` (${opt.owner_designation.name.replace(/^Academic Unit Head\s*-\s*/i, '')})` : '' }}
+        </option>
       </select>
       <GradingOptionDetails :option="changeGradingOptionSelected" />
       <p v-if="changeGradingOptionError" class="text-xs text-red-500">{{ changeGradingOptionError }}</p>
