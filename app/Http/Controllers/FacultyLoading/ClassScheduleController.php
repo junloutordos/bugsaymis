@@ -261,20 +261,42 @@ class ClassScheduleController extends Controller
     /** { Monday: {start, end, lunch_start, lunch_end}, ... } — official working time + HR-approved lunch per day, defaulting to the early shift with no lunch recorded. */
     private function facultyOfficialTimes(int $facultyId): array
     {
-        $rows = TeacherOfficialTime::forTeacher($facultyId)->get()->keyBy('day_of_week');
+        return $this->facultyOfficialTimesBulk([$facultyId])[$facultyId];
+    }
 
-        $times = [];
-        foreach (SchedulingConstants::DAYS as $day) {
-            $row = $rows->get($day);
-            $times[$day] = [
-                'start' => substr($row?->start_time ?? '07:30', 0, 5),
-                'end' => substr($row?->end_time ?? '16:30', 0, 5),
-                'lunch_start' => $row?->lunch_start ? substr($row->lunch_start, 0, 5) : null,
-                'lunch_end' => $row?->lunch_end ? substr($row->lunch_end, 0, 5) : null,
-            ];
+    /**
+     * Same as facultyOfficialTimes() but for many faculty in one query —
+     * used by the By-Faculty calendar, which needs every visible faculty's
+     * official time/lunch, not just one.
+     *
+     * { facultyId: { Monday: {start, end, lunch_start, lunch_end}, ... }, ... }
+     */
+    private function facultyOfficialTimesBulk(array $facultyIds): array
+    {
+        $facultyIds = array_values(array_unique(array_map('intval', $facultyIds)));
+
+        $rowsByFaculty = TeacherOfficialTime::whereIn('user_id', $facultyIds)
+            ->get()
+            ->groupBy('user_id');
+
+        $result = [];
+        foreach ($facultyIds as $facultyId) {
+            $rows = ($rowsByFaculty->get($facultyId) ?? collect())->keyBy('day_of_week');
+
+            $times = [];
+            foreach (SchedulingConstants::DAYS as $day) {
+                $row = $rows->get($day);
+                $times[$day] = [
+                    'start' => substr($row?->start_time ?? '07:30', 0, 5),
+                    'end' => substr($row?->end_time ?? '16:30', 0, 5),
+                    'lunch_start' => $row?->lunch_start ? substr($row->lunch_start, 0, 5) : null,
+                    'lunch_end' => $row?->lunch_end ? substr($row->lunch_end, 0, 5) : null,
+                ];
+            }
+            $result[$facultyId] = $times;
         }
 
-        return $times;
+        return $result;
     }
 
     private function resolvePrintTerm(Request $request, ?int $schoolYearId = null): AcademicTerm
@@ -414,6 +436,32 @@ class ClassScheduleController extends Controller
                     'scienceCore' => ($isElectiveSection || $isScienceCoreSection)
                         ? []
                         : $this->scienceCore->getScienceCoreWindows($term->school_year_id, $term->id, $gradeLevel, $day),
+                ];
+            }
+        } elseif (! empty($extra['officialTimes'])) {
+            // Faculty sheets have no single grade to borrow a Lunch band
+            // from (one teacher can span several grades' schedules) — so
+            // the band is built directly from that teacher's own
+            // HR-approved lunch break instead of a grade default. No band
+            // is added for a day with no lunch recorded (nullable by
+            // design), and it carries no `write` descriptor, so it renders
+            // display-only — same non-editable rule the frontend already
+            // applies to bands without one.
+            foreach (SchedulingConstants::DAYS as $day) {
+                $config = $extra['officialTimes'][$day] ?? null;
+                $blocked = [];
+                if (! empty($config['lunch_start']) && ! empty($config['lunch_end'])) {
+                    $blocked[] = [
+                        'type' => 'LUNCH',
+                        'label' => 'Lunch',
+                        'start' => $config['lunch_start'],
+                        'end' => $config['lunch_end'],
+                    ];
+                }
+                $dayConfigs[$day] = [
+                    'start' => $config['start'] ?? null,
+                    'end' => $config['end'] ?? null,
+                    'blocked' => $blocked,
                 ];
             }
         }
@@ -625,6 +673,15 @@ class ClassScheduleController extends Controller
                 'office_name' => $u->office?->name,
             ]);
 
+        // Official time + HR-approved lunch for every faculty shown in this
+        // view — the By-Faculty calendar plots each teacher's own Lunch band
+        // from their own official time, not a borrowed grade default (a
+        // faculty member can teach several grades with different lunch
+        // windows, so there's no single grade whose band would be correct).
+        $officialTimesByFaculty = $faculty->isNotEmpty()
+            ? $this->facultyOfficialTimesBulk($faculty->pluck('id')->all())
+            : [];
+
         $subjects = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units', 'has_ilp']);
         $classrooms = Classroom::available()->orderBy('name')->get(['id', 'name', 'code', 'classroom_type', 'capacity']);
 
@@ -819,8 +876,13 @@ class ClassScheduleController extends Controller
 
         // Official time + HR-approved lunch — only meaningful (and only sent)
         // on the self-pinned "My Faculty Schedule" view, mirroring what the
-        // faculty member's own print sheet shows.
-        $myOfficialTimes = $cap['level'] === 'self' ? $this->facultyOfficialTimes((int) Auth::id()) : null;
+        // faculty member's own print sheet shows. Reuses the batch above when
+        // the self user made it into $faculty (has the Faculty role); falls
+        // back to a direct lookup otherwise (view_own access without the
+        // Faculty role is possible and shouldn't lose this panel).
+        $myOfficialTimes = $cap['level'] === 'self'
+            ? ($officialTimesByFaculty[(int) Auth::id()] ?? $this->facultyOfficialTimes((int) Auth::id()))
+            : null;
 
         return Inertia::render('FacultyLoading/Schedules/Index', [
             'schedules' => $schedules,
@@ -880,6 +942,7 @@ class ClassScheduleController extends Controller
             'recessByGrade' => SchedulingConstants::setting('RECESS_BY_GRADE_DAY'),
             'recessCampus' => SchedulingConstants::setting('RECESS_CAMPUS_DAY'),
             'myOfficialTimes' => $myOfficialTimes,
+            'officialTimesByFaculty' => $officialTimesByFaculty,
         ]);
     }
 
