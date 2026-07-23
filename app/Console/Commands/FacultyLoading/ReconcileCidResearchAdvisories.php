@@ -19,6 +19,7 @@ class ReconcileCidResearchAdvisories extends Command
 
     private const USER_ID_OVERRIDES = [
         'Fernando, Michelle B.' => 25,
+        'Penados, Jhon Michael' => 114, // production account is spelled "John Michael"
     ];
 
     /**
