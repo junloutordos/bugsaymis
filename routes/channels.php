@@ -34,3 +34,7 @@ Broadcast::channel('conversation.{conversationId}', function ($user, int $conver
 Broadcast::channel('attendance', function ($user) {
     return $user->isSuperAdmin() || $user->hasRole('Security Guard');
 });
+
+Broadcast::channel('biometric-feed', function ($user) {
+    return $user->isSuperAdmin() || $user->hasAnyPermission(['hr.biometric.monitor', 'hr.biometric.manage']);
+});

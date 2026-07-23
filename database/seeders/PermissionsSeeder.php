@@ -239,6 +239,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'HR',     'name' => 'hr.dtr.view',            'description' => 'View DTR records for all employees'],
             ['module' => 'HR',     'name' => 'hr.dtr.manage',          'description' => 'Generate, edit, and lock DTR records'],
             ['module' => 'HR',     'name' => 'hr.biometric.manage',    'description' => 'Upload and resolve biometric logs'],
+            ['module' => 'HR',     'name' => 'hr.biometric.monitor',   'description' => 'View the live biometric punch feed (read-only)'],
             ['module' => 'HR',     'name' => 'dtr.view_own',           'description' => 'View and submit penned entries on own DTR'],
 
             // ── HR — Leave (new module) ────────────────────────────────────────

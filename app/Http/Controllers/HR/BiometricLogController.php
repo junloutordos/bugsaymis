@@ -17,7 +17,9 @@ class BiometricLogController extends Controller
 {
     public function index(Request $request)
     {
-        $this->authorize('hr.biometric.manage');
+        if (! auth()->user()->hasAnyPermission(['hr.biometric.manage', 'hr.biometric.monitor'])) {
+            abort(403);
+        }
 
         $query = BiometricLog::with('user')
             ->when($request->resolved === 'true',  fn ($q) => $q->where('is_resolved', true))
@@ -34,13 +36,14 @@ class BiometricLogController extends Controller
         ];
 
         return Inertia::render('HR/Biometric/Index', [
-            'logs'    => $query->paginate(50)->withQueryString(),
-            'stats'   => $stats,
-            'users'   => User::employees()->where('status', 'active')
+            'logs'      => $query->paginate(50)->withQueryString(),
+            'stats'     => $stats,
+            'users'     => User::employees()->where('status', 'active')
                 ->select('id', 'name', 'badge_id')
                 ->orderBy('name')
                 ->get(),
-            'filters' => $request->only(['resolved', 'batch', 'search']),
+            'filters'   => $request->only(['resolved', 'batch', 'search']),
+            'canManage' => auth()->user()->hasPermission('hr.biometric.manage'),
         ]);
     }
 

@@ -7,6 +7,7 @@ use App\Models\HR\DtrRecord;
 use App\Models\HR\EmployeeSchedule;
 use App\Models\HR\SchedulePreset;
 use App\Models\User;
+use App\Services\FacultyLoading\TeacherOfficialTimeSyncService;
 use App\Services\HR\DTRService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -112,7 +113,7 @@ class EmployeeScheduleController extends Controller
     /**
      * Bulk-assign a preset to the selected employees (HR-initiated).
      */
-    public function assign(Request $request, DTRService $dtrService)
+    public function assign(Request $request, DTRService $dtrService, TeacherOfficialTimeSyncService $officialTimeSync)
     {
         $this->authorize('hr.schedule.manage');
 
@@ -151,6 +152,8 @@ class EmployeeScheduleController extends Controller
                 'remarks'                => $preset->remarks,
             ]);
 
+            $officialTimeSync->syncFromEmployeeSchedule($newSchedule);
+
             // Recompute unlocked DTR records from the effective date onwards
             $latestRecord = DtrRecord::where('user_id', $userId)
                 ->where('work_date', '>=', $data['effective_date'])
@@ -176,7 +179,7 @@ class EmployeeScheduleController extends Controller
      | HR ADMIN — APPROVE / REJECT EMPLOYEE SUBMISSIONS
      |=====================================================*/
 
-    public function approveSubmission(Request $request, EmployeeSchedule $schedule, DTRService $dtrService)
+    public function approveSubmission(Request $request, EmployeeSchedule $schedule, DTRService $dtrService, TeacherOfficialTimeSyncService $officialTimeSync)
     {
         $this->authorize('hr.schedule.manage');
 
@@ -198,6 +201,12 @@ class EmployeeScheduleController extends Controller
             'status'     => 'approved',
             'is_default' => true,
         ]);
+
+        // Mirror the newly-approved work hours into teacher_official_times —
+        // used by the class-schedule print sheet, My Faculty Schedule, and
+        // the scheduler's H3 hard constraint. No-op for non-teaching staff
+        // (they simply never get a teacher_official_times row).
+        $officialTimeSync->syncFromEmployeeSchedule($schedule);
 
         // Recompute unlocked DTR records from the effective date onwards
         $latestRecord = DtrRecord::where('user_id', $userId)

@@ -90,16 +90,15 @@
                 v-for="entry in schedulesByDay[day] ?? []"
                 :key="entry.id"
                 class="schedule-print-event"
-                :class="{
+                :class="[durationTierClass(entry), {
                   'schedule-print-event-nonteaching': entry.entry_type === 'non_teaching',
                   'schedule-print-event-tentative': entry.status === 'tentative',
-                  'schedule-print-event-short': durationMinutes(entry) <= 30,
-                }"
+                }]"
                 :style="rangeStyle(entry.start_time, entry.end_time)"
               >
                 <div class="schedule-print-event-title">{{ eventTitle(entry) }}</div>
-                <div v-if="eventDetail(entry)" class="schedule-print-event-detail">{{ eventDetail(entry) }}</div>
-                <div v-if="durationMinutes(entry) >= 40" class="schedule-print-event-time">
+                <div v-if="eventDetail(entry) && durationMinutes(entry) > 15" class="schedule-print-event-detail">{{ eventDetail(entry) }}</div>
+                <div class="schedule-print-event-time">
                   {{ formatTime(entry.start_time) }}–{{ formatTime(entry.end_time) }}
                 </div>
               </div>
@@ -230,6 +229,21 @@ function durationMinutes(entry) {
   return timeToMinutes(entry.end_time) - timeToMinutes(entry.start_time)
 }
 
+/**
+ * Duration tiers scale font-size/line-height/layout down as the cell shrinks,
+ * so short entries (e.g. ILP sessions) still fit title + time without
+ * overflow. Tiers, from smallest: xs (≤15min, single-line, no detail),
+ * sm (16–25min, single-line), short (26–30min, stacked but compact),
+ * default (>30min, full stacked layout at base font size).
+ */
+function durationTierClass(entry) {
+  const minutes = durationMinutes(entry)
+  if (minutes <= 15) return 'schedule-print-event-xs'
+  if (minutes <= 25) return 'schedule-print-event-sm'
+  if (minutes <= 30) return 'schedule-print-event-short'
+  return ''
+}
+
 function isAdvisoryBand(blocked) {
   return props.scheduleType === 'section'
     && !!props.owner.adviser_name
@@ -286,45 +300,16 @@ function officialTimeLabel(day) {
 }
 
 /**
- * Lunch = up to 60 free minutes inside the 10:00 AM–2:00 PM window (clipped to
- * official time), taken from the longest free gap of the day's occupied blocks.
- * Like the CID Excel sheet, the slot ends when the next class starts; on a day
- * with no midday classes it defaults to the 12:00–1:00 block.
+ * Lunch = the faculty member's actual HR-approved lunch break for the day,
+ * synced from their employee_schedules submission into
+ * teacher_official_times on HR approval. Shows "—" when no lunch was
+ * recorded for that day (the field is optional on submission) — an
+ * unrecorded lunch is shown as unrecorded, not guessed from the calendar.
  */
 function lunchTimeLabel(day) {
-  const official = officialWindow(day) ?? { start: CAL_START, end: CAL_END }
-  const windowStart = Math.max(10 * 60, official.start)
-  const windowEnd = Math.min(14 * 60, official.end)
-  if (windowEnd - windowStart < 30) return '—'
-
-  const busy = (schedulesByDay.value[day] ?? [])
-    .map(entry => [timeToMinutes(entry.start_time), timeToMinutes(entry.end_time)])
-    .filter(([start, end]) => end > windowStart && start < windowEnd)
-    .map(([start, end]) => [Math.max(start, windowStart), Math.min(end, windowEnd)])
-    .sort((a, b) => a[0] - b[0])
-
-  const gaps = []
-  let cursor = windowStart
-  for (const [start, end] of busy) {
-    if (start > cursor) gaps.push([cursor, start])
-    cursor = Math.max(cursor, end)
-  }
-  if (cursor < windowEnd) gaps.push([cursor, windowEnd])
-
-  const longest = gaps.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0]
-  if (!longest || longest[1] - longest[0] < 30) return '—'
-
-  let [start, end] = longest
-  if (end < windowEnd) {
-    // Gap is bounded by an afternoon class — lunch ends when that class starts.
-    start = Math.max(start, end - 60)
-  } else if (start <= NOON && end >= 13 * 60) {
-    [start, end] = [NOON, 13 * 60]
-  } else {
-    start = Math.max(start, end - 60)
-  }
-
-  return `${formatTime(minutesToTime(start))} – ${formatTime(minutesToTime(end))}`
+  const config = props.officialTimes?.[day]
+  if (!config?.lunch_start || !config?.lunch_end) return '—'
+  return `${formatTime(config.lunch_start)} – ${formatTime(config.lunch_end)}`
 }
 </script>
 
@@ -661,12 +646,76 @@ function lunchTimeLabel(day) {
   gap: 0.8mm;
   padding-top: 0.2mm;
   padding-bottom: 0.2mm;
+  font-size: 5.3pt;
   text-align: left;
 }
 
 .schedule-print-event-short .schedule-print-event-title,
 .schedule-print-event-short .schedule-print-event-detail {
   min-width: 0;
+}
+
+.schedule-print-event-short .schedule-print-event-time {
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+
+/* 16–25min entries (e.g. ILP sessions) — single line, title + time only,
+ * no detail line (dropped in template to save room). Smaller font so both
+ * pieces fit without clipping. */
+.schedule-print-event-sm {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6mm;
+  padding: 0.1mm 0.6mm 0.1mm 0.9mm;
+  min-height: 1.8mm;
+  font-size: 4.8pt;
+  line-height: 1.05;
+  text-align: left;
+}
+
+.schedule-print-event-sm .schedule-print-event-title {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.schedule-print-event-sm .schedule-print-event-detail {
+  display: none;
+}
+
+.schedule-print-event-sm .schedule-print-event-time {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+/* ≤15min entries — tightest tier. Title truncates first; time is always
+ * fully visible so the period is still identifiable at a glance. */
+.schedule-print-event-xs {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4mm;
+  padding: 0 0.5mm 0 0.8mm;
+  min-height: 1.6mm;
+  font-size: 4.3pt;
+  line-height: 1;
+  text-align: left;
+}
+
+.schedule-print-event-xs .schedule-print-event-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.schedule-print-event-xs .schedule-print-event-detail {
+  display: none;
+}
+
+.schedule-print-event-xs .schedule-print-event-time {
+  flex: 0 0 auto;
+  margin-top: 0;
+  opacity: 0.85;
 }
 
 /* ── Official / lunch time summary rows (faculty print) ───────────────────── */

@@ -97,6 +97,22 @@
         <span v-if="approvalBatch.conforme_signed" class="font-medium">Conforme signed</span>
       </div>
 
+      <!-- Official time + lunch — self view only, mirrors the print sheet and
+           comes from the faculty member's HR-approved work schedule. -->
+      <div v-if="isSelf && myOfficialTimeRows.length" class="rounded-lg border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <span class="font-semibold text-indigo-700">My Official Time &amp; Lunch</span>
+          <span class="text-xs text-indigo-500">From your HR-approved work schedule — to change it, submit a new schedule under My Work Schedule</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div v-for="row in myOfficialTimeRows" :key="row.day" class="rounded-md bg-white/70 px-3 py-2">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ row.day.slice(0, 3) }}</p>
+            <p class="text-xs text-slate-700 font-mono mt-0.5">{{ row.official }}</p>
+            <p class="text-xs text-slate-400 font-mono mt-0.5">Lunch: {{ row.lunch }}</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Filters -->
       <AppFilterBar>
         <div v-if="!isSelf && !isAdvisory" class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
@@ -1254,6 +1270,7 @@ const props = defineProps({
   lunchCampus: { type: Object, default: () => ({}) },
   recessByGrade: { type: Object, default: () => ({}) },
   recessCampus: { type: Object, default: () => ({}) },
+  myOfficialTimes: { type: Object, default: null },
 })
 
 const scheduleBlockError = (err) => {
@@ -1272,6 +1289,35 @@ const isSelf   = computed(() => props.capability.level === 'self')
 const isReview = computed(() => props.capability.level === 'review')
 const isAdvisory = computed(() => props.capability.level === 'advisory')
 const isReadOnly = computed(() => isReview.value || isAdvisory.value)
+
+// ── My official time + lunch (self view only) — mirrors what the faculty
+// member's own print sheet shows, sourced from their HR-approved work
+// schedule (employee_schedules → teacher_official_times sync on approval). ──
+
+const OFFICIAL_TIME_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+
+function formatOfficialTime(time) {
+  if (!time) return null
+  const [h, m] = time.split(':').map(Number)
+  const displayHour = h % 12 || 12
+  return `${displayHour}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+const myOfficialTimeRows = computed(() => {
+  if (!props.myOfficialTimes) return []
+  return OFFICIAL_TIME_DAYS.map(day => {
+    const config = props.myOfficialTimes[day] ?? {}
+    return {
+      day,
+      official: config.start && config.end
+        ? `${formatOfficialTime(config.start)} – ${formatOfficialTime(config.end)}`
+        : '—',
+      lunch: config.lunch_start && config.lunch_end
+        ? `${formatOfficialTime(config.lunch_start)} – ${formatOfficialTime(config.lunch_end)}`
+        : '—',
+    }
+  })
+})
 
 // Class plotting/adjusting is open to CID/admin AND Academic Unit Heads — the
 // server scopes a unit head to their own faculty. School-wide tools (AI
