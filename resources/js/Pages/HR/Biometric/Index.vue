@@ -43,7 +43,7 @@
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         <!-- Upload Panel -->
-        <div class="lg:col-span-1 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
+        <div v-if="canManage" class="lg:col-span-1 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-5">
           <h2 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <ArrowUpTrayIcon class="h-4 w-4 text-indigo-500" />
             Upload Biometric File
@@ -82,7 +82,7 @@
         </div>
 
         <!-- Stats Cards -->
-        <div class="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div :class="canManage ? 'lg:col-span-2' : 'lg:col-span-3'" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
             <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Total</p>
             <p class="text-2xl font-bold text-slate-800 mt-1">{{ stats.total.toLocaleString() }}</p>
@@ -158,7 +158,7 @@
           </td>
           <td class="px-4 py-3">
             <button
-              v-if="!log.is_resolved"
+              v-if="canManage && !log.is_resolved"
               @click="openResolve(log)"
               class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
             >
@@ -181,7 +181,7 @@
               <AppBadge :color="logTypeBadge(log.log_type)">{{ log.log_type.replace('_', ' ') }}</AppBadge>
               <span>{{ log.device_id ?? '—' }}</span>
             </div>
-            <div v-if="!log.is_resolved" class="flex justify-end pt-1">
+            <div v-if="canManage && !log.is_resolved" class="flex justify-end pt-1">
               <button @click="openResolve(log)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Resolve</button>
             </div>
           </div>
@@ -258,10 +258,11 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  logs:    Object,
-  stats:   Object,
-  users:   Array,
-  filters: Object,
+  logs:      Object,
+  stats:     Object,
+  users:     Array,
+  filters:   Object,
+  canManage: Boolean,
 })
 
 // ── Live Punch Feed ────────────────────────────────────────────────────────
