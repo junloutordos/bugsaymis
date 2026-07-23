@@ -1271,6 +1271,7 @@ const props = defineProps({
   recessByGrade: { type: Object, default: () => ({}) },
   recessCampus: { type: Object, default: () => ({}) },
   myOfficialTimes: { type: Object, default: null },
+  officialTimesByFaculty: { type: Object, default: () => ({}) },
 })
 
 const scheduleBlockError = (err) => {
@@ -2113,10 +2114,25 @@ function dayConfigFor(groupId, day) {
   // Consultation: those are section/grade bell-schedule concepts a CID Chief
   // sets, not a faculty member's own — faculty have (or will have) their own
   // separate mechanism for this instead. Every other band is unaffected.
-  if (viewBy.value === 'faculty' && base) {
+  //
+  // Lunch specifically is replaced (not just filtered) with a band built
+  // from this teacher's OWN HR-approved official time — a faculty member can
+  // teach several grades with different lunch windows, so the borrowed
+  // grade's Lunch band would often be wrong for them. No band is added for a
+  // day with no lunch recorded (nullable by design). This band carries no
+  // `write`/`sectionEditable` marker, so isBandDraggable/isBandClickable
+  // treat it as display-only automatically — official time changes go
+  // through My Work Schedule, not a calendar drag.
+  if (viewBy.value === 'faculty') {
+    const filteredBlocked = (base?.blocked ?? []).filter(b => ! ['WHITE_SPACE', 'WELLNESS', 'CONSULT', 'LUNCH'].includes(b.type))
+    const lunch = props.officialTimesByFaculty?.[groupId]?.[day]
+    if (lunch?.lunch_start && lunch?.lunch_end) {
+      filteredBlocked.push({ type: 'LUNCH', label: 'Lunch', start: lunch.lunch_start, end: lunch.lunch_end })
+    }
+    if (!base && filteredBlocked.length === 0) return base
     return {
-      ...base,
-      blocked: (base.blocked ?? []).filter(b => ! ['WHITE_SPACE', 'WELLNESS', 'CONSULT'].includes(b.type)),
+      ...(base ?? {}),
+      blocked: filteredBlocked,
     }
   }
 
