@@ -5,7 +5,6 @@ namespace App\Services\Registrar;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\StanineLookup;
-use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\RetentionPolicy;
 use App\Models\Registrar\StudentAcademicStanding;
 use App\Models\Registrar\StudentAnnualGrade;
@@ -46,14 +45,14 @@ class StudentTranscriptService
             return [];
         }
 
-        $schoolYear = SchoolYear::find($schoolYearId);
-        $stanine    = StanineLookup::orderByDesc('percentage')->get()->toArray();
+        $stanine = StanineLookup::orderByDesc('percentage')->get()->toArray();
 
-        // class_records use the string school_year (e.g. "2025-2026") not the FK
+        // Roster membership is authoritative. This includes regular sections,
+        // cross-section electives, and Grade 11/12 Science Core subjects.
         $classRecords = ClassRecord::with('gradingOption.categories')
-            ->where('section_id', $enrollment->section_id)
-            ->where('school_year', $schoolYear->name)
+            ->where('school_year_id', $schoolYearId)
             ->whereIn('status', ['submitted', 'checked'])
+            ->whereHas('quarters.students', fn ($query) => $query->where('student_id', $studentId))
             ->get();
 
         $savedGrades = [];
@@ -66,15 +65,15 @@ class StudentTranscriptService
 
             $row = StudentAnnualGrade::updateOrCreate(
                 [
-                    'student_id'      => $studentId,
-                    'school_year_id'  => $schoolYearId,
+                    'student_id' => $studentId,
+                    'school_year_id' => $schoolYearId,
                     'class_record_id' => $classRecord->id,
                 ],
                 array_merge($gradeData, [
                     'school_year_id' => $schoolYearId,
-                    'subject_id'     => $classRecord->subject_id,
-                    'subject_name'   => $classRecord->subject_name,
-                    'computed_at'    => Carbon::now(),
+                    'subject_id' => $classRecord->subject_id,
+                    'subject_name' => $classRecord->subject_name,
+                    'computed_at' => Carbon::now(),
                 ])
             );
 
@@ -95,17 +94,17 @@ class StudentTranscriptService
             ->orderBy('subject_name')
             ->get()
             ->map(fn ($row) => [
-                'id'           => $row->id,
+                'id' => $row->id,
                 'subject_name' => $row->subject_name,
-                'q1_ge'        => $row->q1_ge,
-                'q2_ge'        => $row->q2_ge,
-                'q3_ge'        => $row->q3_ge,
-                'q4_ge'        => $row->q4_ge,
-                'final_ge'     => $row->final_ge,
-                'remarks'      => $row->remarks,
-                'passed'       => $row->isPassed(),
-                'is_locked'    => $row->is_locked,
-                'computed_at'  => $row->computed_at?->toDateTimeString(),
+                'q1_ge' => $row->q1_ge,
+                'q2_ge' => $row->q2_ge,
+                'q3_ge' => $row->q3_ge,
+                'q4_ge' => $row->q4_ge,
+                'final_ge' => $row->final_ge,
+                'remarks' => $row->remarks,
+                'passed' => $row->isPassed(),
+                'is_locked' => $row->is_locked,
+                'computed_at' => $row->computed_at?->toDateTimeString(),
             ])
             ->toArray();
     }
@@ -125,14 +124,14 @@ class StudentTranscriptService
             ->whereNotNull('final_ge')
             ->get();
 
-        $subjectCount  = $grades->count();
-        $failedCount   = $grades->filter(fn ($g) => (float) $g->final_ge > 3.0)->count();
-        $gwa           = $subjectCount > 0
+        $subjectCount = $grades->count();
+        $failedCount = $grades->filter(fn ($g) => (float) $g->final_ge > 3.0)->count();
+        $gwa = $subjectCount > 0
             ? round($grades->avg(fn ($g) => (float) $g->final_ge), 3)
             : null;
 
-        $policy  = $this->resolvePolicy($schoolYearId, $gradeLevel);
-        $honors  = $this->determineHonors($gwa, $failedCount, $policy);
+        $policy = $this->resolvePolicy($schoolYearId, $gradeLevel);
+        $honors = $this->determineHonors($gwa, $failedCount, $policy);
         $standing = $policy
             ? $policy->determineStanding($failedCount, $gwa ? $this->geToGwaPct($gwa) : 0)
             : ($failedCount >= 3 ? 'retained' : 'promoted');
@@ -140,13 +139,13 @@ class StudentTranscriptService
         return StudentAcademicStanding::updateOrCreate(
             ['student_id' => $studentId, 'school_year_id' => $schoolYearId],
             [
-                'gwa'                  => $gwa,
-                'subject_count'        => $subjectCount,
+                'gwa' => $gwa,
+                'subject_count' => $subjectCount,
                 'failed_subject_count' => $failedCount,
-                'honors'               => $honors,
-                'standing'             => ucfirst($standing),
-                'processed_by'         => $processedBy ?? Auth::id(),
-                'processed_at'         => Carbon::now(),
+                'honors' => $honors,
+                'standing' => ucfirst($standing),
+                'processed_by' => $processedBy ?? Auth::id(),
+                'processed_at' => Carbon::now(),
             ]
         );
     }
@@ -172,6 +171,7 @@ class StudentTranscriptService
 
             if (! $quarter || $quarter->students->isEmpty()) {
                 $runningGEs[$q] = null;
+
                 continue;
             }
 
@@ -180,6 +180,7 @@ class StudentTranscriptService
 
             if (! $studentRow) {
                 $runningGEs[$q] = null;
+
                 continue;
             }
 
@@ -206,17 +207,17 @@ class StudentTranscriptService
         $q4 = $runningGEs[4] ?? $q3;
 
         $finalResult = $this->grader->computeFinalGrade($q1, $q2, $q3, $q4, $stanine);
-        $finalGE     = $finalResult['finalGE'];
+        $finalGE = $finalResult['finalGE'];
 
         return [
-            'student_id'      => $studentId,
+            'student_id' => $studentId,
             'class_record_id' => $classRecord->id,
-            'q1_ge'           => $q1,
-            'q2_ge'           => $runningGEs[2],
-            'q3_ge'           => $runningGEs[3],
-            'q4_ge'           => $runningGEs[4],
-            'final_ge'        => $finalGE,
-            'remarks'         => $finalGE <= 3.0 ? 'Passed' : 'Failed',
+            'q1_ge' => $q1,
+            'q2_ge' => $runningGEs[2],
+            'q3_ge' => $runningGEs[3],
+            'q4_ge' => $runningGEs[4],
+            'final_ge' => $finalGE,
+            'remarks' => $finalGE <= 3.0 ? 'Passed' : 'Failed',
         ];
     }
 
@@ -233,9 +234,9 @@ class StudentTranscriptService
     ): float {
         $categories = $classRecord->gradingOption->categories
             ->map(fn ($cat) => [
-                'id'          => $cat->id,
-                'code'        => $cat->code,
-                'weight'      => (float) $cat->weight,
+                'id' => $cat->id,
+                'code' => $cat->code,
+                'weight' => (float) $cat->weight,
                 'assessments' => $quarter->assessments
                     ->where('grading_category_id', $cat->id)
                     ->sortBy('sort_order')
@@ -246,7 +247,7 @@ class StudentTranscriptService
             ->toArray();
 
         $studentData = [[
-            'id'     => $studentRow->id,
+            'id' => $studentRow->id,
             'scores' => $studentRow->scores
                 ->mapWithKeys(fn ($s) => [
                     $s->class_record_assessment_id => $s->score !== null ? (float) $s->score : null,
@@ -256,10 +257,10 @@ class StudentTranscriptService
 
         // Pass quarter=1 so the grader treats this as a standalone quarter (no rolling)
         $result = $this->grader->computeFullClassRecord([
-            'quarter'               => 1,
-            'gradingOption'         => ['categories' => $categories],
-            'students'              => $studentData,
-            'stanineLookup'         => $stanine,
+            'quarter' => 1,
+            'gradingOption' => ['categories' => $categories],
+            'students' => $studentData,
+            'stanineLookup' => $stanine,
             'previousQuarterGrades' => [],
         ]);
 
@@ -302,18 +303,32 @@ class StudentTranscriptService
 
         if ($policy === null) {
             // Default DepEd Order 8 GE thresholds
-            if ($gwaGE <= 1.25) return 'With Highest Honors';
-            if ($gwaGE <= 1.50) return 'With High Honors';
-            if ($gwaGE <= 1.75) return 'With Honors';
+            if ($gwaGE <= 1.25) {
+                return 'With Highest Honors';
+            }
+            if ($gwaGE <= 1.50) {
+                return 'With High Honors';
+            }
+            if ($gwaGE <= 1.75) {
+                return 'With Honors';
+            }
+
             return 'None';
         }
 
         // Policy uses percentage-based cutoffs; convert GE to approximate percentage
         $gwaPct = $this->geToGwaPct($gwaGE);
 
-        if ($gwaPct >= (float) $policy->honors_highest_cutoff) return 'With Highest Honors';
-        if ($gwaPct >= (float) $policy->honors_high_cutoff)    return 'With High Honors';
-        if ($gwaPct >= (float) $policy->honors_regular_cutoff) return 'With Honors';
+        if ($gwaPct >= (float) $policy->honors_highest_cutoff) {
+            return 'With Highest Honors';
+        }
+        if ($gwaPct >= (float) $policy->honors_high_cutoff) {
+            return 'With High Honors';
+        }
+        if ($gwaPct >= (float) $policy->honors_regular_cutoff) {
+            return 'With Honors';
+        }
+
         return 'None';
     }
 

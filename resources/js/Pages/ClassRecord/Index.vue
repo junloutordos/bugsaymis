@@ -171,7 +171,7 @@
             <div class="min-w-0">
               <p class="font-medium text-sm text-slate-800 truncate">{{ la.subject_name }}</p>
               <p class="text-xs text-slate-500 mt-0.5">
-                G-{{ la.grade_level }} {{ la.section_name }}
+                {{ la.scope_label }}
                 <span v-if="isAdmin && la.teacher_name" class="ml-1 text-slate-400">· {{ la.teacher_name }}</span>
               </p>
             </div>
@@ -201,7 +201,7 @@
         <div class="rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 mb-4 text-sm">
           <p class="font-semibold text-indigo-800">{{ selectedLoad.subject_name }}</p>
           <p class="text-indigo-600 text-xs mt-0.5">
-            G-{{ selectedLoad.grade_level }} {{ selectedLoad.section_name }}
+            {{ selectedLoad.scope_label }}
             <span v-if="isAdmin && selectedLoad.teacher_name"> · {{ selectedLoad.teacher_name }}</span>
             · <span :class="selectedLoad.subject_type === 'elective' ? 'text-warning-600 font-medium' : ''">
               {{ selectedLoad.subject_type }}

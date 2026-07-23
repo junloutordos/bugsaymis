@@ -18,7 +18,7 @@ class ClassRecordQuarter extends Model
     ];
 
     protected $casts = [
-        'quarter'   => 'integer',
+        'quarter' => 'integer',
         'is_locked' => 'boolean',
         'locked_at' => 'datetime',
     ];
@@ -35,6 +35,8 @@ class ClassRecordQuarter extends Model
 
     public function students(): HasMany
     {
-        return $this->hasMany(ClassRecordStudent::class)->orderBy('sequence_number');
+        return $this->hasMany(ClassRecordStudent::class)
+            ->where('is_active', true)
+            ->orderBy('sequence_number');
     }
 }

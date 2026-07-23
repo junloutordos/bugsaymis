@@ -6,11 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\StanineLookup;
-use App\Services\ClassRecord\GradeComputationService;
 use App\Services\ClassRecord\ClassRecordExcelService;
 use App\Services\ClassRecord\ClassRecordPdfService;
+use App\Services\ClassRecord\GradeComputationService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -20,7 +19,7 @@ class ClassRecordQuarterController extends Controller
     public function __construct(
         private readonly GradeComputationService $grader,
         private readonly ClassRecordExcelService $excelService,
-        private readonly ClassRecordPdfService   $pdfService,
+        private readonly ClassRecordPdfService $pdfService,
     ) {}
 
     private function isAdmin(): bool
@@ -111,9 +110,9 @@ class ClassRecordQuarterController extends Controller
                 ->toArray();
 
             return [
-                'id'          => $cat->id,
-                'code'        => $cat->code,
-                'weight'      => (float) $cat->weight,
+                'id' => $cat->id,
+                'code' => $cat->code,
+                'weight' => (float) $cat->weight,
                 'assessments' => $assessments,
             ];
         })->toArray();
@@ -138,7 +137,14 @@ class ClassRecordQuarterController extends Controller
             if ($prevQuarter) {
                 // We don't store computed grades — re-compute previous quarter to get running grade
                 // For performance, we could cache; for now compute inline
-                $previousGrades = $this->getPreviousRunningGrades($classRecord, $q - 1);
+                $previousByMasterStudent = $this->getPreviousRunningGrades($classRecord, $q - 1);
+                $previousGrades = $quarter->students
+                    ->filter(fn ($student) => $student->student_id !== null)
+                    ->mapWithKeys(fn ($student) => [
+                        $student->id => $previousByMasterStudent[$student->student_id] ?? null,
+                    ])
+                    ->filter(fn ($grade) => $grade !== null)
+                    ->all();
             }
         }
 
@@ -146,10 +152,10 @@ class ClassRecordQuarterController extends Controller
         $stanine = StanineLookup::orderByDesc('percentage')->get()->toArray();
 
         $result = $this->grader->computeFullClassRecord([
-            'quarter'               => $q,
-            'gradingOption'         => ['categories' => $categories],
-            'students'              => $students,
-            'stanineLookup'         => $stanine,
+            'quarter' => $q,
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+            'stanineLookup' => $stanine,
             'previousQuarterGrades' => $previousGrades,
         ]);
 
@@ -157,12 +163,14 @@ class ClassRecordQuarterController extends Controller
         $studentMap = $quarter->students->keyBy('id');
         $result['students'] = array_map(function ($s) use ($studentMap) {
             $model = $studentMap->get($s['studentId']);
+
             return array_merge($s, [
-                'familyName'     => $model?->family_name,
-                'givenName'      => $model?->given_name,
-                'middleInitial'  => $model?->middle_initial,
-                'sex'            => $model?->sex,
+                'familyName' => $model?->family_name,
+                'givenName' => $model?->given_name,
+                'middleInitial' => $model?->middle_initial,
+                'sex' => $model?->sex,
                 'sequenceNumber' => $model?->sequence_number,
+                'masterStudentId' => $model?->student_id,
             ]);
         }, $result['students']);
 
@@ -171,19 +179,22 @@ class ClassRecordQuarterController extends Controller
 
     /**
      * Recursively get the running grades from a previous quarter.
-     * Returns [ studentId => runningGrade (float) ].
+     * Returns [ students.id => runningGrade (float) ].
      */
     private function getPreviousRunningGrades(ClassRecord $classRecord, int $q): array
     {
         // Compute grades for the previous quarter by re-running the service
         // This is intentionally recursive for Q3/Q4 but depth is always ≤ 3
         $response = $this->grades($classRecord, $q);
-        $data     = json_decode($response->getContent(), true);
+        $data = json_decode($response->getContent(), true);
 
         $result = [];
         foreach ($data['students'] ?? [] as $s) {
-            $result[$s['studentId']] = $s['runningGrade'] ?? null;
+            if (! empty($s['masterStudentId'])) {
+                $result[$s['masterStudentId']] = $s['runningGrade'] ?? null;
+            }
         }
+
         return $result;
     }
 
@@ -235,14 +246,14 @@ class ClassRecordQuarterController extends Controller
 
         $pdfBytes = $this->pdfService->exportQuarter($classRecord, $q);
 
-        $subject  = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->subject_name);
-        $section  = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->year_level_section);
-        $sy       = str_replace('-', '_', $classRecord->school_year);
+        $subject = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->subject_name);
+        $section = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->year_level_section);
+        $sy = str_replace('-', '_', $classRecord->school_year);
         $filename = "{$subject}_{$section}_Q{$q}_{$sy}.pdf";
 
         return response($pdfBytes, 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
         ]);
     }
 
@@ -250,8 +261,9 @@ class ClassRecordQuarterController extends Controller
     {
         $subject = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->subject_name);
         $section = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->year_level_section);
-        $sy      = str_replace('-', '_', $classRecord->school_year);
-        $qPart   = $quarter ? "_Q{$quarter}" : '_All';
+        $sy = str_replace('-', '_', $classRecord->school_year);
+        $qPart = $quarter ? "_Q{$quarter}" : '_All';
+
         return "{$subject}_{$section}{$qPart}_{$sy}.xlsx";
     }
 }

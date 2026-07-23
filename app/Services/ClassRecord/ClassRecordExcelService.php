@@ -3,17 +3,15 @@
 namespace App\Services\ClassRecord;
 
 use App\Models\ClassRecord\ClassRecord;
-use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\StanineLookup;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Font;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ClassRecordExcelService
 {
@@ -34,7 +32,7 @@ class ClassRecordExcelService
             'quarters.students',
         ]);
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $spreadsheet->removeSheetByIndex(0); // remove default sheet
 
         $stanine = StanineLookup::orderByDesc('percentage')->get()->toArray();
@@ -56,7 +54,7 @@ class ClassRecordExcelService
             'quarters.students',
         ]);
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $spreadsheet->removeSheetByIndex(0);
 
         $stanine = StanineLookup::orderByDesc('percentage')->get()->toArray();
@@ -74,12 +72,12 @@ class ClassRecordExcelService
     private function addQuarterSheet(Spreadsheet $spreadsheet, ClassRecord $classRecord, int $quarter, array $stanine): void
     {
         $subjectSlug = substr(preg_replace('/[^A-Za-z0-9 ]/', '', $classRecord->subject_name), 0, 20);
-        $sheetTitle  = trim("{$subjectSlug} Q{$quarter}");
+        $sheetTitle = trim("{$subjectSlug} Q{$quarter}");
 
         $ws = new Worksheet($spreadsheet, $sheetTitle);
         $spreadsheet->addSheet($ws);
 
-        $qLabel      = self::QUARTER_LABELS[$quarter - 1];
+        $qLabel = self::QUARTER_LABELS[$quarter - 1];
         $quarterData = $classRecord->quarters->firstWhere('quarter', $quarter);
 
         // Load scores into a map { studentId_assessmentId => score }
@@ -92,7 +90,7 @@ class ClassRecordExcelService
 
         // Sorted categories and students
         $categories = $classRecord->gradingOption->categories->sortBy('sort_order')->values();
-        $students   = $quarterData?->students?->sortBy('sequence_number')->values() ?? collect();
+        $students = $quarterData?->students?->sortBy('sequence_number')->values() ?? collect();
         $assessByCategory = [];
         foreach ($categories as $cat) {
             $assessByCategory[$cat->id] = ($quarterData?->assessments ?? collect())
@@ -104,7 +102,14 @@ class ClassRecordExcelService
         // Compute previous running grades for Q2-Q4
         $previousGrades = [];
         if ($quarter > 1) {
-            $previousGrades = $this->getPreviousRunningGrades($classRecord, $quarter - 1, $stanine);
+            $previousByMaster = $this->getPreviousRunningGrades($classRecord, $quarter - 1, $stanine);
+            $previousGrades = $students
+                ->filter(fn ($student) => $student->student_id !== null)
+                ->mapWithKeys(fn ($student) => [
+                    $student->id => $previousByMaster[$student->student_id] ?? null,
+                ])
+                ->filter(fn ($grade) => $grade !== null)
+                ->all();
         }
 
         // ── Rows 1-8: School info header ──────────────────────────────────────
@@ -127,40 +132,40 @@ class ClassRecordExcelService
         // Then: TW%, Score%, GE, AE
         // For Q2+: Quarter GE (2/3), Prev Grade (1/3), Final Grade, Final GE
 
-        $FIXED   = 5;   // A–E
+        $FIXED = 5;   // A–E
         $colCursor = $FIXED + 1;  // next column index (1-based)
 
         // Category column ranges
         $catCols = []; // { catId => { start, end, assessCols: [colIdx] } }
         foreach ($categories as $cat) {
-            $assmnts  = $assessByCategory[$cat->id] ?? collect();
-            $start    = $colCursor;
-            $assCols  = [];
+            $assmnts = $assessByCategory[$cat->id] ?? collect();
+            $start = $colCursor;
+            $assCols = [];
             foreach ($assmnts as $a) {
                 $assCols[] = $colCursor++;
             }
-            $tCol      = $colCursor++;
-            $pctCol    = $colCursor++;
-            $wPctCol   = $colCursor++;
+            $tCol = $colCursor++;
+            $pctCol = $colCursor++;
+            $wPctCol = $colCursor++;
             $catCols[$cat->id] = [
-                'start'   => $start,
-                'end'     => $colCursor - 1,
+                'start' => $start,
+                'end' => $colCursor - 1,
                 'assCols' => $assCols,
-                'tCol'    => $tCol,
-                'pctCol'  => $pctCol,
+                'tCol' => $tCol,
+                'pctCol' => $pctCol,
                 'wPctCol' => $wPctCol,
                 'assmnts' => $assmnts,
             ];
         }
 
-        $twCol    = $colCursor++;
+        $twCol = $colCursor++;
         $scoreCol = $colCursor++;
-        $geCol    = $colCursor++;
-        $aeCol    = $colCursor++;
+        $geCol = $colCursor++;
+        $aeCol = $colCursor++;
 
         $runCols = [];
         if ($quarter > 1) {
-            $runCols['qGe2_3']  = $colCursor++;  // Quarter GE × 2/3
+            $runCols['qGe2_3'] = $colCursor++;  // Quarter GE × 2/3
             $runCols['prevGe1_3'] = $colCursor++;  // Prev × 1/3
             $runCols['finalGe'] = $colCursor++;
             $runCols['finalAe'] = $colCursor++;
@@ -179,16 +184,16 @@ class ClassRecordExcelService
         $ws->setCellValue('E10', 'Sex');
 
         foreach ($categories as $cat) {
-            $cc      = $catCols[$cat->id];
-            $startL  = Coordinate::stringFromColumnIndex($cc['start']);
-            $endL    = Coordinate::stringFromColumnIndex($cc['end']);
+            $cc = $catCols[$cat->id];
+            $startL = Coordinate::stringFromColumnIndex($cc['start']);
+            $endL = Coordinate::stringFromColumnIndex($cc['end']);
             $ws->mergeCells("{$startL}10:{$endL}10");
-            $ws->setCellValue("{$startL}10", "{$cat->name} (" . round($cat->weight * 100) . '%)');
+            $ws->setCellValue("{$startL}10", "{$cat->name} (".round($cat->weight * 100).'%)');
         }
 
         // Summary group header (TW%, Score%, GE, AE)
         $sumStart = Coordinate::stringFromColumnIndex($twCol);
-        $sumEnd   = Coordinate::stringFromColumnIndex($quarter > 1 ? max($runCols) : $aeCol);
+        $sumEnd = Coordinate::stringFromColumnIndex($quarter > 1 ? max($runCols) : $aeCol);
         $ws->mergeCells("{$sumStart}10:{$sumEnd}10");
         $ws->setCellValue("{$sumStart}10", "{$qLabel} Quarter Summary");
 
@@ -196,29 +201,29 @@ class ClassRecordExcelService
         foreach ($categories as $cat) {
             $cc = $catCols[$cat->id];
             foreach ($cc['assmnts'] as $i => $a) {
-                $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]) . '11',
-                    $cat->code . $a->assessment_number);
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]).'11',
+                    $cat->code.$a->assessment_number);
             }
-            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['tCol'])    . '11', 'T');
-            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['pctCol'])  . '11', '%');
-            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['wPctCol']) . '11', 'W%');
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['tCol']).'11', 'T');
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['pctCol']).'11', '%');
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['wPctCol']).'11', 'W%');
         }
-        $ws->setCellValue(Coordinate::stringFromColumnIndex($twCol)    . '11', 'TW%');
-        $ws->setCellValue(Coordinate::stringFromColumnIndex($scoreCol) . '11', 'Score%');
-        $ws->setCellValue(Coordinate::stringFromColumnIndex($geCol)    . '11', 'GE');
-        $ws->setCellValue(Coordinate::stringFromColumnIndex($aeCol)    . '11', 'Adjectival Eq.');
+        $ws->setCellValue(Coordinate::stringFromColumnIndex($twCol).'11', 'TW%');
+        $ws->setCellValue(Coordinate::stringFromColumnIndex($scoreCol).'11', 'Score%');
+        $ws->setCellValue(Coordinate::stringFromColumnIndex($geCol).'11', 'GE');
+        $ws->setCellValue(Coordinate::stringFromColumnIndex($aeCol).'11', 'Adjectival Eq.');
         if ($quarter > 1) {
-            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['qGe2_3'])   . '11', "{$qLabel} Qtr × 2/3");
-            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['prevGe1_3']). '11', "Prev × 1/3");
-            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalGe'])  . '11', 'Final GE');
-            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalAe'])  . '11', 'Final Adjectival');
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['qGe2_3']).'11', "{$qLabel} Qtr × 2/3");
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['prevGe1_3']).'11', 'Prev × 1/3');
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalGe']).'11', 'Final GE');
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalAe']).'11', 'Final Adjectival');
         }
 
         // ── Row 12: Max scores ────────────────────────────────────────────────
         foreach ($categories as $cat) {
             $cc = $catCols[$cat->id];
             foreach ($cc['assmnts'] as $i => $a) {
-                $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]) . '12',
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]).'12',
                     number_format($a->max_score, 0));
             }
         }
@@ -230,8 +235,8 @@ class ClassRecordExcelService
                 ->getFont()->setBold(true);
             $ws->getStyle("A{$row}:{$lastCol}{$row}")
                 ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)
-                                ->setVertical(Alignment::VERTICAL_CENTER)
-                                ->setWrapText(true);
+                ->setVertical(Alignment::VERTICAL_CENTER)
+                ->setWrapText(true);
             $ws->getStyle("A{$row}:{$lastCol}{$row}")
                 ->getFill()->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setRGB($row === 10 ? 'BDD7EE' : ($row === 11 ? 'D9E1F2' : 'EBF3FB'));
@@ -244,8 +249,8 @@ class ClassRecordExcelService
 
         // ── Rows 13+: Student data ────────────────────────────────────────────
         foreach ($students as $sIdx => $student) {
-            $row  = 13 + $sIdx;
-            $sid  = $student->id;
+            $row = 13 + $sIdx;
+            $sid = $student->id;
             $comp = $computed[$sid] ?? null;
 
             $ws->setCellValue("A{$row}", $student->sequence_number);
@@ -259,8 +264,8 @@ class ClassRecordExcelService
                 foreach ($cc['assmnts'] as $i => $a) {
                     $score = $scoresMap["{$sid}_{$a->id}"] ?? null;
                     if ($score !== null) {
-                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]) . $row, $score);
-                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['assCols'][$i]) . $row)
+                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]).$row, $score);
+                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['assCols'][$i]).$row)
                             ->getNumberFormat()->setFormatCode('0.00');
                     }
                 }
@@ -270,45 +275,45 @@ class ClassRecordExcelService
                     // PHP service returns key 'categories' with sub-key 'categoryId'
                     $catResult = collect($comp['categories'] ?? [])->firstWhere('categoryId', $cat->id);
                     if ($catResult) {
-                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['tCol'])    . $row, $catResult['total']);
-                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['pctCol'])  . $row, $catResult['percentage']);
-                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['wPctCol']) . $row, $catResult['weightedPercentage']);
-                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['pctCol'])  . $row)->getNumberFormat()->setFormatCode('0.00%');
-                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['wPctCol']) . $row)->getNumberFormat()->setFormatCode('0.00%');
+                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['tCol']).$row, $catResult['total']);
+                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['pctCol']).$row, $catResult['percentage']);
+                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['wPctCol']).$row, $catResult['weightedPercentage']);
+                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['pctCol']).$row)->getNumberFormat()->setFormatCode('0.00%');
+                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['wPctCol']).$row)->getNumberFormat()->setFormatCode('0.00%');
                     }
                 }
             }
 
             if ($comp) {
                 // PHP service uses 'totalWeightedPercentage' and 'percentageScore'
-                $ws->setCellValue(Coordinate::stringFromColumnIndex($twCol)    . $row, $comp['totalWeightedPercentage']);
-                $ws->setCellValue(Coordinate::stringFromColumnIndex($scoreCol) . $row, $comp['percentageScore'] / 100);
-                $ws->setCellValue(Coordinate::stringFromColumnIndex($geCol)    . $row, $comp['gradeEquivalent']);
-                $ws->setCellValue(Coordinate::stringFromColumnIndex($aeCol)    . $row, $comp['adjectivalEquivalent']);
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($twCol).$row, $comp['totalWeightedPercentage']);
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($scoreCol).$row, $comp['percentageScore'] / 100);
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($geCol).$row, $comp['gradeEquivalent']);
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($aeCol).$row, $comp['adjectivalEquivalent']);
 
-                $ws->getStyle(Coordinate::stringFromColumnIndex($twCol)    . $row)->getNumberFormat()->setFormatCode('0.00%');
-                $ws->getStyle(Coordinate::stringFromColumnIndex($scoreCol) . $row)->getNumberFormat()->setFormatCode('0.00%');
-                $ws->getStyle(Coordinate::stringFromColumnIndex($geCol)    . $row)->getNumberFormat()->setFormatCode('0.000');
+                $ws->getStyle(Coordinate::stringFromColumnIndex($twCol).$row)->getNumberFormat()->setFormatCode('0.00%');
+                $ws->getStyle(Coordinate::stringFromColumnIndex($scoreCol).$row)->getNumberFormat()->setFormatCode('0.00%');
+                $ws->getStyle(Coordinate::stringFromColumnIndex($geCol).$row)->getNumberFormat()->setFormatCode('0.000');
 
                 if ($quarter > 1) {
                     $prevGrade = $previousGrades[$sid] ?? null;
-                    $qWeight   = $comp['gradeEquivalent'] * (2 / 3);
-                    $pWeight   = $prevGrade !== null ? $prevGrade * (1 / 3) : 0;
-                    $finalGe   = $comp['runningGrade'];
+                    $qWeight = $comp['gradeEquivalent'] * (2 / 3);
+                    $pWeight = $prevGrade !== null ? $prevGrade * (1 / 3) : 0;
+                    $finalGe = $comp['runningGrade'];
                     $finalLookup = $this->stanineAdjectival($finalGe, $stanine);
 
-                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['qGe2_3'])    . $row, $qWeight);
-                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['prevGe1_3']) . $row, $pWeight);
-                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalGe'])   . $row, $finalGe);
-                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalAe'])   . $row, $finalLookup);
+                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['qGe2_3']).$row, $qWeight);
+                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['prevGe1_3']).$row, $pWeight);
+                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalGe']).$row, $finalGe);
+                    $ws->setCellValue(Coordinate::stringFromColumnIndex($runCols['finalAe']).$row, $finalLookup);
 
-                    $ws->getStyle(Coordinate::stringFromColumnIndex($runCols['finalGe']) . $row)->getNumberFormat()->setFormatCode('0.000');
+                    $ws->getStyle(Coordinate::stringFromColumnIndex($runCols['finalGe']).$row)->getNumberFormat()->setFormatCode('0.000');
                 }
 
                 // Color-code the Adjectival cell
-                $this->applyAdjectivalColor($ws, Coordinate::stringFromColumnIndex($aeCol) . $row, $comp['adjectivalEquivalent']);
+                $this->applyAdjectivalColor($ws, Coordinate::stringFromColumnIndex($aeCol).$row, $comp['adjectivalEquivalent']);
                 if ($quarter > 1 && isset($runCols['finalAe'])) {
-                    $this->applyAdjectivalColor($ws, Coordinate::stringFromColumnIndex($runCols['finalAe']) . $row, $finalLookup ?? '');
+                    $this->applyAdjectivalColor($ws, Coordinate::stringFromColumnIndex($runCols['finalAe']).$row, $finalLookup ?? '');
                 }
             }
 
@@ -327,11 +332,11 @@ class ClassRecordExcelService
 
         // ── Signature block (footer) ──────────────────────────────────────────
         $footerRow = 13 + $students->count() + 3;
-        $ws->setCellValue("A{$footerRow}",       'Prepared by:');
-        $ws->setCellValue("D{$footerRow}",       'Checked by:');
-        $ws->setCellValue("G{$footerRow}",       'Approved by:');
-        $ws->setCellValue("A" . ($footerRow + 2), $classRecord->teacher?->name ?? '');
-        $ws->setCellValue("A" . ($footerRow + 3), $classRecord->teacher?->position ?? 'Subject Teacher');
+        $ws->setCellValue("A{$footerRow}", 'Prepared by:');
+        $ws->setCellValue("D{$footerRow}", 'Checked by:');
+        $ws->setCellValue("G{$footerRow}", 'Approved by:');
+        $ws->setCellValue('A'.($footerRow + 2), $classRecord->teacher?->name ?? '');
+        $ws->setCellValue('A'.($footerRow + 3), $classRecord->teacher?->position ?? 'Subject Teacher');
         $ws->getStyle("A{$footerRow}")->getFont()->setBold(true);
         $ws->getStyle("D{$footerRow}")->getFont()->setBold(true);
         $ws->getStyle("G{$footerRow}")->getFont()->setBold(true);
@@ -344,9 +349,9 @@ class ClassRecordExcelService
         foreach ($categories as $cat) {
             $cc = $catCols[$cat->id];
             foreach ($cc['assmnts'] as $i => $a) {
-                $label = $cat->code . $a->assessment_number . ': ' . $a->title;
-                $date  = $a->activity_date ? ' (' . $a->activity_date . ')' : '';
-                $ws->setCellValue("A{$logRow}", $label . $date);
+                $label = $cat->code.$a->assessment_number.': '.$a->title;
+                $date = $a->activity_date ? ' ('.$a->activity_date.')' : '';
+                $ws->setCellValue("A{$logRow}", $label.$date);
                 $logRow++;
             }
         }
@@ -405,27 +410,31 @@ class ClassRecordExcelService
 
     private function loadScoresMap(?int $quarterId): array
     {
-        if (!$quarterId) return [];
+        if (! $quarterId) {
+            return [];
+        }
 
         return ClassRecordScore::whereHas(
             'student', fn ($q) => $q->where('class_record_quarter_id', $quarterId)
         )->get(['class_record_student_id', 'class_record_assessment_id', 'score'])
-         ->mapWithKeys(fn ($s) => [
-             "{$s->class_record_student_id}_{$s->class_record_assessment_id}" => $s->score,
-         ])
-         ->toArray();
+            ->mapWithKeys(fn ($s) => [
+                "{$s->class_record_student_id}_{$s->class_record_assessment_id}" => $s->score,
+            ])
+            ->toArray();
     }
 
     private function computeGrades(ClassRecord $classRecord, int $quarter, array $stanine, array $scoresMap): array
     {
         $quarterData = $classRecord->quarters->firstWhere('quarter', $quarter);
-        if (!$quarterData) return [];
+        if (! $quarterData) {
+            return [];
+        }
 
         $categories = $classRecord->gradingOption->categories->sortBy('sort_order')->map(function ($cat) use ($quarterData) {
             return [
-                'id'          => $cat->id,
-                'code'        => $cat->code,
-                'weight'      => (float) $cat->weight,
+                'id' => $cat->id,
+                'code' => $cat->code,
+                'weight' => (float) $cat->weight,
                 'assessments' => ($quarterData->assessments ?? collect())
                     ->where('grading_category_id', $cat->id)
                     ->map(fn ($a) => ['id' => $a->id, 'maxScore' => (float) $a->max_score])
@@ -434,7 +443,7 @@ class ClassRecordExcelService
         })->toArray();
 
         $students = ($quarterData->students ?? collect())->map(fn ($s) => [
-            'id'     => $s->id,
+            'id' => $s->id,
             'scores' => collect($scoresMap)
                 ->filter(fn ($v, $k) => str_starts_with($k, "{$s->id}_"))
                 ->mapWithKeys(fn ($v, $k) => [
@@ -442,15 +451,22 @@ class ClassRecordExcelService
                 ])->toArray(),
         ])->toArray();
 
-        $previousGrades = $quarter > 1
+        $previousByMaster = $quarter > 1
             ? $this->getPreviousRunningGrades($classRecord, $quarter - 1, $stanine)
             : [];
+        $previousGrades = ($quarterData->students ?? collect())
+            ->filter(fn ($student) => $student->student_id !== null)
+            ->mapWithKeys(fn ($student) => [
+                $student->id => $previousByMaster[$student->student_id] ?? null,
+            ])
+            ->filter(fn ($grade) => $grade !== null)
+            ->all();
 
         $result = $this->grader->computeFullClassRecord([
-            'quarter'               => $quarter,
-            'gradingOption'         => ['categories' => $categories],
-            'students'              => $students,
-            'stanineLookup'         => $stanine,
+            'quarter' => $quarter,
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+            'stanineLookup' => $stanine,
             'previousQuarterGrades' => $previousGrades,
         ]);
 
@@ -460,12 +476,22 @@ class ClassRecordExcelService
     private function getPreviousRunningGrades(ClassRecord $classRecord, int $prevQ, array $stanine): array
     {
         $prevQuarterData = $classRecord->quarters->firstWhere('quarter', $prevQ);
-        if (!$prevQuarterData) return [];
+        if (! $prevQuarterData) {
+            return [];
+        }
 
         $scoresMap = $this->loadScoresMap($prevQuarterData->id);
-        $computed  = $this->computeGrades($classRecord, $prevQ, $stanine, $scoresMap);
+        $computed = $this->computeGrades($classRecord, $prevQ, $stanine, $scoresMap);
 
-        return collect($computed)->mapWithKeys(fn ($g, $sid) => [$sid => $g['runningGrade']])->toArray();
+        $studentMap = $prevQuarterData->students->keyBy('id');
+
+        return collect($computed)
+            ->mapWithKeys(function ($grade, $rosterRowId) use ($studentMap) {
+                $masterStudentId = $studentMap->get((int) $rosterRowId)?->student_id;
+
+                return $masterStudentId ? [$masterStudentId => $grade['runningGrade']] : [];
+            })
+            ->toArray();
     }
 
     private function stanineAdjectival(float $ge, array $stanine): string
@@ -476,25 +502,38 @@ class ClassRecordExcelService
                 return $row['adjectival_equivalent'];
             }
         }
-        if ($ge <= 1.140) return 'Excellent';
-        if ($ge <= 1.600) return 'Very Good';
-        if ($ge <= 2.100) return 'Good';
-        if ($ge <= 2.600) return 'Satisfactory';
-        if ($ge <= 3.379) return 'Fair';
-        if ($ge <= 4.402) return 'Failed on Condition';
+        if ($ge <= 1.140) {
+            return 'Excellent';
+        }
+        if ($ge <= 1.600) {
+            return 'Very Good';
+        }
+        if ($ge <= 2.100) {
+            return 'Good';
+        }
+        if ($ge <= 2.600) {
+            return 'Satisfactory';
+        }
+        if ($ge <= 3.379) {
+            return 'Fair';
+        }
+        if ($ge <= 4.402) {
+            return 'Failed on Condition';
+        }
+
         return 'Failed';
     }
 
     private function applyAdjectivalColor(Worksheet $ws, string $cell, string $adjectival): void
     {
-        $a   = strtolower($adjectival);
+        $a = strtolower($adjectival);
         $rgb = match (true) {
-            $a === 'excellent' || $a === 'very good'  => 'C6EFCE',  // green
-            $a === 'good' || $a === 'satisfactory'    => 'BDD7EE',  // blue
-            $a === 'fair'                             => 'FFEB9C',  // amber
-            str_contains($a, 'condition')             => 'FFCBA4',  // orange
-            $a === 'failed'                           => 'FFC7CE',  // red
-            default                                   => null,
+            $a === 'excellent' || $a === 'very good' => 'C6EFCE',  // green
+            $a === 'good' || $a === 'satisfactory' => 'BDD7EE',  // blue
+            $a === 'fair' => 'FFEB9C',  // amber
+            str_contains($a, 'condition') => 'FFCBA4',  // orange
+            $a === 'failed' => 'FFC7CE',  // red
+            default => null,
         };
         if ($rgb) {
             $ws->getStyle($cell)->getFill()
@@ -505,8 +544,9 @@ class ClassRecordExcelService
 
     private function saveTempFile(Spreadsheet $spreadsheet): string
     {
-        $tempFile = tempnam(sys_get_temp_dir(), 'cr_export_') . '.xlsx';
+        $tempFile = tempnam(sys_get_temp_dir(), 'cr_export_').'.xlsx';
         IOFactory::createWriter($spreadsheet, 'Xlsx')->save($tempFile);
+
         return $tempFile;
     }
 }
