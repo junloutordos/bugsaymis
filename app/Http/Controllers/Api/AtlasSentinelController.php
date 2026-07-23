@@ -375,15 +375,23 @@ class AtlasSentinelController extends Controller
             ]);
         }
 
-        $biometricBridge = BiometricDevice::where('ict_equipment_device_id', $device->id)
-            ->where('is_active', true)
-            ->first();
-        if ($biometricBridge) {
-            $response['biometric_bridge'] = [
-                'device_key'    => $biometricBridge->device_key,
-                'label'         => $biometricBridge->label,
-                'receiver_port' => $biometricBridge->receiver_port,
-            ];
+        // A biometric bridge lookup hiccup must never take health monitoring down with it.
+        try {
+            $biometricBridge = BiometricDevice::where('ict_equipment_device_id', $device->id)
+                ->where('is_active', true)
+                ->first();
+            if ($biometricBridge) {
+                $response['biometric_bridge'] = [
+                    'device_key'    => $biometricBridge->device_key,
+                    'label'         => $biometricBridge->label,
+                    'receiver_port' => $biometricBridge->receiver_port,
+                ];
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Atlas Sentinel: biometric bridge lookup failed during checkin', [
+                'device_id' => $device->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         $latestRelease = AtlasSentinelRelease::latestRelease();
