@@ -5,7 +5,6 @@ namespace App\Http\Controllers\ClassRecord;
 use App\Http\Controllers\Controller;
 use App\Mail\ClassRecord\ClassRecordCheckedMail;
 use App\Models\ClassRecord\ClassRecord;
-use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
@@ -36,14 +35,13 @@ class ClassRecordController extends Controller
         $isAdmin = $this->isAdmin();
 
         $query = LoadAssignment::with([
-                'subject:id,name,subject_type,grade_level',
-                'section:id,levelid,sectionname',
-                'faculty:id,name',
-            ])
+            'subject:id,name,subject_type,grade_level',
+            'section:id,levelid,sectionname',
+            'faculty:id,name',
+        ])
             ->where('school_year_id', $currentSY->id)
             ->where('assignment_type', 'teaching')
-            ->whereNotNull('subject_id')
-            ->whereNotNull('section_id');
+            ->whereNotNull('subject_id');
 
         if (! $isAdmin) {
             $query->where('user_id', Auth::id());
@@ -58,8 +56,7 @@ class ClassRecordController extends Controller
 
         // Flag assignments that already have a class record this SY
         $existingQuery = ClassRecord::where('school_year_id', $currentSY->id)
-            ->whereNotNull('subject_id')
-            ->whereNotNull('section_id');
+            ->whereNotNull('subject_id');
 
         if (! $isAdmin) {
             $existingQuery->where('teacher_id', Auth::id());
@@ -67,22 +64,31 @@ class ClassRecordController extends Controller
 
         $existingPairs = $existingQuery
             ->get(['teacher_id', 'subject_id', 'section_id'])
-            ->map(fn ($r) => $r->teacher_id . '_' . $r->subject_id . '_' . $r->section_id)
+            ->map(fn ($r) => $r->teacher_id.'_'.$r->subject_id.'_'.$r->section_id)
             ->flip();
 
-        $result = $assignments->map(fn ($la) => [
-            'load_assignment_id' => $la->id,
-            'teacher_id'         => $la->user_id,
-            'teacher_name'       => $la->faculty?->name,
-            'subject_id'         => $la->subject_id,
-            'subject_name'       => $la->subject?->name,
-            'subject_type'       => $la->subject?->subject_type,
-            'grade_level'        => $la->subject?->grade_level,
-            'section_id'         => $la->section_id,
-            'section_name'       => $la->section?->sectionname,
-            'display_label'      => ($la->subject?->name ?? '—') . ' — ' . ($la->section?->sectionname ?? '—'),
-            'already_created'    => $existingPairs->has($la->user_id . '_' . $la->subject_id . '_' . $la->section_id),
-        ]);
+        $result = $assignments->map(function ($la) use ($existingPairs) {
+            $isCrossSection = in_array($la->subject?->subject_type, ['elective', 'science_core'], true);
+            $grade = (int) ($la->subject?->grade_level ?? 0);
+            $scopeLabel = $la->section?->sectionname
+                ?? ($grade === 0 ? 'Grades 11–12 — Cross-section' : "Grade {$grade} — Cross-section");
+
+            return [
+                'load_assignment_id' => $la->id,
+                'teacher_id' => $la->user_id,
+                'teacher_name' => $la->faculty?->name,
+                'subject_id' => $la->subject_id,
+                'subject_name' => $la->subject?->name,
+                'subject_type' => $la->subject?->subject_type,
+                'grade_level' => $grade,
+                'section_id' => $la->section_id,
+                'section_name' => $la->section?->sectionname,
+                'scope_label' => $scopeLabel,
+                'is_cross_section' => $isCrossSection,
+                'display_label' => ($la->subject?->name ?? '—').' — '.$scopeLabel,
+                'already_created' => $existingPairs->has($la->user_id.'_'.$la->subject_id.'_'.$la->section_id),
+            ];
+        });
 
         return response()->json([
             'assignments' => $result,
@@ -120,35 +126,53 @@ class ClassRecordController extends Controller
         if (! $currentSY) {
             return response()->json([
                 'message' => 'No active school year is set. Please contact the administrator.',
-                'errors'  => ['school_year' => ['No active school year is configured.']],
+                'errors' => ['school_year' => ['No active school year is configured.']],
             ], 422);
         }
 
         $validated = $request->validate([
-            'subject_id'       => 'required|integer|exists:subjects,id',
-            'section_id'       => 'required|integer|exists:sections,id',
-            'grading_option_id'=> 'required|integer|exists:grading_options,id',
+            'subject_id' => 'required|integer|exists:subjects,id',
+            'section_id' => 'nullable|integer|exists:sections,id',
+            'grading_option_id' => 'required|integer|exists:grading_options,id',
             // Admins may create on behalf of another teacher
-            'teacher_id'       => 'nullable|integer|exists:users,id',
+            'teacher_id' => 'nullable|integer|exists:users,id',
         ]);
 
-        // Verify section belongs to the current school year
-        $section = Section::where('id', $validated['section_id'])
-            ->where('school_year_id', $currentSY->id)
-            ->first();
+        $subject = Subject::findOrFail($validated['subject_id']);
+        $isCrossSection = in_array($subject->subject_type, ['elective', 'science_core'], true);
 
-        if (! $section) {
+        if (! $isCrossSection && empty($validated['section_id'])) {
             return response()->json([
-                'message' => 'The selected section does not belong to the current school year.',
-                'errors'  => ['section_id' => ['Invalid section for current school year.']],
+                'message' => 'A regular subject must be linked to a section.',
+                'errors' => ['section_id' => ['Select a section for this regular subject.']],
             ], 422);
         }
 
-        $subject = Subject::findOrFail($validated['subject_id']);
+        $section = null;
+        if (! empty($validated['section_id'])) {
+            // Verify section belongs to the current school year
+            $section = Section::where('id', $validated['section_id'])
+                ->where('school_year_id', $currentSY->id)
+                ->first();
+
+            if (! $section) {
+                return response()->json([
+                    'message' => 'The selected section does not belong to the current school year.',
+                    'errors' => ['section_id' => ['Invalid section for current school year.']],
+                ], 422);
+            }
+        }
 
         // Auto-derive display fields from FK data
-        $subjectName      = $subject->name;
-        $yearLevelSection = "G-{$section->levelid} {$section->sectionname}";
+        $subjectName = $subject->name;
+        if ($section) {
+            $yearLevelSection = "G-{$section->levelid} {$section->sectionname}";
+        } elseif ((int) $subject->grade_level === 0) {
+            $yearLevelSection = 'Grades 11–12 — Elective';
+        } else {
+            $scopeName = $subject->subject_type === 'science_core' ? 'Science Core' : 'Elective';
+            $yearLevelSection = "Grade {$subject->grade_level} — {$scopeName}";
+        }
 
         // Non-admins can only create for themselves
         $teacherId = ($this->isAdmin() && isset($validated['teacher_id']))
@@ -156,20 +180,20 @@ class ClassRecordController extends Controller
             : Auth::id();
 
         $record = ClassRecord::create([
-            'subject_id'         => $validated['subject_id'],
-            'section_id'         => $validated['section_id'],
-            'grading_option_id'  => $validated['grading_option_id'],
-            'subject_name'       => $subjectName,
+            'subject_id' => $validated['subject_id'],
+            'section_id' => $validated['section_id'] ?? null,
+            'grading_option_id' => $validated['grading_option_id'],
+            'subject_name' => $subjectName,
             'year_level_section' => $yearLevelSection,
-            'teacher_id'         => $teacherId,
-            'school_year_id'     => $currentSY->id,
-            'school_year'        => $currentSY->name,
-            'status'             => 'draft',
+            'teacher_id' => $teacherId,
+            'school_year_id' => $currentSY->id,
+            'school_year' => $currentSY->name,
+            'status' => 'draft',
         ]);
 
         return response()->json([
             'message' => 'Class record created successfully.',
-            'data'    => $record->load('gradingOption'),
+            'data' => $record->load('gradingOption'),
         ], 201);
     }
 
@@ -199,11 +223,11 @@ class ClassRecordController extends Controller
             'Cannot edit a submitted class record.');
 
         $validated = $request->validate([
-            'subject_id'         => 'nullable|integer|exists:subjects,id',
-            'section_id'         => 'nullable|integer',
-            'grading_option_id'  => 'sometimes|integer|exists:grading_options,id',
-            'school_year'        => 'sometimes|string|max:20',
-            'subject_name'       => 'sometimes|string|max:255',
+            'subject_id' => 'nullable|integer|exists:subjects,id',
+            'section_id' => 'nullable|integer',
+            'grading_option_id' => 'sometimes|integer|exists:grading_options,id',
+            'school_year' => 'sometimes|string|max:20',
+            'subject_name' => 'sometimes|string|max:255',
             'year_level_section' => 'sometimes|string|max:255',
         ]);
 
@@ -219,7 +243,7 @@ class ClassRecordController extends Controller
             if (isset($message)) {
                 return response()->json([
                     'message' => $message,
-                    'errors'  => ['grading_option_id' => [$message]],
+                    'errors' => ['grading_option_id' => [$message]],
                 ], 422);
             }
         }
@@ -230,7 +254,7 @@ class ClassRecordController extends Controller
 
         return response()->json([
             'message' => 'Class record updated.',
-            'data'    => $classRecord,
+            'data' => $classRecord,
         ]);
     }
 
@@ -257,7 +281,7 @@ class ClassRecordController extends Controller
         abort_if($classRecord->status !== 'draft', 422, 'Only draft records can be submitted.');
 
         $classRecord->update([
-            'status'       => 'submitted',
+            'status' => 'submitted',
             'submitted_at' => now(),
         ]);
 
@@ -272,8 +296,8 @@ class ClassRecordController extends Controller
         abort_if($classRecord->status !== 'submitted', 422, 'Record must be submitted first.');
 
         $classRecord->update([
-            'status'        => 'checked',
-            'checked_at'    => now(),
+            'status' => 'checked',
+            'checked_at' => now(),
             'checked_by_id' => Auth::id(),
         ]);
 
@@ -281,11 +305,11 @@ class ClassRecordController extends Controller
         $checker = Auth::user();
 
         NotificationService::notifyUser(
-            user:        $classRecord->teacher,
+            user: $classRecord->teacher,
             requestType: 'Class Record',
             referenceNo: "{$classRecord->subject_name} — {$classRecord->year_level_section}",
-            newStatus:   'Checked',
-            url:         route('class-records.page.show', $classRecord),
+            newStatus: 'Checked',
+            url: route('class-records.page.show', $classRecord),
         );
 
         Mail::to($classRecord->teacher)->queue(new ClassRecordCheckedMail($classRecord, $checker));

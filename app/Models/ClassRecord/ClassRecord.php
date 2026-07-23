@@ -3,8 +3,9 @@
 namespace App\Models\ClassRecord;
 
 use App\Models\FacultyLoading\SchoolYear;
-use App\Models\User;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,10 +30,10 @@ class ClassRecord extends Model
     ];
 
     protected $casts = [
-        'subject_id'   => 'integer',
-        'section_id'   => 'integer',
+        'subject_id' => 'integer',
+        'section_id' => 'integer',
         'submitted_at' => 'datetime',
-        'checked_at'   => 'datetime',
+        'checked_at' => 'datetime',
     ];
 
     public function schoolYear(): BelongsTo
@@ -79,6 +80,11 @@ class ClassRecord extends Model
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(Section::class);
     }
 
     public function teacher(): BelongsTo

@@ -45,7 +45,9 @@ class ClassRecordFinalGradeController extends Controller
             // Feed running grades forward for the next quarter
             $previousGrades = [];
             foreach ($quarterData as $row) {
-                $previousGrades[$row['studentId']] = $row['runningGrade'];
+                if ($row['masterStudentId'] !== null) {
+                    $previousGrades[$row['masterStudentId']] = $row['runningGrade'];
+                }
             }
         }
 
@@ -53,39 +55,39 @@ class ClassRecordFinalGradeController extends Controller
         if (collect($quarterResults)->contains(fn ($rows) => empty($rows))) {
             return response()->json([
                 'students' => [],
-                'message'  => 'One or more quarters have no student data. Final grades cannot be computed.',
+                'message' => 'One or more quarters have no student data. Final grades cannot be computed.',
             ]);
         }
 
         // Merge per-quarter GEs and compute final grade per student
         // Use Q1's student list as the canonical roster
-        $q1Students = collect($quarterResults[1])->keyBy('studentId');
-        $q2ByStudent = collect($quarterResults[2])->keyBy('studentId');
-        $q3ByStudent = collect($quarterResults[3])->keyBy('studentId');
-        $q4ByStudent = collect($quarterResults[4])->keyBy('studentId');
+        $q1Students = collect($quarterResults[1])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
+        $q2ByStudent = collect($quarterResults[2])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
+        $q3ByStudent = collect($quarterResults[3])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
+        $q4ByStudent = collect($quarterResults[4])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
 
         $students = [];
-        foreach ($q1Students as $studentId => $q1Row) {
+        foreach ($q1Students as $masterStudentId => $q1Row) {
             $q1GE = $q1Row['gradeEquivalent'];
-            $q2GE = $q2ByStudent[$studentId]['gradeEquivalent'] ?? $q1GE;
-            $q3GE = $q3ByStudent[$studentId]['gradeEquivalent'] ?? $q1GE;
-            $q4GE = $q4ByStudent[$studentId]['gradeEquivalent'] ?? $q1GE;
+            $q2GE = $q2ByStudent[$masterStudentId]['gradeEquivalent'] ?? $q1GE;
+            $q3GE = $q3ByStudent[$masterStudentId]['gradeEquivalent'] ?? $q2GE;
+            $q4GE = $q4ByStudent[$masterStudentId]['gradeEquivalent'] ?? $q3GE;
 
             $final = $this->grader->computeFinalGrade($q1GE, $q2GE, $q3GE, $q4GE, $stanine);
 
             $students[] = [
-                'studentId'      => $studentId,
+                'studentId' => $masterStudentId,
                 'sequenceNumber' => $q1Row['sequenceNumber'],
-                'familyName'     => $q1Row['familyName'],
-                'givenName'      => $q1Row['givenName'],
-                'middleInitial'  => $q1Row['middleInitial'],
-                'sex'            => $q1Row['sex'],
-                'q1GE'           => $q1GE,
-                'q2GE'           => $q2GE,
-                'q3GE'           => $q3GE,
-                'q4GE'           => $q4GE,
-                'finalGE'        => $final['finalGE'],
-                'adjectival'     => $final['adjectivalEquivalent'],
+                'familyName' => $q1Row['familyName'],
+                'givenName' => $q1Row['givenName'],
+                'middleInitial' => $q1Row['middleInitial'],
+                'sex' => $q1Row['sex'],
+                'q1GE' => $q1GE,
+                'q2GE' => $q2GE,
+                'q3GE' => $q3GE,
+                'q4GE' => $q4GE,
+                'finalGE' => $final['finalGE'],
+                'adjectival' => $final['adjectivalEquivalent'],
             ];
         }
 
@@ -100,9 +102,9 @@ class ClassRecordFinalGradeController extends Controller
      */
     private function computeQuarterGrades(
         ClassRecord $classRecord,
-        int         $q,
-        array       $previousGrades,
-        array       $stanine,
+        int $q,
+        array $previousGrades,
+        array $stanine,
     ): array {
         $quarter = ClassRecordQuarter::where('class_record_id', $classRecord->id)
             ->where('quarter', $q)
@@ -115,9 +117,9 @@ class ClassRecordFinalGradeController extends Controller
 
         $categories = $classRecord->gradingOption->categories->map(function ($cat) use ($quarter) {
             return [
-                'id'          => $cat->id,
-                'code'        => $cat->code,
-                'weight'      => (float) $cat->weight,
+                'id' => $cat->id,
+                'code' => $cat->code,
+                'weight' => (float) $cat->weight,
                 'assessments' => $quarter->assessments
                     ->where('grading_category_id', $cat->id)
                     ->sortBy('sort_order')
@@ -129,31 +131,41 @@ class ClassRecordFinalGradeController extends Controller
 
         $students = $quarter->students->map(function ($student) {
             return [
-                'id'     => $student->id,
+                'id' => $student->id,
                 'scores' => $student->scores->mapWithKeys(fn ($s) => [
                     $s->class_record_assessment_id => $s->score !== null ? (float) $s->score : null,
                 ])->toArray(),
             ];
         })->toArray();
 
+        $previousForQuarterRows = $quarter->students
+            ->filter(fn ($student) => $student->student_id !== null)
+            ->mapWithKeys(fn ($student) => [
+                $student->id => $previousGrades[$student->student_id] ?? null,
+            ])
+            ->filter(fn ($grade) => $grade !== null)
+            ->all();
+
         $result = $this->grader->computeFullClassRecord([
-            'quarter'               => $q,
-            'gradingOption'         => ['categories' => $categories],
-            'students'              => $students,
-            'stanineLookup'         => $stanine,
-            'previousQuarterGrades' => $previousGrades,
+            'quarter' => $q,
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+            'stanineLookup' => $stanine,
+            'previousQuarterGrades' => $previousForQuarterRows,
         ]);
 
         $studentMap = $quarter->students->keyBy('id');
 
         return array_map(function ($row) use ($studentMap) {
             $model = $studentMap->get($row['studentId']);
+
             return array_merge($row, [
-                'familyName'     => $model?->family_name,
-                'givenName'      => $model?->given_name,
-                'middleInitial'  => $model?->middle_initial,
-                'sex'            => $model?->sex,
+                'familyName' => $model?->family_name,
+                'givenName' => $model?->given_name,
+                'middleInitial' => $model?->middle_initial,
+                'sex' => $model?->sex,
                 'sequenceNumber' => $model?->sequence_number,
+                'masterStudentId' => $model?->student_id,
             ]);
         }, $result['students']);
     }

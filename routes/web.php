@@ -2351,6 +2351,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
 
     // Students
     Route::get('/class-records/{classRecord}/quarters/{q}/students/from-enrollment', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'fromEnrollment'])->name('class-records.students.from-enrollment');
+    Route::get('/class-records/{classRecord}/quarters/{q}/students/candidates', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'candidates'])->name('class-records.students.candidates');
     Route::get('/class-records/{classRecord}/quarters/{q}/students',          [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'index'])->name('class-records.students.index');
     Route::post('/class-records/{classRecord}/quarters/{q}/students',         [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'upsert'])->name('class-records.students.upsert');
     Route::get('/class-records/{classRecord}/quarters/{q}/students/template', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'template'])->name('class-records.students.template');

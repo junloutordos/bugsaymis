@@ -4,11 +4,11 @@ namespace App\Http\Controllers\ClassRecord;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
-use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\ClassRecord\StanineLookup;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\Quiz\Quiz;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -41,13 +41,13 @@ class ClassRecordPageController extends Controller
         $currentSY = SchoolYear::where('is_current', true)->first();
 
         return Inertia::render('ClassRecord/Index', [
-            'classRecords'      => $records,
-            'gradingOptions'    => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
-            'isAdmin'           => $this->isAdmin(),
+            'classRecords' => $records,
+            'gradingOptions' => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
+            'isAdmin' => $this->isAdmin(),
             // Grading Options management is broader than isAdmin: AUHs hold the
             // scoped class-records.grading-options grant without full admin.
             'canManageGradingOptions' => Auth::user()->hasAnyPermission(['class-records.admin', 'class-records.grading-options']),
-            'filters'           => $request->only(['school_year']),
+            'filters' => $request->only(['school_year']),
             'currentSchoolYear' => $currentSY ? $currentSY->name : null,
         ]);
     }
@@ -62,12 +62,13 @@ class ClassRecordPageController extends Controller
         $classRecord->load([
             'teacher:id,name,position',
             'subject:id,name,subject_type,grade_level',
+            'section:id,levelid,sectionname',
             'gradingOption.categories',
             'quarters.assessments.gradingCategory',
             'quarters.students',
         ]);
 
-        $currentSY   = SchoolYear::where('is_current', true)->first();
+        $currentSY = SchoolYear::where('is_current', true)->first();
         $isCurrentSY = $currentSY && $classRecord->school_year_id === $currentSY->id;
 
         $classRecord->setAttribute('can_change_grading_option', $classRecord->canChangeGradingOption($this->isAdmin()));
@@ -95,15 +96,15 @@ class ClassRecordPageController extends Controller
             ->get(['id', 'subject_name', 'year_level_section', 'school_year']);
 
         return Inertia::render('ClassRecord/Show', [
-            'classRecord'        => $classRecord,
-            'isAdmin'            => $this->isAdmin(),
-            'gradingOptions'     => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
-            'stanineLookup'      => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
-            'isCurrentSY'        => $isCurrentSY,
-            'currentSYName'      => $currentSY?->name,
+            'classRecord' => $classRecord,
+            'isAdmin' => $this->isAdmin(),
+            'gradingOptions' => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
+            'stanineLookup' => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
+            'isCurrentSY' => $isCurrentSY,
+            'currentSYName' => $currentSY?->name,
             'sameSubjectRecords' => $sameSubjectRecords,
-            'scheduledDays'      => $scheduledDays,
-            'quizzes'            => \App\Models\Quiz\Quiz::where('source_type', 'class_record')
+            'scheduledDays' => $scheduledDays,
+            'quizzes' => Quiz::where('source_type', 'class_record')
                 ->where('source_id', $classRecord->id)
                 ->withCount('questions')
                 ->get()
