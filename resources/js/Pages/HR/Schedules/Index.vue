@@ -34,29 +34,52 @@
           subtitle="Employees can submit schedule requests from their My Work Schedule page." />
 
         <div v-else class="divide-y divide-slate-100">
-          <div v-for="sub in pendingSubmissions" :key="sub.id"
-            class="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <p class="font-medium text-slate-800 text-sm">{{ sub.user?.name ?? '—' }}</p>
-                <AppBadge color="slate">{{ sub.user?.emp_category ?? '—' }}</AppBadge>
+          <div v-for="sub in pendingSubmissions" :key="sub.id" class="px-5 py-4">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="font-medium text-slate-800 text-sm">{{ sub.user?.name ?? '—' }}</p>
+                  <AppBadge color="slate">{{ sub.user?.emp_category ?? '—' }}</AppBadge>
+                </div>
+                <p class="text-sm text-slate-700 mt-0.5">{{ sub.name }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  {{ formatDaysWithTimes(sub.daily_schedules) }}
+                </p>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Effective: <span class="font-medium text-slate-600">{{ sub.effective_date }}</span>
+                  <template v-if="sub.remarks"> · {{ sub.remarks }}</template>
+                </p>
+                <button type="button" @click="toggleSubmissionDetails(sub)"
+                  class="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                  <component :is="expandedSubmissionId === sub.id ? ChevronUpIcon : ChevronDownIcon" class="h-3.5 w-3.5" />
+                  {{ expandedSubmissionId === sub.id ? 'Hide' : 'View' }} daily details
+                </button>
               </div>
-              <p class="text-sm text-slate-700 mt-0.5">{{ sub.name }}</p>
-              <p class="text-xs text-slate-500 mt-0.5">
-                {{ formatDaysWithTimes(sub.daily_schedules) }}
-              </p>
-              <p class="text-xs text-slate-400 mt-0.5">
-                Effective: <span class="font-medium text-slate-600">{{ sub.effective_date }}</span>
-                <template v-if="sub.remarks"> · {{ sub.remarks }}</template>
-              </p>
+              <div class="flex items-center gap-2 shrink-0">
+                <AppButton size="sm" variant="success" @click="approveSubmission(sub)">
+                  <CheckCircleIcon class="h-3.5 w-3.5" /> Approve
+                </AppButton>
+                <AppButton size="sm" variant="danger" @click="openReject(sub)">
+                  <XCircleIcon class="h-3.5 w-3.5" /> Reject
+                </AppButton>
+              </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <AppButton size="sm" variant="success" @click="approveSubmission(sub)">
-                <CheckCircleIcon class="h-3.5 w-3.5" /> Approve
-              </AppButton>
-              <AppButton size="sm" variant="danger" @click="openReject(sub)">
-                <XCircleIcon class="h-3.5 w-3.5" /> Reject
-              </AppButton>
+
+            <!-- Per-day breakdown, incl. lunch — hidden by default to keep the list scannable -->
+            <div v-if="expandedSubmissionId === sub.id" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-3">
+              <div v-for="entry in sortedDailySchedules(sub.daily_schedules)" :key="entry.day"
+                :class="['rounded-lg px-3 py-2', entry.work_from_home ? 'bg-blue-50' : 'bg-slate-50']">
+                <div class="flex items-center gap-1.5">
+                  <p class="text-xs font-semibold text-slate-600">{{ entry.day }}</p>
+                  <AppBadge v-if="entry.work_from_home" color="blue">
+                    <span class="inline-flex items-center gap-0.5"><HomeIcon class="h-2.5 w-2.5" /> WFH</span>
+                  </AppBadge>
+                </div>
+                <p class="text-xs text-slate-500 font-mono mt-0.5">{{ entry.time_in }} – {{ entry.time_out }}</p>
+                <p v-if="entry.lunch_start && entry.lunch_end" class="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Lunch: {{ entry.lunch_start }} – {{ entry.lunch_end }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -379,6 +402,7 @@ import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import {
   PlusIcon, ClockIcon, PencilSquareIcon, TrashIcon,
   UserGroupIcon, TableCellsIcon, CheckCircleIcon, XCircleIcon,
+  ChevronDownIcon, ChevronUpIcon, HomeIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -392,6 +416,12 @@ const props = defineProps({
 const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 // ── Pending Submissions ───────────────────────────────────────────────────────
+
+const expandedSubmissionId = ref(null)
+
+function toggleSubmissionDetails(sub) {
+  expandedSubmissionId.value = expandedSubmissionId.value === sub.id ? null : sub.id
+}
 
 async function approveSubmission(sub) {
   if (!(await confirmAction({ title: 'Approve schedule submission?', text: `Approve the schedule submission for ${sub.user?.name}?`, confirmText: 'Approve' }))) return
@@ -542,6 +572,16 @@ function submitAssign() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+/** { day, time_in, time_out, lunch_start, lunch_end, work_from_home }[], Mon→Sun order. */
+function sortedDailySchedules(dailySchedules) {
+  if (!dailySchedules) return []
+  return DAY_ORDER
+    .filter(d => d in dailySchedules)
+    .map(d => ({ day: d, ...dailySchedules[d] }))
+}
 
 function formatDays(days) {
   if (!days?.length) return 'Mon–Fri'

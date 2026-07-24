@@ -66,8 +66,23 @@
         </div>
         <div class="px-5 py-4">
           <p class="font-medium text-warning-700">{{ pendingSubmission.name }}</p>
-          <p class="text-sm text-warning-700 mt-0.5">{{ formatDaysWithTimes(pendingSubmission.daily_schedules) }}</p>
           <p class="text-xs text-warning-600 mt-1">Effective: {{ pendingSubmission.effective_date }}</p>
+          <!-- Day breakdown (mirrors Current Active Schedule) -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            <div v-for="entry in sortedDailySchedules(pendingSubmission.daily_schedules)" :key="entry.day"
+              :class="['rounded-lg px-3 py-2', entry.work_from_home ? 'bg-blue-50' : 'bg-white/70']">
+              <div class="flex items-center gap-1.5">
+                <p class="text-xs font-semibold text-warning-700">{{ entry.day }}</p>
+                <AppBadge v-if="entry.work_from_home" color="blue">
+                  <span class="inline-flex items-center gap-0.5"><HomeIcon class="h-2.5 w-2.5" /> WFH</span>
+                </AppBadge>
+              </div>
+              <p class="text-xs text-warning-700 font-mono mt-0.5">{{ entry.time_in }} – {{ entry.time_out }}</p>
+              <p v-if="entry.lunch_start && entry.lunch_end" class="text-[10px] text-warning-600 font-mono mt-0.5">
+                Lunch: {{ entry.lunch_start }} – {{ entry.lunch_end }}
+              </p>
+            </div>
+          </div>
           <div class="mt-3">
             <AppButton variant="danger" size="sm" @click="cancelSubmission">
               Cancel Submission
