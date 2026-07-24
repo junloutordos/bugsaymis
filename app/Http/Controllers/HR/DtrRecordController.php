@@ -581,6 +581,18 @@ class DtrRecordController extends Controller
      */
     private function resolveSupervisor(User $user): ?array
     {
+        // COS Teachers are verified as to prescribed office hours by their
+        // Academic Unit Head (not the CID Chief / division chief). Reuse the
+        // IPCR service's AUH resolver; fall back to the division-chief chain
+        // when the teacher has no resolvable academic unit.
+        if ($user->emp_category === 'COS Teaching') {
+            $auh = app(\App\Services\PerformanceManagement\IPCRWorkflowService::class)
+                ->academicUnitHeadFor($user);
+            if ($auh && (int) $auh->id !== (int) $user->id) {
+                return ['name' => $auh->name, 'position' => $auh->position ?? 'Academic Unit Head'];
+            }
+        }
+
         if ($user->division_id) {
             $division = DB::table('divisions')->where('id', $user->division_id)->first();
             if ($division?->division_chief_id) {

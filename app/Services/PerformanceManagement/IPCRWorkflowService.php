@@ -141,7 +141,7 @@ class IPCRWorkflowService
      * Explicit users.academic_unit_id wins; current-SY teaching-subject
      * derivation remains as a last resort.
      */
-    private function academicUnitHeadFor(User $employee): ?User
+    public function academicUnitHeadFor(User $employee): ?User
     {
         $units = $this->currentAcademicUnits();
 
