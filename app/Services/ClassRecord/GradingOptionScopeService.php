@@ -4,8 +4,6 @@ namespace App\Services\ClassRecord;
 
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\Designation;
-use App\Models\FacultyLoading\LoadAssignment;
-use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -103,57 +101,27 @@ class GradingOptionScopeService
         return $requestedId;
     }
 
-    /** Active campus-wide and relevant unit options for the user's current teaching assignments. */
+    /** All active grading options — visible and usable by every teacher, regardless of unit. */
     public function selectableForUser(User $user): Collection
     {
-        $query = GradingOption::with(['categories', 'ownerDesignation:id,code,name'])
-            ->where('is_active', true);
-
-        if (! $user->hasPermission('class-records.admin')) {
-            $ownerIds = $this->teachingUnitDesignationIds($user);
-            $query->where(function ($scopeQuery) use ($ownerIds) {
-                $scopeQuery->whereNull('owner_designation_id');
-                if ($ownerIds !== []) {
-                    $scopeQuery->orWhereIn('owner_designation_id', $ownerIds);
-                }
-            });
-        }
-
-        return $query->orderBy('id')->get();
-    }
-
-    /** Active campus-wide and matching-unit options for one subject. */
-    public function selectableForSubject(Subject $subject): Collection
-    {
-        $subject->loadMissing('academicUnit:id,code');
-        $ownerId = $this->designationIdForUnitCode($subject->academicUnit?->code);
-
         return GradingOption::with(['categories', 'ownerDesignation:id,code,name'])
             ->where('is_active', true)
-            ->where(function ($query) use ($ownerId) {
-                $query->whereNull('owner_designation_id');
-                if ($ownerId !== null) {
-                    $query->orWhere('owner_designation_id', $ownerId);
-                }
-            })
+            ->orderBy('id')
+            ->get();
+    }
+
+    /** All active grading options — usable for any subject, regardless of unit. */
+    public function selectableForSubject(Subject $subject): Collection
+    {
+        return GradingOption::with(['categories', 'ownerDesignation:id,code,name'])
+            ->where('is_active', true)
             ->orderBy('id')
             ->get();
     }
 
     public function isSelectableForSubject(GradingOption $option, Subject $subject): bool
     {
-        if (! $option->is_active) {
-            return false;
-        }
-
-        if ($option->owner_designation_id === null) {
-            return true;
-        }
-
-        $subject->loadMissing('academicUnit:id,code');
-
-        return (int) $option->owner_designation_id
-            === $this->designationIdForUnitCode($subject->academicUnit?->code);
+        return $option->is_active;
     }
 
     /** Options shown in the management menu. */
@@ -166,47 +134,5 @@ class GradingOptionScopeService
         }
 
         return $query->orderBy('id')->get();
-    }
-
-    /** @return array<int> */
-    private function teachingUnitDesignationIds(User $user): array
-    {
-        $schoolYearId = SchoolYear::where('is_current', true)->value('id');
-        if (! $schoolYearId) {
-            return [];
-        }
-
-        $unitCodes = LoadAssignment::query()
-            ->with('subject.academicUnit:id,code')
-            ->where('user_id', $user->id)
-            ->where('school_year_id', $schoolYearId)
-            ->where('assignment_type', 'teaching')
-            ->whereNotNull('subject_id')
-            ->get()
-            ->pluck('subject.academicUnit.code')
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($unitCodes->isEmpty()) {
-            return [];
-        }
-
-        return Designation::query()
-            ->whereIn('code', $unitCodes->map(fn ($code) => 'AUH-'.$code))
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-    }
-
-    private function designationIdForUnitCode(?string $unitCode): ?int
-    {
-        if (! $unitCode) {
-            return null;
-        }
-
-        $id = Designation::where('code', 'AUH-'.$unitCode)->value('id');
-
-        return $id ? (int) $id : null;
     }
 }
