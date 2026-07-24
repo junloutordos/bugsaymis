@@ -264,6 +264,7 @@ class CidDashboardController extends Controller
             ->count('user_id');
 
         $classRecordsPending = ClassRecord::where('school_year_id', $schoolYearId)
+            ->active()
             ->whereNull('checked_at')
             ->count();
 
@@ -327,8 +328,8 @@ class CidDashboardController extends Controller
         }
 
         // Class record status breakdown
-        $checked   = ClassRecord::where('school_year_id', $schoolYearId)->whereNotNull('checked_at')->count();
-        $unchecked = ClassRecord::where('school_year_id', $schoolYearId)->whereNull('checked_at')->count();
+        $checked   = ClassRecord::where('school_year_id', $schoolYearId)->active()->whereNotNull('checked_at')->count();
+        $unchecked = ClassRecord::where('school_year_id', $schoolYearId)->active()->whereNull('checked_at')->count();
 
         return [
             'assessmentLoad'    => $assessmentLoad,

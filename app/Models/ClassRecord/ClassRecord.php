@@ -27,6 +27,9 @@ class ClassRecord extends Model
         'submitted_at',
         'checked_at',
         'checked_by_id',
+        'archived_at',
+        'archived_by_id',
+        'pre_archive_status',
     ];
 
     protected $casts = [
@@ -34,6 +37,7 @@ class ClassRecord extends Model
         'section_id' => 'integer',
         'submitted_at' => 'datetime',
         'checked_at' => 'datetime',
+        'archived_at' => 'datetime',
     ];
 
     public function schoolYear(): BelongsTo
@@ -100,6 +104,22 @@ class ClassRecord extends Model
     public function checkedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'checked_by_id');
+    }
+
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by_id');
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->status === 'archived';
+    }
+
+    /** Exclude archived (soft-deleted) records from active listings/analytics. */
+    public function scopeActive($query)
+    {
+        return $query->where('status', '<>', 'archived');
     }
 
     public function quarters(): HasMany

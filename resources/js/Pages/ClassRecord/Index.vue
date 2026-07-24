@@ -50,6 +50,14 @@
       <AppFilterBar>
         <input v-model="searchQuery" type="text" placeholder="Search by subject, section, or school year…"
           class="w-full sm:w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+        <select v-model="statusFilter" @change="applyStatusFilter"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+          <option value="">Active (all)</option>
+          <option value="draft">Draft</option>
+          <option value="submitted">Submitted</option>
+          <option value="checked">Checked</option>
+          <option value="archived">Archived</option>
+        </select>
       </AppFilterBar>
 
       <!-- Table -->
@@ -89,10 +97,18 @@
             </div>
           </td>
           <td class="px-4 py-3" @click.stop>
-            <button @click="navigateTo(r)"
-              class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
-              Open <ArrowRightIcon class="h-3.5 w-3.5" />
-            </button>
+            <div class="flex items-center justify-end gap-2">
+              <button @click="navigateTo(r)"
+                class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
+                Open <ArrowRightIcon class="h-3.5 w-3.5" />
+              </button>
+              <AppIconButton v-if="viewingArchived" label="Restore class record" variant="secondary" size="sm" @click="restoreRecord(r, $event)">
+                <ArrowUturnLeftIcon class="h-3.5 w-3.5" />
+              </AppIconButton>
+              <AppIconButton v-else label="Archive class record" variant="danger" size="sm" @click="openArchive(r, $event)">
+                <TrashIcon class="h-3.5 w-3.5" />
+              </AppIconButton>
+            </div>
           </td>
         </tr>
 
@@ -115,11 +131,17 @@
                 Q{{ q }}
               </span>
             </div>
-            <div class="flex justify-end pt-1">
+            <div class="flex justify-end items-center gap-2 pt-1">
               <button @click.stop="navigateTo(r)"
                 class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
                 Open <ArrowRightIcon class="h-3.5 w-3.5" />
               </button>
+              <AppIconButton v-if="viewingArchived" label="Restore class record" variant="secondary" size="sm" @click="restoreRecord(r, $event)">
+                <ArrowUturnLeftIcon class="h-3.5 w-3.5" />
+              </AppIconButton>
+              <AppIconButton v-else label="Archive class record" variant="danger" size="sm" @click="openArchive(r, $event)">
+                <TrashIcon class="h-3.5 w-3.5" />
+              </AppIconButton>
             </div>
           </div>
         </template>
@@ -340,6 +362,17 @@
       </template>
     </AppModal>
 
+    <!-- Archive confirmation + PIN -->
+    <DigitalSignaturePin
+      :show="archiveModal"
+      :has-pin="hasPin"
+      :signature-uri="signatureUri"
+      :loading="archiving"
+      confirm-label="Archive Record"
+      @confirm="confirmArchive"
+      @cancel="archiveModal = false"
+    />
+
   </AdminLayout>
 </template>
 
@@ -357,9 +390,10 @@ import AppTable from '@/Components/AppTable.vue'
 import AppModal from '@/Components/AppModal.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import GradingOptionDetails from './components/GradingOptionDetails.vue'
-import { confirmDelete } from '@/Composables/useConfirm.js'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
-import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecords:      Array,
@@ -369,6 +403,9 @@ const props = defineProps({
   isAdmin:           { type: Boolean, default: false },
   canManageGradingOptions: { type: Boolean, default: false },
   currentSchoolYear: { type: String, default: null },
+  filters:           { type: Object, default: () => ({}) },
+  hasPin:            { type: Boolean, default: false },
+  signatureUri:      { type: String, default: null },
 })
 
 // ── Academic unit labeling ────────────────────────────────────────────────────
@@ -393,13 +430,69 @@ const filtered = computed(() => {
   )
 })
 
+// ── Status filter (active view vs archived) ────────────────────────────────────
+const statusFilter = ref(props.filters?.status ?? '')
+
+function applyStatusFilter() {
+  const query = {}
+  if (statusFilter.value) query.status = statusFilter.value
+  router.get(route('class-records.page.index'), query, { preserveState: true, preserveScroll: true })
+}
+
+const viewingArchived = computed(() => statusFilter.value === 'archived')
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 function statusBadge(status) {
   return {
     draft:     'slate',
     submitted: 'blue',
     checked:   'green',
+    archived:  'amber',
   }[status] ?? 'slate'
+}
+
+// ── Archive (soft-delete) + restore ─────────────────────────────────────────────
+const archiveModal = ref(false)
+const archiveTarget = ref(null)
+const archiving = ref(false)
+
+function openArchive(record, event) {
+  event?.stopPropagation()
+  archiveTarget.value = record
+  archiveModal.value = true
+}
+
+async function confirmArchive(pin) {
+  if (!archiveTarget.value) return
+  archiving.value = true
+  try {
+    await axios.delete(route('class-records.destroy', archiveTarget.value.id), { data: { pin } })
+    archiveModal.value = false
+    archiveTarget.value = null
+    await Swal.fire({ icon: 'success', title: 'Archived', text: 'The class record was archived and can be restored.', timer: 1400, showConfirmButton: false })
+    router.reload({ only: ['classRecords'] })
+  } catch (err) {
+    Swal.fire('Cannot Archive', err.response?.data?.errors?.pin?.[0] ?? err.response?.data?.message ?? 'Failed to archive.', 'error')
+  } finally {
+    archiving.value = false
+  }
+}
+
+async function restoreRecord(record, event) {
+  event?.stopPropagation()
+  const confirmed = await confirmAction({
+    title: 'Restore class record?',
+    text: `"${record.subject_name}" will return to its previous status.`,
+    confirmText: 'Restore',
+  })
+  if (!confirmed) return
+  try {
+    await axios.post(route('class-records.restore', record.id))
+    await Swal.fire({ icon: 'success', title: 'Restored', timer: 1200, showConfirmButton: false })
+    router.reload({ only: ['classRecords'] })
+  } catch (err) {
+    Swal.fire('Cannot Restore', err.response?.data?.message ?? 'Failed to restore.', 'error')
+  }
 }
 
 // ── Quarter progress dots ──────────────────────────────────────────────────────

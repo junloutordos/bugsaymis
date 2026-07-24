@@ -10,6 +10,7 @@ use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Quiz\Quiz;
 use App\Services\ClassRecord\GradingOptionScopeService;
+use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -40,6 +41,13 @@ class ClassRecordPageController extends Controller
         if ($request->filled('school_year')) {
             $query->where('school_year', $request->query('school_year'));
         }
+        if ($request->filled('status')) {
+            $query->where('status', $request->query('status'));
+        } else {
+            // Active listing hides archived (soft-deleted) records; they are
+            // reachable via the explicit ?status=archived filter for recovery.
+            $query->where('status', '<>', 'archived');
+        }
 
         $records = $query->get();
 
@@ -66,8 +74,10 @@ class ClassRecordPageController extends Controller
                 ->values(),
             'isAdmin' => $isAdmin,
             'canManageGradingOptions' => $this->optionScope->canManage($user),
-            'filters' => $request->only(['school_year']),
+            'filters' => $request->only(['school_year', 'status']),
             'currentSchoolYear' => $currentSY ? $currentSY->name : null,
+            'hasPin' => ! empty($user->signature_pin),
+            'signatureUri' => app(DigitalSignatureService::class)->getSignatureDataUri($user),
         ]);
     }
 

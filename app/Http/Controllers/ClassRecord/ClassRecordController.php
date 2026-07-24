@@ -11,6 +11,7 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Services\ClassRecord\GradingOptionScopeService;
+use App\Services\DigitalSignatureService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,8 +20,10 @@ use Illuminate\Support\Facades\Mail;
 
 class ClassRecordController extends Controller
 {
-    public function __construct(private readonly GradingOptionScopeService $optionScope)
-    {
+    public function __construct(
+        private readonly GradingOptionScopeService $optionScope,
+        private readonly DigitalSignatureService $signatures,
+    ) {
     }
 
     private function isAdmin(): bool
@@ -63,6 +66,7 @@ class ClassRecordController extends Controller
 
         // Flag assignments that already have a class record this SY
         $existingQuery = ClassRecord::where('school_year_id', $currentSY->id)
+            ->where('status', '<>', 'archived')
             ->whereNotNull('subject_id');
 
         if (! $isAdmin) {
@@ -121,6 +125,9 @@ class ClassRecordController extends Controller
         }
         if ($request->filled('status')) {
             $query->where('status', $request->query('status'));
+        } else {
+            // Default listing hides archived (soft-deleted) records.
+            $query->where('status', '<>', 'archived');
         }
 
         return response()->json($query->paginate(30));
@@ -288,18 +295,54 @@ class ClassRecordController extends Controller
         ]);
     }
 
-    // ── DELETE /class-records/{classRecord} ───────────────────────────────────
+    // ── DELETE /class-records/{classRecord} — archive (reversible soft-delete) ─
 
-    public function destroy(ClassRecord $classRecord): JsonResponse
+    public function destroy(Request $request, ClassRecord $classRecord): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
-        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record belongs to a past school year and cannot be modified.');
-        abort_if($classRecord->status !== 'draft', 422,
-            'Only draft class records can be deleted.');
+        abort_if($classRecord->isArchived(), 422, 'This class record is already archived.');
 
-        $classRecord->delete();
+        $user = Auth::user();
+        if (empty($user->signature_pin)) {
+            return response()->json([
+                'message' => 'Set up your signature PIN in your profile before archiving a class record.',
+                'errors' => ['pin' => ['No signature PIN is set for your account.']],
+            ], 422);
+        }
 
-        return response()->json(['message' => 'Class record deleted.']);
+        $validated = $request->validate(['pin' => 'required|string']);
+        if (! $this->signatures->verifyPin($user, $validated['pin'])) {
+            return response()->json([
+                'message' => 'The signature PIN is incorrect.',
+                'errors' => ['pin' => ['The signature PIN is incorrect.']],
+            ], 422);
+        }
+
+        $classRecord->update([
+            'pre_archive_status' => $classRecord->status,
+            'status' => 'archived',
+            'archived_at' => now(),
+            'archived_by_id' => $user->id,
+        ]);
+
+        return response()->json(['message' => 'Class record archived. It can be restored from the Archived filter.']);
+    }
+
+    // ── POST /class-records/{classRecord}/restore ─────────────────────────────
+
+    public function restore(ClassRecord $classRecord): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isArchived(), 422, 'Only archived class records can be restored.');
+
+        $classRecord->update([
+            'status' => $classRecord->pre_archive_status ?: 'draft',
+            'archived_at' => null,
+            'archived_by_id' => null,
+            'pre_archive_status' => null,
+        ]);
+
+        return response()->json(['message' => 'Class record restored.']);
     }
 
     // ── POST /class-records/{classRecord}/submit ──────────────────────────────

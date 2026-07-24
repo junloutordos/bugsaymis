@@ -65,6 +65,7 @@ class FacultyDashboardService
 
         return ClassRecord::where('teacher_id', $user->id)
             ->where('school_year_id', $schoolYearId)
+            ->active()
             ->exists();
     }
 
@@ -83,12 +84,13 @@ class FacultyDashboardService
         $totalUnits = $load ? (float) $load->total_units : $this->assignedUnits($user, $schoolYearId, $termId);
         $threshold  = $load ? (float) $load->full_load_threshold : 0.0;
 
-        $records       = ClassRecord::where('teacher_id', $user->id)->where('school_year_id', $schoolYearId);
+        $records       = ClassRecord::where('teacher_id', $user->id)->where('school_year_id', $schoolYearId)->active();
         $recordsTotal  = (clone $records)->count();
         $recordsChecked = (clone $records)->whereNotNull('checked_at')->count();
 
         $sectionsCount = ClassRecord::where('teacher_id', $user->id)
             ->where('school_year_id', $schoolYearId)
+            ->active()
             ->whereNotNull('section_id')
             ->distinct()
             ->count('section_id');
@@ -226,6 +228,7 @@ class FacultyDashboardService
         return ClassRecord::with('section:id,sectionname,levelid')
             ->where('teacher_id', $user->id)
             ->where('school_year_id', $schoolYearId)
+            ->active()
             ->orderBy('section_id')
             ->orderBy('subject_name')
             ->get()

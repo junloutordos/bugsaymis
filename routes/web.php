@@ -2343,6 +2343,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'show'])->name('class-records.show');
     Route::put('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'update'])->name('class-records.update');
     Route::delete('/class-records/{classRecord}',       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'destroy'])->name('class-records.destroy');
+    Route::post('/class-records/{classRecord}/restore', [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'restore'])->name('class-records.restore');
     Route::post('/class-records/{classRecord}/submit',  [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'submit'])->name('class-records.submit');
     Route::post('/class-records/{classRecord}/check',   [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'check'])->name('class-records.check');
 
