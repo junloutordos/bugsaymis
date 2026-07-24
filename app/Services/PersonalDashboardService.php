@@ -64,6 +64,7 @@ class PersonalDashboardService
             'calendarEvents' => $calendarEvents,
             'quickLinks' => $this->rescue('quick links', fn () => $this->quickLinks($user, $approvalCount), []),
             'announcements' => $this->rescue('announcements', fn () => $this->announcements($user), []),
+            'canOnlinePunch' => $user->hasPermission('hr.online-punch.record'),
         ];
     }
 

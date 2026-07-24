@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppButton from '@/Components/AppButton.vue'
 import { storageUrl } from '@/Composables/useStorage.js'
 import { useCountUp } from '@/Composables/useCountUp.js'
 import FullCalendar from '@fullcalendar/vue3'
@@ -36,6 +37,7 @@ const props = defineProps({
   quickLinks: { type: Array, default: () => [] },
   announcements: { type: Array, default: () => [] },
   faculty: { type: Object, default: null },
+  canOnlinePunch: { type: Boolean, default: false },
 })
 
 const page = usePage()
@@ -299,6 +301,16 @@ function statusClass(status) {
           </div>
 
           <div class="flex flex-wrap gap-2">
+            <AppButton
+              v-if="canOnlinePunch"
+              as="link"
+              :href="route('hr.online-punch.index')"
+              variant="success"
+              class="hover:-translate-y-0.5"
+            >
+              <ClockIcon class="h-4 w-4" />
+              Online Time Punch
+            </AppButton>
             <Link
               v-for="link in quickLinks.slice(0, 3)"
               :key="link.label"
