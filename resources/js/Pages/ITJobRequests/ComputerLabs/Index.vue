@@ -11,11 +11,12 @@ import AppSelect from '@/Components/AppSelect.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import LabScheduleCalendarCard from '@/Components/ComputerLabs/LabScheduleCalendarCard.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import { confirmAction } from '@/Composables/useConfirm.js'
 import {
   ArrowLeftIcon, ArrowPathIcon, ArrowRightIcon, CalendarDaysIcon,
   CheckIcon, ComputerDesktopIcon, ExclamationTriangleIcon,
-  PlusIcon, SignalIcon, XMarkIcon,
+  PlusIcon, PrinterIcon, SignalIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -29,6 +30,9 @@ const props = defineProps({
   pendingBookings: { type: Array, default: () => [] },
   capabilities: { type: Object, default: () => ({}) },
   filters: { type: Object, default: () => ({}) },
+  scheduleApproval: { type: Object, default: null },
+  hasPin: { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 })
 
 const filters = reactive({
@@ -97,6 +101,30 @@ async function synchronize() {
   if (!await confirmAction('Synchronize priority subjects with the official class schedule now?')) return
   actionForm.academic_term_id = filters.term_id
   actionForm.post(route('computer-labs.synchronize'), { preserveScroll: true })
+}
+
+const approvalLocked = computed(() => ['pending_approval', 'approved'].includes(props.scheduleApproval?.status))
+
+const submitApprovalModal = ref(false)
+const submitApprovalLoading = ref(false)
+
+function openSubmitApproval() {
+  submitApprovalModal.value = true
+}
+
+function confirmSubmitApproval(pin) {
+  submitApprovalLoading.value = true
+  router.post(route('computer-labs.schedule-approvals.submit', filters.term_id), { pin }, {
+    preserveScroll: true,
+    onSuccess: () => { submitApprovalModal.value = false },
+    onFinish: () => { submitApprovalLoading.value = false },
+  })
+}
+
+function openPrint() {
+  const query = { term_id: filters.term_id, week_start: filters.week_start }
+  if (filters.lab_id) query.lab_id = filters.lab_id
+  window.open(route('computer-labs.print', query), '_blank')
 }
 
 function approve(booking) {
@@ -177,6 +205,53 @@ function moveBooking({ booking, roomId }) {
     onFinish: () => { movingBookingId.value = null },
   })
 }
+
+const transferModal = ref(false)
+const transferBooking = ref(null)
+const transferRoomId = ref(null)
+
+const transferLabOptions = computed(() => {
+  if (!transferBooking.value) return []
+  return props.labs.filter(lab => lab.room.id !== transferBooking.value.room_id)
+})
+
+const transferConflict = computed(() => {
+  const booking = transferBooking.value
+  if (!booking || !transferRoomId.value) return null
+
+  return props.bookings.find(candidate =>
+    candidate.id !== booking.id
+    && candidate.date === booking.date
+    && candidate.room_id === Number(transferRoomId.value)
+    && ['confirmed', 'approved'].includes(candidate.status)
+    && overlaps(booking, candidate)
+  ) ?? null
+})
+
+function openTransfer(booking) {
+  transferBooking.value = booking
+  transferRoomId.value = transferLabOptions.value[0]?.room?.id ?? null
+  transferModal.value = true
+}
+
+function closeTransfer() {
+  transferModal.value = false
+  transferBooking.value = null
+  transferRoomId.value = null
+}
+
+function submitTransfer() {
+  if (!transferBooking.value || !transferRoomId.value || transferConflict.value || movingBookingId.value) return
+
+  const booking = transferBooking.value
+  movingBookingId.value = booking.id
+
+  router.patch(route('computer-labs.bookings.move', booking.id), { room_id: Number(transferRoomId.value) }, {
+    preserveScroll: true,
+    onSuccess: () => closeTransfer(),
+    onFinish: () => { movingBookingId.value = null },
+  })
+}
 </script>
 
 <template>
@@ -188,11 +263,34 @@ function moveBooking({ booking, roomId }) {
           <AppButton v-if="capabilities.canManage && selectedTermId" variant="secondary" :loading="actionForm.processing" @click="synchronize">
             <ArrowPathIcon class="h-4 w-4" /> Sync Class Schedules
           </AppButton>
+          <AppButton v-if="labs.length && selectedTermId" variant="secondary" @click="openPrint">
+            <PrinterIcon class="h-4 w-4" /> Print Schedule
+          </AppButton>
+          <AppButton v-if="capabilities.canSubmitApproval && selectedTermId && !approvalLocked" @click="openSubmitApproval">
+            <CheckIcon class="h-4 w-4" /> Submit for Approval
+          </AppButton>
           <AppButton v-if="capabilities.canBook && labs.length && selectedTermId" @click="openBooking()">
             <PlusIcon class="h-4 w-4" /> Request Lab Use
           </AppButton>
         </template>
       </AppPageHeader>
+
+      <div v-if="scheduleApproval" class="rounded-lg border px-4 py-3 text-sm"
+        :class="{
+          'border-amber-200 bg-amber-50 text-amber-800': scheduleApproval.status === 'pending_approval',
+          'border-emerald-200 bg-emerald-50 text-emerald-800': scheduleApproval.status === 'approved',
+          'border-red-200 bg-red-50 text-red-800': scheduleApproval.status === 'returned',
+        }">
+        <p v-if="scheduleApproval.status === 'pending_approval'">
+          Submitted by {{ scheduleApproval.submitted_by }} on {{ scheduleApproval.submitted_at }} — awaiting CID Chief approval.
+        </p>
+        <p v-else-if="scheduleApproval.status === 'approved'">
+          Approved by {{ scheduleApproval.approved_by }} on {{ scheduleApproval.approved_at }}. Prepared by {{ scheduleApproval.submitted_by }} on {{ scheduleApproval.submitted_at }}.
+        </p>
+        <template v-else-if="scheduleApproval.status === 'returned'">
+          <p>Returned for revision. Reason: {{ scheduleApproval.return_remarks }}</p>
+        </template>
+      </div>
 
       <div v-if="$page.props.flash?.success" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
         {{ $page.props.flash.success }}
@@ -244,9 +342,8 @@ function moveBooking({ booking, roomId }) {
             </div>
           </div>
           <div class="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
-            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span> Priority class</span>
-            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Approved booking</span>
-            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span> Pending request</span>
+            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full border-2 border-slate-400"></span> Color = subject/activity</span>
+            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full border-2 border-dashed border-slate-400"></span> Dashed border = pending request</span>
           </div>
         </div>
 
@@ -267,6 +364,7 @@ function moveBooking({ booking, roomId }) {
             @drag-over="previewBookingMove"
             @drop="dropBooking"
             @cancel="cancel"
+            @transfer="openTransfer"
             @request="({ date, roomId, startTime, endTime }) => openBooking(date, roomId, startTime, endTime)"
           />
         </div>
@@ -326,5 +424,46 @@ function moveBooking({ booking, roomId }) {
         </div>
       </form>
     </AppModal>
+
+    <AppModal :show="transferModal" title="Transfer Laboratory Schedule" subtitle="Move this schedule to another computer laboratory. The target must be vacant for the same day and time." @close="closeTransfer">
+      <form v-if="transferBooking" class="space-y-4" @submit.prevent="submitTransfer">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+          <p class="font-medium text-slate-800">{{ transferBooking.title }}</p>
+          <p class="mt-1 text-xs text-slate-500">
+            Currently in {{ transferBooking.room_name }} · {{ transferBooking.date || transferBooking.day_of_week }} ·
+            {{ formatTime(transferBooking.start_time) }}–{{ formatTime(transferBooking.end_time) }}
+          </p>
+        </div>
+
+        <AppSelect v-model.number="transferRoomId" label="Transfer to Laboratory" :show-blank="false">
+          <option v-for="lab in transferLabOptions" :key="lab.room.id" :value="lab.room.id">
+            {{ lab.room.name }} (capacity {{ lab.room.capacity ?? 30 }})
+          </option>
+        </AppSelect>
+
+        <div v-if="transferRoomId" class="rounded-lg border px-3 py-2 text-sm"
+          :class="transferConflict ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'">
+          <span v-if="transferConflict">Occupied by "{{ transferConflict.title }}" during this period. Choose another laboratory.</span>
+          <span v-else>This laboratory is vacant for the requested day and time.</span>
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-slate-100 pt-3">
+          <AppButton type="button" variant="secondary" @click="closeTransfer">Cancel</AppButton>
+          <AppButton type="submit" :disabled="!transferRoomId || !!transferConflict" :loading="movingBookingId === transferBooking.id">
+            <ArrowRightIcon class="h-4 w-4" /> Transfer
+          </AppButton>
+        </div>
+      </form>
+    </AppModal>
+
+    <DigitalSignaturePin
+      :show="submitApprovalModal"
+      :has-pin="hasPin"
+      :signature-uri="signatureUri"
+      :loading="submitApprovalLoading"
+      confirm-label="Submit for Approval"
+      @confirm="confirmSubmitApproval"
+      @cancel="submitApprovalModal = false"
+    />
   </AdminLayout>
 </template>

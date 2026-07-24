@@ -439,14 +439,30 @@ class ClassScheduleController extends Controller
                 ];
             }
         } elseif (! empty($extra['officialTimes'])) {
-            // Faculty sheets have no single grade to borrow a Lunch band
-            // from (one teacher can span several grades' schedules) — so
-            // the band is built directly from that teacher's own
-            // HR-approved lunch break instead of a grade default. No band
-            // is added for a day with no lunch recorded (nullable by
-            // design), and it carries no `write` descriptor, so it renders
-            // display-only — same non-editable rule the frontend already
-            // applies to bands without one.
+            // Faculty sheets have no single grade to borrow a full band set
+            // from (one teacher can span several grades' schedules) — so:
+            //   - Lunch is built directly from that teacher's own HR-approved
+            //     lunch break (no band on a day with none recorded, nullable
+            //     by design; carries no `write` descriptor, so it renders
+            //     display-only).
+            //   - Flag Ceremony / Flag Retreat / Homeroom / Advising are
+            //     merged across every grade the faculty actually teaches this
+            //     term (derived from $schedules, already fetched above) —
+            //     these are faculty-attended/supervised, unlike Recess,
+            //     White Space, Wellness, and Consultation, which are
+            //     student-only breaks or grade-level concepts a CID Chief
+            //     sets and are deliberately excluded (mirrors the same rule
+            //     already applied to the By-Faculty/My Faculty Schedule
+            //     calendar in dayConfigFor()).
+            $facultyGrades = $schedules
+                ->pluck('grade_level')
+                ->filter(fn ($grade) => $grade !== null && (int) $grade > 0)
+                ->map(fn ($grade) => (int) $grade)
+                ->unique()
+                ->values();
+
+            $facultyBandTypes = ['FLAG', 'FLAG_RETREAT', 'HOMEROOM', 'ADVISING'];
+
             foreach (SchedulingConstants::DAYS as $day) {
                 $config = $extra['officialTimes'][$day] ?? null;
                 $blocked = [];
@@ -458,6 +474,24 @@ class ClassScheduleController extends Controller
                         'end' => $config['lunch_end'],
                     ];
                 }
+
+                $seen = [];
+                foreach ($facultyGrades as $grade) {
+                    foreach (SchedulingConstants::getDisplayBlockedSlots($grade, $day) as $band) {
+                        if (! in_array($band['type'], $facultyBandTypes, true)) {
+                            continue;
+                        }
+                        $key = $band['type'].'|'.$band['start'].'|'.$band['end'];
+                        if (isset($seen[$key])) {
+                            continue;
+                        }
+                        $seen[$key] = true;
+                        $blocked[] = $band;
+                    }
+                }
+
+                usort($blocked, fn ($a, $b) => $a['start'] <=> $b['start']);
+
                 $dayConfigs[$day] = [
                     'start' => $config['start'] ?? null,
                     'end' => $config['end'] ?? null,

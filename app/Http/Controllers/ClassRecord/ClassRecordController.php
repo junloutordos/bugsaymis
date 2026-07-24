@@ -151,8 +151,8 @@ class ClassRecordController extends Controller
         $gradingOption = GradingOption::findOrFail($validated['grading_option_id']);
         if (! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
             return response()->json([
-                'message' => 'The selected grading option is not available for this subject’s academic unit.',
-                'errors' => ['grading_option_id' => ['Select a campus-wide option or one assigned to this subject’s academic unit.']],
+                'message' => 'The selected grading option is inactive.',
+                'errors' => ['grading_option_id' => ['Select an active grading option.']],
             ], 422);
         }
         $isCrossSection = in_array($subject->subject_type, ['elective', 'science_core'], true);
@@ -255,8 +255,8 @@ class ClassRecordController extends Controller
 
             if (! $subject || ! $gradingOption || ! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
                 return response()->json([
-                    'message' => 'The selected grading option is not available for this subject’s academic unit.',
-                    'errors' => ['grading_option_id' => ['Select a campus-wide option or one assigned to this subject’s academic unit.']],
+                    'message' => 'The selected grading option is inactive.',
+                    'errors' => ['grading_option_id' => ['Select an active grading option.']],
                 ], 422);
             }
         }

@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
+import { subjectColorStyle } from '@/Utils/subjectColor.js'
 import {
   ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
+  ArrowsRightLeftIcon,
   ClockIcon,
   PrinterIcon,
 } from '@heroicons/vue/24/outline'
@@ -19,11 +21,11 @@ const props = defineProps({
   dropTarget: { type: Object, default: null },
 })
 
-const emit = defineEmits(['cancel', 'drag-start', 'drag-end', 'drag-over', 'drop', 'request'])
+const emit = defineEmits(['cancel', 'transfer', 'drag-start', 'drag-end', 'drag-over', 'drop', 'request'])
 
 const CALENDAR_START = 7 * 60
 const CALENDAR_END = 17 * 60
-const SCALE = 1.2
+const SCALE = 1.8
 const GUTTER = 62
 const MIN_SELECTION = 30
 const SELECTION_STEP = 15
@@ -118,9 +120,10 @@ function bookingStyle(booking) {
 
   return {
     top: `${(start - CALENDAR_START) * SCALE}px`,
-    height: `${Math.max((end - start) * SCALE, 28)}px`,
+    height: `${Math.max((end - start) * SCALE, 56)}px`,
     left: `calc(${layout.lane * width}% + 2px)`,
     width: `calc(${width}% - 4px)`,
+    ...bookingColorStyle(booking),
   }
 }
 
@@ -141,9 +144,16 @@ function formatTime(time) {
 }
 
 function bookingClasses(booking) {
-  if (booking.booking_type === 'priority_class') return 'border-indigo-200 bg-indigo-50 text-indigo-950'
-  if (booking.status === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-950'
-  return 'border-amber-200 bg-amber-50 text-amber-950'
+  if (booking.status === 'pending') return 'border-dashed'
+  return 'border-solid'
+}
+
+function subjectKey(booking) {
+  return booking.subject || booking.title
+}
+
+function bookingColorStyle(booking) {
+  return subjectColorStyle(subjectKey(booking))
 }
 
 function statusClasses(status) {
@@ -367,8 +377,14 @@ onBeforeUnmount(() => {
                     <ClockIcon class="h-3 w-3 shrink-0" /> {{ formatTime(booking.start_time) }}–{{ formatTime(booking.end_time) }}
                   </p>
                   <p v-if="booking.faculty" class="truncate opacity-70">{{ booking.faculty }}</p>
-                  <button v-if="booking.can_cancel" type="button" class="self-start text-red-600 hover:underline"
-                    @mousedown.stop @click.stop="emit('cancel', booking)">Cancel</button>
+                  <div v-if="booking.can_cancel || (canManage && booking.can_move)" class="mt-auto flex items-center gap-2 pt-0.5">
+                    <button v-if="canManage && booking.can_move" type="button" class="flex items-center gap-0.5 text-indigo-600 hover:underline"
+                      @mousedown.stop @click.stop="emit('transfer', booking)">
+                      <ArrowsRightLeftIcon class="h-3 w-3" /> Transfer
+                    </button>
+                    <button v-if="booking.can_cancel" type="button" class="text-red-600 hover:underline"
+                      @mousedown.stop @click.stop="emit('cancel', booking)">Cancel</button>
+                  </div>
                 </div>
               </article>
             </div>

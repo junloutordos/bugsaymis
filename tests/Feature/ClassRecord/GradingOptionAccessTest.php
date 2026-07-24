@@ -18,11 +18,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Grading Options are now scoped per academic unit via a designation-based
- * AUH assignment (GradingOptionScopeService), not the legacy
- * class-records.grading-options permission grant. These tests cover the
- * designation-driven access/scoping rules directly, independent of whether
- * the user also happens to hold the AUH role/permission.
+ * Grading Options: who can MANAGE (create/edit/delete) an option is scoped
+ * per academic unit via a designation-based AUH assignment
+ * (GradingOptionScopeService), independent of the legacy
+ * class-records.grading-options permission/AUH role. Who can SELECT/USE an
+ * option on a class record is intentionally NOT scoped — every active option
+ * is visible and usable by every teacher regardless of unit (2026-07-24).
  */
 class GradingOptionAccessTest extends TestCase
 {
@@ -114,18 +115,19 @@ class GradingOptionAccessTest extends TestCase
         $this->assertDatabaseMissing('grading_options', ['id' => $option->id]);
     }
 
-    public function test_teacher_only_sees_global_and_matching_unit_options(): void
+    public function test_teacher_sees_every_active_grading_option_regardless_of_unit(): void
     {
         [$term, $mathDesignation] = $this->currentTermAndAuhDesignation('MATH');
         [, $sciDesignation] = $this->currentTermAndAuhDesignation('SCI', $term->schoolYear);
 
-        $global = GradingOption::create(['name' => 'Standard', 'is_active' => true]);
-        $mathOption = GradingOption::create([
+        GradingOption::create(['name' => 'Standard', 'is_active' => true]);
+        GradingOption::create([
             'name' => 'Math Grading', 'is_active' => true, 'owner_designation_id' => $mathDesignation->id,
         ]);
-        $sciOption = GradingOption::create([
+        GradingOption::create([
             'name' => 'Science Grading', 'is_active' => true, 'owner_designation_id' => $sciDesignation->id,
         ]);
+        GradingOption::create(['name' => 'Retired Option', 'is_active' => false]);
 
         $mathUnit = AcademicUnit::where('code', 'MATH')->firstOrFail();
         $subject = Subject::create([
@@ -150,10 +152,11 @@ class GradingOptionAccessTest extends TestCase
         $names = collect($response->json())->pluck('name');
         $this->assertTrue($names->contains('Standard'));
         $this->assertTrue($names->contains('Math Grading'));
-        $this->assertFalse($names->contains('Science Grading'));
+        $this->assertTrue($names->contains('Science Grading'));
+        $this->assertFalse($names->contains('Retired Option'));
     }
 
-    public function test_mismatched_grading_option_is_rejected_server_side_on_class_record_creation(): void
+    public function test_cross_unit_grading_option_is_allowed_on_class_record_creation(): void
     {
         [$term, $mathDesignation] = $this->currentTermAndAuhDesignation('MATH');
         [, $sciDesignation] = $this->currentTermAndAuhDesignation('SCI', $term->schoolYear);
@@ -183,6 +186,38 @@ class GradingOptionAccessTest extends TestCase
         $response = $this->actingAs($teacher)->postJson(route('class-records.store'), [
             'subject_id' => $subject->id,
             'grading_option_id' => $sciOption->id,
+        ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('class_records', [
+            'subject_id' => $subject->id, 'grading_option_id' => $sciOption->id,
+        ]);
+    }
+
+    public function test_inactive_grading_option_is_rejected_server_side_on_class_record_creation(): void
+    {
+        [$term] = $this->currentTermAndAuhDesignation('MATH');
+
+        $subject = Subject::create([
+            'school_year_id' => $term->schoolYear->id, 'code' => 'MATHELEC2', 'name' => 'Math Elective 2',
+            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'elective',
+            'grade_level' => 0, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $inactiveOption = GradingOption::create(['name' => 'Retired Option', 'is_active' => false]);
+
+        $teacher = User::factory()->create(['email_verified_at' => now()]);
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $teacher->id, 'school_year_id' => $term->schoolYear->id, 'academic_term_id' => $term->id,
+        ]);
+        LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $teacher->id,
+            'school_year_id' => $term->schoolYear->id, 'academic_term_id' => $term->id,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'load_units' => 3,
+        ]);
+
+        $response = $this->actingAs($teacher)->postJson(route('class-records.store'), [
+            'subject_id' => $subject->id,
+            'grading_option_id' => $inactiveOption->id,
         ]);
 
         $response->assertStatus(422);
