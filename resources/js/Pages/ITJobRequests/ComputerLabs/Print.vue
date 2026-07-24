@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import { subjectColorStyle } from '@/Utils/subjectColor.js'
 
@@ -54,7 +54,36 @@ function bookingsForLabDay(roomId, date) {
   return props.bookings.filter(booking => booking.room_id === roomId && booking.date === date)
 }
 
+function durationMinutes(booking) {
+  return timeToMinutes(booking.end_time) - timeToMinutes(booking.start_time)
+}
+
+/**
+ * Duration tiers scale font-size/line-height/layout down as the booking
+ * cell shrinks, so short (e.g. 30-minute) bookings still show a legible
+ * title + time instead of clipped/overflowing text. Mirrors
+ * SchedulePrintSheet.vue's durationTierClass() convention.
+ */
+function durationTierClass(booking) {
+  const minutes = durationMinutes(booking)
+  if (minutes <= 15) return 'lab-print-event-xs'
+  if (minutes <= 25) return 'lab-print-event-sm'
+  if (minutes <= 30) return 'lab-print-event-short'
+  return ''
+}
+
 const schoolYearLabel = computed(() => (props.term.school_year ?? '').replace('-', '–'))
+
+onMounted(async () => {
+  await nextTick()
+  const images = [...document.querySelectorAll('.print-asset')]
+  await Promise.all(images.map(image => image.complete ? Promise.resolve() : new Promise(resolve => {
+    image.addEventListener('load', resolve, { once: true })
+    image.addEventListener('error', resolve, { once: true })
+  })))
+  await document.fonts?.ready
+  setTimeout(() => window.print(), 100)
+})
 </script>
 
 <template>
@@ -65,8 +94,8 @@ const schoolYearLabel = computed(() => (props.term.school_year ?? '').replace('-
 
       <main class="lab-print-body">
         <div class="lab-print-heading">
-          <h1>{{ lab.room.name?.toUpperCase() }} COMPUTER LABORATORY SCHEDULE</h1>
-          <p class="lab-print-sy">S.Y. {{ schoolYearLabel }} · {{ term.label }}</p>
+          <h1>{{ lab.room.name?.toUpperCase() }} SCHEDULE</h1>
+          <p class="lab-print-sy">S.Y. {{ schoolYearLabel }}</p>
         </div>
 
         <div class="lab-print-calendar">
@@ -89,9 +118,10 @@ const schoolYearLabel = computed(() => (props.term.school_year ?? '').replace('-
 
               <div v-for="day in days" :key="day.date" class="lab-print-column">
                 <div v-for="booking in bookingsForLabDay(lab.room.id, day.date)" :key="booking.id"
-                  class="lab-print-event" :style="{ ...rangeStyle(booking.start_time, booking.end_time), ...subjectColorStyle(booking.subject || booking.title) }">
+                  class="lab-print-event" :class="durationTierClass(booking)"
+                  :style="{ ...rangeStyle(booking.start_time, booking.end_time), ...subjectColorStyle(booking.subject || booking.title) }">
                   <div class="lab-print-event-title">{{ booking.title }}</div>
-                  <div class="lab-print-event-detail">{{ booking.faculty || booking.requester || '' }}</div>
+                  <div v-if="(booking.faculty || booking.requester) && durationMinutes(booking) > 15" class="lab-print-event-detail">{{ booking.faculty || booking.requester }}</div>
                   <div class="lab-print-event-time">{{ formatTime(booking.start_time) }}–{{ formatTime(booking.end_time) }}</div>
                 </div>
               </div>
@@ -326,6 +356,85 @@ const schoolYearLabel = computed(() => (props.term.school_year ?? '').replace('-
   margin-top: 0.2mm;
   font-variant-numeric: tabular-nums;
   opacity: 0.75;
+}
+
+.lab-print-event-short {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.8mm;
+  padding-top: 0.2mm;
+  padding-bottom: 0.2mm;
+  font-size: 5.3pt;
+  text-align: left;
+}
+
+.lab-print-event-short .lab-print-event-title,
+.lab-print-event-short .lab-print-event-detail {
+  min-width: 0;
+}
+
+.lab-print-event-short .lab-print-event-time {
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+
+/* 16–25min bookings — single line, title + time only, no detail line
+ * (dropped in template to save room). Smaller font so both fit without
+ * clipping. */
+.lab-print-event-sm {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6mm;
+  padding: 0.1mm 0.6mm 0.1mm 0.9mm;
+  min-height: 1.8mm;
+  font-size: 4.8pt;
+  line-height: 1.05;
+  text-align: left;
+}
+
+.lab-print-event-sm .lab-print-event-title {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.lab-print-event-sm .lab-print-event-detail {
+  display: none;
+}
+
+.lab-print-event-sm .lab-print-event-time {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+/* ≤15min bookings — tightest tier. Title truncates first; time is always
+ * fully visible so the period is still identifiable at a glance. */
+.lab-print-event-xs {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4mm;
+  padding: 0 0.5mm 0 0.8mm;
+  min-height: 1.6mm;
+  font-size: 4.3pt;
+  line-height: 1;
+  text-align: left;
+}
+
+.lab-print-event-xs .lab-print-event-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.lab-print-event-xs .lab-print-event-detail {
+  display: none;
+}
+
+.lab-print-event-xs .lab-print-event-time {
+  flex: 0 0 auto;
+  margin-top: 0;
+  opacity: 0.85;
 }
 
 .lab-print-signatories {
