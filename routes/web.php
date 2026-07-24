@@ -2340,6 +2340,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     // Class Records CRUD + workflow
     Route::get('/class-records',                        [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'index'])->name('class-records.index');
     Route::post('/class-records',                       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'store'])->name('class-records.store');
+    Route::post('/class-records/bulk',                  [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'bulkStore'])->name('class-records.bulk-store');
     Route::get('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'show'])->name('class-records.show');
     Route::put('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'update'])->name('class-records.update');
     Route::delete('/class-records/{classRecord}',       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'destroy'])->name('class-records.destroy');

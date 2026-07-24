@@ -162,7 +162,10 @@
       size="lg" body-class="px-6 py-4" @close="showModal = false">
 
       <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
-        {{ isAdmin ? 'Step 1 — Select a teaching assignment' : 'Select your teaching assignment' }}
+        {{ isAdmin ? 'Step 1 — Select teaching assignment(s)' : 'Select your teaching assignment(s)' }}
+      </p>
+      <p class="text-xs text-slate-400 mb-3">
+        Select one or more subjects — a class record will be created for each once you choose a grading option.
       </p>
 
       <!-- Loading -->
@@ -185,28 +188,34 @@
       <div v-else class="space-y-1.5">
         <button v-for="la in myLoad" :key="la.load_assignment_id"
                 type="button"
+                :disabled="la.already_created"
                 @click="pickLoad(la)"
                 class="w-full text-left rounded-xl px-4 py-3 border transition"
-                :class="selectedLoad?.load_assignment_id === la.load_assignment_id
-                  ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
-                  : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'">
+                :class="[
+                  la.already_created ? 'opacity-50 cursor-not-allowed border-slate-100' :
+                  isSelected(la)
+                    ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
+                    : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50',
+                ]">
           <div class="flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <p class="font-medium text-sm text-slate-800 truncate">{{ la.subject_name }}</p>
-              <p class="text-xs text-slate-500 mt-0.5">
-                {{ la.scope_label }}
-                <span v-if="isAdmin && la.teacher_name" class="ml-1 text-slate-400">· {{ la.teacher_name }}</span>
-              </p>
+            <div class="min-w-0 flex items-center gap-2.5">
+              <span class="shrink-0 flex items-center justify-center h-4 w-4 rounded border"
+                    :class="isSelected(la) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'">
+                <svg v-if="isSelected(la)" class="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <p class="font-medium text-sm text-slate-800 truncate">{{ la.subject_name }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  {{ la.scope_label }}
+                  <span v-if="isAdmin && la.teacher_name" class="ml-1 text-slate-400">· {{ la.teacher_name }}</span>
+                </p>
+              </div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <AppBadge :color="la.subject_type === 'elective' ? 'amber' : 'slate'">{{ la.subject_type }}</AppBadge>
               <AppBadge v-if="la.already_created" color="green">✓ created</AppBadge>
-              <span v-if="selectedLoad?.load_assignment_id === la.load_assignment_id"
-                    class="text-indigo-600">
-                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                </svg>
-              </span>
             </div>
           </div>
         </button>
@@ -214,22 +223,28 @@
 
       <p v-if="createErrors.assignment" class="text-xs text-red-500 mt-2">{{ createErrors.assignment[0] }}</p>
 
-      <!-- Step 2: Grading option (only shown when assignment selected) -->
-      <div v-if="selectedLoad" class="mt-5 pt-4 border-t border-slate-100">
+      <!-- Step 2: Grading option (only shown when at least one assignment selected) -->
+      <div v-if="selectedLoads.length" class="mt-5 pt-4 border-t border-slate-100">
         <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
           Step 2 — Grading Option
         </p>
 
-        <!-- Confirmation card -->
-        <div class="rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 mb-4 text-sm">
-          <p class="font-semibold text-indigo-800">{{ selectedLoad.subject_name }}</p>
-          <p class="text-indigo-600 text-xs mt-0.5">
-            {{ selectedLoad.scope_label }}
-            <span v-if="isAdmin && selectedLoad.teacher_name"> · {{ selectedLoad.teacher_name }}</span>
-            · <span :class="selectedLoad.subject_type === 'elective' ? 'text-warning-600 font-medium' : ''">
-              {{ selectedLoad.subject_type }}
-            </span>
+        <!-- Confirmation card(s) -->
+        <div class="rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 mb-4 text-sm space-y-2">
+          <p class="font-semibold text-indigo-800">
+            {{ selectedLoads.length === 1
+              ? 'Creating a class record for:'
+              : `Applying this grading option to ${selectedLoads.length} selected subjects:` }}
           </p>
+          <div v-for="la in selectedLoads" :key="la.load_assignment_id" class="flex items-center justify-between gap-2">
+            <p class="text-indigo-700 text-xs">
+              <span class="font-medium">{{ la.subject_name }}</span> — {{ la.scope_label }}
+              <span v-if="isAdmin && la.teacher_name" class="text-indigo-500"> · {{ la.teacher_name }}</span>
+            </p>
+            <button type="button" @click="pickLoad(la)" class="text-indigo-400 hover:text-indigo-600 shrink-0">
+              <XMarkIcon class="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
         <select v-model="gradingOptionId"
@@ -247,8 +262,8 @@
 
       <template #footer>
         <AppButton variant="secondary" @click="showModal = false">Cancel</AppButton>
-        <AppButton :loading="creating" :disabled="!selectedLoad || !gradingOptionId || !currentSchoolYear" @click="handleCreate">
-          {{ creating ? 'Creating…' : 'Create Class Record' }}
+        <AppButton :loading="creating" :disabled="!selectedLoads.length || !gradingOptionId || !currentSchoolYear" @click="handleCreate">
+          {{ creating ? 'Creating…' : (selectedLoads.length > 1 ? `Create ${selectedLoads.length} Class Records` : 'Create Class Record') }}
         </AppButton>
       </template>
     </AppModal>
@@ -434,7 +449,7 @@ import GradingOptionDetails from './components/GradingOptionDetails.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
-import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon, ArrowUturnLeftIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecords:      Array,
@@ -548,7 +563,7 @@ function quarterDot(record, q) {
 const showModal       = ref(false)
 const creating        = ref(false)
 const createErrors    = ref({})
-const selectedLoad    = ref(null)   // the chosen load assignment object
+const selectedLoads   = ref([])   // array of chosen load assignment objects (multi-select)
 const gradingOptionId = ref('')
 
 const selectedGradingOption = computed(() =>
@@ -574,27 +589,32 @@ async function fetchMyLoad() {
 }
 
 function openCreate() {
-  selectedLoad.value    = null
+  selectedLoads.value    = []
   gradingOptionId.value = ''
   createErrors.value    = {}
   showModal.value       = true
   fetchMyLoad()
 }
 
+function isSelected(assignment) {
+  return selectedLoads.value.some(la => la.load_assignment_id === assignment.load_assignment_id)
+}
+
 function pickLoad(assignment) {
-  // Deselect if clicking the same one
-  if (selectedLoad.value?.load_assignment_id === assignment.load_assignment_id) {
-    selectedLoad.value = null
+  if (assignment.already_created) return
+  const idx = selectedLoads.value.findIndex(la => la.load_assignment_id === assignment.load_assignment_id)
+  if (idx >= 0) {
+    selectedLoads.value.splice(idx, 1)
   } else {
-    selectedLoad.value = assignment
+    selectedLoads.value.push(assignment)
   }
 }
 
 async function handleCreate() {
   createErrors.value = {}
 
-  if (!selectedLoad.value) {
-    createErrors.value = { assignment: ['Please select a teaching assignment.'] }
+  if (!selectedLoads.value.length) {
+    createErrors.value = { assignment: ['Please select at least one teaching assignment.'] }
     return
   }
   if (!gradingOptionId.value) {
@@ -605,21 +625,41 @@ async function handleCreate() {
   creating.value = true
   try {
     const payload = {
-      subject_id:        selectedLoad.value.subject_id,
-      section_id:        selectedLoad.value.section_id,
       grading_option_id: gradingOptionId.value,
-    }
-    // Admins creating on behalf of another teacher
-    if (props.isAdmin && selectedLoad.value.teacher_id) {
-      payload.teacher_id = selectedLoad.value.teacher_id
+      items: selectedLoads.value.map(la => {
+        const item = {
+          subject_id: la.subject_id,
+          section_id: la.section_id,
+        }
+        // Admins creating on behalf of another teacher
+        if (props.isAdmin && la.teacher_id) {
+          item.teacher_id = la.teacher_id
+        }
+        return item
+      }),
     }
 
-    const { data } = await axios.post(route('class-records.store'), payload)
+    const { data } = await axios.post(route('class-records.bulk-store'), payload)
     showModal.value = false
-    router.visit(route('class-records.page.show', data.data.id))
+
+    const count = data.created?.length ?? 0
+    const skippedCount = data.skipped?.length ?? 0
+    let message = count === 1 ? '1 class record created.' : `${count} class records created.`
+    if (skippedCount) {
+      message += ` ${skippedCount} skipped (already exist).`
+    }
+
+    router.visit(route('class-records.page.index'), {
+      onSuccess: () => {
+        Swal.fire({ icon: 'success', title: message, timer: 2000, showConfirmButton: false })
+      },
+    })
   } catch (err) {
     if (err.response?.status === 422) {
       createErrors.value = err.response.data.errors ?? {}
+      if (!Object.keys(createErrors.value).length) {
+        Swal.fire('Error', err.response.data.message ?? 'Could not create class records.', 'error')
+      }
     } else {
       Swal.fire('Error', err.response?.data?.message ?? 'Could not create class record.', 'error')
     }

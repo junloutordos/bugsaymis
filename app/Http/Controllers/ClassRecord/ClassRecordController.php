@@ -16,6 +16,7 @@ use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 class ClassRecordController extends Controller
@@ -217,6 +218,132 @@ class ClassRecordController extends Controller
         return response()->json([
             'message' => 'Class record created successfully.',
             'data' => $record->load('gradingOption'),
+        ], 201);
+    }
+
+    // ── POST /class-records/bulk ────────────────────────────────────────────────
+    // Creates one class record per selected teaching assignment, all sharing the
+    // same grading option. Used when a teacher selects multiple subjects in
+    // Step 1 of the creation wizard. Items that already have a class record for
+    // the current SY are silently skipped (not treated as a failure) so the
+    // rest of the batch still succeeds.
+
+    public function bulkStore(Request $request): JsonResponse
+    {
+        $currentSY = SchoolYear::where('is_current', true)->first();
+
+        if (! $currentSY) {
+            return response()->json([
+                'message' => 'No active school year is set. Please contact the administrator.',
+                'errors' => ['school_year' => ['No active school year is configured.']],
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'grading_option_id' => 'required|integer|exists:grading_options,id',
+            'items' => 'required|array|min:1',
+            'items.*.subject_id' => 'required|integer|exists:subjects,id',
+            'items.*.section_id' => 'nullable|integer|exists:sections,id',
+            'items.*.teacher_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $gradingOption = GradingOption::findOrFail($validated['grading_option_id']);
+        $isAdmin = $this->isAdmin();
+
+        $created = [];
+        $skipped = [];
+
+        DB::transaction(function () use ($validated, $gradingOption, $currentSY, $isAdmin, &$created, &$skipped) {
+            foreach ($validated['items'] as $item) {
+                $subject = Subject::find($item['subject_id']);
+                if (! $subject) {
+                    $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => 'Subject not found.'];
+
+                    continue;
+                }
+
+                if (! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
+                    $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => 'Grading option not applicable to this subject.'];
+
+                    continue;
+                }
+
+                $isCrossSection = in_array($subject->subject_type, ['elective', 'science_core'], true);
+
+                if (! $isCrossSection && empty($item['section_id'])) {
+                    $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => 'A regular subject must be linked to a section.'];
+
+                    continue;
+                }
+
+                $section = null;
+                if (! empty($item['section_id'])) {
+                    $section = Section::where('id', $item['section_id'])
+                        ->where('school_year_id', $currentSY->id)
+                        ->first();
+
+                    if (! $section) {
+                        $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => 'Section does not belong to the current school year.'];
+
+                        continue;
+                    }
+                }
+
+                $teacherId = ($isAdmin && ! empty($item['teacher_id'])) ? $item['teacher_id'] : Auth::id();
+
+                // Skip pairs that already have a non-archived class record this SY
+                $alreadyExists = ClassRecord::where('school_year_id', $currentSY->id)
+                    ->where('status', '<>', 'archived')
+                    ->where('teacher_id', $teacherId)
+                    ->where('subject_id', $subject->id)
+                    ->where('section_id', $item['section_id'] ?? null)
+                    ->exists();
+
+                if ($alreadyExists) {
+                    $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => 'A class record already exists for this subject.'];
+
+                    continue;
+                }
+
+                $subjectName = $subject->name;
+                if ($section) {
+                    $yearLevelSection = "G-{$section->levelid} {$section->sectionname}";
+                } elseif ((int) $subject->grade_level === 0) {
+                    $yearLevelSection = 'Grades 11–12 — Elective';
+                } else {
+                    $scopeName = $subject->subject_type === 'science_core' ? 'Science Core' : 'Elective';
+                    $yearLevelSection = "Grade {$subject->grade_level} — {$scopeName}";
+                }
+
+                $record = ClassRecord::create([
+                    'subject_id' => $subject->id,
+                    'section_id' => $item['section_id'] ?? null,
+                    'grading_option_id' => $gradingOption->id,
+                    'subject_name' => $subjectName,
+                    'year_level_section' => $yearLevelSection,
+                    'teacher_id' => $teacherId,
+                    'school_year_id' => $currentSY->id,
+                    'school_year' => $currentSY->name,
+                    'status' => 'draft',
+                ]);
+
+                $created[] = $record;
+            }
+        });
+
+        if (! $created) {
+            return response()->json([
+                'message' => 'No class records were created. They may already exist.',
+                'created' => [],
+                'skipped' => $skipped,
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => count($created).' class record(s) created successfully.'.
+                ($skipped ? ' '.count($skipped).' skipped (already exist).' : ''),
+            'created' => $created,
+            'skipped' => $skipped,
         ], 201);
     }
 
