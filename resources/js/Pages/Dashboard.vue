@@ -23,7 +23,6 @@ import {
   PhotoIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
-import { ClockIcon as ClockIconSolid } from '@heroicons/vue/24/solid'
 
 const props = defineProps({
   profile: { type: Object, default: () => ({}) },
@@ -312,7 +311,12 @@ function statusClass(status) {
               aria-label="Online Time Punch"
               class="!bg-indigo-50 !px-2.5 !text-indigo-600 hover:!bg-indigo-100 hover:-translate-y-0.5"
             >
-              <ClockIconSolid class="h-4 w-4" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4">
+                <line x1="10" y1="2" x2="14" y2="2" />
+                <line x1="12" y1="2" x2="12" y2="5" />
+                <circle cx="12" cy="14" r="8" />
+                <line x1="12" y1="14" x2="15" y2="11" />
+              </svg>
             </AppButton>
             <Link
               v-for="link in quickLinks.slice(0, 3)"
