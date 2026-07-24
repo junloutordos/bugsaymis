@@ -23,6 +23,7 @@ import {
   PhotoIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
+import { ClockIcon as ClockIconSolid } from '@heroicons/vue/24/solid'
 
 const props = defineProps({
   profile: { type: Object, default: () => ({}) },
@@ -305,11 +306,13 @@ function statusClass(status) {
               v-if="canOnlinePunch"
               as="link"
               :href="route('hr.online-punch.index')"
-              variant="success"
-              class="hover:-translate-y-0.5"
+              variant="ghost"
+              size="md"
+              title="Online Time Punch"
+              aria-label="Online Time Punch"
+              class="!bg-indigo-50 !px-2.5 !text-indigo-600 hover:!bg-indigo-100 hover:-translate-y-0.5"
             >
-              <ClockIcon class="h-4 w-4" />
-              Online Time Punch
+              <ClockIconSolid class="h-4 w-4" />
             </AppButton>
             <Link
               v-for="link in quickLinks.slice(0, 3)"
