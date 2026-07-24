@@ -116,10 +116,15 @@ class ClassRecord extends Model
         return $this->status === 'archived';
     }
 
-    /** Exclude archived (soft-deleted) records from active listings/analytics. */
+    /**
+     * Exclude archived (soft-deleted) records from active listings/analytics.
+     * Whitelist the known active statuses so any archived, blank, or otherwise
+     * invalid status is also excluded (defensive against enum/data drift),
+     * not just an exact 'archived' match.
+     */
     public function scopeActive($query)
     {
-        return $query->where('status', '<>', 'archived');
+        return $query->whereIn('status', ['draft', 'submitted', 'checked']);
     }
 
     public function quarters(): HasMany

@@ -107,6 +107,7 @@ class FacultyDashboardService
             ->where('school_year_id', $schoolYearId)
             ->where('day_of_week', $this->dayOfWeek($today))
             ->where('status', '<>', 'inactive')
+            ->classes()
             ->count();
 
         return [
@@ -207,6 +208,7 @@ class FacultyDashboardService
             ->where('school_year_id', $schoolYearId)
             ->where('day_of_week', $this->dayOfWeek($today))
             ->where('status', '<>', 'inactive')
+            ->classes()
             ->orderBy('start_time')
             ->get()
             ->map(fn (ClassSchedule $s) => [
