@@ -148,6 +148,27 @@ function bookingClasses(booking) {
   return 'border-solid'
 }
 
+function durationMinutes(booking) {
+  return timeToMinutes(booking.end_time) - timeToMinutes(booking.start_time)
+}
+
+/**
+ * Duration tiers scale font-size/line-height/layout down as the booking
+ * cell shrinks, so short (e.g. 30-minute) bookings still show a legible
+ * title + time instead of clipped/overflowing text. Mirrors the tiering
+ * convention used by SchedulePrintSheet.vue's durationTierClass(). Tiers,
+ * from smallest: xs (≤15min, title only), sm (16–25min, title + time, no
+ * faculty/status), short (26–30min, compact stack), default (>30min, full
+ * layout at base size).
+ */
+function durationTierClass(booking) {
+  const minutes = durationMinutes(booking)
+  if (minutes <= 15) return 'lab-booking-xs'
+  if (minutes <= 25) return 'lab-booking-sm'
+  if (minutes <= 30) return 'lab-booking-short'
+  return ''
+}
+
 function subjectKey(booking) {
   return booking.subject || booking.title
 }
@@ -358,6 +379,7 @@ onBeforeUnmount(() => {
                 class="absolute z-10 overflow-hidden rounded-md border shadow-sm transition hover:z-20 hover:shadow-md"
                 :class="[
                   bookingClasses(booking),
+                  durationTierClass(booking),
                   canManage && booking.can_move ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
                   movingBookingId === booking.id ? 'opacity-50' : '',
                 ]"
@@ -366,18 +388,18 @@ onBeforeUnmount(() => {
                 :title="`${booking.title}\n${formatTime(booking.start_time)}–${formatTime(booking.end_time)}${booking.faculty ? `\n${booking.faculty}` : ''}`"
                 @dragstart="onDragStart($event, booking)"
                 @dragend="emit('drag-end')">
-                <div class="flex h-full flex-col gap-0.5 overflow-hidden px-1.5 py-1 text-[10px] leading-tight">
-                  <div class="flex items-start justify-between gap-1">
+                <div class="lab-booking-content flex h-full flex-col gap-0.5 overflow-hidden px-1.5 py-1 text-[10px] leading-tight">
+                  <div class="lab-booking-title-row flex items-start justify-between gap-1">
                     <p class="truncate font-bold">{{ booking.title }}</p>
-                    <span class="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold" :class="statusClasses(booking.status)">
+                    <span class="lab-booking-status shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold" :class="statusClasses(booking.status)">
                       {{ booking.status }}
                     </span>
                   </div>
-                  <p class="flex items-center gap-1 truncate opacity-70">
-                    <ClockIcon class="h-3 w-3 shrink-0" /> {{ formatTime(booking.start_time) }}–{{ formatTime(booking.end_time) }}
+                  <p class="lab-booking-time flex items-center gap-1 truncate opacity-70">
+                    <ClockIcon class="lab-booking-clock-icon h-3 w-3 shrink-0" /> {{ formatTime(booking.start_time) }}–{{ formatTime(booking.end_time) }}
                   </p>
-                  <p v-if="booking.faculty" class="truncate opacity-70">{{ booking.faculty }}</p>
-                  <div v-if="booking.can_cancel || (canManage && booking.can_move)" class="mt-auto flex items-center gap-2 pt-0.5">
+                  <p v-if="booking.faculty" class="lab-booking-faculty truncate opacity-70">{{ booking.faculty }}</p>
+                  <div v-if="booking.can_cancel || (canManage && booking.can_move)" class="lab-booking-actions mt-auto flex items-center gap-2 pt-0.5">
                     <button v-if="canManage && booking.can_move" type="button" class="flex items-center gap-0.5 text-indigo-600 hover:underline"
                       @mousedown.stop @click.stop="emit('transfer', booking)">
                       <ArrowsRightLeftIcon class="h-3 w-3" /> Transfer
@@ -398,6 +420,62 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
+/*
+ * Duration tiers — shrink font/line-height and progressively drop the
+ * least-important line as the booking's real time-slot gets shorter, so
+ * 30-minute (and shorter) bookings stay legible instead of clipping their
+ * stacked title/status/time/faculty lines into an unreadable ~54px cell.
+ * Mirrors SchedulePrintSheet.vue's duration-tier convention.
+ */
+.lab-booking-short .lab-booking-content {
+  gap: 0;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.lab-booking-short .lab-booking-faculty {
+  display: none;
+}
+
+.lab-booking-sm .lab-booking-content {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  font-size: 9px;
+}
+.lab-booking-sm .lab-booking-title-row {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.lab-booking-sm .lab-booking-time {
+  flex: 0 0 auto;
+  width: auto;
+}
+.lab-booking-sm .lab-booking-status,
+.lab-booking-sm .lab-booking-faculty,
+.lab-booking-sm .lab-booking-actions {
+  display: none;
+}
+
+.lab-booking-xs .lab-booking-content {
+  flex-direction: row;
+  align-items: center;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  font-size: 8.5px;
+}
+.lab-booking-xs .lab-booking-title-row {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.lab-booking-xs .lab-booking-status,
+.lab-booking-xs .lab-booking-time,
+.lab-booking-xs .lab-booking-faculty,
+.lab-booking-xs .lab-booking-actions {
+  display: none;
+}
+
 @media print {
   body.print-single-lab-calendar * {
     visibility: hidden;

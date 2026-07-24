@@ -380,7 +380,7 @@ const schoolYearLabel = computed(() => (props.term.school_year ?? '').replace('-
   }
 
   @page {
-    size: landscape;
+    size: A4 landscape;
     margin: 0.4in;
   }
 }

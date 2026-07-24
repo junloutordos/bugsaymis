@@ -8,6 +8,7 @@ use App\Models\ComputerLabScheduleApproval;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\ICTEquipment;
 use App\Models\Room;
+use App\Models\User;
 use App\Services\ComputerLabSchedulingService;
 use App\Services\ComputerLabScheduleApprovalService;
 use App\Services\DigitalSignatureService;

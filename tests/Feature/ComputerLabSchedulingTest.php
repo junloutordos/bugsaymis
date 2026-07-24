@@ -378,4 +378,42 @@ class ComputerLabSchedulingTest extends TestCase
         $this->assertCount(1, $conflicts);
         $this->assertSame('priority_class', $conflicts->first()->booking_type);
     }
+
+    // ── Print schedule ───────────────────────────────────────────────────────
+
+    public function test_print_schedule_renders_successfully_for_all_labs(): void
+    {
+        $user = $this->userWithPermission('computer_labs.manage');
+
+        $this->actingAs($user)
+            ->get(route('computer-labs.print', ['term_id' => $this->term->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('ITJobRequests/ComputerLabs/Print'));
+    }
+
+    public function test_print_schedule_renders_successfully_for_a_single_lab(): void
+    {
+        $user = $this->userWithPermission('computer_labs.manage');
+        $room = Room::where('room_type', 'Computer Laboratory')->first();
+
+        $this->actingAs($user)
+            ->get(route('computer-labs.print', ['term_id' => $this->term->id, 'lab_id' => $room->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('ITJobRequests/ComputerLabs/Print')
+                ->has('labs', 1));
+    }
+
+    public function test_print_schedule_falls_back_to_role_based_signatories_before_any_approval_submission(): void
+    {
+        $user = $this->userWithPermission('computer_labs.manage');
+        $cidChief = User::factory()->create(['name' => 'Chief Person']);
+        $role = Role::create(['name' => 'CID Chief']);
+        $cidChief->roles()->attach($role->id);
+
+        $this->actingAs($user)
+            ->get(route('computer-labs.print', ['term_id' => $this->term->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('signatories.approved.name', 'Chief Person'));
+    }
 }
