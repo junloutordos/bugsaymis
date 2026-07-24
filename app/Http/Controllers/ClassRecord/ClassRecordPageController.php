@@ -94,9 +94,17 @@ class ClassRecordPageController extends Controller
             'subject.academicUnit:id,code',
             'section:id,levelid,sectionname',
             'gradingOption.categories',
+            'quarters.gradingOption.categories',
             'quarters.assessments.gradingCategory',
             'quarters.students',
         ]);
+
+        // Expose the grading option in force per quarter (per-quarter override,
+        // else the record default) so the UI can show/switch it per quarter.
+        $defaultOptionId = $classRecord->grading_option_id;
+        $classRecord->quarters->each(function ($qtr) use ($defaultOptionId) {
+            $qtr->setAttribute('effective_grading_option_id', $qtr->grading_option_id ?? $defaultOptionId);
+        });
 
         $currentSY = SchoolYear::where('is_current', true)->first();
         $isCurrentSY = $currentSY && $classRecord->school_year_id === $currentSY->id;

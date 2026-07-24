@@ -8,6 +8,7 @@ use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\GradingCategory;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\User;
 use App\Services\ClassRecord\WatRuleService;
 use Carbon\Carbon;
@@ -130,6 +131,19 @@ class ClassRecordAssessmentController extends Controller
             'id',
             collect($validated['assessments'])->pluck('grading_category_id')->unique()
         )->get()->keyBy('id');
+
+        // Assessments may only attach to LEAF categories of the grading option
+        // in force for THIS quarter (per-quarter override, else record default).
+        $optionId = $quarter->grading_option_id ?? $classRecord->grading_option_id;
+        $option = GradingOption::with('categories')->find($optionId);
+        $leafIds = $option ? $option->leafCategories()->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
+        foreach ($validated['assessments'] as $item) {
+            abort_unless(
+                in_array((int) $item['grading_category_id'], $leafIds, true),
+                422,
+                'One or more assessments reference a category that is not part of this quarter\'s grading option.',
+            );
+        }
 
         $existingByKey = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)->get()
             ->keyBy(fn ($a) => $a->grading_category_id . '-' . $a->assessment_number);
@@ -296,6 +310,14 @@ class ClassRecordAssessmentController extends Controller
 
         abort_if(! $sourceQuarter, 422, "Quarter {$sourceQ} has no assessments to copy from.");
 
+        $sourceOptionId = $sourceQuarter->grading_option_id ?? $classRecord->grading_option_id;
+        $targetOptionId = $targetQuarter->grading_option_id ?? $classRecord->grading_option_id;
+        abort_if(
+            (int) $sourceOptionId !== (int) $targetOptionId,
+            422,
+            "Quarter {$sourceQ} uses a different grading option than Quarter {$q}; assessments cannot be copied between them.",
+        );
+
         $sourceAssessments = ClassRecordAssessment::where('class_record_quarter_id', $sourceQuarter->id)
             ->orderBy('sort_order')
             ->get();
@@ -359,6 +381,14 @@ class ClassRecordAssessmentController extends Controller
             ->first();
 
         abort_if(! $sourceQuarter, 422, 'Source quarter not found.');
+
+        $sourceOptionId = $sourceQuarter->grading_option_id ?? $sourceRecord->grading_option_id;
+        $targetOptionId = $targetQuarter->grading_option_id ?? $classRecord->grading_option_id;
+        abort_if(
+            (int) $sourceOptionId !== (int) $targetOptionId,
+            422,
+            'The source quarter uses a different grading option than this quarter; assessments cannot be copied between them.',
+        );
 
         $sourceAssessments = ClassRecordAssessment::where('class_record_quarter_id', $sourceQuarter->id)
             ->orderBy('sort_order')

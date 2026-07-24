@@ -71,6 +71,28 @@ const currentQuarterData = computed(() =>
   props.classRecord.quarters?.find(q => q.quarter === activeQuarter.value) ?? null
 )
 
+// ── Per-quarter grading option ─────────────────────────────────────────────────
+// The option in force for the active quarter: the quarter's override if set,
+// else the record default. Leaves carry the weight + assessments.
+function leavesOf(option) {
+  const cats = option?.categories ?? []
+  const parentIds = new Set(cats.map(c => c.parent_id).filter(Boolean))
+  const byId = Object.fromEntries(cats.map(c => [c.id, c]))
+  return cats
+    .filter(c => !parentIds.has(c.id))
+    .map(c => ({
+      ...c,
+      display_name: c.parent_id && byId[c.parent_id] ? `${byId[c.parent_id].name} · ${c.name}` : c.name,
+    }))
+    .sort((a, b) => a.sort_order - b.sort_order)
+}
+
+const currentGradingOption = computed(() =>
+  currentQuarterData.value?.grading_option ?? props.classRecord.grading_option
+)
+
+const currentLeafCategories = computed(() => leavesOf(currentGradingOption.value))
+
 const isLocked   = computed(() => currentQuarterData.value?.is_locked ?? false)
 const isReadOnly = computed(() => !props.isCurrentSY)  // past school year → fully read-only
 
@@ -88,7 +110,8 @@ const assessmentDraft = ref({})
 
 function buildDraft(quarter) {
   const draft = {}
-  for (const cat of props.classRecord.grading_option?.categories ?? []) {
+  const option = quarter?.grading_option ?? props.classRecord.grading_option
+  for (const cat of leavesOf(option)) {
     draft[cat.id] = []
     const existing = (quarter?.assessments ?? [])
       .filter(a => a.grading_category_id === cat.id)
@@ -230,7 +253,7 @@ const currentQuarterAssessmentIds = computed(() =>
 const WAT = { dailyGraded: 3, dailyMajor: 2, weeklyGraded: 15, weeklyMajor: 6 }
 
 const categoriesById = computed(() =>
-  Object.fromEntries((props.classRecord.grading_option?.categories ?? []).map(c => [c.id, c]))
+  Object.fromEntries(currentLeafCategories.value.map(c => [c.id, c]))
 )
 
 // Major = worth ≥10% of the quarterly grade (type is server-derived from the
@@ -487,6 +510,47 @@ async function saveGradingOptionChange() {
   }
 }
 
+// ── Per-quarter grading option change ─────────────────────────────────────────
+const showQuarterOptionModal = ref(false)
+const quarterOptionId        = ref(null)
+const savingQuarterOption    = ref(false)
+const quarterOptionError     = ref(null)
+
+// Options applicable to the active quarter (null applicable_quarters = all).
+const applicableGradingOptions = computed(() =>
+  props.gradingOptions.filter(o => {
+    const aq = o.applicable_quarters
+    return !aq || aq.length === 0 || aq.map(Number).includes(activeQuarter.value)
+  })
+)
+
+const quarterOptionSelected = computed(() =>
+  props.gradingOptions.find(o => o.id === quarterOptionId.value) ?? null
+)
+
+function openQuarterOptionModal() {
+  quarterOptionId.value = currentGradingOption.value?.id ?? props.classRecord.grading_option_id
+  quarterOptionError.value = null
+  showQuarterOptionModal.value = true
+}
+
+async function saveQuarterOption() {
+  savingQuarterOption.value = true
+  quarterOptionError.value  = null
+  try {
+    await axios.put(
+      route('class-records.quarters.grading-option', { classRecord: props.classRecord.id, q: activeQuarter.value }),
+      { grading_option_id: quarterOptionId.value },
+    )
+    showQuarterOptionModal.value = false
+    router.reload({ only: ['classRecord'] })
+  } catch (err) {
+    quarterOptionError.value = err.response?.data?.message ?? 'Failed to change grading option for this quarter.'
+  } finally {
+    savingQuarterOption.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -640,6 +704,21 @@ async function saveGradingOptionChange() {
             </div>
           </div>
 
+          <!-- Per-quarter grading option -->
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+            <div class="text-xs text-slate-600">
+              <span class="font-semibold text-slate-700">Q{{ activeQuarter }} grading option:</span>
+              {{ currentGradingOption?.name ?? '—' }}
+              <span class="text-slate-400">· weights total {{ Math.round(currentLeafCategories.reduce((s, c) => s + Number(c.weight || 0), 0) * 100) }}%</span>
+            </div>
+            <AppButton v-if="!isLocked && !isReadOnly" variant="secondary" size="sm"
+              :disabled="currentHasAssessments"
+              :title="currentHasAssessments ? 'Clear this quarter\'s assessments before changing its grading option' : ''"
+              @click="openQuarterOptionModal">
+              <Cog6ToothIcon class="h-3.5 w-3.5" /> Change Q{{ activeQuarter }} Grading Option
+            </AppButton>
+          </div>
+
           <!-- Copy-from banner (shown only when quarter has no assessments yet) -->
           <div v-if="!isLocked && !isReadOnly && !currentHasAssessments && (quartersWithAssessments.length || sameSubjectRecords.length)"
             class="mb-4 flex flex-wrap items-center gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
@@ -676,12 +755,12 @@ async function saveGradingOptionChange() {
 
           <!-- Category groups -->
           <div class="space-y-6">
-            <div v-for="cat in classRecord.grading_option?.categories" :key="cat.id">
+            <div v-for="cat in currentLeafCategories" :key="cat.id">
               <div class="flex items-center gap-2 mb-2">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
                   {{ cat.code }}
                 </span>
-                <span class="text-sm font-semibold text-slate-700">{{ cat.name }}</span>
+                <span class="text-sm font-semibold text-slate-700">{{ cat.display_name }}</span>
                 <span class="text-xs text-slate-400">({{ Math.round(cat.weight * 100) }}%)</span>
               </div>
 
@@ -765,7 +844,7 @@ async function saveGradingOptionChange() {
             :class-record-id="classRecord.id"
             :quarter-number="activeQuarter"
             :quarter-data="currentQuarterData"
-            :grading-option="classRecord.grading_option"
+            :grading-option="currentGradingOption"
             :stanine-lookup="stanineLookup"
             :previous-grades="{}"
             :is-locked="isLocked || isReadOnly"
@@ -907,6 +986,28 @@ async function saveGradingOptionChange() {
         :disabled="!changeGradingOptionId || changeGradingOptionId === classRecord.grading_option_id"
         @click="saveGradingOptionChange">
         {{ changingGradingOption ? 'Saving…' : 'Save Change' }}
+      </AppButton>
+    </template>
+  </AppModal>
+
+  <!-- Per-quarter grading option modal -->
+  <AppModal :show="showQuarterOptionModal" :title="`Change Q${activeQuarter} Grading Option`"
+    subtitle="Only options applicable to this quarter are shown. Available before this quarter has any assessments."
+    size="md" @close="showQuarterOptionModal = false">
+    <div class="space-y-3">
+      <select v-model="quarterOptionId"
+        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option v-for="opt in applicableGradingOptions" :key="opt.id" :value="opt.id">
+          {{ opt.name }}{{ opt.owner_designation ? ` (${opt.owner_designation.name.replace(/^Academic Unit Head\s*-\s*/i, '')})` : '' }}
+        </option>
+      </select>
+      <GradingOptionDetails :option="quarterOptionSelected" />
+      <p v-if="quarterOptionError" class="text-xs text-red-500">{{ quarterOptionError }}</p>
+    </div>
+    <template #footer>
+      <AppButton variant="secondary" @click="showQuarterOptionModal = false">Cancel</AppButton>
+      <AppButton :loading="savingQuarterOption" :disabled="!quarterOptionId || savingQuarterOption" @click="saveQuarterOption">
+        {{ savingQuarterOption ? 'Saving…' : 'Save Change' }}
       </AppButton>
     </template>
   </AppModal>

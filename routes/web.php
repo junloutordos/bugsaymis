@@ -2351,6 +2351,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/quarters/{q}',        [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'show'])->name('class-records.quarters.show');
     Route::post('/class-records/{classRecord}/quarters/{q}/lock',   [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'lock'])->name('class-records.quarters.lock');
     Route::post('/class-records/{classRecord}/quarters/{q}/unlock', [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'unlock'])->name('class-records.quarters.unlock');
+    Route::put('/class-records/{classRecord}/quarters/{q}/grading-option', [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'setGradingOption'])->name('class-records.quarters.grading-option');
     Route::get('/class-records/{classRecord}/quarters/{q}/grades',  [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'grades'])->name('class-records.quarters.grades');
 
     // Assessments

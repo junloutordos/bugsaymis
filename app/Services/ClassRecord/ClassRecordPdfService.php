@@ -4,6 +4,7 @@ namespace App\Services\ClassRecord;
 
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\ClassRecord\StanineLookup;
 use Mpdf\Mpdf;
 use Mpdf\MpdfException;
@@ -100,7 +101,11 @@ class ClassRecordPdfService
 
     private function buildCategories(ClassRecord $classRecord, ClassRecordQuarter $quarter): array
     {
-        return $classRecord->gradingOption->categories->map(function ($cat) use ($quarter) {
+        $optionId = $quarter->grading_option_id ?? $classRecord->grading_option_id;
+        $option = $optionId ? GradingOption::with('categories')->find($optionId) : null;
+        $leaves = $option ? $option->leafCategories()->sortBy('sort_order')->values() : collect();
+
+        return $leaves->map(function ($cat) use ($quarter) {
             return [
                 'id' => $cat->id,
                 'code' => $cat->code,

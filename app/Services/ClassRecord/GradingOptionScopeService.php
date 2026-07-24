@@ -124,6 +124,17 @@ class GradingOptionScopeService
         return $option->is_active;
     }
 
+    /** Active options applicable to a specific quarter (null applicable_quarters = all). */
+    public function selectableForQuarter(int $quarter): Collection
+    {
+        return GradingOption::with(['categories', 'ownerDesignation:id,code,name'])
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (GradingOption $option) => $option->appliesToQuarter($quarter))
+            ->values();
+    }
+
     /** Options shown in the management menu. */
     public function manageableFor(User $user): Collection
     {

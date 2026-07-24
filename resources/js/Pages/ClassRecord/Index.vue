@@ -297,58 +297,99 @@
           </div>
         </div>
 
-        <!-- Categories table -->
+        <!-- Applies to quarters -->
+        <div>
+          <p class="text-sm font-semibold text-slate-700 mb-2">Applies to</p>
+          <div class="flex flex-wrap items-center gap-4">
+            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" :value="true" v-model="manageOptionForm.applies_all" class="text-indigo-600" />
+              All quarters
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" :value="false" v-model="manageOptionForm.applies_all" class="text-indigo-600" />
+              Specific quarter(s)
+            </label>
+            <div v-if="!manageOptionForm.applies_all" class="flex items-center gap-2">
+              <label v-for="q in [1,2,3,4]" :key="q"
+                class="inline-flex items-center gap-1 text-sm text-slate-600 px-2 py-1 rounded-lg border"
+                :class="manageOptionForm.quarters.includes(q) ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200'">
+                <input type="checkbox" :checked="manageOptionForm.quarters.includes(q)" @change="toggleQuarter(q)" class="text-indigo-600" />
+                Q{{ q }}
+              </label>
+            </div>
+          </div>
+          <p v-if="!manageOptionForm.applies_all && !manageOptionForm.quarters.length" class="text-[11px] text-amber-600 mt-1">
+            Select at least one quarter, or choose "All quarters".
+          </p>
+        </div>
+
+        <!-- Categories editor (with sub-categories) -->
         <div>
           <div class="flex items-center justify-between mb-2">
-            <p class="text-sm font-semibold text-slate-700">Categories</p>
+            <p class="text-sm font-semibold text-slate-700">Categories &amp; Sub-categories</p>
             <AppBadge :color="weightTotal === 100 ? 'green' : 'red'">
               Total: {{ weightTotal }}% {{ weightTotal === 100 ? '✓' : '≠ 100%' }}
             </AppBadge>
           </div>
           <p v-if="manageErrors.categories" class="text-xs text-red-500 mb-2">{{ manageErrors.categories[0] }}</p>
+          <p class="text-[11px] text-slate-400 mb-3">
+            Add sub-categories to a category to break it down; leaf categories/sub-categories carry the weight (all leaves must total 100%).
+          </p>
 
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50/80">
-              <tr>
-                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-1/3">Name</th>
-                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-16">Code</th>
-                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-24">Weight %</th>
-                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-24">Max Items</th>
-                <th class="px-3 py-2 w-8"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="(cat, idx) in manageCategories" :key="idx" class="hover:bg-slate-50/50">
-                <td class="px-3 py-1.5">
-                  <input v-model="cat.name" type="text" placeholder="e.g. Alternative Assessments"
-                    class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-                </td>
-                <td class="px-3 py-1.5">
-                  <input v-model="cat.code" type="text" maxlength="5" placeholder="AA"
-                    class="w-full rounded border border-slate-200 px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-                </td>
-                <td class="px-3 py-1.5">
+          <div class="space-y-3">
+            <div v-for="(cat, idx) in manageCategories" :key="idx" class="rounded-lg border border-slate-200 p-3">
+              <div class="flex items-start gap-2">
+                <input v-model="cat.name" type="text" placeholder="Category name (e.g. Written Works)"
+                  class="flex-1 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                <input v-model="cat.code" type="text" maxlength="10" placeholder="Code"
+                  class="w-20 rounded border border-slate-200 px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                <template v-if="!cat.children || !cat.children.length">
                   <div class="flex items-center gap-1">
                     <input v-model.number="cat.weight" type="number" min="0.01" max="1" step="0.05"
                       class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-                    <span class="text-xs text-slate-400">{{ Math.round(cat.weight * 100) }}%</span>
+                    <span class="text-xs text-slate-400">{{ Math.round((cat.weight || 0) * 100) }}%</span>
                   </div>
-                </td>
-                <td class="px-3 py-1.5">
-                  <input v-model.number="cat.max_assessments" type="number" min="1" max="20"
+                  <input v-model.number="cat.max_assessments" type="number" min="1" max="20" title="Max items"
                     class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-                </td>
-                <td class="px-3 py-1.5 text-center">
-                  <AppIconButton label="Remove category" variant="danger" size="sm" @click="removeCategory(idx)">
+                </template>
+                <span v-else class="text-xs text-slate-400 whitespace-nowrap px-2 py-1">
+                  Group · {{ Math.round(cat.children.reduce((s, c) => s + Number(c.weight || 0), 0) * 100) }}%
+                </span>
+                <AppIconButton label="Remove category" variant="danger" size="sm" @click="removeCategory(idx)">
+                  <TrashIcon class="h-4 w-4" />
+                </AppIconButton>
+              </div>
+
+              <!-- Sub-categories -->
+              <div v-if="cat.children && cat.children.length" class="mt-2 pl-4 border-l-2 border-slate-100 space-y-2">
+                <div v-for="(sub, cidx) in cat.children" :key="cidx" class="flex items-center gap-2">
+                  <span class="text-slate-300 text-xs">↳</span>
+                  <input v-model="sub.name" type="text" placeholder="Sub-category name"
+                    class="flex-1 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  <input v-model="sub.code" type="text" maxlength="10" placeholder="Code"
+                    class="w-20 rounded border border-slate-200 px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  <div class="flex items-center gap-1">
+                    <input v-model.number="sub.weight" type="number" min="0.01" max="1" step="0.05"
+                      class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    <span class="text-xs text-slate-400">{{ Math.round((sub.weight || 0) * 100) }}%</span>
+                  </div>
+                  <input v-model.number="sub.max_assessments" type="number" min="1" max="20" title="Max items"
+                    class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  <AppIconButton label="Remove sub-category" variant="danger" size="sm" @click="removeSubCategory(idx, cidx)">
                     <TrashIcon class="h-4 w-4" />
                   </AppIconButton>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </div>
+              </div>
 
-          <button @click="addCategory"
-            class="mt-2 inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
+              <button type="button" @click="addSubCategory(idx)"
+                class="mt-2 inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
+                <PlusIcon class="h-3.5 w-3.5" /> Add Sub-category
+              </button>
+            </div>
+          </div>
+
+          <button type="button" @click="addCategory"
+            class="mt-3 inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
             <PlusIcon class="h-4 w-4" /> Add Category
           </button>
         </div>
@@ -356,7 +397,7 @@
 
       <template #footer>
         <AppButton variant="secondary" @click="showManageModal = false">Cancel</AppButton>
-        <AppButton :loading="manageSaving" :disabled="weightTotal !== 100" @click="saveManageOption">
+        <AppButton :loading="manageSaving" :disabled="weightTotal !== 100 || (!manageOptionForm.applies_all && !manageOptionForm.quarters.length)" @click="saveManageOption">
           {{ manageSaving ? 'Saving…' : (managingOption ? 'Save Changes' : 'Create Option') }}
         </AppButton>
       </template>
@@ -594,7 +635,7 @@ function navigateTo(record) {
 // ── Grading Option Management Modal ──────────────────────────────────────────
 const showManageModal   = ref(false)
 const managingOption    = ref(null)   // null = create mode, object = edit mode
-const manageOptionForm  = ref({ name: '', description: '', is_active: true, owner_designation_id: null })
+const manageOptionForm  = ref({ name: '', description: '', is_active: true, owner_designation_id: null, applies_all: true, quarters: [] })
 const manageCategories  = ref([])
 const manageSaving      = ref(false)
 const manageErrors      = ref({})
@@ -603,6 +644,23 @@ const manageErrors      = ref({})
 // picks among their own; an AUH with exactly one unit gets it auto-assigned.
 const showUnitPicker = computed(() => props.isAdmin || props.gradingOptionUnits.length > 1)
 
+/** Build the nested editor model (parents with children) from flat categories. */
+function buildNestedCategories(cats) {
+  const list = cats ?? []
+  const parents = list.filter(c => !c.parent_id).sort((a, b) => a.sort_order - b.sort_order)
+  return parents.map(p => ({
+    id: p.id,
+    name: p.name,
+    code: p.code,
+    weight: Number(p.weight),
+    max_assessments: p.max_assessments,
+    children: list
+      .filter(c => c.parent_id === p.id)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(c => ({ id: c.id, name: c.name, code: c.code, weight: Number(c.weight), max_assessments: c.max_assessments })),
+  }))
+}
+
 function openManageModal(option) {
   managingOption.value   = option
   manageOptionForm.value = {
@@ -610,8 +668,10 @@ function openManageModal(option) {
     description: option.description ?? '',
     is_active: option.is_active,
     owner_designation_id: option.owner_designation_id ?? null,
+    applies_all: !(option.applicable_quarters && option.applicable_quarters.length),
+    quarters: option.applicable_quarters ? [...option.applicable_quarters].map(Number) : [],
   }
-  manageCategories.value = option.categories.map(c => ({ ...c }))
+  manageCategories.value = buildNestedCategories(option.categories)
   manageErrors.value     = {}
   showManageModal.value  = true
 }
@@ -626,8 +686,10 @@ function openCreateOptionModal() {
     owner_designation_id: (!props.isAdmin && props.gradingOptionUnits.length === 1)
       ? props.gradingOptionUnits[0].id
       : null,
+    applies_all: true,
+    quarters: [],
   }
-  manageCategories.value = [{ id: null, name: '', code: '', weight: 0, max_assessments: 1, sort_order: 1 }]
+  manageCategories.value = [{ id: null, name: '', code: '', weight: 0, max_assessments: 1, children: [] }]
   manageErrors.value     = {}
   showManageModal.value  = true
 }
@@ -645,43 +707,90 @@ async function deleteOption(opt, event) {
   }
 }
 
-const weightTotal = computed(() =>
-  Math.round(manageCategories.value.reduce((s, c) => s + Number(c.weight || 0), 0) * 100)
-)
+const weightTotal = computed(() => {
+  let sum = 0
+  for (const cat of manageCategories.value) {
+    if (cat.children?.length) {
+      for (const ch of cat.children) sum += Number(ch.weight || 0)
+    } else {
+      sum += Number(cat.weight || 0)
+    }
+  }
+  return Math.round(sum * 100)
+})
 
 function addCategory() {
-  const next = manageCategories.value.length + 1
   manageCategories.value.push({
-    id: null, name: '', code: '', weight: 0, max_assessments: 1, sort_order: next,
+    id: null, name: '', code: '', weight: 0, max_assessments: 1, children: [],
   })
 }
 
 function removeCategory(idx) {
   manageCategories.value.splice(idx, 1)
-  manageCategories.value.forEach((c, i) => { c.sort_order = i + 1 })
+}
+
+function addSubCategory(idx) {
+  const cat = manageCategories.value[idx]
+  if (!cat.children) cat.children = []
+  cat.children.push({ id: null, name: '', code: '', weight: 0, max_assessments: 1 })
+}
+
+function removeSubCategory(idx, cidx) {
+  manageCategories.value[idx].children.splice(cidx, 1)
+}
+
+function toggleQuarter(q) {
+  const set = manageOptionForm.value.quarters
+  const i = set.indexOf(q)
+  if (i === -1) set.push(q)
+  else set.splice(i, 1)
 }
 
 async function saveManageOption() {
   manageSaving.value = true
   manageErrors.value = {}
 
-  const categories = manageCategories.value.map((c, i) => ({
-    id:              c.id ?? null,
-    name:            c.name,
-    code:            c.code,
-    weight:          Number(c.weight),
-    max_assessments: Number(c.max_assessments),
-    sort_order:      i + 1,
-  }))
+  // Nested payload: a category with children is a parent (weight derived);
+  // otherwise it is a leaf carrying weight + max items.
+  const categories = manageCategories.value.map((cat, i) => {
+    const base = { id: cat.id ?? null, name: cat.name, code: cat.code, sort_order: i }
+    if (cat.children?.length) {
+      base.children = cat.children.map((ch, j) => ({
+        id: ch.id ?? null,
+        name: ch.name,
+        code: ch.code,
+        weight: Number(ch.weight),
+        max_assessments: Number(ch.max_assessments),
+        sort_order: j,
+      }))
+    } else {
+      base.weight = Number(cat.weight)
+      base.max_assessments = Number(cat.max_assessments)
+    }
+    return base
+  })
+
+  const applicable_quarters = manageOptionForm.value.applies_all
+    ? null
+    : [...manageOptionForm.value.quarters].sort()
+
+  const meta = {
+    name: manageOptionForm.value.name,
+    description: manageOptionForm.value.description,
+    is_active: manageOptionForm.value.is_active,
+    applicable_quarters,
+  }
 
   try {
     if (managingOption.value === null) {
-      // Create mode — single POST with categories included
-      await axios.post(route('grading-options.store'), { ...manageOptionForm.value, categories })
+      await axios.post(route('grading-options.store'), {
+        ...meta,
+        owner_designation_id: manageOptionForm.value.owner_designation_id,
+        categories,
+      })
       await Swal.fire({ icon: 'success', title: 'Grading option created!', timer: 1200, showConfirmButton: false })
     } else {
-      // Edit mode — PUT meta then PUT categories
-      await axios.put(route('grading-options.update', managingOption.value.id), manageOptionForm.value)
+      await axios.put(route('grading-options.update', managingOption.value.id), meta)
       await axios.put(route('grading-options.categories.update', managingOption.value.id), { categories })
       await Swal.fire({ icon: 'success', title: 'Grading option updated!', timer: 1200, showConfirmButton: false })
     }

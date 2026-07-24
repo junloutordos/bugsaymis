@@ -4,12 +4,15 @@ namespace App\Http\Controllers\ClassRecord;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\ClassRecordQuarter;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\ClassRecord\StanineLookup;
 use App\Services\ClassRecord\ClassRecordExcelService;
 use App\Services\ClassRecord\ClassRecordPdfService;
 use App\Services\ClassRecord\GradeComputationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -80,6 +83,42 @@ class ClassRecordQuarterController extends Controller
         return response()->json(['message' => "Quarter {$q} unlocked."]);
     }
 
+    // ── PUT /class-records/{classRecord}/quarters/{q}/grading-option ──────────
+
+    public function setGradingOption(Request $request, ClassRecord $classRecord, int $q): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
+
+        $data = $request->validate([
+            'grading_option_id' => 'required|integer|exists:grading_options,id',
+        ]);
+
+        $quarter = $this->resolveQuarter($classRecord, $q);
+        abort_if($quarter->is_locked, 403, 'Quarter is locked. Unlock it before changing the grading option.');
+
+        $option = GradingOption::findOrFail($data['grading_option_id']);
+        abort_unless($option->is_active, 422, 'Select an active grading option.');
+        abort_unless($option->appliesToQuarter($q), 422, "This grading option does not apply to Quarter {$q}.");
+
+        // Changing the option re-defines the categories that assessments/scores
+        // hang off — block while this quarter still has assessments so nothing
+        // is silently orphaned. The teacher must clear them first.
+        $hasAssessments = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)->exists();
+        abort_if(
+            $hasAssessments,
+            422,
+            'This quarter already has assessments under the current grading option. Clear this quarter\'s assessments before changing its grading option.',
+        );
+
+        $quarter->update(['grading_option_id' => $option->id]);
+
+        return response()->json([
+            'message' => "Quarter {$q} grading option updated.",
+            'data' => $quarter->fresh()->load('gradingOption.categories'),
+        ]);
+    }
+
     // ── GET /class-records/{classRecord}/quarters/{q}/grades ──────────────────
 
     public function grades(ClassRecord $classRecord, int $q): JsonResponse
@@ -96,12 +135,14 @@ class ClassRecordQuarterController extends Controller
             return response()->json(['students' => []]);
         }
 
-        // Load grading option categories with weights
-        $classRecord->load('gradingOption.categories');
-        $gradingOption = $classRecord->gradingOption;
+        // Resolve the grading option in force for THIS quarter (per-quarter
+        // override, else the record default), then compute over its leaves.
+        $optionId = ($quarter->grading_option_id ?? $classRecord->grading_option_id);
+        $gradingOption = GradingOption::with('categories')->find($optionId);
+        $leaves = $gradingOption ? $gradingOption->leafCategories() : collect();
 
-        // Build categories structure for computation service
-        $categories = $gradingOption->categories->map(function ($cat) use ($quarter) {
+        // Build categories structure for computation service (leaves only)
+        $categories = $leaves->map(function ($cat) use ($quarter) {
             $assessments = $quarter->assessments
                 ->where('grading_category_id', $cat->id)
                 ->sortBy('sort_order')

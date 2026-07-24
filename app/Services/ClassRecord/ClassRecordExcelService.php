@@ -3,7 +3,9 @@
 namespace App\Services\ClassRecord;
 
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordScore;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\ClassRecord\StanineLookup;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -89,7 +91,7 @@ class ClassRecordExcelService
             : [];
 
         // Sorted categories and students
-        $categories = $classRecord->gradingOption->categories->sortBy('sort_order')->values();
+        $categories = $this->effectiveLeafCategories($classRecord, $quarterData);
         $students = $quarterData?->students?->sortBy('sequence_number')->values() ?? collect();
         $assessByCategory = [];
         foreach ($categories as $cat) {
@@ -408,6 +410,18 @@ class ClassRecordExcelService
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Leaf categories of the grading option in force for the given quarter
+     * (per-quarter override, else the record default), sorted for display.
+     */
+    private function effectiveLeafCategories(ClassRecord $classRecord, ?ClassRecordQuarter $quarterData)
+    {
+        $optionId = $quarterData?->grading_option_id ?? $classRecord->grading_option_id;
+        $option = $optionId ? GradingOption::with('categories')->find($optionId) : null;
+
+        return $option ? $option->leafCategories()->sortBy('sort_order')->values() : collect();
+    }
+
     private function loadScoresMap(?int $quarterId): array
     {
         if (! $quarterId) {
@@ -430,7 +444,7 @@ class ClassRecordExcelService
             return [];
         }
 
-        $categories = $classRecord->gradingOption->categories->sortBy('sort_order')->map(function ($cat) use ($quarterData) {
+        $categories = $this->effectiveLeafCategories($classRecord, $quarterData)->map(function ($cat) use ($quarterData) {
             return [
                 'id' => $cat->id,
                 'code' => $cat->code,

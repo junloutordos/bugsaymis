@@ -27,9 +27,18 @@ const emit = defineEmits(['reload'])
 
 // ── Derived data ──────────────────────────────────────────────────────────────
 
-const categories = computed(() =>
-  [...(props.gradingOption?.categories ?? [])].sort((a, b) => a.sort_order - b.sort_order)
-)
+const categories = computed(() => {
+  const cats = [...(props.gradingOption?.categories ?? [])]
+  const parentIds = new Set(cats.map(c => c.parent_id).filter(Boolean))
+  const byId = Object.fromEntries(cats.map(c => [c.id, c]))
+  return cats
+    .filter(c => !parentIds.has(c.id)) // leaves carry weight + assessments
+    .map(c => ({
+      ...c,
+      displayName: c.parent_id && byId[c.parent_id] ? `${byId[c.parent_id].name} · ${c.name}` : c.name,
+    }))
+    .sort((a, b) => a.sort_order - b.sort_order)
+})
 
 const students = computed(() =>
   [...(props.quarterData?.students ?? [])].sort((a, b) => a.sequence_number - b.sequence_number)
@@ -350,7 +359,7 @@ const showRunning = computed(() => props.quarterNumber > 1)
             <th v-for="cat in categories" :key="cat.id"
               :colspan="(assessmentsByCategory[cat.id]?.length ?? 0) + 3"
               class="border border-slate-200 px-2 py-1.5 text-center font-bold text-indigo-700 bg-indigo-50 whitespace-nowrap">
-              {{ cat.name }} ({{ Math.round(cat.weight * 100) }}%)
+              {{ cat.displayName }} ({{ Math.round(cat.weight * 100) }}%)
             </th>
 
             <!-- Summary group -->
