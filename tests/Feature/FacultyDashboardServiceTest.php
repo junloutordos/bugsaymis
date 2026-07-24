@@ -113,4 +113,15 @@ class FacultyDashboardServiceTest extends TestCase
         $this->assertSame(2, $payload['cards']['records_total']);
         $this->assertCount(2, $payload['classRecords']);
     }
+
+    public function test_class_record_card_links_to_inertia_page_not_json_api(): void
+    {
+        $rec = $this->record('draft');
+
+        $payload = app(FacultyDashboardService::class)->payload($this->faculty);
+        $url = collect($payload['classRecords'])->firstWhere('id', $rec->id)['url'];
+
+        $this->assertSame(route('class-records.page.show', $rec->id), $url);
+        $this->assertNotSame(route('class-records.show', $rec->id), $url);
+    }
 }

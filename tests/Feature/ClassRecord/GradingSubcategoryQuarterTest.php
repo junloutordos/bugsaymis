@@ -144,6 +144,28 @@ class GradingSubcategoryQuarterTest extends TestCase
         $this->actingAs($admin)->postJson(route('grading-options.store'), $payload)->assertStatus(422);
     }
 
+    public function test_update_categories_succeeds_without_option_name(): void
+    {
+        $admin = $this->admin();
+        $option = $this->option();
+        GradingCategory::create(['grading_option_id' => $option->id, 'name' => 'Old', 'code' => 'OLD', 'weight' => 1.0, 'max_assessments' => 3, 'sort_order' => 0]);
+
+        // The edit flow posts ONLY categories to categories.update (name goes
+        // to grading-options.update separately) — must not require `name`.
+        $response = $this->actingAs($admin)->putJson(route('grading-options.categories.update', $option->id), [
+            'categories' => [
+                ['name' => 'Written', 'code' => 'WW', 'weight' => 0.6, 'max_assessments' => 5, 'sort_order' => 0],
+                ['name' => 'Performance', 'code' => 'PT', 'weight' => 0.4, 'max_assessments' => 3, 'sort_order' => 1],
+            ],
+        ]);
+
+        $response->assertOk();
+        $this->assertEqualsCanonicalizing(
+            ['WW', 'PT'],
+            GradingCategory::where('grading_option_id', $option->id)->pluck('code')->all(),
+        );
+    }
+
     // ── Per-quarter grading option change ───────────────────────────────────────
 
     public function test_teacher_can_set_quarter_option_applicable_to_that_quarter(): void

@@ -239,7 +239,7 @@ class FacultyDashboardService
                 'subject'  => $r->subject_name ?? 'Subject',
                 'section'  => $r->section ? "Gr.{$r->section->levelid} {$r->section->sectionname}" : 'Unassigned',
                 'checked'  => $r->checked_at !== null,
-                'url'      => route('class-records.show', $r->id),
+                'url'      => route('class-records.page.show', $r->id),
             ])
             ->values()
             ->all();

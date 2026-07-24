@@ -45,28 +45,36 @@ class GradingOptionController extends Controller
     {
         abort_unless($this->canManageOptions(), 403, 'You are not allowed to create grading options.');
 
-        $validated = $this->validatePayload($request, requireCategories: true);
+        $meta = $request->validate([
+            'name'                  => 'required|string|max:255',
+            'description'           => 'nullable|string|max:1000',
+            'is_active'             => 'boolean',
+            'owner_designation_id'  => 'nullable|integer|exists:designations,id',
+            'applicable_quarters'   => 'nullable|array',
+            'applicable_quarters.*' => 'integer|in:1,2,3,4',
+        ]);
+        $categories = $this->validateCategoriesPayload($request);
 
         $ownerDesignationId = $this->scope->resolveOwnerDesignationId(
             Auth::user(),
-            isset($validated['owner_designation_id']) ? (int) $validated['owner_designation_id'] : null,
+            isset($meta['owner_designation_id']) ? (int) $meta['owner_designation_id'] : null,
         );
-        $this->ensureUniqueName($validated['name'], $ownerDesignationId);
+        $this->ensureUniqueName($meta['name'], $ownerDesignationId);
 
-        if (($error = $this->validateLeafWeights($validated['categories'])) !== null) {
+        if (($error = $this->validateLeafWeights($categories)) !== null) {
             return $error;
         }
 
-        $option = DB::transaction(function () use ($validated, $ownerDesignationId) {
+        $option = DB::transaction(function () use ($meta, $categories, $ownerDesignationId) {
             $option = GradingOption::create([
-                'name'                 => $validated['name'],
-                'description'          => $validated['description'] ?? null,
-                'is_active'            => $validated['is_active'] ?? true,
-                'applicable_quarters'  => $this->normalizeQuarters($validated['applicable_quarters'] ?? null),
+                'name'                 => $meta['name'],
+                'description'          => $meta['description'] ?? null,
+                'is_active'            => $meta['is_active'] ?? true,
+                'applicable_quarters'  => $this->normalizeQuarters($meta['applicable_quarters'] ?? null),
                 'owner_designation_id' => $ownerDesignationId,
             ]);
 
-            $this->syncCategories($option, $validated['categories']);
+            $this->syncCategories($option, $categories);
 
             return $option;
         });
@@ -153,14 +161,14 @@ class GradingOptionController extends Controller
             'You may only edit grading options owned by your academic unit.',
         );
 
-        $validated = $this->validatePayload($request, requireCategories: true);
+        $categories = $this->validateCategoriesPayload($request);
 
-        if (($error = $this->validateLeafWeights($validated['categories'])) !== null) {
+        if (($error = $this->validateLeafWeights($categories)) !== null) {
             return $error;
         }
 
         // Block removal of any category that already has assessments.
-        $incomingIds = $this->incomingCategoryIds($validated['categories']);
+        $incomingIds = $this->incomingCategoryIds($categories);
         $existingIds = $gradingOption->categories->pluck('id')->all();
         $removedIds  = array_diff($existingIds, $incomingIds);
 
@@ -174,11 +182,11 @@ class GradingOptionController extends Controller
             }
         }
 
-        DB::transaction(function () use ($gradingOption, $validated, $removedIds) {
+        DB::transaction(function () use ($gradingOption, $categories, $removedIds) {
             if ($removedIds) {
                 GradingCategory::whereIn('id', $removedIds)->delete();
             }
-            $this->syncCategories($gradingOption, $validated['categories']);
+            $this->syncCategories($gradingOption, $categories);
         });
 
         return response()->json([
@@ -190,22 +198,18 @@ class GradingOptionController extends Controller
     // ── Shared category/quarter helpers ───────────────────────────────────────
 
     /**
-     * Validate a create/updateCategories payload. Categories may be flat
-     * (leaf: weight + max_assessments) or nested (a parent with `children`,
-     * each child a leaf). One level of nesting is supported.
+     * Validate the categories portion of a payload (shared by store and
+     * updateCategories). Categories may be flat (leaf: weight + max_assessments)
+     * or nested (a parent with `children`, each child a leaf). One level of
+     * nesting is supported. Does NOT validate option meta (name/description/…)
+     * so it can be reused by updateCategories, which only receives categories.
      *
-     * @return array validated data
+     * @return array the validated categories array
      */
-    private function validatePayload(Request $request, bool $requireCategories): array
+    private function validateCategoriesPayload(Request $request): array
     {
-        $rules = [
-            'name'                                    => 'required|string|max:255',
-            'description'                             => 'nullable|string|max:1000',
-            'is_active'                               => 'boolean',
-            'owner_designation_id'                    => 'nullable|integer|exists:designations,id',
-            'applicable_quarters'                     => 'nullable|array',
-            'applicable_quarters.*'                   => 'integer|in:1,2,3,4',
-            'categories'                              => ($requireCategories ? 'required' : 'nullable').'|array|min:1',
+        $validated = $request->validate([
+            'categories'                              => 'required|array|min:1',
             'categories.*.id'                         => 'nullable|integer',
             'categories.*.name'                       => 'required|string|max:255',
             'categories.*.code'                       => 'required|string|max:10',
@@ -219,13 +223,11 @@ class GradingOptionController extends Controller
             'categories.*.children.*.weight'          => 'required|numeric|min:0.0001|max:1',
             'categories.*.children.*.max_assessments' => 'required|integer|min:1|max:20',
             'categories.*.children.*.sort_order'      => 'required|integer|min:0',
-        ];
-
-        $validated = $request->validate($rules);
+        ]);
 
         // A top-level category with no children is a leaf and must carry its
         // own weight + max_assessments.
-        foreach ($validated['categories'] ?? [] as $index => $cat) {
+        foreach ($validated['categories'] as $cat) {
             if (empty($cat['children'])) {
                 if (! isset($cat['weight']) || ! isset($cat['max_assessments'])) {
                     abort(422, "Category \"{$cat['name']}\" must have a weight and max items, or contain sub-categories.");
@@ -233,7 +235,7 @@ class GradingOptionController extends Controller
             }
         }
 
-        return $validated;
+        return $validated['categories'];
     }
 
     /** Flatten a nested payload to its leaves (children, or childless top-level). */
