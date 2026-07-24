@@ -177,6 +177,8 @@ class WatRuleService
                 'class_record_assessments.plotted_at',
                 'class_record_assessments.max_score',
                 'cr.id as class_record_id',
+                'cr.subject_id',
+                'cr.section_id',
                 'cr.subject_name',
                 'cr.teacher_id',
                 'gc.name as category_name',
@@ -198,15 +200,53 @@ class WatRuleService
             ->groupBy('class_record_assessment_id')
             ->pluck('n', 'class_record_assessment_id');
 
-        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts) {
+        // Time: assessments have no time-of-day of their own — resolve the
+        // class period's scheduled start/end from ClassSchedule, matched on
+        // section + subject + the activity's day-of-week. Batched by the
+        // distinct (section_id, subject_id) pairs actually present this
+        // week, keyed by "sectionId|subjectId|DayName" for O(1) lookup per
+        // item. Falls back to null (rendered as "—") when subject_id is
+        // absent (e.g. an elective/other class record with no subject link)
+        // or no matching schedule row exists.
+        $schedulePairs = $rows
+            ->filter(fn ($row) => $row->section_id && $row->subject_id)
+            ->map(fn ($row) => ['section_id' => (int) $row->section_id, 'subject_id' => (int) $row->subject_id])
+            ->unique(fn ($pair) => $pair['section_id'].'|'.$pair['subject_id'])
+            ->values();
+
+        $schedulesByKey = [];
+        if ($schedulePairs->isNotEmpty()) {
+            $query = ClassSchedule::query()->occupying();
+            $query->where(function ($outer) use ($schedulePairs) {
+                foreach ($schedulePairs as $pair) {
+                    $outer->orWhere(function ($inner) use ($pair) {
+                        $inner->where('section_id', $pair['section_id'])
+                            ->where('subject_id', $pair['subject_id']);
+                    });
+                }
+            });
+
+            foreach ($query->get(['section_id', 'subject_id', 'day_of_week', 'start_time', 'end_time']) as $schedule) {
+                $key = $schedule->section_id.'|'.$schedule->subject_id.'|'.$schedule->day_of_week;
+                $schedulesByKey[$key] ??= ['start_time' => $schedule->start_time, 'end_time' => $schedule->end_time];
+            }
+        }
+
+        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts, $schedulesByKey) {
             $roster    = (int) ($rosterCounts[$row->class_record_quarter_id] ?? 0);
             $submitted = (int) ($scoreCounts[$row->id] ?? 0);
+            $date      = $row->activity_date instanceof Carbon
+                ? $row->activity_date
+                : Carbon::parse((string) $row->activity_date);
+
+            $scheduleKey = $row->section_id && $row->subject_id
+                ? $row->section_id.'|'.$row->subject_id.'|'.$date->format('l')
+                : null;
+            $schedule    = $scheduleKey ? ($schedulesByKey[$scheduleKey] ?? null) : null;
 
             return [
                 'id'              => $row->id,
-                'date'            => $row->activity_date instanceof Carbon
-                    ? $row->activity_date->toDateString()
-                    : (string) $row->activity_date,
+                'date'            => $date->toDateString(),
                 'title'           => $row->title,
                 'subject_name'    => $row->subject_name,
                 'teacher_name'    => $teachers[$row->teacher_id]?->name,
@@ -220,6 +260,9 @@ class WatRuleService
                 'submitted_count' => $row->is_graded ? $submitted : null,
                 'compliance'      => ($row->is_graded && $roster > 0)
                     ? round($submitted / $roster * 100, 1)
+                    : null,
+                'time_label'      => $schedule
+                    ? substr((string) $schedule['start_time'], 0, 5).'–'.substr((string) $schedule['end_time'], 0, 5)
                     : null,
             ];
         });

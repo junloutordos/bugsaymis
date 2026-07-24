@@ -106,7 +106,7 @@ function complianceColor(pct) {
           <select v-model.number="selectedSection" @change="reload"
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option v-for="s in sections" :key="s.id" :value="s.id">
-              Grade {{ s.level }} — {{ s.name }}{{ s.is_advised ? ' (my advisory)' : '' }}
+              Grade {{ s.level }} — {{ s.name }}
             </option>
           </select>
         </div>

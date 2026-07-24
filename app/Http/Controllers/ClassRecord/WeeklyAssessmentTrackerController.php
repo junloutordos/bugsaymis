@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\WatReview;
+use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\User;
 use App\Services\ClassRecord\WatRuleService;
+use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -21,26 +23,35 @@ use Inertia\Inertia;
 /**
  * Weekly Assessment Tracker (WAT) pages.
  *
- * - Homeroom Coordinators (sections.adviser) consolidate and print their
- *   section's weekly tracker.
- * - Subject teachers can view the WAT of sections they teach.
+ * - Homeroom Coordinators consolidate and print the WAT for their assigned
+ *   section(s)/grade range. Coordinator scope is resolved through
+ *   AdvisoryScheduleScopeService from the Designations module (HR_ADV /
+ *   HR_ACAD categories) — NOT the legacy Section::adviser column, and NOT
+ *   tied to holding a teaching load. Subject teachers do not have WAT
+ *   access, even for sections they teach.
  * - The ACIDAA (resolved through the Faculty Loading designation, same as
  *   the IPCR chain) and class-records.admin review section-weeks campus-wide.
  */
 class WeeklyAssessmentTrackerController extends Controller
 {
+    public function __construct(private AdvisoryScheduleScopeService $advisoryScope)
+    {
+    }
+
     // ── GET /class-records/wat ────────────────────────────────────────────────
 
     public function index(Request $request)
     {
         $user = Auth::user();
         $sy   = $this->currentSchoolYear();
+        $term = $this->currentAcademicTerm($sy);
 
         $canReview = $this->canReview($user, $sy->id);
-        abort_unless($user->hasPermission('class-records.view') || $canReview, 403);
+        $isCoordinator = $this->advisoryScope->sectionIds($user, $term->id) !== [];
+        abort_unless($isCoordinator || $canReview, 403);
 
-        $sections = $this->accessibleSections($user, $sy->id, $canReview);
-        abort_if($sections->isEmpty() && ! $canReview, 403, 'You have no sections to track — WAT is available to section advisers and subject teachers with class records this school year.');
+        $sections = $this->accessibleSections($user, $sy->id, $term->id, $canReview);
+        abort_if($sections->isEmpty() && ! $canReview, 403, 'You have no sections to track — WAT is available to Homeroom Coordinators (via Designations) for their assigned section(s)/grade range.');
 
         $weekStart = Carbon::parse($request->query('week', now()->toDateString()))
             ->startOfWeek(Carbon::MONDAY)->toDateString();
@@ -64,28 +75,36 @@ class WeeklyAssessmentTrackerController extends Controller
     {
         $user = Auth::user();
         $sy   = $this->currentSchoolYear();
+        $term = $this->currentAcademicTerm($sy);
 
         $canReview = $this->canReview($user, $sy->id);
-        abort_unless($user->hasPermission('class-records.view') || $canReview, 403);
+        $isCoordinator = $this->advisoryScope->sectionIds($user, $term->id) !== [];
+        abort_unless($isCoordinator || $canReview, 403);
 
         $sectionId = (int) $request->query('section');
-        $sections  = $this->accessibleSections($user, $sy->id, $canReview);
+        $sections  = $this->accessibleSections($user, $sy->id, $term->id, $canReview);
         abort_unless($sections->pluck('id')->contains($sectionId), 403, 'You do not have access to that section.');
 
         $weekStart = Carbon::parse($request->query('week', now()->toDateString()))
             ->startOfWeek(Carbon::MONDAY)->toDateString();
 
-        $section = Section::find($sectionId);
-        $adviser = $section?->adviser ? User::find($section->adviser, ['id', 'name']) : null;
+        $coordinatorName = $this->advisoryScope
+            ->adviserNamesBySection($term->id, [$sectionId])
+            ->get($sectionId);
 
         $acidaaUserId = $this->acidaaAssignmentQuery($sy->id)->latest('id')->value('user_id');
 
+        $cidChief = User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))
+            ->where('status', '<>', 'inactive')
+            ->first(['id', 'name']);
+
         return Inertia::render('ClassRecord/Wat/Print', [
-            'section'     => $sections->firstWhere('id', $sectionId),
-            'wat'         => WatRuleService::weekData($sectionId, $sy->id, $weekStart),
-            'adviserName' => $adviser?->name,
-            'acidaaName'  => $acidaaUserId ? User::find($acidaaUserId, ['id', 'name'])?->name : null,
-            'schoolYear'  => $sy->only(['id', 'name']),
+            'section'         => $sections->firstWhere('id', $sectionId),
+            'wat'             => WatRuleService::weekData($sectionId, $sy->id, $weekStart),
+            'coordinatorName' => $coordinatorName,
+            'acidaaName'      => $acidaaUserId ? User::find($acidaaUserId, ['id', 'name'])?->name : null,
+            'cidChiefName'    => $cidChief?->name,
+            'schoolYear'      => $sy->only(['id', 'name']),
         ]);
     }
 
@@ -115,7 +134,7 @@ class WeeklyAssessmentTrackerController extends Controller
             ->groupBy('cr.section_id', 'd')
             ->get();
 
-        $sections = $this->accessibleSections($user, $sy->id, true);
+        $sections = $this->accessibleSections($user, $sy->id, $this->currentAcademicTerm($sy)->id, true);
         $reviews  = WatReview::with('reviewedBy:id,name')
             ->where('school_year_id', $sy->id)
             ->where('week_start', $monday->toDateString())
@@ -188,6 +207,14 @@ class WeeklyAssessmentTrackerController extends Controller
         return $sy;
     }
 
+    private function currentAcademicTerm(SchoolYear $sy): AcademicTerm
+    {
+        $term = AcademicTerm::where('school_year_id', $sy->id)->where('is_current', true)->first();
+        abort_if(! $term, 422, 'No current academic term is set.');
+
+        return $term;
+    }
+
     private function canReview(User $user, int $schoolYearId): bool
     {
         return $user->hasPermission('class-records.admin')
@@ -206,9 +233,13 @@ class WeeklyAssessmentTrackerController extends Controller
 
     /**
      * Sections the user may track: reviewers see every section with class
-     * records this SY; others see sections they advise or teach.
+     * records this SY; Homeroom Coordinators see only their designated
+     * section(s)/grade range, resolved via AdvisoryScheduleScopeService from
+     * the Designations module (HR_ADV / HR_ACAD categories) — NOT the legacy
+     * Section::adviser column, and NOT a function of holding a teaching load.
+     * Subject teachers have no WAT access.
      */
-    private function accessibleSections(User $user, int $schoolYearId, bool $canReview)
+    private function accessibleSections(User $user, int $schoolYearId, int $academicTermId, bool $canReview)
     {
         $sectionIds = ClassRecord::where('school_year_id', $schoolYearId)
             ->whereNotNull('section_id')
@@ -216,26 +247,19 @@ class WeeklyAssessmentTrackerController extends Controller
             ->pluck('section_id');
 
         $sections = Section::whereIn('id', $sectionIds)
-            ->get(['id', 'sectionname', 'levelid', 'adviser']);
+            ->get(['id', 'sectionname', 'levelid']);
 
         if (! $canReview) {
-            $taughtIds = ClassRecord::where('school_year_id', $schoolYearId)
-                ->where('teacher_id', $user->id)
-                ->whereNotNull('section_id')
-                ->pluck('section_id');
-
-            $sections = $sections->filter(
-                fn ($s) => (int) $s->adviser === $user->id || $taughtIds->contains($s->id)
-            );
+            $coordinatorSectionIds = $this->advisoryScope->sectionIds($user, $academicTermId);
+            $sections = $sections->filter(fn ($s) => in_array((int) $s->id, $coordinatorSectionIds, true));
         }
 
         return $sections
             ->sortBy([['levelid', 'asc'], ['sectionname', 'asc']])
             ->map(fn ($s) => [
-                'id'         => $s->id,
-                'name'       => $s->sectionname,
-                'level'      => $s->levelid,
-                'is_advised' => (int) $s->adviser === $user->id,
+                'id'    => $s->id,
+                'name'  => $s->sectionname,
+                'level' => $s->levelid,
             ])
             ->values();
     }
