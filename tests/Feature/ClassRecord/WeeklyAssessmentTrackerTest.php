@@ -109,6 +109,21 @@ class WeeklyAssessmentTrackerTest extends TestCase
         ]);
     }
 
+    /** Plain subject-teacher LoadAssignment — 'teaching' type, tied to a section, no designation. */
+    private function assignTeachingLoad(User $user, Subject $subject, Section $section): LoadAssignment
+    {
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $user->id, 'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+        ]);
+
+        return LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $user->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'load_units' => 3,
+        ]);
+    }
+
     private function makeClassRecordWithAssessment(Section $section, Subject $subject, User $teacher, string $activityDate): ClassRecordAssessment
     {
         $record = ClassRecord::create([
@@ -168,15 +183,76 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->where('sections.0.id', $g8->id));
     }
 
-    public function test_subject_teacher_without_coordinator_designation_cannot_access_wat(): void
+    public function test_subject_teacher_can_view_wat_for_a_section_they_teach(): void
     {
         $teacher = User::factory()->create();
         $section = $this->makeSection();
         $subject = $this->makeSubject();
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
+        $this->assignTeachingLoad($teacher, $subject, $section);
 
         $this->actingAs($teacher)
             ->get(route('class-records.wat.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sections', 1)
+                ->where('sections.0.id', $section->id)
+                ->where('canReview', false)
+                ->where('isCoordinator', false));
+    }
+
+    public function test_subject_teacher_without_any_teaching_load_or_designation_cannot_access_wat(): void
+    {
+        $teacher = User::factory()->create();
+        $otherTeacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $this->makeClassRecordWithAssessment($section, $subject, $otherTeacher, '2025-09-01');
+
+        $this->actingAs($teacher)
+            ->get(route('class-records.wat.index'))
+            ->assertForbidden();
+    }
+
+    public function test_subject_teacher_cannot_print_wat_form_for_a_section_they_teach(): void
+    {
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
+        $this->assignTeachingLoad($teacher, $subject, $section);
+
+        $this->actingAs($teacher)
+            ->get(route('class-records.wat.print', ['section' => $section->id]))
+            ->assertForbidden();
+    }
+
+    public function test_subject_teacher_cannot_review_all_sections(): void
+    {
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
+        $this->assignTeachingLoad($teacher, $subject, $section);
+
+        $this->actingAs($teacher)
+            ->get(route('class-records.wat.review'))
+            ->assertForbidden();
+    }
+
+    public function test_subject_teacher_cannot_view_a_section_they_do_not_teach(): void
+    {
+        $teacher = User::factory()->create();
+        $otherTeacher = User::factory()->create();
+        $mySection = $this->makeSection(['levelid' => 8, 'sectionname' => 'Emerald']);
+        $notMySection = $this->makeSection(['levelid' => 8, 'sectionname' => 'Anthurium']);
+        $subject = $this->makeSubject();
+        $this->makeClassRecordWithAssessment($mySection, $subject, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($notMySection, $subject, $otherTeacher, '2025-09-01');
+        $this->assignTeachingLoad($teacher, $subject, $mySection);
+
+        $this->actingAs($teacher)
+            ->get(route('class-records.wat.index', ['section' => $notMySection->id]))
             ->assertForbidden();
     }
 
@@ -225,7 +301,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('ClassRecord/Wat/Print')
-                ->where('coordinatorName', 'Coordinator Person'));
+                ->where('coordinatorName', 'COORDINATOR PERSON'));
     }
 
     public function test_print_includes_cid_chief_signatory(): void
@@ -243,7 +319,22 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->actingAs($coordinator)
             ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('cidChiefName', 'Chief Person'));
+            ->assertInertia(fn ($page) => $page->where('cidChiefName', 'CHIEF PERSON'));
+    }
+
+    public function test_print_signatory_names_use_firstname_middle_initial_lastname_format(): void
+    {
+        $coordinator = User::factory()->create(['name' => 'Juan Dela Cruz']);
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $this->assignCoordinator($coordinator, 'HR_ADV', 'HRA-G8-EMERALD', 'HR Adviser — G8 Emerald', $section);
+        $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
+
+        $this->actingAs($coordinator)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('coordinatorName', 'JUAN D. CRUZ'));
     }
 
     // ── Time column resolution ───────────────────────────────────────────────

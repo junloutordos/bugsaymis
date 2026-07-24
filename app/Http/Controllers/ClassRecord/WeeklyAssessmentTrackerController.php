@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\ClassRecord\WatRuleService;
 use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
+use App\Services\PersonNameFormatter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,15 +28,19 @@ use Inertia\Inertia;
  *   section(s)/grade range. Coordinator scope is resolved through
  *   AdvisoryScheduleScopeService from the Designations module (HR_ADV /
  *   HR_ACAD categories) — NOT the legacy Section::adviser column, and NOT
- *   tied to holding a teaching load. Subject teachers do not have WAT
- *   access, even for sections they teach.
+ *   tied to holding a teaching load.
+ * - Subject teachers may VIEW the WAT (read-only) for sections where they
+ *   hold a 'teaching' LoadAssignment, but may NOT print the form or review
+ *   other sections — those actions remain Coordinator/ACIDAA/admin-only.
  * - The ACIDAA (resolved through the Faculty Loading designation, same as
  *   the IPCR chain) and class-records.admin review section-weeks campus-wide.
  */
 class WeeklyAssessmentTrackerController extends Controller
 {
-    public function __construct(private AdvisoryScheduleScopeService $advisoryScope)
-    {
+    public function __construct(
+        private AdvisoryScheduleScopeService $advisoryScope,
+        private PersonNameFormatter $nameFormatter,
+    ) {
     }
 
     // ── GET /class-records/wat ────────────────────────────────────────────────
@@ -48,10 +53,11 @@ class WeeklyAssessmentTrackerController extends Controller
 
         $canReview = $this->canReview($user, $sy->id);
         $isCoordinator = $this->advisoryScope->sectionIds($user, $term->id) !== [];
-        abort_unless($isCoordinator || $canReview, 403);
+        $isTeacher = $this->teachingSectionIds($user, $sy->id) !== [];
+        abort_unless($isCoordinator || $canReview || $isTeacher, 403);
 
-        $sections = $this->accessibleSections($user, $sy->id, $term->id, $canReview);
-        abort_if($sections->isEmpty() && ! $canReview, 403, 'You have no sections to track — WAT is available to Homeroom Coordinators (via Designations) for their assigned section(s)/grade range.');
+        $sections = $this->accessibleSections($user, $sy->id, $term->id, $canReview, $isCoordinator);
+        abort_if($sections->isEmpty(), 403, 'You have no sections to track — WAT is available to Homeroom Coordinators (via Designations) and to subject teachers for the sections they teach.');
 
         $weekStart = Carbon::parse($request->query('week', now()->toDateString()))
             ->startOfWeek(Carbon::MONDAY)->toDateString();
@@ -60,12 +66,13 @@ class WeeklyAssessmentTrackerController extends Controller
         abort_unless(! $sectionId || $sections->pluck('id')->contains($sectionId), 403, 'You do not have access to that section.');
 
         return Inertia::render('ClassRecord/Wat/Index', [
-            'sections'   => $sections->values(),
-            'sectionId'  => $sectionId ?: null,
-            'weekStart'  => $weekStart,
-            'wat'        => $sectionId ? WatRuleService::weekData($sectionId, $sy->id, $weekStart) : null,
-            'canReview'  => $canReview,
-            'schoolYear' => $sy->only(['id', 'name']),
+            'sections'      => $sections->values(),
+            'sectionId'     => $sectionId ?: null,
+            'weekStart'     => $weekStart,
+            'wat'           => $sectionId ? WatRuleService::weekData($sectionId, $sy->id, $weekStart) : null,
+            'canReview'     => $canReview,
+            'isCoordinator' => $isCoordinator,
+            'schoolYear'    => $sy->only(['id', 'name']),
         ]);
     }
 
@@ -77,33 +84,39 @@ class WeeklyAssessmentTrackerController extends Controller
         $sy   = $this->currentSchoolYear();
         $term = $this->currentAcademicTerm($sy);
 
+        // Printing (and reviewing) remain Coordinator/ACIDAA/admin-only —
+        // subject teachers can view the WAT but not generate or sign the
+        // consolidated print form for a section they merely teach in.
         $canReview = $this->canReview($user, $sy->id);
         $isCoordinator = $this->advisoryScope->sectionIds($user, $term->id) !== [];
         abort_unless($isCoordinator || $canReview, 403);
 
         $sectionId = (int) $request->query('section');
-        $sections  = $this->accessibleSections($user, $sy->id, $term->id, $canReview);
+        $sections  = $this->accessibleSections($user, $sy->id, $term->id, $canReview, $isCoordinator);
         abort_unless($sections->pluck('id')->contains($sectionId), 403, 'You do not have access to that section.');
 
         $weekStart = Carbon::parse($request->query('week', now()->toDateString()))
             ->startOfWeek(Carbon::MONDAY)->toDateString();
 
-        $coordinatorName = $this->advisoryScope
-            ->adviserNamesBySection($term->id, [$sectionId])
+        $coordinatorUserId = $this->advisoryScope
+            ->adviserUserIdsBySection($term->id, [$sectionId])
             ->get($sectionId);
+        $coordinatorName = $coordinatorUserId
+            ? $this->nameFormatter->formal(User::findOrFail($coordinatorUserId))
+            : null;
 
         $acidaaUserId = $this->acidaaAssignmentQuery($sy->id)->latest('id')->value('user_id');
 
         $cidChief = User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))
             ->where('status', '<>', 'inactive')
-            ->first(['id', 'name']);
+            ->first();
 
         return Inertia::render('ClassRecord/Wat/Print', [
             'section'         => $sections->firstWhere('id', $sectionId),
             'wat'             => WatRuleService::weekData($sectionId, $sy->id, $weekStart),
             'coordinatorName' => $coordinatorName,
-            'acidaaName'      => $acidaaUserId ? User::find($acidaaUserId, ['id', 'name'])?->name : null,
-            'cidChiefName'    => $cidChief?->name,
+            'acidaaName'      => $acidaaUserId ? $this->nameFormatter->formal(User::findOrFail($acidaaUserId)) : null,
+            'cidChiefName'    => $cidChief ? $this->nameFormatter->formal($cidChief) : null,
             'schoolYear'      => $sy->only(['id', 'name']),
         ]);
     }
@@ -134,7 +147,7 @@ class WeeklyAssessmentTrackerController extends Controller
             ->groupBy('cr.section_id', 'd')
             ->get();
 
-        $sections = $this->accessibleSections($user, $sy->id, $this->currentAcademicTerm($sy)->id, true);
+        $sections = $this->accessibleSections($user, $sy->id, $this->currentAcademicTerm($sy)->id, true, false);
         $reviews  = WatReview::with('reviewedBy:id,name')
             ->where('school_year_id', $sy->id)
             ->where('week_start', $monday->toDateString())
@@ -237,9 +250,11 @@ class WeeklyAssessmentTrackerController extends Controller
      * section(s)/grade range, resolved via AdvisoryScheduleScopeService from
      * the Designations module (HR_ADV / HR_ACAD categories) — NOT the legacy
      * Section::adviser column, and NOT a function of holding a teaching load.
-     * Subject teachers have no WAT access.
+     * Subject teachers (no coordinator designation) see only the sections
+     * where they hold a 'teaching' LoadAssignment — read-only, resolved via
+     * teachingSectionIds().
      */
-    private function accessibleSections(User $user, int $schoolYearId, int $academicTermId, bool $canReview)
+    private function accessibleSections(User $user, int $schoolYearId, int $academicTermId, bool $canReview, bool $isCoordinator)
     {
         $sectionIds = ClassRecord::where('school_year_id', $schoolYearId)
             ->whereNotNull('section_id')
@@ -250,8 +265,10 @@ class WeeklyAssessmentTrackerController extends Controller
             ->get(['id', 'sectionname', 'levelid']);
 
         if (! $canReview) {
-            $coordinatorSectionIds = $this->advisoryScope->sectionIds($user, $academicTermId);
-            $sections = $sections->filter(fn ($s) => in_array((int) $s->id, $coordinatorSectionIds, true));
+            $scopedSectionIds = $isCoordinator
+                ? $this->advisoryScope->sectionIds($user, $academicTermId)
+                : $this->teachingSectionIds($user, $schoolYearId);
+            $sections = $sections->filter(fn ($s) => in_array((int) $s->id, $scopedSectionIds, true));
         }
 
         return $sections
@@ -262,5 +279,25 @@ class WeeklyAssessmentTrackerController extends Controller
                 'level' => $s->levelid,
             ])
             ->values();
+    }
+
+    /**
+     * Sections where the user holds a 'teaching' LoadAssignment this school
+     * year — the WAT scope for plain subject teachers (view-only; does not
+     * grant print or review access).
+     *
+     * @return array<int>
+     */
+    private function teachingSectionIds(User $user, int $schoolYearId): array
+    {
+        return LoadAssignment::where('user_id', $user->id)
+            ->where('school_year_id', $schoolYearId)
+            ->where('assignment_type', 'teaching')
+            ->whereNotNull('section_id')
+            ->pluck('section_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

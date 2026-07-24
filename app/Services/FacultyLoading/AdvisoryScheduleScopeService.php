@@ -10,6 +10,46 @@ use Illuminate\Support\Collection;
 
 class AdvisoryScheduleScopeService
 {
+    /** @return Collection<int, int> Adviser user IDs keyed by section ID — for formatting the name via PersonNameFormatter. */
+    public function adviserUserIdsBySection(int $academicTermId, array|Collection $sectionIds): Collection
+    {
+        $sectionIds = collect($sectionIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($sectionIds->isEmpty()) {
+            return collect();
+        }
+
+        return LoadAssignment::with(['designation.category'])
+            ->where('academic_term_id', $academicTermId)
+            ->whereNotNull('designation_id')
+            ->whereHas('designation', fn ($query) => $query
+                ->where('is_active', true)
+                ->where(function ($sectionQuery) use ($sectionIds) {
+                    $sectionQuery->whereIn('section_id', $sectionIds)
+                        ->orWhereNull('section_id');
+                })
+                ->whereHas('category', fn ($categoryQuery) => $categoryQuery
+                    ->whereIn('code', ['HR_ADV', 'HR_ACAD'])))
+            ->where(function ($query) use ($sectionIds) {
+                $query->whereIn('section_id', $sectionIds)
+                    ->orWhereHas('designation', fn ($designationQuery) => $designationQuery
+                        ->whereIn('section_id', $sectionIds));
+            })
+            ->orderBy('id')
+            ->get()
+            ->mapWithKeys(function (LoadAssignment $assignment) {
+                $sectionId = $assignment->designation?->section_id ?? $assignment->section_id;
+
+                return $sectionId && $assignment->user_id
+                    ? [(int) $sectionId => (int) $assignment->user_id]
+                    : [];
+            });
+    }
+
     /** @return Collection<int, string> Adviser names keyed by section ID. */
     public function adviserNamesBySection(int $academicTermId, array|Collection $sectionIds): Collection
     {

@@ -175,7 +175,6 @@ body {
 .wat-heading {
   flex: 0 0 auto;
   margin-bottom: 1.5mm;
-  text-align: left;
 }
 
 .wat-heading h1 {
@@ -184,6 +183,7 @@ body {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-align: center;
 }
 
 .wat-meta {

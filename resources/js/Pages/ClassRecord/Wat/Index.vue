@@ -11,12 +11,13 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  sections:   { type: Array, default: () => [] },
-  sectionId:  { type: Number, default: null },
-  weekStart:  { type: String, required: true },
-  wat:        { type: Object, default: null },
-  canReview:  { type: Boolean, default: false },
-  schoolYear: { type: Object, default: null },
+  sections:       { type: Array, default: () => [] },
+  sectionId:      { type: Number, default: null },
+  weekStart:      { type: String, required: true },
+  wat:            { type: Object, default: null },
+  canReview:      { type: Boolean, default: false },
+  isCoordinator:  { type: Boolean, default: false },
+  schoolYear:     { type: Object, default: null },
 })
 
 const selectedSection = ref(props.sectionId)
@@ -93,7 +94,7 @@ function complianceColor(pct) {
           <AppButton v-if="canReview" variant="secondary" @click="router.get(route('class-records.wat.review', { week: selectedWeek }))">
             <ClipboardDocumentCheckIcon class="w-4 h-4" /> Review All Sections
           </AppButton>
-          <AppButton v-if="sectionId" variant="secondary" @click="openPrint">
+          <AppButton v-if="sectionId && (isCoordinator || canReview)" variant="secondary" @click="openPrint">
             <PrinterIcon class="w-4 h-4" /> Print WAT Form
           </AppButton>
         </template>
