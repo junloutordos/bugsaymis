@@ -1019,6 +1019,48 @@ class FacultyLoadingHttpTest extends TestCase
             ->assertForbidden();
     }
 
+    /**
+     * Faculty print sheets must show Flag Ceremony and Homeroom bands
+     * (faculty attend/supervise these) merged from every grade the faculty
+     * teaches, but must never show Recess (a student-only break) even
+     * though the G8 Monday timetable has one.
+     */
+    public function test_faculty_print_includes_flag_and_homeroom_but_excludes_recess(): void
+    {
+        $faculty = $this->facultyUser();
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $section = $this->makeSection($sy, ['levelid' => 8, 'sectionname' => 'Diamond']);
+        $subject = $this->makeSubject();
+        $room = $this->makeClassroom();
+
+        ClassSchedule::create([
+            'user_id' => $faculty->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'classroom_id' => $room->id, 'school_year_id' => $sy->id, 'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday', 'start_time' => '10:00:00', 'end_time' => '10:50:00', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.schedules.faculty.print', [
+                'faculty' => $faculty,
+                'term_id' => $term->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $page->component('FacultyLoading/Schedules/Print')
+                    ->where('scheduleType', 'faculty');
+
+                $monday = $page->toArray()['props']['dayConfigs']['Monday']['blocked'] ?? [];
+                $types = array_column($monday, 'type');
+
+                $this->assertContains('FLAG', $types, 'Faculty Monday print must include Flag Ceremony');
+                $this->assertContains('HOMEROOM', $types, 'Faculty Monday print must include Homeroom');
+                $this->assertNotContains('RECESS', $types, 'Faculty print must never include Recess — it is a student-only break');
+
+                return $page;
+            });
+    }
+
     public function test_cid_can_create_schedule(): void
     {
         $faculty = User::factory()->create(['email_verified_at' => now()]);

@@ -2113,7 +2113,10 @@ function dayConfigFor(groupId, day) {
   // viewBy 'faculty', see the ref below) must not show Wellness/White Space/
   // Consultation: those are section/grade bell-schedule concepts a CID Chief
   // sets, not a faculty member's own — faculty have (or will have) their own
-  // separate mechanism for this instead. Every other band is unaffected.
+  // separate mechanism for this instead. Recess is excluded too — it's a
+  // student break faculty are not required to observe (unlike Flag Ceremony
+  // and Homeroom, which faculty attend/supervise). Every other band is
+  // unaffected.
   //
   // Lunch specifically is replaced (not just filtered) with a band built
   // from this teacher's OWN HR-approved official time — a faculty member can
@@ -2124,7 +2127,7 @@ function dayConfigFor(groupId, day) {
   // treat it as display-only automatically — official time changes go
   // through My Work Schedule, not a calendar drag.
   if (viewBy.value === 'faculty') {
-    const filteredBlocked = (base?.blocked ?? []).filter(b => ! ['WHITE_SPACE', 'WELLNESS', 'CONSULT', 'LUNCH'].includes(b.type))
+    const filteredBlocked = (base?.blocked ?? []).filter(b => ! ['WHITE_SPACE', 'WELLNESS', 'CONSULT', 'LUNCH', 'RECESS'].includes(b.type))
     const lunch = props.officialTimesByFaculty?.[groupId]?.[day]
     if (lunch?.lunch_start && lunch?.lunch_end) {
       filteredBlocked.push({ type: 'LUNCH', label: 'Lunch', start: lunch.lunch_start, end: lunch.lunch_end })
