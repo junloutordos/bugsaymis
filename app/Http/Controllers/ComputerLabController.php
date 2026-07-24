@@ -298,13 +298,29 @@ class ComputerLabController extends Controller
         $signature = $approval?->signatures->first(fn ($sig) => ($sig->metadata['stage'] ?? '') === $stage);
 
         return [
-            'name' => $user->name,
+            'name' => $this->formatSignatoryName($user->name),
             'position' => $stage === 'prepared'
                 ? ($user->position ?? 'Science Research Assistant')
                 : ($user->position ?? 'CID Chief'),
             'signature' => $signature ? $signatures->getSignatureDataUri($user) : null,
             'signed_at' => $signature?->signed_at?->format('M d, Y h:i A'),
         ];
+    }
+
+    /**
+     * Names are stored campus-wide in filing order, "Lastname, Firstname M.I."
+     * Reverse to reading order, "Firstname M.I. Lastname", for print. Names
+     * without a comma don't follow the convention and are left as-is.
+     */
+    private function formatSignatoryName(?string $name): ?string
+    {
+        if (! $name || ! str_contains($name, ',')) {
+            return $name;
+        }
+
+        [$lastName, $rest] = explode(',', $name, 2);
+
+        return trim(trim($rest).' '.trim($lastName));
     }
 
     public function updateSeat(Request $request, ICTEquipment $equipment)

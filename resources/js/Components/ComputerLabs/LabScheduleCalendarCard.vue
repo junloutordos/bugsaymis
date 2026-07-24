@@ -21,7 +21,7 @@ const props = defineProps({
   dropTarget: { type: Object, default: null },
 })
 
-const emit = defineEmits(['cancel', 'transfer', 'drag-start', 'drag-end', 'drag-over', 'drop', 'request'])
+const emit = defineEmits(['cancel', 'transfer', 'drag-start', 'drag-end', 'drag-over', 'drop', 'request', 'print'])
 
 const CALENDAR_START = 7 * 60
 const CALENDAR_END = 17 * 60
@@ -275,24 +275,15 @@ function onKeydown(event) {
 }
 
 function printCard() {
-  document.body.classList.add('print-single-lab-calendar')
-  rootEl.value?.classList.add('lab-calendar-print-target')
-  requestAnimationFrame(() => window.print())
-}
-
-function handleAfterPrint() {
-  document.body.classList.remove('print-single-lab-calendar')
-  rootEl.value?.classList.remove('lab-calendar-print-target')
+  emit('print', props.lab.room.id)
 }
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  window.addEventListener('afterprint', handleAfterPrint)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  window.removeEventListener('afterprint', handleAfterPrint)
   window.removeEventListener('mousemove', updateSelection)
   window.removeEventListener('mouseup', finishSelection)
 })
@@ -476,24 +467,4 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-@media print {
-  body.print-single-lab-calendar * {
-    visibility: hidden;
-  }
-  body.print-single-lab-calendar .lab-calendar-print-target,
-  body.print-single-lab-calendar .lab-calendar-print-target * {
-    visibility: visible;
-  }
-  body.print-single-lab-calendar .lab-calendar-print-target {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    border-radius: 0;
-    box-shadow: none;
-  }
-  @page {
-    size: landscape;
-    margin: 0.4in;
-  }
-}
 </style>

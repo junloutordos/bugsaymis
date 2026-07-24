@@ -121,9 +121,10 @@ function confirmSubmitApproval(pin) {
   })
 }
 
-function openPrint() {
+function openPrint(labId = null) {
   const query = { term_id: filters.term_id, week_start: filters.week_start }
-  if (filters.lab_id) query.lab_id = filters.lab_id
+  const resolvedLabId = labId ?? filters.lab_id
+  if (resolvedLabId) query.lab_id = resolvedLabId
   window.open(route('computer-labs.print', query), '_blank')
 }
 
@@ -263,7 +264,7 @@ function submitTransfer() {
           <AppButton v-if="capabilities.canManage && selectedTermId" variant="secondary" :loading="actionForm.processing" @click="synchronize">
             <ArrowPathIcon class="h-4 w-4" /> Sync Class Schedules
           </AppButton>
-          <AppButton v-if="labs.length && selectedTermId" variant="secondary" @click="openPrint">
+          <AppButton v-if="labs.length && selectedTermId" variant="secondary" @click="openPrint()">
             <PrinterIcon class="h-4 w-4" /> Print Schedule
           </AppButton>
           <AppButton v-if="capabilities.canSubmitApproval && selectedTermId && !approvalLocked" @click="openSubmitApproval">
@@ -366,6 +367,7 @@ function submitTransfer() {
             @cancel="cancel"
             @transfer="openTransfer"
             @request="({ date, roomId, startTime, endTime }) => openBooking(date, roomId, startTime, endTime)"
+            @print="openPrint"
           />
         </div>
 
