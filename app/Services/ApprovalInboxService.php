@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ComputerLabScheduleApproval;
 use App\Models\Division;
 use App\Models\Facility;
 use App\Models\FacilityRequest;
@@ -48,6 +49,7 @@ class ApprovalInboxService
         $isGSUHead = $user->hasRole('GSU Head');
         $isOCD = $user->hasRole('OCD');
         $isHROfficer = $user->hasPermission('hr.leave.approve');
+        $isCidChief = $user->hasRole('CID Chief');
         $isAdmin = $user->hasRole('Administrator');
 
         // Administrator sees all pending items across every module (union of all roles)
@@ -57,6 +59,7 @@ class ApprovalInboxService
             $isGSUHead = true;
             $isOCD = true;
             $isHROfficer = true;
+            $isCidChief = true;
         }
 
         // Pre-compute division IDs for DC queries (used in multiple places)
@@ -265,6 +268,14 @@ class ApprovalInboxService
             $this->mergeOrAddTab($tabs, 'class_schedules', 'Class Schedules', $scheduleBatches);
         }
 
+        // ── CID Chief ─────────────────────────────────────────────────────────
+        if ($isCidChief) {
+            $labApprovals = ComputerLabScheduleApproval::with(['academicTerm.schoolYear', 'submitter:id,name'])
+                ->where('status', 'pending_approval')->latest()->get()
+                ->map(fn ($approval) => $this->normaliseComputerLabSchedule($approval))->values()->all();
+            $this->mergeOrAddTab($tabs, 'computer_lab_schedules', 'Computer Lab Schedules', $labApprovals);
+        }
+
         // ── HR Officer ────────────────────────────────────────────────────────
         if ($isHROfficer) {
             $laHR = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code'])
@@ -384,6 +395,29 @@ class ApprovalInboxService
                     ['label' => 'Schedule Entries', 'value' => count($batch->schedule_snapshot ?? [])],
                     ['label' => 'Changed Entries', 'value' => $isAmendment ? count($batch->change_set ?? []) : '—'],
                     ['label' => 'Submitted At', 'value' => $batch->submitted_at?->format('M d, Y h:i A') ?? '—'],
+                ],
+            ]],
+        ];
+    }
+
+    private function normaliseComputerLabSchedule(ComputerLabScheduleApproval $approval): array
+    {
+        return [
+            'id' => $approval->id,
+            'type' => 'computer_lab_schedules',
+            'reference_no' => "COMLAB-{$approval->id}",
+            'requester_name' => $approval->submitter?->name ?? 'Science Research Assistant',
+            'filed_at' => $approval->submitted_at?->toISOString(),
+            'status' => 'Pending CID Chief Approval',
+            'summary' => 'Computer Laboratory Schedule - '.($approval->academicTerm?->full_label ?? ''),
+            'view_url' => route('computer-labs.index', ['term_id' => $approval->academic_term_id]),
+            'sections' => [[
+                'title' => 'Computer Laboratory Schedule Submission',
+                'fields' => [
+                    ['label' => 'Academic Term', 'value' => $approval->academicTerm?->full_label ?? '—', 'full' => true],
+                    ['label' => 'Prepared By', 'value' => $approval->submitter?->name ?? '—'],
+                    ['label' => 'Booking Entries', 'value' => count($approval->schedule_snapshot ?? [])],
+                    ['label' => 'Submitted At', 'value' => $approval->submitted_at?->format('M d, Y h:i A') ?? '—'],
                 ],
             ]],
         ];

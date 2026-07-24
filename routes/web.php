@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
 use App\Http\Controllers\ComputerLabController;
+use App\Http\Controllers\ComputerLabScheduleApprovalController;
 use App\Http\Controllers\HR\EmployeeDocumentController;
 use App\Http\Controllers\ApprovalInboxController;
 use App\Http\Controllers\AtlasGoDownloadController;
@@ -1019,6 +1020,15 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/computer-labs/synchronize', [ComputerLabController::class, 'synchronize'])
         ->middleware('permission:computer_labs.manage|faculty_loading.manage')
         ->name('computer-labs.synchronize');
+    Route::post('/computer-labs/schedule-approvals/{term}/submit', [ComputerLabScheduleApprovalController::class, 'submit'])
+        ->name('computer-labs.schedule-approvals.submit');
+    Route::post('/computer-labs/schedule-approvals/{approval}/approve', [ComputerLabScheduleApprovalController::class, 'approve'])
+        ->name('computer-labs.schedule-approvals.approve');
+    Route::post('/computer-labs/schedule-approvals/{approval}/return', [ComputerLabScheduleApprovalController::class, 'returnForRevision'])
+        ->name('computer-labs.schedule-approvals.return');
+    Route::get('/computer-labs/print', [ComputerLabController::class, 'printSchedule'])
+        ->middleware('permission:it.equipment.view|computer_labs.book|computer_labs.manage')
+        ->name('computer-labs.print');
     Route::get('/computer-labs/{room}', [ComputerLabController::class, 'show'])
         ->middleware('permission:it.equipment.view')
         ->name('computer-labs.show');

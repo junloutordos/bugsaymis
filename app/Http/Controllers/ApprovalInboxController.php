@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\ComputerLabScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\HR\LeaveApplicationController;
 use App\Http\Controllers\HumanResource\GatePassController;
+use App\Models\ComputerLabScheduleApproval;
 use App\Models\Division;
 use App\Models\FacilityRequest;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
@@ -37,6 +39,7 @@ class ApprovalInboxController extends Controller
         'leave_applications',
         'pms_schedules',
         'class_schedules',
+        'computer_lab_schedules',
     ];
 
     /**
@@ -232,6 +235,14 @@ class ApprovalInboxController extends Controller
                 }
 
                 return [ClassScheduleApprovalBatch::class, $record];
+
+            case 'computer_lab_schedules':
+                $record = ComputerLabScheduleApproval::find($id);
+                if (! $record) {
+                    abort(404);
+                }
+
+                return [ComputerLabScheduleApproval::class, $record];
         }
 
         abort(404);
@@ -377,6 +388,12 @@ class ApprovalInboxController extends Controller
                     break;
                 }
                 abort(403);
+
+            case 'computer_lab_schedules':
+                if ($user->hasRole('CID Chief') || $user->isSuperAdmin()) {
+                    break;
+                }
+                abort(403);
         }
     }
 
@@ -396,6 +413,7 @@ class ApprovalInboxController extends Controller
             'leave_applications' => ['pending', 'hr_verified', 'forwarded'],
             'pms_schedules' => ['pending'],
             'class_schedules' => ['pending_ocd'],
+            'computer_lab_schedules' => ['pending_approval'],
         ];
 
         $allowed = $pendingStatuses[$type] ?? [];
@@ -518,6 +536,10 @@ class ApprovalInboxController extends Controller
             case 'class_schedules':
                 return app(ClassScheduleApprovalController::class)
                     ->approve($request, $record);
+
+            case 'computer_lab_schedules':
+                return app(ComputerLabScheduleApprovalController::class)
+                    ->approve($request, $record);
         }
 
         abort(404);
@@ -629,6 +651,12 @@ class ApprovalInboxController extends Controller
                 $request->merge(['reason' => $request->input('reason')]);
 
                 return app(ClassScheduleApprovalController::class)
+                    ->returnForRevision($request, $record);
+
+            case 'computer_lab_schedules':
+                $request->merge(['reason' => $request->input('reason')]);
+
+                return app(ComputerLabScheduleApprovalController::class)
                     ->returnForRevision($request, $record);
         }
 

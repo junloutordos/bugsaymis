@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\AtlasSentinelRelease;
 use App\Models\ComputerLabBooking;
+use App\Models\ComputerLabScheduleApproval;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\ICTEquipment;
 use App\Models\Room;
 use App\Services\ComputerLabSchedulingService;
+use App\Services\ComputerLabScheduleApprovalService;
+use App\Services\DigitalSignatureService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,12 +24,15 @@ class ComputerLabController extends Controller
     const LAB_ROWS = 5;
     const LAB_COLS = 6;
 
-    public function index(Request $request)
+    public function index(Request $request, DigitalSignatureService $signatures)
     {
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId = (int) $request->input('term_id', $currentTerm?->id);
         $term = $termId ? AcademicTerm::with('schoolYear')->find($termId) : null;
         $weekStart = $this->resolveWeekStart($request, $term);
+
+        $approval = $termId ? ComputerLabScheduleApprovalService::latestFor($termId) : null;
+        $user = $request->user();
 
         return Inertia::render('ITJobRequests/ComputerLabs/Index', [
             'labs' => self::summary(),
@@ -43,7 +49,21 @@ class ComputerLabController extends Controller
                 'canBook' => $this->canBook($request),
                 'canManage' => $this->canManage($request),
                 'canViewEquipment' => $request->user()->isSuperAdmin() || $request->user()->hasPermission('it.equipment.view'),
+                'canSubmitApproval' => (int) $user->id === ComputerLabScheduleApprovalService::PREPARER_USER_ID
+                    || $user->isSuperAdmin(),
+                'canApproveSchedule' => $user->hasRole('CID Chief') || $user->isSuperAdmin(),
             ],
+            'scheduleApproval' => $approval ? [
+                'id' => $approval->id,
+                'status' => $approval->status,
+                'submitted_by' => $approval->submitter?->name,
+                'submitted_at' => $approval->submitted_at?->format('M d, Y h:i A'),
+                'approved_by' => $approval->approver?->name,
+                'approved_at' => $approval->approved_at?->format('M d, Y h:i A'),
+                'return_remarks' => $approval->return_remarks,
+            ] : null,
+            'hasPin' => ! empty($user->signature_pin),
+            'signatureUri' => $signatures->getSignatureDataUri($user),
         ]);
     }
 
@@ -225,6 +245,65 @@ class ComputerLabController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    public function printSchedule(Request $request, DigitalSignatureService $signatures)
+    {
+        $currentTerm = AcademicTerm::where('is_current', true)->first();
+        $termId = (int) $request->input('term_id', $currentTerm?->id);
+        $term = $termId ? AcademicTerm::with('schoolYear')->findOrFail($termId) : abort(404);
+        $weekStart = $this->resolveWeekStart($request, $term);
+        $labId = $request->integer('lab_id') ?: null;
+
+        $approval = ComputerLabScheduleApprovalService::latestFor($termId);
+        $prepared = $this->printSignatory($approval, 'prepared', $signatures);
+        $approved = $this->printSignatory($approval, 'approved', $signatures);
+
+        return Inertia::render('ITJobRequests/ComputerLabs/Print', [
+            'labs' => self::summary()->when($labId, fn ($labs) => $labs->filter(fn ($lab) => $lab['room']->id === $labId))->values(),
+            'term' => [
+                'id' => $term->id,
+                'label' => $term->full_label,
+                'school_year' => $term->schoolYear?->name,
+            ],
+            ...$this->calendarPayload($term, $weekStart, $labId),
+            'signatories' => [
+                'prepared' => $prepared,
+                'approved' => $approved,
+            ],
+        ]);
+    }
+
+    private function printSignatory(?ComputerLabScheduleApproval $approval, string $stage, DigitalSignatureService $signatures): ?array
+    {
+        $user = match ($stage) {
+            'prepared' => $approval?->submitter,
+            'approved' => $approval?->approver,
+            default => null,
+        };
+
+        if (! $user) {
+            // Fall back to a role-based lookup so the sheet still shows a name
+            // before any submission exists (e.g. San Miguel / CID Chief on file).
+            $user = $stage === 'prepared'
+                ? User::find(ComputerLabScheduleApprovalService::PREPARER_USER_ID)
+                : User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))->where('status', '<>', 'inactive')->first();
+        }
+
+        if (! $user) {
+            return null;
+        }
+
+        $signature = $approval?->signatures->first(fn ($sig) => ($sig->metadata['stage'] ?? '') === $stage);
+
+        return [
+            'name' => $user->name,
+            'position' => $stage === 'prepared'
+                ? ($user->position ?? 'Science Research Assistant')
+                : ($user->position ?? 'CID Chief'),
+            'signature' => $signature ? $signatures->getSignatureDataUri($user) : null,
+            'signed_at' => $signature?->signed_at?->format('M d, Y h:i A'),
+        ];
     }
 
     public function updateSeat(Request $request, ICTEquipment $equipment)
