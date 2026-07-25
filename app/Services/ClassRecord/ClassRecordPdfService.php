@@ -83,7 +83,7 @@ class ClassRecordPdfService
             $mpdf->SetTitle(sprintf(
                 'Class Record Q%d — %s — %s',
                 $quarter,
-                $classRecord->subject_name,
+                $classRecord->display_name,
                 $classRecord->year_level_section,
             ));
             $mpdf->SetAuthor('Atlas');
@@ -216,7 +216,7 @@ class ClassRecordPdfService
         $out .= '<div style="font-size:9pt; font-weight:bold;">PHILIPPINE SCIENCE HIGH SCHOOL – CARAGA REGION CAMPUS</div>';
         $out .= '<div style="font-size:8pt; font-weight:bold;">CLASS RECORD — '.strtoupper($qLabel).' QUARTER</div>';
         $out .= '<div style="font-size:7pt;">';
-        $out .= 'Subject: <b>'.htmlspecialchars($classRecord->subject_name).'</b>&nbsp;|&nbsp;';
+        $out .= 'Subject: <b>'.htmlspecialchars($classRecord->display_name).'</b>&nbsp;|&nbsp;';
         $out .= 'Section: <b>'.htmlspecialchars($classRecord->year_level_section).'</b>&nbsp;|&nbsp;';
         $out .= 'SY '.htmlspecialchars($classRecord->school_year ?? '').'&nbsp;|&nbsp;';
         $out .= 'Teacher: <b>'.htmlspecialchars($teacherName).'</b>';

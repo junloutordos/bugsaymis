@@ -2374,6 +2374,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::post('/class-records/{classRecord}/quarters/{q}/students',         [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'upsert'])->name('class-records.students.upsert');
     Route::get('/class-records/{classRecord}/quarters/{q}/students/template', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'template'])->name('class-records.students.template');
     Route::post('/class-records/{classRecord}/quarters/{q}/students/import',  [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'import'])->name('class-records.students.import');
+    Route::post('/class-records/{classRecord}/quarters/{q}/students/{classRecordStudent}/transfer', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'transfer'])->name('class-records.students.transfer');
 
     // Scores
     Route::get('/class-records/{classRecord}/quarters/{q}/scores',  [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'index'])->name('class-records.scores.index');

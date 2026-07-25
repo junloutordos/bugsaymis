@@ -118,7 +118,7 @@ class ClassRecordExcelService
         $ws->setCellValue('B1', '                      Republic of the Philippines');
         $ws->setCellValue('B2', '                      Department of Science and Technology');
         $ws->setCellValue('B3', '                      PHILIPPINE SCIENCE HIGH SCHOOL - CARAGA REGION CAMPUS IN BUTUAN CITY');
-        $ws->setCellValue('B5', "SUBJECT:  {$classRecord->subject_name}");
+        $ws->setCellValue('B5', "SUBJECT:  {$classRecord->display_name}");
         $ws->setCellValue('B6', "YR. LEVEL & SECTION:  {$classRecord->year_level_section}");
         $ws->setCellValue('B7', "SCHOOL YEAR:  {$classRecord->school_year}");
         $ws->setCellValue('B8', "QUARTER:  {$qLabel} Quarter");

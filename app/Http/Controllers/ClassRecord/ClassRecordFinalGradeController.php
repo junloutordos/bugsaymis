@@ -25,33 +25,47 @@ class ClassRecordFinalGradeController extends Controller
      * GET /class-records/{classRecord}/final-grades
      *
      * Returns per-student final annual grade (average of all 4 quarterly GEs).
-     * Requires all 4 quarters to have at least one student record.
+     * Requires at least one student record somewhere in each quarter.
+     *
+     * A subject can be split into category-labeled sibling class records
+     * (e.g. STEM Research "Ongoing" -> "Completed") that a student moves
+     * between mid-year. Neither sibling alone necessarily spans all 4
+     * quarters for every student, so grades are resolved per student, per
+     * quarter, from whichever sibling in the group had them active that
+     * quarter, then merged before computing the annual grade.
      */
     public function index(ClassRecord $classRecord): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
 
-        $classRecord->load('gradingOption.categories');
+        $group = collect([$classRecord])->concat($classRecord->siblingsQuery()->get());
+        $group->each(fn ($cr) => $cr->loadMissing('gradingOption.categories'));
+
         $stanine = StanineLookup::orderByDesc('percentage')->get()->toArray();
 
-        // Compute grades for each quarter, chaining previous running grades
+        // Compute grades for each quarter across the whole sibling group,
+        // merging by student, chaining previous running grades forward.
         $previousGrades = [];
         $quarterResults = [];
 
         for ($q = 1; $q <= 4; $q++) {
-            $quarterData = $this->computeQuarterGrades($classRecord, $q, $previousGrades, $stanine);
-            $quarterResults[$q] = $quarterData;
-
-            // Feed running grades forward for the next quarter
-            $previousGrades = [];
-            foreach ($quarterData as $row) {
-                if ($row['masterStudentId'] !== null) {
-                    $previousGrades[$row['masterStudentId']] = $row['runningGrade'];
+            $merged = [];
+            foreach ($group as $sibling) {
+                foreach ($this->computeQuarterGrades($sibling, $q, $previousGrades, $stanine) as $row) {
+                    if ($row['masterStudentId'] !== null) {
+                        $merged[$row['masterStudentId']] = $row;
+                    }
                 }
+            }
+            $quarterResults[$q] = $merged;
+
+            $previousGrades = [];
+            foreach ($merged as $studentId => $row) {
+                $previousGrades[$studentId] = $row['runningGrade'];
             }
         }
 
-        // If any quarter produced no students, we cannot compute a final grade
+        // If any quarter produced no students anywhere in the group, we cannot compute a final grade
         if (collect($quarterResults)->contains(fn ($rows) => empty($rows))) {
             return response()->json([
                 'students' => [],
@@ -59,33 +73,53 @@ class ClassRecordFinalGradeController extends Controller
             ]);
         }
 
-        // Merge per-quarter GEs and compute final grade per student
-        // Use Q1's student list as the canonical roster
-        $q1Students = collect($quarterResults[1])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
-        $q2ByStudent = collect($quarterResults[2])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
-        $q3ByStudent = collect($quarterResults[3])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
-        $q4ByStudent = collect($quarterResults[4])->whereNotNull('masterStudentId')->keyBy('masterStudentId');
+        // Canonical roster = every student who appeared in ANY quarter across
+        // the group (not just Q1 — a student may join a sibling record mid-year).
+        $allStudentIds = collect();
+        foreach ($quarterResults as $rows) {
+            $allStudentIds = $allStudentIds->merge(array_keys($rows));
+        }
+        $allStudentIds = $allStudentIds->unique()->values();
 
         $students = [];
-        foreach ($q1Students as $masterStudentId => $q1Row) {
-            $q1GE = $q1Row['gradeEquivalent'];
-            $q2GE = $q2ByStudent[$masterStudentId]['gradeEquivalent'] ?? $q1GE;
-            $q3GE = $q3ByStudent[$masterStudentId]['gradeEquivalent'] ?? $q2GE;
-            $q4GE = $q4ByStudent[$masterStudentId]['gradeEquivalent'] ?? $q3GE;
+        foreach ($allStudentIds as $masterStudentId) {
+            $ge = [];
+            $anchorRow = null;
+            foreach ([1, 2, 3, 4] as $q) {
+                $row = $quarterResults[$q][$masterStudentId] ?? null;
+                $ge[$q] = $row['gradeEquivalent'] ?? null;
+                $anchorRow ??= $row;
+            }
+            if (! $anchorRow) {
+                continue;
+            }
 
-            $final = $this->grader->computeFinalGrade($q1GE, $q2GE, $q3GE, $q4GE, $stanine);
+            // Forward-fill gaps (student absent from a later quarter's data);
+            // back-fill any leading gap (student's first-ever quarter isn't Q1)
+            // with their earliest known GE so the average never sees a null.
+            for ($q = 2; $q <= 4; $q++) {
+                $ge[$q] ??= $ge[$q - 1];
+            }
+            if ($ge[1] === null) {
+                $earliest = collect($ge)->first(fn ($v) => $v !== null);
+                foreach ([1, 2, 3, 4] as $q) {
+                    $ge[$q] ??= $earliest;
+                }
+            }
+
+            $final = $this->grader->computeFinalGrade($ge[1], $ge[2], $ge[3], $ge[4], $stanine);
 
             $students[] = [
                 'studentId' => $masterStudentId,
-                'sequenceNumber' => $q1Row['sequenceNumber'],
-                'familyName' => $q1Row['familyName'],
-                'givenName' => $q1Row['givenName'],
-                'middleInitial' => $q1Row['middleInitial'],
-                'sex' => $q1Row['sex'],
-                'q1GE' => $q1GE,
-                'q2GE' => $q2GE,
-                'q3GE' => $q3GE,
-                'q4GE' => $q4GE,
+                'sequenceNumber' => $anchorRow['sequenceNumber'],
+                'familyName' => $anchorRow['familyName'],
+                'givenName' => $anchorRow['givenName'],
+                'middleInitial' => $anchorRow['middleInitial'],
+                'sex' => $anchorRow['sex'],
+                'q1GE' => $ge[1],
+                'q2GE' => $ge[2],
+                'q3GE' => $ge[3],
+                'q4GE' => $ge[4],
                 'finalGE' => $final['finalGE'],
                 'adjectival' => $final['adjectivalEquivalent'],
             ];

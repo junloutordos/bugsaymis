@@ -139,6 +139,78 @@ class ClassRecordStudentController extends Controller
         return response()->json($students);
     }
 
+    // ── POST /class-records/{cr}/quarters/{q}/students/{classRecordStudent}/transfer ─
+    // Moves an active roster row to a sibling class record (same subject +
+    // section + teacher + SY, different category_label) for the same quarter
+    // — e.g. STEM Research "Ongoing" -> "Completed" once a student finishes.
+    // Earlier quarters are untouched; this only affects quarter $q onward.
+
+    public function transfer(Request $request, ClassRecord $classRecord, int $q, ClassRecordStudent $classRecordStudent): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
+
+        $quarter = $this->resolveQuarter($classRecord, $q);
+        abort_if($quarter->is_locked, 403, 'Quarter is locked. Unlock it before transferring students.');
+        abort_unless($classRecordStudent->class_record_quarter_id === $quarter->id, 404);
+        abort_unless($classRecordStudent->is_active, 422, 'This student is not active in this quarter.');
+        abort_unless($classRecordStudent->student_id, 422, 'Only students linked to an enrollment record can be transferred.');
+
+        $validated = $request->validate([
+            'target_class_record_id' => 'required|integer|exists:class_records,id',
+        ]);
+
+        $target = ClassRecord::findOrFail($validated['target_class_record_id']);
+        $isSibling = $classRecord->siblingsQuery()->where('id', $target->id)->exists();
+        abort_unless($isSibling, 422, 'The target must be a sibling category of this same subject/section/teacher.');
+        abort_unless($this->isAdmin() || $target->teacher_id === Auth::id(), 403);
+
+        $targetQuarter = ClassRecordQuarter::firstOrCreate(
+            ['class_record_id' => $target->id, 'quarter' => $q],
+            ['is_locked' => false]
+        );
+        abort_if($targetQuarter->is_locked, 403, 'The target class record\'s Q'.$q.' is locked.');
+
+        $studentName = $classRecordStudent->full_name;
+
+        $targetRow = DB::transaction(function () use ($classRecordStudent, $targetQuarter) {
+            $classRecordStudent->update(['is_active' => false]);
+
+            $row = ClassRecordStudent::where('class_record_quarter_id', $targetQuarter->id)
+                ->where('student_id', $classRecordStudent->student_id)
+                ->first();
+
+            $nextSeq = 1 + (int) ClassRecordStudent::where('class_record_quarter_id', $targetQuarter->id)
+                ->where('is_active', true)
+                ->max('sequence_number');
+
+            $attributes = [
+                'family_name' => $classRecordStudent->family_name,
+                'given_name' => $classRecordStudent->given_name,
+                'middle_initial' => $classRecordStudent->middle_initial,
+                'sex' => $classRecordStudent->sex,
+                'is_active' => true,
+            ];
+
+            if ($row) {
+                $row->update($attributes + ['sequence_number' => $row->sequence_number ?? $nextSeq]);
+            } else {
+                $row = ClassRecordStudent::create($attributes + [
+                    'class_record_quarter_id' => $targetQuarter->id,
+                    'student_id' => $classRecordStudent->student_id,
+                    'sequence_number' => $nextSeq,
+                ]);
+            }
+
+            return $row;
+        });
+
+        return response()->json([
+            'message' => "{$studentName} transferred to \"{$target->display_name}\" for Q{$q}.",
+            'data' => $targetRow,
+        ]);
+    }
+
     // ── POST /class-records/{cr}/quarters/{q}/students ───────────────────────
 
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
@@ -207,6 +279,27 @@ class ClassRecordStudentController extends Controller
             throw ValidationException::withMessages([
                 'students' => 'One or more students are not actively enrolled within this class record’s permitted section or grade scope.',
             ]);
+        }
+
+        // A student split across sibling category records (e.g. STEM Research
+        // "Ongoing"/"Completed") must be active in exactly one of them per
+        // quarter — otherwise they'd be graded twice for the same subject.
+        if ($linkedIds) {
+            $siblingIds = $classRecord->siblingsQuery()->pluck('id');
+            if ($siblingIds->isNotEmpty()) {
+                $conflict = ClassRecordStudent::whereIn('student_id', $linkedIds)
+                    ->where('is_active', true)
+                    ->whereHas('quarter', fn ($query) => $query->where('quarter', $q)->whereIn('class_record_id', $siblingIds))
+                    ->with('quarter.classRecord:id,subject_name,category_label')
+                    ->first();
+
+                if ($conflict) {
+                    $siblingLabel = $conflict->quarter->classRecord->display_name;
+                    throw ValidationException::withMessages([
+                        'students' => "{$conflict->full_name} is already active in \"{$siblingLabel}\" for Q{$q}. Transfer or remove them there first.",
+                    ]);
+                }
+            }
         }
 
         $studentSnapshots = Student::whereIn('id', $linkedIds)->get()->keyBy('id');

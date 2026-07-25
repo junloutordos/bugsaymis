@@ -40,6 +40,7 @@ const props = defineProps({
   isCurrentSY:        { type: Boolean, default: true },
   currentSYName:      { type: String, default: null },
   sameSubjectRecords: { type: Array, default: () => [] },
+  siblings:           { type: Array, default: () => [] },
   quizzes:            { type: Array, default: () => [] },
   scheduledDays:      { type: Array, default: () => [] },
 })
@@ -600,16 +601,16 @@ async function saveQuarterOption() {
 </script>
 
 <template>
-  <Head :title="`Class Record — ${classRecord.subject_name}`" />
-  <AdminLayout :title="classRecord.subject_name">
+  <Head :title="`Class Record — ${classRecord.display_name}`" />
+  <AdminLayout :title="classRecord.display_name">
     <div class="space-y-5">
 
       <AppPageHeader
-        :title="classRecord.subject_name"
+        :title="classRecord.display_name"
         :subtitle="`${classRecord.year_level_section} · SY ${classRecord.school_year} · ${classRecord.grading_option?.name ?? ''}`"
         :breadcrumb="[
           { label: 'Class Records', href: route('class-records.page.index') },
-          { label: classRecord.subject_name },
+          { label: classRecord.display_name },
         ]">
         <template #actions>
           <AppBadge :color="statusBadge(classRecord.status)">
@@ -896,6 +897,7 @@ async function saveQuarterOption() {
             :is-locked="isLocked || isReadOnly"
             :subject-type="classRecord.subject?.subject_type ?? null"
             :section-id="classRecord.section_id ?? null"
+            :siblings="props.siblings"
             @reload="router.reload({ only: ['classRecord'] })"
           />
         </div>

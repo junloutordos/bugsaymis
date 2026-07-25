@@ -133,6 +133,11 @@ class ClassRecordPageController extends Controller
             ->orderByDesc('school_year')
             ->get(['id', 'subject_name', 'year_level_section', 'school_year']);
 
+        // Sibling records splitting this exact subject+section+teacher+SY into
+        // separate categories (e.g. STEM Research "Ongoing" vs "Completed") —
+        // used by the roster tab's Transfer action.
+        $siblings = $classRecord->siblingsQuery()->get(['id', 'subject_name', 'category_label']);
+
         return Inertia::render('ClassRecord/Show', [
             'classRecord' => $classRecord,
             'isAdmin' => $this->isAdmin(),
@@ -147,6 +152,7 @@ class ClassRecordPageController extends Controller
             'isCurrentSY' => $isCurrentSY,
             'currentSYName' => $currentSY?->name,
             'sameSubjectRecords' => $sameSubjectRecords,
+            'siblings' => $siblings,
             'scheduledDays' => $scheduledDays,
             'quizzes' => Quiz::where('source_type', 'class_record')
                 ->where('source_id', $classRecord->id)

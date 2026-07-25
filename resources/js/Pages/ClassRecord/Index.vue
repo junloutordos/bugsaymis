@@ -78,7 +78,7 @@
         <tr v-for="r in filtered" :key="r.id"
           class="hover:bg-indigo-50/40 cursor-pointer"
           @click="navigateTo(r)">
-          <td class="px-4 py-3 font-medium text-slate-800">{{ r.subject_name }}</td>
+          <td class="px-4 py-3 font-medium text-slate-800">{{ r.display_name }}</td>
           <td class="px-4 py-3 text-slate-600">{{ r.year_level_section }}</td>
           <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ r.school_year }}</td>
           <td v-if="isAdmin" class="px-4 py-3 text-slate-600">{{ r.teacher?.name ?? '—' }}</td>
@@ -116,7 +116,7 @@
           <div v-for="r in filtered" :key="r.id" class="p-4 space-y-2" @click="navigateTo(r)">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
-                <p class="font-medium text-slate-800 truncate">{{ r.subject_name }}</p>
+                <p class="font-medium text-slate-800 truncate">{{ r.display_name }}</p>
                 <p class="text-xs text-slate-500 mt-0.5">{{ r.year_level_section }} &middot; {{ r.school_year }}</p>
                 <p v-if="isAdmin" class="text-xs text-slate-400 mt-0.5">{{ r.teacher?.name ?? '—' }}</p>
               </div>
@@ -188,11 +188,9 @@
       <div v-else class="space-y-1.5">
         <button v-for="la in myLoad" :key="la.load_assignment_id"
                 type="button"
-                :disabled="la.already_created"
                 @click="pickLoad(la)"
                 class="w-full text-left rounded-xl px-4 py-3 border transition"
                 :class="[
-                  la.already_created ? 'opacity-50 cursor-not-allowed border-slate-100' :
                   isSelected(la)
                     ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
                     : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50',
@@ -215,9 +213,15 @@
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <AppBadge :color="la.subject_type === 'elective' ? 'amber' : 'slate'">{{ la.subject_type }}</AppBadge>
-              <AppBadge v-if="la.already_created" color="green">✓ created</AppBadge>
+              <AppBadge v-if="la.already_created" color="green">
+                ✓ {{ la.existing_records?.length > 1 ? `${la.existing_records.length} records` : 'created' }}
+              </AppBadge>
             </div>
           </div>
+          <p v-if="la.already_created" class="text-[11px] text-slate-400 mt-1.5">
+            Existing: {{ la.existing_records.map(r => r.category_label || '(no category)').join(', ') }} —
+            selecting this will create <span class="font-medium">another</span> category for this subject.
+          </p>
         </button>
       </div>
 
@@ -236,14 +240,20 @@
               ? 'Creating a class record for:'
               : `Applying this grading option to ${selectedLoads.length} selected subjects:` }}
           </p>
-          <div v-for="la in selectedLoads" :key="la.load_assignment_id" class="flex items-center justify-between gap-2">
-            <p class="text-indigo-700 text-xs">
-              <span class="font-medium">{{ la.subject_name }}</span> — {{ la.scope_label }}
-              <span v-if="isAdmin && la.teacher_name" class="text-indigo-500"> · {{ la.teacher_name }}</span>
-            </p>
-            <button type="button" @click="pickLoad(la)" class="text-indigo-400 hover:text-indigo-600 shrink-0">
-              <XMarkIcon class="h-3.5 w-3.5" />
-            </button>
+          <div v-for="la in selectedLoads" :key="la.load_assignment_id" class="space-y-1">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-indigo-700 text-xs">
+                <span class="font-medium">{{ la.subject_name }}</span> — {{ la.scope_label }}
+                <span v-if="isAdmin && la.teacher_name" class="text-indigo-500"> · {{ la.teacher_name }}</span>
+              </p>
+              <button type="button" @click="pickLoad(la)" class="text-indigo-400 hover:text-indigo-600 shrink-0">
+                <XMarkIcon class="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <input v-model="la.category_label" type="text" maxlength="100"
+              :placeholder="la.already_created ? 'Category label (required, e.g. Ongoing, Completed)' : 'Category label (optional)'"
+              class="w-full rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              :class="la.already_created && !la.category_label ? 'border-red-300' : 'border-indigo-200'" />
           </div>
         </div>
 
@@ -480,6 +490,7 @@ const filtered = computed(() => {
   if (!q) return props.classRecords
   return props.classRecords.filter(r =>
     r.subject_name?.toLowerCase().includes(q) ||
+    r.category_label?.toLowerCase().includes(q) ||
     r.year_level_section?.toLowerCase().includes(q) ||
     r.school_year?.toLowerCase().includes(q) ||
     r.teacher?.name?.toLowerCase().includes(q)
@@ -601,11 +612,11 @@ function isSelected(assignment) {
 }
 
 function pickLoad(assignment) {
-  if (assignment.already_created) return
   const idx = selectedLoads.value.findIndex(la => la.load_assignment_id === assignment.load_assignment_id)
   if (idx >= 0) {
     selectedLoads.value.splice(idx, 1)
   } else {
+    if (assignment.category_label === undefined) assignment.category_label = ''
     selectedLoads.value.push(assignment)
   }
 }
@@ -621,6 +632,11 @@ async function handleCreate() {
     createErrors.value = { grading_option_id: ['Please select a grading option.'] }
     return
   }
+  const missingLabel = selectedLoads.value.find(la => la.already_created && !la.category_label?.trim())
+  if (missingLabel) {
+    createErrors.value = { assignment: [`"${missingLabel.subject_name}" already has a class record — give this one a category label to create another.`] }
+    return
+  }
 
   creating.value = true
   try {
@@ -630,6 +646,7 @@ async function handleCreate() {
         const item = {
           subject_id: la.subject_id,
           section_id: la.section_id,
+          category_label: la.category_label?.trim() || null,
         }
         // Admins creating on behalf of another teacher
         if (props.isAdmin && la.teacher_id) {

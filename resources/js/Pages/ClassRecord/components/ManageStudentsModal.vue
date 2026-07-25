@@ -4,7 +4,7 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 import AppModal from '@/Components/AppModal.vue'
 import AppButton from '@/Components/AppButton.vue'
-import { TrashIcon, BoltIcon, MagnifyingGlassIcon, UserPlusIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, BoltIcon, MagnifyingGlassIcon, UserPlusIcon, ArrowRightCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   show:            { type: Boolean, default: false },
@@ -13,6 +13,7 @@ const props = defineProps({
   initialStudents: { type: Array,   default: () => [] },
   subjectType:     { type: String,  default: null },
   sectionId:       { type: Number,  default: null },
+  siblings:        { type: Array,   default: () => [] },
 })
 
 const emit = defineEmits(['close', 'saved'])
@@ -150,6 +151,56 @@ async function autoPopulate() {
   }
 }
 
+// ── Transfer to a sibling category record (e.g. Ongoing -> Completed) ────────
+const transferringId = ref(null)
+
+async function transferStudent(student) {
+  if (!props.siblings.length) return
+
+  let targetId = props.siblings[0].id
+  if (props.siblings.length > 1) {
+    const options = Object.fromEntries(props.siblings.map(s => [s.id, s.category_label || s.display_name || s.subject_name]))
+    const { value, isConfirmed } = await Swal.fire({
+      title: 'Transfer to which category?',
+      input: 'select',
+      inputOptions: options,
+      showCancelButton: true,
+      confirmButtonText: 'Transfer',
+    })
+    if (!isConfirmed || !value) return
+    targetId = Number(value)
+  } else {
+    const target = props.siblings[0]
+    const confirmed = await Swal.fire({
+      title: `Transfer to "${target.category_label || target.display_name || target.subject_name}"?`,
+      text: `${student.family_name}, ${student.given_name} will be moved starting Quarter ${props.quarter}. Earlier quarters are unaffected.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, transfer',
+    })
+    if (!confirmed.isConfirmed) return
+  }
+
+  transferringId.value = student.id
+  try {
+    const { data } = await axios.post(
+      route('class-records.students.transfer', {
+        classRecord: props.classRecordId,
+        q: props.quarter,
+        classRecordStudent: student.id,
+      }),
+      { target_class_record_id: targetId },
+    )
+    Swal.fire({ icon: 'success', title: data.message, timer: 2000, showConfirmButton: false })
+    emit('saved')
+    emit('close')
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to transfer student.', 'error')
+  } finally {
+    transferringId.value = null
+  }
+}
+
 async function save() {
   const rows = students.value.filter(s => !s._delete)
   if (!rows.length) {
@@ -273,9 +324,18 @@ async function save() {
                 </span>
               </td>
               <td class="px-3 py-2 text-center">
-                <button @click="removeRow(idx)" class="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600">
-                  <TrashIcon class="h-4 w-4" />
-                </button>
+                <div class="flex items-center justify-center gap-1">
+                  <button v-if="student.id && student.student_id && siblings.length"
+                    @click="transferStudent(student)"
+                    :disabled="transferringId === student.id"
+                    title="Transfer to a sibling category (e.g. Ongoing → Completed)"
+                    class="p-1 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50">
+                    <ArrowRightCircleIcon class="h-4 w-4" />
+                  </button>
+                  <button @click="removeRow(idx)" class="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600">
+                    <TrashIcon class="h-4 w-4" />
+                  </button>
+                </div>
               </td>
             </tr>
           </template>

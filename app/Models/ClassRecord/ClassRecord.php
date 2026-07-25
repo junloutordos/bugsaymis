@@ -22,6 +22,7 @@ class ClassRecord extends Model
         'school_year_id',
         'school_year',
         'subject_name',
+        'category_label',
         'year_level_section',
         'status',
         'submitted_at',
@@ -39,6 +40,8 @@ class ClassRecord extends Model
         'checked_at' => 'datetime',
         'archived_at' => 'datetime',
     ];
+
+    protected $appends = ['display_name'];
 
     public function schoolYear(): BelongsTo
     {
@@ -94,6 +97,35 @@ class ClassRecord extends Model
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_id');
+    }
+
+    /**
+     * Other class records that split the same subject+section+teacher this SY
+     * into separate categories (e.g. STEM Research "Ongoing" vs "Completed").
+     * There is no explicit link column — sibling-ness is derived from sharing
+     * that 4-tuple, same as myTeachingLoad()'s existing-pair check.
+     */
+    public function siblingsQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::query()
+            ->where('subject_id', $this->subject_id)
+            ->where('teacher_id', $this->teacher_id)
+            ->where('school_year_id', $this->school_year_id)
+            ->where('id', '<>', $this->id)
+            ->where('status', '<>', 'archived')
+            ->when(
+                $this->section_id === null,
+                fn ($q) => $q->whereNull('section_id'),
+                fn ($q) => $q->where('section_id', $this->section_id),
+            );
+    }
+
+    /** This record's display name, with its category label suffixed if set. */
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->category_label
+            ? "{$this->subject_name} — {$this->category_label}"
+            : $this->subject_name;
     }
 
     public function gradingOption(): BelongsTo

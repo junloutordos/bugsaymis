@@ -65,7 +65,9 @@ class ClassRecordController extends Controller
         $assignments = $query->get()
             ->unique(fn ($la) => "{$la->user_id}_{$la->subject_id}_{$la->section_id}");
 
-        // Flag assignments that already have a class record this SY
+        // Flag assignments that already have a class record this SY, and surface
+        // the existing record(s) + their category labels so the wizard can offer
+        // "add another category" instead of just blocking re-creation.
         $existingQuery = ClassRecord::where('school_year_id', $currentSY->id)
             ->where('status', '<>', 'archived')
             ->whereNotNull('subject_id');
@@ -74,16 +76,16 @@ class ClassRecordController extends Controller
             $existingQuery->where('teacher_id', Auth::id());
         }
 
-        $existingPairs = $existingQuery
-            ->get(['teacher_id', 'subject_id', 'section_id'])
-            ->map(fn ($r) => $r->teacher_id.'_'.$r->subject_id.'_'.$r->section_id)
-            ->flip();
+        $existingByPair = $existingQuery
+            ->get(['id', 'teacher_id', 'subject_id', 'section_id', 'category_label'])
+            ->groupBy(fn ($r) => $r->teacher_id.'_'.$r->subject_id.'_'.$r->section_id);
 
-        $result = $assignments->map(function ($la) use ($existingPairs) {
+        $result = $assignments->map(function ($la) use ($existingByPair) {
             $isCrossSection = in_array($la->subject?->subject_type, ['elective', 'science_core'], true);
             $grade = (int) ($la->subject?->grade_level ?? 0);
             $scopeLabel = $la->section?->sectionname
                 ?? ($grade === 0 ? 'Grades 11–12 — Cross-section' : "Grade {$grade} — Cross-section");
+            $existingRecords = $existingByPair->get($la->user_id.'_'.$la->subject_id.'_'.$la->section_id, collect());
 
             return [
                 'load_assignment_id' => $la->id,
@@ -100,7 +102,11 @@ class ClassRecordController extends Controller
                 'scope_label' => $scopeLabel,
                 'is_cross_section' => $isCrossSection,
                 'display_label' => ($la->subject?->name ?? '—').' — '.$scopeLabel,
-                'already_created' => $existingPairs->has($la->user_id.'_'.$la->subject_id.'_'.$la->section_id),
+                'already_created' => $existingRecords->isNotEmpty(),
+                'existing_records' => $existingRecords->map(fn ($r) => [
+                    'id' => $r->id,
+                    'category_label' => $r->category_label,
+                ])->values(),
             ];
         });
 
@@ -151,6 +157,7 @@ class ClassRecordController extends Controller
             'subject_id' => 'required|integer|exists:subjects,id',
             'section_id' => 'nullable|integer|exists:sections,id',
             'grading_option_id' => 'required|integer|exists:grading_options,id',
+            'category_label' => 'nullable|string|max:100',
             // Admins may create on behalf of another teacher
             'teacher_id' => 'nullable|integer|exists:users,id',
         ]);
@@ -203,11 +210,24 @@ class ClassRecordController extends Controller
             ? $validated['teacher_id']
             : Auth::id();
 
+        $categoryLabel = trim((string) ($validated['category_label'] ?? '')) ?: null;
+        $labelError = $this->checkCategoryLabel(
+            $subjectId = (int) $validated['subject_id'],
+            $sectionId = $validated['section_id'] ?? null,
+            $teacherId,
+            $currentSY->id,
+            $categoryLabel,
+        );
+        if ($labelError) {
+            return $labelError;
+        }
+
         $record = ClassRecord::create([
             'subject_id' => $validated['subject_id'],
             'section_id' => $validated['section_id'] ?? null,
             'grading_option_id' => $validated['grading_option_id'],
             'subject_name' => $subjectName,
+            'category_label' => $categoryLabel,
             'year_level_section' => $yearLevelSection,
             'teacher_id' => $teacherId,
             'school_year_id' => $currentSY->id,
@@ -219,6 +239,59 @@ class ClassRecordController extends Controller
             'message' => 'Class record created successfully.',
             'data' => $record->load('gradingOption'),
         ], 201);
+    }
+
+    /**
+     * A subject can be split into multiple category-labeled class records
+     * (e.g. STEM Research "Ongoing" vs "Completed") that share the same
+     * subject+section+teacher+SY. The first record for that tuple needs no
+     * label; any additional one must carry a label, distinct from its
+     * siblings', so the split is always deliberate and never ambiguous.
+     */
+    private function checkCategoryLabel(int $subjectId, ?int $sectionId, int $teacherId, int $schoolYearId, ?string $categoryLabel, ?int $excludeId = null): ?JsonResponse
+    {
+        $error = $this->categoryLabelConflict($subjectId, $sectionId, $teacherId, $schoolYearId, $categoryLabel, $excludeId);
+        if (! $error) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => $error,
+            'errors' => ['category_label' => [$error]],
+        ], 422);
+    }
+
+    /** Same rule as checkCategoryLabel(), but returns a plain reason string for batch skip-lists. */
+    private function categoryLabelConflict(int $subjectId, ?int $sectionId, int $teacherId, int $schoolYearId, ?string $categoryLabel, ?int $excludeId = null): ?string
+    {
+        $siblings = ClassRecord::where('subject_id', $subjectId)
+            ->where('teacher_id', $teacherId)
+            ->where('school_year_id', $schoolYearId)
+            ->where('status', '<>', 'archived')
+            ->when($excludeId, fn ($q) => $q->where('id', '<>', $excludeId))
+            ->when(
+                $sectionId === null,
+                fn ($q) => $q->whereNull('section_id'),
+                fn ($q) => $q->where('section_id', $sectionId),
+            )
+            ->get(['id', 'category_label']);
+
+        if ($siblings->isEmpty()) {
+            return null;
+        }
+
+        if ($categoryLabel === null) {
+            return 'A class record already exists for this subject. Give this one a category label (e.g. "Ongoing", "Completed") to create another.';
+        }
+
+        $normalized = mb_strtolower($categoryLabel);
+        $collides = $siblings->contains(fn ($s) => $s->category_label !== null && mb_strtolower($s->category_label) === $normalized);
+
+        if ($collides) {
+            return "Another class record for this subject already uses the category label \"{$categoryLabel}\".";
+        }
+
+        return null;
     }
 
     // ── POST /class-records/bulk ────────────────────────────────────────────────
@@ -245,6 +318,7 @@ class ClassRecordController extends Controller
             'items.*.subject_id' => 'required|integer|exists:subjects,id',
             'items.*.section_id' => 'nullable|integer|exists:sections,id',
             'items.*.teacher_id' => 'nullable|integer|exists:users,id',
+            'items.*.category_label' => 'nullable|string|max:100',
         ]);
 
         $gradingOption = GradingOption::findOrFail($validated['grading_option_id']);
@@ -290,17 +364,17 @@ class ClassRecordController extends Controller
                 }
 
                 $teacherId = ($isAdmin && ! empty($item['teacher_id'])) ? $item['teacher_id'] : Auth::id();
+                $categoryLabel = trim((string) ($item['category_label'] ?? '')) ?: null;
 
-                // Skip pairs that already have a non-archived class record this SY
-                $alreadyExists = ClassRecord::where('school_year_id', $currentSY->id)
-                    ->where('status', '<>', 'archived')
-                    ->where('teacher_id', $teacherId)
-                    ->where('subject_id', $subject->id)
-                    ->where('section_id', $item['section_id'] ?? null)
-                    ->exists();
+                // Skip pairs that already have a non-archived class record this SY,
+                // unless this item carries a distinct category label — that's a
+                // deliberate "split this subject" request, not a duplicate.
+                $labelConflict = $this->categoryLabelConflict(
+                    $subject->id, $item['section_id'] ?? null, $teacherId, $currentSY->id, $categoryLabel,
+                );
 
-                if ($alreadyExists) {
-                    $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => 'A class record already exists for this subject.'];
+                if ($labelConflict) {
+                    $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => $labelConflict];
 
                     continue;
                 }
@@ -320,6 +394,7 @@ class ClassRecordController extends Controller
                     'section_id' => $item['section_id'] ?? null,
                     'grading_option_id' => $gradingOption->id,
                     'subject_name' => $subjectName,
+                    'category_label' => $categoryLabel,
                     'year_level_section' => $yearLevelSection,
                     'teacher_id' => $teacherId,
                     'school_year_id' => $currentSY->id,
@@ -333,7 +408,7 @@ class ClassRecordController extends Controller
 
         if (! $created) {
             return response()->json([
-                'message' => 'No class records were created. They may already exist.',
+                'message' => 'No class records were created. See the skipped reasons below.',
                 'created' => [],
                 'skipped' => $skipped,
             ], 422);
@@ -341,7 +416,7 @@ class ClassRecordController extends Controller
 
         return response()->json([
             'message' => count($created).' class record(s) created successfully.'.
-                ($skipped ? ' '.count($skipped).' skipped (already exist).' : ''),
+                ($skipped ? ' '.count($skipped).' skipped.' : ''),
             'created' => $created,
             'skipped' => $skipped,
         ], 201);
@@ -378,8 +453,24 @@ class ClassRecordController extends Controller
             'grading_option_id' => 'sometimes|integer|exists:grading_options,id',
             'school_year' => 'sometimes|string|max:20',
             'subject_name' => 'sometimes|string|max:255',
+            'category_label' => 'sometimes|nullable|string|max:100',
             'year_level_section' => 'sometimes|string|max:255',
         ]);
+
+        if (array_key_exists('category_label', $validated)) {
+            $validated['category_label'] = trim((string) ($validated['category_label'] ?? '')) ?: null;
+            $labelError = $this->checkCategoryLabel(
+                $classRecord->subject_id,
+                $classRecord->section_id,
+                $classRecord->teacher_id,
+                $classRecord->school_year_id,
+                $validated['category_label'],
+                $classRecord->id,
+            );
+            if ($labelError) {
+                return $labelError;
+            }
+        }
 
         if (isset($validated['grading_option_id'])) {
             $subject = isset($validated['subject_id'])

@@ -21,6 +21,7 @@ const props = defineProps({
   isLocked:        { type: Boolean, default: false },
   subjectType:     { type: String,  default: null },
   sectionId:       { type: Number,  default: null },
+  siblings:        { type: Array,   default: () => [] },
 })
 
 const emit = defineEmits(['reload'])
@@ -551,6 +552,7 @@ const showRunning = computed(() => props.quarterNumber > 1)
     :initial-students="students"
     :subject-type="subjectType"
     :section-id="sectionId"
+    :siblings="siblings"
     @close="showStudentsModal = false"
     @saved="onStudentsSaved"
   />
