@@ -355,9 +355,9 @@
             <div v-for="(cat, idx) in manageCategories" :key="idx" class="rounded-lg border border-slate-200 p-3">
               <div class="flex items-start gap-2">
                 <input v-model="cat.name" type="text" placeholder="Category name (e.g. Written Works)"
-                  class="flex-1 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  :class="['flex-1 rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400', isCatNameInvalid(idx) ? 'border-red-400' : 'border-slate-200']" />
                 <input v-model="cat.code" type="text" maxlength="10" placeholder="Code"
-                  class="w-20 rounded border border-slate-200 px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  :class="['w-20 rounded border px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400', isCatCodeInvalid(idx) ? 'border-red-400' : 'border-slate-200']" />
                 <template v-if="!cat.children || !cat.children.length">
                   <div class="flex items-center gap-1">
                     <input v-model.number="cat.weight" type="number" min="0.01" max="1" step="0.05"
@@ -380,9 +380,9 @@
                 <div v-for="(sub, cidx) in cat.children" :key="cidx" class="flex items-center gap-2">
                   <span class="text-slate-300 text-xs">↳</span>
                   <input v-model="sub.name" type="text" placeholder="Sub-category name"
-                    class="flex-1 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    :class="['flex-1 rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400', isSubNameInvalid(idx, cidx) ? 'border-red-400' : 'border-slate-200']" />
                   <input v-model="sub.code" type="text" maxlength="10" placeholder="Code"
-                    class="w-20 rounded border border-slate-200 px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    :class="['w-20 rounded border px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400', isSubCodeInvalid(idx, cidx) ? 'border-red-400' : 'border-slate-200']" />
                   <div class="flex items-center gap-1">
                     <input v-model.number="sub.weight" type="number" min="0.01" max="1" step="0.05"
                       class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
@@ -679,6 +679,7 @@ const manageOptionForm  = ref({ name: '', description: '', is_active: true, owne
 const manageCategories  = ref([])
 const manageSaving      = ref(false)
 const manageErrors      = ref({})
+const attemptedSave     = ref(false)  // true once a save was tried — drives red-border hints
 
 // Admins choose any unit (or campus-wide); an AUH managing more than one unit
 // picks among their own; an AUH with exactly one unit gets it auto-assigned.
@@ -713,6 +714,7 @@ function openManageModal(option) {
   }
   manageCategories.value = buildNestedCategories(option.categories)
   manageErrors.value     = {}
+  attemptedSave.value    = false
   showManageModal.value  = true
 }
 
@@ -731,6 +733,7 @@ function openCreateOptionModal() {
   }
   manageCategories.value = [{ id: null, name: '', code: '', weight: 0, max_assessments: 1, children: [] }]
   manageErrors.value     = {}
+  attemptedSave.value    = false
   showManageModal.value  = true
 }
 
@@ -779,6 +782,55 @@ function removeSubCategory(idx, cidx) {
   manageCategories.value[idx].children.splice(cidx, 1)
 }
 
+// ── Category field validation (name + code are required on every leaf row) ──
+function isCatNameInvalid(idx) {
+  return attemptedSave.value && !manageCategories.value[idx]?.name?.trim()
+}
+function isCatCodeInvalid(idx) {
+  return attemptedSave.value && !manageCategories.value[idx]?.code?.trim()
+}
+function isSubNameInvalid(idx, cidx) {
+  return attemptedSave.value && !manageCategories.value[idx]?.children?.[cidx]?.name?.trim()
+}
+function isSubCodeInvalid(idx, cidx) {
+  return attemptedSave.value && !manageCategories.value[idx]?.children?.[cidx]?.code?.trim()
+}
+
+/** First missing required name/code across categories + sub-categories, or null if all filled. */
+function firstMissingCategoryField() {
+  for (let i = 0; i < manageCategories.value.length; i++) {
+    const cat = manageCategories.value[i]
+    if (!cat.name?.trim()) return { message: `Category #${i + 1} needs a name.` }
+    if (!cat.code?.trim()) return { message: `Category "${cat.name}" needs a Code.` }
+    const children = cat.children ?? []
+    for (let j = 0; j < children.length; j++) {
+      const sub = children[j]
+      if (!sub.name?.trim()) return { message: `Sub-category #${j + 1} under "${cat.name}" needs a name.` }
+      if (!sub.code?.trim()) return { message: `Sub-category "${sub.name}" under "${cat.name}" needs a Code.` }
+    }
+  }
+  return null
+}
+
+/** Translate a raw Laravel dotted-array error key (categories.0.children.1.code) into a readable row reference. */
+function humanizeCategoryError(errors) {
+  const key = Object.keys(errors ?? {}).find(k => /^categories\.\d+/.test(k))
+  if (!key) return null
+  const match = key.match(/^categories\.(\d+)(?:\.children\.(\d+))?\.(\w+)$/)
+  if (!match) return null
+  const [, i, j, field] = match
+  const cat = manageCategories.value[Number(i)]
+  const catLabel = cat?.name?.trim() || `Category #${Number(i) + 1}`
+  const fieldLabel = field === 'code' ? 'a Code' : field === 'name' ? 'a name' : `a valid "${field}"`
+  if (j !== undefined) {
+    const sub = cat?.children?.[Number(j)]
+    const subLabel = sub?.name?.trim() || `Sub-category #${Number(j) + 1}`
+    return `"${subLabel}" under "${catLabel}" needs ${fieldLabel}.`
+  }
+
+  return `"${catLabel}" needs ${fieldLabel}.`
+}
+
 function toggleQuarter(q) {
   const set = manageOptionForm.value.quarters
   const i = set.indexOf(q)
@@ -787,18 +839,27 @@ function toggleQuarter(q) {
 }
 
 async function saveManageOption() {
+  attemptedSave.value = true
+
+  const missing = firstMissingCategoryField()
+  if (missing) {
+    manageErrors.value = { categories: [missing.message] }
+    Swal.fire('Validation Error', missing.message, 'warning')
+    return
+  }
+
   manageSaving.value = true
   manageErrors.value = {}
 
   // Nested payload: a category with children is a parent (weight derived);
   // otherwise it is a leaf carrying weight + max items.
   const categories = manageCategories.value.map((cat, i) => {
-    const base = { id: cat.id ?? null, name: cat.name, code: cat.code, sort_order: i }
+    const base = { id: cat.id ?? null, name: cat.name.trim(), code: cat.code.trim(), sort_order: i }
     if (cat.children?.length) {
       base.children = cat.children.map((ch, j) => ({
         id: ch.id ?? null,
-        name: ch.name,
-        code: ch.code,
+        name: ch.name.trim(),
+        code: ch.code.trim(),
         weight: Number(ch.weight),
         max_assessments: Number(ch.max_assessments),
         sort_order: j,
@@ -839,8 +900,9 @@ async function saveManageOption() {
   } catch (err) {
     if (err.response?.status === 422) {
       manageErrors.value = err.response.data.errors ?? {}
-      const msg = err.response.data.message ?? 'Please fix the errors below.'
-      Swal.fire('Validation Error', msg, 'warning')
+      const friendly = humanizeCategoryError(manageErrors.value)
+      if (friendly) manageErrors.value.categories = [friendly]
+      Swal.fire('Validation Error', friendly ?? err.response.data.message ?? 'Please fix the errors below.', 'warning')
     } else {
       Swal.fire('Error', err.response?.data?.message ?? 'Failed to save.', 'error')
     }
