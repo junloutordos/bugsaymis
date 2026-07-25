@@ -511,17 +511,19 @@ async function saveGradingOptionChange() {
 }
 
 // ── Per-quarter grading option change ─────────────────────────────────────────
-const showQuarterOptionModal = ref(false)
-const quarterOptionId        = ref(null)
-const savingQuarterOption    = ref(false)
-const quarterOptionError     = ref(null)
+const showQuarterOptionModal   = ref(false)
+const quarterOptionId          = ref(null)
+const savingQuarterOption      = ref(false)
+const quarterOptionError       = ref(null)
+const applyToRemainingQuarters = ref(false)
 
 // Options applicable to the active quarter (null applicable_quarters = all).
+function optionAppliesToQuarter(opt, q) {
+  const aq = opt?.applicable_quarters
+  return !aq || aq.length === 0 || aq.map(Number).includes(q)
+}
 const applicableGradingOptions = computed(() =>
-  props.gradingOptions.filter(o => {
-    const aq = o.applicable_quarters
-    return !aq || aq.length === 0 || aq.map(Number).includes(activeQuarter.value)
-  })
+  props.gradingOptions.filter(o => optionAppliesToQuarter(o, activeQuarter.value))
 )
 
 const quarterOptionSelected = computed(() =>
@@ -531,23 +533,67 @@ const quarterOptionSelected = computed(() =>
 function openQuarterOptionModal() {
   quarterOptionId.value = currentGradingOption.value?.id ?? props.classRecord.grading_option_id
   quarterOptionError.value = null
+  applyToRemainingQuarters.value = false
   showQuarterOptionModal.value = true
+}
+
+/** Put the grading option for one quarter; returns null on success or a skip/failure reason. */
+async function applyGradingOptionToQuarter(q) {
+  try {
+    await axios.put(
+      route('class-records.quarters.grading-option', { classRecord: props.classRecord.id, q }),
+      { grading_option_id: quarterOptionId.value },
+    )
+    return null
+  } catch (err) {
+    return err.response?.data?.message ?? 'Failed to change grading option.'
+  }
 }
 
 async function saveQuarterOption() {
   savingQuarterOption.value = true
   quarterOptionError.value  = null
-  try {
-    await axios.put(
-      route('class-records.quarters.grading-option', { classRecord: props.classRecord.id, q: activeQuarter.value }),
-      { grading_option_id: quarterOptionId.value },
-    )
-    showQuarterOptionModal.value = false
-    router.reload({ only: ['classRecord'] })
-  } catch (err) {
-    quarterOptionError.value = err.response?.data?.message ?? 'Failed to change grading option for this quarter.'
-  } finally {
+
+  const failure = await applyGradingOptionToQuarter(activeQuarter.value)
+  if (failure) {
+    quarterOptionError.value = failure
     savingQuarterOption.value = false
+    return
+  }
+
+  const results = [{ quarter: activeQuarter.value, status: 'applied' }]
+
+  if (applyToRemainingQuarters.value) {
+    const option = quarterOptionSelected.value
+    for (let q = activeQuarter.value + 1; q <= 4; q++) {
+      const qt = props.classRecord.quarters?.find(x => x.quarter === q)
+      if (qt?.is_locked) {
+        results.push({ quarter: q, status: 'skipped', reason: 'locked' })
+        continue
+      }
+      if ((qt?.assessments?.length ?? 0) > 0) {
+        results.push({ quarter: q, status: 'skipped', reason: 'already has assessments' })
+        continue
+      }
+      if (!optionAppliesToQuarter(option, q)) {
+        results.push({ quarter: q, status: 'skipped', reason: 'option does not apply to this quarter' })
+        continue
+      }
+      const err = await applyGradingOptionToQuarter(q)
+      results.push(err ? { quarter: q, status: 'failed', reason: err } : { quarter: q, status: 'applied' })
+    }
+  }
+
+  showQuarterOptionModal.value = false
+  savingQuarterOption.value = false
+  await router.reload({ only: ['classRecord'] })
+
+  if (results.length > 1) {
+    const applied = results.filter(r => r.status === 'applied').map(r => `Q${r.quarter}`)
+    const rest = results.filter(r => r.status !== 'applied').map(r => `Q${r.quarter} (${r.reason})`)
+    const lines = [`Applied: ${applied.join(', ')}.`]
+    if (rest.length) lines.push(`Not changed: ${rest.join(', ')}.`)
+    Swal.fire('Grading Option Updated', lines.join(' '), 'success')
   }
 }
 
@@ -1002,6 +1048,10 @@ async function saveQuarterOption() {
         </option>
       </select>
       <GradingOptionDetails :option="quarterOptionSelected" />
+      <label v-if="activeQuarter < 4" class="flex items-start gap-2 text-xs text-slate-600">
+        <input type="checkbox" v-model="applyToRemainingQuarters" class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+        <span>Also apply to Q{{ activeQuarter + 1 }}–Q4, skipping any that already have assessments, are locked, or don't accept this option.</span>
+      </label>
       <p v-if="quarterOptionError" class="text-xs text-red-500">{{ quarterOptionError }}</p>
     </div>
     <template #footer>
