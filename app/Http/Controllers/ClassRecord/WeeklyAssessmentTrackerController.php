@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ClassRecord;
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
+use App\Models\ClassRecord\QuarterExamWindow;
 use App\Models\ClassRecord\WatReview;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Designation;
@@ -65,14 +66,20 @@ class WeeklyAssessmentTrackerController extends Controller
         $sectionId = (int) $request->query('section', $sections->first()['id'] ?? 0);
         abort_unless(! $sectionId || $sections->pluck('id')->contains($sectionId), 403, 'You do not have access to that section.');
 
+        $isAdmin = $user->hasPermission('class-records.admin');
+
         return Inertia::render('ClassRecord/Wat/Index', [
-            'sections'      => $sections->values(),
-            'sectionId'     => $sectionId ?: null,
-            'weekStart'     => $weekStart,
-            'wat'           => $sectionId ? WatRuleService::weekData($sectionId, $sy->id, $weekStart) : null,
-            'canReview'     => $canReview,
-            'isCoordinator' => $isCoordinator,
-            'schoolYear'    => $sy->only(['id', 'name']),
+            'sections'             => $sections->values(),
+            'sectionId'            => $sectionId ?: null,
+            'weekStart'            => $weekStart,
+            'wat'                  => $sectionId ? WatRuleService::weekData($sectionId, $sy->id, $weekStart) : null,
+            'canReview'            => $canReview,
+            'isCoordinator'        => $isCoordinator,
+            'schoolYear'           => $sy->only(['id', 'name']),
+            'canManageExamWindows' => $isAdmin,
+            'examWindows'          => $isAdmin
+                ? QuarterExamWindow::where('school_year_id', $sy->id)->orderBy('quarter')->get()
+                : [],
         ]);
     }
 

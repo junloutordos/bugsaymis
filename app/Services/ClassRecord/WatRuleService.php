@@ -6,10 +6,12 @@ use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\ClassRecordStudent;
 use App\Models\ClassRecord\GradingCategory;
+use App\Models\ClassRecord\QuarterExamWindow;
 use App\Models\ClassRecord\WatReview;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Weekly Assessment Tracker (WAT) rules — single source of truth for the
@@ -79,6 +81,32 @@ class WatRuleService
         return now()->greaterThan(self::plottingDeadline($activityDate));
     }
 
+    // ── Quarter final exam window (daily/weekly caps + schedule-day exempt) ──
+
+    /**
+     * True when $date falls inside the configured Quarter Final Exam window
+     * for this school year + quarter. During that window, Long Test/Quarterly
+     * Exam entries are exempt from the daily/weekly caps and the schedule-day
+     * rule — every subject legitimately sits its final exam in the same few
+     * campus-wide days, which isn't the cramming those rules guard against.
+     * The plotting-deadline rule (Friday before) still applies unchanged.
+     */
+    public static function isWithinExamWindow(int $schoolYearId, int $quarter, string $date): bool
+    {
+        return QuarterExamWindow::where('school_year_id', $schoolYearId)
+            ->where('quarter', $quarter)
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->exists();
+    }
+
+    /** Only Long Test/Quarterly Exam entries dated inside the window get the pass. */
+    public static function isExamExempt(?string $assessmentType, int $schoolYearId, int $quarter, string $date): bool
+    {
+        return in_array($assessmentType, ['long_test_1', 'long_test_2'], true)
+            && self::isWithinExamWindow($schoolYearId, $quarter, $date);
+    }
+
     // ── Section-wide graded/major counts (exclude IDs being replaced) ─────────
 
     public static function sectionCountsOnDate(int $sectionId, int $schoolYearId, string $date, array $excludeIds = []): array
@@ -108,6 +136,20 @@ class WatRuleService
     {
         $row = $query
             ->when($excludeIds, fn ($q) => $q->whereNotIn('class_record_assessments.id', $excludeIds))
+            // Long Test/Quarterly Exam entries inside a configured exam window never
+            // count toward the cap — every subject legitimately sits its final exam
+            // in the same campus-wide days, section-wide.
+            ->where(function ($q) {
+                $q->whereNotIn('class_record_assessments.assessment_type', ['long_test_1', 'long_test_2'])
+                    ->orWhereNotExists(function ($sub) {
+                        $sub->select(DB::raw(1))
+                            ->from('quarter_exam_windows as qew')
+                            ->whereColumn('qew.school_year_id', 'cr.school_year_id')
+                            ->whereColumn('qew.quarter', 'crq.quarter')
+                            ->whereColumn('class_record_assessments.activity_date', '>=', 'qew.start_date')
+                            ->whereColumn('class_record_assessments.activity_date', '<=', 'qew.end_date');
+                    });
+            })
             ->selectRaw('
                 COALESCE(SUM(class_record_assessments.is_graded), 0)  as graded,
                 COALESCE(SUM(class_record_assessments.is_major AND class_record_assessments.is_graded), 0) as major
@@ -267,18 +309,28 @@ class WatRuleService
             ];
         });
 
-        $days = collect(range(0, 4))->map(function ($offset) use ($monday, $items) {
+        // Exam windows configured for this school year (any quarter) — used only
+        // to annotate the reviewer view with *why* a day/week may legitimately
+        // exceed the normal caps. Enforcement itself is per-quarter, in
+        // ClassRecordAssessmentController.
+        $examWindows = QuarterExamWindow::where('school_year_id', $schoolYearId)->get(['start_date', 'end_date']);
+        $isExamWindowDate = fn (string $date) => $examWindows->contains(
+            fn ($w) => $date >= $w->start_date->toDateString() && $date <= $w->end_date->toDateString()
+        );
+
+        $days = collect(range(0, 4))->map(function ($offset) use ($monday, $items, $isExamWindowDate) {
             $date    = $monday->copy()->addDays($offset)->toDateString();
             $dayRows = $items->where('date', $date)->values();
             $graded  = $dayRows->where('is_graded', true)->count();
             $major   = $dayRows->where('is_graded', true)->where('is_major', true)->count();
 
             return [
-                'date'         => $date,
-                'items'        => $dayRows,
-                'graded_count' => $graded,
-                'major_count'  => $major,
-                'over_daily'   => $graded > self::DAILY_GRADED_MAX || $major > self::DAILY_MAJOR_MAX,
+                'date'            => $date,
+                'items'           => $dayRows,
+                'graded_count'    => $graded,
+                'major_count'     => $major,
+                'over_daily'      => $graded > self::DAILY_GRADED_MAX || $major > self::DAILY_MAJOR_MAX,
+                'is_exam_window'  => $isExamWindowDate($date),
             ];
         });
 
@@ -290,9 +342,10 @@ class WatRuleService
             'week_end'     => $friday->toDateString(),
             'days'         => $days,
             'totals'       => [
-                'graded'      => $weekGraded,
-                'major'       => $weekMajor,
-                'over_weekly' => $weekGraded > self::WEEKLY_GRADED_MAX || $weekMajor > self::WEEKLY_MAJOR_MAX,
+                'graded'           => $weekGraded,
+                'major'            => $weekMajor,
+                'over_weekly'      => $weekGraded > self::WEEKLY_GRADED_MAX || $weekMajor > self::WEEKLY_MAJOR_MAX,
+                'has_exam_window'  => $days->contains('is_exam_window', true),
             ],
             'limits'       => [
                 'daily_graded'  => self::DAILY_GRADED_MAX,

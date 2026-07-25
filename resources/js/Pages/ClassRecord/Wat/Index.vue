@@ -5,19 +5,23 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
+import axios from 'axios'
+import Swal from 'sweetalert2'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon, CheckBadgeIcon,
-  ClipboardDocumentCheckIcon, ExclamationTriangleIcon,
+  ClipboardDocumentCheckIcon, ExclamationTriangleIcon, AcademicCapIcon, Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  sections:       { type: Array, default: () => [] },
-  sectionId:      { type: Number, default: null },
-  weekStart:      { type: String, required: true },
-  wat:            { type: Object, default: null },
-  canReview:      { type: Boolean, default: false },
-  isCoordinator:  { type: Boolean, default: false },
-  schoolYear:     { type: Object, default: null },
+  sections:             { type: Array, default: () => [] },
+  sectionId:            { type: Number, default: null },
+  weekStart:            { type: String, required: true },
+  wat:                  { type: Object, default: null },
+  canReview:            { type: Boolean, default: false },
+  isCoordinator:        { type: Boolean, default: false },
+  schoolYear:           { type: Object, default: null },
+  canManageExamWindows: { type: Boolean, default: false },
+  examWindows:          { type: Array, default: () => [] },
 })
 
 const selectedSection = ref(props.sectionId)
@@ -75,6 +79,59 @@ function submitReview() {
   })
 }
 
+// ── Quarter final exam windows (admin-only) ───────────────────────────────────
+const showExamWindows = ref(false)
+const examWindowForm = ref(
+  [1, 2, 3, 4].map(q => {
+    const existing = props.examWindows.find(w => w.quarter === q)
+    return { quarter: q, start_date: existing?.start_date ?? '', end_date: existing?.end_date ?? '', id: existing?.id ?? null }
+  })
+)
+const savingExamWindow = ref(null)
+
+async function saveExamWindow(row) {
+  if (!row.start_date || !row.end_date) return
+  savingExamWindow.value = row.quarter
+  try {
+    await axios.put(route('quarter-exam-windows.upsert'), {
+      school_year_id: props.schoolYear.id,
+      quarter: row.quarter,
+      start_date: row.start_date,
+      end_date: row.end_date,
+    })
+    router.reload({ only: ['examWindows', 'wat'] })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to save exam window.', 'error')
+  } finally {
+    savingExamWindow.value = null
+  }
+}
+
+async function clearExamWindow(row) {
+  if (!row.id) {
+    row.start_date = ''
+    row.end_date = ''
+    return
+  }
+  const confirmed = await Swal.fire({
+    title: `Clear the Quarter ${row.quarter} exam window?`,
+    icon: 'warning', showCancelButton: true, confirmButtonText: 'Clear',
+  })
+  if (!confirmed.isConfirmed) return
+  savingExamWindow.value = row.quarter
+  try {
+    await axios.delete(route('quarter-exam-windows.destroy', row.id))
+    row.id = null
+    row.start_date = ''
+    row.end_date = ''
+    router.reload({ only: ['examWindows', 'wat'] })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to clear exam window.', 'error')
+  } finally {
+    savingExamWindow.value = null
+  }
+}
+
 function complianceColor(pct) {
   if (pct === null || pct === undefined) return 'bg-slate-200'
   if (pct >= 90) return 'bg-emerald-500'
@@ -91,6 +148,9 @@ function complianceColor(pct) {
       <AppPageHeader title="Weekly Assessment Tracker"
         subtitle="Section-wide view of plotted assessments against the daily and weekly WAT limits.">
         <template #actions>
+          <AppButton v-if="canManageExamWindows" variant="secondary" @click="showExamWindows = !showExamWindows">
+            <Cog6ToothIcon class="w-4 h-4" /> Quarter Exam Windows
+          </AppButton>
           <AppButton v-if="canReview" variant="secondary" @click="router.get(route('class-records.wat.review', { week: selectedWeek }))">
             <ClipboardDocumentCheckIcon class="w-4 h-4" /> Review All Sections
           </AppButton>
@@ -99,6 +159,35 @@ function complianceColor(pct) {
           </AppButton>
         </template>
       </AppPageHeader>
+
+      <!-- Quarter final exam windows (admin-only) -->
+      <div v-if="canManageExamWindows && showExamWindows" class="bg-white rounded-xl border border-slate-100 p-4 space-y-3">
+        <div>
+          <h3 class="text-sm font-semibold text-slate-800">Quarter Final Exam Windows — SY {{ schoolYear?.name }}</h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Dates set here exempt Long Test/Quarterly Exam entries from the daily/weekly WAT caps and the schedule-day rule for that quarter. The Friday-before plotting deadline still applies.
+          </p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div v-for="row in examWindowForm" :key="row.quarter" class="rounded-lg border border-slate-200 p-3 space-y-2">
+            <p class="text-xs font-semibold text-slate-700">Quarter {{ row.quarter }}</p>
+            <div class="flex items-center gap-1">
+              <input v-model="row.start_date" type="date"
+                class="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+              <span class="text-slate-300 text-xs">–</span>
+              <input v-model="row.end_date" type="date"
+                class="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+            </div>
+            <div class="flex gap-1.5">
+              <AppButton size="sm" :loading="savingExamWindow === row.quarter"
+                :disabled="!row.start_date || !row.end_date" @click="saveExamWindow(row)">
+                Save
+              </AppButton>
+              <AppButton v-if="row.id" size="sm" variant="secondary" @click="clearExamWindow(row)">Clear</AppButton>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Controls -->
       <div class="bg-white rounded-xl border border-slate-100 p-4 flex flex-wrap items-end gap-3">
@@ -135,15 +224,19 @@ function complianceColor(pct) {
               <p class="text-xs text-slate-500">{{ weekLabel }} · SY {{ schoolYear?.name }}</p>
             </div>
             <div class="flex-1"></div>
-            <AppBadge :color="wat.totals.graded > wat.limits.weekly_graded ? 'red' : 'slate'">
+            <AppBadge :color="wat.totals.graded > wat.limits.weekly_graded && !wat.totals.has_exam_window ? 'red' : 'slate'">
               {{ wat.totals.graded }} / {{ wat.limits.weekly_graded }} graded this week
             </AppBadge>
-            <AppBadge :color="wat.totals.major > wat.limits.weekly_major ? 'red' : 'slate'">
+            <AppBadge :color="wat.totals.major > wat.limits.weekly_major && !wat.totals.has_exam_window ? 'red' : 'slate'">
               {{ wat.totals.major }} / {{ wat.limits.weekly_major }} major this week
             </AppBadge>
           </div>
 
-          <div v-if="wat.totals.over_weekly" class="mt-3 flex items-center gap-2 bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-3 py-2 text-xs">
+          <div v-if="wat.totals.over_weekly && wat.totals.has_exam_window" class="mt-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg px-3 py-2 text-xs">
+            <AcademicCapIcon class="w-4 h-4 shrink-0" />
+            This week includes a Quarter Final Exam window — the daily/weekly caps don't apply to Long Test/Quarterly Exam entries in that window.
+          </div>
+          <div v-else-if="wat.totals.over_weekly" class="mt-3 flex items-center gap-2 bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-3 py-2 text-xs">
             <ExclamationTriangleIcon class="w-4 h-4 shrink-0" />
             This section exceeds the weekly WAT limits ({{ wat.limits.weekly_graded }} graded / {{ wat.limits.weekly_major }} major).
           </div>
@@ -176,10 +269,13 @@ function complianceColor(pct) {
         <!-- Day-by-day grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           <div v-for="day in wat.days" :key="day.date"
-            :class="['bg-white rounded-xl border p-3 flex flex-col', day.over_daily ? 'border-danger-200' : 'border-slate-100']">
+            :class="['bg-white rounded-xl border p-3 flex flex-col', day.over_daily && !day.is_exam_window ? 'border-danger-200' : 'border-slate-100']">
             <div class="flex items-center justify-between mb-2">
-              <h3 class="text-xs font-semibold text-slate-700">{{ dayName(day.date) }}</h3>
-              <span :class="['text-[10px] font-bold', day.over_daily ? 'text-danger-600' : 'text-slate-400']"
+              <h3 class="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                {{ dayName(day.date) }}
+                <AcademicCapIcon v-if="day.is_exam_window" class="w-3.5 h-3.5 text-indigo-500" title="Quarter Final Exam window — caps exempt for Long Test/Quarterly Exam entries" />
+              </h3>
+              <span :class="['text-[10px] font-bold', day.over_daily && !day.is_exam_window ? 'text-danger-600' : 'text-slate-400']"
                 :title="`${day.graded_count}/${wat.limits.daily_graded} graded · ${day.major_count}/${wat.limits.daily_major} major`">
                 {{ day.graded_count }}/{{ wat.limits.daily_graded }} · {{ day.major_count }}M/{{ wat.limits.daily_major }}
               </span>

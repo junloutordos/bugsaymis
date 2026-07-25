@@ -181,10 +181,14 @@ class ClassRecordAssessmentController extends Controller
             }
         }
 
-        // WAT daily/weekly caps — graded assessments only, section-wide
+        // WAT daily/weekly caps — graded assessments only, section-wide.
+        // Long Test/Quarterly Exam entries inside a configured exam window are
+        // exempt: every subject legitimately sits its final exam in the same
+        // campus-wide days, which isn't the cramming these caps guard against.
         if ($classRecord->section_id) {
             $replacedIds = $items->pluck('_existing')->filter()->pluck('id')->all();
-            $datedGraded = $items->filter(fn ($i) => ! empty($i['activity_date']) && $i['is_graded']);
+            $datedGraded = $items->filter(fn ($i) => ! empty($i['activity_date']) && $i['is_graded']
+                && ! WatRuleService::isExamExempt($i['assessment_type'], $classRecord->school_year_id, $q, $i['activity_date']));
 
             foreach ($datedGraded->groupBy('activity_date') as $date => $group) {
                 $counts    = WatRuleService::sectionCountsOnDate($classRecord->section_id, $classRecord->school_year_id, $date, $replacedIds);
@@ -226,10 +230,16 @@ class ClassRecordAssessmentController extends Controller
 
         // Schedule-day rule: faculty may only plot on days the subject meets
         // this section (422 on changed dates, matching the deadline rule);
-        // admins stay warn-only so they can plot make-up/special dates.
+        // admins stay warn-only so they can plot make-up/special dates. Long
+        // Test/Quarterly Exam entries inside a configured exam window are
+        // exempt too — final exams commonly run a special block schedule
+        // that doesn't match the regular weekly rotation.
         $warnings = [];
         $meetsByDate = [];
         foreach ($items->filter(fn ($i) => ! empty($i['activity_date'])) as $item) {
+            if (WatRuleService::isExamExempt($item['assessment_type'], $classRecord->school_year_id, $q, $item['activity_date'])) {
+                continue;
+            }
             $date = $item['activity_date'];
             if (! array_key_exists($date, $meetsByDate)) {
                 $meetsByDate[$date] = WatRuleService::meetsOnDate(

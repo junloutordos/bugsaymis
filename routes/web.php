@@ -2334,6 +2334,11 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::put('/grading-options/{gradingOption}/categories', [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'updateCategories'])->name('grading-options.categories.update');
     Route::delete('/grading-options/{gradingOption}',         [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'destroy'])->name('grading-options.destroy');
 
+    // Quarter final exam windows (WAT cap + schedule-day exemption)
+    Route::get('/quarter-exam-windows',                          [\App\Http\Controllers\ClassRecord\QuarterExamWindowController::class, 'index'])->name('quarter-exam-windows.index');
+    Route::put('/quarter-exam-windows',                          [\App\Http\Controllers\ClassRecord\QuarterExamWindowController::class, 'upsert'])->name('quarter-exam-windows.upsert');
+    Route::delete('/quarter-exam-windows/{quarterExamWindow}',    [\App\Http\Controllers\ClassRecord\QuarterExamWindowController::class, 'destroy'])->name('quarter-exam-windows.destroy');
+
     // Teaching load pre-fill (must be before {classRecord} route)
     Route::get('/class-records/my-teaching-load', [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'myTeachingLoad'])->name('class-records.my-teaching-load');
 
