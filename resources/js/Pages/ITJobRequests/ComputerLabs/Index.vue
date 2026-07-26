@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -14,7 +14,7 @@ import LabScheduleCalendarCard from '@/Components/ComputerLabs/LabScheduleCalend
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import { confirmAction } from '@/Composables/useConfirm.js'
 import {
-  ArrowLeftIcon, ArrowPathIcon, ArrowRightIcon, CalendarDaysIcon,
+  ArrowLeftIcon, ArrowPathIcon, ArrowRightIcon, ArrowsRightLeftIcon, CalendarDaysIcon,
   CheckIcon, ComputerDesktopIcon, ExclamationTriangleIcon,
   PlusIcon, PrinterIcon, SignalIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
@@ -210,6 +210,9 @@ function moveBooking({ booking, roomId }) {
 const transferModal = ref(false)
 const transferBooking = ref(null)
 const transferRoomId = ref(null)
+const transferError = ref(null)
+const transferSwapOffer = ref(null)
+const swapPending = ref(false)
 
 const transferLabOptions = computed(() => {
   if (!transferBooking.value) return []
@@ -229,9 +232,16 @@ const transferConflict = computed(() => {
   ) ?? null
 })
 
+watch(transferRoomId, () => {
+  transferError.value = null
+  transferSwapOffer.value = null
+})
+
 function openTransfer(booking) {
   transferBooking.value = booking
   transferRoomId.value = transferLabOptions.value[0]?.room?.id ?? null
+  transferError.value = null
+  transferSwapOffer.value = null
   transferModal.value = true
 }
 
@@ -239,18 +249,45 @@ function closeTransfer() {
   transferModal.value = false
   transferBooking.value = null
   transferRoomId.value = null
+  transferError.value = null
+  transferSwapOffer.value = null
 }
 
 function submitTransfer() {
-  if (!transferBooking.value || !transferRoomId.value || transferConflict.value || movingBookingId.value) return
+  if (!transferBooking.value || !transferRoomId.value || movingBookingId.value) return
 
   const booking = transferBooking.value
   movingBookingId.value = booking.id
+  swapPending.value = false
+  transferError.value = null
+  transferSwapOffer.value = null
 
   router.patch(route('computer-labs.bookings.move', booking.id), { room_id: Number(transferRoomId.value) }, {
     preserveScroll: true,
     onSuccess: () => closeTransfer(),
+    onError: (errors) => {
+      transferError.value = errors.booking ?? null
+      transferSwapOffer.value = errors.can_swap === '1' ? { title: errors.conflict_title } : null
+    },
     onFinish: () => { movingBookingId.value = null },
+  })
+}
+
+function submitTransferSwap() {
+  if (!transferBooking.value || !transferRoomId.value || movingBookingId.value) return
+
+  const booking = transferBooking.value
+  movingBookingId.value = booking.id
+  swapPending.value = true
+
+  router.patch(route('computer-labs.bookings.move', booking.id), { room_id: Number(transferRoomId.value), swap: true }, {
+    preserveScroll: true,
+    onSuccess: () => closeTransfer(),
+    onError: (errors) => {
+      transferError.value = errors.booking ?? null
+      transferSwapOffer.value = null
+    },
+    onFinish: () => { movingBookingId.value = null; swapPending.value = false },
   })
 }
 </script>
@@ -443,15 +480,22 @@ function submitTransfer() {
           </option>
         </AppSelect>
 
-        <div v-if="transferRoomId" class="rounded-lg border px-3 py-2 text-sm"
+        <div v-if="transferRoomId && !transferError" class="rounded-lg border px-3 py-2 text-sm"
           :class="transferConflict ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'">
-          <span v-if="transferConflict">Occupied by "{{ transferConflict.title }}" during this period. Choose another laboratory.</span>
+          <span v-if="transferConflict">Occupied by "{{ transferConflict.title }}" during this period.</span>
           <span v-else>This laboratory is vacant for the requested day and time.</span>
+        </div>
+
+        <div v-if="transferError" class="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <p>{{ transferError }}</p>
+          <AppButton v-if="transferSwapOffer" type="button" variant="secondary" :loading="swapPending" @click="submitTransferSwap">
+            <ArrowsRightLeftIcon class="h-4 w-4" /> Swap Rooms Instead
+          </AppButton>
         </div>
 
         <div class="flex justify-end gap-2 border-t border-slate-100 pt-3">
           <AppButton type="button" variant="secondary" @click="closeTransfer">Cancel</AppButton>
-          <AppButton type="submit" :disabled="!transferRoomId || !!transferConflict" :loading="movingBookingId === transferBooking.id">
+          <AppButton type="submit" :disabled="!transferRoomId" :loading="movingBookingId === transferBooking.id && !swapPending">
             <ArrowRightIcon class="h-4 w-4" /> Transfer
           </AppButton>
         </div>
