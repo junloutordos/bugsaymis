@@ -282,10 +282,13 @@ function submitTransfer() {
       if (transferBooking.value?.id === bookingId) closeTransfer()
     },
     onError: (errors) => {
-      clearSharedTransferErrors()
-      if (transferBooking.value?.id !== bookingId) return
+      if (transferBooking.value?.id !== bookingId) {
+        clearSharedTransferErrors()
+        return
+      }
       transferError.value = errors.booking ?? null
       transferSwapOffer.value = errors.can_swap === '1' ? { title: errors.conflict_title } : null
+      clearSharedTransferErrors()
     },
     onFinish: () => {
       if (movingBookingId.value === bookingId) movingBookingId.value = null
@@ -308,10 +311,13 @@ function submitTransferSwap() {
       if (transferBooking.value?.id === bookingId) closeTransfer()
     },
     onError: (errors) => {
-      clearSharedTransferErrors()
-      if (transferBooking.value?.id !== bookingId) return
+      if (transferBooking.value?.id !== bookingId) {
+        clearSharedTransferErrors()
+        return
+      }
       transferError.value = errors.booking ?? null
       transferSwapOffer.value = null
+      clearSharedTransferErrors()
     },
     onFinish: () => {
       if (movingBookingId.value === bookingId) movingBookingId.value = null
