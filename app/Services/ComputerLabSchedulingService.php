@@ -21,10 +21,7 @@ class ComputerLabSchedulingService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $movable = ($locked->isPriorityClass() && $locked->status === 'confirmed')
-                || (! $locked->isPriorityClass() && $locked->status === 'approved');
-
-            if (! $movable) {
+            if (! $this->isMovable($locked)) {
                 throw ValidationException::withMessages([
                     'booking' => 'Only confirmed priority classes and approved bookings can be moved.',
                 ]);
@@ -78,14 +75,17 @@ class ComputerLabSchedulingService
 
     private function canSwap(ComputerLabBooking $locked, ComputerLabBooking $conflict): bool
     {
-        $conflictMovable = ($conflict->isPriorityClass() && $conflict->status === 'confirmed')
-            || (! $conflict->isPriorityClass() && $conflict->status === 'approved');
-
-        if (! $conflictMovable) {
+        if (! $this->isMovable($conflict)) {
             return false;
         }
 
         return $this->moveConflicts($conflict, (int) $locked->room_id, $locked->id)->isEmpty();
+    }
+
+    private function isMovable(ComputerLabBooking $booking): bool
+    {
+        return ($booking->isPriorityClass() && $booking->status === 'confirmed')
+            || (! $booking->isPriorityClass() && $booking->status === 'approved');
     }
 
     /**
