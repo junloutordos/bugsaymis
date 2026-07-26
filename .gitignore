@@ -37,3 +37,6 @@ storage/app/pshs-crc-dts-19dea47e8396.json
 /docs/flowchart-architecture.md
 /output/pdf/module-architecture.pdf
 /output/pdf/flowchart-architecture-diagram.pdf
+
+# Superpowers SDD scratch workspace (per-plan ledgers, briefs, reports)
+/.superpowers/
