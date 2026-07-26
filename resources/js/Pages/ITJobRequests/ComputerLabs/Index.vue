@@ -257,19 +257,26 @@ function submitTransfer() {
   if (!transferBooking.value || !transferRoomId.value || movingBookingId.value) return
 
   const booking = transferBooking.value
-  movingBookingId.value = booking.id
+  const bookingId = booking.id
+  const roomId = Number(transferRoomId.value)
+  movingBookingId.value = bookingId
   swapPending.value = false
   transferError.value = null
   transferSwapOffer.value = null
 
-  router.patch(route('computer-labs.bookings.move', booking.id), { room_id: Number(transferRoomId.value) }, {
+  router.patch(route('computer-labs.bookings.move', bookingId), { room_id: roomId }, {
     preserveScroll: true,
-    onSuccess: () => closeTransfer(),
+    onSuccess: () => {
+      if (transferBooking.value?.id === bookingId) closeTransfer()
+    },
     onError: (errors) => {
+      if (transferBooking.value?.id !== bookingId) return
       transferError.value = errors.booking ?? null
       transferSwapOffer.value = errors.can_swap === '1' ? { title: errors.conflict_title } : null
     },
-    onFinish: () => { movingBookingId.value = null },
+    onFinish: () => {
+      if (movingBookingId.value === bookingId) movingBookingId.value = null
+    },
   })
 }
 
@@ -277,17 +284,25 @@ function submitTransferSwap() {
   if (!transferBooking.value || !transferRoomId.value || movingBookingId.value) return
 
   const booking = transferBooking.value
-  movingBookingId.value = booking.id
+  const bookingId = booking.id
+  const roomId = Number(transferRoomId.value)
+  movingBookingId.value = bookingId
   swapPending.value = true
 
-  router.patch(route('computer-labs.bookings.move', booking.id), { room_id: Number(transferRoomId.value), swap: true }, {
+  router.patch(route('computer-labs.bookings.move', bookingId), { room_id: roomId, swap: true }, {
     preserveScroll: true,
-    onSuccess: () => closeTransfer(),
+    onSuccess: () => {
+      if (transferBooking.value?.id === bookingId) closeTransfer()
+    },
     onError: (errors) => {
+      if (transferBooking.value?.id !== bookingId) return
       transferError.value = errors.booking ?? null
       transferSwapOffer.value = null
     },
-    onFinish: () => { movingBookingId.value = null; swapPending.value = false },
+    onFinish: () => {
+      if (movingBookingId.value === bookingId) movingBookingId.value = null
+      swapPending.value = false
+    },
   })
 }
 </script>
