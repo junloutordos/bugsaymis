@@ -375,6 +375,13 @@ class ComputerLabSchedulingTest extends TestCase
         }
 
         try {
+            app(ComputerLabSchedulingService::class)->moveToRoom($moving, $rooms[1]->id);
+            $this->fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            $this->assertSame('0', $e->errors()['can_swap'][0]);
+        }
+
+        try {
             app(ComputerLabSchedulingService::class)->moveToRoom($moving, $rooms[1]->id, true);
             $this->fail('Expected a ValidationException.');
         } catch (ValidationException $e) {
@@ -439,6 +446,13 @@ class ComputerLabSchedulingTest extends TestCase
         ]);
 
         try {
+            $service->moveToRoom($priority, $targetRoom->id);
+            $this->fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            $this->assertSame('0', $e->errors()['can_swap'][0]);
+        }
+
+        try {
             $service->moveToRoom($priority, $targetRoom->id, true);
             $this->fail('Expected a ValidationException.');
         } catch (ValidationException $e) {
@@ -447,6 +461,53 @@ class ComputerLabSchedulingTest extends TestCase
 
         $this->assertSame($priorityOriginalRoom, $priority->refresh()->room_id);
         $this->assertSame($targetRoom->id, $conflict->refresh()->room_id);
+    }
+
+    public function test_swap_is_not_offered_when_the_conflicting_booking_is_not_independently_movable(): void
+    {
+        $rooms = Room::where('room_type', 'Computer Laboratory')->orderBy('id')->get();
+
+        $moving = ComputerLabBooking::create([
+            'room_id' => $rooms[0]->id,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-06-03',
+            'day_of_week' => 'Tuesday',
+            'start_time' => '13:00',
+            'end_time' => '14:00',
+            'booking_type' => 'other',
+            'title' => 'Robotics Club',
+            'purpose' => 'Training',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        // Force an inconsistent seed: a priority_class row with status
+        // 'approved' can never be produced by synchronizeTerm() (which only
+        // ever writes 'confirmed' or 'unassigned' for priority classes), but
+        // the movable guard must still reject swapping into it if this state
+        // ever occurs.
+        $conflict = ComputerLabBooking::create([
+            'room_id' => $rooms[1]->id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '13:00',
+            'end_time' => '14:00',
+            'booking_type' => 'priority_class',
+            'title' => 'Inconsistent priority row',
+            'purpose' => 'Invalid state for testing',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        try {
+            app(ComputerLabSchedulingService::class)->moveToRoom($moving, $rooms[1]->id);
+            $this->fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            $this->assertSame('0', $e->errors()['can_swap'][0]);
+        }
+
+        $this->assertSame($rooms[0]->id, $moving->refresh()->room_id);
+        $this->assertSame($rooms[1]->id, $conflict->refresh()->room_id);
     }
 
     public function test_conflict_error_exposes_swap_metadata_when_swap_is_offered(): void
