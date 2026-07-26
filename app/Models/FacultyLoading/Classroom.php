@@ -24,6 +24,7 @@ class Classroom extends Model
         'is_available',
         'remarks',
         'nfc_uuid',
+        'qr_token',
     ];
 
     protected $casts = [

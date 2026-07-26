@@ -21,6 +21,7 @@ class TeacherAttendanceExport implements FromArray, WithHeadings, WithStyles
             'Tapped At',
             'Status',
             'Late (min)',
+            'Channel',
         ];
     }
 
@@ -35,6 +36,7 @@ class TeacherAttendanceExport implements FromArray, WithHeadings, WithStyles
                 $log->tapped_at?->format('Y-m-d H:i') ?? '—',
                 ucfirst(str_replace('_', ' ', $log->status)),
                 $log->late_minutes ?? 0,
+                strtoupper($log->channel ?? 'nfc'),
             ];
         }, $this->rows);
     }

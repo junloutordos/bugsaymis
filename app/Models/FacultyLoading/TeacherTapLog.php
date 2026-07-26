@@ -18,12 +18,20 @@ class TeacherTapLog extends Model
         'status',
         'is_late',
         'late_minutes',
+        'channel',
+        'ip_address',
+        'location_status',
+        'network_status',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
         'tapped_at'    => 'datetime',
         'is_late'      => 'boolean',
         'late_minutes' => 'integer',
+        'latitude'     => 'decimal:7',
+        'longitude'    => 'decimal:7',
     ];
 
     // ── Relationships ─────────────────────────────────────────────────────────
