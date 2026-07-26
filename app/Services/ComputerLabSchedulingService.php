@@ -13,9 +13,9 @@ use Illuminate\Validation\ValidationException;
 
 class ComputerLabSchedulingService
 {
-    public function moveToRoom(ComputerLabBooking $booking, int $roomId): void
+    public function moveToRoom(ComputerLabBooking $booking, int $roomId, bool $swap = false): bool
     {
-        DB::transaction(function () use ($booking, $roomId) {
+        return DB::transaction(function () use ($booking, $roomId, $swap) {
             $locked = ComputerLabBooking::with('academicTerm')
                 ->whereKey($booking->id)
                 ->lockForUpdate()
@@ -42,21 +42,50 @@ class ComputerLabSchedulingService
             }
 
             if ((int) $locked->room_id === $roomId) {
-                return;
+                return false;
             }
 
-            $conflict = $this->moveConflicts($locked, $roomId)->first();
-            if ($conflict) {
-                throw ValidationException::withMessages([
-                    'booking' => "{$room->name} is already occupied by {$conflict->title} during this period.",
+            $conflicts = $this->moveConflicts($locked, $roomId);
+            if ($conflicts->isEmpty()) {
+                $locked->update([
+                    'room_id' => $roomId,
+                    'conflict_note' => null,
                 ]);
+
+                return false;
             }
 
-            $locked->update([
-                'room_id' => $roomId,
-                'conflict_note' => null,
-            ]);
+            $conflict = $conflicts->first();
+            $canSwap = $conflicts->count() === 1 && $this->canSwap($locked, $conflict);
+
+            if ($swap && $canSwap) {
+                $originalRoomId = (int) $locked->room_id;
+                $locked->update(['room_id' => $roomId, 'conflict_note' => null]);
+                $conflict->update(['room_id' => $originalRoomId, 'conflict_note' => null]);
+
+                return true;
+            }
+
+            throw ValidationException::withMessages(array_merge([
+                'booking' => "{$room->name} is already occupied by {$conflict->title} during this period.",
+            ], $swap ? [] : [
+                'conflict_booking_id' => (string) $conflict->id,
+                'conflict_title' => $conflict->title,
+                'can_swap' => $canSwap ? '1' : '0',
+            ]));
         });
+    }
+
+    private function canSwap(ComputerLabBooking $locked, ComputerLabBooking $conflict): bool
+    {
+        $conflictMovable = ($conflict->isPriorityClass() && $conflict->status === 'confirmed')
+            || (! $conflict->isPriorityClass() && $conflict->status === 'approved');
+
+        if (! $conflictMovable) {
+            return false;
+        }
+
+        return $this->moveConflicts($conflict, (int) $locked->room_id, $locked->id)->isEmpty();
     }
 
     /**
@@ -269,12 +298,13 @@ class ComputerLabSchedulingService
             ->get();
     }
 
-    private function moveConflicts(ComputerLabBooking $booking, int $roomId): Collection
+    private function moveConflicts(ComputerLabBooking $booking, int $roomId, ?int $ignoreId = null): Collection
     {
         $candidates = ComputerLabBooking::query()
             ->where('room_id', $roomId)
             ->where('academic_term_id', $booking->academic_term_id)
             ->whereKeyNot($booking->id)
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))
             ->occupying()
             ->where('start_time', '<', $booking->end_time)
             ->where('end_time', '>', $booking->start_time)
