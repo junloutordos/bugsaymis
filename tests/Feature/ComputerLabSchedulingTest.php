@@ -23,7 +23,9 @@ class ComputerLabSchedulingTest extends TestCase
     use RefreshDatabase;
 
     private AcademicTerm $term;
+
     private Subject $subject;
+
     private User $faculty;
 
     protected function setUp(): void
@@ -257,6 +259,250 @@ class ComputerLabSchedulingTest extends TestCase
 
         $this->expectException(ValidationException::class);
         $service->moveToRoom($priority, $targetRoom->id);
+    }
+
+    public function test_swap_exchanges_rooms_between_two_approved_ad_hoc_bookings(): void
+    {
+        $rooms = Room::where('room_type', 'Computer Laboratory')->orderBy('id')->get();
+
+        $bookingA = ComputerLabBooking::create([
+            'room_id' => $rooms[0]->id,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-06-03',
+            'day_of_week' => 'Tuesday',
+            'start_time' => '13:00',
+            'end_time' => '14:00',
+            'booking_type' => 'other',
+            'title' => 'Robotics Club',
+            'purpose' => 'Training',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        $bookingB = ComputerLabBooking::create([
+            'room_id' => $rooms[1]->id,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-06-03',
+            'day_of_week' => 'Tuesday',
+            'start_time' => '13:00',
+            'end_time' => '14:00',
+            'booking_type' => 'other',
+            'title' => 'Chess Club',
+            'purpose' => 'Practice',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        $roomA = $bookingA->room_id;
+        $roomB = $bookingB->room_id;
+
+        $swapped = app(ComputerLabSchedulingService::class)->moveToRoom($bookingA, $roomB, true);
+
+        $this->assertTrue($swapped);
+        $this->assertSame($roomB, $bookingA->refresh()->room_id);
+        $this->assertSame($roomA, $bookingB->refresh()->room_id);
+        $this->assertSame('approved', $bookingA->status);
+        $this->assertSame('approved', $bookingB->status);
+    }
+
+    public function test_swap_exchanges_rooms_between_two_recurring_priority_classes(): void
+    {
+        foreach (range(1, 2) as $number) {
+            ClassSchedule::create([
+                'user_id' => $this->faculty->id,
+                'subject_id' => $this->subject->id,
+                'section_id' => null,
+                'classroom_id' => null,
+                'school_year_id' => $this->term->school_year_id,
+                'academic_term_id' => $this->term->id,
+                'entry_type' => 'class',
+                'day_of_week' => 'Friday',
+                'start_time' => '09:00',
+                'end_time' => '10:00',
+                'status' => 'active',
+            ]);
+        }
+
+        $service = app(ComputerLabSchedulingService::class);
+        $service->synchronizeTerm($this->term->id);
+        [$first, $second] = ComputerLabBooking::where('booking_type', 'priority_class')->orderBy('id')->get();
+        $firstOriginalRoom = $first->room_id;
+        $secondOriginalRoom = $second->room_id;
+
+        $swapped = $service->moveToRoom($first, $secondOriginalRoom, true);
+
+        $this->assertTrue($swapped);
+        $this->assertSame($secondOriginalRoom, $first->refresh()->room_id);
+        $this->assertSame($firstOriginalRoom, $second->refresh()->room_id);
+    }
+
+    public function test_swap_is_not_offered_when_multiple_bookings_conflict_in_target_room(): void
+    {
+        $rooms = Room::where('room_type', 'Computer Laboratory')->orderBy('id')->get();
+
+        $moving = ComputerLabBooking::create([
+            'room_id' => $rooms[0]->id,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-06-03',
+            'day_of_week' => 'Tuesday',
+            'start_time' => '13:00',
+            'end_time' => '14:00',
+            'booking_type' => 'other',
+            'title' => 'Robotics Club',
+            'purpose' => 'Training',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        // Two overlapping bookings placed directly in the target room to force
+        // an ambiguous conflict. This state can't arise through the service
+        // itself (it always checks before writing), only through direct
+        // seeding — but the "exactly one conflict" guard must still hold.
+        foreach ([['13:00', '14:00', 'Chess Club'], ['13:30', '14:30', 'Debate Society']] as [$start, $end, $title]) {
+            ComputerLabBooking::create([
+                'room_id' => $rooms[1]->id,
+                'academic_term_id' => $this->term->id,
+                'booking_date' => '2098-06-03',
+                'day_of_week' => 'Tuesday',
+                'start_time' => $start,
+                'end_time' => $end,
+                'booking_type' => 'other',
+                'title' => $title,
+                'purpose' => 'Practice',
+                'requested_by' => $this->faculty->id,
+                'status' => 'approved',
+            ]);
+        }
+
+        try {
+            app(ComputerLabSchedulingService::class)->moveToRoom($moving, $rooms[1]->id, true);
+            $this->fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            $this->assertArrayNotHasKey('can_swap', $e->errors());
+        }
+
+        $this->assertSame($rooms[0]->id, $moving->refresh()->room_id);
+    }
+
+    public function test_swap_fails_when_reverse_room_is_not_actually_free(): void
+    {
+        $schedule = ClassSchedule::create([
+            'user_id' => $this->faculty->id,
+            'subject_id' => $this->subject->id,
+            'section_id' => null,
+            'classroom_id' => null,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'entry_type' => 'class',
+            'day_of_week' => 'Monday',
+            'start_time' => '08:00',
+            'end_time' => '09:00',
+            'status' => 'active',
+        ]);
+
+        $service = app(ComputerLabSchedulingService::class);
+        $service->synchronizeTerm($this->term->id);
+        $priority = ComputerLabBooking::where('class_schedule_id', $schedule->id)->firstOrFail();
+        $priorityOriginalRoom = $priority->room_id;
+
+        $targetRoom = Room::where('room_type', 'Computer Laboratory')->whereKeyNot($priorityOriginalRoom)->firstOrFail();
+        $conflict = ComputerLabBooking::create([
+            'room_id' => $targetRoom->id,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-07-07', // a Monday within the term
+            'day_of_week' => 'Monday',
+            'start_time' => '08:00',
+            'end_time' => '09:00',
+            'booking_type' => 'other',
+            'title' => 'One-off robotics session',
+            'purpose' => 'Training',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        // Force an inconsistent seed: another booking already sits in the
+        // priority class's own room on the exact date the conflicting
+        // booking would need to move to, so the reverse fit must fail even
+        // though the forward conflict looks like a clean 1-for-1 swap.
+        ComputerLabBooking::create([
+            'room_id' => $priorityOriginalRoom,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-07-07',
+            'day_of_week' => 'Monday',
+            'start_time' => '08:00',
+            'end_time' => '09:00',
+            'booking_type' => 'other',
+            'title' => 'Pre-existing session',
+            'purpose' => 'Blocks the reverse swap',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        try {
+            $service->moveToRoom($priority, $targetRoom->id, true);
+            $this->fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            $this->assertArrayNotHasKey('can_swap', $e->errors());
+        }
+
+        $this->assertSame($priorityOriginalRoom, $priority->refresh()->room_id);
+        $this->assertSame($targetRoom->id, $conflict->refresh()->room_id);
+    }
+
+    public function test_conflict_error_exposes_swap_metadata_when_swap_is_offered(): void
+    {
+        foreach (range(1, 2) as $number) {
+            ClassSchedule::create([
+                'user_id' => $this->faculty->id,
+                'subject_id' => $this->subject->id,
+                'section_id' => null,
+                'classroom_id' => null,
+                'school_year_id' => $this->term->school_year_id,
+                'academic_term_id' => $this->term->id,
+                'entry_type' => 'class',
+                'day_of_week' => 'Friday',
+                'start_time' => '09:00',
+                'end_time' => '10:00',
+                'status' => 'active',
+            ]);
+        }
+
+        $service = app(ComputerLabSchedulingService::class);
+        $service->synchronizeTerm($this->term->id);
+        [$first, $second] = ComputerLabBooking::where('booking_type', 'priority_class')->orderBy('id')->get();
+
+        try {
+            $service->moveToRoom($first, $second->room_id);
+            $this->fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            $errors = $e->errors();
+            $this->assertSame((string) $second->id, $errors['conflict_booking_id'][0]);
+            $this->assertSame($second->title, $errors['conflict_title'][0]);
+            $this->assertSame('1', $errors['can_swap'][0]);
+        }
+    }
+
+    public function test_move_returns_false_and_swap_flag_is_a_no_op_when_destination_is_free(): void
+    {
+        $rooms = Room::where('room_type', 'Computer Laboratory')->orderBy('id')->get();
+        $booking = ComputerLabBooking::create([
+            'room_id' => $rooms[0]->id,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-06-03',
+            'day_of_week' => 'Tuesday',
+            'start_time' => '13:00',
+            'end_time' => '14:00',
+            'booking_type' => 'other',
+            'title' => 'Approved training',
+            'purpose' => 'Training',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        $swapped = app(ComputerLabSchedulingService::class)->moveToRoom($booking, $rooms[3]->id, true);
+
+        $this->assertFalse($swapped);
+        $this->assertSame($rooms[3]->id, $booking->refresh()->room_id);
     }
 
     public function test_manager_can_move_a_booking_through_the_room_endpoint(): void
