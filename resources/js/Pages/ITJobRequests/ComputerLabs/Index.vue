@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppBadge from '@/Components/AppBadge.vue'
@@ -207,6 +207,17 @@ function moveBooking({ booking, roomId }) {
   })
 }
 
+const page = usePage()
+
+function clearSharedTransferErrors() {
+  const errors = page.props.errors
+  if (!errors) return
+  delete errors.booking
+  delete errors.conflict_booking_id
+  delete errors.conflict_title
+  delete errors.can_swap
+}
+
 const transferModal = ref(false)
 const transferBooking = ref(null)
 const transferRoomId = ref(null)
@@ -251,6 +262,7 @@ function closeTransfer() {
   transferRoomId.value = null
   transferError.value = null
   transferSwapOffer.value = null
+  clearSharedTransferErrors()
 }
 
 function submitTransfer() {
@@ -270,6 +282,7 @@ function submitTransfer() {
       if (transferBooking.value?.id === bookingId) closeTransfer()
     },
     onError: (errors) => {
+      clearSharedTransferErrors()
       if (transferBooking.value?.id !== bookingId) return
       transferError.value = errors.booking ?? null
       transferSwapOffer.value = errors.can_swap === '1' ? { title: errors.conflict_title } : null
@@ -295,6 +308,7 @@ function submitTransferSwap() {
       if (transferBooking.value?.id === bookingId) closeTransfer()
     },
     onError: (errors) => {
+      clearSharedTransferErrors()
       if (transferBooking.value?.id !== bookingId) return
       transferError.value = errors.booking ?? null
       transferSwapOffer.value = null
