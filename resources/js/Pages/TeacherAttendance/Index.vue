@@ -285,6 +285,7 @@ function exportHistory() {
                 <th class="text-left py-3 px-4">Section</th>
                 <th class="text-left py-3 px-4">Status</th>
                 <th class="text-left py-3 px-4">Late</th>
+                <th class="text-left py-3 px-4">Channel</th>
               </tr>
             </thead>
             <tbody>
@@ -308,6 +309,14 @@ function exportHistory() {
                 </td>
                 <td class="py-3 px-4 text-amber-600 text-xs">
                   {{ log.late_minutes > 0 ? `+${log.late_minutes}m` : '—' }}
+                </td>
+                <td class="py-3 px-4">
+                  <span
+                    :class="['inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
+                      log.channel === 'qr' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600']"
+                  >
+                    {{ log.channel === 'qr' ? 'QR' : 'NFC' }}
+                  </span>
                 </td>
               </tr>
             </tbody>

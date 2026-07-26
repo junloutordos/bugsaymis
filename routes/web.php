@@ -2475,10 +2475,23 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
 
 // ── Teacher Class Attendance (NFC Tap-In) ────────────────────────────────────
 Route::middleware(['auth'])->group(function () {
-    // NFC tap endpoint — NFC tag encodes /class-tap/{uuid}, auto-logs on load
+    // NFC tap endpoint — NFC tag encodes /class-tap/{uuid}, auto-logs on load.
+    // nfc_uuid is never printed/exposed via the QR — this route is only ever
+    // reachable by physically tapping the tag.
     Route::get('/class-tap/{uuid}', [\App\Http\Controllers\TeacherAttendanceController::class, 'tap'])
         ->name('class-tap')
         ->where('uuid', '[0-9a-f\-]{36}');
+
+    // QR tap endpoint — printed card encodes /class-tap-qr/{qr_token}, a
+    // separate secret from nfc_uuid. Always renders the confirm page, which
+    // gates on location/network before any attendance is recorded.
+    Route::get('/class-tap-qr/{qrToken}', [\App\Http\Controllers\TeacherAttendanceController::class, 'tapViaQr'])
+        ->name('class-tap-qr')
+        ->where('qrToken', '[A-Za-z0-9]{40}');
+
+    Route::post('/class-tap-qr/{qrToken}/confirm', [\App\Http\Controllers\TeacherAttendanceController::class, 'confirmQrTap'])
+        ->name('class-tap-qr.confirm')
+        ->where('qrToken', '[A-Za-z0-9]{40}');
 
     // Monitoring dashboard (AUH / CID Chief / Admin)
     Route::get('/teacher-attendance',        [\App\Http\Controllers\TeacherAttendanceController::class, 'index'])->name('teacher-attendance.index');

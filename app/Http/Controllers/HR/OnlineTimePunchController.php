@@ -8,6 +8,7 @@ use App\Models\HR\FaceEnrollment;
 use App\Models\HR\OnlinePunchGeofenceZone;
 use App\Models\HR\OnlinePunchNetworkRule;
 use App\Models\HR\OnlineTimePunch;
+use App\Services\CampusPresenceService;
 use App\Services\HR\DTRService;
 use App\Services\HR\FaceRecognitionService;
 use Carbon\Carbon;
@@ -22,6 +23,7 @@ class OnlineTimePunchController extends Controller
     public function __construct(
         private readonly FaceRecognitionService $faceService,
         private readonly DTRService $dtrService,
+        private readonly CampusPresenceService $campusPresence,
     ) {}
 
     // ─── Inertia Page ─────────────────────────────────────────────────────────
@@ -71,7 +73,7 @@ class OnlineTimePunchController extends Controller
             'accuracy'  => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $gate = $this->faceService->resolveLocationGate(
+        $gate = $this->campusPresence->resolveLocationGate(
             lat:      (float) $data['latitude'],
             lng:      (float) $data['longitude'],
             accuracy: isset($data['accuracy']) ? (float) $data['accuracy'] : null,

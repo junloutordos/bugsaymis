@@ -370,9 +370,11 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::get('/',                            [ClassroomController::class, 'index'])->name('index');
                 Route::post('/',                           [ClassroomController::class, 'store'])->name('store');
                 Route::post('/copy-from-year',             [ClassroomController::class, 'copyFromYear'])->name('copy-from-year');
+                Route::get('/print-all',                   [ClassroomController::class, 'printAll'])->name('print-all');
                 Route::put('/{classroom}',                 [ClassroomController::class, 'update'])->name('update');
                 Route::delete('/{classroom}',              [ClassroomController::class, 'destroy'])->name('destroy');
                 Route::post('/{classroom}/regenerate-nfc', [ClassroomController::class, 'regenerateNfc'])->name('regenerate-nfc');
+                Route::get('/{classroom}/print',           [ClassroomController::class, 'printCard'])->name('print');
             });
 
         // ══════════════════════════════════════════════════════════════════════

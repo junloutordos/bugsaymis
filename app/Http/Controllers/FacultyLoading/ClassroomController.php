@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class ClassroomController extends Controller
 {
@@ -125,9 +126,77 @@ class ClassroomController extends Controller
     {
         $this->authorize('faculty_loading.classrooms');
 
-        $classroom->update(['nfc_uuid' => Str::uuid()->toString()]);
+        // qr_token is regenerated alongside nfc_uuid — they're independent
+        // secrets (the QR must never share an identifier with the physical
+        // tag, or its gated route could be bypassed via the bare NFC URL),
+        // but both go stale together operationally: a fresh tag also means
+        // reprinting the card.
+        $classroom->update([
+            'nfc_uuid' => Str::uuid()->toString(),
+            'qr_token' => Str::random(40),
+        ]);
 
-        return back()->with('success', "NFC tag for \"{$classroom->name}\" regenerated. Reprogram the physical tag with the new URL.");
+        return back()->with('success', "NFC tag for \"{$classroom->name}\" regenerated. Reprogram the physical tag and reprint the card.");
+    }
+
+    /** Single-card CR-80 print — the classroom must already have an NFC UUID. */
+    public function printCard(Classroom $classroom): Response
+    {
+        $this->authorize('faculty_loading.classrooms');
+
+        if (! $classroom->nfc_uuid) {
+            return back()->withErrors(['error' => "\"{$classroom->name}\" has no NFC tag yet — regenerate its NFC UUID first."]);
+        }
+
+        return Inertia::render('FacultyLoading/Classrooms/PrintCard', [
+            'cards' => [$this->cardData($classroom)],
+            'skippedCount' => 0,
+            'skippedNames' => [],
+        ]);
+    }
+
+    /** Bulk print for every NFC-provisioned classroom in a school year. */
+    public function printAll(Request $request): Response
+    {
+        $this->authorize('faculty_loading.classrooms');
+
+        $currentSy    = SchoolYear::where('is_current', true)->first();
+        $schoolYearId = (int) $request->input('school_year_id', $currentSy?->id);
+
+        $classrooms = Classroom::where('school_year_id', $schoolYearId)
+            ->orderBy('building')->orderBy('name')->get();
+
+        $printable = $classrooms->filter(fn ($c) => (bool) $c->nfc_uuid);
+        $skipped   = $classrooms->filter(fn ($c) => ! $c->nfc_uuid);
+
+        return Inertia::render('FacultyLoading/Classrooms/PrintCard', [
+            'cards' => $printable->map(fn ($c) => $this->cardData($c))->values(),
+            'skippedCount' => $skipped->count(),
+            'skippedNames' => $skipped->pluck('name')->values(),
+        ]);
+    }
+
+    /**
+     * Shared per-card data for the print page. The QR encodes the classroom's
+     * qr_token via a completely separate, always-gated route — never the
+     * bare NFC URL — so there is no client-controlled way to convert a
+     * QR-obtained request into the ungated NFC path.
+     */
+    private function cardData(Classroom $classroom): array
+    {
+        if (! $classroom->qr_token) {
+            $classroom->update(['qr_token' => Str::random(40)]);
+        }
+
+        $qrUrl = url('/class-tap-qr/'.$classroom->qr_token);
+
+        return [
+            'name'     => $classroom->name,
+            'code'     => $classroom->code,
+            'building' => $classroom->building,
+            'floor'    => $classroom->floor,
+            'qrSvg'    => (string) QrCode::format('svg')->size(240)->margin(0)->generate($qrUrl),
+        ];
     }
 
     public function destroy(Classroom $classroom): RedirectResponse
@@ -145,8 +214,9 @@ class ClassroomController extends Controller
 
     /**
      * Copy all classrooms from a source school year into a target school year.
-     * NFC UUIDs are copied so the same physical tags remain functional in the new year.
-     * Skips any classroom code that already exists in the target year.
+     * NFC UUIDs and QR tokens are copied so the same physical tag and printed
+     * card remain functional in the new year. Skips any classroom code that
+     * already exists in the target year.
      */
     public function copyFromYear(Request $request): RedirectResponse
     {
@@ -181,6 +251,7 @@ class ClassroomController extends Controller
                 'is_available'   => $c->is_available,
                 'remarks'        => $c->remarks,
                 'nfc_uuid'       => $c->nfc_uuid, // preserve so physical tags still work
+                'qr_token'       => $c->qr_token, // preserve so the printed card's QR still works
             ]);
             $copied++;
         }

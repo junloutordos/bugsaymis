@@ -33,8 +33,16 @@ class TeacherAttendanceService
      *   schedule      => ClassSchedule|null (with subject, section relations loaded)
      *   classroom     => Classroom|null
      */
-    public function tap(string $nfcUuid, User $teacher): array
-    {
+    public function tap(
+        string $nfcUuid,
+        User $teacher,
+        string $channel = 'nfc',
+        ?string $ip = null,
+        ?float $lat = null,
+        ?float $lng = null,
+        ?string $locationStatus = null,
+        ?string $networkStatus = null,
+    ): array {
         $currentSyId = SchoolYear::where('is_current', true)->value('id');
         $classroom = Classroom::where('nfc_uuid', $nfcUuid)
             ->where('school_year_id', $currentSyId)
@@ -49,9 +57,18 @@ class TeacherAttendanceService
 
         $schedule = $this->findMatchingSchedule($teacher->id, $classroom->id, $dayOfWeek, $now);
 
+        $tapMeta = [
+            'channel' => $channel,
+            'ip_address' => $ip,
+            'location_status' => $locationStatus,
+            'network_status' => $networkStatus,
+            'latitude' => $lat,
+            'longitude' => $lng,
+        ];
+
         if (! $schedule) {
             // Log the no-match tap so we have an audit trail
-            $tap = TeacherTapLog::create([
+            $tap = TeacherTapLog::create(array_merge([
                 'user_id' => $teacher->id,
                 'classroom_id' => $classroom->id,
                 'class_schedule_id' => null,
@@ -59,7 +76,7 @@ class TeacherAttendanceService
                 'status' => 'no_match',
                 'is_late' => false,
                 'late_minutes' => 0,
-            ]);
+            ], $tapMeta));
 
             return ['status' => 'no_match', 'tap' => $tap, 'schedule' => null, 'classroom' => $classroom];
         }
@@ -80,7 +97,7 @@ class TeacherAttendanceService
         $isLate = $lateMinutes > self::GRACE_PERIOD_MINUTES;
         $tapStatus = $isLate ? 'late' : 'on_time';
 
-        $tap = TeacherTapLog::create([
+        $tap = TeacherTapLog::create(array_merge([
             'user_id' => $teacher->id,
             'classroom_id' => $classroom->id,
             'class_schedule_id' => $schedule->id,
@@ -88,7 +105,7 @@ class TeacherAttendanceService
             'status' => $tapStatus,
             'is_late' => $isLate,
             'late_minutes' => $lateMinutes,
-        ]);
+        ], $tapMeta));
 
         return ['status' => $tapStatus, 'tap' => $tap, 'schedule' => $schedule, 'classroom' => $classroom];
     }
@@ -190,6 +207,7 @@ class TeacherAttendanceService
                 'tap_status' => $displayStatus,
                 'tapped_at' => $tap?->tapped_at?->format('H:i'),
                 'late_minutes' => $tap?->late_minutes ?? 0,
+                'channel' => $tap?->channel,
             ];
         });
     }

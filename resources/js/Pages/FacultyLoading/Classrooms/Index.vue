@@ -8,6 +8,9 @@
           <AppButton variant="secondary" @click="copyModal = true">
             <DocumentDuplicateIcon class="h-4 w-4" /> Copy from Year
           </AppButton>
+          <AppButton variant="secondary" @click="printAll">
+            <PrinterIcon class="h-4 w-4" /> Print All Cards
+          </AppButton>
           <AppButton @click="openForm()">
             <PlusIcon class="h-4 w-4" /> New Classroom
           </AppButton>
@@ -107,6 +110,10 @@
                   <AppButton v-if="c.nfc_url" size="sm" :variant="copied === c.id ? 'success' : 'secondary'" @click="copyNfcUrl(c)">
                     <ClipboardDocumentIcon class="h-3 w-3" />
                     {{ copied === c.id ? 'Copied!' : 'Copy URL' }}
+                  </AppButton>
+                  <AppButton v-if="c.nfc_url" as="a" :href="route('faculty-loading.classrooms.print', c.id)" target="_blank" size="sm" variant="secondary">
+                    <PrinterIcon class="h-3 w-3" />
+                    Print Card
                   </AppButton>
                   <AppButton size="sm" variant="warning" @click="regenerate(c)" title="Generate new NFC UUID (reprogram physical tag after)">
                     <ArrowPathIcon class="h-3 w-3" />
@@ -217,7 +224,7 @@ import EmptyState from '@/Components/EmptyState.vue'
 import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import {
   BuildingOfficeIcon, CheckCircleIcon, DocumentDuplicateIcon, PencilIcon, PlusIcon,
-  TrashIcon, UsersIcon, SignalIcon, ClipboardDocumentIcon, ArrowPathIcon,
+  TrashIcon, UsersIcon, SignalIcon, ClipboardDocumentIcon, ArrowPathIcon, PrinterIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -237,6 +244,10 @@ const filters = reactive({
 
 function applyFilters() {
   router.get(route('faculty-loading.classrooms.index'), filters, { preserveState: true })
+}
+
+function printAll() {
+  window.open(route('faculty-loading.classrooms.print-all', { school_year_id: filters.school_year_id }), '_blank', 'noopener')
 }
 
 function typeBadge(type) {
