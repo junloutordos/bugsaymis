@@ -505,6 +505,84 @@ class ComputerLabSchedulingTest extends TestCase
         $this->assertSame($rooms[3]->id, $booking->refresh()->room_id);
     }
 
+    public function test_manager_can_swap_two_conflicting_priority_classes_through_the_room_endpoint(): void
+    {
+        foreach (range(1, 2) as $number) {
+            ClassSchedule::create([
+                'user_id' => $this->faculty->id,
+                'subject_id' => $this->subject->id,
+                'section_id' => null,
+                'classroom_id' => null,
+                'school_year_id' => $this->term->school_year_id,
+                'academic_term_id' => $this->term->id,
+                'entry_type' => 'class',
+                'day_of_week' => 'Friday',
+                'start_time' => '09:00',
+                'end_time' => '10:00',
+                'status' => 'active',
+            ]);
+        }
+
+        app(ComputerLabSchedulingService::class)->synchronizeTerm($this->term->id);
+        [$first, $second] = ComputerLabBooking::where('booking_type', 'priority_class')->orderBy('id')->get();
+        $firstOriginalRoom = $first->room_id;
+        $secondOriginalRoom = $second->room_id;
+
+        $manager = $this->userWithPermission('computer_labs.manage');
+
+        $this->actingAs($manager)
+            ->patch(route('computer-labs.bookings.move', $first), ['room_id' => $secondOriginalRoom])
+            ->assertSessionHasErrors('booking');
+
+        $this->actingAs($manager)
+            ->patch(route('computer-labs.bookings.move', $first), ['room_id' => $secondOriginalRoom, 'swap' => true])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($secondOriginalRoom, $first->refresh()->room_id);
+        $this->assertSame($firstOriginalRoom, $second->refresh()->room_id);
+    }
+
+    public function test_manager_cannot_force_a_swap_when_multiple_bookings_conflict_in_target_room(): void
+    {
+        $rooms = Room::where('room_type', 'Computer Laboratory')->orderBy('id')->get();
+
+        $moving = ComputerLabBooking::create([
+            'room_id' => $rooms[0]->id,
+            'academic_term_id' => $this->term->id,
+            'booking_date' => '2098-06-03',
+            'day_of_week' => 'Tuesday',
+            'start_time' => '13:00',
+            'end_time' => '14:00',
+            'booking_type' => 'other',
+            'title' => 'Robotics Club',
+            'purpose' => 'Training',
+            'requested_by' => $this->faculty->id,
+            'status' => 'approved',
+        ]);
+
+        foreach ([['13:00', '14:00', 'Chess Club'], ['13:30', '14:30', 'Debate Society']] as [$start, $end, $title]) {
+            ComputerLabBooking::create([
+                'room_id' => $rooms[1]->id,
+                'academic_term_id' => $this->term->id,
+                'booking_date' => '2098-06-03',
+                'day_of_week' => 'Tuesday',
+                'start_time' => $start,
+                'end_time' => $end,
+                'booking_type' => 'other',
+                'title' => $title,
+                'purpose' => 'Practice',
+                'requested_by' => $this->faculty->id,
+                'status' => 'approved',
+            ]);
+        }
+
+        $this->actingAs($this->userWithPermission('computer_labs.manage'))
+            ->patch(route('computer-labs.bookings.move', $moving), ['room_id' => $rooms[1]->id, 'swap' => true])
+            ->assertSessionHasErrors('booking');
+
+        $this->assertSame($rooms[0]->id, $moving->refresh()->room_id);
+    }
+
     public function test_manager_can_move_a_booking_through_the_room_endpoint(): void
     {
         $schedule = ClassSchedule::create([

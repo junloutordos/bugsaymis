@@ -9,20 +9,21 @@ use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\ICTEquipment;
 use App\Models\Room;
 use App\Models\User;
-use App\Services\ComputerLabSchedulingService;
 use App\Services\ComputerLabScheduleApprovalService;
+use App\Services\ComputerLabSchedulingService;
 use App\Services\DigitalSignatureService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ComputerLabController extends Controller
 {
     const LAB_ROWS = 5;
+
     const LAB_COLS = 6;
 
     public function index(Request $request, DigitalSignatureService $signatures)
@@ -111,12 +112,12 @@ class ComputerLabController extends Controller
             ->get();
 
         return Inertia::render('ITJobRequests/ComputerLabs/Show', [
-            'room'               => $room,
-            'equipments'         => $equipments,
-            'rows'               => self::LAB_ROWS,
-            'cols'               => self::LAB_COLS,
+            'room' => $room,
+            'equipments' => $equipments,
+            'rows' => self::LAB_ROWS,
+            'cols' => self::LAB_COLS,
             'latestAgentVersion' => AtlasSentinelRelease::latestRelease()?->version,
-            'scheduleUrl'        => route('computer-labs.index', ['lab_id' => $room->id]),
+            'scheduleUrl' => route('computer-labs.index', ['lab_id' => $room->id]),
         ]);
     }
 
@@ -222,11 +223,14 @@ class ComputerLabController extends Controller
                 'required',
                 Rule::exists('rooms', 'id')->where(fn ($query) => $query->where('room_type', 'Computer Laboratory')),
             ],
+            'swap' => ['sometimes', 'boolean'],
         ]);
 
-        $scheduler->moveToRoom($booking, (int) $data['room_id']);
+        $swapped = $scheduler->moveToRoom($booking, (int) $data['room_id'], (bool) ($data['swap'] ?? false));
 
-        return back()->with('success', 'Computer laboratory schedule moved successfully.');
+        return back()->with('success', $swapped
+            ? 'Computer laboratory schedules swapped successfully.'
+            : 'Computer laboratory schedule moved successfully.');
     }
 
     public function synchronize(
@@ -326,8 +330,8 @@ class ComputerLabController extends Controller
     public function updateSeat(Request $request, ICTEquipment $equipment)
     {
         $validator = Validator::make($request->all(), [
-            'lab_seat_row' => 'nullable|integer|min:1|max:' . self::LAB_ROWS,
-            'lab_seat_col' => 'nullable|integer|min:1|max:' . self::LAB_COLS,
+            'lab_seat_row' => 'nullable|integer|min:1|max:'.self::LAB_ROWS,
+            'lab_seat_col' => 'nullable|integer|min:1|max:'.self::LAB_COLS,
         ]);
 
         if ($validator->fails()) {
