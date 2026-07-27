@@ -304,6 +304,33 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->where('coordinatorName', 'COORDINATOR PERSON'));
     }
 
+    public function test_print_resolves_coordinator_override_name_not_the_section_adviser(): void
+    {
+        $adviser = User::factory()->create(['name' => 'Adviser Person']);
+        $coordinator = User::factory()->create(['name' => 'Coordinator Person']);
+        $teacher = User::factory()->create();
+        $section = $this->makeSection(['adviser' => $adviser->id]);
+        $subject = $this->makeSubject();
+
+        app(\App\Services\FacultyLoading\HeadAdvisoryService::class)->syncSectionAdviser($section, null);
+        $section->update(['homeroom_coordinator_id' => $coordinator->id]);
+        app(\App\Services\FacultyLoading\HeadAdvisoryService::class)->syncHomeroomCoordinator($section->fresh(), null);
+
+        $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
+
+        $this->actingAs($coordinator)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('ClassRecord/Wat/Print')
+                ->where('coordinatorName', 'COORDINATOR PERSON'));
+
+        // The former adviser no longer holds coordinator access for this section.
+        $this->actingAs($adviser)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
+            ->assertForbidden();
+    }
+
     public function test_print_includes_cid_chief_signatory(): void
     {
         $coordinator = User::factory()->create();
