@@ -304,8 +304,12 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->where('coordinatorName', 'COORDINATOR PERSON'));
     }
 
-    public function test_print_resolves_coordinator_override_name_not_the_section_adviser(): void
+    public function test_print_resolves_grade_wide_coordinator_name_over_the_section_adviser(): void
     {
+        // A campus-wide grade-band coordinator (e.g. "COORD-HRG8" — one
+        // designation covering every section in the grade) is a real,
+        // pre-existing role in this school, separate from the per-section
+        // adviser — see AdvisoryScheduleScopeService::gradeWideCoordinatorAssignments().
         $adviser = User::factory()->create(['name' => 'Adviser Person']);
         $coordinator = User::factory()->create(['name' => 'Coordinator Person']);
         $teacher = User::factory()->create();
@@ -313,8 +317,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $subject = $this->makeSubject();
 
         app(\App\Services\FacultyLoading\HeadAdvisoryService::class)->syncSectionAdviser($section, null);
-        $section->update(['homeroom_coordinator_id' => $coordinator->id]);
-        app(\App\Services\FacultyLoading\HeadAdvisoryService::class)->syncHomeroomCoordinator($section->fresh(), null);
+        $this->assignCoordinator($coordinator, 'COORD', 'COORD-HRG8', 'HR Coordinator (G8)');
 
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
@@ -325,16 +328,15 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->component('ClassRecord/Wat/Print')
                 ->where('coordinatorName', 'COORDINATOR PERSON'));
 
-        // The former adviser no longer holds coordinator access for this section.
-        $this->actingAs($adviser)
-            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
-            ->assertForbidden();
-
-        // But the adviser keeps their own Load Assignment credit for it —
-        // losing WAT access must not erase their HRA-/HAC- designation row.
+        // The section's own adviser keeps their Load Assignment credit AND
+        // their own WAT access — a grade-wide coordinator existing doesn't
+        // revoke it (both can legitimately manage/view the same section).
         $this->assertDatabaseHas('load_assignments', [
             'user_id' => $adviser->id, 'section_id' => $section->id, 'academic_term_id' => $this->term->id,
         ]);
+        $this->actingAs($adviser)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
+            ->assertOk();
     }
 
     public function test_print_includes_cid_chief_signatory(): void

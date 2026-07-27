@@ -846,14 +846,6 @@ class SyncLoadingPlan extends Command
 
             $section->update(['adviser' => $newId]);
 
-            // An explicit Homeroom Coordinator override takes precedence —
-            // leave the HR_ADV/HR_ACAD LoadAssignment alone; it belongs to
-            // the coordinator, not the adviser. See HeadAdvisoryService::
-            // syncHomeroomCoordinator().
-            if ($section->homeroom_coordinator_id) {
-                continue;
-            }
-
             // Maintain the HRA-/HAC- homeroom LoadAssignment (term-scoped)
             if ($oldId) {
                 LoadAssignment::where('academic_term_id', $this->term->id)
