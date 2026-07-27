@@ -58,7 +58,7 @@ class FacultyDashboardServiceTest extends TestCase
         ]);
     }
 
-    private function schedule(string $entryType, string $start, string $end): ClassSchedule
+    private function schedule(string $entryType, string $start, string $end, string $status = 'active', ?int $termId = null): ClassSchedule
     {
         return ClassSchedule::create([
             'user_id' => $this->faculty->id,
@@ -66,13 +66,13 @@ class FacultyDashboardServiceTest extends TestCase
             'section_id' => null,
             'classroom_id' => null,
             'school_year_id' => $this->sy->id,
-            'academic_term_id' => $this->term->id,
+            'academic_term_id' => $termId ?? $this->term->id,
             'entry_type' => $entryType,
             'title' => $entryType === 'class' ? null : 'Consultation',
             'day_of_week' => Carbon::today()->format('l'),
             'start_time' => $start,
             'end_time' => $end,
-            'status' => 'active',
+            'status' => $status,
         ]);
     }
 
@@ -99,6 +99,40 @@ class FacultyDashboardServiceTest extends TestCase
         $this->assertSame(1, $payload['cards']['classes_today']);
         $this->assertCount(1, $payload['todaySchedule']);
         $this->assertSame('Computer Science 7', $payload['todaySchedule'][0]['title']);
+    }
+
+    public function test_cancelled_schedule_rows_are_excluded_from_classes_today(): void
+    {
+        // Regression: the status filter used to compare against 'inactive', a
+        // value that doesn't exist in the enum('active','tentative','cancelled')
+        // column — so it never actually excluded anything, including cancelled
+        // rows left behind by a room swap or schedule change.
+        $this->schedule('class', '08:00', '09:00', status: 'active');
+        $this->schedule('class', '14:30', '15:30', status: 'cancelled');
+
+        $payload = app(FacultyDashboardService::class)->payload($this->faculty);
+
+        $this->assertSame(1, $payload['cards']['classes_today']);
+        $this->assertCount(1, $payload['todaySchedule']);
+    }
+
+    public function test_schedule_from_a_different_academic_term_is_excluded(): void
+    {
+        // Regression: classes_today/todaySchedule only scoped by school_year_id,
+        // not academic_term_id — a stale row from a past term for the same
+        // school year would bleed into "today's classes" for the current term.
+        $otherTerm = AcademicTerm::create([
+            'school_year_id' => $this->sy->id, 'name' => 'Other Term', 'term_type' => '2nd_semester',
+            'start_date' => '2098-06-01', 'end_date' => '2099-03-31', 'is_current' => false,
+        ]);
+
+        $this->schedule('class', '08:00', '09:00');
+        $this->schedule('class', '14:30', '15:30', termId: $otherTerm->id);
+
+        $payload = app(FacultyDashboardService::class)->payload($this->faculty);
+
+        $this->assertSame(1, $payload['cards']['classes_today']);
+        $this->assertCount(1, $payload['todaySchedule']);
     }
 
     public function test_archived_records_excluded_from_dashboard_panel_and_counts(): void
