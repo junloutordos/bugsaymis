@@ -113,9 +113,22 @@ function removeRow(idx) {
   resequence()
 }
 
+// Keeps the roster in alphabetical order (family name, then given name) any
+// time a student is added or removed — students are otherwise added in
+// whatever order a teacher searches/clicks them, not alphabetically. Deleted
+// rows are kept (hidden, not rendered) but moved after the active ones since
+// their position no longer matters.
 function resequence() {
-  let sequence = 1
-  students.value.filter(s => !s._delete).forEach(s => { s.sequence_number = sequence++ })
+  const active = students.value.filter(s => !s._delete)
+  const deleted = students.value.filter(s => s._delete)
+
+  active.sort((a, b) => {
+    const byFamily = a.family_name.localeCompare(b.family_name)
+    return byFamily !== 0 ? byFamily : a.given_name.localeCompare(b.given_name)
+  })
+  active.forEach((s, i) => { s.sequence_number = i + 1 })
+
+  students.value = [...active, ...deleted]
 }
 
 async function autoPopulate() {

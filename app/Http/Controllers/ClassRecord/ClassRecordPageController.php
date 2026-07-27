@@ -150,7 +150,7 @@ class ClassRecordPageController extends Controller
             'isAdmin' => $this->isAdmin(),
             'isMonitorView' => $isMonitorView,
             'gradingOptions' => $classRecord->subject
-                ? $this->optionScope->selectableForSubject($classRecord->subject)
+                ? $this->optionScope->selectableForSubject($classRecord->subject, Auth::user())
                 : GradingOption::with('categories')
                     ->whereNull('owner_designation_id')
                     ->where('is_active', true)
