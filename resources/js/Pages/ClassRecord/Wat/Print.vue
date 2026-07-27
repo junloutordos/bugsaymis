@@ -91,29 +91,33 @@ onMounted(async () => {
         </tbody>
       </table>
 
-      <div class="wat-signatories">
-        <div class="wat-signatory">
-          <div class="wat-signatory-caption">Consolidated by:</div>
-          <div class="wat-signatory-name">{{ coordinatorName ?? '' }}</div>
-          <div class="wat-signatory-position">Homeroom Coordinator</div>
-        </div>
-        <div class="wat-signatory">
-          <div class="wat-signatory-caption">Reviewed by:</div>
-          <div class="wat-signatory-name">{{ acidaaName ?? '' }}</div>
-          <div class="wat-signatory-position">Assistant CID Chief for Academic Affairs</div>
-        </div>
-        <div class="wat-signatory">
-          <div class="wat-signatory-caption">Approved by:</div>
-          <div class="wat-signatory-name">{{ cidChiefName ?? '' }}</div>
-          <div class="wat-signatory-position">CID Chief</div>
-        </div>
-      </div>
+      <div class="wat-signoff">
+        <table class="wat-signatories">
+          <tr>
+            <td class="wat-signatory">
+              <div class="wat-signatory-caption">Consolidated by:</div>
+              <div class="wat-signatory-name">{{ coordinatorName ?? '' }}</div>
+              <div class="wat-signatory-position">Homeroom Coordinator</div>
+            </td>
+            <td class="wat-signatory">
+              <div class="wat-signatory-caption">Reviewed by:</div>
+              <div class="wat-signatory-name">{{ acidaaName ?? '' }}</div>
+              <div class="wat-signatory-position">Assistant CID Chief for Academic Affairs</div>
+            </td>
+            <td class="wat-signatory">
+              <div class="wat-signatory-caption">Approved by:</div>
+              <div class="wat-signatory-name">{{ cidChiefName ?? '' }}</div>
+              <div class="wat-signatory-position">CID Chief</div>
+            </td>
+          </tr>
+        </table>
 
-      <p v-if="wat.review" class="wat-reviewed">
-        Reviewed by {{ wat.review.reviewed_by?.name }} on
-        {{ new Date(wat.review.reviewed_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}
-        <template v-if="wat.review.remarks"> — “{{ wat.review.remarks }}”</template>
-      </p>
+        <p v-if="wat.review" class="wat-reviewed">
+          Reviewed by {{ wat.review.reviewed_by?.name }} on
+          {{ new Date(wat.review.reviewed_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+          <template v-if="wat.review.remarks"> — “{{ wat.review.remarks }}”</template>
+        </p>
+      </div>
     </main>
 
     <img class="wat-print-footer print-asset" src="/images/report_footer_landscape.jpg" alt="" />
@@ -121,10 +125,11 @@ onMounted(async () => {
 </template>
 
 <style>
-/* Global (unscoped) on purpose — matches SchedulePrintSheet.vue's approach:
- * @page margin is 0 on this page's own style block below, and the header/
- * footer images render full-bleed edge to edge; actual content gets its
- * margin from .wat-print-body's own padding instead of the page margin. */
+/* Global (unscoped) on purpose — matches SchedulePrintSheet.vue's approach.
+ * Unlike SchedulePrintSheet.vue, WAT content can span multiple printed
+ * pages: the @page rule below reserves top/bottom margin on every page for
+ * the repeating fixed-position header/footer images, and body content gets
+ * its inner left/right spacing from .wat-print-body's own padding. */
 
 * {
   box-sizing: border-box;
@@ -139,41 +144,47 @@ body {
 
 @page {
   size: A4 landscape;
-  margin: 0;
+  /* Top/bottom margin reserves the header/footer band on EVERY page (not
+   * just the first) — the fixed-position header/footer images below are
+   * positioned relative to the full page box, ignoring this margin, so
+   * they render full-bleed inside the reserved band on each page while
+   * body content flows only within the remaining space. */
+  margin: 25.4mm 0;
 }
 
 .wat-print-sheet {
+  /* Matches the report banner images' native aspect ratio (3508x300px ≈
+   * 297mm x 25.4mm at 300dpi); reused below by the header, footer, and
+   * body to reserve fixed header/footer space when printing across
+   * multiple pages. Declared here (the common ancestor) so it inherits
+   * into the header/footer/body siblings. */
+  --wat-band-height: 25.4mm;
   width: 297mm;
-  height: 210mm;
   margin: 0 auto;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
   background: #fff;
   color: #0f172a;
   font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
   font-size: 8.5pt;
 }
 
+/* Deliberately plain block flow, not flex — this content can now span
+ * multiple printed pages, and Chromium's flexbox fragmentation (breaking
+ * flex content across page boundaries) is unreliable, occasionally
+ * dropping or misplacing content on later pages. Block-level elements,
+ * tables, and break-inside/break-before rules paginate correctly. */
 .wat-print-header,
 .wat-print-footer {
   display: block;
   width: 100%;
   height: auto;
   margin: 0;
-  flex: 0 0 auto;
 }
 
 .wat-print-body {
-  min-height: 0;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
   padding: 1mm 10mm 0;
 }
 
 .wat-heading {
-  flex: 0 0 auto;
   margin-bottom: 1.5mm;
 }
 
@@ -197,7 +208,15 @@ body {
 .wat-table {
   width: 100%;
   border-collapse: collapse;
-  flex: 1 1 auto;
+}
+
+.wat-table thead {
+  display: table-header-group;
+}
+
+.wat-table tbody tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .wat-table th,
@@ -223,17 +242,30 @@ body {
 
 /* ── Signatories — 3 columns, matches SchedulePrintSheet.vue conventions ──── */
 
+.wat-signoff {
+  /* Keeps the signature grid and the "reviewed by" remark below it together
+   * on the same page — without this, a page break could land between them
+   * and strand the remark alone at the top of an otherwise-blank page. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* A real <table>, not CSS grid/flexbox — Chromium's print pagination has
+ * long-standing bugs fragmenting grid/flex layouts (rows silently
+ * collapsing to zero height on later pages), but table fragmentation is
+ * mature and reliable, matching .wat-table above. */
 .wat-signatories {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0 12mm;
-  padding: 3mm 6mm 1mm;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
   margin-top: 2mm;
 }
 
 .wat-signatory {
+  width: 33.333%;
+  padding: 3mm 6mm 1mm;
   text-align: center;
+  vertical-align: top;
 }
 
 .wat-signatory-caption {
@@ -271,10 +303,8 @@ body {
   html,
   body {
     width: 297mm;
-    height: 210mm;
     margin: 0;
     padding: 0;
-    overflow: hidden;
     background: #fff;
   }
 
@@ -282,10 +312,30 @@ body {
     margin: 0;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
-    break-after: avoid;
-    break-inside: avoid;
-    page-break-after: avoid;
-    page-break-inside: avoid;
+  }
+
+  /* Fixed-position header/footer repeat on every printed page, positioned
+   * relative to the full page box (ignoring the @page margin above), so
+   * they render full-bleed inside the reserved band on each page. Content
+   * flow is confined to the @page margin's content box automatically, so
+   * it never renders underneath them — on page 1 or any later page. This
+   * replaces the old single-fixed-page layout, which clipped or overlapped
+   * the footer whenever a week had enough assessment rows to overflow one
+   * page. */
+  .wat-print-header,
+  .wat-print-footer {
+    position: fixed;
+    left: 0;
+    width: 297mm;
+    height: var(--wat-band-height);
+  }
+
+  .wat-print-header {
+    top: 0;
+  }
+
+  .wat-print-footer {
+    bottom: 0;
   }
 }
 </style>
