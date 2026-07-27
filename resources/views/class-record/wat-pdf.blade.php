@@ -61,11 +61,14 @@
     .wat-signatories { width: 100%; margin-top: 16mm; }
     .wat-signatory   { width: 33.33%; text-align: center; vertical-align: top; padding: 0 6mm; }
     .wat-signatory-caption {
-      text-align: left; font-size: 7.5pt; color: #334155; margin-bottom: 8mm;
+      text-align: left; font-size: 7.5pt; color: #334155; margin-bottom: 3mm;
     }
+    /* Blank space for the wet signature, with the sign-line as its
+       border-bottom — sits ABOVE the printed name, not under it. */
+    .wat-signature-line { height: 11mm; border-bottom: 1px solid #0f172a; }
     .wat-signatory-name {
       font-size: 8.5pt; font-weight: bold; letter-spacing: 0.3px; text-transform: uppercase;
-      border-bottom: 1px solid #0f172a; padding-bottom: 2px; min-height: 14px;
+      margin-top: 2px;
     }
     .wat-signatory-position { font-size: 7pt; color: #475569; margin-top: 3px; }
 
@@ -132,16 +135,19 @@
     <tr>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Consolidated by:</div>
+        <div class="wat-signature-line"></div>
         <div class="wat-signatory-name"><b>{{ $coordinatorName ?? '' }}</b></div>
         <div class="wat-signatory-position">Homeroom Coordinator</div>
       </td>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Reviewed by:</div>
+        <div class="wat-signature-line"></div>
         <div class="wat-signatory-name"><b>{{ $acidaaName ?? '' }}</b></div>
         <div class="wat-signatory-position">Assistant CID Chief for Academic Affairs</div>
       </td>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Approved by:</div>
+        <div class="wat-signature-line"></div>
         <div class="wat-signatory-name"><b>{{ $cidChiefName ?? '' }}</b></div>
         <div class="wat-signatory-position">CID Chief</div>
       </td>

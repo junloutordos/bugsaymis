@@ -145,6 +145,32 @@ class WeeklyAssessmentTrackerTest extends TestCase
         ]);
     }
 
+    private function makeClassRecord(Section $section, Subject $subject, User $teacher): ClassRecord
+    {
+        return ClassRecord::create([
+            'subject_id' => $subject->id, 'section_id' => $section->id,
+            'grading_option_id' => $this->option->id, 'school_year_id' => $this->sy->id,
+            'school_year' => $this->sy->name, 'subject_name' => $subject->name,
+            'year_level_section' => "G-{$section->levelid} {$section->sectionname}",
+            'teacher_id' => $teacher->id, 'status' => 'draft',
+        ]);
+    }
+
+    private function makeAssessmentInRecord(ClassRecord $record, int $number, string $date): ClassRecordAssessment
+    {
+        $quarter = ClassRecordQuarter::firstOrCreate(
+            ['class_record_id' => $record->id, 'quarter' => 1],
+            ['grading_option_id' => $this->option->id],
+        );
+
+        return ClassRecordAssessment::create([
+            'class_record_quarter_id' => $quarter->id, 'grading_category_id' => $this->category->id,
+            'assessment_type' => 'formative', 'is_graded' => true, 'is_major' => false,
+            'assessment_number' => $number, 'title' => "Quiz {$number}", 'activity_date' => $date,
+            'plotted_at' => now(), 'max_score' => 20, 'sort_order' => $number,
+        ]);
+    }
+
     // ── Access control ──────────────────────────────────────────────────────
 
     public function test_designation_based_coordinator_can_access_wat_for_their_section(): void
@@ -423,5 +449,77 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $wat = \App\Services\ClassRecord\WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
         $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
         $this->assertNull($monday['items'][0]['time_label']);
+    }
+
+    // ── Science Core / Elective grade-pooling ────────────────────────────────
+
+    public function test_science_core_and_elective_synthetic_sections_are_excluded_from_the_wat_dropdown(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $scienceCore = $this->makeSection(['levelid' => 11, 'sectionname' => 'SCI-PHY3L2-G11-1']);
+        $elective = $this->makeSection(['levelid' => 11, 'sectionname' => 'ELEC-DATASCI-G11']);
+        $subject = $this->makeSubject(['grade_level' => 11]);
+        $this->makeClassRecordWithAssessment($homeroom, $subject, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($scienceCore, $subject, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($elective, $subject, $teacher, '2025-09-01');
+
+        $this->actingAs($admin)
+            ->get(route('class-records.wat.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sections', 1)
+                ->where('sections.0.id', $homeroom->id));
+    }
+
+    public function test_wat_week_data_pools_and_tags_science_core_and_elective_rows_into_the_homeroom(): void
+    {
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $scienceCore = $this->makeSection(['levelid' => 11, 'sectionname' => 'SCI-PHY3L2-G11-1']);
+        $subject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
+        $this->makeClassRecordWithAssessment($scienceCore, $subject, $teacher, '2025-09-01');
+
+        $wat = \App\Services\ClassRecord\WatRuleService::weekData($homeroom->id, $this->sy->id, '2025-09-01');
+        $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
+
+        $this->assertCount(1, $monday['items']);
+        $this->assertStringContainsString('(Science Core)', $monday['items'][0]['subject_name']);
+    }
+
+    public function test_grade_wide_wat_cap_pools_elective_assessments_with_the_homeroom(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $elective = $this->makeSection(['levelid' => 11, 'sectionname' => 'ELEC-DATASCI-G11']);
+        $homeroomSubject = $this->makeSubject(['grade_level' => 11]);
+        $electiveSubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+
+        // Fill the grade's daily cap (3 graded/day) entirely inside the
+        // synthetic elective section — the homeroom's own section has zero
+        // assessments that day.
+        $electiveRecord = $this->makeClassRecord($elective, $electiveSubject, $teacher);
+        $this->makeAssessmentInRecord($electiveRecord, 1, '2025-09-01');
+        $this->makeAssessmentInRecord($electiveRecord, 2, '2025-09-01');
+        $this->makeAssessmentInRecord($electiveRecord, 3, '2025-09-01');
+
+        $homeroomRecord = $this->makeClassRecord($homeroom, $homeroomSubject, $teacher);
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $homeroomRecord->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number'   => 1,
+                    'title'               => 'Quiz 1',
+                    'is_graded'           => true,
+                    'activity_date'       => '2025-09-01',
+                    'max_score'           => 20,
+                ]],
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('4 graded assessments', $response->json('message'));
     }
 }

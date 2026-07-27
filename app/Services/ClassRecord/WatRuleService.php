@@ -9,6 +9,7 @@ use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\QuarterExamWindow;
 use App\Models\ClassRecord\WatReview;
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\Section;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -107,23 +108,60 @@ class WatRuleService
             && self::isWithinExamWindow($schoolYearId, $quarter, $date);
     }
 
-    // ── Section-wide graded/major counts (exclude IDs being replaced) ─────────
+    // ── Grade-pooled graded/major counts (exclude IDs being replaced) ────────
 
-    public static function sectionCountsOnDate(int $sectionId, int $schoolYearId, string $date, array $excludeIds = []): array
+    /**
+     * Every section sharing a WAT budget with $grade: the real homerooms
+     * plus any SCI- / ELEC- prefixed synthetic sections at that grade level
+     * (Faculty Loading gives each Science Core/Elective class its own
+     * synthetic Section row, carrying the same levelid as the grade it cuts
+     * across). Those classes pull students from multiple homerooms at once,
+     * so their assessments land on the same students' daily/weekly load and
+     * must pool with it — not track a private budget on their own
+     * synthetic section, which no one reviews independently.
+     *
+     * Not scoped by school year here — sections.school_year_id isn't
+     * reliably populated across all data (legacy sections only carry the
+     * older syid column). The actual year boundary is already enforced by
+     * schoolYearScopeQuery()'s cr.school_year_id filter on the assessments
+     * side, so including a same-levelid section id from another year here
+     * is harmless: no assessment of a different year will ever match it.
+     */
+    public static function poolSectionIds(int $grade): array
     {
+        return Section::where('levelid', $grade)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    public static function gradeCountsOnDate(int $grade, int $schoolYearId, string $date, array $excludeIds = []): array
+    {
+        $sectionIds = self::poolSectionIds($grade);
+        if (empty($sectionIds)) {
+            return ['graded' => 0, 'major' => 0];
+        }
+
         return self::counts(
-            ClassRecordAssessment::sectionScopeQuery($sectionId, $schoolYearId)
+            ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+                ->whereIn('cr.section_id', $sectionIds)
                 ->where('class_record_assessments.activity_date', $date),
             $excludeIds
         );
     }
 
-    public static function sectionCountsInWeek(int $sectionId, int $schoolYearId, string $weekStart, array $excludeIds = []): array
+    public static function gradeCountsInWeek(int $grade, int $schoolYearId, string $weekStart, array $excludeIds = []): array
     {
+        $sectionIds = self::poolSectionIds($grade);
+        if (empty($sectionIds)) {
+            return ['graded' => 0, 'major' => 0];
+        }
+
         $monday = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
 
         return self::counts(
-            ClassRecordAssessment::sectionScopeQuery($sectionId, $schoolYearId)
+            ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+                ->whereIn('cr.section_id', $sectionIds)
                 ->whereBetween('class_record_assessments.activity_date', [
                     $monday->toDateString(),
                     $monday->copy()->addDays(6)->toDateString(),
@@ -191,17 +229,24 @@ class WatRuleService
     // ── Weekly tracker data (Homeroom / ACIDAA views + print) ────────────────
 
     /**
-     * Full WAT dataset for one section-week: per-day assessment rows with
-     * compliance %, per-day and weekly graded/major tallies, limit flags,
-     * and the ACIDAA review record if one exists.
+     * Full WAT dataset for one homeroom's grade-week: per-day assessment rows
+     * (including any Science Core/Elective sessions pooled into this grade's
+     * budget — see poolSectionIds()), with compliance %, per-day and weekly
+     * graded/major tallies, limit flags, and the ACIDAA review record if one
+     * exists.
      */
     public static function weekData(int $sectionId, int $schoolYearId, string $weekStart): array
     {
         $monday = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
         $friday = $monday->copy()->addDays(4);
 
-        $rows = ClassRecordAssessment::sectionScopeQuery($sectionId, $schoolYearId)
+        $grade = Section::where('id', $sectionId)->value('levelid');
+        $poolSectionIds = $grade !== null ? self::poolSectionIds((int) $grade) : [$sectionId];
+
+        $rows = ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+            ->whereIn('cr.section_id', $poolSectionIds)
             ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
+            ->leftJoin('sections as sec', 'sec.id', '=', 'cr.section_id')
             ->whereBetween('class_record_assessments.activity_date', [
                 $monday->toDateString(),
                 $monday->copy()->addDays(6)->toDateString(),
@@ -226,6 +271,7 @@ class WatRuleService
                 'cr.teacher_id',
                 'gc.name as category_name',
                 'gc.code as category_code',
+                'sec.sectionname as row_section_name',
             ]);
 
         $teachers = User::whereIn('id', $rows->pluck('teacher_id')->filter()->unique())
@@ -275,7 +321,7 @@ class WatRuleService
             }
         }
 
-        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts, $schedulesByKey) {
+        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts, $schedulesByKey, $sectionId) {
             $roster    = (int) ($rosterCounts[$row->class_record_quarter_id] ?? 0);
             $submitted = (int) ($scoreCounts[$row->id] ?? 0);
             $date      = $row->activity_date instanceof Carbon
@@ -287,11 +333,22 @@ class WatRuleService
                 : null;
             $schedule    = $scheduleKey ? ($schedulesByKey[$scheduleKey] ?? null) : null;
 
+            // Rows pooled in from a Science Core/Elective synthetic section
+            // (grade-wide, not this specific homeroom) are tagged so the
+            // coordinator can see why their own tally moved.
+            $pooledTag = null;
+            if ((int) $row->section_id !== $sectionId) {
+                $pooledTag = str_starts_with((string) $row->row_section_name, 'SCI-')
+                    ? 'Science Core'
+                    : (str_starts_with((string) $row->row_section_name, 'ELEC-') ? 'Elective' : null);
+            }
+            $subjectName = $row->category_label ? "{$row->subject_name} — {$row->category_label}" : $row->subject_name;
+
             return [
                 'id'              => $row->id,
                 'date'            => $date->toDateString(),
                 'title'           => $row->title,
-                'subject_name'    => $row->category_label ? "{$row->subject_name} — {$row->category_label}" : $row->subject_name,
+                'subject_name'    => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,
                 'teacher_name'    => $teachers[$row->teacher_id]?->name,
                 'assessment_type' => $row->assessment_type,
                 'type_label'      => ClassRecordAssessment::TYPES[$row->assessment_type] ?? $row->category_name,

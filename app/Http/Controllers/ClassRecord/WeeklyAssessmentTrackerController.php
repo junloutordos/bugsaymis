@@ -207,20 +207,24 @@ class WeeklyAssessmentTrackerController extends Controller
 
         $monday = Carbon::parse($request->query('week', now()->toDateString()))->startOfWeek(Carbon::MONDAY);
 
-        // Per-section, per-day graded/major tallies for the week
+        // Per-grade (not per-section), per-day graded/major tallies for the
+        // week — pools Science Core/Elective synthetic-section assessments
+        // into the real homerooms of the same grade, same as the tracker/
+        // print view (WatRuleService::weekData()).
         $rows = ClassRecordAssessment::schoolYearScopeQuery($sy->id)
+            ->join('sections as sec', 'sec.id', '=', 'cr.section_id')
             ->whereNotNull('cr.section_id')
             ->whereBetween('class_record_assessments.activity_date', [
                 $monday->toDateString(),
                 $monday->copy()->addDays(6)->toDateString(),
             ])
             ->selectRaw('
-                cr.section_id,
+                sec.levelid as grade,
                 class_record_assessments.activity_date as d,
                 COALESCE(SUM(class_record_assessments.is_graded), 0) as graded,
                 COALESCE(SUM(class_record_assessments.is_major AND class_record_assessments.is_graded), 0) as major
             ')
-            ->groupBy('cr.section_id', 'd')
+            ->groupBy('sec.levelid', 'd')
             ->get();
 
         $sections = $this->accessibleSections($user, $sy->id, $this->currentAcademicTerm($sy)->id, true, false);
@@ -231,7 +235,7 @@ class WeeklyAssessmentTrackerController extends Controller
             ->keyBy('section_id');
 
         $summary = $sections->map(function ($section) use ($rows, $reviews) {
-            $days = $rows->where('section_id', $section['id']);
+            $days = $rows->where('grade', $section['level']);
 
             return array_merge($section, [
                 'graded_count' => (int) $days->sum('graded'),
@@ -329,6 +333,11 @@ class WeeklyAssessmentTrackerController extends Controller
      * Subject teachers (no coordinator designation) see only the sections
      * where they hold a 'teaching' LoadAssignment — read-only, resolved via
      * teachingSectionIds().
+     *
+     * Science Core/Elective synthetic sections (SCI- / ELEC- prefixed) are
+     * excluded — they aren't homerooms anyone tracks on their own; their
+     * assessments are pooled into their grade's real homerooms by
+     * WatRuleService instead (see WatRuleService::poolSectionIds()).
      */
     private function accessibleSections(User $user, int $schoolYearId, int $academicTermId, bool $canReview, bool $isCoordinator)
     {
@@ -338,6 +347,8 @@ class WeeklyAssessmentTrackerController extends Controller
             ->pluck('section_id');
 
         $sections = Section::whereIn('id', $sectionIds)
+            ->where('sectionname', 'not like', 'SCI-%')
+            ->where('sectionname', 'not like', 'ELEC-%')
             ->get(['id', 'sectionname', 'levelid']);
 
         if (! $canReview) {
