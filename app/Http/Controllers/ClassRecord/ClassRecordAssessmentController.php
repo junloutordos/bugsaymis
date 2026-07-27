@@ -118,6 +118,7 @@ class ClassRecordAssessmentController extends Controller
 
         $validated = $request->validate([
             'assessments'                         => 'required|array|min:1',
+            'assessments.*.id'                     => 'nullable|integer',
             'assessments.*.grading_category_id'   => 'required|integer|exists:grading_categories,id',
             'assessments.*.assessment_number'      => 'required|integer|min:1',
             'assessments.*.title'                  => 'required|string|max:255',
@@ -145,18 +146,22 @@ class ClassRecordAssessmentController extends Controller
             );
         }
 
-        $existingByKey = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)->get()
-            ->keyBy(fn ($a) => $a->grading_category_id . '-' . $a->assessment_number);
+        // Existing rows are matched by their stable primary key, not by
+        // (category, number) position — position shifts every time a row is
+        // removed (siblings renumber down), which would otherwise silently
+        // reassign one row's identity (and any scores already entered
+        // against it) to whatever content now lands on its old number.
+        $existingById = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)->get()->keyBy('id');
 
         // Type and is_major are always derived server-side — never trusted from
         // the client (the grading category already identifies the type)
-        $items = collect($validated['assessments'])->map(function ($item) use ($categories, $existingByKey) {
+        $items = collect($validated['assessments'])->map(function ($item) use ($categories, $existingById) {
             $category = $categories[$item['grading_category_id']];
 
             $item['is_graded']       = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
             $item['assessment_type'] = WatRuleService::deriveType($category->code, (int) $item['assessment_number']);
             $item['is_major']        = WatRuleService::isMajor($item['assessment_type'], $category);
-            $item['_existing'] = $existingByKey->get($item['grading_category_id'] . '-' . $item['assessment_number']);
+            $item['_existing'] = ! empty($item['id']) ? $existingById->get($item['id']) : null;
             $item['_date_changed'] = ! empty($item['activity_date']) && ! (
                 $item['_existing']?->activity_date
                 && $item['_existing']->activity_date->toDateString() === Carbon::parse($item['activity_date'])->toDateString()
@@ -264,31 +269,64 @@ class ClassRecordAssessmentController extends Controller
             }
         }
 
-        $upserted = [];
-        foreach ($items as $i => $item) {
-            $hasDate    = ! empty($item['activity_date']);
-            $existing   = $item['_existing'];
+        // ── Removed rows: any existing assessment for this quarter whose id is
+        //    absent from the incoming payload was deleted by the user. Block
+        //    the whole save if any of those already have scores entered.
+        $incomingIds = $items->pluck('id')->filter()->map(fn ($id) => (int) $id)->unique();
+        $toDeleteIds = $existingById->keys()->diff($incomingIds)->values();
 
-            $assessment = ClassRecordAssessment::updateOrCreate(
-                [
+        if ($toDeleteIds->isNotEmpty()) {
+            $blockedIds = ClassRecordScore::whereIn('class_record_assessment_id', $toDeleteIds)
+                ->distinct()
+                ->pluck('class_record_assessment_id');
+
+            if ($blockedIds->isNotEmpty()) {
+                $titles = $existingById->only($blockedIds->all())->pluck('title')->implode('", "');
+                return response()->json([
+                    'message' => "Cannot save — \"{$titles}\" already has scores entered. Clear its scores first before removing it.",
+                    'errors'  => ['assessments' => ['One or more removed assessments already have scores entered.']],
+                ], 422);
+            }
+        }
+
+        $upserted = [];
+        DB::transaction(function () use ($items, $quarter, $toDeleteIds, &$upserted) {
+            if ($toDeleteIds->isNotEmpty()) {
+                ClassRecordAssessment::whereIn('id', $toDeleteIds)->delete();
+            }
+
+            // Process in (category, number) order so a row moving INTO a slot
+            // never collides with the unique index before the row that used
+            // to occupy that slot has already moved (or been deleted) out of it.
+            $ordered = $items->sortBy(fn ($item) => [$item['grading_category_id'], $item['assessment_number']]);
+
+            foreach ($ordered as $i => $item) {
+                $hasDate  = ! empty($item['activity_date']);
+                $existing = $item['_existing'];
+
+                $attributes = [
                     'class_record_quarter_id' => $quarter->id,
                     'grading_category_id'     => $item['grading_category_id'],
                     'assessment_number'       => $item['assessment_number'],
-                ],
-                [
-                    'title'           => $item['title'],
-                    'assessment_type' => $item['assessment_type'],
-                    'is_graded'       => $item['is_graded'],
-                    'is_major'        => $item['is_major'],
-                    'activity_date'   => $item['activity_date'] ?? null,
-                    'plotted_at'      => ! $hasDate ? null
+                    'title'                   => $item['title'],
+                    'assessment_type'         => $item['assessment_type'],
+                    'is_graded'               => $item['is_graded'],
+                    'is_major'                => $item['is_major'],
+                    'activity_date'           => $item['activity_date'] ?? null,
+                    'plotted_at'              => ! $hasDate ? null
                         : ($item['_date_changed'] || ! $existing?->plotted_at ? now() : $existing->plotted_at),
-                    'max_score'       => $item['max_score'],
-                    'sort_order'      => $item['sort_order'] ?? $i,
-                ]
-            );
-            $upserted[] = $assessment;
-        }
+                    'max_score'               => $item['max_score'],
+                    'sort_order'              => $item['sort_order'] ?? $i,
+                ];
+
+                if ($existing) {
+                    $existing->update($attributes);
+                    $upserted[] = $existing;
+                } else {
+                    $upserted[] = ClassRecordAssessment::create($attributes);
+                }
+            }
+        });
 
         return response()->json([
             'message'  => count($upserted) . ' assessment(s) saved.',

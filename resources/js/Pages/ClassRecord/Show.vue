@@ -196,7 +196,17 @@ async function saveSetup() {
   savingSetup.value = true
   setupErrors.value = []
 
-  const assessments = Object.values(assessmentDraft.value).flat().filter(a => a.title && a.max_score)
+  const assessments = Object.values(assessmentDraft.value).flat()
+    .filter(a => a.title && a.max_score)
+    .map(a => ({
+      id:                   a._db_id,
+      grading_category_id:  a.grading_category_id,
+      assessment_number:    a.assessment_number,
+      title:                a.title,
+      is_graded:            a.is_graded,
+      activity_date:        a.activity_date,
+      max_score:            a.max_score,
+    }))
 
   if (!assessments.length) {
     setupErrors.value = ['Add at least one assessment with a title and max score.']
