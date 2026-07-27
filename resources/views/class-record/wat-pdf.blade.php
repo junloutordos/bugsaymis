@@ -17,7 +17,10 @@
     .page-body { padding: 1mm 10mm 0; }
 
     .wat-heading    { text-align: center; margin-bottom: 3mm; }
-    .wat-heading h1 { font-size: 13pt; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 2mm; }
+    /* font-weight: bold (not a numeric weight like 800) — mPDF's font
+       substitution only reliably maps normal/bold, so a numeric weight can
+       silently fall back to regular. */
+    .wat-heading h1 { font-size: 13pt; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 2mm; }
     .wat-meta       { font-size: 8pt; text-align: left; }
     .wat-meta span  { margin: 0 9px; }
 
@@ -52,14 +55,16 @@
     .wat-major  { font-weight: 700; color: #b91c1c; }
 
     /* Signatories — 3-column table, matches the .wat-signatories layout
-       previously used in the browser-print version. */
-    .wat-signatories { width: 100%; margin-top: 6mm; }
+       previously used in the browser-print version. Extra margin-top is the
+       deliberate breathing room/break between the assessment table and the
+       signature block. */
+    .wat-signatories { width: 100%; margin-top: 16mm; }
     .wat-signatory   { width: 33.33%; text-align: center; vertical-align: top; padding: 0 6mm; }
     .wat-signatory-caption {
       text-align: left; font-size: 7.5pt; color: #334155; margin-bottom: 8mm;
     }
     .wat-signatory-name {
-      font-size: 8.5pt; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+      font-size: 8.5pt; font-weight: bold; letter-spacing: 0.3px; text-transform: uppercase;
       border-bottom: 1px solid #0f172a; padding-bottom: 2px; min-height: 14px;
     }
     .wat-signatory-position { font-size: 7pt; color: #475569; margin-top: 3px; }
@@ -72,7 +77,7 @@
 <div class="page-body">
 
   <div class="wat-heading">
-    <h1>Weekly Assessment Tracker</h1>
+    <h1><b>Weekly Assessment Tracker</b></h1>
     <div class="wat-meta">
       <span><strong>Section:</strong> Grade {{ $section['level'] }} — {{ $section['name'] }}</span>
       <span><strong>Week:</strong> {{ \Carbon\Carbon::parse($wat['week_start'])->format('F j, Y') }} – {{ \Carbon\Carbon::parse($wat['week_end'])->format('F j, Y') }}</span>
@@ -127,17 +132,17 @@
     <tr>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Consolidated by:</div>
-        <div class="wat-signatory-name">{{ $coordinatorName ?? '' }}</div>
+        <div class="wat-signatory-name"><b>{{ $coordinatorName ?? '' }}</b></div>
         <div class="wat-signatory-position">Homeroom Coordinator</div>
       </td>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Reviewed by:</div>
-        <div class="wat-signatory-name">{{ $acidaaName ?? '' }}</div>
+        <div class="wat-signatory-name"><b>{{ $acidaaName ?? '' }}</b></div>
         <div class="wat-signatory-position">Assistant CID Chief for Academic Affairs</div>
       </td>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Approved by:</div>
-        <div class="wat-signatory-name">{{ $cidChiefName ?? '' }}</div>
+        <div class="wat-signatory-name"><b>{{ $cidChiefName ?? '' }}</b></div>
         <div class="wat-signatory-position">CID Chief</div>
       </td>
     </tr>
