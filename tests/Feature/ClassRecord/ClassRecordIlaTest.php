@@ -43,7 +43,7 @@ class ClassRecordIlaTest extends TestCase
     private function makeSection(): Section
     {
         return Section::create([
-            'levelid' => 8, 'sectionname' => 'Emerald', 'syid' => $this->sy->id,
+            'levelid' => 8, 'sectionname' => 'Section-'.uniqid(), 'syid' => $this->sy->id,
             'school_year_id' => $this->sy->id, 'is_active' => true,
         ]);
     }
@@ -51,7 +51,7 @@ class ClassRecordIlaTest extends TestCase
     private function makeSubject(bool $hasIlp = true): Subject
     {
         return Subject::create([
-            'school_year_id' => $this->sy->id, 'code' => 'SUBJ1', 'name' => 'Subject 1',
+            'school_year_id' => $this->sy->id, 'code' => 'SUBJ-'.uniqid(), 'name' => 'Subject 1',
             'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
             'grade_level' => 8, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
             'has_ilp' => $hasIlp,
@@ -203,6 +203,56 @@ class ClassRecordIlaTest extends TestCase
             'class_record_student_id' => $student->id,
             'status' => 'compliant',
         ]);
+    }
+
+    public function test_upsert_rejects_a_date_belonging_to_another_class_record(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher, $this->makeSection(), $this->makeSubject());
+        $quarter = $this->makeQuarter($record);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id, 'family_name' => 'Doe', 'given_name' => 'Jane',
+            'sequence_number' => 1, 'is_active' => true,
+        ]);
+
+        // A date belonging to a DIFFERENT class record's quarter.
+        $otherRecord = $this->makeRecord(User::factory()->create(), $this->makeSection(), $this->makeSubject());
+        $otherQuarter = $this->makeQuarter($otherRecord);
+        $foreignDate = ClassRecordIlaDate::create(['class_record_quarter_id' => $otherQuarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.ila.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'records' => [['date_id' => $foreignDate->id, 'student_id' => $student->id, 'status' => 'compliant']],
+            ])
+            ->assertStatus(422)
+            ->assertJsonFragment(['message' => 'One or more dates do not belong to this quarter.']);
+
+        $this->assertDatabaseMissing('class_record_ila_records', ['class_record_ila_date_id' => $foreignDate->id]);
+    }
+
+    public function test_upsert_rejects_a_student_belonging_to_another_class_record(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher, $this->makeSection(), $this->makeSubject());
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordIlaDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+
+        // A student belonging to a DIFFERENT class record's quarter.
+        $otherRecord = $this->makeRecord(User::factory()->create(), $this->makeSection(), $this->makeSubject());
+        $otherQuarter = $this->makeQuarter($otherRecord);
+        $foreignStudent = ClassRecordStudent::create([
+            'class_record_quarter_id' => $otherQuarter->id, 'family_name' => 'Roe', 'given_name' => 'Richard',
+            'sequence_number' => 1, 'is_active' => true,
+        ]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.ila.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'records' => [['date_id' => $date->id, 'student_id' => $foreignStudent->id, 'status' => 'compliant']],
+            ])
+            ->assertStatus(422)
+            ->assertJsonFragment(['message' => 'One or more students do not belong to this class record.']);
+
+        $this->assertDatabaseMissing('class_record_ila_records', ['class_record_student_id' => $foreignStudent->id]);
     }
 
     public function test_locked_quarter_blocks_ila_changes(): void

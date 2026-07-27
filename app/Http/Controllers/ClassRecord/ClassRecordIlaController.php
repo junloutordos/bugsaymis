@@ -7,6 +7,7 @@ use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordIlaDate;
 use App\Models\ClassRecord\ClassRecordIlaRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
+use App\Models\ClassRecord\ClassRecordStudent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -108,6 +109,21 @@ class ClassRecordIlaController extends Controller
             'records.*.student_id' => 'required|integer|exists:class_record_students,id',
             'records.*.status'     => 'nullable|in:compliant,non_compliant',
         ]);
+
+        // "exists" only proves the IDs are valid rows *somewhere* — without this,
+        // a teacher could pass a date_id/student_id belonging to another class
+        // record entirely and delete or overwrite someone else's ILA data.
+        $dateIds = collect($validated['records'])->pluck('date_id')->unique();
+        $validDateIds = ClassRecordIlaDate::whereIn('id', $dateIds)
+            ->where('class_record_quarter_id', $quarter->id)
+            ->pluck('id');
+        abort_if($validDateIds->count() !== $dateIds->count(), 422, 'One or more dates do not belong to this quarter.');
+
+        $studentIds = collect($validated['records'])->pluck('student_id')->unique();
+        $validStudentIds = ClassRecordStudent::whereIn('id', $studentIds)
+            ->where('class_record_quarter_id', $quarter->id)
+            ->pluck('id');
+        abort_if($validStudentIds->count() !== $studentIds->count(), 422, 'One or more students do not belong to this class record.');
 
         $now      = now();
         $toUpsert = [];

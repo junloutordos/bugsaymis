@@ -7,6 +7,7 @@ use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAttendanceDate;
 use App\Models\ClassRecord\ClassRecordAttendanceRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
+use App\Models\ClassRecord\ClassRecordStudent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -111,6 +112,21 @@ class ClassRecordAttendanceController extends Controller
             'records.*.status'     => 'nullable|in:present,absent,late,excused,cut_class,unexcused_absence,excused_absence,excused_tardy,unexcused_tardy',
             'records.*.uniform'    => 'nullable|in:complete,incomplete',
         ]);
+
+        // "exists" only proves the IDs are valid rows *somewhere* — without this,
+        // a teacher could pass a date_id/student_id belonging to another class
+        // record entirely and delete or overwrite someone else's attendance data.
+        $dateIds = collect($validated['records'])->pluck('date_id')->unique();
+        $validDateIds = ClassRecordAttendanceDate::whereIn('id', $dateIds)
+            ->where('class_record_quarter_id', $quarter->id)
+            ->pluck('id');
+        abort_if($validDateIds->count() !== $dateIds->count(), 422, 'One or more dates do not belong to this quarter.');
+
+        $studentIds = collect($validated['records'])->pluck('student_id')->unique();
+        $validStudentIds = ClassRecordStudent::whereIn('id', $studentIds)
+            ->where('class_record_quarter_id', $quarter->id)
+            ->pluck('id');
+        abort_if($validStudentIds->count() !== $studentIds->count(), 422, 'One or more students do not belong to this class record.');
 
         $now      = now();
         $toUpsert = [];
