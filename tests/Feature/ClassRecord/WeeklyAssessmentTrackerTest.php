@@ -522,4 +522,76 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $response->assertStatus(422);
         $this->assertStringContainsString('4 graded assessments', $response->json('message'));
     }
+
+    // ── Sibling homerooms never pool with each other ─────────────────────────
+    // Regression: poolSectionIds() briefly pooled EVERY section at a grade
+    // (any homeroom, not just SCI-/ELEC- synthetics) — production symptom
+    // was Grade 7 "Opal" showing 32 graded assessments that actually
+    // belonged to other Grade 7 homerooms.
+
+    public function test_wat_week_data_does_not_pool_a_sibling_homeroom(): void
+    {
+        $teacher = User::factory()->create();
+        $opal = $this->makeSection(['levelid' => 7, 'sectionname' => 'Opal']);
+        $sapphire = $this->makeSection(['levelid' => 7, 'sectionname' => 'Sapphire']);
+        $subject = $this->makeSubject(['grade_level' => 7]);
+        $this->makeClassRecordWithAssessment($sapphire, $subject, $teacher, '2025-09-01');
+
+        $wat = \App\Services\ClassRecord\WatRuleService::weekData($opal->id, $this->sy->id, '2025-09-01');
+        $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
+
+        $this->assertSame(0, $monday['graded_count']);
+        $this->assertCount(0, $monday['items']);
+    }
+
+    public function test_grade_wide_wat_cap_does_not_pool_a_sibling_homeroom(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $opal = $this->makeSection(['levelid' => 7, 'sectionname' => 'Opal']);
+        $sapphire = $this->makeSection(['levelid' => 7, 'sectionname' => 'Sapphire']);
+        $subject = $this->makeSubject(['grade_level' => 7]);
+
+        // Fill Sapphire's own daily cap entirely — Opal must be unaffected.
+        $sapphireRecord = $this->makeClassRecord($sapphire, $subject, $teacher);
+        $this->makeAssessmentInRecord($sapphireRecord, 1, '2025-09-01');
+        $this->makeAssessmentInRecord($sapphireRecord, 2, '2025-09-01');
+        $this->makeAssessmentInRecord($sapphireRecord, 3, '2025-09-01');
+
+        $opalRecord = $this->makeClassRecord($opal, $subject, $teacher);
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $opalRecord->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number'   => 1,
+                    'title'               => 'Quiz 1',
+                    'is_graded'           => true,
+                    'activity_date'       => '2025-09-01',
+                    'max_score'           => 20,
+                ]],
+            ]);
+
+        $response->assertOk();
+    }
+
+    public function test_review_summary_keeps_sibling_homeroom_counts_separate(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $opal = $this->makeSection(['levelid' => 7, 'sectionname' => 'Opal']);
+        $sapphire = $this->makeSection(['levelid' => 7, 'sectionname' => 'Sapphire']);
+        $subject = $this->makeSubject(['grade_level' => 7]);
+        $this->makeClassRecordWithAssessment($opal, $subject, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($sapphire, $subject, $teacher, '2025-09-01');
+
+        $this->actingAs($admin)
+            ->get(route('class-records.wat.review', ['week' => '2025-09-01']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.0.name', 'Opal')
+                ->where('summary.0.graded_count', 1)
+                ->where('summary.1.name', 'Sapphire')
+                ->where('summary.1.graded_count', 1));
+    }
 }

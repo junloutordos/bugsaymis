@@ -199,14 +199,15 @@ class ClassRecordAssessmentController extends Controller
             }
         }
 
-        // WAT daily/weekly caps — graded assessments only, pooled across the
-        // whole grade (not just this section): Science Core/Elective classes
-        // cut across homerooms, so their assessments and a homeroom's own
-        // assessments share one budget per grade level (see
-        // WatRuleService::poolSectionIds()). Long Test/Quarterly Exam entries
-        // inside a configured exam window are exempt: every subject
-        // legitimately sits its final exam in the same campus-wide days,
-        // which isn't the cramming these caps guard against.
+        // WAT daily/weekly caps — graded assessments only, pooled with any
+        // Science Core/Elective synthetic sections at this section's grade
+        // (they cut across homerooms, so their assessments and this
+        // section's own assessments share one budget — see
+        // WatRuleService::poolSectionIds()). Never pooled with sibling real
+        // homerooms. Long Test/Quarterly Exam entries inside a configured
+        // exam window are exempt: every subject legitimately sits its final
+        // exam in the same campus-wide days, which isn't the cramming these
+        // caps guard against.
         $grade = $classRecord->section?->levelid;
         if ($grade !== null) {
             $replacedIds = $items->pluck('_existing')->filter()->pluck('id')->all();
@@ -214,7 +215,7 @@ class ClassRecordAssessmentController extends Controller
                 && ! WatRuleService::isExamExempt($i['assessment_type'], $classRecord->school_year_id, $q, $i['activity_date']));
 
             foreach ($datedGraded->groupBy('activity_date') as $date => $group) {
-                $counts    = WatRuleService::gradeCountsOnDate($grade, $classRecord->school_year_id, $date, $replacedIds);
+                $counts    = WatRuleService::gradeCountsOnDate($classRecord->section_id, $grade, $classRecord->school_year_id, $date, $replacedIds);
                 $graded    = $counts['graded'] + $group->count();
                 $major     = $counts['major'] + $group->where('is_major', true)->count();
                 $formatted = Carbon::parse($date)->format('M d, Y');
@@ -233,7 +234,7 @@ class ClassRecordAssessmentController extends Controller
 
             $byWeek = $datedGraded->groupBy(fn ($i) => Carbon::parse($i['activity_date'])->startOfWeek(Carbon::MONDAY)->toDateString());
             foreach ($byWeek as $weekStart => $group) {
-                $counts = WatRuleService::gradeCountsInWeek($grade, $classRecord->school_year_id, $weekStart, $replacedIds);
+                $counts = WatRuleService::gradeCountsInWeek($classRecord->section_id, $grade, $classRecord->school_year_id, $weekStart, $replacedIds);
                 $graded = $counts['graded'] + $group->count();
                 $major  = $counts['major'] + $group->where('is_major', true)->count();
                 $label  = Carbon::parse($weekStart)->format('M d') . '–' . Carbon::parse($weekStart)->addDays(4)->format('M d, Y');

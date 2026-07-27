@@ -207,10 +207,11 @@ class WeeklyAssessmentTrackerController extends Controller
 
         $monday = Carbon::parse($request->query('week', now()->toDateString()))->startOfWeek(Carbon::MONDAY);
 
-        // Per-grade (not per-section), per-day graded/major tallies for the
-        // week — pools Science Core/Elective synthetic-section assessments
-        // into the real homerooms of the same grade, same as the tracker/
-        // print view (WatRuleService::weekData()).
+        // Per-section, per-day graded/major tallies for the week. Science
+        // Core/Elective synthetic sections (SCI-/ELEC-) pool into every real
+        // homeroom's own tally at the same grade, same as the tracker/print
+        // view (WatRuleService::weekData()) — but two real homerooms never
+        // pool with each other, only with the grade's synthetic sections.
         $rows = ClassRecordAssessment::schoolYearScopeQuery($sy->id)
             ->join('sections as sec', 'sec.id', '=', 'cr.section_id')
             ->whereNotNull('cr.section_id')
@@ -219,13 +220,18 @@ class WeeklyAssessmentTrackerController extends Controller
                 $monday->copy()->addDays(6)->toDateString(),
             ])
             ->selectRaw('
+                cr.section_id,
                 sec.levelid as grade,
+                sec.sectionname,
                 class_record_assessments.activity_date as d,
                 COALESCE(SUM(class_record_assessments.is_graded), 0) as graded,
                 COALESCE(SUM(class_record_assessments.is_major AND class_record_assessments.is_graded), 0) as major
             ')
-            ->groupBy('sec.levelid', 'd')
+            ->groupBy('cr.section_id', 'sec.levelid', 'sec.sectionname', 'd')
             ->get();
+
+        $isSynthetic = fn ($name) => str_starts_with((string) $name, 'SCI-') || str_starts_with((string) $name, 'ELEC-');
+        $syntheticByGrade = $rows->filter(fn ($r) => $isSynthetic($r->sectionname))->groupBy('grade');
 
         $sections = $this->accessibleSections($user, $sy->id, $this->currentAcademicTerm($sy)->id, true, false);
         $reviews  = WatReview::with('reviewedBy:id,name')
@@ -234,8 +240,13 @@ class WeeklyAssessmentTrackerController extends Controller
             ->get()
             ->keyBy('section_id');
 
-        $summary = $sections->map(function ($section) use ($rows, $reviews) {
-            $days = $rows->where('grade', $section['level']);
+        $summary = $sections->map(function ($section) use ($rows, $syntheticByGrade, $reviews) {
+            $pooled = $rows->where('section_id', $section['id'])
+                ->concat($syntheticByGrade->get($section['level'], collect()));
+            $days = $pooled->groupBy('d')->map(fn ($g) => (object) [
+                'graded' => (int) $g->sum('graded'),
+                'major'  => (int) $g->sum('major'),
+            ]);
 
             return array_merge($section, [
                 'graded_count' => (int) $days->sum('graded'),

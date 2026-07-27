@@ -111,36 +111,43 @@ class WatRuleService
     // ── Grade-pooled graded/major counts (exclude IDs being replaced) ────────
 
     /**
-     * Every section sharing a WAT budget with $grade: the real homerooms
-     * plus any SCI- / ELEC- prefixed synthetic sections at that grade level
-     * (Faculty Loading gives each Science Core/Elective class its own
-     * synthetic Section row, carrying the same levelid as the grade it cuts
-     * across). Those classes pull students from multiple homerooms at once,
-     * so their assessments land on the same students' daily/weekly load and
-     * must pool with it — not track a private budget on their own
-     * synthetic section, which no one reviews independently.
+     * The sections sharing $sectionId's WAT budget: itself, plus any SCI- /
+     * ELEC- prefixed synthetic sections at the same grade level (Faculty
+     * Loading gives each Science Core/Elective class its own synthetic
+     * Section row, carrying the same levelid as the grade it cuts across).
+     * Those classes pull students from multiple homerooms at once, so their
+     * assessments land on the same students' daily/weekly load and must
+     * pool with it — not track a private budget on their own synthetic
+     * section, which no one reviews independently.
+     *
+     * Deliberately NOT every section at that grade — two real homerooms
+     * (e.g. Grade 7 "Opal" and Grade 7 "Sapphire") never share a budget with
+     * each other, only with the grade's synthetic cross-section classes.
      *
      * Not scoped by school year here — sections.school_year_id isn't
      * reliably populated across all data (legacy sections only carry the
      * older syid column). The actual year boundary is already enforced by
      * schoolYearScopeQuery()'s cr.school_year_id filter on the assessments
-     * side, so including a same-levelid section id from another year here
-     * is harmless: no assessment of a different year will ever match it.
+     * side, so including a same-levelid synthetic section id from another
+     * year here is harmless: no assessment of a different year will ever
+     * match it.
      */
-    public static function poolSectionIds(int $grade): array
+    public static function poolSectionIds(int $sectionId, int $grade): array
     {
-        return Section::where('levelid', $grade)
+        $syntheticIds = Section::where('levelid', $grade)
+            ->where(function ($q) {
+                $q->where('sectionname', 'like', 'SCI-%')
+                    ->orWhere('sectionname', 'like', 'ELEC-%');
+            })
             ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+            ->map(fn ($id) => (int) $id);
+
+        return $syntheticIds->push($sectionId)->unique()->values()->all();
     }
 
-    public static function gradeCountsOnDate(int $grade, int $schoolYearId, string $date, array $excludeIds = []): array
+    public static function gradeCountsOnDate(int $sectionId, int $grade, int $schoolYearId, string $date, array $excludeIds = []): array
     {
-        $sectionIds = self::poolSectionIds($grade);
-        if (empty($sectionIds)) {
-            return ['graded' => 0, 'major' => 0];
-        }
+        $sectionIds = self::poolSectionIds($sectionId, $grade);
 
         return self::counts(
             ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
@@ -150,14 +157,10 @@ class WatRuleService
         );
     }
 
-    public static function gradeCountsInWeek(int $grade, int $schoolYearId, string $weekStart, array $excludeIds = []): array
+    public static function gradeCountsInWeek(int $sectionId, int $grade, int $schoolYearId, string $weekStart, array $excludeIds = []): array
     {
-        $sectionIds = self::poolSectionIds($grade);
-        if (empty($sectionIds)) {
-            return ['graded' => 0, 'major' => 0];
-        }
-
-        $monday = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
+        $sectionIds = self::poolSectionIds($sectionId, $grade);
+        $monday     = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
 
         return self::counts(
             ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
@@ -241,7 +244,7 @@ class WatRuleService
         $friday = $monday->copy()->addDays(4);
 
         $grade = Section::where('id', $sectionId)->value('levelid');
-        $poolSectionIds = $grade !== null ? self::poolSectionIds((int) $grade) : [$sectionId];
+        $poolSectionIds = $grade !== null ? self::poolSectionIds($sectionId, (int) $grade) : [$sectionId];
 
         $rows = ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
             ->whereIn('cr.section_id', $poolSectionIds)
