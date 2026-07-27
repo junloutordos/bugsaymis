@@ -27,7 +27,7 @@ class ResearchAdvisoryController extends Controller
 
     public function index(Request $request): Response
     {
-        $this->authorize('faculty_loading.manage');
+        abort_unless($request->user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.research_advisories']), 403);
 
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId      = $request->input('term_id', $currentTerm?->id);
@@ -57,7 +57,7 @@ class ResearchAdvisoryController extends Controller
 
     public function studentsForGrade(Request $request): JsonResponse
     {
-        $this->authorize('faculty_loading.manage');
+        abort_unless($request->user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.research_advisories']), 403);
 
         $request->validate([
             'grade_level'  => 'required|integer|min:7|max:12',
@@ -116,7 +116,7 @@ class ResearchAdvisoryController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('faculty_loading.manage');
+        abort_unless($request->user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.research_advisories']), 403);
 
         $data = $request->validate([
             'user_id'          => 'required|exists:users,id',
@@ -188,7 +188,7 @@ class ResearchAdvisoryController extends Controller
 
     public function update(Request $request, ResearchAdvisory $researchAdvisory): RedirectResponse
     {
-        $this->authorize('faculty_loading.manage');
+        abort_unless($request->user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.research_advisories']), 403);
 
         $load = FacultyLoad::where('user_id', $researchAdvisory->user_id)
             ->where('academic_term_id', $researchAdvisory->academic_term_id)
@@ -249,7 +249,7 @@ class ResearchAdvisoryController extends Controller
 
     public function destroy(ResearchAdvisory $researchAdvisory): RedirectResponse
     {
-        $this->authorize('faculty_loading.manage');
+        abort_unless(Auth::user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.research_advisories']), 403);
 
         $load = FacultyLoad::where('user_id', $researchAdvisory->user_id)
             ->where('academic_term_id', $researchAdvisory->academic_term_id)

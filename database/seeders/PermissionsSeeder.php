@@ -296,6 +296,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.vacancies',       'description' => 'View and manage faculty vacancy slots'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.training',        'description' => 'Manage training and L&D records'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.training.verify', 'description' => 'Verify or reject training records'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.research_advisories', 'description' => 'Manage Research Advisory groups (create/edit/remove, assign members)'],
 
             // ── Payroll Upload (Cashier) ──────────────────────────────────────
             ['module' => 'Payroll', 'name' => 'payroll.upload',    'description' => 'Upload payroll Excel and parse into payslips'],

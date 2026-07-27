@@ -1374,7 +1374,7 @@ export const menuItems = [
       "faculty_loading.manage", "faculty_loading.school_year",
       "faculty_loading.approve", "faculty_loading.reports",
       "faculty_loading.setup", "faculty_loading.vacancies",
-      "faculty_loading.training",
+      "faculty_loading.training", "faculty_loading.research_advisories",
     ],
     orRoles: ["ScheduleAdvisory"],
     children: [
@@ -1451,7 +1451,7 @@ export const menuItems = [
         href: route("faculty-loading.research-advisories.index"),
         icon: BookOpenIcon,
         roles: [],
-        permissions: ["faculty_loading.manage"],
+        permissions: ["faculty_loading.manage", "faculty_loading.research_advisories"],
       },
       {
         label: "Committee Assignments",
