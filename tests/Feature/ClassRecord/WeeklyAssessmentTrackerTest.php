@@ -286,6 +286,19 @@ class WeeklyAssessmentTrackerTest extends TestCase
     }
 
     // ── Print signatories ────────────────────────────────────────────────────
+    // printForm() now streams a server-rendered mPDF PDF (see
+    // WeeklyAssessmentTrackerController::renderPdf()) instead of an Inertia
+    // page — assert on the Content-Type header and the actual rendered PDF
+    // text, extracted via smalot/pdfparser, rather than Inertia props.
+
+    private function assertPdfTextContains(\Illuminate\Testing\TestResponse $response, string $needle): void
+    {
+        $response->assertOk();
+        $this->assertSame('application/pdf', $response->headers->get('content-type'));
+
+        $pdf = (new \Smalot\PdfParser\Parser())->parseContent($response->streamedContent());
+        $this->assertStringContainsString($needle, $pdf->getText());
+    }
 
     public function test_print_resolves_coordinator_name_from_designation_not_adviser_column(): void
     {
@@ -296,12 +309,10 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->assignCoordinator($coordinator, 'HR_ADV', 'HRA-G8-EMERALD', 'HR Adviser — G8 Emerald', $section);
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $this->actingAs($coordinator)
-            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('ClassRecord/Wat/Print')
-                ->where('coordinatorName', 'COORDINATOR PERSON'));
+        $response = $this->actingAs($coordinator)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']));
+
+        $this->assertPdfTextContains($response, 'COORDINATOR PERSON');
     }
 
     public function test_print_resolves_grade_wide_coordinator_name_over_the_section_adviser(): void
@@ -321,12 +332,10 @@ class WeeklyAssessmentTrackerTest extends TestCase
 
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $this->actingAs($coordinator)
-            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('ClassRecord/Wat/Print')
-                ->where('coordinatorName', 'COORDINATOR PERSON'));
+        $response = $this->actingAs($coordinator)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']));
+
+        $this->assertPdfTextContains($response, 'COORDINATOR PERSON');
 
         // The section's own adviser keeps their Load Assignment credit AND
         // their own WAT access — a grade-wide coordinator existing doesn't
@@ -351,10 +360,10 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->assignCoordinator($coordinator, 'HR_ADV', 'HRA-G8-EMERALD', 'HR Adviser — G8 Emerald', $section);
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $this->actingAs($coordinator)
-            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('cidChiefName', 'CHIEF PERSON'));
+        $response = $this->actingAs($coordinator)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']));
+
+        $this->assertPdfTextContains($response, 'CHIEF PERSON');
     }
 
     public function test_print_signatory_names_use_firstname_middle_initial_lastname_format(): void
@@ -366,17 +375,23 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->assignCoordinator($coordinator, 'HR_ADV', 'HRA-G8-EMERALD', 'HR Adviser — G8 Emerald', $section);
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $this->actingAs($coordinator)
-            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('coordinatorName', 'JUAN D. CRUZ'));
+        $response = $this->actingAs($coordinator)
+            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']));
+
+        $this->assertPdfTextContains($response, 'JUAN D. CRUZ');
     }
 
     // ── Time column resolution ───────────────────────────────────────────────
 
+    // ── Time column resolution ───────────────────────────────────────────────
+    // Tests WatRuleService::weekData() directly rather than through the print
+    // endpoint — the data-assembly logic under test is unchanged by the
+    // Inertia→mPDF migration, but the structured `wat.days[].items[]` array
+    // it used to inspect is no longer exposed as a response (it's rendered
+    // into PDF text instead).
+
     public function test_wat_item_resolves_time_label_from_matching_class_schedule(): void
     {
-        $coordinator = User::factory()->create();
         $teacher = User::factory()->create();
         $section = $this->makeSection();
         $subject = $this->makeSubject();
@@ -390,40 +405,23 @@ class WeeklyAssessmentTrackerTest extends TestCase
             'classroom_id' => $room->id, 'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
             'day_of_week' => 'Monday', 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'status' => 'active',
         ]);
-        $this->assignCoordinator($coordinator, 'HR_ADV', 'HRA-G8-EMERALD', 'HR Adviser — G8 Emerald', $section);
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $this->actingAs($coordinator)
-            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
-            ->assertOk()
-            ->assertInertia(function ($page) {
-                $days = $page->toArray()['props']['wat']['days'];
-                $monday = collect($days)->firstWhere('date', '2025-09-01');
-                $this->assertSame('08:00–09:00', $monday['items'][0]['time_label']);
-
-                return $page;
-            });
+        $wat = \App\Services\ClassRecord\WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
+        $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
+        $this->assertSame('08:00–09:00', $monday['items'][0]['time_label']);
     }
 
     public function test_wat_item_time_label_is_null_when_no_matching_schedule(): void
     {
-        $coordinator = User::factory()->create();
         $teacher = User::factory()->create();
         $section = $this->makeSection();
         $subject = $this->makeSubject();
-        $this->assignCoordinator($coordinator, 'HR_ADV', 'HRA-G8-EMERALD', 'HR Adviser — G8 Emerald', $section);
         // No ClassSchedule row created for this subject/section at all.
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $this->actingAs($coordinator)
-            ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
-            ->assertOk()
-            ->assertInertia(function ($page) {
-                $days = $page->toArray()['props']['wat']['days'];
-                $monday = collect($days)->firstWhere('date', '2025-09-01');
-                $this->assertNull($monday['items'][0]['time_label']);
-
-                return $page;
-            });
+        $wat = \App\Services\ClassRecord\WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
+        $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
+        $this->assertNull($monday['items'][0]['time_label']);
     }
 }
