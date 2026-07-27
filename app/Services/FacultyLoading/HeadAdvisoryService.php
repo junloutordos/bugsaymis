@@ -15,11 +15,19 @@ use App\Models\FacultyLoading\Section;
  * Automatically manages LoadAssignment rows when:
  *   1. An Academic Unit Head is assigned / changed / removed
  *   2. A Section Adviser is assigned / changed / removed
+ *   3. A section's Homeroom Coordinator override is assigned / changed / removed
  *
  * Designation mapping:
  *   Unit Head     → AUH-{DEPT_CODE}              (e.g. AUH-CS)         → admin, 3 units
  *   Adviser G7–10 → HRA-{section_code}           (e.g. HRA-G7-NEWTON)  → admin, 3 units
  *   Adviser G11–12→ HAC-{section_code}           (e.g. HAC-G11-MARS)   → admin, 3 units
+ *   Coordinator   → HRC-{section_code}           (e.g. HRC-G7-NEWTON)  → admin, 3 units
+ *
+ * The Homeroom Coordinator override is a SEPARATE, independently credited
+ * designation from the adviser's — both can be held by different people on
+ * the same section at once, each showing their own row in Load Assignments.
+ * The override only changes who WAT treats as authoritative for the
+ * section — see AdvisoryScheduleScopeService.
  *
  * Section designations are auto-created from the Sections table — not hardcoded in seeders.
  */
@@ -115,13 +123,6 @@ class HeadAdvisoryService
             $this->removeAdviserAssignment($section->id, $oldAdviserId);
         }
 
-        // An explicit Homeroom Coordinator override takes precedence — the
-        // adviser no longer automatically holds the section's HR_ADV/HR_ACAD
-        // designation while an override is set. See syncHomeroomCoordinator().
-        if ($section->homeroom_coordinator_id) {
-            return;
-        }
-
         // ── Create new adviser's homeroom assignment ───────────────────────────
         if ($newAdviserId) {
             // Ensure the section's designation exists (auto-creates if needed)
@@ -161,10 +162,11 @@ class HeadAdvisoryService
     /**
      * Call after updating a section's homeroom_coordinator_id column.
      *
-     * An explicit coordinator holds the section's HR_ADV/HR_ACAD designation
-     * instead of the adviser. Clearing the override (new value null) falls
-     * back to the adviser, re-syncing it if the adviser doesn't already hold
-     * the designation.
+     * The coordinator gets their OWN HRC-{section_code} designation — a
+     * separate LoadAssignment from the adviser's HRA-/HAC- one, not a
+     * replacement for it. Both are independently credited. WAT access/print
+     * treats this override as authoritative for the section regardless —
+     * see AdvisoryScheduleScopeService.
      *
      * @param Section  $section          The section with its new homeroom_coordinator_id already saved.
      * @param int|null $oldCoordinatorId The homeroom_coordinator_id before the update.
@@ -181,25 +183,15 @@ class HeadAdvisoryService
 
         // ── Remove old coordinator's homeroom assignment for this section ──────
         if ($oldCoordinatorId) {
-            $this->removeAdviserAssignment($section->id, $oldCoordinatorId);
+            $this->removeCoordinatorAssignment($section->id, $oldCoordinatorId);
         }
 
-        // ── Override cleared — fall back to the adviser ─────────────────────────
         if (! $newCoordinatorId) {
-            if ($section->adviser) {
-                $this->syncSectionAdviser($section, null);
-            }
             return;
         }
 
         // ── Create new coordinator's homeroom assignment ────────────────────────
-        // Clean up a stale auto-synced adviser assignment for this section, if
-        // any, so only one person holds the designation at a time.
-        if ($section->adviser && (int) $section->adviser !== $newCoordinatorId) {
-            $this->removeAdviserAssignment($section->id, (int) $section->adviser);
-        }
-
-        $designation = $this->ensureSectionDesignation($section);
+        $designation = $this->ensureCoordinatorDesignation($section);
         if (! $designation) {
             return; // Not a G7-12 section — skip
         }
@@ -388,6 +380,40 @@ class HeadAdvisoryService
     }
 
     /**
+     * Ensure an HRC-{section_code} "Homeroom Coordinator" designation exists
+     * for the given section — separate from the adviser's HRA-/HAC- one, so
+     * both can be held (and credited) independently. Only grades 7–12.
+     *
+     * @return Designation|null  Null if section is not grade 7–12.
+     */
+    public function ensureCoordinatorDesignation(Section $section): ?Designation
+    {
+        $grade = (int) $section->levelid;
+        if ($grade < 7 || $grade > 12) {
+            return null;
+        }
+
+        $isJhs = $grade <= 10;
+        $sc    = $section->section_code ?? ('G' . $grade . '-' . strtoupper(str_replace(' ', '_', $section->sectionname)));
+        $code  = 'HRC-' . $sc;
+
+        return Designation::firstOrCreate(
+            ['code' => $code],
+            [
+                'designation_category_id' => $isJhs ? $this->hraCategoryId() : $this->hacCategoryId(),
+                'section_id'              => $section->id,
+                'name'                    => "Homeroom Coordinator — G{$grade} {$section->sectionname}",
+                'load_units'              => 3,
+                'assignment_type'         => 'admin',
+                'requires_unit'           => false,
+                'max_holders'             => 1,
+                'sort_order'              => 0,
+                'is_active'               => true,
+            ]
+        );
+    }
+
+    /**
      * Sync the section designation when a section's name or section_code changes.
      * Called on section update. Updates the designation code and/or name.
      *
@@ -508,6 +534,29 @@ class HeadAdvisoryService
         $assignments = LoadAssignment::where('user_id', $userId)
             ->where('section_id', $sectionId)
             ->whereHas('designation', fn ($q) => $q->whereIn('designation_category_id', $hrCategoryIds))
+            ->get();
+
+        foreach ($assignments as $assignment) {
+            $facultyLoad = $assignment->facultyLoad;
+            $assignment->delete();
+            if ($facultyLoad) {
+                $this->loads->syncLoad($facultyLoad);
+            }
+        }
+    }
+
+    /**
+     * Delete the HRC- (Homeroom Coordinator) load assignment for a specific
+     * section and old coordinator. Scoped to the HRC- designation code only,
+     * so it never touches that same person's adviser (HRA-/HAC-) assignment
+     * if they happen to hold both roles on the same section.
+     * Syncs the faculty load totals after deletion.
+     */
+    private function removeCoordinatorAssignment(int $sectionId, int $userId): void
+    {
+        $assignments = LoadAssignment::where('user_id', $userId)
+            ->where('section_id', $sectionId)
+            ->whereHas('designation', fn ($q) => $q->where('code', 'like', 'HRC-%'))
             ->get();
 
         foreach ($assignments as $assignment) {

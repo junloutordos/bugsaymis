@@ -23,7 +23,7 @@ class AdvisoryScheduleScopeService
             return collect();
         }
 
-        return LoadAssignment::with(['designation.category'])
+        $base = LoadAssignment::with(['designation.category'])
             ->where('academic_term_id', $academicTermId)
             ->whereNotNull('designation_id')
             ->whereHas('designation', fn ($query) => $query
@@ -48,6 +48,12 @@ class AdvisoryScheduleScopeService
                     ? [(int) $sectionId => (int) $assignment->user_id]
                     : [];
             });
+
+        // Collection::merge() treats numeric keys (section IDs) as a list and
+        // renumbers/appends instead of preserving them as a map — union()
+        // keeps keyed values intact, and preferring the override's collection
+        // makes it win on any key collision with the designation-based base.
+        return $this->coordinatorOverrideUserIds($sectionIds)->union($base);
     }
 
     /** @return Collection<int, string> Adviser names keyed by section ID. */
@@ -63,7 +69,7 @@ class AdvisoryScheduleScopeService
             return collect();
         }
 
-        return LoadAssignment::with(['faculty:id,name', 'designation.category'])
+        $base = LoadAssignment::with(['faculty:id,name', 'designation.category'])
             ->where('academic_term_id', $academicTermId)
             ->whereNotNull('designation_id')
             ->whereHas('designation', fn ($query) => $query
@@ -88,6 +94,37 @@ class AdvisoryScheduleScopeService
                     ? [(int) $sectionId => $assignment->faculty->name]
                     : [];
             });
+
+        $overrides = Section::whereIn('id', $sectionIds)
+            ->whereNotNull('homeroom_coordinator_id')
+            ->with('homeroomCoordinatorUser:id,name')
+            ->get()
+            ->mapWithKeys(fn (Section $s) => [$s->id => $s->homeroomCoordinatorUser?->name])
+            ->filter();
+
+        // See adviserUserIdsBySection() — union(), not merge(), to preserve
+        // numeric section-ID keys and let the override win on collision.
+        return $overrides->union($base);
+    }
+
+    /**
+     * Explicit per-section Homeroom Coordinator overrides, keyed by section
+     * ID. This always wins over whatever LoadAssignment row happens to
+     * exist for the section's HR_ADV/HR_ACAD designations — the adviser
+     * keeps their own designation (and Load Assignment credit) even after
+     * an override is set, so relying on "most recently created row wins"
+     * would be fragile (e.g. re-assigning the adviser later would create a
+     * newer row and wrongly flip WAT resolution back to them).
+     *
+     * @param Collection<int, int> $sectionIds
+     * @return Collection<int, int>
+     */
+    private function coordinatorOverrideUserIds(Collection $sectionIds): Collection
+    {
+        return Section::whereIn('id', $sectionIds)
+            ->whereNotNull('homeroom_coordinator_id')
+            ->pluck('homeroom_coordinator_id', 'id')
+            ->map(fn ($id) => (int) $id);
     }
 
     /** @return array<int> */
@@ -127,6 +164,23 @@ class AdvisoryScheduleScopeService
                     ->map(fn ($id) => (int) $id)
             );
         }
+
+        // An explicit per-section Homeroom Coordinator override is
+        // authoritative for WAT access: it grants access to whoever holds
+        // it and revokes it from anyone else who'd otherwise qualify via
+        // their own designation (e.g. the adviser, who keeps their Load
+        // Assignment credit but not WAT access once overridden).
+        $overridden = Section::where('school_year_id', $term->school_year_id)
+            ->where('is_active', true)
+            ->whereNotNull('homeroom_coordinator_id')
+            ->get(['id', 'homeroom_coordinator_id']);
+
+        $overriddenToOthers = $overridden->where('homeroom_coordinator_id', '!=', $user->id)
+            ->pluck('id')->map(fn ($id) => (int) $id);
+        $overriddenToMe = $overridden->where('homeroom_coordinator_id', $user->id)
+            ->pluck('id')->map(fn ($id) => (int) $id);
+
+        $sectionIds = $sectionIds->diff($overriddenToOthers)->merge($overriddenToMe);
 
         return $sectionIds->unique()->sort()->values()->all();
     }
@@ -171,7 +225,14 @@ class AdvisoryScheduleScopeService
     private function coordinatorGrades(LoadAssignment $assignment): array
     {
         $designation = $assignment->designation;
-        if (! $designation) {
+
+        // A designation tied to one specific section (HRA-/HAC-/HRC-) can
+        // never ALSO be a grade-wide "coordinates every section in this
+        // range" role — those are mutually exclusive. Without this guard,
+        // the per-section HRC- "Homeroom Coordinator" designation name
+        // would false-positive the regex below (it contains "COORDINATOR")
+        // and wrongly grant access to every other section in that grade.
+        if (! $designation || $designation->section_id) {
             return [];
         }
 
