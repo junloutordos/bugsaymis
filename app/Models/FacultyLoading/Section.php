@@ -86,7 +86,6 @@ class Section extends Model
         'afternoon_break_start',
         'afternoon_break_end',
         'adviser',
-        'homeroom_coordinator_id',
         'syid',
         'is_active',
         'permission',
@@ -159,7 +158,6 @@ class Section extends Model
         'school_year_id' => 'integer',
         'capacity'       => 'integer',
         'classroom_id'   => 'integer',
-        'homeroom_coordinator_id' => 'integer',
         'is_active'      => 'boolean',
     ];
 
@@ -181,17 +179,6 @@ class Section extends Model
     public function adviserUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'adviser');
-    }
-
-    /**
-     * Explicit Homeroom Coordinator override, independent of the Section
-     * Adviser. When set, this person (not the adviser) holds the section's
-     * HR_ADV/HR_ACAD designation — see HeadAdvisoryService::syncHomeroomCoordinator().
-     * Null means the adviser remains the coordinator (the default).
-     */
-    public function homeroomCoordinatorUser(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'homeroom_coordinator_id');
     }
 
     public function consultationOverrides(): HasMany

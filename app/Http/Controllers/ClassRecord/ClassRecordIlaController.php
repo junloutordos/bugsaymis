@@ -4,8 +4,8 @@ namespace App\Http\Controllers\ClassRecord;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
-use App\Models\ClassRecord\ClassRecordAttendanceDate;
-use App\Models\ClassRecord\ClassRecordAttendanceRecord;
+use App\Models\ClassRecord\ClassRecordIlaDate;
+use App\Models\ClassRecord\ClassRecordIlaRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordStudent;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class ClassRecordAttendanceController extends Controller
+class ClassRecordIlaController extends Controller
 {
     private function isAdmin(): bool
     {
@@ -23,12 +23,13 @@ class ClassRecordAttendanceController extends Controller
     private function resolveQuarter(ClassRecord $classRecord, int $q): ClassRecordQuarter
     {
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
+
         return ClassRecordQuarter::where('class_record_id', $classRecord->id)
             ->where('quarter', $q)
             ->firstOrFail();
     }
 
-    // ── GET /class-records/{cr}/quarters/{q}/attendance ───────────────────────
+    // ── GET /class-records/{cr}/quarters/{q}/ila ──────────────────────────────
 
     public function index(ClassRecord $classRecord, int $q): JsonResponse
     {
@@ -36,27 +37,24 @@ class ClassRecordAttendanceController extends Controller
 
         $quarter = $this->resolveQuarter($classRecord, $q);
 
-        $dates = ClassRecordAttendanceDate::where('class_record_quarter_id', $quarter->id)
+        $dates = ClassRecordIlaDate::where('class_record_quarter_id', $quarter->id)
             ->orderBy('date')
-            ->get(['id', 'date', 'sort_order']);
+            ->get(['id', 'date', 'is_auto_generated', 'sort_order']);
 
-        $records = ClassRecordAttendanceRecord::whereHas('attendanceDate', fn ($sq) =>
+        $records = ClassRecordIlaRecord::whereHas('ilaDate', fn ($sq) =>
                 $sq->where('class_record_quarter_id', $quarter->id)
             )
-            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'uniform_status'])
+            ->get(['class_record_ila_date_id', 'class_record_student_id', 'status'])
             ->mapWithKeys(fn ($r) => [
-                "{$r->class_record_student_id}_{$r->class_record_attendance_date_id}" => [
-                    'status'  => $r->status,
-                    'uniform' => $r->uniform_status,
-                ],
+                "{$r->class_record_student_id}_{$r->class_record_ila_date_id}" => $r->status,
             ]);
 
         return response()->json(['dates' => $dates, 'records' => $records]);
     }
 
-    // ── POST /class-records/{cr}/quarters/{q}/attendance/dates ────────────────
+    // ── POST /class-records/{cr}/quarters/{q}/ila/dates ───────────────────────
 
-    public function storeDates(Request $request, ClassRecord $classRecord, int $q): JsonResponse
+    public function storeDate(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
@@ -68,34 +66,34 @@ class ClassRecordAttendanceController extends Controller
             'date' => 'required|date',
         ]);
 
-        $maxOrder = ClassRecordAttendanceDate::where('class_record_quarter_id', $quarter->id)
+        $maxOrder = ClassRecordIlaDate::where('class_record_quarter_id', $quarter->id)
             ->max('sort_order') ?? 0;
 
-        $date = ClassRecordAttendanceDate::firstOrCreate(
+        $date = ClassRecordIlaDate::firstOrCreate(
             ['class_record_quarter_id' => $quarter->id, 'date' => $validated['date']],
-            ['sort_order' => $maxOrder + 1]
+            ['sort_order' => $maxOrder + 1, 'is_auto_generated' => false]
         );
 
         return response()->json($date);
     }
 
-    // ── DELETE /class-records/{cr}/quarters/{q}/attendance/dates/{date} ───────
+    // ── DELETE /class-records/{cr}/quarters/{q}/ila/dates/{ilaDate} ───────────
 
-    public function destroyDate(ClassRecord $classRecord, int $q, ClassRecordAttendanceDate $attendanceDate): JsonResponse
+    public function destroyDate(ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
-        abort_unless($attendanceDate->class_record_quarter_id === $quarter->id, 404);
+        abort_unless($ilaDate->class_record_quarter_id === $quarter->id, 404);
         abort_if($quarter->is_locked, 403, 'Quarter is locked.');
 
-        $attendanceDate->delete();
+        $ilaDate->delete();
 
         return response()->json(['message' => 'Date removed.']);
     }
 
-    // ── POST /class-records/{cr}/quarters/{q}/attendance/records ─────────────
+    // ── POST /class-records/{cr}/quarters/{q}/ila/records ─────────────────────
 
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
@@ -107,17 +105,16 @@ class ClassRecordAttendanceController extends Controller
 
         $validated = $request->validate([
             'records'              => 'required|array|min:1',
-            'records.*.date_id'    => 'required|integer|exists:class_record_attendance_dates,id',
+            'records.*.date_id'    => 'required|integer|exists:class_record_ila_dates,id',
             'records.*.student_id' => 'required|integer|exists:class_record_students,id',
-            'records.*.status'     => 'nullable|in:present,absent,late,excused,cut_class,unexcused_absence,excused_absence,excused_tardy,unexcused_tardy',
-            'records.*.uniform'    => 'nullable|in:complete,incomplete',
+            'records.*.status'     => 'nullable|in:compliant,non_compliant',
         ]);
 
         // "exists" only proves the IDs are valid rows *somewhere* — without this,
         // a teacher could pass a date_id/student_id belonging to another class
-        // record entirely and delete or overwrite someone else's attendance data.
+        // record entirely and delete or overwrite someone else's ILA data.
         $dateIds = collect($validated['records'])->pluck('date_id')->unique();
-        $validDateIds = ClassRecordAttendanceDate::whereIn('id', $dateIds)
+        $validDateIds = ClassRecordIlaDate::whereIn('id', $dateIds)
             ->where('class_record_quarter_id', $quarter->id)
             ->pluck('id');
         abort_if($validDateIds->count() !== $dateIds->count(), 422, 'One or more dates do not belong to this quarter.');
@@ -132,33 +129,29 @@ class ClassRecordAttendanceController extends Controller
         $toUpsert = [];
 
         foreach ($validated['records'] as $item) {
-            $status  = $item['status'] ?? null;
-            $uniform = $item['uniform'] ?? null;
+            $status = $item['status'] ?? null;
 
-            // A cell with neither an attendance status nor a uniform check has
-            // no reason to exist as a row.
-            if ($status === null && $uniform === null) {
-                DB::table('class_record_attendance_records')
-                    ->where('class_record_attendance_date_id', $item['date_id'])
+            if ($status === null) {
+                DB::table('class_record_ila_records')
+                    ->where('class_record_ila_date_id', $item['date_id'])
                     ->where('class_record_student_id', $item['student_id'])
                     ->delete();
             } else {
                 $toUpsert[] = [
-                    'class_record_attendance_date_id' => $item['date_id'],
-                    'class_record_student_id'         => $item['student_id'],
-                    'status'                          => $status,
-                    'uniform_status'                  => $uniform,
-                    'created_at'                      => $now,
-                    'updated_at'                      => $now,
+                    'class_record_ila_date_id' => $item['date_id'],
+                    'class_record_student_id'  => $item['student_id'],
+                    'status'                   => $status,
+                    'created_at'               => $now,
+                    'updated_at'               => $now,
                 ];
             }
         }
 
         if ($toUpsert) {
-            DB::table('class_record_attendance_records')->upsert(
+            DB::table('class_record_ila_records')->upsert(
                 $toUpsert,
-                ['class_record_attendance_date_id', 'class_record_student_id'],
-                ['status', 'uniform_status', 'updated_at']
+                ['class_record_ila_date_id', 'class_record_student_id'],
+                ['status', 'updated_at']
             );
         }
 

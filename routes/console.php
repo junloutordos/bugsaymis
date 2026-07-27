@@ -48,6 +48,10 @@ Schedule::command('computer-labs:sync')->everyThirtyMinutes()->withoutOverlappin
 //    no result reported (device went offline/crashed mid-flight) ─────────
 Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinutes()->withoutOverlapping();
 
+// ── Class Record: auto-create today's ILA date for every class record whose
+//    subject has a scheduled ILP period today ────────────────────────────
+Schedule::command('class-record:generate-ila-dates')->dailyAt('05:30')->withoutOverlapping();
+
 // Atlas Sentinel stale-device bell notifications removed 2026-07-17 (offline /
 // not-reporting devices were spamming IT staff). The command still exists for
 // manual runs: php artisan atlas-sentinel:notify-stale-devices

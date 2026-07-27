@@ -126,9 +126,11 @@ class ClassRecordPageController extends Controller
                 ->all();
         }
 
-        // Other class records by the same teacher for the same subject (for copy-from-section feature)
+        // Other class records by the same teacher for the same subject (for copy-from-section feature).
+        // Archived records are excluded — they're soft-deleted and must never resurface as a copy source.
         $sameSubjectRecords = ClassRecord::where('teacher_id', $classRecord->teacher_id)
             ->where('id', '!=', $classRecord->id)
+            ->where('status', '<>', 'archived')
             ->whereRaw('LOWER(subject_name) = LOWER(?)', [$classRecord->subject_name])
             ->orderByDesc('school_year')
             ->get(['id', 'subject_name', 'year_level_section', 'school_year']);

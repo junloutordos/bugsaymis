@@ -2386,6 +2386,12 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::delete('/class-records/{classRecord}/quarters/{q}/attendance/dates/{attendanceDate}', [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'destroyDate'])->name('class-records.attendance.destroy-date');
     Route::post('/class-records/{classRecord}/quarters/{q}/attendance/records',     [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'upsert'])->name('class-records.attendance.upsert');
 
+    // Independent Learning Activity (ILA) — auto-generated from scheduled ILP periods
+    Route::get('/class-records/{classRecord}/quarters/{q}/ila',              [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'index'])->name('class-records.ila.index');
+    Route::post('/class-records/{classRecord}/quarters/{q}/ila/dates',       [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'storeDate'])->name('class-records.ila.store-date');
+    Route::delete('/class-records/{classRecord}/quarters/{q}/ila/dates/{ilaDate}', [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'destroyDate'])->name('class-records.ila.destroy-date');
+    Route::post('/class-records/{classRecord}/quarters/{q}/ila/records',     [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'upsert'])->name('class-records.ila.upsert');
+
     // Final grades
     Route::get('/class-records/{classRecord}/final-grades', [\App\Http\Controllers\ClassRecord\ClassRecordFinalGradeController::class, 'index'])->name('class-records.final-grades');
 

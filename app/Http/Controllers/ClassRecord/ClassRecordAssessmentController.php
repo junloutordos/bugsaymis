@@ -123,7 +123,7 @@ class ClassRecordAssessmentController extends Controller
             'assessments.*.assessment_number'      => 'required|integer|min:1',
             'assessments.*.title'                  => 'required|string|max:255',
             'assessments.*.is_graded'              => 'sometimes|boolean',
-            'assessments.*.activity_date'          => 'nullable|date',
+            'assessments.*.activity_date'          => 'required|date',
             'assessments.*.max_score'              => 'required|numeric|min:0.01',
             'assessments.*.sort_order'             => 'sometimes|integer|min:0',
         ]);
@@ -417,6 +417,11 @@ class ClassRecordAssessmentController extends Controller
             $this->isAdmin() || $sourceRecord->teacher_id === Auth::id(),
             403,
             'You do not have access to that class record.'
+        );
+        abort_if(
+            $sourceRecord->isArchived(),
+            422,
+            'That class record has been archived and can no longer be used as a copy source.'
         );
         abort_if(
             strtolower($sourceRecord->subject_name) !== strtolower($classRecord->subject_name),

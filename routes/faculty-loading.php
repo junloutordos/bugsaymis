@@ -254,14 +254,6 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::delete('/{loadAssignmentVersion}',  [LoadAssignmentVersionController::class, 'destroy'])->name('destroy');
                 });
 
-                // Research Advisories
-                Route::prefix('research-advisories')->name('research-advisories.')->group(function () {
-                    Route::get('/',                         [ResearchAdvisoryController::class, 'index'])->name('index');
-                    Route::get('/students',                 [ResearchAdvisoryController::class, 'studentsForGrade'])->name('students');
-                    Route::post('/',                        [ResearchAdvisoryController::class, 'store'])->name('store');
-                    Route::put('/{researchAdvisory}',       [ResearchAdvisoryController::class, 'update'])->name('update');
-                    Route::delete('/{researchAdvisory}',    [ResearchAdvisoryController::class, 'destroy'])->name('destroy');
-                });
 
                 // Committee Assignments (admin CRUD; member-facing routes are
                 // registered below outside the manage group)
@@ -301,6 +293,17 @@ Route::middleware(['web', 'auth', 'verified'])
                         ->name('wellness')
                         ->where('day', 'Monday|Tuesday|Wednesday|Thursday|Friday');
                 });
+            });
+
+        // Research Advisories — own scoped permission, independent of the
+        // blanket faculty_loading.manage group above.
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.research_advisories')
+            ->prefix('research-advisories')->name('research-advisories.')->group(function () {
+                Route::get('/',                         [ResearchAdvisoryController::class, 'index'])->name('index');
+                Route::get('/students',                 [ResearchAdvisoryController::class, 'studentsForGrade'])->name('students');
+                Route::post('/',                        [ResearchAdvisoryController::class, 'store'])->name('store');
+                Route::put('/{researchAdvisory}',       [ResearchAdvisoryController::class, 'update'])->name('update');
+                Route::delete('/{researchAdvisory}',    [ResearchAdvisoryController::class, 'destroy'])->name('destroy');
             });
 
         // ══════════════════════════════════════════════════════════════════════

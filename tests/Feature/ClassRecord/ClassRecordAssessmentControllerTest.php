@@ -96,8 +96,25 @@ class ClassRecordAssessmentControllerTest extends TestCase
         return [
             'id' => $a->id, 'grading_category_id' => $a->grading_category_id,
             'assessment_number' => $a->assessment_number, 'title' => $a->title,
-            'is_graded' => true, 'activity_date' => null, 'max_score' => $a->max_score,
+            'is_graded' => true, 'activity_date' => $a->activity_date?->toDateString() ?? now()->addMonth()->toDateString(), 'max_score' => $a->max_score,
         ];
+    }
+
+    public function test_activity_date_is_required(): void
+    {
+        $teacher = User::factory()->create();
+        $quarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $this->makeSubject());
+        $assessment = $this->makeAssessment($quarter, 1, 'Quiz 1');
+
+        $payload = $this->payloadFor($assessment);
+        $payload['activity_date'] = null;
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
+                'assessments' => [$payload],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['assessments.0.activity_date']);
     }
 
     public function test_removing_an_assessment_from_the_payload_deletes_it(): void
