@@ -16,9 +16,14 @@
 <body>
   <div class="center">
     <div class="card" id="approvedCard">
-      @php $already = $already ?? false; @endphp
+      @php $already = $already ?? false; $blocked = $blocked ?? false; @endphp
+      @if($blocked)
+      <h1>Approval Not Yet Available</h1>
+      <p class="meta">{{ $blockedReason ?? 'This request is awaiting an earlier approval step.' }}</p>
+      @else
       <h1>{{ $already ? 'Request Already Approved' : 'Work Request Approved' }}</h1>
       <p class="meta">{{ $already ? 'This request was already approved.' : 'Thank you — the request has been approved successfully.' }}</p>
+      @endif
       <p class="meta">Request ID: {{ $facilityRequest->id }}</p>
       <p><a class="btn" id="returnBtn" href="{{ url('/') }}">Return to Application</a></p>
     </div>

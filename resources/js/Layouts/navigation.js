@@ -950,6 +950,20 @@ export const menuItems = [
         icon: ClipboardDocumentListIcon,
         permissions: ["facilities.view"],
       },
+      {
+        label: "Work Request — DC Approval",
+        routeName: "work-requests.dc-approval",
+        href: route('work-requests.dc-approval'),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["facilities.dc-approve"],
+      },
+      {
+        label: "Work Request — FAD Approval",
+        routeName: "work-requests.fad-approval",
+        href: route('work-requests.fad-approval'),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["facilities.fad-approve"],
+      },
       // No roles/permissions — every authenticated employee can report and
       // browse the found-items board; GSU actions are gated in-page.
       {
