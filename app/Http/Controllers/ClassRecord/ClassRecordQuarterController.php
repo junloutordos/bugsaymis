@@ -9,6 +9,7 @@ use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\ClassRecord\StanineLookup;
 use App\Services\ClassRecord\ClassRecordExcelService;
+use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use App\Services\ClassRecord\ClassRecordPdfService;
 use App\Services\ClassRecord\GradeComputationService;
 use Illuminate\Http\JsonResponse;
@@ -23,11 +24,20 @@ class ClassRecordQuarterController extends Controller
         private readonly GradeComputationService $grader,
         private readonly ClassRecordExcelService $excelService,
         private readonly ClassRecordPdfService $pdfService,
+        private readonly ClassRecordMonitorScopeService $monitorScope,
     ) {}
 
     private function isAdmin(): bool
     {
         return Auth::user()->hasPermission('class-records.admin');
+    }
+
+    /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
+    private function canView(ClassRecord $classRecord): bool
+    {
+        return $this->isAdmin()
+            || $classRecord->teacher_id === Auth::id()
+            || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
     private function resolveQuarter(ClassRecord $classRecord, int $q): ClassRecordQuarter
@@ -243,7 +253,7 @@ class ClassRecordQuarterController extends Controller
 
     public function exportQuarter(ClassRecord $classRecord, int $q): BinaryFileResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($this->canView($classRecord), 403);
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
 
         $classRecord->loadMissing([
@@ -262,7 +272,7 @@ class ClassRecordQuarterController extends Controller
 
     public function exportAll(ClassRecord $classRecord): BinaryFileResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($this->canView($classRecord), 403);
 
         $classRecord->loadMissing([
             'gradingOption.categories',
@@ -280,7 +290,7 @@ class ClassRecordQuarterController extends Controller
 
     public function exportPdf(ClassRecord $classRecord, int $q): Response
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($this->canView($classRecord), 403);
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
 
         $classRecord->load(['teacher:id,name,position', 'gradingOption.categories']);

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\StanineLookup;
+use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use App\Services\ClassRecord\GradeComputationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -14,11 +15,20 @@ class ClassRecordFinalGradeController extends Controller
 {
     public function __construct(
         private readonly GradeComputationService $grader,
+        private readonly ClassRecordMonitorScopeService $monitorScope,
     ) {}
 
     private function isAdmin(): bool
     {
         return Auth::user()->hasPermission('class-records.admin');
+    }
+
+    /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
+    private function canView(ClassRecord $classRecord): bool
+    {
+        return $this->isAdmin()
+            || $classRecord->teacher_id === Auth::id()
+            || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
     /**
@@ -36,7 +46,7 @@ class ClassRecordFinalGradeController extends Controller
      */
     public function index(ClassRecord $classRecord): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($this->canView($classRecord), 403);
 
         $group = collect([$classRecord])->concat($classRecord->siblingsQuery()->get());
         $group->each(fn ($cr) => $cr->loadMissing('gradingOption.categories'));

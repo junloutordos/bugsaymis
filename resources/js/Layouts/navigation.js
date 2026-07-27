@@ -1316,6 +1316,7 @@ export const menuItems = [
     label: "Class Records",
     icon: TableCellsIcon,
     roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
+    orRoles: ["AUH"],
     children: [
       {
         label: "My Class Records",
@@ -1330,6 +1331,17 @@ export const menuItems = [
         href: route("class-records.wat.index"),
         icon: CalendarDaysIcon,
         roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
+      },
+      {
+        // Read-only monitoring for CID Chief (campus-wide) and Academic Unit
+        // Heads (own unit, scoped server-side via Office.unit_head) — never
+        // grants write access, the page itself enforces that.
+        label: "Class Record Monitoring",
+        routeName: "class-records.monitor.index",
+        href: route("class-records.monitor.index"),
+        icon: DocumentChartBarIcon,
+        roles: ["Administrator", "CID Chief"],
+        orRoles: ["AUH"],
       },
     ],
   },

@@ -37,6 +37,7 @@ import { adjectivalColor } from '@/Utils/ClassRecord/gradeUtils.js'
 const props = defineProps({
   classRecord:        Object,
   isAdmin:            { type: Boolean, default: false },
+  isMonitorView:      { type: Boolean, default: false },
   gradingOptions:     { type: Array, default: () => [] },
   stanineLookup:      { type: Array, default: () => [] },
   isCurrentSY:        { type: Boolean, default: true },
@@ -97,7 +98,10 @@ const currentGradingOption = computed(() =>
 const currentLeafCategories = computed(() => leavesOf(currentGradingOption.value))
 
 const isLocked   = computed(() => currentQuarterData.value?.is_locked ?? false)
-const isReadOnly = computed(() => !props.isCurrentSY)  // past school year → fully read-only
+// Past school year, or viewing as a CID Chief / Academic Unit Head monitor —
+// both render every tab fully read-only (no new write surface, no separate
+// component needed — every edit affordance in this page already checks this).
+const isReadOnly = computed(() => !props.isCurrentSY || props.isMonitorView)
 
 // Sub-tab bar (Setup / Scores / Attendance / ILA / Live Quiz)
 const subTabs = [
@@ -676,11 +680,15 @@ async function saveQuarterOption() {
         </template>
       </AppPageHeader>
 
-      <!-- Past SY read-only banner -->
+      <!-- Read-only banner: past school year, or a CID Chief / AUH monitor view -->
       <div v-if="isReadOnly"
         class="flex items-start gap-3 rounded-xl border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">
         <LockClosedIcon class="h-4 w-4 mt-0.5 shrink-0 text-warning-500" />
-        <span>
+        <span v-if="isMonitorView">
+          You're viewing this class record in <strong>read-only monitoring mode</strong>. You can review activity and
+          status here, but only the teacher or an administrator can make changes.
+        </span>
+        <span v-else>
           This class record is from <strong>SY {{ classRecord.school_year }}</strong> and is
           <strong>read-only</strong>. The school year is no longer active.
         </span>

@@ -10,6 +10,7 @@ use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\User;
+use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use App\Services\ClassRecord\WatRuleService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -19,9 +20,21 @@ use Illuminate\Support\Facades\DB;
 
 class ClassRecordAssessmentController extends Controller
 {
+    public function __construct(private readonly ClassRecordMonitorScopeService $monitorScope)
+    {
+    }
+
     private function isAdmin(): bool
     {
         return Auth::user()->hasPermission('class-records.admin');
+    }
+
+    /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
+    private function canView(ClassRecord $classRecord): bool
+    {
+        return $this->isAdmin()
+            || $classRecord->teacher_id === Auth::id()
+            || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
     private function resolveQuarter(ClassRecord $classRecord, int $q): ClassRecordQuarter
@@ -37,7 +50,7 @@ class ClassRecordAssessmentController extends Controller
 
     public function index(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($this->canView($classRecord), 403);
 
         $quarter     = $this->resolveQuarter($classRecord, $q);
         $assessments = ClassRecordAssessment::with('gradingCategory')
@@ -52,7 +65,7 @@ class ClassRecordAssessmentController extends Controller
 
     public function sectionCalendar(ClassRecord $classRecord): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($this->canView($classRecord), 403);
         abort_if(! $classRecord->section_id, 422, 'This class record has no section linked.');
 
         $rows = ClassRecordAssessment::select([
