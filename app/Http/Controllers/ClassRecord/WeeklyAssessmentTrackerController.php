@@ -21,6 +21,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Mpdf\Mpdf;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Weekly Assessment Tracker (WAT) pages.
@@ -85,7 +87,18 @@ class WeeklyAssessmentTrackerController extends Controller
 
     // ── GET /class-records/wat/print ──────────────────────────────────────────
 
-    public function printForm(Request $request)
+    /**
+     * Streams the WAT as a server-rendered PDF (mPDF), replacing the earlier
+     * browser-print (window.print()) approach. Chromium's interactive Print
+     * Preview pipeline (what window.print() triggers) does not paginate
+     * fixed-position repeating headers/footers the same way its headless
+     * --print-to-pdf pipeline does — a long week's form would render as a
+     * single page in Print Preview no matter how much content overflowed.
+     * mPDF generates the finished, already-paginated PDF bytes server-side,
+     * independent of whichever browser later opens it — same pattern already
+     * used by IT Job Requests, PDS, SALN, and PPMP exports in this app.
+     */
+    public function printForm(Request $request): StreamedResponse
     {
         $user = Auth::user();
         $sy   = $this->currentSchoolYear();
@@ -118,13 +131,69 @@ class WeeklyAssessmentTrackerController extends Controller
             ->where('status', '<>', 'inactive')
             ->first();
 
-        return Inertia::render('ClassRecord/Wat/Print', [
-            'section'         => $sections->firstWhere('id', $sectionId),
-            'wat'             => WatRuleService::weekData($sectionId, $sy->id, $weekStart),
+        $section = $sections->firstWhere('id', $sectionId);
+        $wat     = WatRuleService::weekData($sectionId, $sy->id, $weekStart);
+
+        return $this->renderPdf($section, $wat, [
             'coordinatorName' => $coordinatorName,
             'acidaaName'      => $acidaaUserId ? $this->nameFormatter->formal(User::findOrFail($acidaaUserId)) : null,
             'cidChiefName'    => $cidChief ? $this->nameFormatter->formal($cidChief) : null,
             'schoolYear'      => $sy->only(['id', 'name']),
+        ]);
+    }
+
+    /**
+     * Builds and streams the WAT PDF. A4 landscape, full-bleed repeating
+     * header/footer banner images sized from their own aspect ratio (avoids
+     * hardcoding a margin that would silently drift if the images change).
+     */
+    private function renderPdf(array $section, array $wat, array $extra): StreamedResponse
+    {
+        $headerPath = public_path('images/report_header_landscape.jpg');
+        $footerPath = public_path('images/report_footer_landscape.jpg');
+
+        $hInfo = @getimagesize($headerPath);
+        $fInfo = @getimagesize($footerPath);
+        $headerMm = $hInfo ? round(($hInfo[1] / $hInfo[0]) * 297) + 3 : 28;
+        $footerMm = $fInfo ? round(($fInfo[1] / $fInfo[0]) * 297) + 3 : 28;
+
+        $html = view('class-record.wat-pdf', array_merge(compact('section', 'wat'), $extra))->render();
+
+        // A multi-page WAT embeds the full-resolution header/footer JPEGs on
+        // every page — raise the memory limit for this build, same as
+        // IssuanceService does for its image-heavy PDFs. Not restored after:
+        // PHP errors trying to shrink memory_limit below whatever's already
+        // in use once mPDF has actually built the document.
+        ini_set('memory_limit', '256M');
+
+        $mpdf = new Mpdf([
+            'mode'          => 'utf-8',
+            'format'        => 'A4',
+            'orientation'   => 'L',
+            'margin_left'   => 0,
+            'margin_right'  => 0,
+            'margin_top'    => $headerMm,
+            'margin_bottom' => $footerMm,
+            'margin_header' => 0,
+            'margin_footer' => 0,
+            'tempDir'       => sys_get_temp_dir(),
+        ]);
+
+        $mpdf->SetHTMLHeader('<img src="'.$headerPath.'" style="width:100%; display:block;">');
+        $mpdf->SetHTMLFooter('<img src="'.$footerPath.'" style="width:100%; display:block;">');
+
+        $mpdf->SetTitle("WAT — Grade {$section['level']} {$section['name']} — Week of {$wat['week_start']}");
+        $mpdf->WriteHTML($html);
+
+        $pdfBytes = $mpdf->Output('', 'S');
+        $filename = 'WAT_G'.$section['level'].'-'.$section['name'].'_'.$wat['week_start'].'.pdf';
+
+        return new StreamedResponse(function () use ($pdfBytes) {
+            echo $pdfBytes;
+        }, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            'Content-Length'      => strlen($pdfBytes),
         ]);
     }
 
