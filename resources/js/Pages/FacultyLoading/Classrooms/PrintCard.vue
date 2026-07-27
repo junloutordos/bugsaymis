@@ -80,10 +80,7 @@ function printNow() {
             <div class="tap-ring r1"></div>
             <div class="tap-ring r2"></div>
             <div class="tap-ring r3"></div>
-            <svg class="tap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-              <rect x="6" y="3" width="12" height="18" rx="2.5"></rect>
-              <line x1="10" y1="19" x2="14" y2="19"></line>
-            </svg>
+            <img src="/images/atlas-mark.png" class="tap-icon" alt="" />
           </div>
           <div class="tap-caption">Tap Phone Here</div>
           <div class="tap-sub">to record attendance</div>
@@ -91,8 +88,10 @@ function printNow() {
 
         <div class="card-divider"></div>
 
-        <div class="card-qr" v-html="card.qrSvg"></div>
-        <div class="card-qr-caption">or scan if tap fails</div>
+        <div class="card-qr-block">
+          <div class="card-qr" v-html="card.qrSvg"></div>
+          <div class="card-qr-caption">or scan if tap fails</div>
+        </div>
       </div>
 
       <div class="card-footer-band">Classroom Attendance</div>
@@ -149,18 +148,19 @@ function printNow() {
 .card-room-meta { font-size: 5.5px; color: #475569; margin-top: 0.8mm; }
 
 .tap-zone { display: flex; flex-direction: column; align-items: center; margin-top: 2.5mm; }
-.tap-rings { position: relative; width: 16mm; height: 16mm; display: flex; align-items: center; justify-content: center; }
+.tap-rings { position: relative; width: 24mm; height: 24mm; display: flex; align-items: center; justify-content: center; }
 .tap-ring { position: absolute; border-radius: 50%; border: 0.3mm solid #1447c0; }
-.tap-ring.r1 { width: 16mm; height: 16mm; opacity: .16; }
-.tap-ring.r2 { width: 11mm; height: 11mm; opacity: .30; }
-.tap-ring.r3 { width: 7mm;  height: 7mm;  opacity: .55; }
-.tap-icon { position: relative; z-index: 2; width: 4.5mm; height: 4.5mm; color: #1447c0; }
+.tap-ring.r1 { width: 24mm; height: 24mm; opacity: .16; }
+.tap-ring.r2 { width: 17mm; height: 17mm; opacity: .30; }
+.tap-ring.r3 { width: 11mm; height: 11mm; opacity: .55; }
+.tap-icon { position: relative; z-index: 2; height: 8mm; width: auto; }
 .tap-caption { font-size: 6px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: #1447c0; margin-top: 1mm; }
 .tap-sub { font-size: 5px; color: #94a3b8; }
 
 .card-divider { width: 60%; height: 0.2mm; background: #e6eaf2; margin: 2mm 0 1.5mm; }
 
-.card-qr { width: 15mm; height: 15mm; }
+.card-qr-block { display: flex; flex-direction: column; align-items: center; margin-top: auto; }
+.card-qr { width: 11mm; height: 11mm; }
 .card-qr svg { width: 100%; height: 100%; }
 .card-qr-caption { font-size: 5px; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; margin-top: 0.6mm; }
 
