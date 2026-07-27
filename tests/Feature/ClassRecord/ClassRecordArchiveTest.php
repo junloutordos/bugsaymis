@@ -189,4 +189,47 @@ class ClassRecordArchiveTest extends TestCase
             ->deleteJson(route('class-records.destroy', $record->id), ['pin' => '123456'])
             ->assertStatus(422);
     }
+
+    public function test_archived_record_does_not_appear_as_a_copy_from_source(): void
+    {
+        $teacher = $this->teacher();
+        $archived = $this->record($teacher);
+        $new = $this->record($teacher);
+
+        $this->actingAs($teacher)
+            ->deleteJson(route('class-records.destroy', $archived->id), ['pin' => '123456'])
+            ->assertOk();
+
+        $this->actingAs($teacher)
+            ->get(route('class-records.page.show', $new->id))
+            ->assertInertia(fn ($page) => $page
+                ->component('ClassRecord/Show')
+                ->where('sameSubjectRecords', []));
+    }
+
+    public function test_copy_from_record_rejects_an_archived_source(): void
+    {
+        $teacher = $this->teacher();
+        $archived = $this->record($teacher);
+        $new = $this->record($teacher);
+
+        \App\Models\ClassRecord\ClassRecordQuarter::create([
+            'class_record_id' => $archived->id, 'quarter' => 1, 'is_locked' => false,
+        ]);
+        \App\Models\ClassRecord\ClassRecordQuarter::create([
+            'class_record_id' => $new->id, 'quarter' => 1, 'is_locked' => false,
+        ]);
+
+        $this->actingAs($teacher)
+            ->deleteJson(route('class-records.destroy', $archived->id), ['pin' => '123456'])
+            ->assertOk();
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.copy-from-record', ['classRecord' => $new->id, 'q' => 1]), [
+                'source_class_record_id' => $archived->id,
+                'source_quarter' => 1,
+            ])
+            ->assertStatus(422)
+            ->assertJsonFragment(['message' => 'That class record has been archived and can no longer be used as a copy source.']);
+    }
 }

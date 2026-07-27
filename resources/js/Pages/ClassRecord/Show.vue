@@ -24,10 +24,12 @@ import {
   ClipboardDocumentListIcon,
   PlayCircleIcon,
   CalendarDaysIcon,
+  BoltIcon,
 } from '@heroicons/vue/24/outline'
 import AppDatePicker from '@/Components/AppDatePicker.vue'
 import ScoreGrid from './components/ScoreGrid.vue'
 import AttendanceGrid from './components/AttendanceGrid.vue'
+import IlaGrid from './components/IlaGrid.vue'
 import SectionAssessmentCalendar from './components/SectionAssessmentCalendar.vue'
 import GradingOptionDetails from './components/GradingOptionDetails.vue'
 import { adjectivalColor } from '@/Utils/ClassRecord/gradeUtils.js'
@@ -97,11 +99,12 @@ const currentLeafCategories = computed(() => leavesOf(currentGradingOption.value
 const isLocked   = computed(() => currentQuarterData.value?.is_locked ?? false)
 const isReadOnly = computed(() => !props.isCurrentSY)  // past school year → fully read-only
 
-// Sub-tab bar (Setup / Scores / Attendance / Live Quiz)
+// Sub-tab bar (Setup / Scores / Attendance / ILA / Live Quiz)
 const subTabs = [
   { key: 'setup',       label: 'Setup',              icon: Cog6ToothIcon },
   { key: 'scores',      label: 'Scores & Grades',    icon: ChartBarIcon },
   { key: 'attendance',  label: 'Attendance',          icon: ClipboardDocumentListIcon },
+  { key: 'ila',         label: 'ILA',                 icon: BoltIcon },
   { key: 'quiz',        label: 'Live Quiz',           icon: PlayCircleIcon },
 ]
 
@@ -192,13 +195,38 @@ watch(() => props.classRecord.quarters, () => {
   assessmentDraft.value = buildDraft(currentQuarterData.value)
 }, { deep: true })
 
+// Title, Activity Date, and Max Score are all required per row. A row left
+// completely untouched is just an unused placeholder and is skipped quietly,
+// but a row with only SOME of those fields filled in used to be silently
+// dropped from the save — the teacher would think it saved when it hadn't.
+// Now it blocks the save with a specific error instead.
 async function saveSetup() {
   savingSetup.value = true
   setupErrors.value = []
 
-  const assessments = Object.values(assessmentDraft.value).flat()
-    .filter(a => a.title && a.max_score)
-    .map(a => ({
+  const allRows = Object.values(assessmentDraft.value).flat()
+  const incomplete = []
+  const assessments = []
+
+  for (const a of allRows) {
+    const hasTitle = !!a.title
+    const hasDate  = !!a.activity_date
+    const hasScore = a.max_score !== '' && a.max_score !== null && a.max_score !== undefined
+
+    if (!hasTitle && !hasDate && !hasScore) continue // untouched placeholder row
+
+    if (!hasTitle || !hasDate || !hasScore) {
+      const cat = currentLeafCategories.value.find(c => c.id === a.grading_category_id)
+      const label = cat ? `${cat.code}${a.assessment_number}` : `Row ${a.assessment_number}`
+      const missing = []
+      if (!hasTitle) missing.push('Title')
+      if (!hasDate)  missing.push('Activity Date')
+      if (!hasScore) missing.push('Max Score')
+      incomplete.push(`${label}: missing ${missing.join(', ')}`)
+      continue
+    }
+
+    assessments.push({
       id:                   a._db_id,
       grading_category_id:  a.grading_category_id,
       assessment_number:    a.assessment_number,
@@ -206,10 +234,17 @@ async function saveSetup() {
       is_graded:            a.is_graded,
       activity_date:        a.activity_date,
       max_score:            a.max_score,
-    }))
+    })
+  }
+
+  if (incomplete.length) {
+    setupErrors.value = incomplete.map(m => `Incomplete row — ${m}.`)
+    savingSetup.value = false
+    return
+  }
 
   if (!assessments.length) {
-    setupErrors.value = ['Add at least one assessment with a title and max score.']
+    setupErrors.value = ['Add at least one assessment with a title, activity date, and max score.']
     savingSetup.value = false
     return
   }
@@ -826,10 +861,10 @@ async function saveQuarterOption() {
                   <thead class="bg-slate-50/80">
                     <tr>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-16">#</th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description <span class="text-danger-500">*</span></th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-32">Category</th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date</th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date <span class="text-danger-500">*</span></th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score <span class="text-danger-500">*</span></th>
                       <th v-if="!isLocked && !isReadOnly" class="px-2 py-2 w-8"></th>
                     </tr>
                   </thead>
@@ -915,6 +950,16 @@ async function saveQuarterOption() {
         <!-- ── Attendance sub-tab ────────────────────────────────────────── -->
         <div v-if="activeSubTab === 'attendance'" class="p-5">
           <AttendanceGrid
+            :class-record-id="classRecord.id"
+            :quarter-number="activeQuarter"
+            :quarter-data="currentQuarterData"
+            :is-locked="isLocked || isReadOnly"
+          />
+        </div>
+
+        <!-- ── ILA sub-tab ───────────────────────────────────────────────── -->
+        <div v-if="activeSubTab === 'ila'" class="p-5">
+          <IlaGrid
             :class-record-id="classRecord.id"
             :quarter-number="activeQuarter"
             :quarter-data="currentQuarterData"
