@@ -17,7 +17,9 @@ use App\Mail\WorkRequestStatusMail;
 use App\Mail\WorkRequestForAssignmentMail;
 use App\Mail\WorkRequestAssignedMail;
 use App\Mail\WorkRequestFADApprovalMail;
+use App\Mail\WorkRequestDCApprovalMail;
 use App\Mail\WorkRequestCompletedMail;
+use App\Models\Division;
 use App\Enums\ApprovalStep;
 use App\Services\SnapshotService;
 use App\Services\DigitalSignatureService;
@@ -128,28 +130,31 @@ class WorkRequestController extends Controller
         $data['status'] = 'Pending';
         $data['requires_pre_repair_inspection'] = true;
 
+        // Approval order is Division Chief -> GSU Head -> FAD Chief. Resolve the
+        // requester's Division Chief so the first approval request goes to them.
+        $requester = User::find($userId);
+        $dcId = $requester?->division_id
+            ? Division::where('id', $requester->division_id)->value('division_chief_id')
+            : null;
+        if ($dcId) {
+            $data['division_chief_id'] = $dcId;
+        }
+
         $wr = WorkRequest::create($data);
 
-        // Instead of sending initial notification to FAD/Division Chief,
-        // send the first approval request to GSU Head(s).
+        // Send the first approval request to the requester's Division Chief.
         try {
-            $gsuHeadRole = \App\Models\Role::where('name', 'GSU Head')->first();
-            $gsuHeads = $gsuHeadRole
-                ? User::whereRaw('FIND_IN_SET(?, role_id)', [$gsuHeadRole->id])->get()
-                : collect();
+            $dc = $dcId ? User::find($dcId) : null;
 
-            if ($gsuHeads->isEmpty()) {
-                logger()->warning('No GSU Head users found to notify for new work request', ['work_request_id' => $wr->id]);
-            }
-
-            foreach ($gsuHeads as $gsu) {
-                if (! $gsu->email) continue;
-                $approveUrl = URL::signedRoute('work-requests.gsu.approve', ['workRequest' => $wr->id, 'gsu' => $gsu->id], now()->addDays(7));
-                $declineUrl = URL::signedRoute('work-requests.gsu.decline', ['workRequest' => $wr->id, 'gsu' => $gsu->id], now()->addDays(7));
-                Mail::to($gsu->email)->queue(new \App\Mail\WorkRequestCreatedMail($wr, $approveUrl, $declineUrl, $gsu->id));
+            if (! $dc || ! $dc->email) {
+                logger()->warning('No Division Chief found to notify for new work request', ['work_request_id' => $wr->id, 'requester_id' => $userId]);
+            } else {
+                $approveUrl = URL::signedRoute('work-requests.approve', ['workRequest' => $wr->id, 'chief' => $dc->id], now()->addDays(7));
+                $declineUrl = URL::signedRoute('work-requests.decline', ['workRequest' => $wr->id, 'chief' => $dc->id], now()->addDays(7));
+                Mail::to($dc->email)->queue(new WorkRequestDCApprovalMail($wr, $approveUrl, $declineUrl, $dc));
             }
         } catch (\Throwable $e) {
-            logger()->error('Failed to send GSU Head work request email', ['error' => $e->getMessage(), 'work_request_id' => $wr->id]);
+            logger()->error('Failed to send Division Chief work request email', ['error' => $e->getMessage(), 'work_request_id' => $wr->id]);
         }
 
         $this->performSign($request, WorkRequest::class, $wr->id,
@@ -279,8 +284,19 @@ class WorkRequestController extends Controller
     public function approveByGSUHead(Request $request, WorkRequest $workRequest, $gsu)
     {
         // basic check: if already acted upon, show already page
-        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Division Approved'])) {
+        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Pending FAD Approval','Declined'])) {
             return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => true]);
+        }
+
+        // Approval order is Division Chief -> GSU Head -> FAD Chief. Requests
+        // created before this ordering was enforced have no division_chief_id
+        // and skip straight from Pending, preserving their original behavior.
+        if ($workRequest->division_chief_id && $workRequest->status !== 'Division Approved') {
+            return view('work_request_approved', [
+                'facilityRequest' => $workRequest,
+                'blocked' => true,
+                'blockedReason' => 'This work request is awaiting Division Chief approval before GSU Head can act.',
+            ]);
         }
 
         // if an assigned_user_id was provided in the signed link, persist it
@@ -396,8 +412,17 @@ class WorkRequestController extends Controller
     // FAD approval handlers (signed)
     public function approveByFADChief(Request $request, WorkRequest $workRequest, $chief)
     {
-        if ($workRequest->status === 'FAD Approved') {
+        if (in_array($workRequest->status, ['FAD Approved', 'Approved', 'Declined'])) {
             return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => true]);
+        }
+
+        // Approval order is Division Chief -> GSU Head -> FAD Chief.
+        if (! in_array($workRequest->status, ['GSU Approved', 'Pending FAD Approval'])) {
+            return view('work_request_approved', [
+                'facilityRequest' => $workRequest,
+                'blocked' => true,
+                'blockedReason' => 'This work request is awaiting Division Chief and GSU Head approval before FAD Chief can act.',
+            ]);
         }
 
         $workRequest->status = 'FAD Approved';
@@ -624,6 +649,15 @@ class WorkRequestController extends Controller
 
         $request->validate(['action' => 'required|in:approve,reject']);
 
+        if (in_array($workRequest->status, ['FAD Approved', 'Approved', 'Declined'])) {
+            return back()->with('success', 'Already processed.');
+        }
+
+        // Approval order is Division Chief -> GSU Head -> FAD Chief.
+        if ($request->action === 'approve' && ! in_array($workRequest->status, ['GSU Approved', 'Pending FAD Approval'])) {
+            return back()->withErrors(['action' => 'This work request is awaiting Division Chief and GSU Head approval before FAD Chief can act.']);
+        }
+
         if ($request->action === 'approve') {
             $workRequest->update(['status' => 'FAD Approved']);
             if ($workRequest->requester) { NotificationService::notifyUser($workRequest->requester, 'Work Request', "#{$workRequest->id}", 'Approved by FAD', route('work-requests.index')); }
@@ -679,6 +713,14 @@ class WorkRequestController extends Controller
 
         // detect assignment change
         $previousAssigned = $workRequest->assigned_user_id;
+        $newlyAssigning = empty($previousAssigned) && ! empty($data['assigned_user_id'] ?? null);
+
+        // Approval order is Division Chief -> GSU Head -> FAD Chief. Requests
+        // created before this ordering was enforced have no division_chief_id
+        // and keep their original behavior (assignment allowed from Pending).
+        if ($newlyAssigning && $workRequest->division_chief_id && $workRequest->status !== 'Division Approved') {
+            return back()->withErrors(['assigned_user_id' => 'This work request is awaiting Division Chief approval before staff can be assigned.']);
+        }
 
         $workRequest->update($data);
 

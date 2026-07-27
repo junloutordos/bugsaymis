@@ -400,6 +400,15 @@ class EnrollmentController extends Controller
         DB::transaction(function () use ($enrollments, $section) {
             foreach ($enrollments as $enrollment) {
                 $enrollment->update(['section_id' => $section->id]);
+
+                // Keep legacy section consumers (AMS, consultations, library, and
+                // the Faculty Loading section roster) aligned with enrollment.
+                if ($section->syid !== null) {
+                    DB::table('section_students')->updateOrInsert(
+                        ['studentid' => $enrollment->student_id, 'syid' => $section->syid],
+                        ['sectionid' => $section->id, 'levelid' => $section->levelid],
+                    );
+                }
             }
         });
 

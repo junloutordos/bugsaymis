@@ -196,6 +196,44 @@ class EnrollmentSectionTransferTest extends TestCase
         $this->assertSame($this->source->id, $this->enrollment->fresh()->section_id);
     }
 
+    public function test_bulk_assign_section_syncs_legacy_section_students_mirror(): void
+    {
+        $unassigned = StudentEnrollment::create([
+            'student_id' => 2001,
+            'school_year_id' => $this->schoolYear->id,
+            'section_id' => null,
+            'grade_level' => 7,
+            'enrollment_type' => 'new',
+            'status' => 'enrolled',
+            'enrollment_date' => '2026-07-20',
+        ]);
+
+        $this->assertDatabaseMissing('section_students', [
+            'studentid' => $unassigned->student_id,
+            'syid' => 2026,
+        ]);
+
+        $this->actingAs($this->userWithPermission('students.enrollment.manage'))
+            ->post(route('registrar.enrollment.bulk-assign'), [
+                'school_year_id' => $this->schoolYear->id,
+                'section_id' => $this->target->id,
+                'enrollment_ids' => [$unassigned->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('student_enrollments', [
+            'id' => $unassigned->id,
+            'section_id' => $this->target->id,
+        ]);
+        $this->assertDatabaseHas('section_students', [
+            'studentid' => $unassigned->student_id,
+            'syid' => 2026,
+            'sectionid' => $this->target->id,
+            'levelid' => 7,
+        ]);
+    }
+
     private function makeSection(string $name, array $overrides = []): Section
     {
         return Section::create(array_merge([
