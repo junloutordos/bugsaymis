@@ -159,20 +159,26 @@ function toggleUniform(studentId, dateId) {
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 
+// Submits every student x date cell's EFFECTIVE state (implied defaults —
+// Present / Complete Uniform — included), not just explicitly-touched ones.
+// Before this, an untouched cell had no row in the database at all despite
+// visually showing Present/Complete — anything reading the table directly
+// (exports, other reports) would see it as blank.
 async function saveAttendance() {
-  if (!pendingChanges.size) return
+  if (!dates.value.length || !students.value.length) return
   saving.value = true
 
-  const payload = [...pendingChanges].map(key => {
-    const parts = key.split('_')
-    const value = records.value[key] ?? {}
-    return {
-      student_id: Number(parts[0]),
-      date_id:    Number(parts[1]),
-      status:     value.status ?? null,
-      uniform:    value.uniform ?? null,
+  const payload = []
+  for (const s of students.value) {
+    for (const d of dates.value) {
+      payload.push({
+        student_id: s.id,
+        date_id:    d.id,
+        status:     effectiveStatus(s.id, d.id),
+        uniform:    effectiveUniform(s.id, d.id),
+      })
     }
-  })
+  }
 
   try {
     await axios.post(
@@ -292,8 +298,10 @@ function presentCountForDate(dateId) {
             <PlusIcon class="h-3.5 w-3.5" /> Add Date
           </AppButton>
 
-          <AppButton size="sm" :disabled="!hasPendingChanges || saving" @click="saveAttendance">
-            {{ saving ? 'Saving…' : (hasPendingChanges ? `Save (${pendingChanges.size} change${pendingChanges.size > 1 ? 's' : ''})` : 'Save Attendance') }}
+          <AppButton size="sm" :disabled="!dates.length || saving" @click="saveAttendance">
+            {{ saving
+              ? 'Saving…'
+              : (hasPendingChanges ? `Save Attendance (${pendingChanges.size} unsaved change${pendingChanges.size > 1 ? 's' : ''})` : 'Save Attendance') }}
           </AppButton>
         </template>
       </div>

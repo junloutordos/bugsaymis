@@ -9,6 +9,7 @@ use App\Models\ClassRecord\StanineLookup;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Quiz\Quiz;
+use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use App\Services\ClassRecord\GradingOptionScopeService;
 use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
@@ -17,8 +18,10 @@ use Inertia\Inertia;
 
 class ClassRecordPageController extends Controller
 {
-    public function __construct(private readonly GradingOptionScopeService $optionScope)
-    {
+    public function __construct(
+        private readonly GradingOptionScopeService $optionScope,
+        private readonly ClassRecordMonitorScopeService $monitorScope,
+    ) {
     }
 
     private function isAdmin(): bool
@@ -86,7 +89,9 @@ class ClassRecordPageController extends Controller
      */
     public function show(ClassRecord $classRecord)
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $isOwner = $classRecord->teacher_id === Auth::id();
+        $isMonitorView = ! $this->isAdmin() && ! $isOwner && $this->monitorScope->canView(Auth::user(), $classRecord);
+        abort_unless($this->isAdmin() || $isOwner || $isMonitorView, 403);
 
         $classRecord->load([
             'teacher:id,name,position',
@@ -143,8 +148,9 @@ class ClassRecordPageController extends Controller
         return Inertia::render('ClassRecord/Show', [
             'classRecord' => $classRecord,
             'isAdmin' => $this->isAdmin(),
+            'isMonitorView' => $isMonitorView,
             'gradingOptions' => $classRecord->subject
-                ? $this->optionScope->selectableForSubject($classRecord->subject)
+                ? $this->optionScope->selectableForSubject($classRecord->subject, Auth::user())
                 : GradingOption::with('categories')
                     ->whereNull('owner_designation_id')
                     ->where('is_active', true)

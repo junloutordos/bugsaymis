@@ -11,6 +11,7 @@ use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Subject;
+use App\Models\Office;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -21,9 +22,16 @@ use Tests\TestCase;
  * Grading Options: who can MANAGE (create/edit/delete) an option is scoped
  * per academic unit via a designation-based AUH assignment
  * (GradingOptionScopeService), independent of the legacy
- * class-records.grading-options permission/AUH role. Who can SELECT/USE an
- * option on a class record is intentionally NOT scoped — every active option
- * is visible and usable by every teacher regardless of unit (2026-07-24).
+ * class-records.grading-options permission/AUH role.
+ *
+ * Who can SELECT/USE an option on a class record was briefly unscoped
+ * (2026-07-24, "make all Grading Options visible and usable by all") — the
+ * old scoping relied on Subject.academic_unit_id, a column never populated by
+ * any UI in this app, so it likely just hid every unit-owned option from
+ * everyone. Selection scoping is now reinstated (2026-07-27) via a reliable
+ * path instead: the ACTING TEACHER's own Office -> Office.unit_head -> the
+ * AUH designation that head currently holds. Campus-wide (owner_designation_id
+ * = NULL) options remain visible to everyone regardless of office.
  */
 class GradingOptionAccessTest extends TestCase
 {
@@ -115,10 +123,12 @@ class GradingOptionAccessTest extends TestCase
         $this->assertDatabaseMissing('grading_options', ['id' => $option->id]);
     }
 
-    public function test_teacher_sees_every_active_grading_option_regardless_of_unit(): void
+    public function test_teacher_sees_campus_wide_and_their_own_units_options_only(): void
     {
         [$term, $mathDesignation] = $this->currentTermAndAuhDesignation('MATH');
         [, $sciDesignation] = $this->currentTermAndAuhDesignation('SCI', $term->schoolYear);
+        $mathAuh = $this->assignAuhDesignation($term, $mathDesignation);
+        $office = Office::create(['name' => 'Math Unit '.uniqid(), 'unit_head' => $mathAuh->id]);
 
         GradingOption::create(['name' => 'Standard', 'is_active' => true]);
         GradingOption::create([
@@ -129,22 +139,7 @@ class GradingOptionAccessTest extends TestCase
         ]);
         GradingOption::create(['name' => 'Retired Option', 'is_active' => false]);
 
-        $mathUnit = AcademicUnit::where('code', 'MATH')->firstOrFail();
-        $subject = Subject::create([
-            'school_year_id' => $term->schoolYear->id, 'code' => 'MATH7', 'name' => 'Mathematics 7',
-            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
-            'grade_level' => 7, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
-            'academic_unit_id' => $mathUnit->id,
-        ]);
-        $teacher = User::factory()->create(['email_verified_at' => now()]);
-        $facultyLoad = FacultyLoad::create([
-            'user_id' => $teacher->id, 'school_year_id' => $term->schoolYear->id, 'academic_term_id' => $term->id,
-        ]);
-        LoadAssignment::create([
-            'faculty_load_id' => $facultyLoad->id, 'user_id' => $teacher->id,
-            'school_year_id' => $term->schoolYear->id, 'academic_term_id' => $term->id,
-            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'load_units' => 3,
-        ]);
+        $teacher = User::factory()->create(['email_verified_at' => now(), 'office_id' => $office->id]);
 
         $response = $this->actingAs($teacher)->getJson(route('grading-options.index'));
 
@@ -152,28 +147,47 @@ class GradingOptionAccessTest extends TestCase
         $names = collect($response->json())->pluck('name');
         $this->assertTrue($names->contains('Standard'));
         $this->assertTrue($names->contains('Math Grading'));
-        $this->assertTrue($names->contains('Science Grading'));
+        $this->assertFalse($names->contains('Science Grading'));
         $this->assertFalse($names->contains('Retired Option'));
     }
 
-    public function test_cross_unit_grading_option_is_allowed_on_class_record_creation(): void
+    public function test_teacher_with_no_office_unit_link_sees_only_campus_wide_options(): void
+    {
+        [$term, $mathDesignation] = $this->currentTermAndAuhDesignation('MATH');
+
+        GradingOption::create(['name' => 'Standard', 'is_active' => true]);
+        GradingOption::create([
+            'name' => 'Math Grading', 'is_active' => true, 'owner_designation_id' => $mathDesignation->id,
+        ]);
+
+        $teacher = User::factory()->create(['email_verified_at' => now()]);
+
+        $response = $this->actingAs($teacher)->getJson(route('grading-options.index'));
+
+        $response->assertOk();
+        $names = collect($response->json())->pluck('name');
+        $this->assertTrue($names->contains('Standard'));
+        $this->assertFalse($names->contains('Math Grading'));
+    }
+
+    public function test_cross_unit_grading_option_is_rejected_on_class_record_creation(): void
     {
         [$term, $mathDesignation] = $this->currentTermAndAuhDesignation('MATH');
         [, $sciDesignation] = $this->currentTermAndAuhDesignation('SCI', $term->schoolYear);
+        $mathAuh = $this->assignAuhDesignation($term, $mathDesignation);
+        $office = Office::create(['name' => 'Math Unit '.uniqid(), 'unit_head' => $mathAuh->id]);
 
-        $mathUnit = AcademicUnit::where('code', 'MATH')->firstOrFail();
         // Cross-section subject type so no section_id is required for this test.
         $subject = Subject::create([
             'school_year_id' => $term->schoolYear->id, 'code' => 'MATHELEC', 'name' => 'Math Elective',
             'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'elective',
             'grade_level' => 0, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
-            'academic_unit_id' => $mathUnit->id,
         ]);
         $sciOption = GradingOption::create([
             'name' => 'Science Grading', 'is_active' => true, 'owner_designation_id' => $sciDesignation->id,
         ]);
 
-        $teacher = User::factory()->create(['email_verified_at' => now()]);
+        $teacher = User::factory()->create(['email_verified_at' => now(), 'office_id' => $office->id]);
         $facultyLoad = FacultyLoad::create([
             'user_id' => $teacher->id, 'school_year_id' => $term->schoolYear->id, 'academic_term_id' => $term->id,
         ]);
@@ -188,9 +202,45 @@ class GradingOptionAccessTest extends TestCase
             'grading_option_id' => $sciOption->id,
         ]);
 
+        $response->assertStatus(422);
+        $this->assertDatabaseMissing('class_records', [
+            'subject_id' => $subject->id, 'grading_option_id' => $sciOption->id,
+        ]);
+    }
+
+    public function test_teacher_can_use_their_own_units_option_on_class_record_creation(): void
+    {
+        [$term, $mathDesignation] = $this->currentTermAndAuhDesignation('MATH');
+        $mathAuh = $this->assignAuhDesignation($term, $mathDesignation);
+        $office = Office::create(['name' => 'Math Unit '.uniqid(), 'unit_head' => $mathAuh->id]);
+
+        $subject = Subject::create([
+            'school_year_id' => $term->schoolYear->id, 'code' => 'MATHELEC3', 'name' => 'Math Elective 3',
+            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'elective',
+            'grade_level' => 0, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $mathOption = GradingOption::create([
+            'name' => 'Math Grading', 'is_active' => true, 'owner_designation_id' => $mathDesignation->id,
+        ]);
+
+        $teacher = User::factory()->create(['email_verified_at' => now(), 'office_id' => $office->id]);
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $teacher->id, 'school_year_id' => $term->schoolYear->id, 'academic_term_id' => $term->id,
+        ]);
+        LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $teacher->id,
+            'school_year_id' => $term->schoolYear->id, 'academic_term_id' => $term->id,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'load_units' => 3,
+        ]);
+
+        $response = $this->actingAs($teacher)->postJson(route('class-records.store'), [
+            'subject_id' => $subject->id,
+            'grading_option_id' => $mathOption->id,
+        ]);
+
         $response->assertCreated();
         $this->assertDatabaseHas('class_records', [
-            'subject_id' => $subject->id, 'grading_option_id' => $sciOption->id,
+            'subject_id' => $subject->id, 'grading_option_id' => $mathOption->id,
         ]);
     }
 

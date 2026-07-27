@@ -2316,6 +2316,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/class-records/wat/review',  [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'review'])->name('class-records.wat.review');
     Route::post('/class-records/wat/review', [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'storeReview'])->name('class-records.wat.review.store');
 
+    // CID Chief / Academic Unit Head read-only monitoring dashboard — must be
+    // registered BEFORE the {classRecord} wildcard
+    Route::get('/class-records/monitoring', [\App\Http\Controllers\ClassRecord\ClassRecordMonitorController::class, 'index'])->name('class-records.monitor.index');
+
     Route::get('/class-records/{classRecord}', [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'show'])->name('class-records.page.show');
 });
 // ── PSGC Address Lookup (public geographic data, no auth required) ────────────

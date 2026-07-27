@@ -8,6 +8,7 @@ use App\Models\ClassRecord\ClassRecordIlaDate;
 use App\Models\ClassRecord\ClassRecordIlaRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordStudent;
+use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,9 +16,21 @@ use Illuminate\Support\Facades\DB;
 
 class ClassRecordIlaController extends Controller
 {
+    public function __construct(private readonly ClassRecordMonitorScopeService $monitorScope)
+    {
+    }
+
     private function isAdmin(): bool
     {
         return Auth::user()->hasPermission('class-records.admin');
+    }
+
+    /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
+    private function canView(ClassRecord $classRecord): bool
+    {
+        return $this->isAdmin()
+            || $classRecord->teacher_id === Auth::id()
+            || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
     private function resolveQuarter(ClassRecord $classRecord, int $q): ClassRecordQuarter
@@ -33,7 +46,7 @@ class ClassRecordIlaController extends Controller
 
     public function index(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($this->canView($classRecord), 403);
 
         $quarter = $this->resolveQuarter($classRecord, $q);
 

@@ -45,7 +45,7 @@ class FacultyDashboardService
                 'loadDistribution'  => $this->loadDistribution($user, $sy->id, $term?->id),
                 'assessmentByQuarter' => $this->assessmentByQuarter($user, $sy->id),
                 'weeklyAttendance'  => $this->weeklyAttendance($user, $today),
-                'todaySchedule'     => $this->todaySchedule($user, $sy->id, $today),
+                'todaySchedule'     => $this->todaySchedule($user, $sy->id, $term?->id, $today),
                 'classRecords'      => $this->classRecords($user, $sy->id),
             ];
         }, null);
@@ -105,8 +105,9 @@ class FacultyDashboardService
 
         $todayClasses = ClassSchedule::where('user_id', $user->id)
             ->where('school_year_id', $schoolYearId)
+            ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->where('day_of_week', $this->dayOfWeek($today))
-            ->where('status', '<>', 'inactive')
+            ->where('status', '<>', 'cancelled')
             ->classes()
             ->count();
 
@@ -201,13 +202,14 @@ class FacultyDashboardService
         return $out;
     }
 
-    private function todaySchedule(User $user, int $schoolYearId, Carbon $today): array
+    private function todaySchedule(User $user, int $schoolYearId, ?int $termId, Carbon $today): array
     {
         return ClassSchedule::with(['subject:id,name,code', 'section:id,sectionname,levelid', 'classroom:id,name'])
             ->where('user_id', $user->id)
             ->where('school_year_id', $schoolYearId)
+            ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->where('day_of_week', $this->dayOfWeek($today))
-            ->where('status', '<>', 'inactive')
+            ->where('status', '<>', 'cancelled')
             ->classes()
             ->orderBy('start_time')
             ->get()

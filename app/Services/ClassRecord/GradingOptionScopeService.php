@@ -5,6 +5,7 @@ namespace App\Services\ClassRecord;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\Subject;
+use App\Models\Office;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -101,27 +102,78 @@ class GradingOptionScopeService
         return $requestedId;
     }
 
-    /** All active grading options — visible and usable by every teacher, regardless of unit. */
+    /**
+     * Campus-wide options (owner_designation_id = NULL) plus the user's own
+     * Academic Unit/Office's options. Scoped via the user's Office ->
+     * Office.unit_head -> the AUH designation that head currently holds — NOT
+     * users.academic_unit_id / subjects.academic_unit_id, which are declared
+     * in the schema but never populated by any UI in this app. A user whose
+     * office isn't linked to any AUH still sees every campus-wide option.
+     */
     public function selectableForUser(User $user): Collection
     {
+        if ($user->hasPermission('class-records.admin')) {
+            return GradingOption::with(['categories', 'ownerDesignation:id,code,name'])
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->get();
+        }
+
+        $ownerIds = $this->officeUnitDesignationIds($user);
+
         return GradingOption::with(['categories', 'ownerDesignation:id,code,name'])
             ->where('is_active', true)
+            ->where(function ($query) use ($ownerIds) {
+                $query->whereNull('owner_designation_id');
+                if ($ownerIds !== []) {
+                    $query->orWhereIn('owner_designation_id', $ownerIds);
+                }
+            })
             ->orderBy('id')
             ->get();
     }
 
-    /** All active grading options — usable for any subject, regardless of unit. */
-    public function selectableForSubject(Subject $subject): Collection
+    /** Same rule as selectableForUser(), for a specific subject's create/edit flow. */
+    public function selectableForSubject(Subject $subject, User $user): Collection
     {
-        return GradingOption::with(['categories', 'ownerDesignation:id,code,name'])
-            ->where('is_active', true)
-            ->orderBy('id')
-            ->get();
+        return $this->selectableForUser($user);
     }
 
-    public function isSelectableForSubject(GradingOption $option, Subject $subject): bool
+    public function isSelectableForSubject(GradingOption $option, Subject $subject, User $user): bool
     {
-        return $option->is_active;
+        if (! $option->is_active) {
+            return false;
+        }
+
+        if ($user->hasPermission('class-records.admin')) {
+            return true;
+        }
+
+        if ($option->owner_designation_id === null) {
+            return true;
+        }
+
+        return in_array((int) $option->owner_designation_id, $this->officeUnitDesignationIds($user), true);
+    }
+
+    /** @return array<int> */
+    private function officeUnitDesignationIds(User $user): array
+    {
+        if (! $user->office_id) {
+            return [];
+        }
+
+        $unitHeadUserId = Office::where('id', $user->office_id)->value('unit_head');
+        if (! $unitHeadUserId) {
+            return [];
+        }
+
+        $head = User::find($unitHeadUserId);
+        if (! $head) {
+            return [];
+        }
+
+        return $this->managedDesignationIds($head);
     }
 
     /** Active options applicable to a specific quarter (null applicable_quarters = all). */

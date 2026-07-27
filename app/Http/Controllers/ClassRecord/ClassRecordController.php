@@ -164,10 +164,10 @@ class ClassRecordController extends Controller
 
         $subject = Subject::findOrFail($validated['subject_id']);
         $gradingOption = GradingOption::findOrFail($validated['grading_option_id']);
-        if (! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
+        if (! $this->optionScope->isSelectableForSubject($gradingOption, $subject, Auth::user())) {
             return response()->json([
-                'message' => 'The selected grading option is inactive.',
-                'errors' => ['grading_option_id' => ['Select an active grading option.']],
+                'message' => 'That grading option is inactive or belongs to another academic unit.',
+                'errors' => ['grading_option_id' => ['Select an active grading option available to your unit.']],
             ], 422);
         }
         $isCrossSection = in_array($subject->subject_type, ['elective', 'science_core'], true);
@@ -336,7 +336,7 @@ class ClassRecordController extends Controller
                     continue;
                 }
 
-                if (! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
+                if (! $this->optionScope->isSelectableForSubject($gradingOption, $subject, Auth::user())) {
                     $skipped[] = ['subject_id' => $item['subject_id'], 'reason' => 'Grading option not applicable to this subject.'];
 
                     continue;
@@ -478,10 +478,10 @@ class ClassRecordController extends Controller
                 : $classRecord->subject;
             $gradingOption = GradingOption::find($validated['grading_option_id']);
 
-            if (! $subject || ! $gradingOption || ! $this->optionScope->isSelectableForSubject($gradingOption, $subject)) {
+            if (! $subject || ! $gradingOption || ! $this->optionScope->isSelectableForSubject($gradingOption, $subject, Auth::user())) {
                 return response()->json([
-                    'message' => 'The selected grading option is inactive.',
-                    'errors' => ['grading_option_id' => ['Select an active grading option.']],
+                    'message' => 'That grading option is inactive or belongs to another academic unit.',
+                    'errors' => ['grading_option_id' => ['Select an active grading option available to your unit.']],
                 ], 422);
             }
         }
