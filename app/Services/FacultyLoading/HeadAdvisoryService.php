@@ -115,6 +115,13 @@ class HeadAdvisoryService
             $this->removeAdviserAssignment($section->id, $oldAdviserId);
         }
 
+        // An explicit Homeroom Coordinator override takes precedence — the
+        // adviser no longer automatically holds the section's HR_ADV/HR_ACAD
+        // designation while an override is set. See syncHomeroomCoordinator().
+        if ($section->homeroom_coordinator_id) {
+            return;
+        }
+
         // ── Create new adviser's homeroom assignment ───────────────────────────
         if ($newAdviserId) {
             // Ensure the section's designation exists (auto-creates if needed)
@@ -148,6 +155,79 @@ class HeadAdvisoryService
 
                 $this->loads->syncLoad($facultyLoad);
             }
+        }
+    }
+
+    /**
+     * Call after updating a section's homeroom_coordinator_id column.
+     *
+     * An explicit coordinator holds the section's HR_ADV/HR_ACAD designation
+     * instead of the adviser. Clearing the override (new value null) falls
+     * back to the adviser, re-syncing it if the adviser doesn't already hold
+     * the designation.
+     *
+     * @param Section  $section          The section with its new homeroom_coordinator_id already saved.
+     * @param int|null $oldCoordinatorId The homeroom_coordinator_id before the update.
+     */
+    public function syncHomeroomCoordinator(Section $section, ?int $oldCoordinatorId): void
+    {
+        $newCoordinatorId = $section->homeroom_coordinator_id ? (int) $section->homeroom_coordinator_id : null;
+        $oldCoordinatorId = $oldCoordinatorId ? (int) $oldCoordinatorId : null;
+
+        // Nothing to do if the coordinator did not change
+        if ($oldCoordinatorId === $newCoordinatorId) {
+            return;
+        }
+
+        // ── Remove old coordinator's homeroom assignment for this section ──────
+        if ($oldCoordinatorId) {
+            $this->removeAdviserAssignment($section->id, $oldCoordinatorId);
+        }
+
+        // ── Override cleared — fall back to the adviser ─────────────────────────
+        if (! $newCoordinatorId) {
+            if ($section->adviser) {
+                $this->syncSectionAdviser($section, null);
+            }
+            return;
+        }
+
+        // ── Create new coordinator's homeroom assignment ────────────────────────
+        // Clean up a stale auto-synced adviser assignment for this section, if
+        // any, so only one person holds the designation at a time.
+        if ($section->adviser && (int) $section->adviser !== $newCoordinatorId) {
+            $this->removeAdviserAssignment($section->id, (int) $section->adviser);
+        }
+
+        $designation = $this->ensureSectionDesignation($section);
+        if (! $designation) {
+            return; // Not a G7-12 section — skip
+        }
+
+        $facultyLoad = $this->findOrCreateFacultyLoad($newCoordinatorId);
+        if (! $facultyLoad) {
+            return; // No active school year/term — skip silently
+        }
+
+        $alreadyAssigned = LoadAssignment::where('faculty_load_id', $facultyLoad->id)
+            ->where('section_id', $section->id)
+            ->where('designation_id', $designation->id)
+            ->exists();
+
+        if (! $alreadyAssigned) {
+            LoadAssignment::create([
+                'faculty_load_id'  => $facultyLoad->id,
+                'user_id'          => $newCoordinatorId,
+                'school_year_id'   => $facultyLoad->school_year_id,
+                'academic_term_id' => $facultyLoad->academic_term_id,
+                'assignment_type'  => 'admin',
+                'section_id'       => $section->id,
+                'load_units'       => (float) $designation->load_units,
+                'description'      => $designation->name,
+                'designation_id'   => $designation->id,
+            ]);
+
+            $this->loads->syncLoad($facultyLoad);
         }
     }
 

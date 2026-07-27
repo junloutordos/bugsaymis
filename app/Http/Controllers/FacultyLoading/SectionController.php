@@ -201,6 +201,7 @@ class SectionController extends Controller
             'lunch_start'  => 'nullable|date_format:H:i',
             'lunch_end'    => 'nullable|date_format:H:i|after:lunch_start',
             'adviser'      => 'nullable|exists:users,id',
+            'homeroom_coordinator_id' => 'nullable|exists:users,id',
             'syid'         => 'required|exists:school_years,id',
             'is_active'    => 'boolean',
         ]);
@@ -230,6 +231,10 @@ class SectionController extends Controller
             $advisory->syncSectionAdviser($section, null);
         }
 
+        if ($section->homeroom_coordinator_id) {
+            $advisory->syncHomeroomCoordinator($section, null);
+        }
+
         return back()->with('success', 'Section created.');
     }
 
@@ -252,6 +257,7 @@ class SectionController extends Controller
             'lunch_start'  => 'nullable|date_format:H:i',
             'lunch_end'    => 'nullable|date_format:H:i|after:lunch_start',
             'adviser'      => 'nullable|exists:users,id',
+            'homeroom_coordinator_id' => 'nullable|exists:users,id',
             'is_active'    => 'boolean',
         ]);
 
@@ -270,6 +276,10 @@ class SectionController extends Controller
 
         $oldAdviserId = $section->adviser ? (int) $section->adviser : null;
         $newAdviserId = isset($data['adviser']) && $data['adviser'] ? (int) $data['adviser'] : null;
+        $oldCoordinatorId = $section->homeroom_coordinator_id ? (int) $section->homeroom_coordinator_id : null;
+        $newCoordinatorId = isset($data['homeroom_coordinator_id']) && $data['homeroom_coordinator_id']
+            ? (int) $data['homeroom_coordinator_id']
+            : null;
         $oldName      = $section->sectionname;
         $oldCode      = $section->section_code ?? '';
 
@@ -280,6 +290,10 @@ class SectionController extends Controller
 
         if ($oldAdviserId !== $newAdviserId) {
             $advisory->syncSectionAdviser($section->fresh(), $oldAdviserId);
+        }
+
+        if ($oldCoordinatorId !== $newCoordinatorId) {
+            $advisory->syncHomeroomCoordinator($section->fresh(), $oldCoordinatorId);
         }
 
         return back()->with('success', 'Section updated.');
