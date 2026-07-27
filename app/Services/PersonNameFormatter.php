@@ -43,9 +43,29 @@ class PersonNameFormatter
 
     private function assemble(string $first, ?string $middle, string $last, ?string $suffix = null): string
     {
-        $initial = trim((string) $middle) !== '' ? mb_substr(trim($middle), 0, 1).'.' : null;
+        $middle = $this->cleanPart($middle);
+        $suffix = $this->cleanPart($suffix);
 
-        return mb_strtoupper(implode(' ', array_filter([trim($first), $initial, trim($last), trim((string) $suffix)])));
+        $initial = $middle !== null ? mb_substr($middle, 0, 1).'.' : null;
+
+        return mb_strtoupper(implode(' ', array_filter([trim($first), $initial, trim($last), $suffix])));
+    }
+
+    /**
+     * Some PDS records have placeholder text ("N/A", "None", etc.) typed
+     * into optional fields like middle name or suffix instead of being left
+     * blank — strip those so they don't get printed as part of the name.
+     */
+    private function cleanPart(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper($value));
+
+        return in_array($normalized, ['NA', 'NONE'], true) ? null : $value;
     }
 
     private function fromDisplayName(string $name): string

@@ -53,4 +53,34 @@ class PersonNameFormatterTest extends TestCase
 
         $this->assertSame('JUAN S. DELACRUZ', (new PersonNameFormatter)->formal($user));
     }
+
+    public function test_it_strips_na_placeholder_suffix_from_pds_records(): void
+    {
+        $personalInfo = new PDSPersonalInfo([
+            'first_name' => 'Divine Faith', 'middle_name' => 'Gemida',
+            'surname' => 'Almocera', 'name_ext' => 'N/A',
+        ]);
+        $pds = new Pds;
+        $pds->setRelation('personalInfo', $personalInfo);
+
+        $user = new User(['name' => 'Almocera, Divine Faith G.']);
+        $user->setRelation('pds', $pds);
+
+        $this->assertSame('DIVINE FAITH G. ALMOCERA', (new PersonNameFormatter)->formal($user));
+    }
+
+    public function test_it_strips_none_placeholder_middle_name_from_pds_records(): void
+    {
+        $personalInfo = new PDSPersonalInfo([
+            'first_name' => 'Juan', 'middle_name' => 'None',
+            'surname' => 'Dela Cruz', 'name_ext' => null,
+        ]);
+        $pds = new Pds;
+        $pds->setRelation('personalInfo', $personalInfo);
+
+        $user = new User(['name' => 'Dela Cruz, Juan']);
+        $user->setRelation('pds', $pds);
+
+        $this->assertSame('JUAN DELA CRUZ', (new PersonNameFormatter)->formal($user));
+    }
 }
