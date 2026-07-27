@@ -15,11 +15,12 @@ use Tests\TestCase;
 /**
  * Regression coverage for the Homeroom Coordinator override.
  *
- * Before this feature, sections.adviser was the ONLY input to the
- * HR_ADV/HR_ACAD designation — HeadAdvisoryService::syncSectionAdviser()
- * auto-mirrored it 1:1, so the WAT form's "Homeroom Coordinator" always
- * resolved to the same person as the Section Adviser, with no way to make
- * them different people. These tests cover the override that decouples them.
+ * The override is a SEPARATE, independently credited designation
+ * (HRC-{section_code}) from the adviser's own HRA-/HAC- one — both are
+ * held at once and both show their own Load Assignment row. Only WAT
+ * access/print (see WeeklyAssessmentTrackerTest) treats the override as
+ * authoritative for the section — the adviser keeps their Load Assignment
+ * credit regardless.
  */
 class HeadAdvisoryServiceHomeroomCoordinatorTest extends TestCase
 {
@@ -57,10 +58,11 @@ class HeadAdvisoryServiceHomeroomCoordinatorTest extends TestCase
         return LoadAssignment::where('section_id', $section->id)
             ->where('academic_term_id', $this->term->id)
             ->whereHas('designation', fn ($q) => $q->whereIn('designation_category_id', $categoryIds))
+            ->with('designation')
             ->get();
     }
 
-    public function test_setting_an_override_assigns_the_coordinator_and_removes_the_advisers_auto_synced_row(): void
+    public function test_setting_an_override_adds_the_coordinator_without_removing_the_advisers_row(): void
     {
         $adviser = User::factory()->create();
         $coordinator = User::factory()->create();
@@ -69,17 +71,20 @@ class HeadAdvisoryServiceHomeroomCoordinatorTest extends TestCase
         $section = $this->makeSection(['adviser' => $adviser->id]);
         $advisory->syncSectionAdviser($section, null);
 
-        $this->assertSame($adviser->id, $this->hrAssignments($section)->first()->user_id);
-
         $section->update(['homeroom_coordinator_id' => $coordinator->id]);
         $advisory->syncHomeroomCoordinator($section->fresh(), null);
 
         $assignments = $this->hrAssignments($section);
-        $this->assertCount(1, $assignments, 'Only one HR_ADV/HR_ACAD holder should exist per section — no duplicate rows.');
-        $this->assertSame($coordinator->id, $assignments->first()->user_id);
+        $this->assertCount(2, $assignments, 'Adviser and coordinator must both be credited — two separate designations.');
+
+        $byUser = $assignments->keyBy('user_id');
+        $this->assertTrue($byUser->has($adviser->id), 'Adviser must keep their HRA-/HAC- row.');
+        $this->assertTrue($byUser->has($coordinator->id), 'Coordinator must get their own HRC- row.');
+        $this->assertStringStartsWith('HRC-', $byUser[$coordinator->id]->designation->code);
+        $this->assertStringStartsNotWith('HRC-', $byUser[$adviser->id]->designation->code);
     }
 
-    public function test_changing_adviser_while_an_override_is_active_does_not_create_a_second_assignment(): void
+    public function test_changing_adviser_while_an_override_is_active_does_not_touch_the_coordinators_row(): void
     {
         $originalAdviser = User::factory()->create();
         $newAdviser = User::factory()->create();
@@ -94,11 +99,15 @@ class HeadAdvisoryServiceHomeroomCoordinatorTest extends TestCase
         $advisory->syncSectionAdviser($section->fresh(), $originalAdviser->id);
 
         $assignments = $this->hrAssignments($section);
-        $this->assertCount(1, $assignments, 'Adviser change must not add a second holder while the coordinator override is active.');
-        $this->assertSame($coordinator->id, $assignments->first()->user_id);
+        $this->assertCount(2, $assignments, 'Still exactly one adviser row + one coordinator row.');
+
+        $byUser = $assignments->keyBy('user_id');
+        $this->assertTrue($byUser->has($newAdviser->id), 'New adviser must be credited.');
+        $this->assertFalse($byUser->has($originalAdviser->id), 'Old adviser must lose their row.');
+        $this->assertTrue($byUser->has($coordinator->id), 'Coordinator must be untouched by the adviser change.');
     }
 
-    public function test_clearing_the_override_falls_back_to_the_current_adviser(): void
+    public function test_clearing_the_override_removes_only_the_coordinators_row(): void
     {
         $adviser = User::factory()->create();
         $coordinator = User::factory()->create();
@@ -112,7 +121,28 @@ class HeadAdvisoryServiceHomeroomCoordinatorTest extends TestCase
         $advisory->syncHomeroomCoordinator($section->fresh(), $coordinator->id);
 
         $assignments = $this->hrAssignments($section);
-        $this->assertCount(1, $assignments, 'Clearing the override must not leave a stale coordinator row alongside the adviser fallback.');
+        $this->assertCount(1, $assignments, 'Clearing the override must remove the coordinator row and leave the adviser untouched.');
         $this->assertSame($adviser->id, $assignments->first()->user_id);
+    }
+
+    public function test_same_person_can_hold_both_adviser_and_coordinator_roles_independently(): void
+    {
+        $person = User::factory()->create();
+        $advisory = app(HeadAdvisoryService::class);
+
+        $section = $this->makeSection(['adviser' => $person->id, 'homeroom_coordinator_id' => $person->id]);
+        $advisory->syncSectionAdviser($section, null);
+        $advisory->syncHomeroomCoordinator($section->fresh(), null);
+
+        $this->assertCount(2, $this->hrAssignments($section), 'One person can hold both designations at once — each is its own row.');
+
+        // Clearing only the coordinator override must not touch their adviser row.
+        $section->update(['homeroom_coordinator_id' => null]);
+        $advisory->syncHomeroomCoordinator($section->fresh(), $person->id);
+
+        $remaining = $this->hrAssignments($section);
+        $this->assertCount(1, $remaining);
+        $this->assertSame($person->id, $remaining->first()->user_id);
+        $this->assertStringStartsNotWith('HRC-', $remaining->first()->designation->code);
     }
 }

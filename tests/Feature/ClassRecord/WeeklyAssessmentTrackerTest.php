@@ -329,6 +329,12 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->actingAs($adviser)
             ->get(route('class-records.wat.print', ['section' => $section->id, 'week' => '2025-09-01']))
             ->assertForbidden();
+
+        // But the adviser keeps their own Load Assignment credit for it —
+        // losing WAT access must not erase their HRA-/HAC- designation row.
+        $this->assertDatabaseHas('load_assignments', [
+            'user_id' => $adviser->id, 'section_id' => $section->id, 'academic_term_id' => $this->term->id,
+        ]);
     }
 
     public function test_print_includes_cid_chief_signatory(): void
