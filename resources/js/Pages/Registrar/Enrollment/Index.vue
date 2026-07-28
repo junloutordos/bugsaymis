@@ -522,7 +522,13 @@ function clearanceLabel(status) {
         </div>
 
         <div class="flex items-center gap-2 pb-2">
-          <AppButton size="sm" @click="openEnrollModal">
+          <a :href="route('registrar.enrollment.create-student-form')">
+            <AppButton size="sm">
+              <UserPlusIcon class="w-4 h-4" />
+              Add Student
+            </AppButton>
+          </a>
+          <AppButton size="sm" variant="secondary" @click="openEnrollModal">
             <UserPlusIcon class="w-4 h-4" />
             Enroll Student
           </AppButton>
@@ -538,7 +544,8 @@ function clearanceLabel(status) {
       </div>
 
       <p class="text-xs text-slate-500 -mt-2">
-        Enroll Student / Bulk Import add students to a grade level only. Once enrolled, place them into a
+        Add Student registers a brand-new student (walk-in, no self-service application on file). Enroll Student / Bulk Import
+        enroll an existing student record. All three add students to a grade level only — once enrolled, place them into a
         section using "Assign by Grade List" inside a section below.
       </p>
 

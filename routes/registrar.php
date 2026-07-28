@@ -82,6 +82,14 @@ Route::middleware(['auth'])->group(function () {
         ->name('registrar.enrollment.export')
         ->middleware('permission:students.records.export');
 
+    Route::get('/registrar/enrollment/students/create', [EnrollmentController::class, 'createStudentForm'])
+        ->name('registrar.enrollment.create-student-form')
+        ->middleware('permission:students.enrollment.manage');
+
+    Route::post('/registrar/enrollment/students', [EnrollmentController::class, 'createStudent'])
+        ->name('registrar.enrollment.create-student')
+        ->middleware('permission:students.enrollment.manage');
+
     Route::post('/registrar/enrollment', [EnrollmentController::class, 'store'])
         ->name('registrar.enrollment.store')
         ->middleware('permission:students.enrollment.manage');

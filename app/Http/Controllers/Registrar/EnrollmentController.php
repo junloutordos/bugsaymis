@@ -9,7 +9,9 @@ use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
 use App\Models\StudentClearance\StudentClearance;
 use App\Models\StudentClearance\StudentClearancePeriod;
+use App\Services\Atlas\WorkspaceProvisioningService;
 use App\Services\Registrar\EnrollmentDataExportService;
+use App\Services\Registrar\StudentEnrollmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -242,6 +244,93 @@ class EnrollmentController extends Controller
             'pisays_id' => $s->pisaysystemID,
             'sex'       => $s->sex,
         ]));
+    }
+
+    // ── Add Student: render the walk-in registration form ─────────────────────
+
+    public function createStudentForm(Request $request): Response
+    {
+        $this->authorize('students.enrollment.manage');
+
+        $currentSY = SchoolYear::where('is_current', true)->first(['id', 'name']);
+
+        return Inertia::render('Registrar/Enrollment/AddStudent', [
+            'schoolYear' => $currentSY,
+        ]);
+    }
+
+    // ── Add Student: create a brand-new student + enrollment stub ─────────────
+    //
+    // Unlike store()/bulkStore() below (which enroll an EXISTING students
+    // row), this creates the students row itself — the walk-in counterpart
+    // to the public self-service /enroll form, for students who show up in
+    // person without submitting an application first. Same field set as
+    // EnrollmentApplicationController::store() for data-quality parity.
+
+    public function createStudent(Request $request, StudentEnrollmentService $enrollmentService, WorkspaceProvisioningService $provisioning): RedirectResponse
+    {
+        $this->authorize('students.enrollment.manage');
+
+        $emailOrNa = fn ($attribute, $value, $fail) => (
+            strtolower(trim($value)) !== 'n/a' && ! filter_var($value, FILTER_VALIDATE_EMAIL)
+                ? $fail("The {$attribute} must be a valid email address or N/A.")
+                : null
+        );
+
+        $data = $request->validate([
+            'pisays_id'               => 'required|string|max:20',
+            'grade_level'             => 'required|integer|between:7,12',
+            'enrollment_type'         => ['required', Rule::in(['new', 'returning', 'transferee', 'returnee'])],
+            'lastname'                => 'required|string|max:100',
+            'firstname'               => 'required|string|max:100',
+            'middlename'              => 'required|string|max:100',
+            'birthday'                => 'required|date|before:today',
+            'sex'                     => 'required|in:Male,Female',
+            'birth_place'             => 'required|string|max:200',
+            'lrn'                     => 'required|string|max:30',
+            'address'             => 'nullable|string|max:600',
+            'address_house'       => 'nullable|string|max:200',
+            'address_street'      => 'nullable|string|max:200',
+            'address_subdivision' => 'nullable|string|max:200',
+            'address_barangay'    => 'required|string|max:100',
+            'address_city'        => 'required|string|max:100',
+            'address_province'    => 'nullable|string|max:100',
+            'address_region'      => 'required|string|max:100',
+            'address_zip'         => 'nullable|string|max:10',
+            'contact_no'              => 'required|string|max:20',
+            'email'                   => ['required', 'string', 'max:150', $emailOrNa],
+            'father_name'             => 'required|string|max:200',
+            'father_occupation'       => 'required|string|max:150',
+            'father_contact'          => 'required|string|max:20',
+            'mother_name'             => 'required|string|max:200',
+            'mother_occupation'       => 'required|string|max:150',
+            'mother_contact'          => 'required|string|max:20',
+            'guardian_name'           => 'required|string|max:200',
+            'guardian_contact'        => 'required|string|max:20',
+            'previous_school'         => 'required|string|max:300',
+        ]);
+
+        $schoolYearId = SchoolYear::where('is_current', true)->value('id');
+        abort_unless($schoolYearId, 422, 'No active school year configured.');
+
+        $result = $enrollmentService->createStudentAndEnroll(
+            $data,
+            $data['pisays_id'],
+            $data['grade_level'],
+            $schoolYearId,
+            $data['enrollment_type'],
+            Auth::id(),
+        );
+
+        $provisioned = $provisioning->provisionStudent($result['student_id']);
+
+        $message = "{$data['firstname']} {$data['lastname']} enrolled successfully. Assign their section from \"Assign by Grade List\".";
+
+        if ($provisioned) {
+            $message .= " Google account created: {$provisioned['email']} — temporary password: {$provisioned['temp_password']} (shown once, share with the student directly, not by email).";
+        }
+
+        return redirect()->route('registrar.enrollment.index')->with('success', $message);
     }
 
     // ── Enroll a student ──────────────────────────────────────────────────────

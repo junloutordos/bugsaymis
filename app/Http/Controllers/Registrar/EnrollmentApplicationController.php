@@ -7,12 +7,11 @@ use App\Mail\EnrollmentApplicationDecisionMail;
 use App\Mail\EnrollmentApplicationReceivedMail;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\EnrollmentApplication;
-use App\Models\Registrar\StudentEnrollment;
 use App\Services\Atlas\WorkspaceProvisioningService;
+use App\Services\Registrar\StudentEnrollmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -173,7 +172,7 @@ class EnrollmentApplicationController extends Controller
 
     // ── Registrar: approve ────────────────────────────────────────────────────
 
-    public function approve(Request $request, EnrollmentApplication $enrollmentApplication, WorkspaceProvisioningService $provisioning): RedirectResponse
+    public function approve(Request $request, EnrollmentApplication $enrollmentApplication, WorkspaceProvisioningService $provisioning, StudentEnrollmentService $enrollmentService): RedirectResponse
     {
         $this->authorize('students.enrollment.manage');
 
@@ -183,110 +182,35 @@ class EnrollmentApplicationController extends Controller
             'pisays_id' => 'required|string|max:20',
         ]);
 
-        // Guard: PISAY ID must be unique in the students table
-        $exists = DB::table('students')->where('pisaysystemID', $data['pisays_id'])->exists();
-        abort_if($exists, 422, 'PISAY ID ' . $data['pisays_id'] . ' is already assigned to another student.');
-
         $currentSyId = SchoolYear::where('is_current', true)->value('id');
-        $newStudentId = null;
 
-        DB::transaction(function () use ($enrollmentApplication, $data, $currentSyId, &$newStudentId) {
-            // Determine batch year: grade 7 in SY 2026-2027 → graduates 2032
-            // Formula: batch = school_year_start + (12 - grade_level) + 1
-            // For grade 7, SY 2026-2027 start=2026: batch = 2026 + 5 + 1 = 2032
-            $syStart = (int) substr(
-                SchoolYear::find($currentSyId)?->name ?? '2026-2027',
-                0, 4
-            );
-            $batch = $syStart + (12 - $enrollmentApplication->grade_level) + 1;
+        $result = $enrollmentService->createStudentAndEnroll(
+            $enrollmentApplication->only([
+                'lastname', 'firstname', 'middlename', 'birthday', 'sex', 'birth_place', 'lrn',
+                'address_house', 'address_street', 'address_subdivision', 'address_barangay',
+                'address_city', 'address_province', 'address_region', 'address_zip',
+                'contact_no', 'email',
+                'father_name', 'father_occupation', 'father_contact',
+                'mother_name', 'mother_occupation', 'mother_contact',
+                'guardian_name', 'guardian_contact',
+                'previous_school',
+            ]),
+            $data['pisays_id'],
+            $enrollmentApplication->grade_level,
+            $currentSyId,
+            'new',
+            Auth::id(),
+        );
 
-            // Insert into legacy students table (bypasses guarded model)
-            $studentId = DB::table('students')->insertGetId([
-                'lastname'        => $enrollmentApplication->lastname,
-                'firstname'       => $enrollmentApplication->firstname,
-                'middlename'      => $enrollmentApplication->middlename ?? '',
-                'birthday'        => $enrollmentApplication->birthday ?? '',
-                'sex'             => $enrollmentApplication->sex ?? '',
-                'birthplace'      => $enrollmentApplication->birth_place ?? '',
-                'lrn'             => $enrollmentApplication->lrn ?? '',
-                'student_email'   => $enrollmentApplication->email ?? '',
-                'studentcontact'  => $enrollmentApplication->contact_no ?? '',
-                'province'        => $enrollmentApplication->address_province ?? '',
-                'municipal'       => $enrollmentApplication->address_city ?? '',
-                'barangay'        => $enrollmentApplication->address_barangay ?? '',
-                'region'          => $enrollmentApplication->address_region ?? '',
-                'zipcode'         => $enrollmentApplication->address_zip ?? '',
-                'houseno'         => implode(', ', array_filter([
-                                         $enrollmentApplication->address_house ?? '',
-                                         $enrollmentApplication->address_street ?? '',
-                                         $enrollmentApplication->address_subdivision ?? '',
-                                     ])),
-                'father_name'     => $enrollmentApplication->father_name ?? '',
-                'mother_name'     => $enrollmentApplication->mother_name ?? '',
-                'foccupation'     => $enrollmentApplication->father_occupation ?? '',
-                'moccupation'     => $enrollmentApplication->mother_occupation ?? '',
-                'contactno1'      => $enrollmentApplication->father_contact
-                                     ?? $enrollmentApplication->guardian_contact ?? '',
-                'contactperson'   => $enrollmentApplication->guardian_name ?? '',
-                'elemschool'      => $enrollmentApplication->previous_school ?? '',
-                'pisaysystemID'   => $data['pisays_id'],
-                'batch'           => (string) $batch,
-                'status'          => 'Enrolled',
-                'date_encoded'    => now()->format('Y-m-d'),
-                'ethnic'          => '',
-                'regiongraduated' => '',
-                'malumnus'        => '',
-                'falumnus'        => '',
-                'schocat'         => '',
-                'dormer1'         => '',
-                'pkey'            => '',
-                'mbirthday'       => '',
-                'fbirthday'       => '',
-                'meduc'           => '',
-                'feduc'           => '',
-                'mschool'         => '',
-                'fschool'         => '',
-                'parentsstatus'   => '',
-                'zipcode'         => '',
-                'schooladdress'   => '',
-                'relation1'       => '',
-                'contact_address1'      => '',
-                'contact_ofc_address1'  => '',
-                'contact_ofc_telno1'    => '',
-                'contactperson2'        => '',
-                'relation2'             => '',
-                'contact_address2'      => '',
-                'contactno2'            => '',
-                'contact_ofc_address2'  => '',
-                'contact_ofc_telno2'    => '',
-                'socioeconomic'   => '',
-                'schoolType1'     => '',
-                'schoolType2'     => '',
-            ]);
+        $newStudentId = $result['student_id'];
 
-            // Create enrollment stub (section_id = null → assigned via Section Assignment wizard)
-            StudentEnrollment::create([
-                'student_id'      => $studentId,
-                'school_year_id'  => $currentSyId,
-                'section_id'      => null,
-                'grade_level'     => $enrollmentApplication->grade_level,
-                'enrollment_type' => 'new',
-                'status'          => 'enrolled',
-                'enrollment_date' => now()->toDateString(),
-                'encoded_by'      => Auth::id(),
-            ]);
-
-            // Update application
-            $enrollmentApplication->update([
-                'status'            => 'approved',
-                'pisays_id_assigned'=> $data['pisays_id'],
-                'student_id'        => $studentId,
-                'reviewed_by'       => Auth::id(),
-                'reviewed_at'       => now(),
-            ]);
-
-            $newStudentId = $studentId;
-        });
+        $enrollmentApplication->update([
+            'status'            => 'approved',
+            'pisays_id_assigned'=> $data['pisays_id'],
+            'student_id'        => $newStudentId,
+            'reviewed_by'       => Auth::id(),
+            'reviewed_at'       => now(),
+        ]);
 
         // Provision the official Google Workspace account outside the DB
         // transaction (external API call). Never blocks enrollment — if this
