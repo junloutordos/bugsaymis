@@ -15,12 +15,18 @@ class ClassRecordIlaDate extends Model
         'date',
         'is_auto_generated',
         'sort_order',
+        'is_graded',
+        'class_record_assessment_id',
+        'graded_by_id',
+        'graded_decided_at',
     ];
 
     protected $casts = [
-        'date'              => 'date:Y-m-d',
-        'is_auto_generated' => 'boolean',
-        'sort_order'        => 'integer',
+        'date'               => 'date:Y-m-d',
+        'is_auto_generated'  => 'boolean',
+        'sort_order'         => 'integer',
+        'is_graded'          => 'boolean',
+        'graded_decided_at'  => 'datetime',
     ];
 
     public function quarter(): BelongsTo
@@ -31,5 +37,15 @@ class ClassRecordIlaDate extends Model
     public function records(): HasMany
     {
         return $this->hasMany(ClassRecordIlaRecord::class, 'class_record_ila_date_id');
+    }
+
+    public function assessment(): BelongsTo
+    {
+        return $this->belongsTo(ClassRecordAssessment::class, 'class_record_assessment_id');
+    }
+
+    public function gradedBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'graded_by_id');
     }
 }

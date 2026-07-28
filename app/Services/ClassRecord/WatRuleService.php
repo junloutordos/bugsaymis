@@ -3,6 +3,7 @@
 namespace App\Services\ClassRecord;
 
 use App\Models\ClassRecord\ClassRecordAssessment;
+use App\Models\ClassRecord\ClassRecordIlaDate;
 use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\ClassRecordStudent;
 use App\Models\ClassRecord\GradingCategory;
@@ -18,7 +19,8 @@ use Illuminate\Support\Facades\DB;
  * Weekly Assessment Tracker (WAT) rules — single source of truth for the
  * campus assessment-plotting policy:
  *
- *  - Plotting deadline: no later than Friday preceding the week of implementation
+ *  - Plotting deadline: no later than 12:00 NN Friday preceding the week of
+ *    implementation (leaves the Friday afternoon for coordinator/CID Chief review)
  *  - Daily:  max 3 graded assessments per section, of which max 2 major
  *  - Weekly: max 15 graded / 6 major per section (Mon–Sun window)
  *  - Major  = Long Test, or any assessment worth >= 10% of the quarterly grade
@@ -73,8 +75,10 @@ class WatRuleService
 
     public static function plottingDeadline(string $activityDate): Carbon
     {
-        // Monday of the implementation week minus 3 days = preceding Friday
-        return Carbon::parse($activityDate)->startOfWeek(Carbon::MONDAY)->subDays(3)->endOfDay();
+        // Monday of the implementation week minus 3 days = preceding Friday,
+        // cutoff at 12:00 NN (not end of day) so coordinators/CID Chief have
+        // the Friday afternoon to review the week's plotted assessments.
+        return Carbon::parse($activityDate)->startOfWeek(Carbon::MONDAY)->subDays(3)->setTime(12, 0, 0);
     }
 
     public static function violatesPlottingDeadline(string $activityDate): bool
@@ -277,7 +281,26 @@ class WatRuleService
                 'sec.sectionname as row_section_name',
             ]);
 
-        $teachers = User::whereIn('id', $rows->pluck('teacher_id')->filter()->unique())
+        // Non-graded ILA dates (the default) are still surfaced in the WAT
+        // grid — informational only, never counted toward the graded/major
+        // caps below — so coordinators can see the ILA session happened even
+        // when nobody elected to grade it. Graded ILA dates need no special
+        // handling here: they're already a normal row in $rows above via
+        // their linked class_record_assessments entry.
+        $ilaDates = ClassRecordIlaDate::where('is_graded', false)
+            ->whereBetween('date', [$monday->toDateString(), $monday->copy()->addDays(6)->toDateString()])
+            ->whereHas('quarter.classRecord', function ($q) use ($poolSectionIds, $schoolYearId) {
+                $q->whereIn('section_id', $poolSectionIds)->where('school_year_id', $schoolYearId);
+            })
+            ->with([
+                'quarter.classRecord:id,subject_name,teacher_id,section_id,category_label',
+                'quarter.classRecord.section:id,sectionname',
+            ])
+            ->get();
+
+        $teachers = User::whereIn('id', $rows->pluck('teacher_id')
+                ->concat($ilaDates->pluck('quarter.classRecord.teacher_id'))
+                ->filter()->unique())
             ->get(['id', 'name'])->keyBy('id');
 
         // Compliance: students with a recorded score / quarter roster size
@@ -369,6 +392,43 @@ class WatRuleService
                     : null,
             ];
         });
+
+        $ilaItems = $ilaDates->map(function ($ilaDate) use ($teachers, $sectionId) {
+            $classRecord = $ilaDate->quarter->classRecord;
+            $pooledTag   = null;
+            if ($classRecord && (int) $classRecord->section_id !== $sectionId) {
+                $sectionName = (string) $classRecord->section?->sectionname;
+                $pooledTag   = str_starts_with($sectionName, 'SCI-')
+                    ? 'Science Core'
+                    : (str_starts_with($sectionName, 'ELEC-') ? 'Elective' : null);
+            }
+            $subjectName = $classRecord?->category_label
+                ? "{$classRecord->subject_name} — {$classRecord->category_label}"
+                : $classRecord?->subject_name;
+
+            return [
+                'id'              => 'ila-'.$ilaDate->id,
+                'ila_date_id'     => $ilaDate->id,
+                'class_record_id' => $classRecord?->id,
+                'date'            => $ilaDate->date->toDateString(),
+                'title'           => 'Independent Learning Activity',
+                'subject_name'    => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,
+                'teacher_name'    => $teachers[$classRecord?->teacher_id]?->name,
+                'assessment_type' => 'ila',
+                'type_label'      => ClassRecordAssessment::TYPES['ila'],
+                'category_code'   => null,
+                'is_graded'       => false,
+                'is_major'        => false,
+                'plotted_at'      => null,
+                'roster_count'    => null,
+                'submitted_count' => null,
+                'compliance'      => null,
+                'time_label'      => null,
+                'source'          => 'ila_pending',
+            ];
+        });
+
+        $items = $items->concat($ilaItems);
 
         // Exam windows configured for this school year (any quarter) — used only
         // to annotate the reviewer view with *why* a day/week may legitimately

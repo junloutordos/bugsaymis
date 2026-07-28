@@ -315,14 +315,16 @@ function isMajorRow(row) {
   return Math.round((cat.weight / Math.max(1, cat.max_assessments)) * 1e6) / 1e6 >= 0.10
 }
 
-// Monday of the date's week, minus 3 days = the preceding Friday (end of day)
+// Monday of the date's week, minus 3 days = the preceding Friday, cutoff at
+// 12:00 NN (not end of day) so coordinators/CID Chief have the Friday
+// afternoon to review the week's plotted assessments.
 function plottingDeadline(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   const monday = new Date(d)
   monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
   const friday = new Date(monday)
   friday.setDate(monday.getDate() - 3)
-  friday.setHours(23, 59, 59, 999)
+  friday.setHours(12, 0, 0, 0)
   return friday
 }
 
@@ -380,7 +382,7 @@ function onDateChange(row) {
     row.activity_date = row._prevDate
   } else if (!props.isAdmin && new Date() > plottingDeadline(row.activity_date)) {
     const deadline = plottingDeadline(row.activity_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-    row._dateWarning  = `Plotting deadline passed — assessments must be plotted by the Friday before their week (${deadline}).`
+    row._dateWarning  = `Plotting deadline passed — assessments must be plotted by 12:00 NN of the Friday before their week (${deadline}).`
     row.activity_date = row._prevDate
   } else {
     row._dateWarning = null
@@ -972,6 +974,7 @@ async function saveQuarterOption() {
             :quarter-number="activeQuarter"
             :quarter-data="currentQuarterData"
             :is-locked="isLocked || isReadOnly"
+            :leaf-categories="currentLeafCategories"
           />
         </div>
 
