@@ -62,6 +62,7 @@ import {
   PuzzlePieceIcon,
   MegaphoneIcon,
   PresentationChartLineIcon,
+  FlagIcon,
 } from "@heroicons/vue/24/outline";
 import LighthouseIcon from '@/Components/Icons/LighthouseIcon.vue';
 
@@ -1389,6 +1390,14 @@ export const menuItems = [
         routeName: "homeroom-attendance.activities.index",
         href: route("homeroom-attendance.activities.index"),
         icon: CalendarDaysIcon,
+        roles: [],
+        permissions: ["homeroom-attendance.log"],
+      },
+      {
+        label: "Flag Ceremony / Retreat",
+        routeName: "homeroom-attendance.flag.index",
+        href: route("homeroom-attendance.flag.index"),
+        icon: FlagIcon,
         roles: [],
         permissions: ["homeroom-attendance.log"],
       },

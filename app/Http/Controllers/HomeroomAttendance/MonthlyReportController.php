@@ -104,7 +104,9 @@ class MonthlyReportController extends Controller
         $sy = $this->roster->currentSchoolYear();
         $term = $this->roster->currentAcademicTerm($sy);
 
-        $sectionIds = $this->roster->scopedSectionIds($user, $term->id);
+        $sectionIds = $user->hasPermission('homeroom-attendance.admin')
+            ? $this->roster->accessibleSections($user, $term->id, $sy->id)->pluck('id')->all()
+            : $this->roster->scopedSectionIds($user, $term->id);
         abort_if(empty($sectionIds), 403, 'You have no coordinator scope assigned.');
 
         $reports = MonthlyReport::whereIn('section_id', $sectionIds)
