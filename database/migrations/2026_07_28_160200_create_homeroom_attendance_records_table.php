@@ -12,7 +12,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('homeroom_attendance_date_id')->constrained('homeroom_attendance_dates')->cascadeOnDelete();
             $table->integer('student_id')->comment('FK to students.id (legacy INT pk); no constraint');
-            $table->enum('status', ['present', 'absent', 'tardy', 'cutting']);
+            // 'Cutting' is intentionally not a directly-selectable whole-day
+            // status here — it's a derived concept (subject-level Absent
+            // while this record says Present/Tardy), computed by
+            // AdmissionSlipService, never hand-picked by the adviser.
+            $table->enum('status', ['present', 'absent', 'tardy']);
             $table->boolean('incomplete_uniform')->default(false);
             $table->enum('excused_status', ['n_a', 'excused', 'unexcused'])->default('n_a');
             $table->foreignId('admission_slip_id')->nullable()->constrained('class_admission_slips')->nullOnDelete();

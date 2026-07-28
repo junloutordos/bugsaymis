@@ -433,7 +433,7 @@ class RolePermissionSeeder extends Seeder
         // WAT) — actual eligibility to log/approve for a specific section is
         // gated at runtime via AdvisoryScheduleScopeService, not this permission.
         $assign('Faculty',   ['homeroom-attendance.log', 'homeroom-attendance.coordinator-review']);
-        $assign('CID Chief', ['homeroom-attendance.admin', 'homeroom-attendance.settings.manage', 'homeroom-attendance.coordinator-review']);
+        $assign('CID Chief', ['homeroom-attendance.admin', 'homeroom-attendance.settings.manage', 'homeroom-attendance.coordinator-review', 'academic-calendar.manage']);
 
         // ── Teacher Class Attendance (NFC Tap-In) ─────────────────────────────
         // AUH scoping is handled at runtime by checking academic_units.head_user_id

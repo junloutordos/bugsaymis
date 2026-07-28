@@ -74,7 +74,7 @@ class DailyAttendanceController extends Controller
             'date'                              => ['required', 'date'],
             'rows'                               => ['required', 'array', 'min:1'],
             'rows.*.student_id'                 => ['required', 'integer'],
-            'rows.*.status'                      => ['required', 'in:present,absent,tardy,cutting'],
+            'rows.*.status'                      => ['required', 'in:present,absent,tardy'],
             'rows.*.incomplete_uniform'          => ['sometimes', 'boolean'],
             'rows.*.remarks'                      => ['nullable', 'string', 'max:255'],
         ]);

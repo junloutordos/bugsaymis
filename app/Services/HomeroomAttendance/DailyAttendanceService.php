@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\DB;
 
 class DailyAttendanceService
 {
+    public function __construct(private SubjectAttendanceSyncService $subjectSync)
+    {
+    }
+
     public function findDate(int $sectionId, string $date): ?AttendanceDate
     {
         return AttendanceDate::where('section_id', $sectionId)
@@ -17,9 +21,14 @@ class DailyAttendanceService
     }
 
     /**
-     * Create/update the day's attendance for a section. Excused/unexcused
-     * status is intentionally not set here — that's decided later by the
-     * Registrar when a Class Admission Slip is issued (AdmissionSlipService).
+     * Create/update the day's attendance for a section, then push each
+     * student's whole-day status into their subject-level Class Records for
+     * the same date (SubjectAttendanceSyncService) — so subject teachers see
+     * the day pre-filled and only need to correct exceptions.
+     *
+     * Excused/unexcused status is intentionally not set here — that's
+     * decided later by the Registrar when a Class Admission Slip is issued
+     * (AdmissionSlipService).
      *
      * @param  array<int, array{student_id:int, status:string, incomplete_uniform?:bool, remarks?:?string}>  $rows
      */
@@ -45,6 +54,8 @@ class DailyAttendanceService
                         'remarks'            => $row['remarks'] ?? null,
                     ],
                 );
+
+                $this->subjectSync->syncForStudent($row['student_id'], $date, $row['status']);
             }
 
             return $attendanceDate->load('records');

@@ -25,8 +25,12 @@ class AttendanceRecord extends Model
         'incomplete_uniform' => 'boolean',
     ];
 
-    /** Whole-day statuses that count against days present when unexcused. */
-    public const INFRACTION_STATUSES = ['absent', 'tardy', 'cutting'];
+    /**
+     * Whole-day statuses that count against days present when unexcused.
+     * Cutting is NOT among these — it's derived per subject, never a
+     * directly-selectable whole-day status (see AdmissionSlipService).
+     */
+    public const INFRACTION_STATUSES = ['absent', 'tardy'];
 
     public function attendanceDate(): BelongsTo
     {

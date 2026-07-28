@@ -16,11 +16,13 @@ const props = defineProps({
   schoolYear: { type: Object, required: true },
 })
 
+// Cutting is intentionally not selectable here — it's derived by comparing
+// this whole-day status against each subject's own Class Record attendance
+// (see AdmissionSlipService::pending()), never hand-picked by the adviser.
 const STATUSES = [
   { value: 'present', label: 'Present', code: 'P', cls: 'bg-emerald-100 text-emerald-700' },
   { value: 'absent',  label: 'Absent',  code: 'A', cls: 'bg-red-100 text-red-700' },
   { value: 'tardy',   label: 'Tardy',   code: 'T', cls: 'bg-amber-100 text-amber-700' },
-  { value: 'cutting', label: 'Cutting Class', code: 'CC', cls: 'bg-rose-100 text-rose-700' },
 ]
 
 const sectionModel = ref(String(props.sectionId))

@@ -15,44 +15,30 @@ const props = defineProps({
 })
 
 // ── Status vocabulary ────────────────────────────────────────────────────────
+// Present/Absent/Tardy only. Excused/Unexcused is no longer a status a
+// subject teacher picks here — it's set by the Homeroom Adviser/Registrar's
+// Class Admission Slip workflow and shown read-only below. "Cutting" isn't a
+// status either — it's detected automatically whenever this record says
+// Absent but the student's Homeroom Attendance for the same date says
+// Present/Tardy (surfaced to the Registrar's admission-slip queue).
 
 const STATUSES = [
-  { value: 'present',           code: 'P',  label: 'Present',           cls: 'bg-emerald-100 text-emerald-700' },
-  { value: 'absent',            code: 'A',  label: 'Absent',            cls: 'bg-red-100 text-red-700' },
-  { value: 'late',              code: 'L',  label: 'Late/Tardy',        cls: 'bg-amber-100 text-amber-700' },
-  { value: 'excused',           code: 'E',  label: 'Excused',           cls: 'bg-blue-100 text-blue-700' },
-  { value: 'cut_class',         code: 'CC', label: 'Cut Class',         cls: 'bg-rose-100 text-rose-700' },
-  { value: 'unexcused_absence', code: 'UA', label: 'Unexcused Absence', cls: 'bg-red-100 text-red-700' },
-  { value: 'excused_absence',   code: 'EU', label: 'Excused Absence',   cls: 'bg-blue-100 text-blue-700' },
-  { value: 'excused_tardy',     code: 'ET', label: 'Excused Tardy',     cls: 'bg-amber-100 text-amber-700' },
-  { value: 'unexcused_tardy',   code: 'UT', label: 'Unexcused Tardy',   cls: 'bg-orange-100 text-orange-700' },
+  { value: 'present', code: 'P', label: 'Present', cls: 'bg-emerald-100 text-emerald-700' },
+  { value: 'absent',  code: 'A', label: 'Absent',  cls: 'bg-red-100 text-red-700' },
+  { value: 'tardy',   code: 'T', label: 'Tardy',   cls: 'bg-amber-100 text-amber-700' },
 ]
 const STATUS_BY_VALUE = Object.fromEntries(STATUSES.map(s => [s.value, s]))
-// Cycle for cells that already have an explicit record: null (default/Present) →
-// absent → late → … → unexcused_tardy → back to null.
+// Cycle for cells that already have an explicit record: null (default/Present) → absent → tardy → back to null.
 const STATUS_CYCLE = [null, ...STATUSES.map(status => status.value)]
-// Cycle used the *first* click on a still-default cell — Present is already
-// implied, so jump straight past it to the first exception state.
+// First click on a still-default cell — Present is already implied, so jump straight past it.
 const DEFAULT_STATUS_CYCLE = STATUSES.map(status => status.value)
 
-// Tally groups for the totals columns.
-const ABSENCE_SET = new Set(['absent', 'unexcused_absence', 'excused_absence', 'cut_class'])
-const TARDY_SET   = new Set(['late', 'excused_tardy', 'unexcused_tardy'])
-
-const UNIFORMS = {
-  complete:   { code: 'CU', label: 'Complete Uniform',   cls: 'bg-sky-100 text-sky-700' },
-  incomplete: { code: 'IU', label: 'Incomplete Uniform', cls: 'bg-orange-100 text-orange-700' },
-}
-// Cycle for cells with an explicit uniform record already set.
-const UNIFORM_CYCLE = [null, 'complete', 'incomplete']
-// First click on a still-default cell — Complete is already implied, so jump
-// straight to Incomplete (the only exception state).
-const DEFAULT_UNIFORM_CYCLE = ['incomplete']
+const EXCUSED_LABELS = { excused: 'Excused', unexcused: 'Unexcused' }
 
 // ── State ────────────────────────────────────────────────────────────────────
 
 const dates          = ref([])
-const records        = ref({})   // key `${studentId}_${dateId}` → { status, uniform }
+const records        = ref({})   // key `${studentId}_${dateId}` → { status, excused, synced }
 const pendingChanges = reactive(new Set())
 const loading        = ref(false)
 const saving         = ref(false)
@@ -70,17 +56,15 @@ function cell(studentId, dateId) {
   return records.value[`${studentId}_${dateId}`] ?? null
 }
 
-// Effective (displayed) status/uniform — falls back to the implicit default
-// (Present / Complete Uniform) when no explicit record has been saved yet.
-// Explicit records always take precedence, including an explicit "blank"
-// once one has been set via the cycle (see cycleAttendance/toggleUniform).
+// Effective (displayed) status — falls back to the implicit default
+// (Present) when no explicit record has been saved yet. Explicit records
+// always take precedence, including an explicit "blank" once one has been
+// set via the cycle (see cycleAttendance).
 function effectiveStatus(studentId, dateId) {
-  const value = cell(studentId, dateId)
-  return value?.status ?? 'present'
+  return cell(studentId, dateId)?.status ?? 'present'
 }
-function effectiveUniform(studentId, dateId) {
-  const value = cell(studentId, dateId)
-  return value?.uniform ?? 'complete'
+function excusedStatus(studentId, dateId) {
+  return cell(studentId, dateId)?.excused ?? 'n_a'
 }
 function isDefaulted(studentId, dateId) {
   return !cell(studentId, dateId)
@@ -110,7 +94,7 @@ watch(() => props.quarterNumber, load)
 function cycleAttendance(studentId, dateId) {
   if (props.isLocked) return
   const key  = `${studentId}_${dateId}`
-  const prev = records.value[key] ?? { status: null, uniform: null }
+  const prev = records.value[key] ?? { status: null }
 
   let nextStatus
   if (isDefaulted(studentId, dateId)) {
@@ -122,48 +106,21 @@ function cycleAttendance(studentId, dateId) {
     nextStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]
   }
 
-  const next = { ...prev, status: nextStatus }
-  if (next.status === null && next.uniform === null) {
+  if (nextStatus === null) {
     delete records.value[key]
   } else {
-    records.value[key] = next
-  }
-  pendingChanges.add(key)
-}
-
-// ── Uniform toggle (3 states — cycling stays comfortable) ────────────────────
-
-function toggleUniform(studentId, dateId) {
-  if (props.isLocked) return
-  const key  = `${studentId}_${dateId}`
-  const prev = records.value[key] ?? { status: null, uniform: null }
-
-  let nextUniform
-  if (isDefaulted(studentId, dateId)) {
-    // First click on a still-default cell — skip re-selecting Complete,
-    // go straight to Incomplete.
-    nextUniform = DEFAULT_UNIFORM_CYCLE[0]
-  } else {
-    const idx = UNIFORM_CYCLE.indexOf(prev.uniform ?? null)
-    nextUniform = UNIFORM_CYCLE[(idx + 1) % UNIFORM_CYCLE.length]
-  }
-
-  const next = { ...prev, uniform: nextUniform }
-  if (next.status === null && next.uniform === null) {
-    delete records.value[key]
-  } else {
-    records.value[key] = next
+    records.value[key] = { ...prev, status: nextStatus }
   }
   pendingChanges.add(key)
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 
-// Submits every student x date cell's EFFECTIVE state (implied defaults —
-// Present / Complete Uniform — included), not just explicitly-touched ones.
-// Before this, an untouched cell had no row in the database at all despite
-// visually showing Present/Complete — anything reading the table directly
-// (exports, other reports) would see it as blank.
+// Submits every student x date cell's EFFECTIVE status (the implied default —
+// Present — included), not just explicitly-touched ones. Before this, an
+// untouched cell had no row in the database at all despite visually showing
+// Present — anything reading the table directly (exports, other reports)
+// would see it as blank.
 async function saveAttendance() {
   if (!dates.value.length || !students.value.length) return
   saving.value = true
@@ -175,7 +132,6 @@ async function saveAttendance() {
         student_id: s.id,
         date_id:    d.id,
         status:     effectiveStatus(s.id, d.id),
-        uniform:    effectiveUniform(s.id, d.id),
       })
     }
   }
@@ -247,18 +203,16 @@ function formatDate(d) {
 // ── Totals ───────────────────────────────────────────────────────────────────
 
 function studentTotals(studentId) {
-  let present = 0, absences = 0, tardies = 0, iu = 0
+  let present = 0, absences = 0, tardies = 0
   for (const d of dates.value) {
-    const status  = effectiveStatus(studentId, d.id)
-    const uniform = effectiveUniform(studentId, d.id)
+    const status = effectiveStatus(studentId, d.id)
     if (status === 'present') present++
-    if (ABSENCE_SET.has(status)) absences++
-    if (TARDY_SET.has(status)) tardies++
-    if (uniform === 'incomplete') iu++
+    if (status === 'absent') absences++
+    if (status === 'tardy') tardies++
   }
   const total = dates.value.length
   const pct = total > 0 ? Math.round((present / total) * 100) : null
-  return { total, present, absences, tardies, iu, pct }
+  return { total, present, absences, tardies, pct }
 }
 
 function presentCountForDate(dateId) {
@@ -276,9 +230,8 @@ function presentCountForDate(dateId) {
     <!-- Toolbar -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <p class="text-xs text-slate-500">
-        Cells default to <span class="font-semibold">P</span> / <span class="font-semibold">CU</span> —
-        click an <span class="font-semibold">Att</span> cell to mark an exception (absent, late, etc.) ·
-        click a <span class="font-semibold">Unif</span> cell to mark incomplete uniform
+        Cells default to <span class="font-semibold">P</span> —
+        click to cycle Present → Absent → Tardy. Excused/Unexcused is decided by the Homeroom Adviser/Registrar and shown read-only.
       </p>
       <div class="flex items-center gap-2 shrink-0">
         <template v-if="!isLocked">
@@ -310,7 +263,7 @@ function presentCountForDate(dateId) {
     <!-- Empty state -->
     <div v-if="!dates.length" class="flex flex-col items-center justify-center py-14 text-slate-400 text-sm gap-2">
       <p>No class dates recorded yet.</p>
-      <p v-if="!isLocked" class="text-xs">Click "Add Date" above to log a class meeting.</p>
+      <p v-if="!isLocked" class="text-xs">Click "Add Date" above to log a class meeting — or it fills in automatically once the Homeroom Adviser logs the day.</p>
     </div>
 
     <!-- Grid -->
@@ -318,10 +271,10 @@ function presentCountForDate(dateId) {
       <table class="min-w-full text-xs border-collapse">
         <thead class="bg-slate-50">
           <tr>
-            <th rowspan="2" class="sticky left-0 z-10 bg-slate-50 px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-8 border-r border-slate-100">#</th>
-            <th rowspan="2" class="sticky left-8 z-10 bg-slate-50 px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide min-w-[160px] border-r border-slate-200">Student</th>
-            <th v-for="d in dates" :key="d.id" colspan="2"
-              class="px-2 pt-2 pb-1 text-center text-xs font-semibold text-slate-500 border-r border-slate-200 group">
+            <th class="sticky left-0 z-10 bg-slate-50 px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-8 border-r border-slate-100">#</th>
+            <th class="sticky left-8 z-10 bg-slate-50 px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide min-w-[160px] border-r border-slate-200">Student</th>
+            <th v-for="d in dates" :key="d.id"
+              class="px-2 py-2.5 text-center text-xs font-semibold text-slate-500 border-r border-slate-200 group w-14">
               <div class="flex items-center justify-center gap-1">
                 <span>{{ formatDate(d.date) }}</span>
                 <button v-if="!isLocked" @click="removeDate(d)"
@@ -331,17 +284,10 @@ function presentCountForDate(dateId) {
                 </button>
               </div>
             </th>
-            <th rowspan="2" class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-14 border-r border-slate-100">Classes</th>
-            <th rowspan="2" class="px-3 py-2.5 text-center text-xs font-semibold text-red-400 uppercase tracking-wide w-14 border-r border-slate-100">Absences</th>
-            <th rowspan="2" class="px-3 py-2.5 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide w-14 border-r border-slate-100">Tardies</th>
-            <th rowspan="2" class="px-3 py-2.5 text-center text-xs font-semibold text-orange-500 uppercase tracking-wide w-12 border-r border-slate-100" title="Incomplete Uniform days">IU</th>
-            <th rowspan="2" class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Present %</th>
-          </tr>
-          <tr>
-            <template v-for="d in dates" :key="'sub' + d.id">
-              <th class="px-1 pb-1.5 text-center text-[9px] font-semibold text-slate-400 uppercase tracking-wider w-9 border-r border-slate-100">Att</th>
-              <th class="px-1 pb-1.5 text-center text-[9px] font-semibold text-slate-400 uppercase tracking-wider w-9 border-r border-slate-200">Unif</th>
-            </template>
+            <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-14 border-r border-slate-100">Classes</th>
+            <th class="px-3 py-2.5 text-center text-xs font-semibold text-red-400 uppercase tracking-wide w-14 border-r border-slate-100">Absences</th>
+            <th class="px-3 py-2.5 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide w-14 border-r border-slate-100">Tardies</th>
+            <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Present %</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -358,47 +304,31 @@ function presentCountForDate(dateId) {
               {{ student.family_name }}, {{ student.given_name }}
               <span v-if="student.middle_initial"> {{ student.middle_initial }}.</span>
             </td>
-            <!-- Date cells: attendance + uniform -->
-            <template v-for="d in dates" :key="d.id">
-              <td class="px-0.5 py-1.5 text-center border-r border-slate-100">
-                <button
-                  @click="cycleAttendance(student.id, d.id)"
-                  :class="[
-                    'min-w-[30px] h-6 px-1 rounded-md text-[11px] font-bold transition-colors',
-                    STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.cls,
-                    isDefaulted(student.id, d.id) ? 'opacity-60' : '',
-                    pendingChanges.has(`${student.id}_${d.id}`) ? 'ring-1 ring-offset-1 ring-indigo-400' : '',
-                    isLocked ? 'cursor-default' : 'cursor-pointer',
-                  ]"
-                  :disabled="isLocked"
-                  :title="isLocked
-                    ? ''
-                    : (isDefaulted(student.id, d.id)
-                      ? 'Defaults to Present — click to mark an exception'
-                      : STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.label)">
-                  {{ STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.code }}
-                </button>
-              </td>
-              <td class="px-0.5 py-1.5 text-center border-r border-slate-200">
-                <button
-                  @click="toggleUniform(student.id, d.id)"
-                  :class="[
-                    'min-w-[30px] h-6 px-1 rounded-md text-[11px] font-bold transition-colors',
-                    UNIFORMS[effectiveUniform(student.id, d.id)].cls,
-                    isDefaulted(student.id, d.id) ? 'opacity-60' : '',
-                    pendingChanges.has(`${student.id}_${d.id}`) ? 'ring-1 ring-offset-1 ring-indigo-400' : '',
-                    isLocked ? 'cursor-default' : 'cursor-pointer',
-                  ]"
-                  :disabled="isLocked"
-                  :title="isLocked
-                    ? ''
-                    : (isDefaulted(student.id, d.id)
-                      ? 'Defaults to Complete Uniform — click to mark incomplete'
-                      : UNIFORMS[effectiveUniform(student.id, d.id)].label)">
-                  {{ UNIFORMS[effectiveUniform(student.id, d.id)].code }}
-                </button>
-              </td>
-            </template>
+            <!-- Date cells -->
+            <td v-for="d in dates" :key="d.id" class="px-0.5 py-1.5 text-center border-r border-slate-100">
+              <button
+                @click="cycleAttendance(student.id, d.id)"
+                :class="[
+                  'min-w-[30px] h-6 px-1 rounded-md text-[11px] font-bold transition-colors',
+                  STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.cls,
+                  isDefaulted(student.id, d.id) ? 'opacity-60' : '',
+                  pendingChanges.has(`${student.id}_${d.id}`) ? 'ring-1 ring-offset-1 ring-indigo-400' : '',
+                  isLocked ? 'cursor-default' : 'cursor-pointer',
+                ]"
+                :disabled="isLocked"
+                :title="isLocked
+                  ? ''
+                  : (isDefaulted(student.id, d.id)
+                    ? 'Defaults to Present — click to mark an exception'
+                    : STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.label)">
+                {{ STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.code }}
+              </button>
+              <div v-if="excusedStatus(student.id, d.id) !== 'n_a'"
+                class="mt-0.5 text-[9px] font-semibold"
+                :class="excusedStatus(student.id, d.id) === 'excused' ? 'text-emerald-600' : 'text-red-500'">
+                {{ EXCUSED_LABELS[excusedStatus(student.id, d.id)] }}
+              </div>
+            </td>
             <!-- Totals -->
             <td class="px-3 py-2 text-center text-slate-500 border-r border-slate-100 font-mono">
               {{ studentTotals(student.id).total }}
@@ -410,10 +340,6 @@ function presentCountForDate(dateId) {
             <td class="px-3 py-2 text-center border-r border-slate-100 font-mono"
               :class="studentTotals(student.id).tardies > 0 ? 'text-amber-600' : 'text-slate-300'">
               {{ studentTotals(student.id).tardies || '—' }}
-            </td>
-            <td class="px-3 py-2 text-center border-r border-slate-100 font-mono"
-              :class="studentTotals(student.id).iu > 0 ? 'text-orange-600' : 'text-slate-300'">
-              {{ studentTotals(student.id).iu || '—' }}
             </td>
             <td class="px-3 py-2 text-center font-mono font-semibold"
               :class="studentTotals(student.id).pct !== null
@@ -430,11 +356,11 @@ function presentCountForDate(dateId) {
               class="sticky left-0 z-10 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide border-r border-slate-200">
               Present
             </td>
-            <td v-for="d in dates" :key="d.id" colspan="2"
+            <td v-for="d in dates" :key="d.id"
               class="px-1 py-2 text-center text-xs font-semibold border-r border-slate-200 text-emerald-600">
               {{ presentCountForDate(d.id) }}
             </td>
-            <td colspan="5" />
+            <td colspan="4" />
           </tr>
         </tfoot>
       </table>
@@ -443,8 +369,9 @@ function presentCountForDate(dateId) {
     <!-- Legend -->
     <div class="mt-3 space-y-1.5">
       <p class="text-xs text-slate-400">
-        Unmarked cells default to <span class="font-semibold text-slate-500">Present</span> /
-        <span class="font-semibold text-slate-500">Complete Uniform</span> — click only to record an exception.
+        Unmarked cells default to <span class="font-semibold text-slate-500">Present</span> — click only to record an exception.
+        A student marked Absent here while Homeroom Attendance says Present/Tardy that day is automatically flagged as
+        cutting class to the Registrar.
       </p>
       <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-500">
         <span v-for="s in STATUSES" :key="s.value" class="inline-flex items-center gap-1.5">
@@ -452,14 +379,6 @@ function presentCountForDate(dateId) {
             {{ s.code }}
           </span>
           {{ s.label }}
-        </span>
-      </div>
-      <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-500">
-        <span v-for="(u, k) in UNIFORMS" :key="k" class="inline-flex items-center gap-1.5">
-          <span :class="['inline-flex items-center justify-center min-w-[26px] h-5 px-1 rounded-md text-[11px] font-bold', u.cls]">
-            {{ u.code }}
-          </span>
-          {{ u.label }}
         </span>
       </div>
     </div>

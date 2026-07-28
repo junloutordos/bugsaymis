@@ -55,7 +55,7 @@ async function issueSlip() {
       student_id: active.value.student_id,
       section_id: Number(sectionModel.value),
       infraction_date: active.value.date,
-      infraction_type: active.value.status === 'absent' ? 'absence' : active.value.status,
+      infraction_type: active.value.infraction_type,
       excused_status: excusedStatus.value,
       reason: reason.value || null,
       document_base64: documentBase64.value,
@@ -102,10 +102,13 @@ function formatDate(d) {
             <tr v-if="!pending.length">
               <td colspan="4" class="px-4 py-8 text-center text-slate-400 text-sm">No infractions awaiting a slip.</td>
             </tr>
-            <tr v-for="record in pending" :key="record.attendance_record_id">
+            <tr v-for="record in pending" :key="`${record.type}_${record.reference_id}`">
               <td class="px-4 py-2 text-slate-700">{{ record.student_name }}</td>
               <td class="px-4 py-2 text-slate-500">{{ formatDate(record.date) }}</td>
-              <td class="px-4 py-2 text-slate-500 capitalize">{{ record.status }}</td>
+              <td class="px-4 py-2 text-slate-500 capitalize">
+                {{ record.infraction_type }}
+                <span v-if="record.type === 'subject_cutting'" class="ml-1 text-[10px] text-slate-400 normal-case">(detected — subject absent, homeroom present)</span>
+              </td>
               <td class="px-4 py-2 text-right">
                 <AppButton size="sm" @click="openSlipModal(record)">Issue Slip</AppButton>
               </td>
@@ -150,7 +153,7 @@ function formatDate(d) {
     <AppModal :show="showModal" @close="showModal = false" title="Issue Class Admission Slip">
       <div v-if="active" class="space-y-3">
         <p class="text-sm text-slate-600">
-          <span class="font-medium">{{ active.student_name }}</span> — {{ formatDate(active.date) }} ({{ active.status }})
+          <span class="font-medium">{{ active.student_name }}</span> — {{ formatDate(active.date) }} ({{ active.infraction_type }})
         </p>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Determination</label>

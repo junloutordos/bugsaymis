@@ -60,6 +60,8 @@ class MonthlyReportService
                 ->get()
                 ->groupBy('student_id');
 
+            $cuttingCountsByStudent = $this->cuttingCountsForMonth($sectionId, $start, $end);
+
             $deductions = AttendanceSetting::deductionPoints();
             $students = $this->roster->studentsForSection($sectionId, $schoolYearId);
 
@@ -68,7 +70,10 @@ class MonthlyReportService
 
                 $excusedAbsences = $studentRecords->where('status', 'absent')->where('excused_status', 'excused')->count();
                 $unexcusedAbsences = $studentRecords->where('status', 'absent')->where('excused_status', '!=', 'excused')->count();
-                $cutting = $studentRecords->where('status', 'cutting')->count();
+                // Cutting is never a status anyone picks — it's a subject
+                // Absent while this same date's Homeroom record says
+                // Present/Tardy (see AdmissionSlipService::pending()).
+                $cutting = (int) ($cuttingCountsByStudent[$student->id] ?? 0);
                 $tardy = $studentRecords->where('status', 'tardy')->count();
                 $incUniform = $studentRecords->where('incomplete_uniform', true)->count();
 
@@ -104,6 +109,36 @@ class MonthlyReportService
 
             return $report->load('lines.student');
         });
+    }
+
+    /**
+     * Cutting instances per student for the month — a subject's Absent
+     * record where the same date's Homeroom record says Present/Tardy.
+     * Counted the same way absences are: excused_status 'n_a' still counts
+     * as unexcused for the deduction/tally until a slip resolves it.
+     *
+     * @return array<int, int> student_id => count
+     */
+    private function cuttingCountsForMonth(int $sectionId, Carbon $start, Carbon $end): array
+    {
+        return DB::table('class_record_attendance_records as car')
+            ->join('class_record_attendance_dates as cad', 'cad.id', '=', 'car.class_record_attendance_date_id')
+            ->join('class_record_students as crs', 'crs.id', '=', 'car.class_record_student_id')
+            ->join('homeroom_attendance_dates as had', function ($join) use ($sectionId) {
+                $join->on('had.date', '=', 'cad.date')->where('had.section_id', '=', $sectionId);
+            })
+            ->join('homeroom_attendance_records as har', function ($join) {
+                $join->on('har.homeroom_attendance_date_id', '=', 'had.id')
+                    ->on('har.student_id', '=', 'crs.student_id');
+            })
+            ->where('car.status', 'absent')
+            ->where('car.excused_status', '!=', 'excused')
+            ->whereIn('har.status', ['present', 'tardy'])
+            ->whereBetween('cad.date', [$start->toDateString(), $end->toDateString()])
+            ->groupBy('crs.student_id')
+            ->select('crs.student_id', DB::raw('COUNT(*) as cutting_count'))
+            ->pluck('cutting_count', 'student_id')
+            ->all();
     }
 
     public function submit(MonthlyReport $report, int $userId): MonthlyReport

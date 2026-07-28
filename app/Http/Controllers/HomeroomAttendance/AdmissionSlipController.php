@@ -53,13 +53,11 @@ class AdmissionSlipController extends Controller
         return Inertia::render('HomeroomAttendance/AdmissionSlips/Index', [
             'sections'  => $sections,
             'sectionId' => $sectionId,
-            'pending'   => $pending->map(fn ($record) => [
-                'attendance_record_id' => $record->id,
-                'student_id'           => $record->student_id,
-                'student_name'         => trim("{$record->student->lastname}, {$record->student->firstname} {$record->student->middlename}"),
-                'date'                 => $record->attendanceDate->date->toDateString(),
-                'status'               => $record->status,
-            ])->values(),
+            // Already shaped by AdmissionSlipService::pending() — a mix of
+            // whole-day homeroom infractions and derived subject-level
+            // cutting mismatches, each tagged with `type` + `infraction_type`
+            // (absence/tardy/cutting, matching the slip's own enum values).
+            'pending'   => $pending->values(),
             'issued'    => $issued->map(fn (AdmissionSlip $slip) => [
                 'id'             => $slip->id,
                 'student_name'   => trim("{$slip->student->lastname}, {$slip->student->firstname} {$slip->student->middlename}"),

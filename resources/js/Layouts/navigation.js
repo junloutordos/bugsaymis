@@ -1424,6 +1424,14 @@ export const menuItems = [
         roles: [],
         permissions: ["homeroom-attendance.settings.manage"],
       },
+      {
+        label: "Academic Calendar",
+        routeName: "academic-calendar.index",
+        href: route("academic-calendar.index"),
+        icon: CalendarDaysIcon,
+        roles: [],
+        permissions: ["academic-calendar.manage"],
+      },
     ],
   },
 

@@ -79,6 +79,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.coordinator-review',    'description' => 'Approve/return monthly Record on Attendance and Punctuality (Homeroom Unit Coordinator)'],
             ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.admin',                 'description' => 'Campus-wide oversight of Homeroom Attendance'],
             ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.settings.manage',        'description' => 'Edit Homeroom Attendance deduction-point settings'],
+            ['module' => 'HomeroomAttendance', 'name' => 'academic-calendar.manage',                  'description' => 'Flag holidays and class suspensions (CID Chief)'],
 
             // ── IT / MIS ──────────────────────────────────────────────────────
             ['module' => 'IT',       'name' => 'it.requests.view',   'description' => 'View IT job requests'],
