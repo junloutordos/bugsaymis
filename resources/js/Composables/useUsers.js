@@ -19,6 +19,8 @@ export function useUsers(props) {
   const form = ref({
     id: null,
     name: "",
+    prenominal_title: "",
+    postnominal_title: "",
     email: "",
     sex:"",
     badge_id: "",
@@ -82,6 +84,8 @@ export function useUsers(props) {
       form.value = {
         id: user.id,
         name: user.name,
+        prenominal_title: user.prenominal_title ?? "",
+        postnominal_title: user.postnominal_title ?? "",
         email: user.email,
         sex: user.sex,
         badge_id: user.badge_id ?? "",
@@ -102,6 +106,8 @@ export function useUsers(props) {
       form.value = {
         id: null,
         name: "",
+        prenominal_title: "",
+        postnominal_title: "",
         email: "",
         sex: "",
         badge_id: "",

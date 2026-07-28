@@ -44,6 +44,35 @@ class ProfileTest extends TestCase
         $this->assertNull($user->refresh()->nickname);
     }
 
+    public function test_nominal_titles_can_be_saved_and_cleared(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'prenominal_title' => 'Dr.',
+                'postnominal_title' => 'Ph.D.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $user->refresh();
+        $this->assertSame('Dr.', $user->prenominal_title);
+        $this->assertSame('Ph.D.', $user->postnominal_title);
+
+        $this->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'prenominal_title' => '',
+                'postnominal_title' => '',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $user->refresh();
+        $this->assertNull($user->prenominal_title);
+        $this->assertNull($user->postnominal_title);
+    }
+
     public function test_profile_information_can_be_updated(): void
     {
         $user = User::factory()->create();

@@ -452,6 +452,8 @@ function formatSg(user) {
                 </div>
               </div>
               <p class="text-sm text-slate-700">Name: <strong>{{ selectedUser.name }}</strong></p>
+              <p class="text-sm text-slate-700">Pre-Nominal Title: <strong>{{ selectedUser.prenominal_title ?? '—' }}</strong></p>
+              <p class="text-sm text-slate-700">Post-Nominal Title: <strong>{{ selectedUser.postnominal_title ?? '—' }}</strong></p>
               <p class="text-sm text-slate-700">Sex: <strong>{{ selectedUser.sex }}</strong></p>
               <p class="text-sm text-slate-700">Email: <strong>{{ selectedUser.email }}</strong></p>
               <p class="text-sm text-slate-700">Biometric ID: <strong>{{ selectedUser.badge_id ?? '—' }}</strong></p>
@@ -470,6 +472,18 @@ function formatSg(user) {
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
                 <input v-model="form.name" type="text" required
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Pre-Nominal Title</label>
+                <input v-model="form.prenominal_title" type="text" placeholder="e.g. Dr., Engr., Atty." maxlength="50"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Post-Nominal Title</label>
+                <input v-model="form.postnominal_title" type="text" placeholder="e.g. Ph.D., CESO III, LPT" maxlength="100"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
               </div>
 

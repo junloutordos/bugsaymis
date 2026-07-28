@@ -34,11 +34,30 @@ class PersonNameFormatter
         $user->loadMissing('pds.personalInfo');
         $info = $user->pds?->personalInfo;
 
-        if ($info?->first_name && $info?->surname) {
-            return $this->assemble($info->first_name, $info->middle_name, $info->surname, $info->name_ext);
+        $baseName = ($info?->first_name && $info?->surname)
+            ? $this->assemble($info->first_name, $info->middle_name, $info->surname, $info->name_ext)
+            : $this->fromDisplayName($user->name);
+
+        return $this->withTitles($user, $baseName);
+    }
+
+    /**
+     * Decorate an already-formatted name with the user's optional pre-/post-nominal
+     * titles, without touching whatever ordering logic produced $baseName.
+     */
+    public function withTitles(User $user, string $baseName): string
+    {
+        $baseName = trim($baseName);
+        $pre      = trim((string) $user->prenominal_title);
+        $post     = trim((string) $user->postnominal_title);
+
+        $name = $pre !== '' ? trim($pre . ' ' . $baseName) : $baseName;
+
+        if ($post !== '') {
+            $name = $name !== '' ? $name . ', ' . $post : $post;
         }
 
-        return $this->fromDisplayName($user->name);
+        return $name;
     }
 
     private function assemble(string $first, ?string $middle, string $last, ?string $suffix = null): string

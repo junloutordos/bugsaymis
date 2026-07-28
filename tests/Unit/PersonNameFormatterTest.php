@@ -83,4 +83,40 @@ class PersonNameFormatterTest extends TestCase
 
         $this->assertSame('JUAN DELA CRUZ', (new PersonNameFormatter)->formal($user));
     }
+
+    public function test_with_titles_returns_base_name_unchanged_when_no_titles_set(): void
+    {
+        $user = new User(['name' => 'Fernando, Michelle B.']);
+
+        $this->assertSame('MICHELLE B. FERNANDO', (new PersonNameFormatter)->withTitles($user, 'MICHELLE B. FERNANDO'));
+    }
+
+    public function test_with_titles_prepends_prenominal_title(): void
+    {
+        $user = new User(['name' => 'Cruz, Juan', 'prenominal_title' => 'Dr.']);
+
+        $this->assertSame('Dr. JUAN CRUZ', (new PersonNameFormatter)->withTitles($user, 'JUAN CRUZ'));
+    }
+
+    public function test_with_titles_appends_postnominal_title(): void
+    {
+        $user = new User(['name' => 'Cruz, Juan', 'postnominal_title' => 'Ph.D.']);
+
+        $this->assertSame('JUAN CRUZ, Ph.D.', (new PersonNameFormatter)->withTitles($user, 'JUAN CRUZ'));
+    }
+
+    public function test_with_titles_applies_both_pre_and_post_nominal_titles(): void
+    {
+        $user = new User(['name' => 'Cruz, Juan', 'prenominal_title' => 'Dr.', 'postnominal_title' => 'CESO III']);
+
+        $this->assertSame('Dr. JUAN CRUZ, CESO III', (new PersonNameFormatter)->withTitles($user, 'JUAN CRUZ'));
+    }
+
+    public function test_formal_includes_titles_when_set(): void
+    {
+        $user = new User(['name' => 'Fernando, Michelle B.', 'prenominal_title' => 'Engr.', 'postnominal_title' => 'LPT']);
+        $user->setRelation('pds', null);
+
+        $this->assertSame('Engr. MICHELLE B. FERNANDO, LPT', (new PersonNameFormatter)->formal($user));
+    }
 }
