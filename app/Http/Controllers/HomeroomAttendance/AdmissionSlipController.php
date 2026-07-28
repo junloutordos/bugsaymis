@@ -7,6 +7,7 @@ use App\Models\FacultyLoading\Section;
 use App\Models\HomeroomAttendance\AdmissionSlip;
 use App\Services\HomeroomAttendance\AdmissionSlipPdfService;
 use App\Services\HomeroomAttendance\AdmissionSlipService;
+use App\Services\HomeroomAttendance\RosterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +26,7 @@ class AdmissionSlipController extends Controller
     public function __construct(
         private AdmissionSlipService $slips,
         private AdmissionSlipPdfService $pdf,
+        private RosterService $roster,
     ) {
     }
 
@@ -33,8 +35,10 @@ class AdmissionSlipController extends Controller
     public function index(Request $request)
     {
         $sectionId = $request->query('section') ? (int) $request->query('section') : null;
+        $sy = $this->roster->currentSchoolYear();
 
-        $sections = Section::where('is_active', true)
+        $sections = Section::where('school_year_id', $sy->id)
+            ->where('is_active', true)
             ->where('sectionname', 'not like', 'SCI-%')
             ->where('sectionname', 'not like', 'ELEC-%')
             ->orderBy('levelid')->orderBy('sectionname')

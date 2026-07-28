@@ -26,7 +26,7 @@ class DailyAttendanceController extends Controller
         $sy = $this->roster->currentSchoolYear();
         $term = $this->roster->currentAcademicTerm($sy);
 
-        $sections = $this->roster->accessibleSections($user, $term->id);
+        $sections = $this->roster->accessibleSections($user, $term->id, $sy->id);
         abort_if($sections->isEmpty(), 403, 'You have no homeroom advisory sections assigned.');
 
         $sectionId = (int) $request->query('section', $sections->first()->id);

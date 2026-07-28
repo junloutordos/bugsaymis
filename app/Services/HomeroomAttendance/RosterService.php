@@ -54,28 +54,42 @@ class RosterService
         return $this->advisoryScope->sectionIds($user, $academicTermId);
     }
 
+    /**
+     * homeroom-attendance.admin (CID Chief/Administrator) gets campus-wide
+     * access regardless of designation — an Administrator has no HR_ADV/
+     * HR_ACAD/COORD-* designation of their own, so without this bypass
+     * they'd be 403'd out of a module they're supposed to have full
+     * oversight of.
+     */
     public function canAccessSection(User $user, int $sectionId, int $academicTermId): bool
     {
-        return in_array($sectionId, $this->scopedSectionIds($user, $academicTermId), true);
+        return $user->hasPermission('homeroom-attendance.admin')
+            || in_array($sectionId, $this->scopedSectionIds($user, $academicTermId), true);
     }
 
     /**
      * Sections (real homerooms only — Science Core/Elective synthetic
-     * sections excluded, same convention as WAT) the user may manage.
+     * sections excluded, same convention as WAT) the user may manage,
+     * scoped to the given school year. homeroom-attendance.admin holders
+     * see every active homeroom that year; everyone else sees only their
+     * designation-resolved scope (see canAccessSection()).
      */
-    public function accessibleSections(User $user, int $academicTermId): Collection
+    public function accessibleSections(User $user, int $academicTermId, int $schoolYearId): Collection
     {
-        $sectionIds = $this->scopedSectionIds($user, $academicTermId);
-        if (empty($sectionIds)) {
-            return collect();
+        $query = Section::where('school_year_id', $schoolYearId)
+            ->where('is_active', true)
+            ->where('sectionname', 'not like', 'SCI-%')
+            ->where('sectionname', 'not like', 'ELEC-%');
+
+        if (! $user->hasPermission('homeroom-attendance.admin')) {
+            $sectionIds = $this->scopedSectionIds($user, $academicTermId);
+            if (empty($sectionIds)) {
+                return collect();
+            }
+            $query->whereIn('id', $sectionIds);
         }
 
-        return Section::whereIn('id', $sectionIds)
-            ->where('sectionname', 'not like', 'SCI-%')
-            ->where('sectionname', 'not like', 'ELEC-%')
-            ->orderBy('levelid')
-            ->orderBy('sectionname')
-            ->get(['id', 'sectionname', 'levelid']);
+        return $query->orderBy('levelid')->orderBy('sectionname')->get(['id', 'sectionname', 'levelid']);
     }
 
     /**
