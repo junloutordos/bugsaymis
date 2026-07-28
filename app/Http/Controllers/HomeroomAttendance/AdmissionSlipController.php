@@ -15,6 +15,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdmissionSlipController extends Controller
 {
+    /** Extension → Content-Type allowlist for supporting documents — no SVG/HTML, ever. */
+    private const DOCUMENT_TYPES = [
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+    ];
+
     public function __construct(
         private AdmissionSlipService $slips,
         private AdmissionSlipPdfService $pdf,
@@ -107,18 +114,28 @@ class AdmissionSlipController extends Controller
      * Streams the document attached to THIS slip only — the S3 key always
      * comes from the slip's own DB column, never from client input, so there
      * is no way to walk this endpoint into an arbitrary S3 path.
+     *
+     * Content-Type is looked up from our own extension allowlist, never from
+     * S3/client-supplied metadata, and the response always forces a download
+     * (Content-Disposition: attachment) — otherwise a browser could sniff an
+     * uploaded file as HTML/SVG and execute it in this app's origin (stored XSS).
      */
     public function document(AdmissionSlip $slip): StreamedResponse
     {
         $s3Key = $slip->supporting_document_path;
         abort_unless($s3Key && Storage::disk('s3')->exists($s3Key), 404);
 
+        $extension = strtolower(pathinfo($s3Key, PATHINFO_EXTENSION));
+        $contentType = self::DOCUMENT_TYPES[$extension] ?? 'application/octet-stream';
+
         $stream = Storage::disk('s3')->readStream($s3Key);
 
         return new StreamedResponse(function () use ($stream) {
             fpassthru($stream);
         }, 200, [
-            'Content-Type' => Storage::disk('s3')->mimeType($s3Key) ?: 'application/octet-stream',
+            'Content-Type'        => $contentType,
+            'Content-Disposition' => 'attachment; filename="Admission-Slip-Document-'.$slip->id.'.'.$extension.'"',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -127,7 +144,11 @@ class AdmissionSlipController extends Controller
         [, $base64] = str_contains($dataUri, ',') ? explode(',', $dataUri, 2) : [null, $dataUri];
         $imageData = base64_decode($base64);
 
-        $s3Key = 'homeroom-attendance/admission-slips/'.$studentId.'/'.uniqid('doc_', true);
+        $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->buffer($imageData);
+        $extension = array_search($mimeType, self::DOCUMENT_TYPES, true);
+        abort_unless($extension, 422, 'Unsupported file type. Only PDF, PNG, and JPEG are allowed.');
+
+        $s3Key = 'homeroom-attendance/admission-slips/'.$studentId.'/'.uniqid('doc_', true).'.'.$extension;
         Storage::disk('s3')->put($s3Key, $imageData);
 
         return $s3Key;
