@@ -78,6 +78,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('registrar.enrollment.continuing-students')
         ->middleware('permission:students.enrollment.manage');
 
+    Route::get('/registrar/enrollment/export', [EnrollmentController::class, 'export'])
+        ->name('registrar.enrollment.export')
+        ->middleware('permission:students.records.export');
+
     Route::post('/registrar/enrollment', [EnrollmentController::class, 'store'])
         ->name('registrar.enrollment.store')
         ->middleware('permission:students.enrollment.manage');
