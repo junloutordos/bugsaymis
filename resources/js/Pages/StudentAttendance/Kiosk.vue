@@ -46,7 +46,7 @@ const pairForm = useForm({
 })
 
 const reader = new BrowserMultiFormatReader(undefined, {
-  delayBetweenScanAttempts: 120,
+  delayBetweenScanAttempts: 80,
   delayBetweenScanSuccess: 1000,
 })
 reader.possibleFormats = [BarcodeFormat.CODE_128, BarcodeFormat.QR_CODE]
@@ -82,8 +82,9 @@ async function startCameraStream() {
     audio: false,
     video: {
       facingMode: { ideal: cameraFacing.value },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      focusMode: { ideal: 'continuous' },
     },
   }, video.value, (result) => {
     if (!result || scannerState.value !== 'scanning') return
@@ -929,7 +930,13 @@ onUnmounted(() => {
       </div>
 
       <form v-if="scannerState === 'scanning'" class="manual-entry" @submit.prevent="submitManual">
-        <input v-model="manualBarcode" maxlength="50" placeholder="Manual ID entry" aria-label="Manual student ID entry" />
+        <input
+          v-model="manualBarcode"
+          maxlength="50"
+          placeholder="Manual ID entry"
+          aria-label="Manual student ID entry"
+          @keydown.tab.prevent="submitManual"
+        />
         <button>Submit</button>
       </form>
 
