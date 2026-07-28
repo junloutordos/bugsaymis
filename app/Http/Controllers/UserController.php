@@ -7,9 +7,12 @@ use App\Models\Role;
 use App\Models\Division;
 use App\Models\Office;
 use App\Models\FacultyLoading\SalarySchedule;
+use App\Services\Atlas\WorkspaceProvisioningService;
 use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class UserController extends Controller
@@ -184,14 +187,21 @@ class UserController extends Controller
         return response()->json($users);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, WorkspaceProvisioningService $provisioning)
     {
+        // The Employees form omits this field entirely, which posts "" rather
+        // than null — normalize so `nullable` actually takes effect below.
+        if ($request->input('email') === '') {
+            $request->merge(['email' => null]);
+        }
+
         $data = $request->validate([
             'sex'                => 'nullable|in:Male,Female',
             'name'               => 'required|string|max:255',
             'prenominal_title'   => 'nullable|string|max:50',
             'postnominal_title'  => 'nullable|string|max:100',
-            'email'              => 'required|email|unique:users,email',
+            // Leave blank to auto-provision a real Google Workspace account instead.
+            'email'              => 'nullable|email|unique:users,email',
             'emp_category'       => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
             'badge_id'           => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
             'employee_no'        => ['nullable','string','max:50','unique:users,employee_no'],
@@ -202,13 +212,34 @@ class UserController extends Controller
         ]);
 
         $data['account_type'] = 'employee';
+        $needsProvisioning = empty($data['email']);
+
+        if ($needsProvisioning) {
+            // Placeholder — unique() above already ran, so this is safe;
+            // overwritten below once the Workspace account is created.
+            $data['email'] = 'pending-'.Str::uuid().'@crc.pshs.edu.ph';
+        }
+
+        // Login is Google SSO only (see Auth\GoogleAuthController) — this
+        // password is never used to sign in, same throwaway pattern as there.
+        $data['password'] = Hash::make(Str::random(16));
 
         $user = User::create($data);
         if (empty($user->employee_no)) {
             $user->update(['employee_no' => 'pshscrc13-00' . $user->id]);
         }
 
-        return redirect()->route('users.index')->with('success', 'User created successfully');
+        $message = 'User created successfully';
+
+        if ($needsProvisioning) {
+            $provisioned = $provisioning->provisionEmployee($user->id);
+
+            $message = $provisioned
+                ? "User created. Google account: {$provisioned['email']} — temporary password: {$provisioned['temp_password']} (shown once, share directly with the employee, not by email)."
+                : 'User created, but the Google account could not be auto-created — set their email manually and try again from Workspace Sync.';
+        }
+
+        return redirect()->route('users.index')->with('success', $message);
     }
 
     public function update(Request $request, $id)
