@@ -63,7 +63,7 @@
               </AppIconButton>
 
               <AppIconButton
-                v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))"
+                v-if="((wr.status === 'Pending GSU Approval' && hasRole('Administrator')) || (hasRole('GSU Head') && (wr.status === 'Pending GSU Approval' || (wr.status === 'Pending' && !wr.division_chief_id))))"
                 label="Assign"
                 @click.prevent="openModal(wr)"
               >
@@ -97,7 +97,7 @@
               </AppIconButton>
 
               <AppIconButton
-                v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))"
+                v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Pending GSU Approval' && hasRole('GSU Head')))"
                 label="Mark Completed"
                 variant="success"
                 @click.prevent="openCompleteModal(wr)"
@@ -143,11 +143,11 @@
               <AppBadge :color="inspectionStatusClass(wr)">{{ inspectionStatus(wr) }}</AppBadge>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <AppButton v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))" size="sm" @click.prevent="openModal(wr)">Assign</AppButton>
+              <AppButton v-if="((wr.status === 'Pending GSU Approval' && hasRole('Administrator')) || (hasRole('GSU Head') && (wr.status === 'Pending GSU Approval' || (wr.status === 'Pending' && !wr.division_chief_id))))" size="sm" @click.prevent="openModal(wr)">Assign</AppButton>
               <AppButton v-if="hasRole('Administrator')" size="sm" @click.prevent="openModal(wr)">Edit</AppButton>
               <AppButton v-if="hasRole('Administrator')" size="sm" variant="danger" @click.prevent="destroy(wr)">Delete</AppButton>
               <AppButton v-if="canOpenInspection(wr)" size="sm" variant="warning" @click.prevent="openInspectionModal(wr)">Inspection</AppButton>
-              <AppButton v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" size="sm" variant="success" @click.prevent="openCompleteModal(wr)">Mark Completed</AppButton>
+              <AppButton v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Pending GSU Approval' && hasRole('GSU Head')))" size="sm" variant="success" @click.prevent="openCompleteModal(wr)">Mark Completed</AppButton>
               <AppButton v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" as="a" :href="`/work-requests/${wr.id}/print`" target="_blank" size="sm" variant="secondary">Print</AppButton>
               <AppButton v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" size="sm" variant="success" @click.prevent="openCsmModal(wr)">Confirm &amp; Rate</AppButton>
             </div>

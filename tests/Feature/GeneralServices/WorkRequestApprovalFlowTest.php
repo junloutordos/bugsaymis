@@ -41,7 +41,12 @@ class WorkRequestApprovalFlowTest extends TestCase
         $this->divisionChief->roles()->attach($this->rolePermission('facilities.dc-approve'));
 
         $gsuRole = Role::firstOrCreate(['name' => 'GSU Head']);
+        $gsuRole->permissions()->attach(Permission::firstOrCreate(
+            ['name' => 'facilities.create'],
+            ['module' => 'Facilities', 'description' => 'facilities.create'],
+        ));
         $this->gsuHead = User::factory()->create(['email' => 'gsu@crc.pshs.edu.ph', 'role_id' => (string) $gsuRole->id]);
+        $this->gsuHead->roles()->attach($gsuRole);
 
         $this->fadChief = User::factory()->create(['email' => 'fad@crc.pshs.edu.ph', 'position' => 'FAD Chief']);
         $this->fadChief->roles()->attach($this->rolePermission('facilities.fad-approve'));
@@ -87,7 +92,7 @@ class WorkRequestApprovalFlowTest extends TestCase
             ->post(route('work-requests.approve.inapp', $wr->id))
             ->assertRedirect();
 
-        $this->assertSame('Division Approved', $wr->fresh()->status);
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
 
         $this->actingAs($this->gsuHead)
             ->get(route('work-requests.gsu.approve', ['workRequest' => $wr->id, 'gsu' => $this->gsuHead->id]))
@@ -103,12 +108,12 @@ class WorkRequestApprovalFlowTest extends TestCase
         $this->actingAs($this->divisionChief)
             ->post(route('work-requests.approve.inapp', $wr->id));
 
-        $this->assertSame('Division Approved', $wr->fresh()->status);
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
 
         $fadUrl = URL::signedRoute('work-requests.fad.approve', ['workRequest' => $wr->id, 'chief' => $this->fadChief->id]);
         $this->actingAs($this->fadChief)->get($fadUrl)->assertOk();
 
-        $this->assertSame('Division Approved', $wr->fresh()->status, 'FAD Chief must not be able to approve before GSU Head.');
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status, 'FAD Chief must not be able to approve before GSU Head.');
     }
 
     public function test_full_division_chief_gsu_fad_approval_sequence(): void
@@ -117,7 +122,7 @@ class WorkRequestApprovalFlowTest extends TestCase
 
         $this->actingAs($this->divisionChief)
             ->post(route('work-requests.approve.inapp', $wr->id));
-        $this->assertSame('Division Approved', $wr->fresh()->status);
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
 
         $this->actingAs($this->gsuHead)
             ->get(route('work-requests.gsu.approve', ['workRequest' => $wr->id, 'gsu' => $this->gsuHead->id]));
@@ -126,6 +131,70 @@ class WorkRequestApprovalFlowTest extends TestCase
         $fadUrl = URL::signedRoute('work-requests.fad.approve', ['workRequest' => $wr->id, 'chief' => $this->fadChief->id]);
         $this->actingAs($this->fadChief)->get($fadUrl);
         $this->assertSame('FAD Approved', $wr->fresh()->status);
+    }
+
+    public function test_gsu_head_can_assign_staff_in_app_after_division_chief_approves(): void
+    {
+        $wr = $this->makeWorkRequest();
+        $staff = User::factory()->create(['position' => 'Skilled Worker']);
+
+        $this->actingAs($this->divisionChief)
+            ->post(route('work-requests.approve.inapp', $wr->id));
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
+
+        $this->actingAs($this->gsuHead)
+            ->put(route('work-requests.update', $wr->id), [
+                'issue' => $wr->issue,
+                'category' => 'Electrical',
+                'assigned_user_id' => $staff->id,
+            ])
+            ->assertRedirect(route('work-requests.index'));
+
+        $wr->refresh();
+        $this->assertSame($staff->id, $wr->assigned_user_id);
+        $this->assertSame('Pending FAD Approval', $wr->status);
+    }
+
+    public function test_gsu_head_cannot_assign_staff_before_division_chief_approves(): void
+    {
+        $wr = $this->makeWorkRequest();
+        $staff = User::factory()->create(['position' => 'Skilled Worker']);
+
+        $this->actingAs($this->gsuHead)
+            ->put(route('work-requests.update', $wr->id), [
+                'issue' => $wr->issue,
+                'category' => 'Electrical',
+                'assigned_user_id' => $staff->id,
+            ])
+            ->assertSessionHasErrors('assigned_user_id');
+
+        $this->assertNull($wr->fresh()->assigned_user_id);
+        $this->assertSame('Pending', $wr->fresh()->status);
+    }
+
+    public function test_gsu_head_can_assign_legacy_request_with_no_division_chief(): void
+    {
+        $legacyWr = WorkRequest::create([
+            'issue' => 'Leaky faucet',
+            'description' => 'Predates DC approval requirement',
+            'status' => 'Pending',
+            'requester_id' => $this->requester->id,
+            'division_chief_id' => null,
+            'requires_pre_repair_inspection' => false,
+        ]);
+        $staff = User::factory()->create(['position' => 'Skilled Worker']);
+
+        $this->actingAs($this->gsuHead)
+            ->put(route('work-requests.update', $legacyWr->id), [
+                'issue' => $legacyWr->issue,
+                'category' => 'Plumbing',
+                'assigned_user_id' => $staff->id,
+            ])
+            ->assertRedirect(route('work-requests.index'));
+
+        $legacyWr->refresh();
+        $this->assertSame($staff->id, $legacyWr->assigned_user_id);
+        $this->assertSame('Pending FAD Approval', $legacyWr->status);
     }
 
     private function makeWorkRequest(): WorkRequest
