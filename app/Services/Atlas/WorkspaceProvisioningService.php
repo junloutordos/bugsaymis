@@ -12,10 +12,15 @@ use Illuminate\Support\Str;
  * admitted student or newly hired employee, and writes the resulting
  * official email back to students.student_email / users.email.
  *
+ * Phase 3 — suspends/reactivates the Workspace account alongside an
+ * employee's Atlas status (offboarding). Students are deliberately left
+ * out — "withdrawn" vs "graduated" vs "on leave" carries different
+ * intent than an employee simply leaving, and wasn't scoped here.
+ *
  * Never blocks the caller's transaction: any Workspace API failure is
- * logged and returns null so enrollment/hiring still succeeds — the
- * record is just left without an official email, catchable later by the
- * Phase 1 review queue or a manual retry.
+ * logged and returns null/false so the Atlas-side change still succeeds —
+ * the account is just left as-is, catchable later by the Phase 1 review
+ * queue or a manual retry.
  */
 class WorkspaceProvisioningService
 {
@@ -75,6 +80,49 @@ class WorkspaceProvisioningService
         $employee->update(['email' => $result['email']]);
 
         return $result;
+    }
+
+    /**
+     * Suspend an employee's Workspace account (offboarding). Returns false
+     * (and logs) if the employee has no official-domain email on file yet,
+     * or the API call fails — either way, the Atlas-side status change is
+     * never blocked by this.
+     */
+    public function suspendEmployee(int $userId): bool
+    {
+        return $this->setEmployeeSuspension($userId, true);
+    }
+
+    /**
+     * Reactivate a previously suspended employee's Workspace account.
+     */
+    public function reactivateEmployee(int $userId): bool
+    {
+        return $this->setEmployeeSuspension($userId, false);
+    }
+
+    private function setEmployeeSuspension(int $userId, bool $suspended): bool
+    {
+        $employee = User::find($userId);
+
+        if (! $employee || ! str_ends_with(strtolower((string) $employee->email), '@'.self::DOMAIN)) {
+            return false;
+        }
+
+        try {
+            $this->directory->setSuspended($employee->email, $suspended);
+
+            return true;
+        } catch (\Throwable $e) {
+            logger()->error('WorkspaceProvisioningService: suspend/reactivate failed', [
+                'user_id' => $userId,
+                'email' => $employee->email,
+                'suspended' => $suspended,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /**

@@ -242,7 +242,7 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', $message);
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, WorkspaceProvisioningService $provisioning)
     {
         $user = User::findOrFail($id);
 
@@ -262,17 +262,31 @@ class UserController extends Controller
             'status'             => 'nullable|in:active,inactive',
         ]);
 
+        $previousStatus = $user->status;
         $user->update($data);
+
+        // Keep the Workspace account's lifecycle in sync when status is
+        // changed from this general edit form too, not just the dedicated
+        // destroy()/activate() actions below.
+        if (isset($data['status']) && $data['status'] !== $previousStatus) {
+            if ($data['status'] === 'inactive') {
+                $provisioning->suspendEmployee($user->id);
+            } else {
+                $provisioning->reactivateEmployee($user->id);
+            }
+        }
 
         return redirect()->route('users.index')->with('success', 'User updated successfully');
     }
 
-    public function destroy($id)
+    public function destroy($id, WorkspaceProvisioningService $provisioning)
     {
         $user = User::findOrFail($id);
         // soft-delete by setting status to inactive so record is preserved
         $user->status = 'inactive';
         $user->save();
+
+        $provisioning->suspendEmployee($user->id);
 
         return back()->with('success', 'User marked as inactive.');
     }
@@ -280,11 +294,13 @@ class UserController extends Controller
     /**
      * Reactivate a user previously marked inactive.
      */
-    public function activate($id)
+    public function activate($id, WorkspaceProvisioningService $provisioning)
     {
         $user = User::findOrFail($id);
         $user->status = 'active';
         $user->save();
+
+        $provisioning->reactivateEmployee($user->id);
 
         return back()->with('success', 'User reactivated.');
     }

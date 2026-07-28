@@ -162,4 +162,15 @@ class GoogleWorkspaceDirectoryService
 
         return $created->getPrimaryEmail();
     }
+
+    /**
+     * Suspend or reactivate a Workspace account (offboarding/rehire).
+     */
+    public function setSuspended(string $email, bool $suspended): void
+    {
+        $patch = new WorkspaceUser();
+        $patch->setSuspended($suspended);
+
+        $this->getDirectory()->users->update($email, $patch);
+    }
 }
