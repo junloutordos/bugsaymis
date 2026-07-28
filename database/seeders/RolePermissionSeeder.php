@@ -34,6 +34,7 @@ class RolePermissionSeeder extends Seeder
             'computer_labs.book', 'computer_labs.manage',
             'atlas.modules.view',
             'atlas.watchtower.view', 'atlas.watchtower.manage',
+            'atlas.workspace-sync.view', 'atlas.workspace-sync.manage',
             'facilities.view', 'facilities.manage',
             'vehicles.view', 'vehicles.manage',
             'documents.view',

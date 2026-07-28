@@ -89,6 +89,10 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Atlas',    'name' => 'atlas.watchtower.view',   'description' => 'View the Atlas WatchTower telemetry dashboard (requests, slow queries, jobs, exceptions)'],
             ['module' => 'Atlas',    'name' => 'atlas.watchtower.manage', 'description' => 'Manage Atlas WatchTower settings (sampling, thresholds, ignored routes)'],
 
+            // ── Atlas Workspace Sync (Google Workspace directory reconciliation) ─
+            ['module' => 'Atlas',    'name' => 'atlas.workspace-sync.view',   'description' => 'View proposed student/employee official-email corrections from the Google Workspace directory'],
+            ['module' => 'Atlas',    'name' => 'atlas.workspace-sync.manage', 'description' => 'Run Workspace directory scans and approve/reject proposed email corrections'],
+
             // ── Facilities & Services ─────────────────────────────────────────
             ['module' => 'Facilities','name' => 'facilities.view',       'description' => 'View facility requests'],
             ['module' => 'Facilities','name' => 'facilities.create',     'description' => 'Submit facility requests'],

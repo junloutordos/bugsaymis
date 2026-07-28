@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\Office;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
 use App\Services\PersonNameFormatter;
@@ -221,6 +222,20 @@ class FacultyLoadController extends Controller
         return [$sectionMap, $cidChief, $director];
     }
 
+    /**
+     * Print-only override: a Division Chief's office_id points at the
+     * division they administratively head (so Office::unitHeadUser
+     * resolves to themselves) — but the "Prepared & submitted by" signatory
+     * for their own teaching/advisory load should be the head of the unit
+     * their actual work falls under, not themselves. Keyed by user_id,
+     * value is the office_id whose unit head should sign instead.
+     * office_id itself is untouched; this only affects this print.
+     */
+    private const PRINT_AUH_OFFICE_OVERRIDE = [
+        9  => 3,  // Gumapac, Jasmine S. (SSD Chief) -> Social Science Unit (Salang, Keith R.)
+        25 => 42, // Fernando, Michelle B. (CID Chief) -> Research Unit (Alerta, Gilbert)
+    ];
+
     private function mapLoadForPrint(FacultyLoad $l, array $sectionMap, ?User $cidChief, ?User $director): array
     {
         $assignments = $l->assignments->map(function ($a) use ($sectionMap) {
@@ -239,9 +254,13 @@ class FacultyLoadController extends Controller
             ];
         })->values();
 
-        // Resolve AUH from the faculty member's office (Office/Unit under CID Division)
-        $office           = $l->faculty?->office;
-        $academicUnitName = $office?->name;
+        // Resolve AUH from the faculty member's office (Office/Unit under CID Division),
+        // unless a print-only override applies (see PRINT_AUH_OFFICE_OVERRIDE).
+        $overrideOfficeId = self::PRINT_AUH_OFFICE_OVERRIDE[$l->faculty?->id] ?? null;
+        $office           = $overrideOfficeId
+            ? Office::with('unitHeadUser.pds.personalInfo')->find($overrideOfficeId)
+            : $l->faculty?->office;
+        $academicUnitName = $overrideOfficeId ? $l->faculty?->office?->name : $office?->name;
         $auh = $office?->unitHeadUser ? [
             'name'     => $this->names->formal($office->unitHeadUser),
             'position' => $office->unitHeadUser->position ?? 'Academic Unit Head',

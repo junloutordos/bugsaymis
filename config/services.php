@@ -53,6 +53,15 @@ return [
         'ict_backup_folder_id' => env('GOOGLE_DRIVE_ICT_BACKUP_FOLDER_ID', env('GOOGLE_DRIVE_FOLDER_ID')),
     ],
 
+    // Google Workspace Admin SDK (Directory API) — domain-wide delegation
+    // service account, impersonates an admin mailbox to manage/read the
+    // @crc.pshs.edu.ph directory (students + employees).
+    'google_workspace' => [
+        'credentials'      => env('GOOGLE_WORKSPACE_CREDENTIALS'),
+        'admin_email'      => env('GOOGLE_WORKSPACE_ADMIN_EMAIL'),
+        'domain'           => env('GOOGLE_WORKSPACE_DOMAIN', 'crc.pshs.edu.ph'),
+    ],
+
     'firebase' => [
         // Absolute path to the Firebase service-account JSON file.
         // Used for FCM push notifications to parent mobile devices.

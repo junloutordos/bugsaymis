@@ -2560,6 +2560,24 @@ Route::middleware(['auth', 'permission:atlas.watchtower.view'])
             ->name('user-activity');
     });
 
+// ── Atlas Workspace Sync (Google Workspace directory reconciliation) ──────────
+Route::middleware(['auth', 'permission:atlas.workspace-sync.view'])
+    ->prefix('atlas/workspace-sync')
+    ->name('atlas.workspace-sync.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Atlas\WorkspaceSyncController::class, 'index'])
+            ->name('index');
+
+        Route::middleware('permission:atlas.workspace-sync.manage')->group(function () {
+            Route::post('/scan', [\App\Http\Controllers\Atlas\WorkspaceSyncController::class, 'runScan'])
+                ->name('scan');
+            Route::post('/{proposal}/approve', [\App\Http\Controllers\Atlas\WorkspaceSyncController::class, 'approve'])
+                ->name('approve');
+            Route::post('/{proposal}/reject', [\App\Http\Controllers\Atlas\WorkspaceSyncController::class, 'reject'])
+                ->name('reject');
+        });
+    });
+
 // ── Error Reports ─────────────────────────────────────────────────────────────
 Route::middleware('auth')->prefix('error-reports')->name('error-reports.')->group(function () {
     Route::post('/',              [\App\Http\Controllers\ErrorReportController::class, 'store'])      ->name('store');

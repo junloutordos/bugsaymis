@@ -17,6 +17,7 @@ import {
   UserGroupIcon,
   ChartBarIcon,
   CloudArrowUpIcon,
+  ArrowPathIcon,
   ServerStackIcon,
   QueueListIcon,
   ComputerDesktopIcon,
@@ -280,6 +281,13 @@ export const menuItems = [
         href: route("atlas.watchtower.index"),
         icon: LighthouseIcon,
         permissions: ["atlas.watchtower.view"],
+      },
+      {
+        label: "Workspace Sync",
+        routeName: "atlas.workspace-sync.index",
+        href: route("atlas.workspace-sync.index"),
+        icon: ArrowPathIcon,
+        permissions: ["atlas.workspace-sync.view"],
       },
       {
         label: "PMS",

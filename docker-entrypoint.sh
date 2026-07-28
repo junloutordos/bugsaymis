@@ -28,6 +28,20 @@ if [ -n "$GOOGLE_JSON" ]; then
     chown www-data:www-data /var/www/google-credentials.json
 fi
 
+# ── Secrets Manager: fetch Google Workspace Admin (Directory API) credentials ─
+# Service account with domain-wide delegation, impersonates portal@crc.pshs.edu.ph.
+GOOGLE_WORKSPACE_JSON=$(aws secretsmanager get-secret-value \
+  --secret-id crcmis/google-workspace-admin-credentials \
+  --region ap-southeast-1 \
+  --query SecretString \
+  --output text 2>/dev/null || echo "")
+
+if [ -n "$GOOGLE_WORKSPACE_JSON" ]; then
+    echo "$GOOGLE_WORKSPACE_JSON" > /var/www/google-workspace-credentials.json
+    chmod 600 /var/www/google-workspace-credentials.json
+    chown www-data:www-data /var/www/google-workspace-credentials.json
+fi
+
 # ── Export env vars for cron (restricted to non-secret vars) ──────────────────
 # Exclude secrets — DB_PASSWORD, APP_KEY, SOKETI secret are injected by ECS
 # at runtime and available to processes; cron reads /etc/environment on start.
