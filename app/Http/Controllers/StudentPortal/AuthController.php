@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use App\Services\StudentAttendance\StudentGoogleLinkGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -115,6 +116,12 @@ class AuthController extends Controller
             ]);
         }
 
+        $mismatch = StudentGoogleLinkGuard::checkMismatch($student, $googleEmail);
+
+        if ($mismatch) {
+            return back()->withErrors(['pisaysystemID' => $mismatch]);
+        }
+
         // Prevent one pisaysystemID from being linked to multiple Google accounts
         $existingLink = DB::table('student_google_links')
             ->where('pisaysystemID', $pisayID)
@@ -131,6 +138,8 @@ class AuthController extends Controller
             ['google_email' => $googleEmail],
             ['pisaysystemID' => $pisayID, 'linked_at' => now()]
         );
+
+        StudentGoogleLinkGuard::backfillEmailIfBlank($student, $googleEmail);
 
         session()->forget(['student_portal_google_email', 'student_portal_google_name']);
 

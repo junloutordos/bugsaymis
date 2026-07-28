@@ -27,6 +27,17 @@ class RegisterController extends Controller
             'password_confirmation' => ['required'],
         ]);
 
+        $belongsToStudent = DB::table('students')
+            ->whereRaw('LOWER(TRIM(student_email)) = ?', [strtolower(trim($validated['email']))])
+            ->exists();
+
+        if ($belongsToStudent) {
+            return response()->json([
+                'message' => 'This email is registered as a student account. Please use the Student sign-in option instead.',
+                'errors'  => ['email' => ['This email is registered as a student account.']],
+            ], 422);
+        }
+
         $parentRole = Role::where('name', 'Parent')->firstOrFail();
 
         $user = User::create([
