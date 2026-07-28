@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\StudentMobileLink;
 use App\Models\User;
+use App\Services\StudentAttendance\StudentGoogleLinkGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +106,12 @@ class GoogleAuthController extends Controller
             ], 422);
         }
 
+        $mismatch = StudentGoogleLinkGuard::checkMismatch($student, $email);
+
+        if ($mismatch) {
+            return response()->json(['message' => $mismatch], 422);
+        }
+
         // One PISAY ID per Google account (matches the web portal rule)
         $takenByOther = DB::table('student_google_links')
             ->where('pisaysystemID', $pisayID)
@@ -121,6 +128,8 @@ class GoogleAuthController extends Controller
             ['google_email' => $email],
             ['pisaysystemID' => $pisayID, 'linked_at' => now()]
         );
+
+        StudentGoogleLinkGuard::backfillEmailIfBlank($student, $email);
 
         return $this->issueStudentSession($student, $email, $payload['name'] ?? $email, $validated['device_name']);
     }
