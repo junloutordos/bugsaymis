@@ -104,13 +104,18 @@ const isLocked   = computed(() => currentQuarterData.value?.is_locked ?? false)
 const isReadOnly = computed(() => !props.isCurrentSY || props.isMonitorView)
 
 // Sub-tab bar (Setup / Scores / Attendance / ILA / Live Quiz)
-const subTabs = [
+// ILA only applies to subjects that reserve an Independent Learning Period.
+const subTabs = computed(() => [
   { key: 'setup',       label: 'Setup',              icon: Cog6ToothIcon },
   { key: 'scores',      label: 'Scores & Grades',    icon: ChartBarIcon },
   { key: 'attendance',  label: 'Attendance',          icon: ClipboardDocumentListIcon },
-  { key: 'ila',         label: 'ILA',                 icon: BoltIcon },
+  ...(props.classRecord.subject?.has_ilp ? [{ key: 'ila', label: 'ILA', icon: BoltIcon }] : []),
   { key: 'quiz',        label: 'Live Quiz',           icon: PlayCircleIcon },
-]
+])
+
+watch(subTabs, (tabs) => {
+  if (!tabs.some(t => t.key === activeSubTab.value)) activeSubTab.value = 'setup'
+})
 
 // ── Assessment setup ──────────────────────────────────────────────────────────
 // Build editable assessment rows from the grading option categories
