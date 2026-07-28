@@ -8,6 +8,7 @@ use App\Mail\EnrollmentApplicationReceivedMail;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\EnrollmentApplication;
 use App\Models\Registrar\StudentEnrollment;
+use App\Services\Atlas\WorkspaceProvisioningService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -172,7 +173,7 @@ class EnrollmentApplicationController extends Controller
 
     // ── Registrar: approve ────────────────────────────────────────────────────
 
-    public function approve(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
+    public function approve(Request $request, EnrollmentApplication $enrollmentApplication, WorkspaceProvisioningService $provisioning): RedirectResponse
     {
         $this->authorize('students.enrollment.manage');
 
@@ -187,8 +188,9 @@ class EnrollmentApplicationController extends Controller
         abort_if($exists, 422, 'PISAY ID ' . $data['pisays_id'] . ' is already assigned to another student.');
 
         $currentSyId = SchoolYear::where('is_current', true)->value('id');
+        $newStudentId = null;
 
-        DB::transaction(function () use ($enrollmentApplication, $data, $currentSyId) {
+        DB::transaction(function () use ($enrollmentApplication, $data, $currentSyId, &$newStudentId) {
             // Determine batch year: grade 7 in SY 2026-2027 → graduates 2032
             // Formula: batch = school_year_start + (12 - grade_level) + 1
             // For grade 7, SY 2026-2027 start=2026: batch = 2026 + 5 + 1 = 2032
@@ -282,7 +284,15 @@ class EnrollmentApplicationController extends Controller
                 'reviewed_by'       => Auth::id(),
                 'reviewed_at'       => now(),
             ]);
+
+            $newStudentId = $studentId;
         });
+
+        // Provision the official Google Workspace account outside the DB
+        // transaction (external API call). Never blocks enrollment — if this
+        // fails, the student is simply picked up later by the Workspace Sync
+        // review queue instead.
+        $provisioned = $provisioning->provisionStudent($newStudentId);
 
         // Send decision email
         if ($enrollmentApplication->email) {
@@ -298,7 +308,13 @@ class EnrollmentApplicationController extends Controller
             }
         }
 
-        return back()->with('success', "Application {$enrollmentApplication->reference_no} approved.");
+        $message = "Application {$enrollmentApplication->reference_no} approved.";
+
+        if ($provisioned) {
+            $message .= " Google account created: {$provisioned['email']} — temporary password: {$provisioned['temp_password']} (shown once, share with the student directly, not by email).";
+        }
+
+        return back()->with('success', $message);
     }
 
     // ── Registrar: reject ─────────────────────────────────────────────────────

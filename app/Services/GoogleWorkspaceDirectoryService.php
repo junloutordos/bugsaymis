@@ -5,6 +5,8 @@ namespace App\Services;
 use Google\Client;
 use Google\Service\Directory;
 use Google\Service\Directory\User as WorkspaceUser;
+use Google\Service\Directory\UserName as WorkspaceUserName;
+use Google\Service\Exception as GoogleServiceException;
 
 /**
  * Google Workspace Admin SDK (Directory API) — reads/manages the
@@ -113,5 +115,51 @@ class GoogleWorkspaceDirectoryService
         } while ($pageToken && count($users) < $limit);
 
         return $users;
+    }
+
+    /**
+     * Whether a Workspace account already exists for this address.
+     */
+    public function emailExists(string $email): bool
+    {
+        try {
+            $this->getDirectory()->users->get($email);
+
+            return true;
+        } catch (GoogleServiceException $e) {
+            if ($e->getCode() === 404) {
+                return false;
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Create a new Workspace account. Returns the primary email on success.
+     * Caller is responsible for checking emailExists() first to pick a free
+     * address — this does not itself resolve collisions.
+     */
+    public function createUser(
+        string $email,
+        string $givenName,
+        string $familyName,
+        string $password,
+        string $orgUnitPath,
+    ): string {
+        $name = new WorkspaceUserName();
+        $name->setGivenName($givenName);
+        $name->setFamilyName($familyName);
+
+        $user = new WorkspaceUser();
+        $user->setPrimaryEmail($email);
+        $user->setName($name);
+        $user->setPassword($password);
+        $user->setChangePasswordAtNextLogin(true);
+        $user->setOrgUnitPath($orgUnitPath);
+
+        $created = $this->getDirectory()->users->insert($user);
+
+        return $created->getPrimaryEmail();
     }
 }
