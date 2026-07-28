@@ -66,8 +66,12 @@
     /* Blank space for the wet signature, with the sign-line as its
        border-bottom — sits ABOVE the printed name, not under it. */
     .wat-signature-line { height: 11mm; border-bottom: 1px solid #0f172a; }
+    /* No text-transform: uppercase here — PersonNameFormatter::assemble()
+       already uppercases the base name in PHP; forcing it in CSS would also
+       uppercase any pre-/post-nominal title, which must keep its original
+       casing (e.g. "Dr." not "DR."). */
     .wat-signatory-name {
-      font-size: 8.5pt; font-weight: bold; letter-spacing: 0.3px; text-transform: uppercase;
+      font-size: 8.5pt; font-weight: bold; letter-spacing: 0.3px;
       margin-top: 2px;
     }
     .wat-signatory-position { font-size: 7pt; color: #475569; margin-top: 3px; }
@@ -135,19 +139,19 @@
     <tr>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Consolidated by:</div>
-        <div class="wat-signature-line"></div>
+        <div class="wat-signature-line">&nbsp;</div>
         <div class="wat-signatory-name"><b>{{ $coordinatorName ?? '' }}</b></div>
         <div class="wat-signatory-position">Homeroom Coordinator</div>
       </td>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Reviewed by:</div>
-        <div class="wat-signature-line"></div>
+        <div class="wat-signature-line">&nbsp;</div>
         <div class="wat-signatory-name"><b>{{ $acidaaName ?? '' }}</b></div>
         <div class="wat-signatory-position">Assistant CID Chief for Academic Affairs</div>
       </td>
       <td class="wat-signatory">
         <div class="wat-signatory-caption">Approved by:</div>
-        <div class="wat-signature-line"></div>
+        <div class="wat-signature-line">&nbsp;</div>
         <div class="wat-signatory-name"><b>{{ $cidChiefName ?? '' }}</b></div>
         <div class="wat-signatory-position">CID Chief</div>
       </td>
