@@ -13,14 +13,17 @@ use Illuminate\Console\Command;
 class GenerateIlaDates extends Command
 {
     protected $signature = 'class-record:generate-ila-dates
-                            {--date= : Target date (Y-m-d). Defaults to today.}';
+                            {--date= : Generate for a single target date (Y-m-d) instead of the rolling window.}
+                            {--days=10 : When no --date is given, how many days ahead (inclusive of today) to generate.}';
 
-    protected $description = 'Auto-create an ILA date entry for every class record whose subject has a scheduled ILP period today.';
+    protected $description = 'Auto-create ILA date entries for every class record whose subject has a scheduled ILP period, generated ahead of time so the graded/non-graded decision can be locked in by the WAT plotting deadline (12:00 NN the Friday before).';
 
     public function handle(): int
     {
-        $date = $this->option('date') ? Carbon::parse($this->option('date')) : Carbon::today();
-        $dayOfWeek = $date->format('l'); // "Monday", "Tuesday", …
+        $dates = $this->option('date')
+            ? collect([Carbon::parse($this->option('date'))])
+            : collect(range(0, max(0, (int) $this->option('days') - 1)))
+                ->map(fn ($offset) => Carbon::today()->addDays($offset));
 
         $term = AcademicTerm::where('is_current', true)->first();
         if (! $term) {
@@ -28,6 +31,25 @@ class GenerateIlaDates extends Command
 
             return self::SUCCESS;
         }
+
+        $totalCreated = 0;
+        $totalSkipped = 0;
+
+        foreach ($dates as $date) {
+            [$created, $skipped] = $this->generateForDate($date, $term);
+            $totalCreated += $created;
+            $totalSkipped += $skipped;
+        }
+
+        $this->info("ILA dates generated across {$dates->count()} day(s): {$totalCreated} class record(s) processed, {$totalSkipped} skipped (no class record yet or ambiguous active quarter).");
+
+        return self::SUCCESS;
+    }
+
+    /** @return array{0: int, 1: int} [created, skipped] */
+    private function generateForDate(Carbon $date, AcademicTerm $term): array
+    {
+        $dayOfWeek = $date->format('l'); // "Monday", "Tuesday", …
 
         $schedules = ClassSchedule::ilp()
             ->occupying()
@@ -68,9 +90,7 @@ class GenerateIlaDates extends Command
             $created++;
         }
 
-        $this->info("ILA dates for {$date->toDateString()} ({$dayOfWeek}): {$created} class record(s) processed, {$skipped} skipped (no class record yet or ambiguous active quarter).");
-
-        return self::SUCCESS;
+        return [$created, $skipped];
     }
 
     /**

@@ -5,13 +5,14 @@ import Swal from 'sweetalert2'
 import AppButton from '@/Components/AppButton.vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import { confirmDelete } from '@/Composables/useConfirm.js'
-import { PlusIcon, XMarkIcon, BoltIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, XMarkIcon, BoltIcon, AcademicCapIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecordId: { type: Number, required: true },
   quarterNumber: { type: Number, required: true },
   quarterData:   { type: Object, default: null },
   isLocked:      { type: Boolean, default: false },
+  leafCategories: { type: Array, default: () => [] },
 })
 
 // ── Status vocabulary ────────────────────────────────────────────────────────
@@ -158,6 +159,79 @@ function formatDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
 }
 
+// ── Grading ──────────────────────────────────────────────────────────────────
+// Deciding to grade an ILA date is the same decision as plotting any other
+// WAT assessment — it must be locked in no later than 12:00 NN of the Friday
+// before its week. The server enforces the deadline and the daily/weekly
+// caps; this just surfaces whatever message it returns.
+
+async function gradeDate(dateObj) {
+  if (!props.leafCategories.length) {
+    Swal.fire('No grading category available', "This quarter's grading option has no category configured yet — ask an admin to add one before grading ILA sessions.", 'warning')
+    return
+  }
+
+  const categoryOptions = props.leafCategories
+    .map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+
+  const { value: formValues } = await Swal.fire({
+    title: `Grade ILA — ${formatDate(dateObj.date)}`,
+    html: `
+      <div class="text-left text-sm space-y-1">
+        <label class="block text-xs font-semibold text-slate-500 mt-1">Grading Category</label>
+        <select id="ila-grade-category" class="swal2-select" style="width:100%;margin:0">${categoryOptions}</select>
+        <label class="block text-xs font-semibold text-slate-500 mt-2">Title</label>
+        <input id="ila-grade-title" class="swal2-input" style="width:100%;margin:0" value="Independent Learning Activity — ${formatDate(dateObj.date)}" />
+        <label class="block text-xs font-semibold text-slate-500 mt-2">Max Score</label>
+        <input id="ila-grade-max" type="number" min="1" step="0.01" class="swal2-input" style="width:100%;margin:0" value="100" />
+      </div>
+    `,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Grade this ILA',
+    preConfirm: () => {
+      const grading_category_id = document.getElementById('ila-grade-category').value
+      const title     = document.getElementById('ila-grade-title').value.trim()
+      const max_score  = document.getElementById('ila-grade-max').value
+      if (!grading_category_id || !title || !max_score || Number(max_score) <= 0) {
+        Swal.showValidationMessage('All fields are required.')
+        return false
+      }
+      return { grading_category_id: Number(grading_category_id), title, max_score: Number(max_score) }
+    },
+  })
+  if (!formValues) return
+
+  try {
+    await axios.post(
+      route('class-records.ila.grade-date', { classRecord: props.classRecordId, q: props.quarterNumber, ilaDate: dateObj.id }),
+      formValues
+    )
+    dateObj.is_graded = true
+    await Swal.fire({
+      icon: 'success', title: 'ILA graded!',
+      text: 'Scores were seeded from the compliance marks already recorded — adjust individual scores in the Weekly Assessment Tracker if needed.',
+      timer: 2600, showConfirmButton: false,
+    })
+  } catch (err) {
+    Swal.fire('Cannot grade this ILA date', err.response?.data?.message ?? 'Failed to grade this ILA date.', 'error')
+  }
+}
+
+async function ungradeDate(dateObj) {
+  const confirmed = await confirmDelete(`Revert ${formatDate(dateObj.date)} to non-graded? Any scores entered for it will be removed.`)
+  if (!confirmed) return
+
+  try {
+    await axios.delete(
+      route('class-records.ila.ungrade-date', { classRecord: props.classRecordId, q: props.quarterNumber, ilaDate: dateObj.id })
+    )
+    dateObj.is_graded = false
+  } catch (err) {
+    Swal.fire('Cannot un-grade this ILA date', err.response?.data?.message ?? 'Failed to un-grade this ILA date.', 'error')
+  }
+}
+
 // ── Totals ───────────────────────────────────────────────────────────────────
 
 function studentTotals(studentId) {
@@ -182,7 +256,8 @@ function studentTotals(studentId) {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <p class="text-xs text-slate-500">
         Dates marked <BoltIcon class="h-3 w-3 inline text-indigo-400" /> are auto-created from the class schedule's ILP period ·
-        click a cell to cycle unmarked → <span class="font-semibold">C</span>ompliant → <span class="font-semibold">N</span>on-<span class="font-semibold">C</span>ompliant
+        click a cell to cycle unmarked → <span class="font-semibold">C</span>ompliant → <span class="font-semibold">N</span>on-<span class="font-semibold">C</span>ompliant ·
+        hover a date and click <AcademicCapIcon class="h-3 w-3 inline text-indigo-400" /> to grade it (must be decided by 12:00 NN the Friday before its week)
       </p>
       <div class="flex items-center gap-2 shrink-0">
         <template v-if="!isLocked">
@@ -226,7 +301,18 @@ function studentTotals(studentId) {
               <div class="flex items-center justify-center gap-1">
                 <BoltIcon v-if="d.is_auto_generated" class="h-3 w-3 text-indigo-400 shrink-0" />
                 <span>{{ formatDate(d.date) }}</span>
-                <button v-if="!isLocked" @click="removeDate(d)"
+                <span v-if="d.is_graded" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 rounded px-1 shrink-0" title="Scored in the Weekly Assessment Tracker">Graded</span>
+                <button v-if="!isLocked && !d.is_graded" @click="gradeDate(d)"
+                  class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 transition-all"
+                  title="Grade this ILA (locks in like any WAT assessment — no later than 12:00 NN the Friday before its week)">
+                  <AcademicCapIcon class="h-3 w-3" />
+                </button>
+                <button v-if="!isLocked && d.is_graded" @click="ungradeDate(d)"
+                  class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-amber-50 text-slate-300 hover:text-amber-500 transition-all"
+                  title="Revert to non-graded (only before the plotting deadline)">
+                  <ArrowUturnLeftIcon class="h-3 w-3" />
+                </button>
+                <button v-if="!isLocked && !d.is_graded" @click="removeDate(d)"
                   class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-all"
                   title="Remove this date">
                   <XMarkIcon class="h-3 w-3" />
