@@ -3,6 +3,7 @@
 use App\Http\Controllers\HomeroomAttendance\ActivityAttendanceController;
 use App\Http\Controllers\HomeroomAttendance\AdmissionSlipController;
 use App\Http\Controllers\HomeroomAttendance\DailyAttendanceController;
+use App\Http\Controllers\HomeroomAttendance\FlagAttendanceController;
 use App\Http\Controllers\HomeroomAttendance\MonthlyReportController;
 use App\Http\Controllers\HomeroomAttendance\SettingsController;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,10 @@ Route::middleware(['auth', 'permission:homeroom-attendance.log'])
         Route::get('/activities', [ActivityAttendanceController::class, 'index'])->name('activities.index');
         Route::get('/activities/create', [ActivityAttendanceController::class, 'create'])->name('activities.create');
         Route::post('/activities', [ActivityAttendanceController::class, 'store'])->name('activities.store');
+
+        Route::get('/flag', [FlagAttendanceController::class, 'index'])->name('flag.index');
+        Route::post('/flag', [FlagAttendanceController::class, 'store'])->name('flag.store');
+        Route::get('/flag/{date}/print', [FlagAttendanceController::class, 'print'])->name('flag.print');
 
         Route::get('/monthly-report', [MonthlyReportController::class, 'show'])->name('monthly-report.show');
         Route::post('/monthly-report/generate', [MonthlyReportController::class, 'generate'])->name('monthly-report.generate');
