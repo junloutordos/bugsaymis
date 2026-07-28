@@ -17,6 +17,7 @@ const video = ref(null)
 const scannerState = ref('stopped') // stopped | starting | scanning | submitting | result
 const scannerInputMode = ref(null) // null | camera | hardware
 const cameraError = ref('')
+const cameraFacing = ref('environment') // environment (rear) | user (front)
 const online = ref(navigator.onLine)
 const lastScan = ref(null)
 const scanStatus = ref('')
@@ -70,6 +71,33 @@ function pairDevice() {
   pairForm.post(route('student-attendance.devices.pair'), { preserveScroll: true })
 }
 
+function cameraErrorMessage(error) {
+  if (error?.name === 'NotAllowedError') return 'Camera access was denied. Allow camera access for this site in your browser settings.'
+  if (error?.name === 'NotFoundError') return 'No camera was found on this device.'
+  return 'The camera could not start. Check the connection and camera permission, then try again.'
+}
+
+async function startCameraStream() {
+  scannerControls = await reader.decodeFromConstraints({
+    audio: false,
+    video: {
+      facingMode: { ideal: cameraFacing.value },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+  }, video.value, (result) => {
+    if (!result || scannerState.value !== 'scanning') return
+    const barcode = result.getText()?.trim()
+    if (!barcode) return
+
+    const detectedAt = Date.now()
+    if (barcode === lastDetectedBarcode && detectedAt - lastDetectedAt < 5000) return
+    lastDetectedBarcode = barcode
+    lastDetectedAt = detectedAt
+    submitScan(barcode)
+  })
+}
+
 async function startScanner() {
   if (!props.device || !activeOperator.value || scannerState.value === 'starting' || scannerState.value === 'scanning') return
 
@@ -82,24 +110,7 @@ async function startScanner() {
     const BrowserAudioContext = window.AudioContext || window.webkitAudioContext
     if (BrowserAudioContext) audioContext ??= new BrowserAudioContext()
 
-    scannerControls = await reader.decodeFromConstraints({
-      audio: false,
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-    }, video.value, (result) => {
-      if (!result || scannerState.value !== 'scanning') return
-      const barcode = result.getText()?.trim()
-      if (!barcode) return
-
-      const detectedAt = Date.now()
-      if (barcode === lastDetectedBarcode && detectedAt - lastDetectedAt < 5000) return
-      lastDetectedBarcode = barcode
-      lastDetectedAt = detectedAt
-      submitScan(barcode)
-    })
+    await startCameraStream()
 
     scannerState.value = 'scanning'
   } catch (error) {
@@ -109,13 +120,34 @@ async function startScanner() {
       return
     }
 
-    if (error?.name === 'NotAllowedError') {
-      cameraError.value = 'Camera access was denied. Allow camera access for this site in your browser settings.'
-    } else if (error?.name === 'NotFoundError') {
-      cameraError.value = 'No camera was found on this device.'
-    } else {
-      cameraError.value = 'The camera could not start. Check the connection and camera permission, then try again.'
+    cameraError.value = cameraErrorMessage(error)
+  }
+}
+
+async function switchCamera() {
+  if (scannerInputMode.value !== 'camera' || scannerState.value === 'starting') return
+
+  const previousFacing = cameraFacing.value
+  cameraFacing.value = previousFacing === 'environment' ? 'user' : 'environment'
+  cameraError.value = ''
+
+  scannerControls?.stop()
+  scannerControls = null
+  if (video.value?.srcObject) {
+    video.value.srcObject.getTracks().forEach(track => track.stop())
+    video.value.srcObject = null
+  }
+
+  try {
+    await startCameraStream()
+  } catch (error) {
+    cameraFacing.value = previousFacing
+    try {
+      await startCameraStream()
+    } catch {
+      stopScanner()
     }
+    cameraError.value = cameraErrorMessage(error)
   }
 }
 
@@ -130,6 +162,7 @@ function stopScanner() {
   hardwareBarcodeBuffer = ''
   scannerInputMode.value = null
   scannerState.value = 'stopped'
+  cameraFacing.value = 'environment'
 }
 
 function startHardwareScanner() {
@@ -815,7 +848,23 @@ onUnmounted(() => {
     </main>
 
     <main v-else class="scanner-stage">
-      <video v-show="scannerInputMode === 'camera'" ref="video" class="camera-preview" playsinline muted />
+      <video
+        v-show="scannerInputMode === 'camera'"
+        ref="video"
+        class="camera-preview"
+        :class="{ 'camera-preview-mirrored': cameraFacing === 'user' }"
+        playsinline
+        muted
+      />
+
+      <button
+        v-if="scannerState === 'scanning' && scannerInputMode === 'camera'"
+        type="button"
+        class="switch-camera-button"
+        @click="switchCamera"
+      >
+        {{ cameraFacing === 'environment' ? 'Use Front Camera' : 'Use Back Camera' }}
+      </button>
       <div class="camera-shade" />
 
       <div v-if="scannerState === 'scanning' && scannerInputMode === 'camera'" class="scan-guide-wrap">
@@ -998,6 +1047,9 @@ onUnmounted(() => {
 .manual-entry button { background: #4f46e5; padding: .65rem 1rem; font-weight: 700; }
 .change-scanner-button { position: absolute; z-index: 8; bottom: 1rem; left: 1rem; border: 1px solid #64748b; border-radius: .75rem; background: rgba(15,23,42,.9); padding: .65rem 1rem; color: #e2e8f0; font-size: .85rem; font-weight: 700; }
 .change-scanner-button:hover { background: #334155; }
+.switch-camera-button { position: absolute; z-index: 8; top: 1rem; right: 1rem; border: 1px solid #64748b; border-radius: .75rem; background: rgba(15,23,42,.9); padding: .65rem 1rem; color: #e2e8f0; font-size: .85rem; font-weight: 700; }
+.switch-camera-button:hover { background: #334155; }
+.camera-preview-mirrored { transform: scaleX(-1); }
 @media (max-width: 640px) {
   .kiosk-header { padding: .75rem; }
   .student-card { flex-direction: column; gap: 1rem; padding: 1rem; }
