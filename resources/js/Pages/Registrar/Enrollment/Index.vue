@@ -17,6 +17,7 @@ import {
   UserPlusIcon,
   MagnifyingGlassIcon,
   ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
   XMarkIcon,
   CheckCircleIcon,
   UserGroupIcon,
@@ -301,6 +302,71 @@ function submitBulk() {
   })
 }
 
+// ── Export enrollment data ────────────────────────────────────────────────────
+const showExportModal  = ref(false)
+const exportScope       = ref('all')
+const exportGradeLevel  = ref(props.gradeLevels?.[0] ?? 7)
+const exportSectionId   = ref(null)
+const exportStudentQuery   = ref('')
+const exportStudentResults = ref([])
+const exportSelectedStudent = ref(null)
+const exportSearching = ref(false)
+let exportSearchTimeout = null
+
+const exportSections = computed(() => props.sections)
+
+function openExportModal() {
+  showExportModal.value        = true
+  exportScope.value            = 'all'
+  exportGradeLevel.value       = activeGrade.value
+  exportSectionId.value        = selectedSection.value?.id ?? null
+  exportStudentQuery.value     = ''
+  exportStudentResults.value   = []
+  exportSelectedStudent.value  = null
+}
+
+watch(exportStudentQuery, (q) => {
+  clearTimeout(exportSearchTimeout)
+  if (q.length < 2) { exportStudentResults.value = []; return }
+  exportSearchTimeout = setTimeout(async () => {
+    exportSearching.value = true
+    try {
+      const { data } = await axios.get(route('registrar.enrollment.search'), {
+        params: { q, school_year_id: schoolYearId.value },
+      })
+      exportStudentResults.value = data
+    } finally {
+      exportSearching.value = false
+    }
+  }, 300)
+})
+
+function selectExportStudent(student) {
+  exportSelectedStudent.value = student
+  exportStudentQuery.value    = student.full_name
+  exportStudentResults.value  = []
+}
+
+const canSubmitExport = computed(() => {
+  if (exportScope.value === 'grade') return !!exportGradeLevel.value
+  if (exportScope.value === 'section') return !!exportSectionId.value
+  if (exportScope.value === 'student') return !!exportSelectedStudent.value
+  return true
+})
+
+function submitExport() {
+  const params = {
+    school_year_id: schoolYearId.value,
+    scope: exportScope.value,
+  }
+  if (exportScope.value === 'grade') params.grade_level = exportGradeLevel.value
+  if (exportScope.value === 'section') params.section_id = exportSectionId.value
+  if (exportScope.value === 'student') params.student_id = exportSelectedStudent.value.id
+
+  window.location.href = route('registrar.enrollment.export', params)
+  showExportModal.value = false
+}
+
 // ── Update enrollment status ──────────────────────────────────────────────────
 const editingEnrollment = ref(null)
 const statusForm = useForm({ status: '', notes: '', section_id: null })
@@ -463,6 +529,10 @@ function clearanceLabel(status) {
           <AppButton size="sm" variant="secondary" @click="openBulkModal">
             <ArrowUpTrayIcon class="w-4 h-4" />
             Bulk Import
+          </AppButton>
+          <AppButton size="sm" variant="secondary" @click="openExportModal">
+            <ArrowDownTrayIcon class="w-4 h-4" />
+            Export
           </AppButton>
         </div>
       </div>
@@ -859,6 +929,102 @@ function clearanceLabel(status) {
           :loading="bulkForm.processing"
           @click="submitBulk"
         >{{ bulkForm.processing ? 'Enrolling…' : `Enroll ${bulkParsed.length} Students` }}</AppButton>
+      </template>
+    </AppModal>
+
+    <!-- ── Export enrollment data modal ───────────────────────────────────────── -->
+    <AppModal
+      :show="showExportModal"
+      title="Export Enrollment Data"
+      subtitle="Generates the DepEd enrollment data file for the selected school year. Fields we don't track are left blank."
+      size="md"
+      @close="showExportModal = false"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Scope</label>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="radio" v-model="exportScope" value="all" class="text-indigo-600 focus:ring-indigo-500" />
+              All Grade Levels
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="radio" v-model="exportScope" value="grade" class="text-indigo-600 focus:ring-indigo-500" />
+              Selected Grade Level
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="radio" v-model="exportScope" value="section" class="text-indigo-600 focus:ring-indigo-500" />
+              Specific Section
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="radio" v-model="exportScope" value="student" class="text-indigo-600 focus:ring-indigo-500" />
+              Individual Student
+            </label>
+          </div>
+        </div>
+
+        <div v-if="exportScope === 'grade'">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
+          <select
+            v-model.number="exportGradeLevel"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option v-for="grade in gradeLevels" :key="grade" :value="grade">Grade {{ grade }}</option>
+          </select>
+        </div>
+
+        <div v-if="exportScope === 'section'">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Section</label>
+          <select
+            v-model.number="exportSectionId"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option :value="null" disabled>Select a section…</option>
+            <option v-for="section in exportSections" :key="section.id" :value="section.id">
+              {{ section.name }} — Grade {{ section.grade_level }}
+            </option>
+          </select>
+        </div>
+
+        <div v-if="exportScope === 'student'" class="relative">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Search Student</label>
+          <div class="relative">
+            <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+            <AppInput
+              v-model="exportStudentQuery"
+              placeholder="Name, PISAY ID, or LRN…"
+              autocomplete="off"
+              class="[&_input]:pl-9"
+            />
+          </div>
+          <div
+            v-if="exportStudentResults.length > 0"
+            class="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
+          >
+            <button
+              v-for="s in exportStudentResults"
+              :key="s.id"
+              type="button"
+              @click="selectExportStudent(s)"
+              class="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50"
+            >
+              <span class="font-medium text-slate-800">{{ s.full_name }}</span>
+              <span class="text-slate-400 ml-2 text-xs">{{ s.pisays_id }}</span>
+            </button>
+          </div>
+          <div v-if="exportSelectedStudent" class="bg-indigo-50 rounded-lg p-3 text-sm mt-2">
+            <p class="font-medium text-indigo-800">{{ exportSelectedStudent.full_name }}</p>
+            <p class="text-indigo-600 text-xs mt-0.5">PISAY ID: {{ exportSelectedStudent.pisays_id ?? '—' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="showExportModal = false">Cancel</AppButton>
+        <AppButton :disabled="!canSubmitExport" @click="submitExport">
+          <ArrowDownTrayIcon class="w-4 h-4" />
+          Export
+        </AppButton>
       </template>
     </AppModal>
 

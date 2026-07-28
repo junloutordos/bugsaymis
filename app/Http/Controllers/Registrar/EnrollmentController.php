@@ -9,6 +9,7 @@ use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
 use App\Models\StudentClearance\StudentClearance;
 use App\Models\StudentClearance\StudentClearancePeriod;
+use App\Services\Registrar\EnrollmentDataExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EnrollmentController extends Controller
 {
@@ -529,5 +531,24 @@ class EnrollmentController extends Controller
         $enrollment->update(['status' => 'dropped']);
 
         return back()->with('success', 'Enrollment dropped.');
+    }
+
+    // ── Export enrollment data (DepEd template) ───────────────────────────────
+
+    public function export(Request $request, EnrollmentDataExportService $exportService): BinaryFileResponse
+    {
+        $this->authorize('students.records.export');
+
+        $data = $request->validate([
+            'school_year_id' => ['required', 'integer', 'exists:school_years,id'],
+            'scope'          => ['required', Rule::in(['all', 'grade', 'section', 'student'])],
+            'grade_level'    => ['required_if:scope,grade', 'integer', 'between:7,12'],
+            'section_id'     => ['required_if:scope,section', 'integer', 'exists:sections,id'],
+            'student_id'     => ['required_if:scope,student', 'integer'],
+        ]);
+
+        $result = $exportService->export($data);
+
+        return response()->download($result['path'], $result['filename'])->deleteFileAfterSend(true);
     }
 }
