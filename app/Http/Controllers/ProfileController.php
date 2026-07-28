@@ -25,6 +25,8 @@ class ProfileController extends Controller
                 'id'              => $user->id,
                 'name'            => $user->name,
                 'nickname'        => $user->nickname,
+                'prenominal_title'  => $user->prenominal_title,
+                'postnominal_title' => $user->postnominal_title,
                 'email'           => $user->email,
                 'position'        => $user->position,
                 'specialization'  => $user->specialization,
@@ -54,6 +56,16 @@ class ProfileController extends Controller
         if (array_key_exists('nickname', $validated)) {
             $nickname = trim((string) $validated['nickname']);
             $user->nickname = $nickname !== '' ? $nickname : null;
+        }
+
+        if (array_key_exists('prenominal_title', $validated)) {
+            $prenominal = trim((string) $validated['prenominal_title']);
+            $user->prenominal_title = $prenominal !== '' ? $prenominal : null;
+        }
+
+        if (array_key_exists('postnominal_title', $validated)) {
+            $postnominal = trim((string) $validated['postnominal_title']);
+            $user->postnominal_title = $postnominal !== '' ? $postnominal : null;
         }
 
         if (! empty($validated['profile_photo_base64'])) {

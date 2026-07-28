@@ -12,6 +12,7 @@ use App\Models\ClassRecord\GradingOption;
 use App\Models\User;
 use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use App\Services\ClassRecord\WatRuleService;
+use App\Services\PersonNameFormatter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,12 +91,15 @@ class ClassRecordAssessmentController extends Controller
             ->get();
 
         $teacherIds = $rows->pluck('teacher_id')->filter()->unique()->values()->toArray();
-        $teachers   = User::whereIn('id', $teacherIds)->get(['id', 'name'])->keyBy('id');
+        $teachers   = User::whereIn('id', $teacherIds)
+            ->get(['id', 'name', 'prenominal_title', 'postnominal_title'])
+            ->keyBy('id');
+        $nameFormatter = new PersonNameFormatter();
 
         $days = $rows->groupBy(fn ($row) => $row->activity_date instanceof \Carbon\Carbon
                 ? $row->activity_date->toDateString()
                 : (string) $row->activity_date)
-            ->map(function ($items, $date) use ($classRecord, $teachers) {
+            ->map(function ($items, $date) use ($classRecord, $teachers, $nameFormatter) {
                 return [
                     'date'         => $date,
                     'count'        => $items->count(),
@@ -105,7 +109,9 @@ class ClassRecordAssessmentController extends Controller
                         'id'              => $row->id,
                         'title'           => $row->title,
                         'subject_name'    => $row->subject_name,
-                        'teacher_name'    => $teachers[$row->teacher_id]?->name,
+                        'teacher_name'    => $teachers[$row->teacher_id]
+                            ? $nameFormatter->withTitles($teachers[$row->teacher_id], $teachers[$row->teacher_id]->name ?? '')
+                            : null,
                         'category_code'   => $row->category_code,
                         'assessment_type' => $row->assessment_type,
                         'is_graded'       => (bool) $row->is_graded,

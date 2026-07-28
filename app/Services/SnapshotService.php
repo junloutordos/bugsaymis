@@ -22,6 +22,10 @@ use Illuminate\Support\Collection;
  */
 class SnapshotService
 {
+    public function __construct(
+        private PersonNameFormatter $nameFormatter,
+    ) {}
+
     // ── User Data Resolution ───────────────────────────────────────────────────
 
     /**
@@ -42,7 +46,7 @@ class SnapshotService
 
         return [
             'user_id'           => $user->id,
-            'name_snapshot'     => $user->name ?? '',
+            'name_snapshot'     => $this->nameFormatter->withTitles($user, $user->name ?? ''),
             'position_snapshot' => $user->position ?? '',
             'division_snapshot' => $user->division?->division_name ?? '',
             'office_snapshot'   => $user->office?->name ?? '',

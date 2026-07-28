@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ComputerLabScheduleApprovalService;
 use App\Services\ComputerLabSchedulingService;
 use App\Services\DigitalSignatureService;
+use App\Services\PersonNameFormatter;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -302,7 +303,7 @@ class ComputerLabController extends Controller
         $signature = $approval?->signatures->first(fn ($sig) => ($sig->metadata['stage'] ?? '') === $stage);
 
         return [
-            'name' => $this->formatSignatoryName($user->name),
+            'name' => $this->formatSignatoryName($user->name, $user),
             'position' => $stage === 'prepared'
                 ? ($user->position ?? 'Science Research Assistant')
                 : ($user->position ?? 'CID Chief'),
@@ -316,15 +317,20 @@ class ComputerLabController extends Controller
      * Reverse to reading order, "Firstname M.I. Lastname", for print. Names
      * without a comma don't follow the convention and are left as-is.
      */
-    private function formatSignatoryName(?string $name): ?string
+    private function formatSignatoryName(?string $name, ?User $user = null): ?string
     {
-        if (! $name || ! str_contains($name, ',')) {
-            return $name;
+        $ordered = $name;
+
+        if ($name && str_contains($name, ',')) {
+            [$lastName, $rest] = explode(',', $name, 2);
+            $ordered = trim(trim($rest).' '.trim($lastName));
         }
 
-        [$lastName, $rest] = explode(',', $name, 2);
+        if (! $user) {
+            return $ordered;
+        }
 
-        return trim(trim($rest).' '.trim($lastName));
+        return (new PersonNameFormatter())->withTitles($user, (string) $ordered);
     }
 
     public function updateSeat(Request $request, ICTEquipment $equipment)

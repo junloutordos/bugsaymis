@@ -18,7 +18,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive'
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'emp_category', 'created_at')
+            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'emp_category', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -47,7 +47,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive' for the employees list as well
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization',
+            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization',
                      'division_id', 'office_id', 'profile_picture', 'electronic_signature',
                      'status', 'emp_category', 'salary_grade', 'salary_step', 'created_at')
             ->where('status', '<>', 'inactive')
@@ -94,7 +94,7 @@ class UserController extends Controller
     public function inactiveIndex()
     {
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status', 'emp_category')
+            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status', 'emp_category')
             ->where('status', 'inactive')
             ->get();
 
@@ -187,16 +187,18 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'sex'            => 'nullable|in:Male,Female',
-            'name'           => 'required|string|max:255',
-            'email'          => 'required|email|unique:users,email',
-            'emp_category'   => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
-            'badge_id'       => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
-            'employee_no'    => ['nullable','string','max:50','unique:users,employee_no'],
-            'position'       => 'nullable|string|max:255',
-            'specialization' => 'nullable|string|max:150',
-            'division_id'    => 'nullable|exists:divisions,id',
-            'office_id'      => 'nullable|exists:offices,id',
+            'sex'                => 'nullable|in:Male,Female',
+            'name'               => 'required|string|max:255',
+            'prenominal_title'   => 'nullable|string|max:50',
+            'postnominal_title'  => 'nullable|string|max:100',
+            'email'              => 'required|email|unique:users,email',
+            'emp_category'       => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
+            'badge_id'           => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
+            'employee_no'        => ['nullable','string','max:50','unique:users,employee_no'],
+            'position'           => 'nullable|string|max:255',
+            'specialization'     => 'nullable|string|max:150',
+            'division_id'        => 'nullable|exists:divisions,id',
+            'office_id'          => 'nullable|exists:offices,id',
         ]);
 
         $data['account_type'] = 'employee';
@@ -214,17 +216,19 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         $data = $request->validate([
-            'sex'            => 'nullable|in:Male,Female',
-            'name'           => 'required|string|max:255',
-            'email'          => 'required|email|unique:users,email,' . $user->id,
-            'emp_category'   => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
-            'badge_id'       => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
-            'employee_no'    => ['nullable','string','max:50','unique:users,employee_no,' . $user->id],
-            'position'       => 'nullable|string|max:255',
-            'specialization' => 'nullable|string|max:150',
-            'division_id'    => 'nullable|exists:divisions,id',
-            'office_id'      => 'nullable|exists:offices,id',
-            'status'         => 'nullable|in:active,inactive',
+            'sex'                => 'nullable|in:Male,Female',
+            'name'               => 'required|string|max:255',
+            'prenominal_title'   => 'nullable|string|max:50',
+            'postnominal_title'  => 'nullable|string|max:100',
+            'email'              => 'required|email|unique:users,email,' . $user->id,
+            'emp_category'       => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
+            'badge_id'           => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
+            'employee_no'        => ['nullable','string','max:50','unique:users,employee_no,' . $user->id],
+            'position'           => 'nullable|string|max:255',
+            'specialization'     => 'nullable|string|max:150',
+            'division_id'        => 'nullable|exists:divisions,id',
+            'office_id'          => 'nullable|exists:offices,id',
+            'status'             => 'nullable|in:active,inactive',
         ]);
 
         $user->update($data);
