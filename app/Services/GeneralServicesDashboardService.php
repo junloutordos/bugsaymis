@@ -98,7 +98,7 @@ class GeneralServicesDashboardService
             'unassignedVehicles'  => VehicleRequest::whereIn('status', ['Approved', 'FAD Approved', 'OCD Approved'])
                 ->whereNull('driver_id')
                 ->count(),
-            'unassignedWork'      => WorkRequest::whereIn('status', ['Pending', 'Division Approved', 'GSU Approved', 'Pending FAD Approval', 'FAD Approved'])
+            'unassignedWork'      => WorkRequest::whereIn('status', ['Pending', 'Pending GSU Approval', 'GSU Approved', 'Pending FAD Approval', 'FAD Approved'])
                 ->whereNull('assigned_user_id')
                 ->count(),
         ];
@@ -263,7 +263,7 @@ class GeneralServicesDashboardService
 
         return [
             'rows' => $rows->sortByDesc('assigned')->values()->all(),
-            'unassignedActive' => WorkRequest::whereIn('status', ['Pending', 'Division Approved', 'GSU Approved', 'Pending FAD Approval', 'FAD Approved'])
+            'unassignedActive' => WorkRequest::whereIn('status', ['Pending', 'Pending GSU Approval', 'GSU Approved', 'Pending FAD Approval', 'FAD Approved'])
                 ->whereNull('assigned_user_id')
                 ->count(),
             'categoryBreakdown' => WorkRequest::select(DB::raw("COALESCE(NULLIF(category, ''), 'Uncategorized') as category"), DB::raw('COUNT(*) as total'))
@@ -312,7 +312,7 @@ class GeneralServicesDashboardService
                 ])
                 ->all(),
             'unassignedWork' => WorkRequest::with('requester:id,name')
-                ->whereIn('status', ['Pending', 'Division Approved', 'GSU Approved', 'Pending FAD Approval', 'FAD Approved'])
+                ->whereIn('status', ['Pending', 'Pending GSU Approval', 'GSU Approved', 'Pending FAD Approval', 'FAD Approved'])
                 ->whereNull('assigned_user_id')
                 ->latest()
                 ->take(8)

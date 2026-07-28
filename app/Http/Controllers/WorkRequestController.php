@@ -174,11 +174,11 @@ class WorkRequestController extends Controller
         if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $chief) {
             abort(403);
         }
-        if ($workRequest->status === 'Approved' || $workRequest->status === 'Division Approved') {
+        if ($workRequest->status === 'Approved' || $workRequest->status === 'Pending GSU Approval') {
             return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => true]);
         }
         // mark as approved by Division Chief but do NOT notify requester yet
-        $workRequest->status = 'Division Approved';
+        $workRequest->status = 'Pending GSU Approval';
         $workRequest->save();
 
         // Notify all GSU Head users to assign staff
@@ -206,9 +206,9 @@ class WorkRequestController extends Controller
         if (! $user || ! $user->hasPermission('facilities.dc-approve')) abort(403);
 
         if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $user->id) abort(403);
-        if (in_array($workRequest->status, ['Approved','Division Approved'])) return back()->with('success', 'Already processed');
+        if (in_array($workRequest->status, ['Approved','Pending GSU Approval'])) return back()->with('success', 'Already processed');
 
-        $workRequest->status = 'Division Approved';
+        $workRequest->status = 'Pending GSU Approval';
         $workRequest->save();
         if ($workRequest->requester) { NotificationService::notifyUser($workRequest->requester, 'Work Request', "#{$workRequest->id}", 'Approved by Division Chief', route('work-requests.index')); }
 
@@ -291,7 +291,7 @@ class WorkRequestController extends Controller
         // Approval order is Division Chief -> GSU Head -> FAD Chief. Requests
         // created before this ordering was enforced have no division_chief_id
         // and skip straight from Pending, preserving their original behavior.
-        if ($workRequest->division_chief_id && $workRequest->status !== 'Division Approved') {
+        if ($workRequest->division_chief_id && $workRequest->status !== 'Pending GSU Approval') {
             return view('work_request_approved', [
                 'facilityRequest' => $workRequest,
                 'blocked' => true,
@@ -359,7 +359,7 @@ class WorkRequestController extends Controller
      */
     public function showGSUDeclineForm(Request $request, WorkRequest $workRequest, $gsu)
     {
-        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Division Approved'])) {
+        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Pending GSU Approval'])) {
             return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => true]);
         }
 
@@ -378,7 +378,7 @@ class WorkRequestController extends Controller
             'reason' => 'required|string|max:1000',
         ]);
 
-        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Division Approved'])) {
+        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Pending GSU Approval'])) {
             $reason = $workRequest->decline_reason ?? '—';
             return view('work_request_declined', ['facilityRequest' => $workRequest, 'reason' => $reason]);
         }
@@ -718,7 +718,7 @@ class WorkRequestController extends Controller
         // Approval order is Division Chief -> GSU Head -> FAD Chief. Requests
         // created before this ordering was enforced have no division_chief_id
         // and keep their original behavior (assignment allowed from Pending).
-        if ($newlyAssigning && $workRequest->division_chief_id && $workRequest->status !== 'Division Approved') {
+        if ($newlyAssigning && $workRequest->division_chief_id && $workRequest->status !== 'Pending GSU Approval') {
             return back()->withErrors(['assigned_user_id' => 'This work request is awaiting Division Chief approval before staff can be assigned.']);
         }
 
