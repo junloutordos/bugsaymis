@@ -73,6 +73,14 @@ class PermissionsSeeder extends Seeder
             ['module' => 'ClassRecord', 'name' => 'class-records.admin',  'description' => 'View all class records, check, unlock quarters (AUH/Admin)'],
             ['module' => 'ClassRecord', 'name' => 'class-records.grading-options', 'description' => 'Manage grading options and their categories (scoped subset of class-records.admin)'],
 
+            // ── Homeroom Attendance ───────────────────────────────────────────
+            ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.log',                  'description' => 'Take/edit daily and activity attendance for own homeroom advisory section(s)'],
+            ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.admission-slip.issue',  'description' => 'Issue Class Admission Slips (School Registrar)'],
+            ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.coordinator-review',    'description' => 'Approve/return monthly Record on Attendance and Punctuality (Homeroom Unit Coordinator)'],
+            ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.admin',                 'description' => 'Campus-wide oversight of Homeroom Attendance'],
+            ['module' => 'HomeroomAttendance', 'name' => 'homeroom-attendance.settings.manage',        'description' => 'Edit Homeroom Attendance deduction-point settings'],
+            ['module' => 'HomeroomAttendance', 'name' => 'academic-calendar.manage',                  'description' => 'Flag holidays and class suspensions (CID Chief)'],
+
             // ── IT / MIS ──────────────────────────────────────────────────────
             ['module' => 'IT',       'name' => 'it.requests.view',   'description' => 'View IT job requests'],
             ['module' => 'IT',       'name' => 'it.requests.create', 'description' => 'Submit IT job requests'],

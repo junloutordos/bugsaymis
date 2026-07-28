@@ -56,11 +56,12 @@ class ClassRecordAttendanceController extends Controller
         $records = ClassRecordAttendanceRecord::whereHas('attendanceDate', fn ($sq) =>
                 $sq->where('class_record_quarter_id', $quarter->id)
             )
-            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'uniform_status'])
+            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'excused_status', 'synced_from_homeroom'])
             ->mapWithKeys(fn ($r) => [
                 "{$r->class_record_student_id}_{$r->class_record_attendance_date_id}" => [
                     'status'  => $r->status,
-                    'uniform' => $r->uniform_status,
+                    'excused' => $r->excused_status,
+                    'synced'  => $r->synced_from_homeroom,
                 ],
             ]);
 
@@ -122,8 +123,12 @@ class ClassRecordAttendanceController extends Controller
             'records'              => 'required|array|min:1',
             'records.*.date_id'    => 'required|integer|exists:class_record_attendance_dates,id',
             'records.*.student_id' => 'required|integer|exists:class_record_students,id',
-            'records.*.status'     => 'nullable|in:present,absent,late,excused,cut_class,unexcused_absence,excused_absence,excused_tardy,unexcused_tardy',
-            'records.*.uniform'    => 'nullable|in:complete,incomplete',
+            // Present/Absent/Tardy only — Excused/Unexcused is no longer a
+            // status a subject teacher picks; it's set by the Homeroom
+            // Adviser/Registrar's Class Admission Slip workflow instead.
+            // Uniform checking also moved to the adviser (once per day), so
+            // there's no uniform field here anymore.
+            'records.*.status'     => 'nullable|in:present,absent,tardy',
         ]);
 
         // "exists" only proves the IDs are valid rows *somewhere* — without this,
@@ -145,12 +150,10 @@ class ClassRecordAttendanceController extends Controller
         $toUpsert = [];
 
         foreach ($validated['records'] as $item) {
-            $status  = $item['status'] ?? null;
-            $uniform = $item['uniform'] ?? null;
+            $status = $item['status'] ?? null;
 
-            // A cell with neither an attendance status nor a uniform check has
-            // no reason to exist as a row.
-            if ($status === null && $uniform === null) {
+            // A cell with no status has no reason to exist as a row.
+            if ($status === null) {
                 DB::table('class_record_attendance_records')
                     ->where('class_record_attendance_date_id', $item['date_id'])
                     ->where('class_record_student_id', $item['student_id'])
@@ -160,7 +163,11 @@ class ClassRecordAttendanceController extends Controller
                     'class_record_attendance_date_id' => $item['date_id'],
                     'class_record_student_id'         => $item['student_id'],
                     'status'                          => $status,
-                    'uniform_status'                  => $uniform,
+                    // A manual save from the subject teacher is always an
+                    // explicit override — clear this so a later Homeroom
+                    // Attendance resync never clobbers it again (see
+                    // SubjectAttendanceSyncService).
+                    'synced_from_homeroom'            => false,
                     'created_at'                      => $now,
                     'updated_at'                      => $now,
                 ];
@@ -171,7 +178,7 @@ class ClassRecordAttendanceController extends Controller
             DB::table('class_record_attendance_records')->upsert(
                 $toUpsert,
                 ['class_record_attendance_date_id', 'class_record_student_id'],
-                ['status', 'uniform_status', 'updated_at']
+                ['status', 'synced_from_homeroom', 'updated_at']
             );
         }
 

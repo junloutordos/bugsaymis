@@ -2525,6 +2525,7 @@ require __DIR__.'/procurement.php';
 require __DIR__.'/supply.php';
 require __DIR__.'/property.php';
 require __DIR__.'/registrar.php';
+require __DIR__.'/homeroom-attendance.php';
 require __DIR__.'/cid.php';
 require __DIR__.'/administration.php';
 require __DIR__.'/science-lab.php';

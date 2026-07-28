@@ -309,6 +309,7 @@ class RolePermissionSeeder extends Seeder
             'students.clearance.view', 'students.clearance.manage',
             'students.clearance.registrar', 'students.clearance.report',
             'reports.view',
+            'homeroom-attendance.admission-slip.issue',
             'chat.access',
         ]);
 
@@ -426,6 +427,13 @@ class RolePermissionSeeder extends Seeder
         $assign('Faculty',   ['class-records.view', 'class-records.manage', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
         $assign('Staff',     ['class-records.view', 'students.clearance.sign']);
         $assign('CID Chief', ['students.clearance.view', 'students.clearance.sign', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
+
+        // ── Homeroom Attendance ────────────────────────────────────────────────
+        // Coordinator-review is granted broadly to Faculty (same convention as
+        // WAT) — actual eligibility to log/approve for a specific section is
+        // gated at runtime via AdvisoryScheduleScopeService, not this permission.
+        $assign('Faculty',   ['homeroom-attendance.log', 'homeroom-attendance.coordinator-review']);
+        $assign('CID Chief', ['homeroom-attendance.admin', 'homeroom-attendance.settings.manage', 'homeroom-attendance.coordinator-review', 'academic-calendar.manage']);
 
         // ── Teacher Class Attendance (NFC Tap-In) ─────────────────────────────
         // AUH scoping is handled at runtime by checking academic_units.head_user_id

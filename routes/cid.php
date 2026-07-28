@@ -2,7 +2,21 @@
 
 use App\Http\Controllers\CID\CompetitionController;
 use App\Http\Controllers\CidDashboardController;
+use App\Http\Controllers\SchoolCalendarController;
 use Illuminate\Support\Facades\Route;
+
+// Academic Calendar (holidays / class suspensions) — feeds
+// SchoolCalendarService, consumed by the Homeroom Attendance schedule-driven
+// subject-attendance sync and the monthly Record on Attendance and
+// Punctuality's school-days count.
+Route::middleware(['auth', 'permission:academic-calendar.manage'])
+    ->prefix('academic-calendar')
+    ->name('academic-calendar.')
+    ->group(function () {
+        Route::get('/',            [SchoolCalendarController::class, 'index'])->name('index');
+        Route::post('/',           [SchoolCalendarController::class, 'store'])->name('store');
+        Route::delete('/{event}',  [SchoolCalendarController::class, 'destroy'])->name('destroy');
+    });
 
 Route::middleware(['auth', 'permission:cid.dashboard'])
     ->prefix('cid')
