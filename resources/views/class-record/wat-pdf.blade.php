@@ -59,9 +59,9 @@
        deliberate breathing room/break between the assessment table and the
        signature block. */
     .wat-signatories { width: 100%; margin-top: 16mm; }
-    .wat-signatory   { width: 33.33%; text-align: center; vertical-align: top; padding: 0 6mm; }
+    .wat-signatory   { width: 33.33%; text-align: left; vertical-align: top; padding: 0 6mm; }
     .wat-signatory-caption {
-      text-align: left; font-size: 7.5pt; color: #334155; margin-bottom: 3mm;
+      font-size: 7.5pt; color: #334155; margin-bottom: 3mm;
     }
     /* Blank space for the wet signature, with the sign-line as its
        border-bottom — sits ABOVE the printed name, not under it. */
