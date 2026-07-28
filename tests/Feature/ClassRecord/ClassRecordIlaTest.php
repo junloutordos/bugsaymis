@@ -279,4 +279,28 @@ class ClassRecordIlaTest extends TestCase
             ->getJson(route('class-records.ila.index', ['classRecord' => $record->id, 'q' => 1]))
             ->assertForbidden();
     }
+
+    public function test_ila_endpoints_are_blocked_for_a_subject_without_ilp(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher, $this->makeSection(), $this->makeSubject(hasIlp: false));
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordIlaDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+
+        $this->actingAs($teacher)
+            ->getJson(route('class-records.ila.index', ['classRecord' => $record->id, 'q' => 1]))
+            ->assertForbidden();
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.ila.store-date', ['classRecord' => $record->id, 'q' => 1]), ['date' => '2026-08-04'])
+            ->assertForbidden();
+
+        $this->actingAs($teacher)
+            ->deleteJson(route('class-records.ila.destroy-date', ['classRecord' => $record->id, 'q' => 1, 'ilaDate' => $date->id]))
+            ->assertForbidden();
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.ila.upsert', ['classRecord' => $record->id, 'q' => 1]), ['records' => []])
+            ->assertForbidden();
+    }
 }

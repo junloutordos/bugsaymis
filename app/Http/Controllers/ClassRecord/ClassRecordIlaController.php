@@ -39,6 +39,12 @@ class ClassRecordIlaController extends Controller
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
+    /** ILA only applies to subjects that reserve an Independent Learning Period. */
+    private function assertIlpSubject(ClassRecord $classRecord): void
+    {
+        abort_unless($classRecord->subject?->has_ilp, 403, "This subject doesn't have an Independent Learning Period — ILA is not applicable.");
+    }
+
     private function resolveQuarter(ClassRecord $classRecord, int $q): ClassRecordQuarter
     {
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
@@ -53,6 +59,7 @@ class ClassRecordIlaController extends Controller
     public function index(ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->canView($classRecord), 403);
+        $this->assertIlpSubject($classRecord);
 
         $quarter = $this->resolveQuarter($classRecord, $q);
 
@@ -76,6 +83,7 @@ class ClassRecordIlaController extends Controller
     public function storeDate(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -101,6 +109,7 @@ class ClassRecordIlaController extends Controller
     public function destroyDate(ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -117,6 +126,7 @@ class ClassRecordIlaController extends Controller
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -192,6 +202,7 @@ class ClassRecordIlaController extends Controller
     public function gradeDate(Request $request, ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -301,6 +312,7 @@ class ClassRecordIlaController extends Controller
     public function ungradeDate(ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
