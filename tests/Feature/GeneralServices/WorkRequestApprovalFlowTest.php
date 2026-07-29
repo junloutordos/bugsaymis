@@ -45,6 +45,10 @@ class WorkRequestApprovalFlowTest extends TestCase
             ['name' => 'facilities.create'],
             ['module' => 'Facilities', 'description' => 'facilities.create'],
         ));
+        $gsuRole->permissions()->attach(Permission::firstOrCreate(
+            ['name' => 'facilities.manage'],
+            ['module' => 'Facilities', 'description' => 'facilities.manage'],
+        ));
         $this->gsuHead = User::factory()->create(['email' => 'gsu@crc.pshs.edu.ph', 'role_id' => (string) $gsuRole->id]);
         $this->gsuHead->roles()->attach($gsuRole);
 
@@ -195,6 +199,126 @@ class WorkRequestApprovalFlowTest extends TestCase
         $legacyWr->refresh();
         $this->assertSame($staff->id, $legacyWr->assigned_user_id);
         $this->assertSame('Pending FAD Approval', $legacyWr->status);
+    }
+
+    public function test_gsu_head_can_approve_in_app_via_approval_inbox(): void
+    {
+        $wr = $this->makeWorkRequest();
+
+        $this->actingAs($this->divisionChief)
+            ->post(route('work-requests.approve.inapp', $wr->id));
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
+
+        $this->actingAs($this->gsuHead)
+            ->post(route('approvals.approve', ['type' => 'work_requests', 'id' => $wr->id]))
+            ->assertRedirect();
+
+        $this->assertSame('GSU Approved', $wr->fresh()->status);
+        $this->assertSame($this->gsuHead->id, $wr->fresh()->acted_by_id);
+    }
+
+    public function test_gsu_head_can_decline_in_app_via_approval_inbox(): void
+    {
+        $wr = $this->makeWorkRequest();
+
+        $this->actingAs($this->divisionChief)
+            ->post(route('work-requests.approve.inapp', $wr->id));
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
+
+        $this->actingAs($this->gsuHead)
+            ->post(route('approvals.decline', ['type' => 'work_requests', 'id' => $wr->id]), [
+                'reason' => 'No budget for parts.',
+            ])
+            ->assertRedirect();
+
+        $wr->refresh();
+        $this->assertSame('Declined', $wr->status);
+        $this->assertSame('No budget for parts.', $wr->decline_reason);
+    }
+
+    public function test_gsu_head_cannot_act_in_app_before_division_chief_approves(): void
+    {
+        $wr = $this->makeWorkRequest();
+
+        // Still 'Pending' (awaiting DC), so the inbox delegates to the DC action,
+        // which the GSU Head lacks permission for.
+        $this->actingAs($this->gsuHead)
+            ->post(route('approvals.approve', ['type' => 'work_requests', 'id' => $wr->id]))
+            ->assertForbidden();
+
+        $this->assertSame('Pending', $wr->fresh()->status);
+    }
+
+    public function test_non_gsu_user_cannot_call_gsu_in_app_endpoint_directly(): void
+    {
+        $wr = $this->makeWorkRequest();
+
+        $this->actingAs($this->divisionChief)
+            ->post(route('work-requests.approve.inapp', $wr->id));
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
+
+        $this->actingAs($this->fadChief)
+            ->post(route('work-requests.gsu-approve.inapp', $wr->id))
+            ->assertForbidden();
+
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
+    }
+
+    public function test_fad_chief_can_still_approve_gsu_approved_request_via_approval_inbox(): void
+    {
+        $wr = $this->makeWorkRequest();
+
+        $this->actingAs($this->divisionChief)
+            ->post(route('work-requests.approve.inapp', $wr->id));
+        $this->actingAs($this->gsuHead)
+            ->post(route('approvals.approve', ['type' => 'work_requests', 'id' => $wr->id]));
+        $this->assertSame('GSU Approved', $wr->fresh()->status);
+
+        $this->actingAs($this->fadChief)
+            ->post(route('approvals.approve', ['type' => 'work_requests', 'id' => $wr->id]))
+            ->assertRedirect();
+
+        $this->assertSame('FAD Approved', $wr->fresh()->status);
+    }
+
+    public function test_fad_chief_can_still_approve_pending_fad_approval_request_via_approval_inbox(): void
+    {
+        $wr = $this->makeWorkRequest();
+        $staff = User::factory()->create(['position' => 'Skilled Worker']);
+
+        $this->actingAs($this->divisionChief)
+            ->post(route('work-requests.approve.inapp', $wr->id));
+        $this->actingAs($this->gsuHead)
+            ->put(route('work-requests.update', $wr->id), [
+                'issue' => $wr->issue,
+                'category' => 'Electrical',
+                'assigned_user_id' => $staff->id,
+            ]);
+        $this->assertSame('Pending FAD Approval', $wr->fresh()->status);
+
+        $this->actingAs($this->fadChief)
+            ->post(route('approvals.approve', ['type' => 'work_requests', 'id' => $wr->id]))
+            ->assertRedirect();
+
+        $this->assertSame('FAD Approved', $wr->fresh()->status);
+    }
+
+    public function test_fad_chief_cannot_hijack_gsu_stage_via_approval_inbox(): void
+    {
+        $wr = $this->makeWorkRequest();
+
+        $this->actingAs($this->divisionChief)
+            ->post(route('work-requests.approve.inapp', $wr->id));
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
+
+        // FAD Chief passes authoriseApprove (isFAD) and checkPending, but the
+        // delegate must still route 'Pending GSU Approval' to the GSU-only
+        // handler, which rejects a non-GSU/non-Administrator actor.
+        $this->actingAs($this->fadChief)
+            ->post(route('approvals.approve', ['type' => 'work_requests', 'id' => $wr->id]))
+            ->assertForbidden();
+
+        $this->assertSame('Pending GSU Approval', $wr->fresh()->status);
     }
 
     private function makeWorkRequest(): WorkRequest

@@ -409,6 +409,91 @@ class WorkRequestController extends Controller
         return view('work_request_declined', ['facilityRequest' => $workRequest, 'reason' => $workRequest->decline_reason]);
     }
 
+    // Authenticated in-app approval by logged-in GSU Head
+    public function approveInAppGSU(Request $request, WorkRequest $workRequest)
+    {
+        $user = $request->user();
+        if (! $user || (! $user->hasRole('GSU Head') && ! $user->hasRole('Administrator'))) abort(403);
+
+        if (in_array($workRequest->status, ['GSU Approved', 'FAD Approved', 'Approved', 'Pending FAD Approval', 'Declined'])) {
+            return back()->with('success', 'Already processed.');
+        }
+
+        // Approval order is Division Chief -> GSU Head -> FAD Chief.
+        if ($workRequest->division_chief_id && $workRequest->status !== 'Pending GSU Approval') {
+            return back()->withErrors(['action' => 'This work request is awaiting Division Chief approval before GSU Head can act.']);
+        }
+
+        $workRequest->status = 'GSU Approved';
+        $workRequest->acted_by_id = $user->id;
+        $workRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $workRequest,
+            step:       ApprovalStep::REQ_GSU,
+            sequence:   2,
+            action:     'approved',
+            approver:   $user,
+        );
+
+        logger()->info('WorkRequest approved by GSU Head (in-app)', ['work_request_id' => $workRequest->id, 'gsu_id' => $user->id]);
+
+        try {
+            $fadChiefs = User::select('id', 'email', 'position')
+                        ->where('position', 'like', '%FAD%')
+                        ->get();
+            foreach ($fadChiefs as $fad) {
+                if (! $fad->email) continue;
+                $approveUrl = URL::signedRoute('work-requests.fad.approve', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                $declineUrl = URL::signedRoute('work-requests.fad.decline', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                Mail::to($fad->email)->queue(new WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl, $fad));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify FAD Chiefs after GSU approval', ['error' => $e->getMessage(), 'work_request_id' => $workRequest->id]);
+        }
+
+        return back()->with('success', 'Work request approved by GSU Head.');
+    }
+
+    public function declineInAppGSU(Request $request, WorkRequest $workRequest)
+    {
+        $user = $request->user();
+        if (! $user || (! $user->hasRole('GSU Head') && ! $user->hasRole('Administrator'))) abort(403);
+
+        $data = $request->validate(['reason' => 'required|string|max:1000']);
+
+        if (in_array($workRequest->status, ['GSU Approved', 'FAD Approved', 'Approved', 'Pending FAD Approval', 'Declined'])) {
+            return back()->with('success', 'Already processed.');
+        }
+
+        $workRequest->status = 'Declined';
+        $workRequest->decline_reason = $data['reason'];
+        $workRequest->declined_at = now();
+        $workRequest->acted_by_id = $user->id;
+        $workRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $workRequest,
+            step:       ApprovalStep::REQ_GSU,
+            sequence:   2,
+            action:     'rejected',
+            approver:   $user,
+        );
+
+        logger()->info('WorkRequest declined by GSU Head (in-app)', ['work_request_id' => $workRequest->id, 'gsu_id' => $user->id, 'reason' => $data['reason']]);
+
+        try {
+            $requesterEmail = $workRequest->requester?->email ?? null;
+            if ($requesterEmail) {
+                Mail::to($requesterEmail)->queue(new WorkRequestStatusMail($workRequest, 'Declined', $data['reason'], $user->name));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send work request declined notification', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Work request declined.');
+    }
+
     // FAD approval handlers (signed)
     public function approveByFADChief(Request $request, WorkRequest $workRequest, $chief)
     {
