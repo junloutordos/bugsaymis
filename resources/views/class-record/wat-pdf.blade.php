@@ -21,9 +21,14 @@
        substitution only reliably maps normal/bold, so a numeric weight can
        silently fall back to regular. */
     .wat-heading h1 { font-size: 13pt; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 2mm; }
-    .wat-meta       { font-size: 8pt; text-align: left; }
-    .wat-meta span  { margin-right: 12mm; }
-    .wat-meta span:last-child { margin-right: 0; }
+    /* A <table> with per-cell padding, not inline <span>s with margin —
+       mPDF silently ignores margin/padding on inline elements (verified by
+       rendering: identical output bytes with or without it); table-cell
+       padding is the reliable primitive for horizontal spacing in mPDF,
+       same as .wat-table/.wat-signatories below. */
+    .wat-meta       { font-size: 8pt; }
+    .wat-meta td    { padding-right: 12mm; white-space: nowrap; }
+    .wat-meta td:last-child { padding-right: 0; }
 
     /* Widths set via width="" on <th> — most reliable in mPDF. */
     .wat-table {
@@ -85,11 +90,13 @@
 
   <div class="wat-heading">
     <h1><b>Weekly Assessment Tracker</b></h1>
-    <div class="wat-meta">
-      <span><strong>Section:</strong> Grade {{ $section['level'] }} — {{ $section['name'] }}</span>
-      <span><strong>Week:</strong> {{ \Carbon\Carbon::parse($wat['week_start'])->format('F j, Y') }} – {{ \Carbon\Carbon::parse($wat['week_end'])->format('F j, Y') }}</span>
-      <span><strong>School Year:</strong> {{ $schoolYear['name'] ?? '' }}</span>
-    </div>
+    <table class="wat-meta">
+      <tr>
+        <td><strong>Section:</strong> Grade {{ $section['level'] }} — {{ $section['name'] }}</td>
+        <td><strong>Week:</strong> {{ \Carbon\Carbon::parse($wat['week_start'])->format('F j, Y') }} – {{ \Carbon\Carbon::parse($wat['week_end'])->format('F j, Y') }}</td>
+        <td><strong>School Year:</strong> {{ $schoolYear['name'] ?? '' }}</td>
+      </tr>
+    </table>
   </div>
 
   <table class="wat-table">
