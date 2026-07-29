@@ -521,13 +521,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Division Chief In-App Approval Dashboards
     Route::get('/vehicle-requests/dc-approval',   [\App\Http\Controllers\VehicleRequestController::class,  'divisionChiefApproval'])->name('vehicle-requests.dc-approval')->middleware('permission:vehicles.dc-approve');
     Route::get('/facility-requests/dc-approval',  [\App\Http\Controllers\FacilityRequestController::class, 'divisionChiefApproval'])->name('facility-requests.dc-approval')->middleware('permission:facilities.dc-approve');
-    Route::get('/work-requests/dc-approval',      [\App\Http\Controllers\WorkRequestController::class,     'divisionChiefApproval'])->name('work-requests.dc-approval')->middleware('permission:facilities.dc-approve');
     Route::get('/service-requests/dc-approval',   [\App\Http\Controllers\ServiceRequestController::class,  'divisionChiefApproval'])->name('service-requests.dc-approval')->middleware('permission:facilities.dc-approve');
 
     // FAD In-App Approval Dashboards
     Route::get('/facility-requests/fad-approval',                          [\App\Http\Controllers\FacilityRequestController::class, 'fadApproval'])->name('facility-requests.fad-approval')->middleware('permission:facilities.fad-approve');
     Route::post('/facility-requests/{facilityRequest}/fad-action',         [\App\Http\Controllers\FacilityRequestController::class, 'fadAction'])->name('facility-requests.fad-action')->middleware('permission:facilities.fad-approve');
-    Route::get('/work-requests/fad-approval',                              [\App\Http\Controllers\WorkRequestController::class,     'fadApproval'])->name('work-requests.fad-approval')->middleware('permission:facilities.fad-approve');
     Route::post('/work-requests/{workRequest}/fad-action',                 [\App\Http\Controllers\WorkRequestController::class,     'fadAction'])->name('work-requests.fad-action')->middleware('permission:facilities.fad-approve');
     Route::get('/service-requests/fad-approval',                           [\App\Http\Controllers\ServiceRequestController::class,  'fadApproval'])->name('service-requests.fad-approval')->middleware('permission:facilities.fad-approve');
     Route::post('/service-requests/{serviceRequest}/fad-action',           [\App\Http\Controllers\ServiceRequestController::class,  'fadAction'])->name('service-requests.fad-action')->middleware('permission:facilities.fad-approve');
