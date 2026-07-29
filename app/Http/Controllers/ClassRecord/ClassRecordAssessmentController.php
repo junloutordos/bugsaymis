@@ -499,4 +499,217 @@ class ClassRecordAssessmentController extends Controller
             'data'    => $copied,
         ]);
     }
+
+    // ── POST /class-records/{cr}/quarters/{q}/assessments/apply-to-sections ──
+
+    /**
+     * Push this quarter's assessment setup (including dates) out to other
+     * sections the same teacher has for this subject. Unlike copyFrom/
+     * copyFromRecord (which strip dates so nothing can violate WAT), this
+     * carries dates over and validates each target independently against
+     * WatRuleService — an ineligible or WAT-violating target is skipped with
+     * a reason rather than aborting the whole batch.
+     */
+    public function applyToSections(Request $request, ClassRecord $classRecord, int $q): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+
+        $sourceQuarter = $this->resolveQuarter($classRecord, $q);
+
+        $validated = $request->validate([
+            'target_class_record_ids'   => 'required|array|min:1',
+            'target_class_record_ids.*' => 'integer|distinct|exists:class_records,id',
+        ]);
+
+        $sourceAssessments = ClassRecordAssessment::where('class_record_quarter_id', $sourceQuarter->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        abort_if($sourceAssessments->isEmpty(), 422, 'This quarter has no assessments to apply.');
+
+        $sourceOptionId = $sourceQuarter->effectiveGradingOptionId();
+
+        $applied = [];
+        $skipped = [];
+
+        foreach ($validated['target_class_record_ids'] as $targetId) {
+            if ((int) $targetId === $classRecord->id) {
+                continue;
+            }
+
+            $target = ClassRecord::with('section:id,levelid,sectionname')->find($targetId);
+            $label  = $target?->year_level_section ?: "Class Record #{$targetId}";
+
+            if (! $this->isAdmin() && $target?->teacher_id !== Auth::id()) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'You do not have access to that class record.'];
+                continue;
+            }
+            if ($target->isArchived()) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'That class record has been archived.'];
+                continue;
+            }
+            if (strtolower($target->subject_name) !== strtolower($classRecord->subject_name)) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'Different subject.'];
+                continue;
+            }
+            if (! $target->isCurrentSchoolYear()) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'That class record is from a past school year and is read-only.'];
+                continue;
+            }
+
+            $targetQuarter = ClassRecordQuarter::firstOrCreate(
+                ['class_record_id' => $target->id, 'quarter' => $q],
+                ['is_locked' => false]
+            );
+
+            if ($targetQuarter->is_locked) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'Quarter is locked.'];
+                continue;
+            }
+            if ((int) $targetQuarter->effectiveGradingOptionId() !== (int) $sourceOptionId) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'Uses a different grading option.'];
+                continue;
+            }
+
+            $existingCount = ClassRecordAssessment::where('class_record_quarter_id', $targetQuarter->id)->count();
+            if ($existingCount > 0) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'Already has assessments this quarter.'];
+                continue;
+            }
+
+            $check = $this->checkWatForApply($target, $q, $sourceAssessments);
+            if ($check['reason']) {
+                $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => $check['reason']];
+                continue;
+            }
+
+            DB::transaction(function () use ($sourceAssessments, $targetQuarter) {
+                foreach ($sourceAssessments as $src) {
+                    ClassRecordAssessment::create([
+                        'class_record_quarter_id' => $targetQuarter->id,
+                        'grading_category_id'     => $src->grading_category_id,
+                        'assessment_number'       => $src->assessment_number,
+                        'title'                   => $src->title,
+                        'assessment_type'         => $src->assessment_type,
+                        'is_graded'               => $src->is_graded,
+                        'is_major'                => $src->is_major,
+                        'activity_date'           => $src->activity_date,
+                        'plotted_at'              => $src->activity_date ? now() : null,
+                        'max_score'               => $src->max_score,
+                        'sort_order'              => $src->sort_order,
+                    ]);
+                }
+            });
+
+            $applied[] = [
+                'class_record_id' => $targetId,
+                'label'           => $label,
+                'count'           => $sourceAssessments->count(),
+                'warnings'        => $check['warnings'],
+            ];
+        }
+
+        return response()->json([
+            'applied' => $applied,
+            'skipped' => $skipped,
+        ]);
+    }
+
+    /**
+     * Simulates applying $sourceAssessments (as-is, dates included) onto
+     * $target's quarter $q and reports the first WAT violation found, if
+     * any — same rules as the upsert() endpoint's own validation, just
+     * evaluated against a different section's existing load. Schedule-day
+     * mismatches are collected as non-blocking warnings, matching their
+     * warn-only status everywhere else in the module.
+     *
+     * @return array{reason: ?string, warnings: array<string>}
+     */
+    private function checkWatForApply(ClassRecord $target, int $q, $sourceAssessments): array
+    {
+        if (! $this->isAdmin()) {
+            foreach ($sourceAssessments as $src) {
+                if (! $src->activity_date) {
+                    continue;
+                }
+                $date = $src->activity_date->toDateString();
+                if (WatRuleService::violatesPlottingDeadline($date)) {
+                    $when     = $src->activity_date->format('M d, Y');
+                    $deadline = WatRuleService::plottingDeadline($date)->format('D, M d, Y \a\t 12:00 NN');
+                    return [
+                        'reason'   => "\"{$src->title}\" is dated {$when}, but the plotting deadline for that week was {$deadline}.",
+                        'warnings' => [],
+                    ];
+                }
+            }
+        }
+
+        $grade = $target->section?->levelid;
+        if ($grade !== null) {
+            $datedGraded = $sourceAssessments->filter(fn ($i) => $i->activity_date && $i->is_graded
+                && ! WatRuleService::isExamExempt($i->assessment_type, $target->school_year_id, $q, $i->activity_date->toDateString()));
+
+            foreach ($datedGraded->groupBy(fn ($i) => $i->activity_date->toDateString()) as $date => $group) {
+                $counts    = WatRuleService::gradeCountsOnDate($target->section_id, $grade, $target->school_year_id, $date);
+                $graded    = $counts['graded'] + $group->count();
+                $major     = $counts['major'] + $group->where('is_major', true)->count();
+                $formatted = Carbon::parse($date)->format('M d, Y');
+
+                if ($graded > WatRuleService::DAILY_GRADED_MAX) {
+                    return [
+                        'reason'   => "Would have {$graded} graded assessments on {$formatted} — the WAT limit is " . WatRuleService::DAILY_GRADED_MAX . ' per day.',
+                        'warnings' => [],
+                    ];
+                }
+                if ($major > WatRuleService::DAILY_MAJOR_MAX) {
+                    return [
+                        'reason'   => "Would have {$major} major assessments on {$formatted} — the WAT limit is " . WatRuleService::DAILY_MAJOR_MAX . ' per day.',
+                        'warnings' => [],
+                    ];
+                }
+            }
+
+            $byWeek = $datedGraded->groupBy(fn ($i) => $i->activity_date->copy()->startOfWeek(Carbon::MONDAY)->toDateString());
+            foreach ($byWeek as $weekStart => $group) {
+                $counts = WatRuleService::gradeCountsInWeek($target->section_id, $grade, $target->school_year_id, $weekStart);
+                $graded = $counts['graded'] + $group->count();
+                $major  = $counts['major'] + $group->where('is_major', true)->count();
+                $label  = Carbon::parse($weekStart)->format('M d') . '–' . Carbon::parse($weekStart)->addDays(4)->format('M d, Y');
+
+                if ($graded > WatRuleService::WEEKLY_GRADED_MAX) {
+                    return [
+                        'reason'   => "Would have {$graded} graded assessments in the week of {$label} — the WAT limit is " . WatRuleService::WEEKLY_GRADED_MAX . ' per week.',
+                        'warnings' => [],
+                    ];
+                }
+                if ($major > WatRuleService::WEEKLY_MAJOR_MAX) {
+                    return [
+                        'reason'   => "Would have {$major} major assessments in the week of {$label} — the WAT limit is " . WatRuleService::WEEKLY_MAJOR_MAX . ' per week.',
+                        'warnings' => [],
+                    ];
+                }
+            }
+        }
+
+        $warnings    = [];
+        $meetsByDate = [];
+        foreach ($sourceAssessments->filter(fn ($i) => $i->activity_date) as $item) {
+            $date = $item->activity_date->toDateString();
+            if (WatRuleService::isExamExempt($item->assessment_type, $target->school_year_id, $q, $date)) {
+                continue;
+            }
+            if (! array_key_exists($date, $meetsByDate)) {
+                $meetsByDate[$date] = WatRuleService::meetsOnDate($target->subject_id, $target->section_id, $target->school_year_id, $date);
+            }
+            if ($meetsByDate[$date] === false) {
+                $day     = Carbon::parse($date)->format('l, M d');
+                $warning = "{$target->subject_name} has no scheduled class with this section on {$day} — double-check the date.";
+                if (! in_array($warning, $warnings, true)) {
+                    $warnings[] = $warning;
+                }
+            }
+        }
+
+        return ['reason' => null, 'warnings' => $warnings];
+    }
 }

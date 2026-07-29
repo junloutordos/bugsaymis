@@ -450,6 +450,52 @@ async function copyFromRecord() {
   }
 }
 
+// ── Apply this setup to other sections (push direction) ───────────────────────
+
+const showApplyToSectionsModal = ref(false)
+const applyToSectionIds         = ref([])
+const applyingToSections        = ref(false)
+
+const applyEligibleRecords = computed(() =>
+  sameSubjectRecords.value.filter(r => r.school_year === props.currentSYName)
+)
+const applyPastYearRecords = computed(() =>
+  sameSubjectRecords.value.filter(r => r.school_year !== props.currentSYName)
+)
+
+function openApplyToSectionsModal() {
+  applyToSectionIds.value = []
+  showApplyToSectionsModal.value = true
+}
+
+async function applyToSections() {
+  if (!applyToSectionIds.value.length) return
+  applyingToSections.value = true
+  try {
+    const { data } = await axios.post(
+      route('class-records.assessments.apply-to-sections', { classRecord: props.classRecord.id, q: activeQuarter.value }),
+      { target_class_record_ids: applyToSectionIds.value }
+    )
+    showApplyToSectionsModal.value = false
+
+    const appliedLines = (data.applied ?? []).map(a => {
+      const warn = a.warnings?.length ? ` (${a.warnings.join(' ')})` : ''
+      return `✓ ${a.label}: ${a.count} assessment(s) applied${warn}`
+    })
+    const skippedLines = (data.skipped ?? []).map(s => `✗ ${s.label}: ${s.reason}`)
+
+    await Swal.fire({
+      icon: skippedLines.length && !appliedLines.length ? 'warning' : 'success',
+      title: 'Apply to Other Sections',
+      html: [...appliedLines, ...skippedLines].map(l => `<div class="text-left text-xs">${l}</div>`).join(''),
+    })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to apply setup.', 'error')
+  } finally {
+    applyingToSections.value = false
+  }
+}
+
 // ── Final annual grades ───────────────────────────────────────────────────────
 const showFinalGrades    = ref(false)
 const finalGrades        = ref([])
@@ -841,6 +887,16 @@ async function saveQuarterOption() {
             </AppButton>
           </div>
 
+          <!-- Apply-to-sections banner (shown once this quarter has assessments) -->
+          <div v-if="!isLocked && !isReadOnly && currentHasAssessments && sameSubjectRecords.length"
+            class="mb-4 flex flex-wrap items-center gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
+            <DocumentDuplicateIcon class="h-4 w-4 text-indigo-400 shrink-0" />
+            <span class="text-slate-600">Teach other sections of {{ classRecord.subject_name }}?</span>
+            <AppButton variant="secondary" size="sm" @click="openApplyToSectionsModal">
+              Apply This Setup to Other Sections…
+            </AppButton>
+          </div>
+
           <!-- WAT plotting rules reminder -->
           <div v-if="!isLocked && !isReadOnly"
             class="mb-4 bg-slate-50 border border-slate-100 text-slate-500 rounded-lg px-3 py-2 text-[11px]">
@@ -1081,6 +1137,32 @@ async function saveQuarterOption() {
       <AppButton variant="secondary" @click="showCopyFromRecordModal = false">Cancel</AppButton>
       <AppButton :loading="copyingFromRecord" :disabled="!copyFromRecordId || copyingFromRecord" @click="copyFromRecord">
         {{ copyingFromRecord ? 'Copying…' : 'Copy Assessments' }}
+      </AppButton>
+    </template>
+  </AppModal>
+
+  <!-- Apply-to-sections modal -->
+  <AppModal :show="showApplyToSectionsModal" title="Apply This Setup to Other Sections"
+    subtitle="Pushes this quarter's assessments (titles, dates, weights) to the sections you pick — each one is checked against its own grading option and WAT limits; anything ineligible is skipped and reported below."
+    size="md" @close="showApplyToSectionsModal = false">
+    <div class="space-y-3">
+      <div v-if="applyEligibleRecords.length" class="space-y-1.5 max-h-64 overflow-y-auto">
+        <label v-for="r in applyEligibleRecords" :key="r.id"
+          class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+          <input type="checkbox" :value="r.id" v-model="applyToSectionIds"
+            class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+          <span>{{ r.year_level_section }} <span class="text-slate-400">({{ r.school_year }})</span></span>
+        </label>
+      </div>
+      <p v-else class="text-sm text-slate-400">No other current-school-year sections found for this subject.</p>
+      <p v-if="applyPastYearRecords.length" class="text-xs text-slate-400">
+        {{ applyPastYearRecords.length }} section(s) from past school years aren't shown — they're read-only.
+      </p>
+    </div>
+    <template #footer>
+      <AppButton variant="secondary" @click="showApplyToSectionsModal = false">Cancel</AppButton>
+      <AppButton :loading="applyingToSections" :disabled="!applyToSectionIds.length || applyingToSections" @click="applyToSections">
+        {{ applyingToSections ? 'Applying…' : `Apply to ${applyToSectionIds.length || ''} Section(s)` }}
       </AppButton>
     </template>
   </AppModal>
