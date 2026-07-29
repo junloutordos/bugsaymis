@@ -197,4 +197,187 @@ class ClassRecordAssessmentControllerTest extends TestCase
             'class_record_student_id'    => $student->id,
         ]);
     }
+
+    // ── Apply this setup to other sections (push direction) ────────────────
+
+    public function test_apply_to_sections_copies_assessments_with_dates_to_a_valid_target(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $assessment = $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $assessment->update(['activity_date' => '2026-09-07']);
+
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(1, 'applied')
+            ->assertJsonCount(0, 'skipped');
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $targetQuarter->id,
+            'title'                   => 'Quiz 1',
+            'activity_date'           => '2026-09-07',
+        ]);
+    }
+
+    public function test_apply_to_sections_skips_target_with_mismatched_grading_option(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $assessment = $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $assessment->update(['activity_date' => '2026-09-07']);
+
+        $otherOption = GradingOption::create(['name' => 'Other', 'is_active' => true]);
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $targetQuarter->update(['grading_option_id' => $otherOption->id]);
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(0, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertStringContainsString('grading option', $response->json('skipped.0.reason'));
+    }
+
+    public function test_apply_to_sections_skips_target_that_already_has_assessments(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $assessment = $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $assessment->update(['activity_date' => '2026-09-07']);
+
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $this->makeAssessment($targetQuarter, 1, 'Existing');
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(0, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertSame('Already has assessments this quarter.', $response->json('skipped.0.reason'));
+    }
+
+    public function test_apply_to_sections_skips_target_that_would_exceed_the_daily_graded_cap(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $targetSection = $this->makeSection();
+
+        // Existing load already on the target section from an unrelated subject —
+        // the daily cap pools by section regardless of subject.
+        $otherSubject = Subject::create([
+            'school_year_id' => $this->sy->id, 'code' => 'SUBJ2', 'name' => 'Subject 2',
+            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
+            'grade_level' => 8, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $busyQuarter = $this->makeRecordAndQuarter($teacher, $targetSection, $otherSubject);
+        for ($i = 1; $i <= 3; $i++) {
+            $a = $this->makeAssessment($busyQuarter, $i, "Existing {$i}");
+            $a->update(['activity_date' => '2026-09-07']);
+        }
+
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $srcAssessment = $this->makeAssessment($sourceQuarter, 1, 'New Quiz');
+        $srcAssessment->update(['activity_date' => '2026-09-07']);
+
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $targetSection, $subject);
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(0, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertStringContainsString('WAT limit', $response->json('skipped.0.reason'));
+    }
+
+    public function test_apply_to_sections_skips_target_when_source_date_is_past_the_plotting_deadline(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $assessment = $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $assessment->update(['activity_date' => '2020-01-06']);
+
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(0, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertStringContainsString('plotting deadline', $response->json('skipped.0.reason'));
+    }
+
+    public function test_apply_to_sections_skips_target_belonging_to_a_different_teacher(): void
+    {
+        $teacher = User::factory()->create();
+        $otherTeacher = User::factory()->create();
+        $subject = $this->makeSubject();
+
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $assessment = $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $assessment->update(['activity_date' => '2026-09-07']);
+
+        $targetQuarter = $this->makeRecordAndQuarter($otherTeacher, $this->makeSection(), $subject);
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(0, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertSame('You do not have access to that class record.', $response->json('skipped.0.reason'));
+    }
+
+    public function test_apply_to_sections_applies_valid_targets_and_skips_invalid_ones_in_the_same_batch(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $assessment = $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $assessment->update(['activity_date' => '2026-09-07']);
+
+        $goodTargetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+
+        $busyTargetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $this->makeAssessment($busyTargetQuarter, 1, 'Already Here');
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [
+                $goodTargetQuarter->class_record_id, $busyTargetQuarter->class_record_id,
+            ]])
+            ->assertOk()
+            ->assertJsonCount(1, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $goodTargetQuarter->id,
+            'title'                   => 'Quiz 1',
+        ]);
+    }
 }
