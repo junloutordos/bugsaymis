@@ -189,6 +189,14 @@ class LeaveApplicationController extends Controller
 
         $approver = Auth::user();
 
+        // Nobody may act on their own leave application at any stage — even if
+        // they separately hold HR Officer/Division Chief/Campus Director permission.
+        abort_if(
+            $leaveApplication->user_id === $approver->id,
+            403,
+            'You cannot act on your own leave application.'
+        );
+
         // Division Chiefs may only act on leave from their own division
         if ($data['stage'] === 'division_chief' && ! $approver->isSuperAdmin()) {
             $divisionIds = \App\Models\Division::where('division_chief_id', $approver->id)

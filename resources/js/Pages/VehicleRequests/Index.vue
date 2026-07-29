@@ -247,7 +247,7 @@ async function handleNewRequest() {
             <div class="flex items-center gap-1 justify-center">
               <AppIconButton v-if="roleName === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'" label="Edit request" size="sm" @click.prevent="openModal(req)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
               <AppIconButton v-if="roleName === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'" label="Delete request" variant="danger" size="sm" @click.prevent="destroy(req)"><TrashIcon class="w-4 h-4" /></AppIconButton>
-              <AppIconButton v-if="hasAnyRole('Administrator','GSU Head') && ['Approved','FAD Approved','OCD Approved'].includes(req.status) && !req.driver" label="Assign driver" size="sm" @click.prevent="openAssignDriverModal(req)"><UserIcon class="w-4 h-4" /></AppIconButton>
+              <AppIconButton v-if="hasAnyRole('Administrator','GSU Head') && ['Pending FAD Approval','Approved','FAD Approved','OCD Approved'].includes(req.status) && !req.driver" label="Assign driver" size="sm" @click.prevent="openAssignDriverModal(req)"><UserIcon class="w-4 h-4" /></AppIconButton>
               <AppIconButton v-if="hasAnyRole('Administrator','GSU Head') && (req.status === 'OCD Approved' || req.status === 'Completed')" label="Print request" size="sm" @click.prevent="openPrint(req)"><PrinterIcon class="w-4 h-4" /></AppIconButton>
               <AppButton v-if="req.status === 'OCD Approved' && req.requestor_id === page.props.auth.user.id" size="sm" variant="success" @click.prevent="openCsmModal(req)">Confirm &amp; Rate</AppButton>
             </div>
@@ -276,7 +276,7 @@ async function handleNewRequest() {
             <div class="flex flex-wrap items-center gap-2">
               <AppButton v-if="roleName === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'" size="sm" class="flex-1" @click.prevent="openModal(req)"><PencilSquareIcon class="w-4 h-4" /> Edit</AppButton>
               <AppIconButton v-if="roleName === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'" label="Delete request" variant="danger" @click.prevent="destroy(req)"><TrashIcon class="w-4 h-4" /></AppIconButton>
-              <AppButton v-if="hasAnyRole('Administrator','GSU Head') && ['Approved','FAD Approved','OCD Approved'].includes(req.status) && !req.driver" size="sm" variant="secondary" @click.prevent="openAssignDriverModal(req)"><UserIcon class="w-4 h-4" /> Assign</AppButton>
+              <AppButton v-if="hasAnyRole('Administrator','GSU Head') && ['Pending FAD Approval','Approved','FAD Approved','OCD Approved'].includes(req.status) && !req.driver" size="sm" variant="secondary" @click.prevent="openAssignDriverModal(req)"><UserIcon class="w-4 h-4" /> Assign</AppButton>
               <AppButton v-if="hasAnyRole('Administrator','GSU Head') && (req.status === 'OCD Approved' || req.status === 'Completed')" size="sm" variant="secondary" @click.prevent="openPrint(req)"><PrinterIcon class="w-4 h-4" /> Print</AppButton>
               <AppButton v-if="req.status === 'OCD Approved' && req.requestor_id === page.props.auth.user.id" size="sm" variant="success" class="flex-1" @click.prevent="openCsmModal(req)">Confirm &amp; Rate</AppButton>
             </div>
