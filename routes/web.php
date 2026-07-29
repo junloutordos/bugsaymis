@@ -2368,6 +2368,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from',        [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFrom'])->name('class-records.assessments.copy-from');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from-record', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFromRecord'])->name('class-records.assessments.copy-from-record');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/apply-to-sections', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'applyToSections'])->name('class-records.assessments.apply-to-sections');
+    Route::post('/class-records/{classRecord}/quarters/{q}/assessments/{assessment}/request-deletion', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'requestDeletion'])->name('class-records.assessments.request-deletion');
     Route::get('/class-records/{classRecord}/section-calendar', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'sectionCalendar'])->name('class-records.assessments.section-calendar');
 
     // Students

@@ -101,6 +101,7 @@ class ClassRecordPageController extends Controller
             'gradingOption.categories',
             'quarters.gradingOption.categories',
             'quarters.assessments.gradingCategory',
+            'quarters.assessments.pendingDeletionRequest',
             'quarters.students',
         ]);
 

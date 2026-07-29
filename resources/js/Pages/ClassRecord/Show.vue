@@ -25,6 +25,8 @@ import {
   PlayCircleIcon,
   CalendarDaysIcon,
   BoltIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 import AppDatePicker from '@/Components/AppDatePicker.vue'
 import ScoreGrid from './components/ScoreGrid.vue'
@@ -145,6 +147,7 @@ function buildDraft(quarter) {
         _db_id:              found?.id ?? null,  // track DB id for delete validation
         _prevDate:           found?.activity_date ?? '',
         _dateWarning:        null,
+        _pendingDeletion:    !!found?.pending_deletion_request,
       })
     }
   }
@@ -171,6 +174,21 @@ function addAssessmentRow(catId) {
 async function removeAssessmentRow(catId, idx) {
   const row = assessmentDraft.value[catId][idx]
 
+  if (row._pendingDeletion) {
+    await Swal.fire('Deletion Already Requested', 'A deletion request for this assessment is awaiting Assistant CID Chief for Academic Affairs approval.', 'info')
+    return
+  }
+
+  // Plotted (dated) + already-saved assessments are considered announced to
+  // students — they can no longer be dropped from the grid directly. File a
+  // deletion request instead; the row stays until ACIDAA acts on it.
+  if (row._db_id && row.activity_date) {
+    requestDeletionRow.value = row
+    requestDeletionReason.value = ''
+    showRequestDeletionModal.value = true
+    return
+  }
+
   // If it has a DB assessment ID, check if scores exist
   if (row._db_id) {
     try {
@@ -188,6 +206,39 @@ async function removeAssessmentRow(catId, idx) {
   assessmentDraft.value[catId].splice(idx, 1)
   // Re-number remaining rows
   assessmentDraft.value[catId].forEach((r, i) => { r.assessment_number = i + 1 })
+}
+
+// ── Request deletion of a plotted assessment (ACIDAA approval required) ───────
+
+const showRequestDeletionModal = ref(false)
+const requestDeletionRow = ref(null)
+const requestDeletionReason = ref('')
+const submittingDeletionRequest = ref(false)
+
+async function submitDeletionRequest() {
+  const row = requestDeletionRow.value
+  if (! row || ! requestDeletionReason.value.trim()) return
+
+  submittingDeletionRequest.value = true
+  try {
+    await axios.post(
+      route('class-records.assessments.request-deletion', {
+        classRecord: props.classRecord.id, q: activeQuarter.value, assessment: row._db_id,
+      }),
+      { reason: requestDeletionReason.value }
+    )
+    row._pendingDeletion = true
+    showRequestDeletionModal.value = false
+    await Swal.fire({
+      icon: 'success', title: 'Deletion requested',
+      text: 'Awaiting Assistant CID Chief for Academic Affairs approval.',
+      timer: 2000, showConfirmButton: false,
+    })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to submit deletion request.', 'error')
+  } finally {
+    submittingDeletionRequest.value = false
+  }
 }
 
 const savingSetup = ref(false)
@@ -974,7 +1025,18 @@ async function saveQuarterOption() {
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
                       <td v-if="!isLocked && !isReadOnly" class="px-2 py-2 text-center">
-                        <AppIconButton label="Remove this assessment row" variant="danger" size="sm"
+                        <span v-if="row._pendingDeletion"
+                          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap cursor-pointer"
+                          title="Awaiting Assistant CID Chief for Academic Affairs approval"
+                          @click="removeAssessmentRow(cat.id, rIdx)">
+                          <ClockIcon class="h-3 w-3" /> Deletion Requested
+                        </span>
+                        <AppIconButton v-else-if="row._db_id && row.activity_date"
+                          label="Request deletion (already plotted / announced to students)" variant="danger" size="sm"
+                          @click="removeAssessmentRow(cat.id, rIdx)">
+                          <ExclamationTriangleIcon class="h-4 w-4" />
+                        </AppIconButton>
+                        <AppIconButton v-else label="Remove this assessment row" variant="danger" size="sm"
                           @click="removeAssessmentRow(cat.id, rIdx)">
                           <XMarkIcon class="h-4 w-4" />
                         </AppIconButton>
@@ -1137,6 +1199,30 @@ async function saveQuarterOption() {
       <AppButton variant="secondary" @click="showCopyFromRecordModal = false">Cancel</AppButton>
       <AppButton :loading="copyingFromRecord" :disabled="!copyFromRecordId || copyingFromRecord" @click="copyFromRecord">
         {{ copyingFromRecord ? 'Copying…' : 'Copy Assessments' }}
+      </AppButton>
+    </template>
+  </AppModal>
+
+  <!-- Request deletion modal -->
+  <AppModal :show="showRequestDeletionModal" title="Request Assessment Deletion"
+    subtitle="This assessment is already plotted and announced to students — it can only be removed once the Assistant CID Chief for Academic Affairs approves. State your reason below."
+    size="md" @close="showRequestDeletionModal = false">
+    <div class="space-y-3">
+      <p v-if="requestDeletionRow" class="text-sm text-slate-600">
+        <strong>{{ requestDeletionRow.title || 'Untitled assessment' }}</strong>
+        — {{ requestDeletionRow.activity_date }}
+      </p>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Reason for Deletion <span class="text-danger-500">*</span></label>
+        <textarea v-model="requestDeletionReason" rows="3" maxlength="1000"
+          placeholder="Why does this assessment need to be removed?"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+      </div>
+    </div>
+    <template #footer>
+      <AppButton variant="secondary" @click="showRequestDeletionModal = false">Cancel</AppButton>
+      <AppButton :loading="submittingDeletionRequest" :disabled="!requestDeletionReason.trim() || submittingDeletionRequest" @click="submitDeletionRequest">
+        {{ submittingDeletionRequest ? 'Submitting…' : 'Submit Request' }}
       </AppButton>
     </template>
   </AppModal>

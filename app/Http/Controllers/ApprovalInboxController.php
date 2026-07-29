@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\ClassRecord\ClassRecordAssessmentController;
 use App\Http\Controllers\ComputerLabScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\HR\LeaveApplicationController;
 use App\Http\Controllers\HumanResource\GatePassController;
+use App\Models\ClassRecord\ClassRecordAssessmentDeletionRequest;
 use App\Models\ComputerLabScheduleApproval;
 use App\Models\Division;
 use App\Models\FacilityRequest;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\HR\LeaveApplication;
 use App\Models\ITJobRequest;
 use App\Models\MessengerialRequest;
@@ -40,6 +44,7 @@ class ApprovalInboxController extends Controller
         'pms_schedules',
         'class_schedules',
         'computer_lab_schedules',
+        'assessment_deletion_requests',
     ];
 
     /**
@@ -145,7 +150,25 @@ class ApprovalInboxController extends Controller
     {
         return $user->hasAnyRole(['Administrator', 'DivisionChief', 'GSU Head', 'OCD', 'FAD Chief'])
             || str_contains($user->position ?? '', 'FAD')
-            || $user->hasPermission('hr.leave.approve');
+            || $user->hasPermission('hr.leave.approve')
+            || $this->holdsAcidaaDesignation($user);
+    }
+
+    /**
+     * Whether $user currently holds the ACIDAA (Assistant CID Chief for
+     * Academic Affairs) load assignment for the current school year — same
+     * lookup as ApprovalInboxService/ClassRecordAssessmentController.
+     */
+    private function holdsAcidaaDesignation($user): bool
+    {
+        $designationIds = Designation::whereIn('code', ['ACIDAA', 'SUP-ACIDAA'])
+            ->orWhere('name', 'like', 'Assistant CID Chief for Academic Affairs%')
+            ->pluck('id');
+
+        return LoadAssignment::whereIn('designation_id', $designationIds)
+            ->where('user_id', $user->id)
+            ->whereHas('schoolYear', fn ($q) => $q->where('is_current', true))
+            ->exists();
     }
 
     /**
@@ -243,6 +266,14 @@ class ApprovalInboxController extends Controller
                 }
 
                 return [ComputerLabScheduleApproval::class, $record];
+
+            case 'assessment_deletion_requests':
+                $record = ClassRecordAssessmentDeletionRequest::find($id);
+                if (! $record) {
+                    abort(404);
+                }
+
+                return [ClassRecordAssessmentDeletionRequest::class, $record];
         }
 
         abort(404);
@@ -394,6 +425,12 @@ class ApprovalInboxController extends Controller
                     break;
                 }
                 abort(403);
+
+            case 'assessment_deletion_requests':
+                if ($this->holdsAcidaaDesignation($user) || $user->isSuperAdmin()) {
+                    break;
+                }
+                abort(403);
         }
     }
 
@@ -414,6 +451,7 @@ class ApprovalInboxController extends Controller
             'pms_schedules' => ['pending'],
             'class_schedules' => ['pending_ocd'],
             'computer_lab_schedules' => ['pending_approval'],
+            'assessment_deletion_requests' => ['pending'],
         ];
 
         $allowed = $pendingStatuses[$type] ?? [];
@@ -540,6 +578,10 @@ class ApprovalInboxController extends Controller
             case 'computer_lab_schedules':
                 return app(ComputerLabScheduleApprovalController::class)
                     ->approve($request, $record);
+
+            case 'assessment_deletion_requests':
+                return app(ClassRecordAssessmentController::class)
+                    ->approveDeletionRequest($request, $record);
         }
 
         abort(404);
@@ -658,6 +700,10 @@ class ApprovalInboxController extends Controller
 
                 return app(ComputerLabScheduleApprovalController::class)
                     ->returnForRevision($request, $record);
+
+            case 'assessment_deletion_requests':
+                return app(ClassRecordAssessmentController::class)
+                    ->declineDeletionRequest($request, $record);
         }
 
         abort(404);

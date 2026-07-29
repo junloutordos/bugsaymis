@@ -5,13 +5,18 @@ namespace App\Http\Controllers\ClassRecord;
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
+use App\Models\ClassRecord\ClassRecordAssessmentDeletionRequest;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\LoadAssignment;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\User;
 use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use App\Services\ClassRecord\WatRuleService;
+use App\Services\NotificationService;
 use App\Services\PersonNameFormatter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -302,6 +307,19 @@ class ClassRecordAssessmentController extends Controller
         $toDeleteIds = $existingById->keys()->diff($incomingIds)->values();
 
         if ($toDeleteIds->isNotEmpty()) {
+            // Once plotted (dated), an assessment is considered announced to
+            // students — it can no longer be silently dropped from the grid.
+            // Deletion from here on requires ACIDAA approval via
+            // requestDeletion()/approveDeletionRequest(), not a plain save.
+            $plotted = $existingById->only($toDeleteIds->all())->filter(fn ($a) => $a->activity_date !== null);
+            if ($plotted->isNotEmpty()) {
+                $titles = $plotted->pluck('title')->implode('", "');
+                return response()->json([
+                    'message' => "Cannot save — \"{$titles}\" is already plotted and announced to students. Use \"Request Deletion\" on that row instead; it can only be removed once the Assistant CID Chief for Academic Affairs approves.",
+                    'errors'  => ['assessments' => ['One or more removed assessments are already plotted.']],
+                ], 422);
+            }
+
             $blockedIds = ClassRecordScore::whereIn('class_record_assessment_id', $toDeleteIds)
                 ->distinct()
                 ->pluck('class_record_assessment_id');
@@ -711,5 +729,162 @@ class ClassRecordAssessmentController extends Controller
         }
 
         return ['reason' => null, 'warnings' => $warnings];
+    }
+
+    // ── POST /class-records/{cr}/quarters/{q}/assessments/{assessment}/request-deletion ──
+
+    /**
+     * A plotted (dated) assessment is considered announced to students —
+     * removing it is no longer a self-service action. This files a pending
+     * request for the ACIDAA (Assistant CID Chief for Academic Affairs) to
+     * approve or reject via the Approval Inbox; the assessment itself is
+     * untouched until then.
+     */
+    public function requestDeletion(Request $request, ClassRecord $classRecord, int $q, ClassRecordAssessment $assessment): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
+
+        $quarter = $this->resolveQuarter($classRecord, $q);
+        abort_if($quarter->is_locked, 403, 'Quarter is locked.');
+        abort_unless($assessment->class_record_quarter_id === $quarter->id, 404);
+
+        abort_if(! $assessment->activity_date, 422, 'This assessment isn\'t plotted yet — remove it directly from the Setup tab.');
+
+        $hasScores = ClassRecordScore::where('class_record_assessment_id', $assessment->id)
+            ->whereNotNull('score')->exists();
+        abort_if($hasScores, 422, 'This assessment already has scores entered. Clear its scores first before requesting deletion.');
+
+        abort_if(
+            ClassRecordAssessmentDeletionRequest::where('class_record_assessment_id', $assessment->id)
+                ->where('status', 'pending')->exists(),
+            422,
+            'A deletion request is already pending for this assessment.'
+        );
+
+        $validated = $request->validate(['reason' => 'required|string|max:1000']);
+
+        $category = $assessment->gradingCategory;
+
+        $deletionRequest = ClassRecordAssessmentDeletionRequest::create([
+            'class_record_assessment_id' => $assessment->id,
+            'class_record_quarter_id'    => $quarter->id,
+            'title'                      => $assessment->title,
+            'assessment_number'          => $assessment->assessment_number,
+            'category_code'              => $category?->code,
+            'category_name'              => $category?->name,
+            'activity_date'              => $assessment->activity_date,
+            'max_score'                  => $assessment->max_score,
+            'requested_by_id'            => Auth::id(),
+            'reason'                     => $validated['reason'],
+            'status'                     => 'pending',
+        ]);
+
+        if ($acidaa = $this->resolveAcidaaHolder($classRecord->school_year_id)) {
+            NotificationService::notifyUser(
+                $acidaa,
+                'Assessment Deletion Request',
+                "#{$deletionRequest->id}",
+                'Pending your approval',
+                route('approvals.inbox'),
+                "\"{$assessment->title}\" — {$classRecord->subject_name}"
+            );
+        }
+
+        return response()->json([
+            'message' => 'Deletion request submitted — it will be removed once the Assistant CID Chief for Academic Affairs approves.',
+        ]);
+    }
+
+    /**
+     * Approve a pending deletion request: deletes the assessment (its
+     * scores would cascade, but requestDeletion() never lets a scored
+     * assessment reach 'pending' in the first place) and notifies the
+     * requesting teacher.
+     */
+    public function approveDeletionRequest(Request $request, ClassRecordAssessmentDeletionRequest $deletionRequest)
+    {
+        $assessment = $deletionRequest->assessment;
+        $classRecord = $deletionRequest->quarter?->classRecord;
+
+        if ($assessment) {
+            $assessment->delete();
+        }
+
+        $deletionRequest->update([
+            'status'          => 'approved',
+            'reviewed_by_id'  => Auth::id(),
+            'reviewed_at'     => now(),
+            'review_remarks'  => $request->input('remarks'),
+        ]);
+
+        if ($teacher = $deletionRequest->requestedBy) {
+            NotificationService::notifyUser(
+                $teacher,
+                'Assessment Deletion Request',
+                "#{$deletionRequest->id}",
+                'Approved',
+                $classRecord ? route('class-records.show', $classRecord->id) : route('class-records.index'),
+                "\"{$deletionRequest->title}\" has been deleted."
+            );
+        }
+
+        return back()->with('success', 'Assessment deleted.');
+    }
+
+    /**
+     * Decline a pending deletion request: the assessment is left untouched
+     * and can be re-requested later; the teacher is notified with the
+     * reviewer's remarks.
+     */
+    public function declineDeletionRequest(Request $request, ClassRecordAssessmentDeletionRequest $deletionRequest)
+    {
+        $classRecord = $deletionRequest->quarter?->classRecord;
+
+        $deletionRequest->update([
+            'status'          => 'rejected',
+            'reviewed_by_id'  => Auth::id(),
+            'reviewed_at'     => now(),
+            'review_remarks'  => $request->input('reason'),
+        ]);
+
+        if ($teacher = $deletionRequest->requestedBy) {
+            NotificationService::notifyUser(
+                $teacher,
+                'Assessment Deletion Request',
+                "#{$deletionRequest->id}",
+                'Declined',
+                $classRecord ? route('class-records.show', $classRecord->id) : route('class-records.index'),
+                $request->input('reason')
+            );
+        }
+
+        return back()->with('success', 'Deletion request declined.');
+    }
+
+    /**
+     * The current holder of the ACIDAA (Assistant CID Chief for Academic
+     * Affairs) designation, resolved the same way IPCRWorkflowService does:
+     * via the current school year's load_assignments row carrying the
+     * ACIDAA designation code. Kept local to Class Record rather than
+     * reaching into IPCRWorkflowService's private lookup.
+     */
+    private function resolveAcidaaHolder(?int $schoolYearId): ?User
+    {
+        $schoolYearId ??= SchoolYear::where('is_current', true)->value('id');
+        if (! $schoolYearId) {
+            return null;
+        }
+
+        $designationIds = Designation::whereIn('code', ['ACIDAA', 'SUP-ACIDAA'])
+            ->orWhere('name', 'like', 'Assistant CID Chief for Academic Affairs%')
+            ->pluck('id');
+
+        $userId = LoadAssignment::whereIn('designation_id', $designationIds)
+            ->where('school_year_id', $schoolYearId)
+            ->latest('id')
+            ->value('user_id');
+
+        return $userId ? User::find($userId) : null;
     }
 }
