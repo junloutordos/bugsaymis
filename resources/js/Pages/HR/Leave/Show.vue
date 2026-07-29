@@ -163,12 +163,12 @@
       <!-- Approve Modal -->
       <AppModal :show="approveModal" title="Review Leave Application" @close="approveModal = false">
         <div class="space-y-4">
-          <!-- Stage selection -->
-          <AppSelect v-model="approveForm.stage" label="Review Stage" :show-blank="false">
-            <option value="hr_officer">HR Officer — Certification of Leave Credits</option>
-            <option value="division_chief">Division Chief — Recommendation</option>
-            <option value="campus_director">Campus Director — Final Approval</option>
-          </AppSelect>
+          <!-- Stage — fixed to whatever stage this application is actually at;
+               not user-selectable, so a reviewer can't skip ahead of the workflow. -->
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Review Stage</label>
+            <p class="text-sm font-medium text-slate-800">{{ stageLabel(approveForm.stage) }}</p>
+          </div>
 
           <!-- Action -->
           <div>
@@ -210,7 +210,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
@@ -218,7 +218,6 @@ import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppModal from '@/Components/AppModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import { PrinterIcon, PaperClipIcon } from '@heroicons/vue/24/outline'
 import { confirmAction } from '@/Composables/useConfirm'
@@ -232,7 +231,7 @@ const props = defineProps({
 const page = usePage()
 const me = page.props.auth?.user
 
-const canApprove = me?.permissions?.includes('hr.leave.approve')
+const canApprove = me?.permissions?.includes('hr.leave.approve') && props.application.user_id !== me?.id
 const canCancel  = computed(() =>
   props.application.user_id === me?.id &&
   ['pending', 'hr_verified', 'forwarded'].includes(props.application.status)
@@ -247,6 +246,14 @@ function defaultStage() {
   if (s === 'hr_verified') return 'division_chief'
   if (s === 'forwarded')   return 'campus_director'
   return 'hr_officer'
+}
+
+function stageLabel(stage) {
+  return {
+    hr_officer:       'HR Officer — Certification of Leave Credits',
+    division_chief:   'Division Chief — Recommendation',
+    campus_director:  'Campus Director — Final Approval',
+  }[stage] ?? stage
 }
 
 function defaultAction(stage) {
@@ -285,10 +292,6 @@ const actionOptions = computed(() => {
     { value: 'approved', label: 'Approve' },
     { value: 'rejected', label: 'Reject' },
   ]
-})
-
-watch(() => approveForm.stage, (stage) => {
-  approveForm.action = defaultAction(stage)
 })
 
 function submitApprove() {

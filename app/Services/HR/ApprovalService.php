@@ -48,6 +48,22 @@ class ApprovalService
         User             $approver,
     ): void {
         DB::transaction(function () use ($application, $stage, $action, $remarks, $approver) {
+            // Enforce the serial workflow — a stage can only be processed while
+            // the application is sitting at the status that stage is meant to act on.
+            // Without this, the "Review Stage" selector lets any authorized approver
+            // skip stages (e.g. jump straight to Campus Director on a still-pending app).
+            $expectedStatus = [
+                'hr_officer'       => 'pending',
+                'division_chief'   => 'hr_verified',
+                'campus_director'  => 'forwarded',
+            ][$stage] ?? null;
+
+            abort_unless(
+                $expectedStatus !== null && $application->status === $expectedStatus,
+                409,
+                "This application is not currently awaiting the {$stage} stage (current status: {$application->status})."
+            );
+
             switch ($stage) {
 
                 case 'hr_officer':
