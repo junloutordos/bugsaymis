@@ -326,12 +326,12 @@ function studentTotals(studentId) {
                 <span v-if="d.is_graded" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 rounded px-1 shrink-0" title="Scored in the Weekly Assessment Tracker">Graded</span>
                 <button v-if="!isLocked && !d.is_graded" @click="editTitle(d)"
                   class="p-0.5 rounded hover:bg-indigo-50 shrink-0 transition-all"
-                  :class="d.title ? 'text-indigo-500' : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-indigo-500'"
+                  :class="d.title ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-500'"
                   :title="d.title ? `Activity: ${d.title} (click to edit)` : 'Set an activity name (shows on the WAT print)'">
                   <PencilIcon class="h-3 w-3" />
                 </button>
                 <button v-if="!isLocked && !d.is_graded" @click="gradeDate(d)"
-                  class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 transition-all"
+                  class="p-0.5 rounded hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 transition-all"
                   title="Grade this ILA (locks in like any WAT assessment — no later than 12:00 NN the Friday before its week)">
                   <AcademicCapIcon class="h-3 w-3" />
                 </button>
@@ -341,7 +341,7 @@ function studentTotals(studentId) {
                   <ArrowUturnLeftIcon class="h-3 w-3" />
                 </button>
                 <button v-if="!isLocked && !d.is_graded" @click="removeDate(d)"
-                  class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-all"
+                  class="p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-all"
                   title="Remove this date">
                   <XMarkIcon class="h-3 w-3" />
                 </button>
