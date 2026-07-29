@@ -107,11 +107,17 @@ class DTRService
             // Determine day type
             [$dayType, $isWorkDay] = $this->getDayType($dateStr, $date, $schedule, $holidays);
 
-            // Skip rest days entirely — weekend/off-day punches are not counted
+            // Rest days (weekend / scheduled off-day) are skipped UNLESS the
+            // employee actually has biometric punches that day — e.g. COS or
+            // Plantilla staff who rendered weekend overtime. In that case we
+            // still generate the record so the punches show up on the DTR,
+            // but there is no scheduled time to compare against, so late /
+            // undertime / overtime are not computed (see below).
             $logsForDay = $this->getLogsForShift($allLogs, $dateStr, $schedule);
-            if ($dayType === 'rest_day') {
+            if ($dayType === 'rest_day' && $logsForDay->isEmpty()) {
                 continue;
             }
+            $isWorkedRestDay = $dayType === 'rest_day' && $logsForDay->isNotEmpty();
 
             // Find approved leave covering this date
             $leave = $leaves->first(
@@ -160,9 +166,18 @@ class DTRService
             $isOvernight      = $schedule && $schedule->isOvernightShift($dateStr);
             $lunchDuration    = $this->getLunchDurationMinutes($dateStr, $schedule);
             $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight, $lunchDuration);
-            $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $dateStr, $schedule);
-            $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $dateStr, $schedule);
-            $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
+            if ($isWorkedRestDay) {
+                // No scheduled time-in/out exists for a rest day — punches are
+                // reflected as-is and counted as regular hours, with no
+                // late/undertime/overtime comparison against a weekday schedule.
+                $lateMinutes      = 0.0;
+                $undertimeMinutes = 0.0;
+                $overtimeMinutes  = 0.0;
+            } else {
+                $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $dateStr, $schedule);
+                $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $dateStr, $schedule);
+                $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
+            }
 
             // Determine attendance status.
             // WFH days (no biometric logs, no online punch, WFH attendance present)
@@ -216,7 +231,10 @@ class DTRService
                     'overtime_minutes'     => round($overtimeMinutes, 2),
                     'gatepass_deduction_minutes' => round($gpDeduction['total'], 2),
                     'gatepass_undertime_minutes' => round($gpDeduction['undertime'], 2),
-                    'day_type'             => $dayType,
+                    // A worked rest day (weekend punches present) is stored as
+                    // a regular day so it prints/displays actual time punches
+                    // instead of the "SATURDAY"/"SUNDAY" rest-day placeholder.
+                    'day_type'             => $isWorkedRestDay ? 'regular' : $dayType,
                     'attendance_status'    => $attendanceStatus,
                     'leave_application_id' => $leave?->id,
                     'wfh_attendance_id'    => $usedWfh ? $wfh->id : null,
@@ -490,9 +508,21 @@ class DTRService
         $isOvernight      = $schedule && $schedule->isOvernightShift($date);
         $lunchDuration    = $this->getLunchDurationMinutes($date, $schedule);
         $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight, $lunchDuration);
-        $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $date, $schedule);
-        $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $date, $schedule);
-        $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
+
+        // A day is only a scheduled work day if the schedule (or the Mon-Fri
+        // default) actually covers it. Weekend/off-day punches (e.g. weekend
+        // overtime) have no scheduled time to compare against, so late /
+        // undertime / overtime stay at zero — same rule generate() applies.
+        $isScheduledDay = $schedule ? $schedule->isWorkDay($date) : ! Carbon::parse($date)->isWeekend();
+        if ($isScheduledDay) {
+            $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $date, $schedule);
+            $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $date, $schedule);
+            $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
+        } else {
+            $lateMinutes      = 0.0;
+            $undertimeMinutes = 0.0;
+            $overtimeMinutes  = 0.0;
+        }
 
         // Re-derive attendance status unless it is a protected status that was
         // set during generation from a data source recompute() doesn't reload
