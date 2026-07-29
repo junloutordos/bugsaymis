@@ -29,6 +29,7 @@ class ClassRecordIlaGradingTest extends TestCase
     use RefreshDatabase;
 
     private SchoolYear $sy;
+    private AcademicTerm $term;
     private GradingOption $option;
     private GradingCategory $category;
 
@@ -45,7 +46,7 @@ class ClassRecordIlaGradingTest extends TestCase
             'name' => '2025-2026', 'start_date' => '2025-08-01', 'end_date' => '2026-06-30',
             'is_current' => true, 'status' => 'active',
         ]);
-        AcademicTerm::create([
+        $this->term = AcademicTerm::create([
             'school_year_id' => $this->sy->id, 'name' => '1st Semester', 'term_type' => '1st_semester',
             'start_date' => '2025-08-01', 'end_date' => '2026-01-15', 'is_current' => true,
         ]);
@@ -379,6 +380,59 @@ class ClassRecordIlaGradingTest extends TestCase
         $this->assertFalse($ilaItem['is_graded']);
         $this->assertSame(0, $monday['graded_count'], 'Non-graded ILA entries must not count toward the daily graded cap.');
         $this->assertSame(0, $wat['totals']['graded']);
+    }
+
+    public function test_non_graded_ila_item_resolves_time_label_from_matching_class_schedule(): void
+    {
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $record  = $this->makeRecord($teacher, $section, $subject);
+        $quarter = $this->makeQuarter($record);
+        $this->makeIlaDate($quarter);
+        // self::ILA_DATE (2026-08-03) is a Monday.
+        \App\Models\FacultyLoading\ClassSchedule::create([
+            'user_id' => $teacher->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id, 'day_of_week' => 'Monday',
+            'start_time' => '15:30:00', 'end_time' => '16:00:00', 'status' => 'active',
+        ]);
+
+        $wat = WatRuleService::weekData($section->id, $this->sy->id, self::ILA_DATE);
+
+        $monday = collect($wat['days'])->firstWhere('date', self::ILA_DATE);
+        $ilaItem = collect($monday['items'])->firstWhere('assessment_type', 'ila');
+        $this->assertSame('15:30–16:00', $ilaItem['time_label']);
+    }
+
+    public function test_non_graded_ila_item_uses_the_faculty_set_activity_title_when_present(): void
+    {
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $record  = $this->makeRecord($teacher, $section, $this->makeSubject());
+        $quarter = $this->makeQuarter($record);
+        $ilaDate = $this->makeIlaDate($quarter);
+        $ilaDate->update(['title' => 'Reading Comprehension Worksheet']);
+
+        $wat = WatRuleService::weekData($section->id, $this->sy->id, self::ILA_DATE);
+
+        $monday = collect($wat['days'])->firstWhere('date', self::ILA_DATE);
+        $ilaItem = collect($monday['items'])->firstWhere('assessment_type', 'ila');
+        $this->assertSame('Reading Comprehension Worksheet', $ilaItem['title']);
+    }
+
+    public function test_non_graded_ila_item_falls_back_to_the_generic_label_without_a_title(): void
+    {
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $record  = $this->makeRecord($teacher, $section, $this->makeSubject());
+        $quarter = $this->makeQuarter($record);
+        $this->makeIlaDate($quarter);
+
+        $wat = WatRuleService::weekData($section->id, $this->sy->id, self::ILA_DATE);
+
+        $monday = collect($wat['days'])->firstWhere('date', self::ILA_DATE);
+        $ilaItem = collect($monday['items'])->firstWhere('assessment_type', 'ila');
+        $this->assertSame('Independent Learning Activity', $ilaItem['title']);
     }
 
     public function test_graded_ila_date_counts_toward_wat_totals(): void

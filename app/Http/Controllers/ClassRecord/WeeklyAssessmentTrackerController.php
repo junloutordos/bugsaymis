@@ -357,9 +357,18 @@ class WeeklyAssessmentTrackerController extends Controller
             ->distinct()
             ->pluck('section_id');
 
+        // A ClassRecord can end up pointing at a stray/legacy section row
+        // (pre-dating the Faculty Loading school_year_id column, or never
+        // properly retired) that isn't tagged to the current school year on
+        // EITHER the legacy syid or the FL-native school_year_id column —
+        // Faculty Loading's own Sections admin page already excludes those
+        // the same way. Without this, such a row can surface here as a
+        // phantom "extra" section for a grade that otherwise has only one
+        // real homeroom of that name.
         $sections = Section::whereIn('id', $sectionIds)
             ->where('sectionname', 'not like', 'SCI-%')
             ->where('sectionname', 'not like', 'ELEC-%')
+            ->where(fn ($q) => $q->where('syid', $schoolYearId)->orWhere('school_year_id', $schoolYearId))
             ->get(['id', 'sectionname', 'levelid']);
 
         if (! $canReview) {
