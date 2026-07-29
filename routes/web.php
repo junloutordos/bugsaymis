@@ -650,6 +650,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('permission:facilities.dc-approve');
     Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
 
+    // Authenticated in-app approve/decline by GSU Head
+    Route::post('/work-requests/{workRequest}/gsu-approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInAppGSU'])->name('work-requests.gsu-approve.inapp')->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/gsu-decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInAppGSU'])->name('work-requests.gsu-decline.inapp')->middleware('permission:facilities.manage');
+
     Route::get('/work-requests/{workRequest}/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showDeclineForm'])
         ->name('work-requests.decline')
         ->middleware(['signed']);

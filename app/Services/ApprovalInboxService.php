@@ -222,7 +222,7 @@ class ApprovalInboxService
             $this->mergeOrAddTab($tabs, 'facility_requests', 'Facility Requests', $frGSU);
 
             $wrGSU = WorkRequest::with(['requester:id,name', 'division:id,name', 'office:id,name'])
-                ->where('status', 'GSU Approved')->latest()->get()
+                ->where('status', 'Pending GSU Approval')->latest()->get()
                 ->map(fn ($r) => $this->normaliseWorkRequest($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'work_requests', 'Work Requests', $wrGSU);
         }

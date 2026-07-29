@@ -346,7 +346,7 @@ class ApprovalInboxController extends Controller
                         break;
                     }
                 }
-                if ($isFAD) {
+                if ($isFAD || $isGSU) {
                     break;
                 }
                 abort(403);
@@ -443,7 +443,7 @@ class ApprovalInboxController extends Controller
             'it_job_requests' => ['Pending Division Chief Approval', 'Pending OCD Approval'],
             'vehicle_requests' => ['Pending', 'Pending FAD Approval', 'FAD Approved', 'Approved'],
             'facility_requests' => ['Pending', 'Pending FAD Approval', 'Pending OCD Approval'],
-            'work_requests' => ['Pending', 'GSU Approved', 'Pending FAD Approval'],
+            'work_requests' => ['Pending', 'Pending GSU Approval', 'GSU Approved', 'Pending FAD Approval'],
             'service_requests' => ['Pending', 'Approved'],
             'messengerial_requests' => ['Pending Division Chief Approval'],
             'gate_passes' => ['Pending', 'Division Approved'],
@@ -515,6 +515,10 @@ class ApprovalInboxController extends Controller
                 if ($status === 'Pending') {
                     return app(WorkRequestController::class)
                         ->approveInApp($request, $record);
+                }
+                if ($status === 'Pending GSU Approval') {
+                    return app(WorkRequestController::class)
+                        ->approveInAppGSU($request, $record);
                 }
                 // GSU Approved → FAD action
                 $request->merge(['action' => 'approve']);
@@ -639,6 +643,10 @@ class ApprovalInboxController extends Controller
                 if ($status === 'Pending') {
                     return app(WorkRequestController::class)
                         ->declineInApp($request, $record);
+                }
+                if ($status === 'Pending GSU Approval') {
+                    return app(WorkRequestController::class)
+                        ->declineInAppGSU($request, $record);
                 }
                 $request->merge(['action' => 'reject']);
 
