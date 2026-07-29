@@ -65,7 +65,7 @@ class ClassRecordIlaController extends Controller
 
         $dates = ClassRecordIlaDate::where('class_record_quarter_id', $quarter->id)
             ->orderBy('date')
-            ->get(['id', 'date', 'is_auto_generated', 'sort_order', 'is_graded', 'class_record_assessment_id']);
+            ->get(['id', 'date', 'is_auto_generated', 'sort_order', 'title', 'is_graded', 'class_record_assessment_id']);
 
         $records = ClassRecordIlaRecord::whereHas('ilaDate', fn ($sq) =>
                 $sq->where('class_record_quarter_id', $quarter->id)
@@ -119,6 +119,35 @@ class ClassRecordIlaController extends Controller
         $ilaDate->delete();
 
         return response()->json(['message' => 'Date removed.']);
+    }
+
+    // ── PATCH /class-records/{cr}/quarters/{q}/ila/dates/{ilaDate}/title ─────
+
+    /**
+     * Sets/edits the activity name for a not-yet-graded ILA date — purely
+     * descriptive, shown in the WAT print's Assessment column in place of
+     * the generic "Independent Learning Activity" placeholder. Once graded,
+     * the real title lives on the linked class_record_assessments row
+     * instead (set at grading time), so this is blocked for graded dates.
+     */
+    public function updateTitle(Request $request, ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $this->assertIlpSubject($classRecord);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
+
+        $quarter = $this->resolveQuarter($classRecord, $q);
+        abort_unless($ilaDate->class_record_quarter_id === $quarter->id, 404);
+        abort_if($quarter->is_locked, 403, 'Quarter is locked.');
+        abort_if($ilaDate->is_graded, 422, 'This ILA date is already graded — its title is set from the graded assessment instead.');
+
+        $validated = $request->validate([
+            'title' => 'nullable|string|max:255',
+        ]);
+
+        $ilaDate->update(['title' => $validated['title'] ?: null]);
+
+        return response()->json($ilaDate->fresh());
     }
 
     // ── POST /class-records/{cr}/quarters/{q}/ila/records ─────────────────────

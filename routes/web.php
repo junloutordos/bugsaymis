@@ -2394,6 +2394,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/quarters/{q}/ila',              [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'index'])->name('class-records.ila.index');
     Route::post('/class-records/{classRecord}/quarters/{q}/ila/dates',       [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'storeDate'])->name('class-records.ila.store-date');
     Route::delete('/class-records/{classRecord}/quarters/{q}/ila/dates/{ilaDate}', [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'destroyDate'])->name('class-records.ila.destroy-date');
+    Route::patch('/class-records/{classRecord}/quarters/{q}/ila/dates/{ilaDate}/title', [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'updateTitle'])->name('class-records.ila.update-title');
     Route::post('/class-records/{classRecord}/quarters/{q}/ila/records',     [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'upsert'])->name('class-records.ila.upsert');
     Route::post('/class-records/{classRecord}/quarters/{q}/ila/dates/{ilaDate}/grade',   [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'gradeDate'])->name('class-records.ila.grade-date');
     Route::delete('/class-records/{classRecord}/quarters/{q}/ila/dates/{ilaDate}/grade', [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'ungradeDate'])->name('class-records.ila.ungrade-date');

@@ -15,6 +15,7 @@ class ClassRecordIlaDate extends Model
         'date',
         'is_auto_generated',
         'sort_order',
+        'title',
         'is_graded',
         'class_record_assessment_id',
         'graded_by_id',

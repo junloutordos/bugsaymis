@@ -473,6 +473,28 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->where('sections.0.id', $homeroom->id));
     }
 
+    public function test_a_stray_section_row_not_tagged_to_the_current_school_year_is_excluded_from_the_wat_dropdown(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        // A legacy/orphaned row that predates the school_year_id column (or
+        // was never retired) — same grade, a different sectionname, tagged
+        // to neither the legacy syid nor the FL-native school_year_id for
+        // the current school year — yet a ClassRecord still references it.
+        $stray = $this->makeSection(['levelid' => 11, 'sectionname' => 'Academic Class Venus', 'syid' => null, 'school_year_id' => null]);
+        $subject = $this->makeSubject(['grade_level' => 11]);
+        $this->makeClassRecordWithAssessment($homeroom, $subject, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($stray, $subject, $teacher, '2025-09-01');
+
+        $this->actingAs($admin)
+            ->get(route('class-records.wat.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sections', 1)
+                ->where('sections.0.id', $homeroom->id));
+    }
+
     public function test_wat_week_data_pools_and_tags_science_core_and_elective_rows_into_the_homeroom(): void
     {
         $teacher = User::factory()->create();

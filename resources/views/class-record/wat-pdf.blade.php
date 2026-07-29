@@ -22,7 +22,8 @@
        silently fall back to regular. */
     .wat-heading h1 { font-size: 13pt; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 2mm; }
     .wat-meta       { font-size: 8pt; text-align: left; }
-    .wat-meta span  { margin: 0 9px; }
+    .wat-meta span  { margin-right: 12mm; }
+    .wat-meta span:last-child { margin-right: 0; }
 
     /* Widths set via width="" on <th> — most reliable in mPDF. */
     .wat-table {
@@ -52,7 +53,6 @@
     .wat-empty  { color: #94a3b8; font-style: italic; }
     .wat-center { text-align: center; white-space: nowrap; }
     .wat-title  { font-weight: 700; }
-    .wat-major  { font-weight: 700; color: #b91c1c; }
 
     /* Signatories — 3-column table, matches the .wat-signatories layout
        previously used in the browser-print version. Extra margin-top is the
@@ -122,7 +122,6 @@
               <td>{{ $item['subject_name'] }}</td>
               <td>
                 <span class="wat-title">{{ $item['title'] }}</span>
-                @if($item['is_major'])<span class="wat-major"> (Major)</span>@endif
               </td>
               <td>{{ $item['type_label'] }}</td>
               <td>{{ $item['is_graded'] ? 'Graded' : 'Non-graded' }}</td>

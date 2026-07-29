@@ -280,6 +280,72 @@ class ClassRecordIlaTest extends TestCase
             ->assertForbidden();
     }
 
+    // ── Activity title (updateTitle) ─────────────────────────────────────────
+
+    public function test_teacher_can_set_the_activity_title_on_a_non_graded_date(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher, $this->makeSection(), $this->makeSubject());
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordIlaDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+
+        $this->actingAs($teacher)
+            ->patchJson(route('class-records.ila.update-title', ['classRecord' => $record->id, 'q' => 1, 'ilaDate' => $date->id]), [
+                'title' => 'Reading Comprehension Worksheet',
+            ])
+            ->assertOk()
+            ->assertJsonFragment(['title' => 'Reading Comprehension Worksheet']);
+
+        $this->assertDatabaseHas('class_record_ila_dates', [
+            'id' => $date->id, 'title' => 'Reading Comprehension Worksheet',
+        ]);
+    }
+
+    public function test_title_update_is_blocked_once_the_date_is_graded(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher, $this->makeSection(), $this->makeSubject());
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordIlaDate::create([
+            'class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1, 'is_graded' => true,
+        ]);
+
+        $this->actingAs($teacher)
+            ->patchJson(route('class-records.ila.update-title', ['classRecord' => $record->id, 'q' => 1, 'ilaDate' => $date->id]), [
+                'title' => 'New Title',
+            ])
+            ->assertStatus(422);
+    }
+
+    public function test_title_update_is_blocked_for_a_locked_quarter(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher, $this->makeSection(), $this->makeSubject());
+        $quarter = $this->makeQuarter($record, 1, locked: true);
+        $date = ClassRecordIlaDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+
+        $this->actingAs($teacher)
+            ->patchJson(route('class-records.ila.update-title', ['classRecord' => $record->id, 'q' => 1, 'ilaDate' => $date->id]), [
+                'title' => 'New Title',
+            ])
+            ->assertStatus(403);
+    }
+
+    public function test_non_owner_cannot_set_the_activity_title(): void
+    {
+        $owner = User::factory()->create();
+        $stranger = User::factory()->create();
+        $record = $this->makeRecord($owner, $this->makeSection(), $this->makeSubject());
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordIlaDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+
+        $this->actingAs($stranger)
+            ->patchJson(route('class-records.ila.update-title', ['classRecord' => $record->id, 'q' => 1, 'ilaDate' => $date->id]), [
+                'title' => 'New Title',
+            ])
+            ->assertForbidden();
+    }
+
     public function test_ila_endpoints_are_blocked_for_a_subject_without_ilp(): void
     {
         $teacher = User::factory()->create();

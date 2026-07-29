@@ -293,10 +293,10 @@ class WatRuleService
                 $q->whereIn('section_id', $poolSectionIds)->where('school_year_id', $schoolYearId);
             })
             ->with([
-                'quarter.classRecord:id,subject_name,teacher_id,section_id,category_label',
+                'quarter.classRecord:id,subject_name,subject_id,teacher_id,section_id,category_label',
                 'quarter.classRecord.section:id,sectionname',
             ])
-            ->get();
+            ->get(['id', 'class_record_quarter_id', 'date', 'title']);
 
         $teachers = User::whereIn('id', $rows->pluck('teacher_id')
                 ->concat($ilaDates->pluck('quarter.classRecord.teacher_id'))
@@ -326,6 +326,10 @@ class WatRuleService
         $schedulePairs = $rows
             ->filter(fn ($row) => $row->section_id && $row->subject_id)
             ->map(fn ($row) => ['section_id' => (int) $row->section_id, 'subject_id' => (int) $row->subject_id])
+            ->concat($ilaDates
+                ->map(fn ($ilaDate) => $ilaDate->quarter->classRecord)
+                ->filter(fn ($cr) => $cr && $cr->section_id && $cr->subject_id)
+                ->map(fn ($cr) => ['section_id' => (int) $cr->section_id, 'subject_id' => (int) $cr->subject_id]))
             ->unique(fn ($pair) => $pair['section_id'].'|'.$pair['subject_id'])
             ->values();
 
@@ -393,7 +397,7 @@ class WatRuleService
             ];
         });
 
-        $ilaItems = $ilaDates->map(function ($ilaDate) use ($teachers, $sectionId) {
+        $ilaItems = $ilaDates->map(function ($ilaDate) use ($teachers, $sectionId, $schedulesByKey) {
             $classRecord = $ilaDate->quarter->classRecord;
             $pooledTag   = null;
             if ($classRecord && (int) $classRecord->section_id !== $sectionId) {
@@ -406,12 +410,17 @@ class WatRuleService
                 ? "{$classRecord->subject_name} — {$classRecord->category_label}"
                 : $classRecord?->subject_name;
 
+            $scheduleKey = $classRecord?->section_id && $classRecord?->subject_id
+                ? $classRecord->section_id.'|'.$classRecord->subject_id.'|'.$ilaDate->date->format('l')
+                : null;
+            $schedule = $scheduleKey ? ($schedulesByKey[$scheduleKey] ?? null) : null;
+
             return [
                 'id'              => 'ila-'.$ilaDate->id,
                 'ila_date_id'     => $ilaDate->id,
                 'class_record_id' => $classRecord?->id,
                 'date'            => $ilaDate->date->toDateString(),
-                'title'           => 'Independent Learning Activity',
+                'title'           => $ilaDate->title ?: 'Independent Learning Activity',
                 'subject_name'    => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,
                 'teacher_name'    => $teachers[$classRecord?->teacher_id]?->name,
                 'assessment_type' => 'ila',
@@ -423,7 +432,9 @@ class WatRuleService
                 'roster_count'    => null,
                 'submitted_count' => null,
                 'compliance'      => null,
-                'time_label'      => null,
+                'time_label'      => $schedule
+                    ? substr((string) $schedule['start_time'], 0, 5).'–'.substr((string) $schedule['end_time'], 0, 5)
+                    : null,
                 'source'          => 'ila_pending',
             ];
         });

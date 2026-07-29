@@ -5,7 +5,7 @@ import Swal from 'sweetalert2'
 import AppButton from '@/Components/AppButton.vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import { confirmDelete } from '@/Composables/useConfirm.js'
-import { PlusIcon, XMarkIcon, BoltIcon, AcademicCapIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, XMarkIcon, BoltIcon, AcademicCapIcon, ArrowUturnLeftIcon, PencilIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecordId: { type: Number, required: true },
@@ -155,6 +155,28 @@ async function removeDate(dateObj) {
   }
 }
 
+async function editTitle(dateObj) {
+  const { value: title } = await Swal.fire({
+    title: `Activity name — ${formatDate(dateObj.date)}`,
+    input: 'text',
+    inputValue: dateObj.title ?? '',
+    inputPlaceholder: 'e.g. Reading Comprehension Worksheet',
+    showCancelButton: true,
+    confirmButtonText: 'Save',
+  })
+  if (title === undefined) return
+
+  try {
+    const { data } = await axios.patch(
+      route('class-records.ila.update-title', { classRecord: props.classRecordId, q: props.quarterNumber, ilaDate: dateObj.id }),
+      { title: title.trim() || null }
+    )
+    dateObj.title = data.title
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to save the activity name.', 'error')
+  }
+}
+
 function formatDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
 }
@@ -181,7 +203,7 @@ async function gradeDate(dateObj) {
         <label class="block text-xs font-semibold text-slate-500 mt-1">Grading Category</label>
         <select id="ila-grade-category" class="swal2-select" style="width:100%;margin:0">${categoryOptions}</select>
         <label class="block text-xs font-semibold text-slate-500 mt-2">Title</label>
-        <input id="ila-grade-title" class="swal2-input" style="width:100%;margin:0" value="Independent Learning Activity — ${formatDate(dateObj.date)}" />
+        <input id="ila-grade-title" class="swal2-input" style="width:100%;margin:0" value="${dateObj.title || `Independent Learning Activity — ${formatDate(dateObj.date)}`}" />
         <label class="block text-xs font-semibold text-slate-500 mt-2">Max Score</label>
         <input id="ila-grade-max" type="number" min="1" step="0.01" class="swal2-input" style="width:100%;margin:0" value="100" />
       </div>
@@ -300,8 +322,14 @@ function studentTotals(studentId) {
               class="px-2 py-2.5 text-center text-xs font-semibold text-slate-500 border-r border-slate-200 group w-16">
               <div class="flex items-center justify-center gap-1">
                 <BoltIcon v-if="d.is_auto_generated" class="h-3 w-3 text-indigo-400 shrink-0" />
-                <span>{{ formatDate(d.date) }}</span>
+                <span :title="d.title || ''">{{ formatDate(d.date) }}</span>
                 <span v-if="d.is_graded" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 rounded px-1 shrink-0" title="Scored in the Weekly Assessment Tracker">Graded</span>
+                <button v-if="!isLocked && !d.is_graded" @click="editTitle(d)"
+                  class="p-0.5 rounded hover:bg-indigo-50 shrink-0 transition-all"
+                  :class="d.title ? 'text-indigo-500' : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-indigo-500'"
+                  :title="d.title ? `Activity: ${d.title} (click to edit)` : 'Set an activity name (shows on the WAT print)'">
+                  <PencilIcon class="h-3 w-3" />
+                </button>
                 <button v-if="!isLocked && !d.is_graded" @click="gradeDate(d)"
                   class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 transition-all"
                   title="Grade this ILA (locks in like any WAT assessment — no later than 12:00 NN the Friday before its week)">
