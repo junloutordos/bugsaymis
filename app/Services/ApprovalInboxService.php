@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\ClassRecord\ClassRecordAssessmentDeletionRequest;
 use App\Models\ComputerLabScheduleApproval;
 use App\Models\Division;
 use App\Models\Facility;
 use App\Models\FacilityRequest;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\HR\LeaveApplication;
 use App\Models\ITJobRequest;
 use App\Models\MessengerialRequest;
@@ -51,6 +54,7 @@ class ApprovalInboxService
         $isHROfficer = $user->hasPermission('hr.leave.approve');
         $isCidChief = $user->hasRole('CID Chief');
         $isAdmin = $user->hasRole('Administrator');
+        $isAcidaa = $this->holdsAcidaaDesignation($user);
 
         // Administrator sees all pending items across every module (union of all roles)
         if ($isAdmin) {
@@ -60,6 +64,7 @@ class ApprovalInboxService
             $isOCD = true;
             $isHROfficer = true;
             $isCidChief = true;
+            $isAcidaa = true;
         }
 
         // Pre-compute division IDs for DC queries (used in multiple places)
@@ -276,6 +281,19 @@ class ApprovalInboxService
             $this->mergeOrAddTab($tabs, 'computer_lab_schedules', 'Computer Lab Schedules', $labApprovals);
         }
 
+        // ── ACIDAA (Assistant CID Chief for Academic Affairs) ────────────────
+        if ($isAcidaa) {
+            $deletionRequests = ClassRecordAssessmentDeletionRequest::with([
+                    'quarter.classRecord:id,subject_name,teacher_id,section_id',
+                    'quarter.classRecord.teacher:id,name',
+                    'quarter.classRecord.section:id,sectionname,levelid',
+                    'requestedBy:id,name',
+                ])
+                ->where('status', 'pending')->latest()->get()
+                ->map(fn ($r) => $this->normaliseAssessmentDeletionRequest($r))->values()->all();
+            $this->mergeOrAddTab($tabs, 'assessment_deletion_requests', 'Assessment Deletion Requests', $deletionRequests);
+        }
+
         // ── HR Officer ────────────────────────────────────────────────────────
         if ($isHROfficer) {
             $laHR = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code'])
@@ -286,6 +304,24 @@ class ApprovalInboxService
 
         // Return only tabs with items, re-indexed
         return array_values(array_filter($tabs, fn ($t) => $t['count'] > 0));
+    }
+
+    /**
+     * Same designation-code lookup ClassRecordAssessmentController and
+     * IPCRWorkflowService each use — whether $user currently holds the
+     * ACIDAA (Assistant CID Chief for Academic Affairs) load assignment
+     * for the current school year.
+     */
+    private function holdsAcidaaDesignation(User $user): bool
+    {
+        $designationIds = Designation::whereIn('code', ['ACIDAA', 'SUP-ACIDAA'])
+            ->orWhere('name', 'like', 'Assistant CID Chief for Academic Affairs%')
+            ->pluck('id');
+
+        return LoadAssignment::whereIn('designation_id', $designationIds)
+            ->where('user_id', $user->id)
+            ->whereHas('schoolYear', fn ($q) => $q->where('is_current', true))
+            ->exists();
     }
 
     // ── Tab helpers ───────────────────────────────────────────────────────────
@@ -653,6 +689,46 @@ class ApprovalInboxService
                         ['label' => 'Gate Pass Date', 'value' => $r->gatepass_date ?? '—'],
                         ['label' => 'Position',       'value' => $r->requester_position ?? '—'],
                         ['label' => 'Status',         'value' => $r->status],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function normaliseAssessmentDeletionRequest(ClassRecordAssessmentDeletionRequest $r): array
+    {
+        $classRecord = $r->quarter?->classRecord;
+        $section = $classRecord?->section;
+        $sectionLabel = $section ? "G-{$section->levelid} {$section->sectionname}" : '—';
+
+        return [
+            'id' => $r->id,
+            'type' => 'assessment_deletion_requests',
+            'reference_no' => "#{$r->id}",
+            'requester_name' => $r->requestedBy?->name ?? '—',
+            'filed_at' => $r->created_at?->toISOString(),
+            'status' => $r->status,
+            'summary' => "{$r->title} — ".($classRecord?->subject_name ?? '—'),
+            'view_url' => $classRecord ? route('class-records.show', $classRecord->id) : null,
+            'sections' => [
+                [
+                    'title' => 'Assessment',
+                    'fields' => [
+                        ['label' => 'Title',       'value' => $r->title],
+                        ['label' => 'Category',    'value' => $r->category_name ?? $r->category_code ?? '—'],
+                        ['label' => 'Activity Date', 'value' => $r->activity_date?->format('M d, Y') ?? '—'],
+                        ['label' => 'Max Score',   'value' => $r->max_score],
+                        ['label' => 'Subject',     'value' => $classRecord?->subject_name ?? '—'],
+                        ['label' => 'Section',     'value' => $sectionLabel],
+                        ['label' => 'Teacher',     'value' => $classRecord?->teacher?->name ?? '—'],
+                    ],
+                ],
+                [
+                    'title' => 'Reason for Deletion',
+                    'fields' => [
+                        ['label' => 'Reason', 'value' => $r->reason, 'full' => true],
+                        ['label' => 'Requested By', 'value' => $r->requestedBy?->name ?? '—'],
+                        ['label' => 'Filed At', 'value' => $r->created_at?->format('M d, Y h:i A')],
                     ],
                 ],
             ],

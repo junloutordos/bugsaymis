@@ -5,6 +5,7 @@ namespace App\Models\ClassRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ClassRecordAssessment extends Model
 {
@@ -55,6 +56,16 @@ class ClassRecordAssessment extends Model
     public function scores(): HasMany
     {
         return $this->hasMany(ClassRecordScore::class);
+    }
+
+    public function deletionRequests(): HasMany
+    {
+        return $this->hasMany(ClassRecordAssessmentDeletionRequest::class);
+    }
+
+    public function pendingDeletionRequest(): HasOne
+    {
+        return $this->hasOne(ClassRecordAssessmentDeletionRequest::class)->where('status', 'pending');
     }
 
     /**
