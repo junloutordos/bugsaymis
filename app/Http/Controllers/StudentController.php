@@ -23,92 +23,137 @@ class StudentController extends Controller
         private StudentProfileService $studentProfileService,
     ) {}
 
+    /** Explicit, known-good column list for the students search box (avoids guessing column names). */
+    private const SEARCHABLE_COLUMNS = [
+        'lastname', 'firstname', 'middlename', 'nickname',
+        'student_email', 'lrn', 'pisaysystemID',
+        'sex', 'contactperson', 'contactno1',
+    ];
+
     public function index(Request $request)
     {
-        $perPage = 10;
+        $perPage = 30;
         $search = $request->input('q');
+        $tab = $request->input('tab') === 'inactive' ? 'inactive' : 'active';
+        $sectionId = $request->input('section_id');
+        $gradeLevel = $request->input('grade_level');
+        $sex = $request->input('sex');
 
-        $query = DB::table('students');
+        $currentSY = SchoolYear::where('is_current', true)->first();
 
-        // If there's a status-like column, default to showing only enrolled students
-        $allCols = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => $c->Field)->all();
-        $statusCandidates = ['status','student_status','enrollment_status','enrolled','enrollment','status_desc'];
-        $statusField = null;
-        foreach ($statusCandidates as $cand) {
-            if (in_array($cand, $allCols)) { $statusField = $cand; break; }
+        $allCols = collect(DB::select('SHOW COLUMNS FROM students'))->map(fn ($c) => $c->Field)->all();
+
+        // Current-SY enrollment (if any) for each student, joined once and reused for
+        // both the tab split and the section/grade columns/filters.
+        $currentEnrollmentJoin = function ($join) use ($currentSY) {
+            $join->on('se.student_id', '=', 'students.id')
+                ->where('se.school_year_id', '=', $currentSY?->id ?? 0);
+        };
+
+        $baseQuery = DB::table('students')
+            ->leftJoin('student_enrollments as se', $currentEnrollmentJoin)
+            ->leftJoin('sections as sec', 'sec.id', '=', 'se.section_id');
+
+        if ($tab === 'active') {
+            $baseQuery->where('se.status', 'enrolled');
+        } else {
+            $baseQuery->where(function ($q) {
+                $q->whereNull('se.id')->orWhere('se.status', '<>', 'enrolled');
+            });
         }
-        if ($statusField) {
-            $query->where($statusField, 'Enrolled');
-        }
+
         if ($search) {
             $term = "%{$search}%";
-
-            // detect available columns and build where clauses only for existing fields
-            $cols = $allCols; // reuse
-
-            $candidates = [
-                'last_name','lastname','lname',
-                'first_name','firstname','fname',
-                'middle_name','middlename','mname',
-                'birthday','birthdate','dob',
-                'sex','gender',
-                'student_email','email'
-            ];
-
-            $searchable = array_values(array_intersect($candidates, $cols));
-
-            if (empty($searchable)) {
-                // fallback: search all varchar/text columns except id/timestamps
-                $searchable = [];
-                foreach (DB::select("SHOW COLUMNS FROM students") as $c) {
-                    $c = (array) $c;
-                    $type = strtolower($c['Type']);
-                    if (str_starts_with($type, 'varchar') || str_contains($type, 'text') || str_starts_with($type, 'char')) {
-                        $field = $c['Field'];
-                        if (!in_array($field, ['id','created_at','updated_at'])) $searchable[] = $field;
-                    }
-                }
-            }
-
+            $searchable = array_values(array_intersect(self::SEARCHABLE_COLUMNS, $allCols));
             if (!empty($searchable)) {
-                $query->where(function ($q) use ($searchable, $term) {
+                $baseQuery->where(function ($q) use ($searchable, $term) {
                     foreach ($searchable as $i => $field) {
-                        if ($i === 0) $q->where($field, 'like', $term);
-                        else $q->orWhere($field, 'like', $term);
+                        $column = "students.{$field}";
+                        if ($i === 0) $q->where($column, 'like', $term);
+                        else $q->orWhere($column, 'like', $term);
                     }
                 });
             }
         }
 
-        // Determine ordering fields (handle different column naming conventions)
-        $lastCandidates = ['last_name','lastname','lname','surname'];
-        $firstCandidates = ['first_name','firstname','fname','given_name'];
-
-        $lastField = null;
-        foreach ($lastCandidates as $cand) {
-            if (in_array($cand, $allCols)) { $lastField = $cand; break; }
+        // Section/grade filters only apply meaningfully to the active tab (inactive
+        // students have no current-SY section), but are accepted either way.
+        if ($sectionId) {
+            $baseQuery->where('se.section_id', $sectionId);
         }
-        $firstField = null;
-        foreach ($firstCandidates as $cand) {
-            if (in_array($cand, $allCols)) { $firstField = $cand; break; }
+        if ($gradeLevel) {
+            $baseQuery->where('se.grade_level', $gradeLevel);
         }
-
-        if ($lastField) {
-            $query->orderBy($lastField);
-            if ($firstField) $query->orderBy($firstField);
-        } else {
-            $query->orderBy('id');
+        if ($sex) {
+            $baseQuery->where('students.sex', $sex);
         }
 
-        $students = $query->paginate($perPage)->appends($request->only('q'));
+        $students = $baseQuery
+            ->select([
+                'students.*',
+                'se.grade_level as current_grade_level',
+                'se.status as current_enrollment_status',
+                'sec.sectionname as current_section_name',
+                'sec.id as current_section_id',
+            ])
+            ->orderBy('students.lastname')
+            ->orderBy('students.firstname')
+            ->paginate($perPage)
+            ->appends($request->only('q', 'tab', 'section_id', 'grade_level', 'sex'));
 
-        $columns = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => (array) $c)->all();
+        // Tab counts (independent of the current tab's own filters, but respect search/section/grade/sex)
+        $countsQuery = fn ($activeTab) => DB::table('students')
+            ->leftJoin('student_enrollments as se', $currentEnrollmentJoin)
+            ->when($activeTab === 'active', fn ($q) => $q->where('se.status', 'enrolled'))
+            ->when($activeTab === 'inactive', fn ($q) => $q->where(function ($qq) {
+                $qq->whereNull('se.id')->orWhere('se.status', '<>', 'enrolled');
+            }))
+            ->when($search, function ($q) use ($search, $allCols) {
+                $term = "%{$search}%";
+                $searchable = array_values(array_intersect(self::SEARCHABLE_COLUMNS, $allCols));
+                if (!empty($searchable)) {
+                    $q->where(function ($qq) use ($searchable, $term) {
+                        foreach ($searchable as $i => $field) {
+                            $column = "students.{$field}";
+                            if ($i === 0) $qq->where($column, 'like', $term);
+                            else $qq->orWhere($column, 'like', $term);
+                        }
+                    });
+                }
+            })
+            ->count();
+
+        // Dropdown options: sections/grades scoped to the current school year
+        $sectionOptions = $currentSY
+            ? DB::table('sections')
+                ->where('syid', $currentSY->id)
+                ->orderBy('levelid')
+                ->orderBy('sectionname')
+                ->get(['id', 'sectionname', 'levelid'])
+            : collect();
+
+        $gradeOptions = $sectionOptions->pluck('levelid')->unique()->sort()->values();
+
+        $columns = collect(DB::select('SHOW COLUMNS FROM students'))->map(fn ($c) => (array) $c)->all();
 
         return Inertia::render('Students/Index', [
             'students' => $students,
             'columns' => $columns,
             'writable_columns' => $this->studentProfileService->writableColumns($allCols),
             'q' => $search,
+            'tab' => $tab,
+            'filters' => [
+                'section_id' => $sectionId,
+                'grade_level' => $gradeLevel,
+                'sex' => $sex,
+            ],
+            'tab_counts' => [
+                'active' => $countsQuery('active'),
+                'inactive' => $countsQuery('inactive'),
+            ],
+            'section_options' => $sectionOptions,
+            'grade_options' => $gradeOptions,
+            'current_school_year' => $currentSY?->name,
             'can_manage_students' => auth()->user()->hasPermission('manage-students') || auth()->user()->isSuperAdmin(),
         ]);
     }
