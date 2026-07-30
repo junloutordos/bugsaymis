@@ -162,12 +162,16 @@ class ClassRecordAttendanceController extends Controller
             'records'              => 'required|array|min:1',
             'records.*.date_id'    => 'required|integer|exists:class_record_attendance_dates,id',
             'records.*.student_id' => 'required|integer|exists:class_record_students,id',
-            // Present/Absent/Tardy only — Excused/Unexcused is no longer a
+            // Present/Absent/Tardy/Cut Class. Excused/Unexcused is no longer a
             // status a subject teacher picks; it's set by the Homeroom
             // Adviser/Registrar's Class Admission Slip workflow instead.
             // Uniform checking also moved to the adviser (once per day), so
             // there's no uniform field here anymore.
-            'records.*.status'     => 'nullable|in:present,absent,tardy',
+            // Cut Class (CIM 3.6/3.6.2) can only be witnessed and asserted by
+            // the subject teacher — the student was on campus but skipped or
+            // left this specific class period — so it's only ever set here,
+            // never on the Homeroom whole-day attendance.
+            'records.*.status'     => 'nullable|in:present,absent,tardy,cut_class',
         ]);
         $subjectId = $this->resolveSubjectId($classRecord, $validated['subject_id'] ?? null);
         abort_unless($classRecord->canEdit(Auth::user(), $subjectId), 403);

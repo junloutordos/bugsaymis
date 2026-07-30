@@ -33,7 +33,7 @@
     <tr><td class="label">Student:</td><td>{{ $slip->student->lastname }}, {{ $slip->student->firstname }} {{ $slip->student->middlename }}</td></tr>
     <tr><td class="label">Section:</td><td>Grade {{ $slip->section->levelid }} - {{ $slip->section->sectionname }}</td></tr>
     <tr><td class="label">Date of Infraction:</td><td>{{ \Carbon\Carbon::parse($slip->infraction_date)->format('F j, Y') }}</td></tr>
-    <tr><td class="label">Type:</td><td>{{ ucfirst($slip->infraction_type) }}</td></tr>
+    <tr><td class="label">Type:</td><td>{{ $slip->infraction_type_label }}</td></tr>
     <tr><td class="label">Reason:</td><td>{{ $slip->reason ?: '—' }}</td></tr>
   </table>
 

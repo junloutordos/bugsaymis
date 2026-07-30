@@ -35,17 +35,24 @@ const canEditSelectedSubject = computed(() => {
 })
 
 // ── Status vocabulary ────────────────────────────────────────────────────────
-// Present/Absent/Tardy only. Excused/Unexcused is no longer a status a
+// Present/Absent/Tardy/Cut Class. Excused/Unexcused is no longer a status a
 // subject teacher picks here — it's set by the Homeroom Adviser/Registrar's
-// Class Admission Slip workflow and shown read-only below. "Cutting" isn't a
-// status either — it's detected automatically whenever this record says
-// Absent but the student's Homeroom Attendance for the same date says
-// Present/Tardy (surfaced to the Registrar's admission-slip queue).
+// Class Admission Slip workflow and shown read-only below.
+//
+// Cut Class (CIM 3.6/3.6.2) is asserted directly by the subject teacher —
+// they're the only one who can witness a student being on campus but
+// skipping or leaving this specific class period without valid reason. It is
+// NOT selectable on Homeroom Daily Attendance (the adviser can't observe it).
+// As a secondary safety net, a mismatch (this record says Absent while the
+// student's Homeroom Attendance for the same date says Present/Tardy) is
+// still automatically flagged to the Registrar's admission-slip queue too,
+// in case a teacher marks Absent without using the Cut Class status.
 
 const STATUSES = [
-  { value: 'present', code: 'P', label: 'Present', cls: 'bg-emerald-100 text-emerald-700' },
-  { value: 'absent',  code: 'A', label: 'Absent',  cls: 'bg-red-100 text-red-700' },
-  { value: 'tardy',   code: 'T', label: 'Tardy',   cls: 'bg-amber-100 text-amber-700' },
+  { value: 'present',   code: 'P',  label: 'Present',   cls: 'bg-emerald-100 text-emerald-700' },
+  { value: 'absent',    code: 'A',  label: 'Absent',    cls: 'bg-red-100 text-red-700' },
+  { value: 'tardy',     code: 'T',  label: 'Tardy',     cls: 'bg-amber-100 text-amber-700' },
+  { value: 'cut_class', code: 'CC', label: 'Cut Class', cls: 'bg-orange-100 text-orange-700' },
 ]
 const STATUS_BY_VALUE = Object.fromEntries(STATUSES.map(s => [s.value, s]))
 // Cycle for cells that already have an explicit record: null (default/Present) → absent → tardy → back to null.
@@ -225,16 +232,17 @@ function formatDate(d) {
 // ── Totals ───────────────────────────────────────────────────────────────────
 
 function studentTotals(studentId) {
-  let present = 0, absences = 0, tardies = 0
+  let present = 0, absences = 0, tardies = 0, cuts = 0
   for (const d of dates.value) {
     const status = effectiveStatus(studentId, d.id)
     if (status === 'present') present++
     if (status === 'absent') absences++
     if (status === 'tardy') tardies++
+    if (status === 'cut_class') cuts++
   }
   const total = dates.value.length
   const pct = total > 0 ? Math.round((present / total) * 100) : null
-  return { total, present, absences, tardies, pct }
+  return { total, present, absences, tardies, cuts, pct }
 }
 
 function presentCountForDate(dateId) {
@@ -265,7 +273,7 @@ function presentCountForDate(dateId) {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <p class="text-xs text-slate-500">
         Cells default to <span class="font-semibold">P</span> —
-        click to cycle Present → Absent → Tardy. Excused/Unexcused is decided by the Homeroom Adviser/Registrar and shown read-only.
+        click to cycle Present → Absent → Tardy → Cut Class. Excused/Unexcused is decided by the Homeroom Adviser/Registrar and shown read-only.
       </p>
       <div class="flex items-center gap-2 shrink-0">
         <template v-if="!isLocked && canEditSelectedSubject">
@@ -321,6 +329,7 @@ function presentCountForDate(dateId) {
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-14 border-r border-slate-100">Classes</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-red-400 uppercase tracking-wide w-14 border-r border-slate-100">Absences</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide w-14 border-r border-slate-100">Tardies</th>
+            <th class="px-3 py-2.5 text-center text-xs font-semibold text-orange-500 uppercase tracking-wide w-14 border-r border-slate-100">Cuts</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Present %</th>
           </tr>
         </thead>
@@ -375,6 +384,10 @@ function presentCountForDate(dateId) {
               :class="studentTotals(student.id).tardies > 0 ? 'text-amber-600' : 'text-slate-300'">
               {{ studentTotals(student.id).tardies || '—' }}
             </td>
+            <td class="px-3 py-2 text-center border-r border-slate-100 font-mono"
+              :class="studentTotals(student.id).cuts > 0 ? 'text-orange-600 font-semibold' : 'text-slate-300'">
+              {{ studentTotals(student.id).cuts || '—' }}
+            </td>
             <td class="px-3 py-2 text-center font-mono font-semibold"
               :class="studentTotals(student.id).pct !== null
                 ? (studentTotals(student.id).pct >= 80 ? 'text-emerald-600' : 'text-red-500')
@@ -394,7 +407,7 @@ function presentCountForDate(dateId) {
               class="px-1 py-2 text-center text-xs font-semibold border-r border-slate-200 text-emerald-600">
               {{ presentCountForDate(d.id) }}
             </td>
-            <td colspan="4" />
+            <td colspan="5" />
           </tr>
         </tfoot>
       </table>
@@ -404,8 +417,10 @@ function presentCountForDate(dateId) {
     <div class="mt-3 space-y-1.5">
       <p class="text-xs text-slate-400">
         Unmarked cells default to <span class="font-semibold text-slate-500">Present</span> — click only to record an exception.
-        A student marked Absent here while Homeroom Attendance says Present/Tardy that day is automatically flagged as
-        cutting class to the Registrar.
+        Mark <span class="font-semibold text-orange-600">Cut Class</span> when a student was on campus but skipped or left this
+        period without valid reason (CIM 3.6/3.6.2) — only you, the subject teacher, can witness this. As a backup, a student
+        marked Absent here while Homeroom Attendance says Present/Tardy that day is still automatically flagged to the
+        Registrar too, in case Cut Class wasn't used.
       </p>
       <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-500">
         <span v-for="s in STATUSES" :key="s.value" class="inline-flex items-center gap-1.5">

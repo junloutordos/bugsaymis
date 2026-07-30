@@ -105,9 +105,12 @@ function formatDate(d) {
             <tr v-for="record in pending" :key="`${record.type}_${record.reference_id}`">
               <td class="px-4 py-2 text-slate-700">{{ record.student_name }}</td>
               <td class="px-4 py-2 text-slate-500">{{ formatDate(record.date) }}</td>
-              <td class="px-4 py-2 text-slate-500 capitalize">
-                {{ record.infraction_type }}
-                <span v-if="record.type === 'subject_cutting'" class="ml-1 text-[10px] text-slate-400 normal-case">(detected — subject absent, homeroom present)</span>
+              <td class="px-4 py-2 text-slate-500">
+                <span :class="record.infraction_type === 'cutting_suspected' ? 'text-slate-400' : ''">
+                  {{ record.infraction_type_label }}
+                </span>
+                <span v-if="record.infraction_type === 'cut_class'" class="ml-1 text-[10px] text-orange-500 normal-case">(marked by subject teacher)</span>
+                <span v-else-if="record.infraction_type === 'cutting_suspected'" class="ml-1 text-[10px] text-slate-400 normal-case">(detected — subject absent, homeroom present)</span>
               </td>
               <td class="px-4 py-2 text-right">
                 <AppButton size="sm" @click="openSlipModal(record)">Issue Slip</AppButton>
@@ -153,7 +156,7 @@ function formatDate(d) {
     <AppModal :show="showModal" @close="showModal = false" title="Issue Class Admission Slip">
       <div v-if="active" class="space-y-3">
         <p class="text-sm text-slate-600">
-          <span class="font-medium">{{ active.student_name }}</span> — {{ formatDate(active.date) }} ({{ active.infraction_type }})
+          <span class="font-medium">{{ active.student_name }}</span> — {{ formatDate(active.date) }} ({{ active.infraction_type_label }})
         </p>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Determination</label>
