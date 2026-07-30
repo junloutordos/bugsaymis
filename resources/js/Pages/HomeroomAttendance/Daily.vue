@@ -14,6 +14,7 @@ const props = defineProps({
   date: { type: String, required: true },
   roster: { type: Array, required: true },
   schoolYear: { type: Object, required: true },
+  subjectSubmissions: { type: Array, default: () => [] },
 })
 
 // Cutting is intentionally not selectable here — it's derived by comparing
@@ -98,6 +99,25 @@ async function save() {
       </div>
     </div>
 
+    <!-- Subject Attendance Status: who has (and hasn't) submitted Class
+         Record Attendance for this section today. Informational only — the
+         adviser cannot act on it here; it just tells them whether the Cut
+         Class/IU signals below are complete yet. -->
+    <div v-if="subjectSubmissions.length" class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 mb-4">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+        Subject Attendance Status — {{ subjectSubmissions.filter(s => s.submitted).length }} / {{ subjectSubmissions.length }} submitted today
+      </h3>
+      <div class="flex flex-wrap gap-2">
+        <span v-for="(s, idx) in subjectSubmissions" :key="idx"
+          class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium"
+          :class="s.submitted ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'">
+          <span class="h-1.5 w-1.5 rounded-full" :class="s.submitted ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+          {{ s.subject_name }} — {{ s.teacher_name }}
+          <span class="font-semibold">{{ s.submitted ? '✓ Submitted' : 'Not yet' }}</span>
+        </span>
+      </div>
+    </div>
+
     <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50">
@@ -132,7 +152,14 @@ async function save() {
               </div>
             </td>
             <td class="px-4 py-2 text-center">
-              <input type="checkbox" v-model="row.incomplete_uniform" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="flex items-center justify-center gap-1.5">
+                <input type="checkbox" v-model="row.incomplete_uniform" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                <span v-if="row.iu_flagged_subjects?.length"
+                  class="inline-flex items-center rounded-md bg-yellow-100 px-1.5 py-0.5 text-[10px] font-bold text-yellow-700"
+                  :title="`Flagged by: ${row.iu_flagged_subjects.join(', ')} (synced from Class Record Attendance — you may still adjust it)`">
+                  {{ row.iu_flagged_subjects.join(', ') }}
+                </span>
+              </div>
             </td>
             <td class="px-4 py-2">
               <input type="text" v-model="row.remarks" placeholder="Optional"
@@ -146,7 +173,8 @@ async function save() {
     <p class="mt-3 text-xs text-slate-400">
       Excused/Unexcused status for any Absent/Tardy/Cutting entry is set later by the Registrar when a Class Admission Slip is issued.
       An orange <span class="font-semibold text-orange-600">CC</span> badge means a subject teacher has marked that student Cut Class
-      today — this is set on the Class Record Attendance grid and is read-only here.
+      today — this is set on the Class Record Attendance grid and is read-only here. A yellow subject badge next to Inc. Uniform means
+      a subject teacher already flagged it there — the checkbox is pre-checked for you but you may still adjust it.
     </p>
   </AdminLayout>
 </template>

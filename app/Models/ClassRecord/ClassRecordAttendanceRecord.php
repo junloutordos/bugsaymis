@@ -13,6 +13,11 @@ class ClassRecordAttendanceRecord extends Model
     // uniform_status is legacy — no longer written by app code (the
     // Homeroom Adviser checks uniform once per day now, not per subject).
     // Column stays for now; dropping it is a separate later migration.
+    //
+    // incomplete_uniform is the reintroduced per-subject flag — independent
+    // of `status` (a teacher can flag IU on a Present day too), synced
+    // one-directionally into Homeroom's own `incomplete_uniform` column via
+    // SubjectAttendanceSyncService.
     protected $fillable = [
         'class_record_attendance_date_id',
         'class_record_student_id',
@@ -20,10 +25,12 @@ class ClassRecordAttendanceRecord extends Model
         'excused_status',
         'admission_slip_id',
         'synced_from_homeroom',
+        'incomplete_uniform',
     ];
 
     protected $casts = [
         'synced_from_homeroom' => 'boolean',
+        'incomplete_uniform'   => 'boolean',
     ];
 
     public function attendanceDate(): BelongsTo
