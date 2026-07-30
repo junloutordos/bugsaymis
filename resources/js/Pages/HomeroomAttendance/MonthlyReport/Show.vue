@@ -31,8 +31,8 @@ function goto() {
   }, { preserveState: false })
 }
 
-const boys = computed(() => props.report?.lines.filter(l => (l.sex || '').toUpperCase() === 'M') ?? [])
-const girls = computed(() => props.report?.lines.filter(l => (l.sex || '').toUpperCase() !== 'M') ?? [])
+const boys = computed(() => props.report?.lines.filter(l => (l.sex || '').toUpperCase() === 'MALE') ?? [])
+const girls = computed(() => props.report?.lines.filter(l => (l.sex || '').toUpperCase() === 'FEMALE') ?? [])
 
 async function generate() {
   generating.value = true

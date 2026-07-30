@@ -20,8 +20,8 @@ class MonthlyReportPdfService
     {
         $report->loadMissing('lines.student');
 
-        $boys = $report->lines->filter(fn ($line) => strtoupper((string) $line->student?->sex) === 'M')->values();
-        $girls = $report->lines->filter(fn ($line) => strtoupper((string) $line->student?->sex) !== 'M')->values();
+        $boys = $report->lines->filter(fn ($line) => strtoupper((string) $line->student?->sex) === 'MALE')->values();
+        $girls = $report->lines->filter(fn ($line) => strtoupper((string) $line->student?->sex) === 'FEMALE')->values();
 
         $html = view('homeroom-attendance.monthly-report-pdf', [
             'section'          => $section,
