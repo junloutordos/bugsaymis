@@ -1704,7 +1704,6 @@ export const menuItems = [
     icon: DocumentTextIcon,
     routeName: "registrar.enrollment.index",
     href: route("registrar.enrollment.index"),
-    roles: ["Administrator", "Registrar"],
     permissions: ["students.enrollment.view"],
     children: [
       {
