@@ -73,7 +73,27 @@ class ClassRecordAssessmentController extends Controller
         abort_unless($this->canView($classRecord), 403);
         abort_if(! $classRecord->section_id, 422, 'This class record has no section linked.');
 
-        $rows = ClassRecordAssessment::select([
+        // Pool in any Science Core/Elective synthetic sections at this
+        // section's grade — same shared daily/weekly budget the backend cap
+        // check (ClassRecordAssessmentController::upsert()) and WatRuleService
+        // enforce. Without this, the calendar under-counts what actually
+        // blocks a new date pick when the budget is being consumed by a
+        // pooled elective class, not just this homeroom's own records.
+        $grade = $classRecord->section?->levelid;
+        $poolSectionIds = $grade !== null
+            ? WatRuleService::poolSectionIds($classRecord->section_id, (int) $grade)
+            : [$classRecord->section_id];
+
+        // Routed through the shared schoolYearScopeQuery() so archived class
+        // records are excluded the same way everywhere else in the WAT —
+        // a hand-rolled join here previously counted archived records'
+        // assessments toward the daily cap, falsely blocking new dates.
+        $rows = ClassRecordAssessment::schoolYearScopeQuery($classRecord->school_year_id)
+            ->whereIn('cr.section_id', $poolSectionIds)
+            ->whereNotNull('class_record_assessments.activity_date')
+            ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
+            ->orderBy('class_record_assessments.activity_date')
+            ->get([
                 'class_record_assessments.id',
                 'class_record_assessments.title',
                 'class_record_assessments.activity_date',
@@ -84,15 +104,7 @@ class ClassRecordAssessmentController extends Controller
                 'cr.subject_name',
                 'cr.teacher_id',
                 'gc.code as category_code',
-            ])
-            ->join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
-            ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
-            ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
-            ->where('cr.section_id', $classRecord->section_id)
-            ->where('cr.school_year_id', $classRecord->school_year_id)
-            ->whereNotNull('class_record_assessments.activity_date')
-            ->orderBy('class_record_assessments.activity_date')
-            ->get();
+            ]);
 
         $teacherIds = $rows->pluck('teacher_id')->filter()->unique()->values()->toArray();
         $teachers   = User::whereIn('id', $teacherIds)
