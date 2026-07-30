@@ -42,7 +42,7 @@ class LeaveCreditAdminController extends Controller
         return Inertia::render('HR/Leave/Credits/Initialize', [
             'employees'       => $query->paginate(20)->withQueryString(),
             'leaveTypes'      => LeaveType::where('is_active', true)
-                ->whereIn('code', ['VL', 'SL', 'CTO', 'WL'])
+                ->whereIn('code', ['VL', 'SL', 'CTO', 'WL', 'FL', 'SPL'])
                 ->orderBy('sort_order')
                 ->get(['id', 'code', 'name']),
             'filters'         => $request->only('search'),
