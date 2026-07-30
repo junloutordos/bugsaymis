@@ -153,12 +153,12 @@ class ClassRecordAssessmentDeletionTest extends TestCase
         $this->assertDatabaseMissing('class_record_assessments', ['id' => $remove->id]);
     }
 
-    public function test_upsert_rejects_dropping_a_plotted_assessment_from_the_payload(): void
+    public function test_upsert_rejects_dropping_a_plotted_assessment_within_its_scheduled_week(): void
     {
         $teacher = User::factory()->create();
         $quarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $this->makeSubject());
         $keep = $this->makeAssessment($quarter, 1, 'Quiz 1', now()->addMonth()->toDateString());
-        $plotted = $this->makeAssessment($quarter, 2, 'Quiz 2', now()->addMonth()->toDateString());
+        $plotted = $this->makeAssessment($quarter, 2, 'Quiz 2', now()->startOfWeek()->toDateString());
 
         $response = $this->actingAs($teacher)
             ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
@@ -166,8 +166,40 @@ class ClassRecordAssessmentDeletionTest extends TestCase
             ])
             ->assertStatus(422);
 
-        $this->assertStringContainsString('already plotted', $response->json('message'));
+        $this->assertStringContainsString('plotted for this week', $response->json('message'));
         $this->assertDatabaseHas('class_record_assessments', ['id' => $plotted->id]);
+    }
+
+    public function test_upsert_freely_removes_a_plotted_assessment_whose_scheduled_week_has_passed(): void
+    {
+        $teacher = User::factory()->create();
+        $quarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $this->makeSubject());
+        $keep = $this->makeAssessment($quarter, 1, 'Quiz 1', now()->addMonth()->toDateString());
+        $pastPlotted = $this->makeAssessment($quarter, 2, 'Quiz 2', now()->subMonth()->toDateString());
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
+                'assessments' => [$this->payloadFor($keep)],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('class_record_assessments', ['id' => $pastPlotted->id]);
+    }
+
+    public function test_upsert_freely_removes_a_plotted_assessment_whose_scheduled_week_has_not_arrived(): void
+    {
+        $teacher = User::factory()->create();
+        $quarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $this->makeSubject());
+        $keep = $this->makeAssessment($quarter, 1, 'Quiz 1', now()->addMonth()->toDateString());
+        $futurePlotted = $this->makeAssessment($quarter, 2, 'Quiz 2', now()->addMonth()->addDay()->toDateString());
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
+                'assessments' => [$this->payloadFor($keep)],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('class_record_assessments', ['id' => $futurePlotted->id]);
     }
 
     // ── requestDeletion() ────────────────────────────────────────────────────

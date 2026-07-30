@@ -10,6 +10,7 @@ import AppBadge from '@/Components/AppBadge.vue'
 import AppModal from '@/Components/AppModal.vue'
 import AppTabs from '@/Components/AppTabs.vue'
 import { confirmAction } from '@/Composables/useConfirm.js'
+import { isWithinScheduledWeek } from '@/Utils/ClassRecord/watUtils.js'
 import Swal from 'sweetalert2'
 import {
   LockClosedIcon,
@@ -180,9 +181,12 @@ async function removeAssessmentRow(catId, idx) {
   }
 
   // Plotted (dated) + already-saved assessments are considered announced to
-  // students — they can no longer be dropped from the grid directly. File a
-  // deletion request instead; the row stays until ACIDAA acts on it.
-  if (row._db_id && row.activity_date) {
+  // students during their scheduled week — while that week is current, they
+  // can no longer be dropped from the grid directly. File a deletion request
+  // instead; the row stays until ACIDAA acts on it. Outside that window
+  // (week hasn't arrived yet, or has already passed) fall through to a
+  // direct delete, same as an unplotted row.
+  if (row._db_id && row.activity_date && isWithinScheduledWeek(row.activity_date)) {
     requestDeletionRow.value = row
     requestDeletionReason.value = ''
     showRequestDeletionModal.value = true

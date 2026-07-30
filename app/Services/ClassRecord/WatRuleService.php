@@ -86,6 +86,25 @@ class WatRuleService
         return now()->greaterThan(self::plottingDeadline($activityDate));
     }
 
+    // ── Scheduled-week window (deletion-approval gate) ────────────────────────
+
+    /**
+     * True when today falls within the Monday–Sunday week containing
+     * $activityDate. A plotted assessment is only "announced to students" in
+     * a way that matters once its week has arrived — before that, nothing's
+     * been experienced yet, and after that week has fully passed, forcing an
+     * ACIDAA approval for a stale/dead entry adds friction without protecting
+     * anyone (the separate has-scores check still blocks removing anything
+     * actually graded, in or out of this window).
+     */
+    public static function isWithinScheduledWeek(string $activityDate): bool
+    {
+        $start = Carbon::parse($activityDate)->startOfWeek(Carbon::MONDAY);
+        $end   = Carbon::parse($activityDate)->endOfWeek(Carbon::SUNDAY);
+
+        return now()->between($start, $end);
+    }
+
     // ── Quarter final exam window (daily/weekly caps + schedule-day exempt) ──
 
     /**
