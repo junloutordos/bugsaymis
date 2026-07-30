@@ -308,14 +308,19 @@ class ClassRecordAssessmentController extends Controller
 
         if ($toDeleteIds->isNotEmpty()) {
             // Once plotted (dated), an assessment is considered announced to
-            // students — it can no longer be silently dropped from the grid.
-            // Deletion from here on requires ACIDAA approval via
+            // students during its scheduled week — it can no longer be
+            // silently dropped from the grid while that week is current.
+            // Deletion during the scheduled week requires ACIDAA approval via
             // requestDeletion()/approveDeletionRequest(), not a plain save.
-            $plotted = $existingById->only($toDeleteIds->all())->filter(fn ($a) => $a->activity_date !== null);
+            // Outside that window (week hasn't arrived yet, or has already
+            // passed) a direct delete is allowed, same as an unplotted row.
+            $plotted = $existingById->only($toDeleteIds->all())
+                ->filter(fn ($a) => $a->activity_date !== null)
+                ->filter(fn ($a) => WatRuleService::isWithinScheduledWeek($a->activity_date->toDateString()));
             if ($plotted->isNotEmpty()) {
                 $titles = $plotted->pluck('title')->implode('", "');
                 return response()->json([
-                    'message' => "Cannot save — \"{$titles}\" is already plotted and announced to students. Use \"Request Deletion\" on that row instead; it can only be removed once the Assistant CID Chief for Academic Affairs approves.",
+                    'message' => "Cannot save — \"{$titles}\" is plotted for this week and announced to students. Use \"Request Deletion\" on that row instead; it can only be removed once the Assistant CID Chief for Academic Affairs approves.",
                     'errors'  => ['assessments' => ['One or more removed assessments are already plotted.']],
                 ], 422);
             }
@@ -734,11 +739,14 @@ class ClassRecordAssessmentController extends Controller
     // ── POST /class-records/{cr}/quarters/{q}/assessments/{assessment}/request-deletion ──
 
     /**
-     * A plotted (dated) assessment is considered announced to students —
-     * removing it is no longer a self-service action. This files a pending
-     * request for the ACIDAA (Assistant CID Chief for Academic Affairs) to
-     * approve or reject via the Approval Inbox; the assessment itself is
-     * untouched until then.
+     * A plotted (dated) assessment is considered announced to students while
+     * its scheduled week is current — removing it during that window is no
+     * longer a self-service action. This files a pending request for the
+     * ACIDAA (Assistant CID Chief for Academic Affairs) to approve or reject
+     * via the Approval Inbox; the assessment itself is untouched until then.
+     * Callable regardless of week (kept permissive), but the Setup tab only
+     * routes here when the row's activity_date falls within the current
+     * scheduled week — otherwise it deletes the row directly.
      */
     public function requestDeletion(Request $request, ClassRecord $classRecord, int $q, ClassRecordAssessment $assessment): JsonResponse
     {
