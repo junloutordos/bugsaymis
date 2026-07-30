@@ -2,10 +2,12 @@
 
 namespace App\Services\ClassRecord;
 
+use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\ClassRecordIlaDate;
 use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\ClassRecordStudent;
+use App\Models\ClassRecord\ClassRecordTeacher;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\QuarterExamWindow;
 use App\Models\ClassRecord\WatReview;
@@ -619,6 +621,124 @@ class WatRuleService
                 'weekly_major'  => $remainingMajor,
             ],
             'teachers'        => $byTeacher,
+        ];
+    }
+
+    // ── Individual Faculty WAT Tracker (teacher → sections direction) ────────
+
+    /**
+     * One teacher's own plotted assessments across every class record they
+     * own (as primary teacher_id, or as a PEHM co-teacher via
+     * ClassRecordTeacher) this school year, for one Mon–Fri week — the
+     * mirror image of teacherBreakdown() (which starts from one section and
+     * breaks it down by teacher). This starts from one teacher and cuts
+     * across every section/subject they teach.
+     *
+     * Built on top of weekData() per distinct section so the exact same
+     * pooling (Science Core/Elective synthetic sections), exam-window
+     * exemption, and cap arithmetic apply — no separate query logic that
+     * could drift from the section-facing tracker.
+     *
+     * @return array{
+     *   week_start: string, week_end: string,
+     *   totals: array{graded:int, major:int},
+     *   sections: array<int, array>,
+     *   days: array<int, array>,
+     * }
+     */
+    public static function facultyWeekData(int $userId, int $schoolYearId, string $weekStart): array
+    {
+        $monday = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
+        $friday = $monday->copy()->addDays(4);
+
+        // Every class record this teacher owns this SY, either as the
+        // primary teacher_id or as a PEHM co-teacher pivot row — mirrors
+        // ClassRecord::teacherIdsFor()'s own fallback logic, just run in the
+        // opposite direction (teacher -> records instead of record -> teachers).
+        $ownRecordIds = ClassRecord::where('school_year_id', $schoolYearId)
+            ->where('status', '<>', 'archived')
+            ->where('teacher_id', $userId)
+            ->pluck('id');
+        $coTeachRecordIds = ClassRecordTeacher::where('user_id', $userId)
+            ->whereHas('classRecord', fn ($q) => $q->where('school_year_id', $schoolYearId)->where('status', '<>', 'archived'))
+            ->pluck('class_record_id');
+
+        $records = ClassRecord::with('section:id,levelid,sectionname')
+            ->whereIn('id', $ownRecordIds->concat($coTeachRecordIds)->unique())
+            ->whereNotNull('section_id')
+            ->get();
+
+        $bySection = $records->groupBy('section_id');
+
+        $sections  = [];
+        $dayBucket = collect(range(0, 4))->mapWithKeys(fn ($o) => [$monday->copy()->addDays($o)->toDateString() => collect()]);
+
+        foreach ($bySection as $sectionId => $sectionRecords) {
+            $first = $sectionRecords->first();
+            $week  = self::weekData((int) $sectionId, $schoolYearId, $monday->toDateString());
+
+            // This teacher's own items only — matched by teacher_name the
+            // same way teacherBreakdown() does, since a pooled Science
+            // Core/Elective row keeps its ORIGINAL owning teacher's name
+            // regardless of which section's items array it landed in.
+            $teacherName = User::find($userId)?->name;
+            $mine = collect($week['days'])->flatMap(fn ($d) => collect($d['items'])->map(fn ($i) => $i + ['date' => $d['date']]))
+                ->filter(fn ($i) => $i['teacher_name'] === $teacherName)
+                ->values();
+
+            foreach ($mine as $item) {
+                if ($dayBucket->has($item['date'])) {
+                    $dayBucket[$item['date']]->push($item + [
+                        'section_id'   => (int) $sectionId,
+                        'section_name' => $first->section?->sectionname,
+                        'grade'        => $first->section?->levelid,
+                    ]);
+                }
+            }
+
+            $gradedMine = $mine->where('is_graded', true)->count();
+            $majorMine  = $mine->where('is_graded', true)->where('is_major', true)->count();
+
+            $sections[] = [
+                'section_id'    => (int) $sectionId,
+                'section_name'  => $first->section?->sectionname,
+                'grade'         => $first->section?->levelid,
+                'subjects'      => $sectionRecords->pluck('subject_name')->unique()->values()->all(),
+                'graded_count'  => $gradedMine,
+                'major_count'   => $majorMine,
+                'remaining'     => [
+                    // Room left in the SECTION's shared budget (pools every
+                    // teacher on it, not just this one) — matches what the
+                    // section-scoped tracker/upsert endpoint actually enforces.
+                    'weekly_graded' => max(0, self::WEEKLY_GRADED_MAX - $week['totals']['graded']),
+                    'weekly_major'  => max(0, self::WEEKLY_MAJOR_MAX - $week['totals']['major']),
+                ],
+                'section_totals' => [
+                    'graded' => $week['totals']['graded'],
+                    'major'  => $week['totals']['major'],
+                ],
+            ];
+        }
+
+        $days = $dayBucket->map(function ($items, $date) {
+            $sorted = $items->sortBy('section_name')->values();
+            return [
+                'date'         => $date,
+                'items'        => $sorted,
+                'graded_count' => $sorted->where('is_graded', true)->count(),
+                'major_count'  => $sorted->where('is_graded', true)->where('is_major', true)->count(),
+            ];
+        })->values();
+
+        $weekGraded = $days->sum('graded_count');
+        $weekMajor  = $days->sum('major_count');
+
+        return [
+            'week_start' => $monday->toDateString(),
+            'week_end'   => $friday->toDateString(),
+            'totals'     => ['graded' => $weekGraded, 'major' => $weekMajor],
+            'sections'   => collect($sections)->sortBy('section_name')->values()->all(),
+            'days'       => $days->all(),
         ];
     }
 }

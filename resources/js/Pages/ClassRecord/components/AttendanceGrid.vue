@@ -96,6 +96,12 @@ function excusedStatus(studentId, dateId) {
 function isDefaulted(studentId, dateId) {
   return !cell(studentId, dateId)
 }
+// IU (Incomplete Uniform) is an independent flag, not a status — a student
+// can be Present AND flagged IU on the same day. Synced one-directionally
+// into Homeroom's own Inc. Uniform checkbox once saved.
+function isIncompleteUniform(studentId, dateId) {
+  return cell(studentId, dateId)?.incomplete_uniform ?? false
+}
 
 async function load() {
   loading.value = true
@@ -135,10 +141,29 @@ function cycleAttendance(studentId, dateId) {
     nextStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]
   }
 
-  if (nextStatus === null) {
+  if (nextStatus === null && !prev.incomplete_uniform) {
+    // Nothing exceptional left to record for this cell — safe to drop the row.
     delete records.value[key]
   } else {
     records.value[key] = { ...prev, status: nextStatus }
+  }
+  pendingChanges.add(key)
+}
+
+// IU (Incomplete Uniform) toggles independently of the status cycle — a
+// student can be Present and flagged IU on the same day. Kept as its own
+// row even if status ends up null, since the flag alone is worth saving
+// (and syncing to Homeroom).
+function toggleIncompleteUniform(studentId, dateId) {
+  if (props.isLocked || !canEditSelectedSubject.value) return
+  const key  = `${studentId}_${dateId}`
+  const prev = records.value[key] ?? { status: isDefaulted(studentId, dateId) ? null : effectiveStatus(studentId, dateId) }
+  const nextFlag = !prev.incomplete_uniform
+
+  if (nextFlag === false && (prev.status ?? null) === null) {
+    delete records.value[key]
+  } else {
+    records.value[key] = { ...prev, incomplete_uniform: nextFlag }
   }
   pendingChanges.add(key)
 }
@@ -161,6 +186,7 @@ async function saveAttendance() {
         student_id: s.id,
         date_id:    d.id,
         status:     effectiveStatus(s.id, d.id),
+        incomplete_uniform: isIncompleteUniform(s.id, d.id),
       })
     }
   }
@@ -232,17 +258,18 @@ function formatDate(d) {
 // ── Totals ───────────────────────────────────────────────────────────────────
 
 function studentTotals(studentId) {
-  let present = 0, absences = 0, tardies = 0, cuts = 0
+  let present = 0, absences = 0, tardies = 0, cuts = 0, ius = 0
   for (const d of dates.value) {
     const status = effectiveStatus(studentId, d.id)
     if (status === 'present') present++
     if (status === 'absent') absences++
     if (status === 'tardy') tardies++
     if (status === 'cut_class') cuts++
+    if (isIncompleteUniform(studentId, d.id)) ius++
   }
   const total = dates.value.length
   const pct = total > 0 ? Math.round((present / total) * 100) : null
-  return { total, present, absences, tardies, cuts, pct }
+  return { total, present, absences, tardies, cuts, ius, pct }
 }
 
 function presentCountForDate(dateId) {
@@ -274,6 +301,7 @@ function presentCountForDate(dateId) {
       <p class="text-xs text-slate-500">
         Cells default to <span class="font-semibold">P</span> —
         click to cycle Present → Absent → Tardy → Cut Class. Excused/Unexcused is decided by the Homeroom Adviser/Registrar and shown read-only.
+        Check <span class="font-semibold text-yellow-600">IU</span> below a cell to flag Incomplete Uniform — independent of the status, and synced to Homeroom's Inc. Uniform checkbox.
       </p>
       <div class="flex items-center gap-2 shrink-0">
         <template v-if="!isLocked && canEditSelectedSubject">
@@ -330,6 +358,7 @@ function presentCountForDate(dateId) {
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-red-400 uppercase tracking-wide w-14 border-r border-slate-100">Absences</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide w-14 border-r border-slate-100">Tardies</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-orange-500 uppercase tracking-wide w-14 border-r border-slate-100">Cuts</th>
+            <th class="px-3 py-2.5 text-center text-xs font-semibold text-yellow-600 uppercase tracking-wide w-14 border-r border-slate-100">IU</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Present %</th>
           </tr>
         </thead>
@@ -371,6 +400,15 @@ function presentCountForDate(dateId) {
                 :class="excusedStatus(student.id, d.id) === 'excused' ? 'text-emerald-600' : 'text-red-500'">
                 {{ EXCUSED_LABELS[excusedStatus(student.id, d.id)] }}
               </div>
+              <label v-if="!isLocked && canEditSelectedSubject" class="mt-0.5 flex items-center justify-center gap-0.5 cursor-pointer"
+                title="Incomplete Uniform (IU) — flags independently of Present/Absent/Tardy/Cut Class; syncs to Homeroom's Inc. Uniform checkbox.">
+                <input type="checkbox" :checked="isIncompleteUniform(student.id, d.id)" @change="toggleIncompleteUniform(student.id, d.id)"
+                  class="h-3 w-3 rounded-sm border-slate-300 text-yellow-600 focus:ring-yellow-500" />
+                <span class="text-[8px] font-semibold text-yellow-600">IU</span>
+              </label>
+              <div v-else-if="isIncompleteUniform(student.id, d.id)" class="mt-0.5 text-[9px] font-semibold text-yellow-600">
+                IU
+              </div>
             </td>
             <!-- Totals -->
             <td class="px-3 py-2 text-center text-slate-500 border-r border-slate-100 font-mono">
@@ -387,6 +425,10 @@ function presentCountForDate(dateId) {
             <td class="px-3 py-2 text-center border-r border-slate-100 font-mono"
               :class="studentTotals(student.id).cuts > 0 ? 'text-orange-600 font-semibold' : 'text-slate-300'">
               {{ studentTotals(student.id).cuts || '—' }}
+            </td>
+            <td class="px-3 py-2 text-center border-r border-slate-100 font-mono"
+              :class="studentTotals(student.id).ius > 0 ? 'text-yellow-600 font-semibold' : 'text-slate-300'">
+              {{ studentTotals(student.id).ius || '—' }}
             </td>
             <td class="px-3 py-2 text-center font-mono font-semibold"
               :class="studentTotals(student.id).pct !== null
@@ -407,7 +449,7 @@ function presentCountForDate(dateId) {
               class="px-1 py-2 text-center text-xs font-semibold border-r border-slate-200 text-emerald-600">
               {{ presentCountForDate(d.id) }}
             </td>
-            <td colspan="5" />
+            <td colspan="6" />
           </tr>
         </tfoot>
       </table>
@@ -420,7 +462,9 @@ function presentCountForDate(dateId) {
         Mark <span class="font-semibold text-orange-600">Cut Class</span> when a student was on campus but skipped or left this
         period without valid reason (CIM 3.6/3.6.2) — only you, the subject teacher, can witness this. As a backup, a student
         marked Absent here while Homeroom Attendance says Present/Tardy that day is still automatically flagged to the
-        Registrar too, in case Cut Class wasn't used.
+        Registrar too, in case Cut Class wasn't used. Check <span class="font-semibold text-yellow-600">IU</span> to flag
+        Incomplete Uniform for a specific date — it's synced to the Homeroom Adviser's Inc. Uniform checkbox for that day and
+        never clears a box the adviser already checked themselves.
       </p>
       <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-500">
         <span v-for="s in STATUSES" :key="s.value" class="inline-flex items-center gap-1.5">

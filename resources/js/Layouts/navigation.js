@@ -1345,6 +1345,16 @@ export const menuItems = [
         roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
       },
       {
+        // Personal, cross-section view of a faculty member's own plotted
+        // load — distinct from the section-scoped tracker above, which is
+        // used by coordinators/reviewers for one section at a time.
+        label: "My WAT Tracker",
+        routeName: "class-records.wat.my-tracker",
+        href: route("class-records.wat.my-tracker"),
+        icon: CalendarDaysIcon,
+        roles: ["Administrator", "Faculty"],
+      },
+      {
         // Read-only monitoring for CID Chief (campus-wide) and Academic Unit
         // Heads (own unit, scoped server-side via Office.unit_head) — never
         // grants write access, the page itself enforces that.

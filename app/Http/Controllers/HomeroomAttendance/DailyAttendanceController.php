@@ -60,9 +60,37 @@ class DailyAttendanceController extends Controller
             ->get()
             ->groupBy('student_id');
 
-        $roster = $students->map(function ($student) use ($recordsByStudent, $cuttingSubjectsByStudent) {
+        // "Who flagged Incomplete Uniform today" — per student, which
+        // subject(s) synced the IU flag (read-only annotation next to the
+        // adviser's own checkbox; see SubjectAttendanceSyncService).
+        $iuSubjectsByStudent = DB::table('class_record_attendance_records as car')
+            ->join('class_record_attendance_dates as cad', 'cad.id', '=', 'car.class_record_attendance_date_id')
+            ->join('class_record_students as crs', 'crs.id', '=', 'car.class_record_student_id')
+            ->join('class_record_quarters as crq', 'crq.id', '=', 'crs.class_record_quarter_id')
+            ->join('class_records as cr', 'cr.id', '=', 'crq.class_record_id')
+            ->leftJoin('subjects', 'subjects.id', '=', DB::raw('COALESCE(cad.subject_id, cr.subject_id)'))
+            ->where('cr.section_id', $sectionId)
+            ->where('cad.date', $date)
+            ->where('car.incomplete_uniform', true)
+            ->select('crs.student_id', 'subjects.name as subject_name')
+            ->get()
+            ->groupBy('student_id');
+
+        // Subject-submission visibility: for every subject actually
+        // scheduled to meet this section on this day of the week, has that
+        // subject's Class Record Attendance grid been saved for this date?
+        // Informational only — the adviser cannot act on this, it's purely
+        // "who's submitted vs who hasn't yet" so they know the picture is
+        // still incomplete before relying on synced Cut Class/IU flags.
+        $subjectSubmissions = $this->attendance->subjectSubmissionStatus($sectionId, $date);
+
+        $roster = $students->map(function ($student) use ($recordsByStudent, $cuttingSubjectsByStudent, $iuSubjectsByStudent) {
             $record = $recordsByStudent->get($student->id);
             $cuttingSubjects = $cuttingSubjectsByStudent->get($student->id, collect())
+                ->pluck('subject_name')
+                ->filter()
+                ->values();
+            $iuSubjects = $iuSubjectsByStudent->get($student->id, collect())
                 ->pluck('subject_name')
                 ->filter()
                 ->values();
@@ -76,6 +104,7 @@ class DailyAttendanceController extends Controller
                 'excused_status'     => $record->excused_status ?? 'n_a',
                 'remarks'            => $record->remarks ?? null,
                 'cut_class_subjects' => $cuttingSubjects,
+                'iu_flagged_subjects'=> $iuSubjects,
             ];
         });
 
@@ -85,6 +114,7 @@ class DailyAttendanceController extends Controller
             'date'      => $date,
             'roster'    => $roster->values(),
             'schoolYear'=> $sy->only(['id', 'name']),
+            'subjectSubmissions' => $subjectSubmissions,
         ]);
     }
 

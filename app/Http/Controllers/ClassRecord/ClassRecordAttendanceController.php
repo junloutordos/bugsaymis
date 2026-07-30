@@ -9,6 +9,7 @@ use App\Models\ClassRecord\ClassRecordAttendanceRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordStudent;
 use App\Services\ClassRecord\ClassRecordMonitorScopeService;
+use App\Services\HomeroomAttendance\SubjectAttendanceSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,8 +17,10 @@ use Illuminate\Support\Facades\DB;
 
 class ClassRecordAttendanceController extends Controller
 {
-    public function __construct(private readonly ClassRecordMonitorScopeService $monitorScope)
-    {
+    public function __construct(
+        private readonly ClassRecordMonitorScopeService $monitorScope,
+        private readonly SubjectAttendanceSyncService $subjectSync,
+    ) {
     }
 
     private function isAdmin(): bool
@@ -95,12 +98,13 @@ class ClassRecordAttendanceController extends Controller
         $records = ClassRecordAttendanceRecord::whereHas('attendanceDate', fn ($sq) =>
                 $sq->where('class_record_quarter_id', $quarter->id)->where('subject_id', $subjectId)
             )
-            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'excused_status', 'synced_from_homeroom'])
+            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'excused_status', 'synced_from_homeroom', 'incomplete_uniform'])
             ->mapWithKeys(fn ($r) => [
                 "{$r->class_record_student_id}_{$r->class_record_attendance_date_id}" => [
-                    'status'  => $r->status,
-                    'excused' => $r->excused_status,
-                    'synced'  => $r->synced_from_homeroom,
+                    'status'             => $r->status,
+                    'excused'            => $r->excused_status,
+                    'synced'             => $r->synced_from_homeroom,
+                    'incomplete_uniform' => $r->incomplete_uniform,
                 ],
             ]);
 
@@ -130,6 +134,42 @@ class ClassRecordAttendanceController extends Controller
             ['class_record_quarter_id' => $quarter->id, 'subject_id' => $subjectId, 'date' => $validated['date']],
             ['sort_order' => $maxOrder + 1]
         );
+
+        // Explicitly persist a "present" record for every active student on
+        // this date the moment it's added — not just an implied UI default.
+        // Before this, a cell showed "P" on screen purely because no DB row
+        // existed yet; anything reading the table directly (exports, other
+        // reports) saw the date as blank until the teacher hit Save. Only
+        // inserts missing rows — never overwrites a row that already exists
+        // (e.g. re-adding a date that still has records from before, or a
+        // date created moments earlier by SubjectAttendanceSyncService).
+        $studentIds = ClassRecordStudent::where('class_record_quarter_id', $quarter->id)
+            ->where('is_active', true)
+            ->pluck('id');
+
+        if ($studentIds->isNotEmpty()) {
+            $existingStudentIds = ClassRecordAttendanceRecord::where('class_record_attendance_date_id', $date->id)
+                ->whereIn('class_record_student_id', $studentIds)
+                ->pluck('class_record_student_id');
+
+            $missingStudentIds = $studentIds->diff($existingStudentIds);
+
+            if ($missingStudentIds->isNotEmpty()) {
+                $now = now();
+                $rows = $missingStudentIds->map(fn ($studentId) => [
+                    'class_record_attendance_date_id' => $date->id,
+                    'class_record_student_id'         => $studentId,
+                    'status'                           => 'present',
+                    'excused_status'                   => 'n_a',
+                    'synced_from_homeroom'             => false,
+                    'incomplete_uniform'                => false,
+                    'created_at'                        => $now,
+                    'updated_at'                        => $now,
+                ])->values()->all();
+
+                DB::table('class_record_attendance_records')->insert($rows);
+            }
+        }
 
         return response()->json($date);
     }
@@ -165,13 +205,17 @@ class ClassRecordAttendanceController extends Controller
             // Present/Absent/Tardy/Cut Class. Excused/Unexcused is no longer a
             // status a subject teacher picks; it's set by the Homeroom
             // Adviser/Registrar's Class Admission Slip workflow instead.
-            // Uniform checking also moved to the adviser (once per day), so
-            // there's no uniform field here anymore.
             // Cut Class (CIM 3.6/3.6.2) can only be witnessed and asserted by
             // the subject teacher — the student was on campus but skipped or
             // left this specific class period — so it's only ever set here,
             // never on the Homeroom whole-day attendance.
             'records.*.status'     => 'nullable|in:present,absent,tardy,cut_class',
+            // Incomplete Uniform (IU) is an independent flag, not a status —
+            // a student can be Present AND flagged IU on the same day. Synced
+            // one-directionally into Homeroom's own `incomplete_uniform`
+            // column (never the other way, and never clearing a box the
+            // adviser already checked themselves).
+            'records.*.incomplete_uniform' => 'sometimes|boolean',
         ]);
         $subjectId = $this->resolveSubjectId($classRecord, $validated['subject_id'] ?? null);
         abort_unless($classRecord->canEdit(Auth::user(), $subjectId), 403);
@@ -185,12 +229,13 @@ class ClassRecordAttendanceController extends Controller
         // record (or another subject on this same shared record) entirely and
         // delete or overwrite someone else's attendance data.
         $dateIds = collect($validated['records'])->pluck('date_id')->unique();
-        $validDateIds = ClassRecordAttendanceDate::whereIn('id', $dateIds)
+        $validDates = ClassRecordAttendanceDate::whereIn('id', $dateIds)
             ->where('class_record_quarter_id', $quarter->id)
             ->where('subject_id', $subjectId)
-            ->pluck('id');
+            ->get(['id', 'date'])
+            ->keyBy('id');
         abort_if(
-            $validDateIds->count() !== $dateIds->count(),
+            $validDates->count() !== $dateIds->count(),
             422,
             $subjectId === null
                 ? 'One or more dates do not belong to this quarter.'
@@ -198,19 +243,22 @@ class ClassRecordAttendanceController extends Controller
         );
 
         $studentIds = collect($validated['records'])->pluck('student_id')->unique();
-        $validStudentIds = ClassRecordStudent::whereIn('id', $studentIds)
+        $validStudents = ClassRecordStudent::whereIn('id', $studentIds)
             ->where('class_record_quarter_id', $quarter->id)
-            ->pluck('id');
-        abort_if($validStudentIds->count() !== $studentIds->count(), 422, 'One or more students do not belong to this class record.');
+            ->get(['id', 'student_id'])
+            ->keyBy('id');
+        abort_if($validStudents->count() !== $studentIds->count(), 422, 'One or more students do not belong to this class record.');
 
         $now      = now();
         $toUpsert = [];
+        $iuSyncs  = []; // [global_student_id, date string] pairs to push to Homeroom after saving.
 
         foreach ($validated['records'] as $item) {
-            $status = $item['status'] ?? null;
+            $status            = $item['status'] ?? null;
+            $incompleteUniform = (bool) ($item['incomplete_uniform'] ?? false);
 
-            // A cell with no status has no reason to exist as a row.
-            if ($status === null) {
+            // A cell with no status AND no IU flag has no reason to exist as a row.
+            if ($status === null && ! $incompleteUniform) {
                 DB::table('class_record_attendance_records')
                     ->where('class_record_attendance_date_id', $item['date_id'])
                     ->where('class_record_student_id', $item['student_id'])
@@ -225,9 +273,18 @@ class ClassRecordAttendanceController extends Controller
                     // Attendance resync never clobbers it again (see
                     // SubjectAttendanceSyncService).
                     'synced_from_homeroom'            => false,
+                    'incomplete_uniform'              => $incompleteUniform,
                     'created_at'                      => $now,
                     'updated_at'                      => $now,
                 ];
+
+                if ($incompleteUniform) {
+                    $globalStudentId = $validStudents->get($item['student_id'])?->student_id;
+                    $date = $validDates->get($item['date_id'])?->date;
+                    if ($globalStudentId && $date) {
+                        $iuSyncs[] = [$globalStudentId, $date->format('Y-m-d')];
+                    }
+                }
             }
         }
 
@@ -235,8 +292,12 @@ class ClassRecordAttendanceController extends Controller
             DB::table('class_record_attendance_records')->upsert(
                 $toUpsert,
                 ['class_record_attendance_date_id', 'class_record_student_id'],
-                ['status', 'synced_from_homeroom', 'updated_at']
+                ['status', 'synced_from_homeroom', 'incomplete_uniform', 'updated_at']
             );
+        }
+
+        foreach ($iuSyncs as [$globalStudentId, $dateStr]) {
+            $this->subjectSync->syncIncompleteUniform($globalStudentId, $dateStr, Auth::id());
         }
 
         return response()->json(['message' => count($toUpsert) . ' record(s) saved.']);
