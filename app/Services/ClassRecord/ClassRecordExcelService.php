@@ -73,6 +73,16 @@ class ClassRecordExcelService
 
     private function addQuarterSheet(Spreadsheet $spreadsheet, ClassRecord $classRecord, int $quarter, array $stanine): void
     {
+        $quarterData = $classRecord->quarters->firstWhere('quarter', $quarter);
+        $optionId = $quarterData?->grading_option_id ?? $classRecord->grading_option_id;
+        $option = $optionId ? GradingOption::find($optionId) : null;
+
+        if ($option?->isComplianceMode()) {
+            $this->addComplianceQuarterSheet($spreadsheet, $classRecord, $quarter, $option);
+
+            return;
+        }
+
         $subjectSlug = substr(preg_replace('/[^A-Za-z0-9 ]/', '', $classRecord->subject_name), 0, 20);
         $sheetTitle = trim("{$subjectSlug} Q{$quarter}");
 
@@ -80,7 +90,6 @@ class ClassRecordExcelService
         $spreadsheet->addSheet($ws);
 
         $qLabel = self::QUARTER_LABELS[$quarter - 1];
-        $quarterData = $classRecord->quarters->firstWhere('quarter', $quarter);
 
         // Load scores into a map { studentId_assessmentId => score }
         $scoresMap = $this->loadScoresMap($quarterData?->id);
@@ -374,6 +383,254 @@ class ClassRecordExcelService
         }
 
         // ── Freeze panes: after row 12, after col E ───────────────────────────
+        $ws->freezePane('F13');
+    }
+
+    // ── Compliance-mode quarter sheet ─────────────────────────────────────────
+
+    /**
+     * A simpler sheet for compliance-mode subjects (e.g. Values Education):
+     * a checkbox per activity (TRUE/blank, exported as ✓/blank), category
+     * %/W% same as numeric, then Compliance % + Remark instead of
+     * TW%/Score%/GE/Adjectival and any running-grade columns — compliance
+     * quarters don't carry forward, each stands alone.
+     */
+    private function addComplianceQuarterSheet(Spreadsheet $spreadsheet, ClassRecord $classRecord, int $quarter, GradingOption $option): void
+    {
+        $subjectSlug = substr(preg_replace('/[^A-Za-z0-9 ]/', '', $classRecord->subject_name), 0, 20);
+        $sheetTitle = trim("{$subjectSlug} Q{$quarter}");
+
+        $ws = new Worksheet($spreadsheet, $sheetTitle);
+        $spreadsheet->addSheet($ws);
+
+        $qLabel = self::QUARTER_LABELS[$quarter - 1];
+        $quarterData = $classRecord->quarters->firstWhere('quarter', $quarter);
+        $passLabel = $option->compliance_pass_label ?? 'Completed';
+        $failLabel = $option->compliance_fail_label ?? 'Not Completed';
+        $passThreshold = (float) ($option->compliance_pass_threshold ?? 0.75);
+
+        $scoresMap = $this->loadScoresMap($quarterData?->id);
+        $categories = $this->effectiveLeafCategories($classRecord, $quarterData);
+        $students = $quarterData?->students?->sortBy('sequence_number')->values() ?? collect();
+        $assessByCategory = [];
+        foreach ($categories as $cat) {
+            $assessByCategory[$cat->id] = ($quarterData?->assessments ?? collect())
+                ->where('grading_category_id', $cat->id)
+                ->sortBy('sort_order')
+                ->values();
+        }
+
+        $computed = [];
+        if ($quarterData) {
+            $categoriesForGrader = $categories->map(fn ($cat) => [
+                'id' => $cat->id,
+                'code' => $cat->code,
+                'weight' => (float) $cat->weight,
+                'assessments' => ($assessByCategory[$cat->id] ?? collect())
+                    ->map(fn ($a) => ['id' => $a->id, 'maxScore' => (float) $a->max_score])
+                    ->values()->toArray(),
+            ])->toArray();
+
+            $studentsForGrader = $students->map(fn ($s) => [
+                'id' => $s->id,
+                'scores' => collect($scoresMap)
+                    ->filter(fn ($v, $k) => str_starts_with($k, "{$s->id}_"))
+                    ->mapWithKeys(fn ($v, $k) => [(int) explode('_', $k)[1] => $v !== null ? (float) $v : null])
+                    ->toArray(),
+            ])->toArray();
+
+            $result = $this->grader->computeFullComplianceClassRecord([
+                'gradingOption' => ['categories' => $categoriesForGrader],
+                'students' => $studentsForGrader,
+                'passThreshold' => $passThreshold,
+                'passLabel' => $passLabel,
+                'failLabel' => $failLabel,
+            ]);
+            $computed = collect($result['students'])->keyBy(fn ($s) => (int) $s['studentId'])->toArray();
+        }
+
+        $ws->setCellValue('B1', '                      Republic of the Philippines');
+        $ws->setCellValue('B2', '                      Department of Science and Technology');
+        $ws->setCellValue('B3', '                      PHILIPPINE SCIENCE HIGH SCHOOL - CARAGA REGION CAMPUS IN BUTUAN CITY');
+        $ws->setCellValue('B5', "SUBJECT:  {$classRecord->display_name}");
+        $ws->setCellValue('B6', "YR. LEVEL & SECTION:  {$classRecord->year_level_section}");
+        $ws->setCellValue('B7', "SCHOOL YEAR:  {$classRecord->school_year}");
+        $ws->setCellValue('B8', "QUARTER:  {$qLabel} Quarter (Compliance)");
+
+        foreach ([1, 2, 3, 5, 6, 7, 8] as $r) {
+            $ws->getStyle("B{$r}")->getFont()->setBold(true)->setSize(10);
+        }
+        $ws->getStyle('B3')->getFont()->setBold(true)->setSize(11);
+
+        $FIXED = 5;
+        $colCursor = $FIXED + 1;
+
+        $catCols = [];
+        foreach ($categories as $cat) {
+            $assmnts = $assessByCategory[$cat->id] ?? collect();
+            $start = $colCursor;
+            $assCols = [];
+            foreach ($assmnts as $a) {
+                $assCols[] = $colCursor++;
+            }
+            $pctCol = $colCursor++;
+            $wPctCol = $colCursor++;
+            $catCols[$cat->id] = [
+                'start' => $start,
+                'end' => $colCursor - 1,
+                'assCols' => $assCols,
+                'pctCol' => $pctCol,
+                'wPctCol' => $wPctCol,
+                'assmnts' => $assmnts,
+            ];
+        }
+
+        $complianceCol = $colCursor++;
+        $remarkCol = $colCursor++;
+
+        foreach ([1, 2, 3, 4, 5] as $c) {
+            $cellAddr = Coordinate::stringFromColumnIndex($c);
+            $ws->mergeCells("{$cellAddr}10:{$cellAddr}12");
+        }
+        $ws->setCellValue('A10', '#');
+        $ws->setCellValue('B10', 'Family Name');
+        $ws->setCellValue('C10', 'Given Name');
+        $ws->setCellValue('D10', 'MI');
+        $ws->setCellValue('E10', 'Sex');
+
+        foreach ($categories as $cat) {
+            $cc = $catCols[$cat->id];
+            $startL = Coordinate::stringFromColumnIndex($cc['start']);
+            $endL = Coordinate::stringFromColumnIndex($cc['end']);
+            $ws->mergeCells("{$startL}10:{$endL}10");
+            $ws->setCellValue("{$startL}10", "{$cat->name} (".round($cat->weight * 100).'%)');
+        }
+
+        $sumStart = Coordinate::stringFromColumnIndex($complianceCol);
+        $sumEnd = Coordinate::stringFromColumnIndex($remarkCol);
+        $ws->mergeCells("{$sumStart}10:{$sumEnd}10");
+        $ws->setCellValue("{$sumStart}10", "{$qLabel} Quarter Summary");
+
+        foreach ($categories as $cat) {
+            $cc = $catCols[$cat->id];
+            foreach ($cc['assmnts'] as $i => $a) {
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]).'11', $cat->code.$a->assessment_number);
+            }
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['pctCol']).'11', '%');
+            $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['wPctCol']).'11', 'W%');
+        }
+        $ws->setCellValue(Coordinate::stringFromColumnIndex($complianceCol).'11', 'Compliance %');
+        $ws->setCellValue(Coordinate::stringFromColumnIndex($remarkCol).'11', 'Remark');
+
+        foreach ([10, 11, 12] as $row) {
+            $lastCol = Coordinate::stringFromColumnIndex($colCursor - 1);
+            $ws->getStyle("A{$row}:{$lastCol}{$row}")->getFont()->setBold(true);
+            $ws->getStyle("A{$row}:{$lastCol}{$row}")
+                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                ->setVertical(Alignment::VERTICAL_CENTER)
+                ->setWrapText(true);
+            $ws->getStyle("A{$row}:{$lastCol}{$row}")
+                ->getFill()->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB($row === 10 ? 'BDD7EE' : ($row === 11 ? 'D9E1F2' : 'EBF3FB'));
+            $ws->getStyle("A{$row}:{$lastCol}{$row}")
+                ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        }
+        $ws->getRowDimension(10)->setRowHeight(22);
+        $ws->getRowDimension(11)->setRowHeight(20);
+        $ws->getRowDimension(12)->setRowHeight(18);
+
+        foreach ($students as $sIdx => $student) {
+            $row = 13 + $sIdx;
+            $sid = $student->id;
+            $comp = $computed[$sid] ?? null;
+
+            $ws->setCellValue("A{$row}", $student->sequence_number);
+            $ws->setCellValue("B{$row}", $student->family_name);
+            $ws->setCellValue("C{$row}", $student->given_name);
+            $ws->setCellValue("D{$row}", $student->middle_initial ?? '');
+            $ws->setCellValue("E{$row}", $student->sex);
+
+            foreach ($categories as $cat) {
+                $cc = $catCols[$cat->id];
+                foreach ($cc['assmnts'] as $i => $a) {
+                    $score = $scoresMap["{$sid}_{$a->id}"] ?? null;
+                    // Complied = score at/above the activity's max — shown as a
+                    // checkmark; anything else (0/null) is left blank.
+                    $complied = $score !== null && (float) $score >= (float) $a->max_score;
+                    $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['assCols'][$i]).$row, $complied ? '✓' : '');
+                    $ws->getStyle(Coordinate::stringFromColumnIndex($cc['assCols'][$i]).$row)
+                        ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                }
+
+                if ($comp) {
+                    $catResult = collect($comp['categories'] ?? [])->firstWhere('categoryId', $cat->id);
+                    if ($catResult) {
+                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['pctCol']).$row, $catResult['percentage']);
+                        $ws->setCellValue(Coordinate::stringFromColumnIndex($cc['wPctCol']).$row, $catResult['weightedPercentage']);
+                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['pctCol']).$row)->getNumberFormat()->setFormatCode('0.00%');
+                        $ws->getStyle(Coordinate::stringFromColumnIndex($cc['wPctCol']).$row)->getNumberFormat()->setFormatCode('0.00%');
+                    }
+                }
+            }
+
+            if ($comp) {
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($complianceCol).$row, $comp['compliancePercentage'] / 100);
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($remarkCol).$row, $comp['remark']);
+                $ws->getStyle(Coordinate::stringFromColumnIndex($complianceCol).$row)->getNumberFormat()->setFormatCode('0.00%');
+
+                $ws->getStyle(Coordinate::stringFromColumnIndex($remarkCol).$row)
+                    ->getFill()->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB($comp['passed'] ? 'C6EFCE' : 'FFC7CE');
+            }
+
+            $lastColL = Coordinate::stringFromColumnIndex($colCursor - 1);
+            $ws->getStyle("A{$row}:{$lastColL}{$row}")
+                ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+            if ($sIdx % 2 === 1) {
+                $ws->getStyle("A{$row}:{$lastColL}{$row}")
+                    ->getFill()->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('F2F2F2');
+            }
+        }
+
+        $footerRow = 13 + $students->count() + 3;
+        $ws->setCellValue("A{$footerRow}", 'Prepared by:');
+        $ws->setCellValue("D{$footerRow}", 'Checked by:');
+        $ws->setCellValue("G{$footerRow}", 'Approved by:');
+        $ws->setCellValue('A'.($footerRow + 2), $classRecord->teacher?->name ?? '');
+        $ws->setCellValue('A'.($footerRow + 3), $classRecord->teacher?->position ?? 'Subject Teacher');
+        $ws->getStyle("A{$footerRow}")->getFont()->setBold(true);
+        $ws->getStyle("D{$footerRow}")->getFont()->setBold(true);
+        $ws->getStyle("G{$footerRow}")->getFont()->setBold(true);
+
+        $logRow = $footerRow + 6;
+        $ws->setCellValue("A{$logRow}", 'Compliance Rule: Pass threshold '.round($passThreshold * 100)."% — {$passLabel} / {$failLabel}");
+        $ws->getStyle("A{$logRow}")->getFont()->setBold(true);
+        $logRow += 2;
+        $ws->setCellValue("A{$logRow}", 'Activity Log:');
+        $ws->getStyle("A{$logRow}")->getFont()->setBold(true);
+        $logRow++;
+        foreach ($categories as $cat) {
+            $cc = $catCols[$cat->id];
+            foreach ($cc['assmnts'] as $i => $a) {
+                $label = $cat->code.$a->assessment_number.': '.$a->title;
+                $date = $a->activity_date ? ' ('.$a->activity_date.')' : '';
+                $ws->setCellValue("A{$logRow}", $label.$date);
+                $logRow++;
+            }
+        }
+
+        $ws->getColumnDimension('A')->setWidth(6);
+        $ws->getColumnDimension('B')->setWidth(20);
+        $ws->getColumnDimension('C')->setWidth(18);
+        $ws->getColumnDimension('D')->setWidth(5);
+        $ws->getColumnDimension('E')->setWidth(5);
+        for ($c = 6; $c < $colCursor; $c++) {
+            $colL = Coordinate::stringFromColumnIndex($c);
+            $ws->getColumnDimension($colL)->setWidth($c === $remarkCol ? 16 : 9);
+        }
+
         $ws->freezePane('F13');
     }
 

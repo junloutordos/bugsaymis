@@ -616,4 +616,115 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->where('summary.1.name', 'Sapphire')
                 ->where('summary.1.graded_count', 1));
     }
+
+    // ── Teacher-level plotting compliance (visibility-only analytics) ────────
+
+    public function test_teacher_breakdown_marks_a_teacher_with_plotted_assessments_as_plotted(): void
+    {
+        $teacher = User::factory()->create(['name' => 'Plotting Teacher']);
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $this->assignTeachingLoad($teacher, $subject, $section);
+        $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
+
+        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
+        $row = collect($breakdown['teachers'])->firstWhere('user_id', $teacher->id);
+
+        $this->assertNotNull($row);
+        $this->assertSame('plotted', $row['status']);
+        $this->assertTrue($row['plotted']);
+        $this->assertSame(1, $row['graded_count']);
+    }
+
+    public function test_teacher_breakdown_marks_a_teacher_with_no_plots_as_not_yet_due_before_the_deadline(): void
+    {
+        $teacher = User::factory()->create(['name' => 'Idle Teacher']);
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $this->assignTeachingLoad($teacher, $subject, $section);
+
+        // A week far enough in the future that "now" is still before its
+        // Friday-noon plotting deadline.
+        $future = now()->addMonths(2)->startOfWeek(\Carbon\Carbon::MONDAY)->toDateString();
+
+        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, $future);
+        $row = collect($breakdown['teachers'])->firstWhere('user_id', $teacher->id);
+
+        $this->assertNotNull($row);
+        $this->assertSame('not_yet_due', $row['status']);
+        $this->assertFalse($row['plotted']);
+    }
+
+    public function test_teacher_breakdown_marks_a_non_plotter_as_not_plotted_when_the_section_still_has_room(): void
+    {
+        $plotter = User::factory()->create(['name' => 'Plotter']);
+        $nonPlotter = User::factory()->create(['name' => 'Non Plotter']);
+        $section = $this->makeSection();
+        $subjectA = $this->makeSubject();
+        $subjectB = $this->makeSubject();
+        $this->assignTeachingLoad($plotter, $subjectA, $section);
+        $this->assignTeachingLoad($nonPlotter, $subjectB, $section);
+
+        // A past week (deadline has passed) with only 1 of 15 weekly graded
+        // slots used — plenty of room left, so the non-plotter has no excuse.
+        $this->makeClassRecordWithAssessment($section, $subjectA, $plotter, '2025-09-01');
+
+        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
+        $row = collect($breakdown['teachers'])->firstWhere('user_id', $nonPlotter->id);
+
+        $this->assertNotNull($row);
+        $this->assertSame('not_plotted', $row['status']);
+        $this->assertFalse($row['plotted']);
+    }
+
+    public function test_teacher_breakdown_marks_a_non_plotter_as_blocked_by_cap_when_the_section_is_maxed_out(): void
+    {
+        $plotter = User::factory()->create(['name' => 'Plotter']);
+        $nonPlotter = User::factory()->create(['name' => 'Blocked Teacher']);
+        $section = $this->makeSection();
+        $subjectA = $this->makeSubject();
+        $subjectB = $this->makeSubject();
+        $this->assignTeachingLoad($plotter, $subjectA, $section);
+        $this->assignTeachingLoad($nonPlotter, $subjectB, $section);
+
+        // Fill the section's entire weekly graded cap (15) via subjectA's
+        // teacher across 5 weekdays (3/day) — the WAT daily/weekly max —
+        // spread as: Mon-Thu 3 each (12) + Fri 3 (15) so the weekly cap of
+        // 15 graded is exactly exhausted before the non-plotter ever plots.
+        $record = $this->makeClassRecord($section, $subjectA, $plotter);
+        $dates = ['2025-09-01', '2025-09-02', '2025-09-03', '2025-09-04', '2025-09-05'];
+        $n = 1;
+        foreach ($dates as $date) {
+            for ($i = 0; $i < 3; $i++) {
+                $this->makeAssessmentInRecord($record, $n, $date);
+                $n++;
+            }
+        }
+
+        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
+        $row = collect($breakdown['teachers'])->firstWhere('user_id', $nonPlotter->id);
+
+        $this->assertNotNull($row);
+        $this->assertSame(0, $breakdown['remaining']['weekly_graded']);
+        $this->assertSame('blocked_by_cap', $row['status']);
+        $this->assertFalse($row['plotted']);
+    }
+
+    public function test_review_endpoint_includes_teacher_breakdown_per_section(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create(['name' => 'Section Teacher']);
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+        $this->assignTeachingLoad($teacher, $subject, $section);
+        $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
+
+        $this->actingAs($admin)
+            ->get(route('class-records.wat.review', ['week' => '2025-09-01']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('summary.0.teacher_breakdown')
+                ->has('summary.0.teacher_breakdown.teachers')
+                ->where('summary.0.teacher_breakdown.teachers.0.status', 'plotted'));
+    }
 }

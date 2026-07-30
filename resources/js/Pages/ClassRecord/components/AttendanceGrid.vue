@@ -12,6 +12,26 @@ const props = defineProps({
   quarterNumber: { type: Number, required: true },
   quarterData:   { type: Object, default: null },
   isLocked:      { type: Boolean, default: false },
+  // On a shared (e.g. PEHM) record: every subject on it ({id, name}) plus
+  // which of them the CURRENT user owns. Empty sharedSubjects means "not a
+  // shared record" — the subject switcher is hidden and every request omits
+  // subject_id entirely, identical to pre-PEHM behavior.
+  sharedSubjects:  { type: Array, default: () => [] },
+  ownedSubjectIds: { type: Array, default: () => [] },
+  isAdmin:         { type: Boolean, default: false },
+})
+
+// Defaults to the user's own subject if they own exactly one (the common
+// case — a PE teacher just wants their own attendance tab); otherwise starts
+// on the first subject in the list (admin/monitor browsing).
+const selectedSubjectId = ref(
+  props.ownedSubjectIds.length === 1 ? props.ownedSubjectIds[0] : (props.sharedSubjects[0]?.id ?? null)
+)
+
+const canEditSelectedSubject = computed(() => {
+  if (!props.sharedSubjects.length) return true // not a shared record
+  if (props.isAdmin) return true
+  return props.ownedSubjectIds.includes(selectedSubjectId.value)
 })
 
 // ── Status vocabulary ────────────────────────────────────────────────────────
@@ -74,7 +94,8 @@ async function load() {
   loading.value = true
   try {
     const { data } = await axios.get(
-      route('class-records.attendance.index', { classRecord: props.classRecordId, q: props.quarterNumber })
+      route('class-records.attendance.index', { classRecord: props.classRecordId, q: props.quarterNumber }),
+      { params: selectedSubjectId.value ? { subject_id: selectedSubjectId.value } : {} }
     )
     dates.value   = data.dates ?? []
     records.value = data.records ?? {}
@@ -88,11 +109,12 @@ async function load() {
 
 onMounted(load)
 watch(() => props.quarterNumber, load)
+watch(selectedSubjectId, load)
 
 // ── Attendance toggle ────────────────────────────────────────────────────────
 
 function cycleAttendance(studentId, dateId) {
-  if (props.isLocked) return
+  if (props.isLocked || !canEditSelectedSubject.value) return
   const key  = `${studentId}_${dateId}`
   const prev = records.value[key] ?? { status: null }
 
@@ -139,7 +161,7 @@ async function saveAttendance() {
   try {
     await axios.post(
       route('class-records.attendance.upsert', { classRecord: props.classRecordId, q: props.quarterNumber }),
-      { records: payload }
+      { records: payload, subject_id: selectedSubjectId.value }
     )
     pendingChanges.clear()
     await Swal.fire({ icon: 'success', title: 'Attendance saved!', timer: 1000, showConfirmButton: false })
@@ -156,7 +178,7 @@ async function addDate() {
   try {
     const { data } = await axios.post(
       route('class-records.attendance.store-dates', { classRecord: props.classRecordId, q: props.quarterNumber }),
-      { date: newDateInput.value }
+      { date: newDateInput.value, subject_id: selectedSubjectId.value }
     )
     // Insert and keep sorted by date
     dates.value.push(data)
@@ -227,6 +249,18 @@ function presentCountForDate(dateId) {
   </div>
 
   <template v-else>
+    <!-- Subject switcher: only shown on a shared (e.g. PEHM) record -->
+    <div v-if="sharedSubjects.length" class="flex items-center gap-2 mb-3">
+      <span class="text-xs font-medium text-slate-500">Subject:</span>
+      <select v-model.number="selectedSubjectId"
+        class="rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option v-for="subj in sharedSubjects" :key="subj.id" :value="subj.id">{{ subj.name }}</option>
+      </select>
+      <span v-if="!canEditSelectedSubject" class="text-[11px] text-slate-400 italic">
+        Read-only — taught by a different teacher on this shared record.
+      </span>
+    </div>
+
     <!-- Toolbar -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <p class="text-xs text-slate-500">
@@ -234,7 +268,7 @@ function presentCountForDate(dateId) {
         click to cycle Present → Absent → Tardy. Excused/Unexcused is decided by the Homeroom Adviser/Registrar and shown read-only.
       </p>
       <div class="flex items-center gap-2 shrink-0">
-        <template v-if="!isLocked">
+        <template v-if="!isLocked && canEditSelectedSubject">
           <!-- Add date inline input -->
           <div v-if="showAddDate" class="flex items-center gap-2">
             <input v-model="newDateInput" type="date"
@@ -263,7 +297,7 @@ function presentCountForDate(dateId) {
     <!-- Empty state -->
     <div v-if="!dates.length" class="flex flex-col items-center justify-center py-14 text-slate-400 text-sm gap-2">
       <p>No class dates recorded yet.</p>
-      <p v-if="!isLocked" class="text-xs">Click "Add Date" above to log a class meeting — or it fills in automatically once the Homeroom Adviser logs the day.</p>
+      <p v-if="!isLocked && canEditSelectedSubject" class="text-xs">Click "Add Date" above to log a class meeting — or it fills in automatically once the Homeroom Adviser logs the day.</p>
     </div>
 
     <!-- Grid -->
@@ -277,7 +311,7 @@ function presentCountForDate(dateId) {
               class="px-2 py-2.5 text-center text-xs font-semibold text-slate-500 border-r border-slate-200 group w-14">
               <div class="flex items-center justify-center gap-1">
                 <span>{{ formatDate(d.date) }}</span>
-                <button v-if="!isLocked" @click="removeDate(d)"
+                <button v-if="!isLocked && canEditSelectedSubject" @click="removeDate(d)"
                   class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-all"
                   title="Remove this date">
                   <XMarkIcon class="h-3 w-3" />

@@ -21,6 +21,105 @@ class GradeComputationServiceTest extends TestCase
 
     // ── Method 1: computeCategoryScore ───────────────────────────────────────
 
+    /**
+     * PEHM regression: GradeComputationService takes categories as a flat
+     * list of leaves with an id/code/weight — it has no concept of
+     * "subject_id" at all (that's purely an access-control concern living on
+     * GradingCategory/ClassRecord). A "Summative Assessments" parent split
+     * into PE/Health/Music leaf sub-categories must sum/weight identically to
+     * any other multi-leaf-under-one-parent grading option — each leaf's
+     * assessments are scored independently by its own teacher, then the
+     * category weights combine exactly like Written Works vs Performance
+     * Tasks would on a normal single-teacher subject.
+     */
+    /** @test */
+    public function it_computes_full_class_record_for_a_pehm_style_multi_subject_leaf_split(): void
+    {
+        // PE 40%, Health 30%, Music 30% — one leaf per subject, summing to 100%.
+        $categories = [
+            [
+                'id' => 1, 'code' => 'PE', 'weight' => 0.40,
+                'assessments' => [['id' => 101, 'maxScore' => 20], ['id' => 102, 'maxScore' => 20]],
+            ],
+            [
+                'id' => 2, 'code' => 'HEA', 'weight' => 0.30,
+                'assessments' => [['id' => 201, 'maxScore' => 30]],
+            ],
+            [
+                'id' => 3, 'code' => 'MUS', 'weight' => 0.30,
+                'assessments' => [['id' => 301, 'maxScore' => 25]],
+            ],
+        ];
+
+        // Student aced PE (40/40), got 24/30 in Health, 20/25 in Music.
+        $students = [[
+            'id' => 1,
+            'scores' => [101 => 20, 102 => 20, 201 => 24, 301 => 20],
+        ]];
+
+        $result = $this->service->computeFullClassRecord([
+            'quarter' => 1,
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+            'stanineLookup' => $this->stanine,
+            'previousQuarterGrades' => [],
+        ]);
+
+        $row = $result['students'][0];
+
+        // PE: 40/40 = 100% * 0.40 = 0.40
+        // Health: 24/30 = 80% * 0.30 = 0.24
+        // Music: 20/25 = 80% * 0.30 = 0.24
+        // Total weighted = 0.40 + 0.24 + 0.24 = 0.88 -> 88%
+        $this->assertEqualsWithDelta(0.88, $row['totalWeightedPercentage'], 0.0001);
+        $this->assertEquals(88.0, $row['percentageScore']);
+
+        $peCategory = collect($row['categories'])->firstWhere('categoryCode', 'PE');
+        $this->assertEquals(40.0, $peCategory['total']);
+        $this->assertEquals(40.0, $peCategory['maxTotal']);
+        $this->assertEqualsWithDelta(1.0, $peCategory['percentage'], 0.0001);
+
+        $healthCategory = collect($row['categories'])->firstWhere('categoryCode', 'HEA');
+        $this->assertEqualsWithDelta(0.8, $healthCategory['percentage'], 0.0001);
+
+        $musicCategory = collect($row['categories'])->firstWhere('categoryCode', 'MUS');
+        $this->assertEqualsWithDelta(0.8, $musicCategory['percentage'], 0.0001);
+    }
+
+    /**
+     * A student with a missing score under ONE subject's leaf (e.g. absent
+     * for the Music assessment) must not zero out the other two subjects —
+     * each leaf's percentage is computed independently, exactly as it would
+     * be for any other missing-assessment scenario on a normal record.
+     */
+    /** @test */
+    public function it_treats_a_missing_score_on_one_pehm_subject_leaf_independently_of_the_others(): void
+    {
+        $categories = [
+            ['id' => 1, 'code' => 'PE', 'weight' => 0.40, 'assessments' => [['id' => 101, 'maxScore' => 20]]],
+            ['id' => 2, 'code' => 'HEA', 'weight' => 0.30, 'assessments' => [['id' => 201, 'maxScore' => 30]]],
+            ['id' => 3, 'code' => 'MUS', 'weight' => 0.30, 'assessments' => [['id' => 301, 'maxScore' => 25]]],
+        ];
+
+        // Music score never entered (null == absent/not yet graded).
+        $students = [[
+            'id' => 1,
+            'scores' => [101 => 20, 201 => 30, 301 => null],
+        ]];
+
+        $result = $this->service->computeFullClassRecord([
+            'quarter' => 1,
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+            'stanineLookup' => $this->stanine,
+            'previousQuarterGrades' => [],
+        ]);
+
+        $row = $result['students'][0];
+        // PE 100% * .40 = .40, Health 100% * .30 = .30, Music 0% * .30 = 0
+        $this->assertEqualsWithDelta(0.70, $row['totalWeightedPercentage'], 0.0001);
+    }
+
     /** @test */
     public function it_computes_category_score_with_all_scores_present(): void
     {
@@ -131,6 +230,234 @@ class GradeComputationServiceTest extends TestCase
         $this->assertEqualsWithDelta(2.033, $result['finalGrade'], 0.0001);
         // Explicitly confirm it did NOT round up
         $this->assertLessThan(2.034, $result['finalGrade']);
+    }
+
+    // ── Compliance-mode methods ───────────────────────────────────────────────
+
+    /** @test */
+    public function it_computes_compliance_category_result_above_threshold(): void
+    {
+        // 3 of 4 activities complied = 75% weighted, threshold 75% → pass.
+        $categoryResults = [
+            ['percentage' => 0.75, 'weight' => 1.0],
+        ];
+
+        $result = $this->service->computeComplianceCategory($categoryResults, 0.75, 'Completed', 'Not Completed');
+
+        $this->assertEquals(75.0, $result['compliancePercentage']);
+        $this->assertTrue($result['passed']);
+        $this->assertEquals('Completed', $result['remark']);
+    }
+
+    /** @test */
+    public function it_computes_compliance_category_result_below_threshold(): void
+    {
+        $categoryResults = [
+            ['percentage' => 0.50, 'weight' => 1.0],
+        ];
+
+        $result = $this->service->computeComplianceCategory($categoryResults, 0.75, 'Completed', 'Not Completed');
+
+        $this->assertEquals(50.0, $result['compliancePercentage']);
+        $this->assertFalse($result['passed']);
+        $this->assertEquals('Not Completed', $result['remark']);
+    }
+
+    /** @test */
+    public function it_combines_multiple_weighted_categories_for_compliance(): void
+    {
+        // Category A: 100% complied, weight 0.6 -> 0.60
+        // Category B: 50% complied, weight 0.4 -> 0.20
+        // Total = 0.80 = 80%, threshold 75% -> pass
+        $categoryResults = [
+            ['percentage' => 1.0, 'weight' => 0.6],
+            ['percentage' => 0.5, 'weight' => 0.4],
+        ];
+
+        $result = $this->service->computeComplianceCategory($categoryResults, 0.75, 'Completed', 'Not Completed');
+
+        $this->assertEquals(80.0, $result['compliancePercentage']);
+        $this->assertTrue($result['passed']);
+    }
+
+    /** @test */
+    public function it_respects_custom_pass_and_fail_labels(): void
+    {
+        $categoryResults = [['percentage' => 1.0, 'weight' => 1.0]];
+
+        $passed = $this->service->computeComplianceCategory($categoryResults, 0.75, 'Passed', 'Did Not Pass');
+        $this->assertEquals('Passed', $passed['remark']);
+
+        $failed = $this->service->computeComplianceCategory([['percentage' => 0.1, 'weight' => 1.0]], 0.75, 'Passed', 'Did Not Pass');
+        $this->assertEquals('Did Not Pass', $failed['remark']);
+    }
+
+    /** @test */
+    public function it_computes_full_compliance_class_record_for_multiple_students(): void
+    {
+        $categories = [
+            ['id' => 1, 'code' => 'ACT', 'weight' => 1.0, 'assessments' => [
+                ['id' => 101, 'maxScore' => 1],
+                ['id' => 102, 'maxScore' => 1],
+                ['id' => 103, 'maxScore' => 1],
+                ['id' => 104, 'maxScore' => 1],
+            ]],
+        ];
+
+        $students = [
+            ['id' => 1, 'scores' => [101 => 1, 102 => 1, 103 => 1, 104 => 1]],  // 100% -> pass
+            ['id' => 2, 'scores' => [101 => 1, 102 => 0, 103 => 0, 104 => 0]],  // 25% -> fail
+        ];
+
+        $result = $this->service->computeFullComplianceClassRecord([
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+            'passThreshold' => 0.75,
+            'passLabel' => 'Completed',
+            'failLabel' => 'Not Completed',
+        ]);
+
+        $byId = collect($result['students'])->keyBy('studentId');
+        $this->assertEquals(100.0, $byId[1]['compliancePercentage']);
+        $this->assertTrue($byId[1]['passed']);
+        $this->assertEquals('Completed', $byId[1]['remark']);
+
+        $this->assertEquals(25.0, $byId[2]['compliancePercentage']);
+        $this->assertFalse($byId[2]['passed']);
+        $this->assertEquals('Not Completed', $byId[2]['remark']);
+    }
+
+    /** @test */
+    public function it_treats_missing_scores_as_not_complied_in_full_compliance_class_record(): void
+    {
+        $categories = [
+            ['id' => 1, 'code' => 'ACT', 'weight' => 1.0, 'assessments' => [
+                ['id' => 101, 'maxScore' => 1],
+                ['id' => 102, 'maxScore' => 1],
+            ]],
+        ];
+
+        // Student never scored on assessment 102 at all (absent from scores array).
+        $students = [['id' => 1, 'scores' => [101 => 1]]];
+
+        $result = $this->service->computeFullComplianceClassRecord([
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+            'passThreshold' => 0.75,
+            'passLabel' => 'Completed',
+            'failLabel' => 'Not Completed',
+        ]);
+
+        $this->assertEquals(50.0, $result['students'][0]['compliancePercentage']);
+        $this->assertFalse($result['students'][0]['passed']);
+    }
+
+    /** @test */
+    public function it_defaults_pass_threshold_and_labels_when_omitted_from_full_compliance_class_record(): void
+    {
+        $categories = [['id' => 1, 'code' => 'ACT', 'weight' => 1.0, 'assessments' => [['id' => 101, 'maxScore' => 1]]]];
+        $students = [['id' => 1, 'scores' => [101 => 1]]];
+
+        $result = $this->service->computeFullComplianceClassRecord([
+            'gradingOption' => ['categories' => $categories],
+            'students' => $students,
+        ]);
+
+        // Defaults: passThreshold 0.75, passLabel 'Completed', failLabel 'Not Completed'.
+        $this->assertEquals('Completed', $result['students'][0]['remark']);
+        $this->assertTrue($result['students'][0]['passed']);
+    }
+
+    /** @test */
+    public function it_passes_school_year_remark_when_all_quarters_meet_threshold(): void
+    {
+        $result = $this->service->computeComplianceSchoolYearRemark(
+            [80.0, 90.0, 75.0, 100.0], 'all_quarters_pass', 0.75, 'Completed', 'Not Completed',
+        );
+
+        $this->assertTrue($result['passed']);
+        $this->assertEquals('Completed', $result['remark']);
+        $this->assertEqualsWithDelta(86.25, $result['averagePercentage'], 0.01);
+    }
+
+    /** @test */
+    public function it_fails_school_year_remark_under_all_quarters_pass_rule_when_one_quarter_misses(): void
+    {
+        // Q3 is below the 75% threshold — must fail the whole SY even though
+        // the average across all 4 would otherwise be comfortably above it.
+        $result = $this->service->computeComplianceSchoolYearRemark(
+            [90.0, 90.0, 50.0, 90.0], 'all_quarters_pass', 0.75, 'Completed', 'Not Completed',
+        );
+
+        $this->assertFalse($result['passed']);
+        $this->assertEquals('Not Completed', $result['remark']);
+    }
+
+    /** @test */
+    public function it_fails_school_year_remark_under_all_quarters_pass_rule_when_a_quarter_is_ungraded(): void
+    {
+        // Q4 was never graded (null) — an incomplete school year must never
+        // silently read as Completed just because the other 3 quarters passed.
+        $result = $this->service->computeComplianceSchoolYearRemark(
+            [90.0, 90.0, 90.0, null], 'all_quarters_pass', 0.75, 'Completed', 'Not Completed',
+        );
+
+        $this->assertFalse($result['passed']);
+        $this->assertEquals('Not Completed', $result['remark']);
+    }
+
+    /** @test */
+    public function it_passes_school_year_remark_under_average_threshold_rule_when_average_meets_it(): void
+    {
+        // Q3 individually dips below 75%, but the AVERAGE of all 4 is still
+        // above threshold — average_threshold rule should pass here even
+        // though all_quarters_pass would not.
+        $result = $this->service->computeComplianceSchoolYearRemark(
+            [90.0, 90.0, 60.0, 90.0], 'average_threshold', 0.75, 'Completed', 'Not Completed',
+        );
+
+        $this->assertEqualsWithDelta(82.5, $result['averagePercentage'], 0.01);
+        $this->assertTrue($result['passed']);
+        $this->assertEquals('Completed', $result['remark']);
+    }
+
+    /** @test */
+    public function it_fails_school_year_remark_under_average_threshold_rule_when_average_misses_it(): void
+    {
+        $result = $this->service->computeComplianceSchoolYearRemark(
+            [60.0, 60.0, 60.0, 60.0], 'average_threshold', 0.75, 'Completed', 'Not Completed',
+        );
+
+        $this->assertEqualsWithDelta(60.0, $result['averagePercentage'], 0.01);
+        $this->assertFalse($result['passed']);
+    }
+
+    /** @test */
+    public function it_fails_school_year_remark_under_average_threshold_rule_when_a_quarter_is_missing_even_if_average_would_pass(): void
+    {
+        // Only 3 of 4 quarters have data, and their average is well above
+        // threshold — but a school year isn't complete without all 4
+        // quarters, so this must still fail regardless of the rule chosen.
+        $result = $this->service->computeComplianceSchoolYearRemark(
+            [100.0, 100.0, 100.0, null], 'average_threshold', 0.75, 'Completed', 'Not Completed',
+        );
+
+        $this->assertFalse($result['passed']);
+        $this->assertEquals('Not Completed', $result['remark']);
+    }
+
+    /** @test */
+    public function it_uses_custom_labels_for_school_year_remark(): void
+    {
+        $passed = $this->service->computeComplianceSchoolYearRemark(
+            [100.0, 100.0, 100.0, 100.0], 'all_quarters_pass', 0.75, 'Passed the Year', 'Did Not Pass the Year',
+        );
+        $this->assertEquals('Passed the Year', $passed['remark']);
+
+        $failed = $this->service->computeComplianceSchoolYearRemark(
+            [10.0, 10.0, 10.0, 10.0], 'all_quarters_pass', 0.75, 'Passed the Year', 'Did Not Pass the Year',
+        );
+        $this->assertEquals('Did Not Pass the Year', $failed['remark']);
     }
 
     // ── Stanine lookup data ───────────────────────────────────────────────────

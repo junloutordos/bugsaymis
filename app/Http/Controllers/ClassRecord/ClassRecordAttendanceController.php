@@ -28,8 +28,7 @@ class ClassRecordAttendanceController extends Controller
     /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
     private function canView(ClassRecord $classRecord): bool
     {
-        return $this->isAdmin()
-            || $classRecord->teacher_id === Auth::id()
+        return $classRecord->canView(Auth::user())
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
@@ -41,20 +40,60 @@ class ClassRecordAttendanceController extends Controller
             ->firstOrFail();
     }
 
+    /**
+     * Resolves and validates the subject_id scope for an attendance request.
+     * On a normal (non-shared) record this is always null — nothing to scope.
+     * On a shared PEHM record, a non-admin caller must own the requested
+     * subject; omitting it defaults to the caller's own subject when they
+     * only own one (so existing single-subject-per-teacher UIs keep working
+     * without having to pass it explicitly).
+     */
+    private function resolveSubjectId(ClassRecord $classRecord, ?int $requestedSubjectId): ?int
+    {
+        if ($classRecord->coTeachers->isEmpty()) {
+            return null;
+        }
+
+        if ($requestedSubjectId !== null) {
+            if (! $this->isAdmin()) {
+                abort_unless(
+                    $classRecord->canEdit(Auth::user(), $requestedSubjectId),
+                    403,
+                    'You do not have edit access to that subject on this class record.',
+                );
+            }
+
+            return $requestedSubjectId;
+        }
+
+        // No subject specified — default to the caller's own subject if they
+        // own exactly one on this shared record (the common case: a subject
+        // teacher's own attendance tab). Admins/monitors with no owned
+        // subject fall through to null (all dates, read-only aggregate).
+        $ownSubjectIds = $classRecord->coTeachers
+            ->where('user_id', Auth::id())
+            ->pluck('subject_id')
+            ->unique();
+
+        return $ownSubjectIds->count() === 1 ? $ownSubjectIds->first() : null;
+    }
+
     // ── GET /class-records/{cr}/quarters/{q}/attendance ───────────────────────
 
-    public function index(ClassRecord $classRecord, int $q): JsonResponse
+    public function index(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->canView($classRecord), 403);
 
         $quarter = $this->resolveQuarter($classRecord, $q);
+        $subjectId = $this->resolveSubjectId($classRecord, $request->integer('subject_id') ?: null);
 
         $dates = ClassRecordAttendanceDate::where('class_record_quarter_id', $quarter->id)
+            ->where('subject_id', $subjectId)
             ->orderBy('date')
-            ->get(['id', 'date', 'sort_order']);
+            ->get(['id', 'date', 'sort_order', 'subject_id']);
 
         $records = ClassRecordAttendanceRecord::whereHas('attendanceDate', fn ($sq) =>
-                $sq->where('class_record_quarter_id', $quarter->id)
+                $sq->where('class_record_quarter_id', $quarter->id)->where('subject_id', $subjectId)
             )
             ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'excused_status', 'synced_from_homeroom'])
             ->mapWithKeys(fn ($r) => [
@@ -65,28 +104,30 @@ class ClassRecordAttendanceController extends Controller
                 ],
             ]);
 
-        return response()->json(['dates' => $dates, 'records' => $records]);
+        return response()->json(['dates' => $dates, 'records' => $records, 'subject_id' => $subjectId]);
     }
 
     // ── POST /class-records/{cr}/quarters/{q}/attendance/dates ────────────────
 
     public function storeDates(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        $validated = $request->validate([
+            'date'       => 'required|date',
+            'subject_id' => 'nullable|integer|exists:subjects,id',
+        ]);
+        $subjectId = $this->resolveSubjectId($classRecord, $validated['subject_id'] ?? null);
+        abort_unless($classRecord->canEdit(Auth::user(), $subjectId), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
         abort_if($quarter->is_locked, 403, 'Quarter is locked.');
 
-        $validated = $request->validate([
-            'date' => 'required|date',
-        ]);
-
         $maxOrder = ClassRecordAttendanceDate::where('class_record_quarter_id', $quarter->id)
+            ->where('subject_id', $subjectId)
             ->max('sort_order') ?? 0;
 
         $date = ClassRecordAttendanceDate::firstOrCreate(
-            ['class_record_quarter_id' => $quarter->id, 'date' => $validated['date']],
+            ['class_record_quarter_id' => $quarter->id, 'subject_id' => $subjectId, 'date' => $validated['date']],
             ['sort_order' => $maxOrder + 1]
         );
 
@@ -97,7 +138,10 @@ class ClassRecordAttendanceController extends Controller
 
     public function destroyDate(ClassRecord $classRecord, int $q, ClassRecordAttendanceDate $attendanceDate): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        // The date itself already carries the subject scope it belongs to —
+        // no need (and no way, for a DELETE with no body) to accept it from
+        // the request.
+        abort_unless($classRecord->canEdit(Auth::user(), $attendanceDate->subject_id), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -113,13 +157,8 @@ class ClassRecordAttendanceController extends Controller
 
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
-        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
-
-        $quarter = $this->resolveQuarter($classRecord, $q);
-        abort_if($quarter->is_locked, 403, 'Quarter is locked.');
-
         $validated = $request->validate([
+            'subject_id'           => 'nullable|integer|exists:subjects,id',
             'records'              => 'required|array|min:1',
             'records.*.date_id'    => 'required|integer|exists:class_record_attendance_dates,id',
             'records.*.student_id' => 'required|integer|exists:class_record_students,id',
@@ -130,15 +169,29 @@ class ClassRecordAttendanceController extends Controller
             // there's no uniform field here anymore.
             'records.*.status'     => 'nullable|in:present,absent,tardy',
         ]);
+        $subjectId = $this->resolveSubjectId($classRecord, $validated['subject_id'] ?? null);
+        abort_unless($classRecord->canEdit(Auth::user(), $subjectId), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
+
+        $quarter = $this->resolveQuarter($classRecord, $q);
+        abort_if($quarter->is_locked, 403, 'Quarter is locked.');
 
         // "exists" only proves the IDs are valid rows *somewhere* — without this,
         // a teacher could pass a date_id/student_id belonging to another class
-        // record entirely and delete or overwrite someone else's attendance data.
+        // record (or another subject on this same shared record) entirely and
+        // delete or overwrite someone else's attendance data.
         $dateIds = collect($validated['records'])->pluck('date_id')->unique();
         $validDateIds = ClassRecordAttendanceDate::whereIn('id', $dateIds)
             ->where('class_record_quarter_id', $quarter->id)
+            ->where('subject_id', $subjectId)
             ->pluck('id');
-        abort_if($validDateIds->count() !== $dateIds->count(), 422, 'One or more dates do not belong to this quarter.');
+        abort_if(
+            $validDateIds->count() !== $dateIds->count(),
+            422,
+            $subjectId === null
+                ? 'One or more dates do not belong to this quarter.'
+                : 'One or more dates do not belong to this quarter/subject.',
+        );
 
         $studentIds = collect($validated['records'])->pluck('student_id')->unique();
         $validStudentIds = ClassRecordStudent::whereIn('id', $studentIds)

@@ -348,6 +348,56 @@
           </p>
         </div>
 
+        <!-- Grading Mode: Numeric (scores → GE/adjectival) vs Compliance (checkbox → % + remark) -->
+        <div>
+          <p class="text-sm font-semibold text-slate-700 mb-2">Grading Mode</p>
+          <div class="flex flex-wrap items-center gap-4">
+            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="numeric" v-model="manageOptionForm.grading_mode" class="text-indigo-600" />
+              Numeric (scores → grade equivalent)
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" value="compliance" v-model="manageOptionForm.grading_mode" class="text-indigo-600" />
+              Compliance (checkbox → % + remark)
+            </label>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">
+            Use Compliance for subjects like Values Education, where each activity is a checkbox
+            (complied or not) and students are graded on completion percentage instead of a numeric score.
+          </p>
+
+          <div v-if="manageOptionForm.grading_mode === 'compliance'" class="mt-3 space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">
+                  Pass Threshold (%) <span class="text-red-500">*</span>
+                </label>
+                <input v-model.number="manageOptionForm.compliance_pass_threshold" type="number" min="0" max="100" step="1"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <p class="text-[11px] text-slate-400 mt-1">% of weighted activities completed to pass a quarter.</p>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">School-Year Rule</label>
+                <select v-model="manageOptionForm.compliance_sy_rule"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                  <option value="all_quarters_pass">Every quarter must pass</option>
+                  <option value="average_threshold">Average of all 4 quarters vs threshold</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Pass Label</label>
+                <input v-model="manageOptionForm.compliance_pass_label" type="text" maxlength="50"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Fail Label</label>
+                <input v-model="manageOptionForm.compliance_fail_label" type="text" maxlength="50"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Categories editor (with sub-categories) -->
         <div>
           <div class="flex items-center justify-between mb-2">
@@ -393,6 +443,12 @@
                     :class="['flex-1 rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400', isSubNameInvalid(idx, cidx) ? 'border-red-400' : 'border-slate-200']" />
                   <input v-model="sub.code" type="text" maxlength="10" placeholder="Code"
                     :class="['w-20 rounded border px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400', isSubCodeInvalid(idx, cidx) ? 'border-red-400' : 'border-slate-200']" />
+                  <select v-if="sharedGroupSubjects.length" v-model="sub.subject_id"
+                    title="Restrict this sub-category to one subject's teacher (PEHM-style shared record)"
+                    class="w-32 rounded border border-slate-200 px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                    <option :value="null">Any teacher</option>
+                    <option v-for="subj in sharedGroupSubjects" :key="subj.id" :value="subj.id">{{ subj.name }}</option>
+                  </select>
                   <div class="flex items-center gap-1">
                     <input v-model.number="sub.weight" type="number" min="0.01" max="1" step="0.05"
                       class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
@@ -422,7 +478,7 @@
 
       <template #footer>
         <AppButton variant="secondary" @click="showManageModal = false">Cancel</AppButton>
-        <AppButton :loading="manageSaving" :disabled="weightTotal !== 100 || (!manageOptionForm.applies_all && !manageOptionForm.quarters.length)" @click="saveManageOption">
+        <AppButton :loading="manageSaving" :disabled="weightTotal !== 100 || (!manageOptionForm.applies_all && !manageOptionForm.quarters.length) || (manageOptionForm.grading_mode === 'compliance' && !isComplianceThresholdValid)" @click="saveManageOption">
           {{ manageSaving ? 'Saving…' : (managingOption ? 'Save Changes' : 'Create Option') }}
         </AppButton>
       </template>
@@ -466,6 +522,7 @@ const props = defineProps({
   gradingOptions:    Array,
   managedGradingOptions: { type: Array, default: () => [] },
   gradingOptionUnits:    { type: Array, default: () => [] },
+  sharedGroupSubjects:   { type: Array, default: () => [] },
   isAdmin:           { type: Boolean, default: false },
   canManageGradingOptions: { type: Boolean, default: false },
   currentSchoolYear: { type: String, default: null },
@@ -728,6 +785,11 @@ function openManageModal(option) {
     owner_designation_id: option.owner_designation_id ?? null,
     applies_all: !(option.applicable_quarters && option.applicable_quarters.length),
     quarters: option.applicable_quarters ? [...option.applicable_quarters].map(Number) : [],
+    grading_mode: option.grading_mode ?? 'numeric',
+    compliance_pass_threshold: option.compliance_pass_threshold != null ? Math.round(option.compliance_pass_threshold * 100) : 75,
+    compliance_sy_rule: option.compliance_sy_rule ?? 'all_quarters_pass',
+    compliance_pass_label: option.compliance_pass_label ?? 'Completed',
+    compliance_fail_label: option.compliance_fail_label ?? 'Not Completed',
   }
   manageCategories.value = buildNestedCategories(option.categories)
   manageErrors.value     = {}
@@ -747,6 +809,11 @@ function openCreateOptionModal() {
       : null,
     applies_all: true,
     quarters: [],
+    grading_mode: 'numeric',
+    compliance_pass_threshold: 75,
+    compliance_sy_rule: 'all_quarters_pass',
+    compliance_pass_label: 'Completed',
+    compliance_fail_label: 'Not Completed',
   }
   manageCategories.value = [{ id: null, name: '', code: '', weight: 0, max_assessments: 1, children: [] }]
   manageErrors.value     = {}
@@ -779,6 +846,11 @@ const weightTotal = computed(() => {
   return Math.round(sum * 100)
 })
 
+const isComplianceThresholdValid = computed(() => {
+  const t = manageOptionForm.value.compliance_pass_threshold
+  return t !== null && t !== '' && Number.isFinite(Number(t)) && Number(t) >= 0 && Number(t) <= 100
+})
+
 function addCategory() {
   manageCategories.value.push({
     id: null, name: '', code: '', weight: 0, max_assessments: 1, children: [],
@@ -792,7 +864,7 @@ function removeCategory(idx) {
 function addSubCategory(idx) {
   const cat = manageCategories.value[idx]
   if (!cat.children) cat.children = []
-  cat.children.push({ id: null, name: '', code: '', weight: 0, max_assessments: 1 })
+  cat.children.push({ id: null, name: '', code: '', weight: 0, max_assessments: 1, subject_id: null })
 }
 
 function removeSubCategory(idx, cidx) {
@@ -897,6 +969,13 @@ async function saveManageOption() {
     description: manageOptionForm.value.description,
     is_active: manageOptionForm.value.is_active,
     applicable_quarters,
+    grading_mode: manageOptionForm.value.grading_mode,
+    compliance_pass_threshold: manageOptionForm.value.grading_mode === 'compliance'
+      ? Number(manageOptionForm.value.compliance_pass_threshold) / 100
+      : null,
+    compliance_sy_rule: manageOptionForm.value.compliance_sy_rule,
+    compliance_pass_label: manageOptionForm.value.compliance_pass_label,
+    compliance_fail_label: manageOptionForm.value.compliance_fail_label,
   }
 
   try {

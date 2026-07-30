@@ -46,13 +46,19 @@ class GradingOptionController extends Controller
         abort_unless($this->canManageOptions(), 403, 'You are not allowed to create grading options.');
 
         $meta = $request->validate([
-            'name'                  => 'required|string|max:255',
-            'description'           => 'nullable|string|max:1000',
-            'is_active'             => 'boolean',
-            'owner_designation_id'  => 'nullable|integer|exists:designations,id',
-            'applicable_quarters'   => 'nullable|array',
-            'applicable_quarters.*' => 'integer|in:1,2,3,4',
+            'name'                        => 'required|string|max:255',
+            'description'                 => 'nullable|string|max:1000',
+            'is_active'                   => 'boolean',
+            'owner_designation_id'        => 'nullable|integer|exists:designations,id',
+            'applicable_quarters'         => 'nullable|array',
+            'applicable_quarters.*'       => 'integer|in:1,2,3,4',
+            'grading_mode'                => 'nullable|in:numeric,compliance',
+            'compliance_pass_threshold'   => 'nullable|numeric|min:0|max:1',
+            'compliance_sy_rule'          => 'nullable|in:all_quarters_pass,average_threshold',
+            'compliance_pass_label'       => 'nullable|string|max:50',
+            'compliance_fail_label'       => 'nullable|string|max:50',
         ]);
+        $this->validateComplianceMeta($meta);
         $categories = $this->validateCategoriesPayload($request);
 
         $ownerDesignationId = $this->scope->resolveOwnerDesignationId(
@@ -72,6 +78,7 @@ class GradingOptionController extends Controller
                 'is_active'            => $meta['is_active'] ?? true,
                 'applicable_quarters'  => $this->normalizeQuarters($meta['applicable_quarters'] ?? null),
                 'owner_designation_id' => $ownerDesignationId,
+                ...$this->complianceAttributes($meta),
             ]);
 
             $this->syncCategories($option, $categories);
@@ -81,7 +88,7 @@ class GradingOptionController extends Controller
 
         return response()->json([
             'message' => 'Grading option created.',
-            'data'    => $option->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
+            'data'    => $option->fresh()->load(['categories.subject:id,name', 'ownerDesignation:id,code,name']),
         ], 201);
     }
 
@@ -123,29 +130,89 @@ class GradingOptionController extends Controller
         );
 
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'description' => 'nullable|string|max:1000',
-            'is_active'   => 'boolean',
-            'applicable_quarters'   => 'nullable|array',
-            'applicable_quarters.*' => 'integer|in:1,2,3,4',
+            'name'                        => 'required|string|max:255',
+            'description'                 => 'nullable|string|max:1000',
+            'is_active'                   => 'boolean',
+            'applicable_quarters'         => 'nullable|array',
+            'applicable_quarters.*'       => 'integer|in:1,2,3,4',
+            'grading_mode'                => 'nullable|in:numeric,compliance',
+            'compliance_pass_threshold'   => 'nullable|numeric|min:0|max:1',
+            'compliance_sy_rule'          => 'nullable|in:all_quarters_pass,average_threshold',
+            'compliance_pass_label'       => 'nullable|string|max:50',
+            'compliance_fail_label'       => 'nullable|string|max:50',
         ]);
+        $this->validateComplianceMeta($validated);
         $this->ensureUniqueName(
             $validated['name'],
             $gradingOption->owner_designation_id,
             (int) $gradingOption->id,
         );
 
+        // grading_mode redefines what a "score" even means (numeric vs.
+        // compliance checkbox) — switching it once real assessments/scores
+        // already exist under this option would silently corrupt whatever
+        // has already been entered, same reasoning as ClassRecord's own
+        // canChangeGradingOption() guard.
+        $requestedMode = $validated['grading_mode'] ?? $gradingOption->grading_mode;
+        if ($requestedMode !== $gradingOption->grading_mode) {
+            $inUse = ClassRecordAssessment::whereHas(
+                'gradingCategory', fn ($q) => $q->where('grading_option_id', $gradingOption->id)
+            )->exists();
+            abort_if(
+                $inUse,
+                422,
+                'Cannot change the grading mode once this option has assessments recorded under it.',
+            );
+        }
+
         $gradingOption->update([
             'name'                => $validated['name'],
             'description'         => $validated['description'] ?? null,
             'is_active'           => $validated['is_active'] ?? $gradingOption->is_active,
             'applicable_quarters' => $this->normalizeQuarters($validated['applicable_quarters'] ?? null),
+            ...$this->complianceAttributes($validated, $gradingOption),
         ]);
 
         return response()->json([
             'message' => 'Grading option updated.',
-            'data'    => $gradingOption->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
+            'data'    => $gradingOption->fresh()->load(['categories.subject:id,name', 'ownerDesignation:id,code,name']),
         ]);
+    }
+
+    /**
+     * Compliance mode requires a pass threshold — without one, "Completed"
+     * vs "Not Completed" has no rule to evaluate against.
+     */
+    private function validateComplianceMeta(array $meta): void
+    {
+        if (($meta['grading_mode'] ?? 'numeric') === 'compliance') {
+            abort_if(
+                ! isset($meta['compliance_pass_threshold']),
+                422,
+                'A compliance pass threshold is required when Grading Mode is set to Compliance.',
+            );
+        }
+    }
+
+    /**
+     * Builds the compliance_* attributes for create/update, applying sane
+     * defaults so a numeric option's columns stay at their harmless defaults
+     * and a compliance option always gets a rule even if the SY-rule/labels
+     * were omitted from the request.
+     */
+    private function complianceAttributes(array $meta, ?GradingOption $existing = null): array
+    {
+        $mode = $meta['grading_mode'] ?? $existing?->grading_mode ?? 'numeric';
+
+        return [
+            'grading_mode'              => $mode,
+            'compliance_pass_threshold' => $mode === 'compliance'
+                ? (float) $meta['compliance_pass_threshold']
+                : ($existing?->compliance_pass_threshold ?? null),
+            'compliance_sy_rule'        => $meta['compliance_sy_rule'] ?? $existing?->compliance_sy_rule ?? 'all_quarters_pass',
+            'compliance_pass_label'     => $meta['compliance_pass_label'] ?? $existing?->compliance_pass_label ?? 'Completed',
+            'compliance_fail_label'     => $meta['compliance_fail_label'] ?? $existing?->compliance_fail_label ?? 'Not Completed',
+        ];
     }
 
     /**
@@ -191,7 +258,7 @@ class GradingOptionController extends Controller
 
         return response()->json([
             'message' => 'Categories updated.',
-            'data'    => $gradingOption->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
+            'data'    => $gradingOption->fresh()->load(['categories.subject:id,name', 'ownerDesignation:id,code,name']),
         ]);
     }
 
@@ -216,6 +283,7 @@ class GradingOptionController extends Controller
             'categories.*.sort_order'                 => 'required|integer|min:0',
             'categories.*.weight'                     => 'nullable|numeric|min:0|max:1',
             'categories.*.max_assessments'            => 'nullable|integer|min:1|max:20',
+            'categories.*.subject_id'                 => 'nullable|integer|exists:subjects,id',
             'categories.*.children'                   => 'nullable|array',
             'categories.*.children.*.id'              => 'nullable|integer',
             'categories.*.children.*.name'            => 'required|string|max:255',
@@ -223,6 +291,7 @@ class GradingOptionController extends Controller
             'categories.*.children.*.weight'          => 'required|numeric|min:0.0001|max:1',
             'categories.*.children.*.max_assessments' => 'required|integer|min:1|max:20',
             'categories.*.children.*.sort_order'      => 'required|integer|min:0',
+            'categories.*.children.*.subject_id'      => 'nullable|integer|exists:subjects,id',
         ]);
 
         // A top-level category with no children is a leaf and must carry its
@@ -298,6 +367,7 @@ class GradingOptionController extends Controller
                 [
                     'grading_option_id' => $option->id,
                     'parent_id'         => null,
+                    'subject_id'        => $isParent ? null : ($cat['subject_id'] ?? null),
                     'name'              => $cat['name'],
                     'code'              => strtoupper($cat['code']),
                     // A parent's stored weight is the sum of its children (display only).
@@ -315,6 +385,7 @@ class GradingOptionController extends Controller
                     [
                         'grading_option_id' => $option->id,
                         'parent_id'         => $parent->id,
+                        'subject_id'        => $child['subject_id'] ?? null,
                         'name'              => $child['name'],
                         'code'              => strtoupper($child['code']),
                         'weight'            => (float) $child['weight'],

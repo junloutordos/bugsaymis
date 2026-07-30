@@ -40,7 +40,7 @@ class ClassRecordStudentController extends Controller
 
     public function fromEnrollment(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_unless($classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year.');
 
         abort_if($this->rosters->isCrossSection($classRecord), 422,
@@ -82,7 +82,7 @@ class ClassRecordStudentController extends Controller
 
     public function candidates(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
 
         $validated = $request->validate([
@@ -128,7 +128,7 @@ class ClassRecordStudentController extends Controller
 
     public function index(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         $quarter = $this->resolveQuarter($classRecord, $q);
         $students = ClassRecordStudent::where('class_record_quarter_id', $quarter->id)
@@ -147,7 +147,7 @@ class ClassRecordStudentController extends Controller
 
     public function transfer(Request $request, ClassRecord $classRecord, int $q, ClassRecordStudent $classRecordStudent): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -163,7 +163,7 @@ class ClassRecordStudentController extends Controller
         $target = ClassRecord::findOrFail($validated['target_class_record_id']);
         $isSibling = $classRecord->siblingsQuery()->where('id', $target->id)->exists();
         abort_unless($isSibling, 422, 'The target must be a sibling category of this same subject/section/teacher.');
-        abort_unless($this->isAdmin() || $target->teacher_id === Auth::id(), 403);
+        abort_unless($target->canEdit(Auth::user()), 403);
 
         $targetQuarter = ClassRecordQuarter::firstOrCreate(
             ['class_record_id' => $target->id, 'quarter' => $q],
@@ -215,7 +215,7 @@ class ClassRecordStudentController extends Controller
 
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -392,7 +392,7 @@ class ClassRecordStudentController extends Controller
 
     public function template(ClassRecord $classRecord, int $q): StreamedResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         $filename = 'students_template_Q'.$q.'.csv';
 
@@ -412,7 +412,7 @@ class ClassRecordStudentController extends Controller
 
     public function import(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);

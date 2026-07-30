@@ -51,17 +51,32 @@ class LeaveCreditReportController extends Controller
             ->groupBy('type')
             ->get();
 
+        // Per-employee balance summary (earned, used, balance) for the filtered
+        // employee/leave-type/year — lets HR see current standing at a glance
+        // alongside the raw transaction trail, with a link into the full
+        // per-employee ledger (hr.leave-credits.ledger).
+        $balanceSummary = LeaveCredit::with(['user', 'leaveType'])
+            ->where('year', $year)
+            ->whereHas('user', fn ($q) => $q->whereNotNull('emp_category'))
+            ->when($userId,      fn ($q) => $q->where('user_id', $userId))
+            ->when($leaveTypeId, fn ($q) => $q->where('leave_type_id', $leaveTypeId))
+            ->orderBy(
+                User::select('name')->whereColumn('users.id', 'leave_credits.user_id')->limit(1)
+            )
+            ->get();
+
         return Inertia::render('HR/Leave/Reports/Ledger', [
-            'transactions' => $transactions,
-            'summary'      => $summary,
-            'leaveTypes'   => LeaveType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']),
-            'employees'    => User::whereNotNull('emp_category')
+            'transactions'   => $transactions,
+            'summary'        => $summary,
+            'balanceSummary' => $balanceSummary,
+            'leaveTypes'     => LeaveType::where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name']),
+            'employees'      => User::whereNotNull('emp_category')
                 ->orderBy('name')
                 ->get(['id', 'name', 'badge_id']),
-            'txTypes'      => ['INITIAL','ACCRUAL','DEDUCTION','ADJUSTMENT','RESTORATION','MONETIZATION','CARRYOVER','FORFEITURE'],
-            'filters'      => $request->only('year', 'user_id', 'leave_type_id', 'type', 'date_from', 'date_to'),
-            'currentYear'  => now()->year,
-            'years'        => range(now()->year, max(now()->year - 5, 2024)),
+            'txTypes'        => ['INITIAL','ACCRUAL','DEDUCTION','ADJUSTMENT','RESTORATION','MONETIZATION','CARRYOVER','FORFEITURE'],
+            'filters'        => $request->only('year', 'user_id', 'leave_type_id', 'type', 'date_from', 'date_to'),
+            'currentYear'    => now()->year,
+            'years'          => range(now()->year, max(now()->year - 5, 2024)),
         ]);
     }
 

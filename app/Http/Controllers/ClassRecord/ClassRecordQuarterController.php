@@ -35,8 +35,7 @@ class ClassRecordQuarterController extends Controller
     /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
     private function canView(ClassRecord $classRecord): bool
     {
-        return $this->isAdmin()
-            || $classRecord->teacher_id === Auth::id()
+        return $classRecord->canView(Auth::user())
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
@@ -54,7 +53,7 @@ class ClassRecordQuarterController extends Controller
 
     public function show(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         $quarter = $this->resolveQuarter($classRecord, $q);
         $quarter->load([
@@ -69,7 +68,7 @@ class ClassRecordQuarterController extends Controller
 
     public function lock(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -97,7 +96,7 @@ class ClassRecordQuarterController extends Controller
 
     public function setGradingOption(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $data = $request->validate([
@@ -133,7 +132,7 @@ class ClassRecordQuarterController extends Controller
 
     public function grades(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
 
         $quarter = ClassRecordQuarter::where('class_record_id', $classRecord->id)
@@ -177,6 +176,37 @@ class ClassRecordQuarterController extends Controller
             return ['id' => $student->id, 'scores' => $scores];
         })->toArray();
 
+        $studentMap = $quarter->students->keyBy('id');
+
+        // Compliance-mode subjects (e.g. Values Education) have no numeric
+        // GE/adjectival or running-grade carry-forward at all — each quarter
+        // stands alone as a completion percentage + a pass/fail remark using
+        // the option's own configurable threshold/rule/labels.
+        if ($gradingOption?->isComplianceMode()) {
+            $result = $this->grader->computeFullComplianceClassRecord([
+                'gradingOption' => ['categories' => $categories],
+                'students' => $students,
+                'passThreshold' => $gradingOption->compliance_pass_threshold ?? 0.75,
+                'passLabel' => $gradingOption->compliance_pass_label ?? 'Completed',
+                'failLabel' => $gradingOption->compliance_fail_label ?? 'Not Completed',
+            ]);
+
+            $result['students'] = array_map(function ($s) use ($studentMap) {
+                $model = $studentMap->get($s['studentId']);
+
+                return array_merge($s, [
+                    'familyName' => $model?->family_name,
+                    'givenName' => $model?->given_name,
+                    'middleInitial' => $model?->middle_initial,
+                    'sex' => $model?->sex,
+                    'sequenceNumber' => $model?->sequence_number,
+                    'masterStudentId' => $model?->student_id,
+                ]);
+            }, $result['students']);
+
+            return response()->json(array_merge($result, ['gradingMode' => 'compliance']));
+        }
+
         // Load previous quarter running grades (Q2-Q4)
         $previousGrades = [];
         if ($q > 1) {
@@ -211,7 +241,6 @@ class ClassRecordQuarterController extends Controller
         ]);
 
         // Attach student names to results
-        $studentMap = $quarter->students->keyBy('id');
         $result['students'] = array_map(function ($s) use ($studentMap) {
             $model = $studentMap->get($s['studentId']);
 
@@ -225,7 +254,7 @@ class ClassRecordQuarterController extends Controller
             ]);
         }, $result['students']);
 
-        return response()->json($result);
+        return response()->json(array_merge($result, ['gradingMode' => 'numeric']));
     }
 
     /**

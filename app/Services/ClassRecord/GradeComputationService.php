@@ -279,4 +279,162 @@ class GradeComputationService
         if ($ge <= 4.402) return 'Failed on Condition';
         return 'Failed';
     }
+
+    // ── Compliance-mode methods ─────────────────────────────────────────────
+    //
+    // For subjects graded by compliance (e.g. Values Education) rather than
+    // numeric score — a "score" is really a checkbox (1 = complied,
+    // 0 = did not), and the output is a completion percentage + a
+    // qualitative remark instead of a percentage/GE/adjectival. The category
+    // weighting math is identical to the numeric path (computeCategoryScore
+    // is reused as-is); only what happens AFTER the weighted sum differs.
+
+    /**
+     * Compute one student's quarter-level compliance result: the same
+     * weighted-sum math as computeStudentQuarterGrade(), but the output is a
+     * compliance percentage + a pass/fail remark (using the option's own
+     * configurable threshold and label text) instead of a GE/adjectival.
+     *
+     * @param  array  $categoryResults  [ ['percentage' => 0.85, 'weight' => 0.70], ... ] — same shape as the numeric path
+     * @param  float  $passThreshold    0–1, e.g. 0.75 for "75% of activities completed"
+     * @param  string $passLabel        e.g. "Completed"
+     * @param  string $failLabel        e.g. "Not Completed"
+     * @return array{compliancePercentage: float, remark: string, passed: bool}
+     */
+    public function computeComplianceCategory(array $categoryResults, float $passThreshold, string $passLabel, string $failLabel): array
+    {
+        $totalWeightedPercentage = array_sum(
+            array_map(fn ($r) => ($r['percentage'] ?? 0.0) * ($r['weight'] ?? 0.0), $categoryResults)
+        );
+
+        $compliancePercentage = round($totalWeightedPercentage * 100, 2);
+        $passed = $totalWeightedPercentage >= $passThreshold;
+
+        return [
+            'compliancePercentage' => $compliancePercentage,
+            'remark'               => $passed ? $passLabel : $failLabel,
+            'passed'               => $passed,
+        ];
+    }
+
+    /**
+     * Orchestrator for compliance mode: same per-student/per-category
+     * weighted-sum pipeline as computeFullClassRecord(), but ending in a
+     * compliance percentage + remark for every student instead of a
+     * percentage/GE/adjectival. "Assessments" here are compliance checkboxes
+     * — a score of 1 = complied, 0/null = did not (same convention already
+     * used by the ILA compliance-to-score conversion elsewhere in this
+     * module), so computeCategoryScore's existing null-as-zero handling
+     * applies unchanged.
+     *
+     * @param  array $data {
+     *   gradingOption: { categories: [{ id, code, weight, assessments: [{ id, maxScore }] }] },
+     *   students: [{ id, scores: { [assessmentId]: float|null } }],
+     *   passThreshold: float, passLabel: string, failLabel: string,
+     * }
+     * @return array{ students: array }
+     */
+    public function computeFullComplianceClassRecord(array $data): array
+    {
+        $categories    = $data['gradingOption']['categories'] ?? [];
+        $students      = $data['students'] ?? [];
+        $passThreshold = (float) ($data['passThreshold'] ?? 0.75);
+        $passLabel     = $data['passLabel'] ?? 'Completed';
+        $failLabel     = $data['failLabel'] ?? 'Not Completed';
+
+        $results = [];
+
+        foreach ($students as $student) {
+            $studentId    = $student['id'];
+            $scores       = $student['scores'] ?? [];
+            $categoryRows = [];
+
+            foreach ($categories as $category) {
+                $catId       = $category['id'];
+                $catCode     = $category['code'];
+                $weight      = (float) $category['weight'];
+                $assessments = $category['assessments'] ?? [];
+
+                $rawScores = [];
+                $maxScores = [];
+                foreach ($assessments as $assessment) {
+                    $aid         = $assessment['id'];
+                    $rawScores[] = $scores[$aid] ?? null;
+                    $maxScores[] = (float) $assessment['maxScore'];
+                }
+
+                $catResult = $this->computeCategoryScore($rawScores, $maxScores, $weight);
+                $categoryRows[] = array_merge($catResult, [
+                    'categoryId'   => $catId,
+                    'categoryCode' => $catCode,
+                    'weight'       => $weight,
+                ]);
+            }
+
+            $compliance = $this->computeComplianceCategory($categoryRows, $passThreshold, $passLabel, $failLabel);
+
+            $results[] = [
+                'studentId'             => $studentId,
+                'categories'            => $categoryRows,
+                'compliancePercentage'  => $compliance['compliancePercentage'],
+                'remark'                => $compliance['remark'],
+                'passed'                => $compliance['passed'],
+            ];
+        }
+
+        return ['students' => $results];
+    }
+
+    /**
+     * Combine four quarters' compliance percentages into a school-year-end
+     * remark, per the grading option's configured rule:
+     *   - 'all_quarters_pass': every quarter individually met the pass
+     *     threshold — one failing quarter fails the whole school year.
+     *   - 'average_threshold': the average of the 4 quarters' percentages is
+     *     compared against the same pass threshold.
+     * A null entry (quarter never graded/no data) counts as not passed —
+     * an incomplete school year cannot silently read as "Completed".
+     *
+     * @param  array<float|null> $quarterPercentages  four 0–100 values, one per quarter (null = ungraded)
+     * @param  string            $rule                'all_quarters_pass' | 'average_threshold'
+     * @param  float             $passThreshold        0–1
+     */
+    public function computeComplianceSchoolYearRemark(
+        array $quarterPercentages,
+        string $rule,
+        float $passThreshold,
+        string $passLabel,
+        string $failLabel,
+    ): array {
+        $thresholdPct = $passThreshold * 100;
+
+        if ($rule === 'average_threshold') {
+            $present = array_filter($quarterPercentages, fn ($v) => $v !== null);
+            $average = count($present) > 0 ? array_sum($present) / count($present) : 0.0;
+            $passed  = count($present) === count($quarterPercentages) && $average >= $thresholdPct;
+
+            return [
+                'averagePercentage' => round($average, 2),
+                'remark'            => $passed ? $passLabel : $failLabel,
+                'passed'            => $passed,
+            ];
+        }
+
+        // 'all_quarters_pass' (default): every quarter must individually meet the threshold.
+        $passed = count($quarterPercentages) > 0
+            && array_reduce(
+                $quarterPercentages,
+                fn ($carry, $pct) => $carry && $pct !== null && $pct >= $thresholdPct,
+                true,
+            );
+
+        $present = array_filter($quarterPercentages, fn ($v) => $v !== null);
+        $average = count($present) > 0 ? array_sum($present) / count($present) : 0.0;
+
+        return [
+            'averagePercentage' => round($average, 2),
+            'remark'            => $passed ? $passLabel : $failLabel,
+            'passed'            => $passed,
+        ];
+    }
 }

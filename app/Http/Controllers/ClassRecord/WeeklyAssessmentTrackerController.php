@@ -240,7 +240,7 @@ class WeeklyAssessmentTrackerController extends Controller
             ->get()
             ->keyBy('section_id');
 
-        $summary = $sections->map(function ($section) use ($rows, $syntheticByGrade, $reviews) {
+        $summary = $sections->map(function ($section) use ($rows, $syntheticByGrade, $reviews, $sy, $monday) {
             $pooled = $rows->where('section_id', $section['id'])
                 ->concat($syntheticByGrade->get($section['level'], collect()));
             $days = $pooled->groupBy('d')->map(fn ($g) => (object) [
@@ -249,11 +249,14 @@ class WeeklyAssessmentTrackerController extends Controller
             ]);
 
             return array_merge($section, [
-                'graded_count' => (int) $days->sum('graded'),
-                'major_count'  => (int) $days->sum('major'),
-                'over_daily'   => $days->contains(fn ($d) => $d->graded > WatRuleService::DAILY_GRADED_MAX || $d->major > WatRuleService::DAILY_MAJOR_MAX),
-                'over_weekly'  => $days->sum('graded') > WatRuleService::WEEKLY_GRADED_MAX || $days->sum('major') > WatRuleService::WEEKLY_MAJOR_MAX,
-                'review'       => $reviews->get($section['id']),
+                'graded_count'      => (int) $days->sum('graded'),
+                'major_count'       => (int) $days->sum('major'),
+                'over_daily'        => $days->contains(fn ($d) => $d->graded > WatRuleService::DAILY_GRADED_MAX || $d->major > WatRuleService::DAILY_MAJOR_MAX),
+                'over_weekly'       => $days->sum('graded') > WatRuleService::WEEKLY_GRADED_MAX || $days->sum('major') > WatRuleService::WEEKLY_MAJOR_MAX,
+                'review'            => $reviews->get($section['id']),
+                // Per-teacher plotting compliance for this section/week —
+                // visibility only, see WatRuleService::teacherBreakdown().
+                'teacher_breakdown' => WatRuleService::teacherBreakdown($section['id'], $sy->id, $monday->toDateString()),
             ]);
         });
 

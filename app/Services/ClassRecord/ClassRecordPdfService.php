@@ -22,8 +22,6 @@ class ClassRecordPdfService
     {
         $classRecord->loadMissing(['teacher:id,name,position', 'gradingOption.categories']);
 
-        $stanine = StanineLookup::orderByDesc('percentage')->get()->toArray();
-
         $qModel = ClassRecordQuarter::where('class_record_id', $classRecord->id)
             ->where('quarter', $quarter)
             ->with(['assessments.gradingCategory', 'students.scores'])
@@ -32,6 +30,54 @@ class ClassRecordPdfService
         if (! $qModel) {
             throw new \RuntimeException("Quarter {$quarter} not found.");
         }
+
+        $optionId = $qModel->grading_option_id ?? $classRecord->grading_option_id;
+        $option = $optionId ? GradingOption::find($optionId) : null;
+
+        $html = $option?->isComplianceMode()
+            ? $this->buildComplianceHtml($classRecord, $qModel, $this->buildCategories($classRecord, $qModel), $option)
+            : $this->buildNumericQuarterHtml($classRecord, $qModel);
+
+        try {
+            $mpdf = new Mpdf([
+                'mode' => 'utf-8',
+                'format' => 'A3',
+                'orientation' => 'L',
+                'margin_left' => 8,
+                'margin_right' => 8,
+                'margin_top' => 8,
+                'margin_bottom' => 8,
+                'default_font' => 'dejavusans',
+                'default_font_size' => 7,
+                'tempDir' => sys_get_temp_dir(),
+            ]);
+
+            $mpdf->SetTitle(sprintf(
+                'Class Record Q%d — %s — %s',
+                $quarter,
+                $classRecord->display_name,
+                $classRecord->year_level_section,
+            ));
+            $mpdf->SetAuthor('Atlas');
+
+            $mpdf->WriteHTML($html);
+
+            return $mpdf->Output('', 'S');
+
+        } catch (MpdfException $e) {
+            throw new \RuntimeException('PDF generation failed: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Numeric-mode quarter export — the original computation + HTML build,
+     * extracted unchanged so exportQuarter() can branch before doing any of
+     * this work for a compliance-mode option.
+     */
+    private function buildNumericQuarterHtml(ClassRecord $classRecord, ClassRecordQuarter $qModel): string
+    {
+        $stanine = StanineLookup::orderByDesc('percentage')->get()->toArray();
+        $quarter = $qModel->quarter;
 
         $categories = $this->buildCategories($classRecord, $qModel);
         $studentsData = $this->buildStudentScores($qModel);
@@ -64,37 +110,7 @@ class ClassRecordPdfService
                 ->toArray();
         }
 
-        $html = $this->buildHtml($classRecord, $qModel, $categories, $gradeMap, $scoreLookup, $stanine);
-
-        try {
-            $mpdf = new Mpdf([
-                'mode' => 'utf-8',
-                'format' => 'A3',
-                'orientation' => 'L',
-                'margin_left' => 8,
-                'margin_right' => 8,
-                'margin_top' => 8,
-                'margin_bottom' => 8,
-                'default_font' => 'dejavusans',
-                'default_font_size' => 7,
-                'tempDir' => sys_get_temp_dir(),
-            ]);
-
-            $mpdf->SetTitle(sprintf(
-                'Class Record Q%d — %s — %s',
-                $quarter,
-                $classRecord->display_name,
-                $classRecord->year_level_section,
-            ));
-            $mpdf->SetAuthor('Atlas');
-
-            $mpdf->WriteHTML($html);
-
-            return $mpdf->Output('', 'S');
-
-        } catch (MpdfException $e) {
-            throw new \RuntimeException('PDF generation failed: '.$e->getMessage(), 0, $e);
-        }
+        return $this->buildHtml($classRecord, $qModel, $categories, $gradeMap, $scoreLookup, $stanine);
     }
 
     // ── Data builders ─────────────────────────────────────────────────────────
@@ -336,6 +352,162 @@ class ClassRecordPdfService
 
         // ── Stanine legend ────────────────────────────────────────────────────
         $out .= $this->buildStanineLegend($stanine);
+
+        $out .= '</body></html>';
+
+        return $out;
+    }
+
+    /**
+     * Compliance-mode quarter export — a checkbox grid (✓/blank per
+     * activity) ending in a Compliance % + Remark column pair instead of
+     * TW%/QGE/R.GE/Rating. No stanine legend (not applicable).
+     */
+    private function buildComplianceHtml(
+        ClassRecord $classRecord,
+        ClassRecordQuarter $quarter,
+        array $categories,
+        GradingOption $option,
+    ): string {
+        $qLabel = self::QUARTER_LABELS[$quarter->quarter];
+        $teacherName = $classRecord->teacher?->name ?? '—';
+        $teacherPos = $classRecord->teacher?->position ?? '';
+        $passLabel = $option->compliance_pass_label ?? 'Completed';
+        $failLabel = $option->compliance_fail_label ?? 'Not Completed';
+        $passThreshold = (float) ($option->compliance_pass_threshold ?? 0.75);
+
+        $studentsData = $this->buildStudentScores($quarter);
+        $result = $this->grader->computeFullComplianceClassRecord([
+            'gradingOption' => ['categories' => $categories],
+            'students' => $studentsData,
+            'passThreshold' => $passThreshold,
+            'passLabel' => $passLabel,
+            'failLabel' => $failLabel,
+        ]);
+        $complianceMap = [];
+        foreach ($result['students'] as $row) {
+            $complianceMap[$row['studentId']] = $row;
+        }
+
+        $scoreLookup = [];
+        foreach ($quarter->students as $student) {
+            $scoreLookup[$student->id] = $student->scores
+                ->mapWithKeys(fn ($s) => [$s->class_record_assessment_id => $s->score])
+                ->toArray();
+        }
+
+        $th = 'border:0.4pt solid #9aabbb; padding:2px 2px; text-align:center; background:#e4eaf6; font-weight:bold;';
+        $thG = 'border:0.4pt solid #9aabbb; padding:2px 2px; text-align:center; background:#cdd8f0; font-weight:bold;';
+        $thP = 'border:0.4pt solid #9aabbb; padding:2px 2px; text-align:center; background:#d4ddf5; font-weight:bold;';
+        $td = 'border:0.4pt solid #c8d4de; padding:1px 2px; text-align:center;';
+        $tdN = 'border:0.4pt solid #c8d4de; padding:1px 4px; text-align:left;';
+        $tdP = 'border:0.4pt solid #c8d4de; padding:1px 2px; text-align:center; background:#edf0fb; font-weight:bold;';
+
+        $out = '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
+             .'<body style="font-family:Arial,sans-serif; font-size:7pt;">';
+
+        $out .= '<div style="text-align:center; margin-bottom:4px; line-height:1.4;">';
+        $out .= '<div style="font-size:9pt; font-weight:bold;">PHILIPPINE SCIENCE HIGH SCHOOL – CARAGA REGION CAMPUS</div>';
+        $out .= '<div style="font-size:8pt; font-weight:bold;">CLASS RECORD — '.strtoupper($qLabel).' QUARTER (COMPLIANCE)</div>';
+        $out .= '<div style="font-size:7pt;">';
+        $out .= 'Subject: <b>'.htmlspecialchars($classRecord->display_name).'</b>&nbsp;|&nbsp;';
+        $out .= 'Section: <b>'.htmlspecialchars($classRecord->year_level_section).'</b>&nbsp;|&nbsp;';
+        $out .= 'SY '.htmlspecialchars($classRecord->school_year ?? '').'&nbsp;|&nbsp;';
+        $out .= 'Teacher: <b>'.htmlspecialchars($teacherName).'</b>';
+        if ($teacherPos) {
+            $out .= ', '.htmlspecialchars($teacherPos);
+        }
+        $out .= '</div></div>';
+
+        $out .= '<table style="width:100%; border-collapse:collapse; font-size:6.5pt;">';
+        $out .= '<thead>';
+
+        $out .= '<tr>';
+        $out .= '<th rowspan="2" style="'.$th.' width:7mm;">#</th>';
+        $out .= '<th rowspan="2" style="'.$th.' text-align:left; width:40mm;">Student Name</th>';
+
+        foreach ($categories as $cat) {
+            $colspan = count($cat['assessments']) + 1;
+            $wpct = round($cat['weight'] * 100).'%';
+            $out .= '<th colspan="'.$colspan.'" style="'.$thG.'">';
+            $out .= htmlspecialchars($cat['code']).' ('.$wpct.')';
+            $out .= '</th>';
+        }
+
+        $out .= '<th rowspan="2" style="'.$th.' width:14mm;">Compliance %</th>';
+        $out .= '<th rowspan="2" style="'.$th.' width:20mm;">Remark</th>';
+        $out .= '</tr>';
+
+        $out .= '<tr>';
+        foreach ($categories as $cat) {
+            foreach ($cat['assessments'] as $a) {
+                $out .= '<th style="'.$th.' width:7mm;">'.htmlspecialchars($cat['code']).$a['num'].'</th>';
+            }
+            $out .= '<th style="'.$thP.' width:8mm;">%</th>';
+        }
+        $out .= '</tr>';
+        $out .= '</thead>';
+
+        $out .= '<tbody>';
+        $students = $quarter->students->sortBy('sequence_number');
+        $rowNum = 0;
+
+        foreach ($students as $student) {
+            $rowNum++;
+            $rowBg = $rowNum % 2 === 0 ? '#f3f5fb' : '#ffffff';
+            $compliance = $complianceMap[$student->id] ?? null;
+
+            $out .= '<tr style="background:'.$rowBg.';">';
+            $out .= '<td style="'.$td.'">'.($student->sequence_number ?? $rowNum).'</td>';
+
+            $name = $student->family_name.', '.$student->given_name;
+            if ($student->middle_initial) {
+                $name .= ' '.$student->middle_initial.'.';
+            }
+            $out .= '<td style="'.$tdN.'">'.htmlspecialchars($name).'</td>';
+
+            if ($compliance) {
+                $catMap = [];
+                foreach ($compliance['categories'] as $cr) {
+                    $catMap[$cr['categoryId']] = $cr;
+                }
+
+                foreach ($categories as $cat) {
+                    foreach ($cat['assessments'] as $a) {
+                        $raw = $scoreLookup[$student->id][$a['id']] ?? null;
+                        // A score equal to the assessment's max = complied (✓);
+                        // anything else (0, null) = not complied (blank).
+                        $val = ($raw !== null && (float) $raw >= (float) $a['maxScore']) ? '✓' : '';
+                        $out .= '<td style="'.$td.'">'.$val.'</td>';
+                    }
+                    $cr = $catMap[$cat['id']] ?? null;
+                    $pct = $cr ? round($cr['percentage'] * 100, 1).'%' : '—';
+                    $out .= '<td style="'.$tdP.'">'.$pct.'</td>';
+                }
+
+                $out .= '<td style="'.$td.' font-weight:bold;">'.number_format($compliance['compliancePercentage'], 2).'%</td>';
+                $remarkColor = $compliance['passed'] ? '#059669' : '#dc2626';
+                $out .= '<td style="'.$td.' color:'.$remarkColor.'; font-weight:bold;">'.htmlspecialchars($compliance['remark']).'</td>';
+            } else {
+                $blankCols = array_sum(array_map(fn ($c) => count($c['assessments']) + 1, $categories)) + 2;
+                $out .= '<td colspan="'.$blankCols.'" style="'.$td.'">—</td>';
+            }
+
+            $out .= '</tr>';
+        }
+
+        if ($rowNum === 0) {
+            $totalCols = array_sum(array_map(fn ($c) => count($c['assessments']) + 1, $categories)) + 4;
+            $out .= '<tr><td colspan="'.$totalCols.'" style="'.$td.' text-align:center; color:#999; padding:6px;">No students found.</td></tr>';
+        }
+
+        $out .= '</tbody></table>';
+
+        $out .= '<div style="margin-top:5px; font-size:5.5pt; line-height:1.5;">';
+        $out .= '<b>Compliance Rule:</b>&nbsp;Pass threshold '.round($passThreshold * 100).'% — ';
+        $out .= '<span style="color:#059669;">'.htmlspecialchars($passLabel).'</span>&nbsp;/&nbsp;';
+        $out .= '<span style="color:#dc2626;">'.htmlspecialchars($failLabel).'</span>';
+        $out .= '</div>';
 
         $out .= '</body></html>';
 

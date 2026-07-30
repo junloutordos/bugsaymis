@@ -44,42 +44,65 @@ class SubjectAttendanceSyncService
                 continue;
             }
 
-            $meetsToday = ClassSchedule::classes()
-                ->where('section_id', $classRecord->section_id)
-                ->where('subject_id', $classRecord->subject_id)
-                ->onDay($dayOfWeek)
-                ->exists();
+            // A shared PEHM record has one independent schedule per subject
+            // (PE/Health/Music each meet on their own days) — sync into
+            // whichever of them actually meet today, each under its own
+            // subject-scoped attendance date. A normal record just has its
+            // single subject_id, same as before.
+            $classRecord->loadMissing('coTeachers');
+            $subjectIds = $classRecord->coTeachers->isNotEmpty()
+                ? $classRecord->coTeachers->pluck('subject_id')->unique()->filter()->values()
+                : collect([$classRecord->subject_id])->filter()->values();
 
-            if (! $meetsToday) {
-                continue;
+            foreach ($subjectIds as $subjectId) {
+                $this->syncSubjectForDay($classRecord, $quarter, $classRecordStudent, $subjectId, $dayOfWeek, $date, $status);
             }
-
-            if (! $this->calendar->isSchoolDay($date, $classRecord->section?->levelid)) {
-                continue;
-            }
-
-            $maxOrder = ClassRecordAttendanceDate::where('class_record_quarter_id', $quarter->id)->max('sort_order') ?? 0;
-            $attendanceDate = ClassRecordAttendanceDate::firstOrCreate(
-                ['class_record_quarter_id' => $quarter->id, 'date' => $date],
-                ['sort_order' => $maxOrder + 1],
-            );
-
-            $existing = ClassRecordAttendanceRecord::where('class_record_attendance_date_id', $attendanceDate->id)
-                ->where('class_record_student_id', $classRecordStudent->id)
-                ->first();
-
-            if (! $existing) {
-                ClassRecordAttendanceRecord::create([
-                    'class_record_attendance_date_id' => $attendanceDate->id,
-                    'class_record_student_id'         => $classRecordStudent->id,
-                    'status'                           => $status,
-                    'synced_from_homeroom'             => true,
-                ]);
-            } elseif ($existing->synced_from_homeroom) {
-                $existing->update(['status' => $status]);
-            }
-            // else: a teacher has already touched this cell — leave it alone,
-            // the mismatch (if any) is exactly what surfaces as cutting.
         }
+    }
+
+    private function syncSubjectForDay($classRecord, $quarter, $classRecordStudent, int $subjectId, string $dayOfWeek, string $date, string $status): void
+    {
+        $meetsToday = ClassSchedule::classes()
+            ->where('section_id', $classRecord->section_id)
+            ->where('subject_id', $subjectId)
+            ->onDay($dayOfWeek)
+            ->exists();
+
+        if (! $meetsToday) {
+            return;
+        }
+
+        if (! $this->calendar->isSchoolDay($date, $classRecord->section?->levelid)) {
+            return;
+        }
+
+        // subject_id is null here for a normal (non-shared) record — same
+        // scope as every date that controller/service already writes for it.
+        $scopedSubjectId = $classRecord->coTeachers->isNotEmpty() ? $subjectId : null;
+
+        $maxOrder = ClassRecordAttendanceDate::where('class_record_quarter_id', $quarter->id)
+            ->where('subject_id', $scopedSubjectId)
+            ->max('sort_order') ?? 0;
+        $attendanceDate = ClassRecordAttendanceDate::firstOrCreate(
+            ['class_record_quarter_id' => $quarter->id, 'subject_id' => $scopedSubjectId, 'date' => $date],
+            ['sort_order' => $maxOrder + 1],
+        );
+
+        $existing = ClassRecordAttendanceRecord::where('class_record_attendance_date_id', $attendanceDate->id)
+            ->where('class_record_student_id', $classRecordStudent->id)
+            ->first();
+
+        if (! $existing) {
+            ClassRecordAttendanceRecord::create([
+                'class_record_attendance_date_id' => $attendanceDate->id,
+                'class_record_student_id'         => $classRecordStudent->id,
+                'status'                           => $status,
+                'synced_from_homeroom'             => true,
+            ]);
+        } elseif ($existing->synced_from_homeroom) {
+            $existing->update(['status' => $status]);
+        }
+        // else: a teacher has already touched this cell — leave it alone,
+        // the mismatch (if any) is exactly what surfaces as cutting.
     }
 }

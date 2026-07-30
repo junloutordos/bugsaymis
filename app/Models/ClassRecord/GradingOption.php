@@ -17,13 +17,25 @@ class GradingOption extends Model
         'is_active',
         'applicable_quarters',
         'owner_designation_id',
+        'grading_mode',
+        'compliance_pass_threshold',
+        'compliance_sy_rule',
+        'compliance_pass_label',
+        'compliance_fail_label',
     ];
 
     protected $casts = [
-        'is_active'            => 'boolean',
-        'applicable_quarters'  => 'array',
-        'owner_designation_id' => 'integer',
+        'is_active'                 => 'boolean',
+        'applicable_quarters'       => 'array',
+        'owner_designation_id'      => 'integer',
+        'compliance_pass_threshold' => 'float',
     ];
+
+    /** True when this option grades by compliance (checkbox) instead of numeric scores. */
+    public function isComplianceMode(): bool
+    {
+        return $this->grading_mode === 'compliance';
+    }
 
     public function ownerDesignation(): BelongsTo
     {
