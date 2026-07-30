@@ -82,14 +82,18 @@ class LeaveApplicationController extends Controller
         $authUser = Auth::user();
 
         return Inertia::render('HR/Leave/Create', [
-            'leaveTypes'   => LeaveType::where('is_active', true)->orderBy('sort_order')->get(),
-            'credits'      => LeaveCredit::where('user_id', Auth::id())
+            'leaveTypes'     => LeaveType::where('is_active', true)->orderBy('sort_order')->get(),
+            'credits'        => LeaveCredit::where('user_id', Auth::id())
                 ->where('year', now()->year)
                 ->with('leaveType')
                 ->get(),
-            'balances'     => $balances,
-            'hasPin'       => ! empty($authUser->signature_pin),
-            'signatureUri' => $this->sigService->getSignatureDataUri($authUser),
+            'balances'       => $balances,
+            'hasPin'         => ! empty($authUser->signature_pin),
+            'signatureUri'   => $this->sigService->getSignatureDataUri($authUser),
+            // Employment type (permanent/casual/contractual/coterminous/substitute), when on
+            // file, is used by the frontend to grey out (never hide/block) leave types that
+            // don't list the employee's type in applicable_employment_types.
+            'employmentType' => $authUser->employeeProfile?->employment_type,
         ]);
     }
 

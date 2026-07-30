@@ -35,6 +35,7 @@
                 :key="lt.code"
                 class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
                 :class="{ 'opacity-40 cursor-not-allowed': !typeByCode[lt.code] }"
+                :title="!isEligibleByEmploymentType(lt.code) ? 'Not typically applicable to your employment type — you may still file if this applies to you.' : null"
               >
                 <input
                   type="radio"
@@ -45,6 +46,8 @@
                   class="accent-indigo-600"
                 />
                 {{ lt.label }}
+                <span v-if="typeByCode[lt.code] && !isEligibleByEmploymentType(lt.code)"
+                      class="text-[10px] text-amber-500 font-normal">(may not apply)</span>
               </label>
 
               <!-- Other purpose row -->
@@ -67,6 +70,7 @@
                 :key="opt.code"
                 class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
                 :class="{ 'opacity-40 cursor-not-allowed': !typeByCode[opt.code] }"
+                :title="!isEligibleByEmploymentType(opt.code) ? 'Not typically applicable to your employment type — you may still file if this applies to you.' : null"
               >
                 <input
                   type="radio"
@@ -77,6 +81,8 @@
                   class="accent-indigo-600"
                 />
                 {{ opt.label }}
+                <span v-if="typeByCode[opt.code] && !isEligibleByEmploymentType(opt.code)"
+                      class="text-[10px] text-amber-500 font-normal">(may not apply)</span>
               </label>
             </div>
           </div>
@@ -203,10 +209,11 @@ import AppButton from '@/Components/AppButton.vue'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  leaveTypes:   Array,
-  credits:      Array,
-  hasPin:       { type: Boolean, default: false },
-  signatureUri: { type: String, default: null },
+  leaveTypes:     Array,
+  credits:        Array,
+  hasPin:         { type: Boolean, default: false },
+  signatureUri:   { type: String, default: null },
+  employmentType: { type: String, default: null },
 })
 
 const currentYear = new Date().getFullYear()
@@ -226,7 +233,7 @@ const officialLeaveTypes = [
   { code: 'SLBW',    label: 'Special Leave Benefits for Women' },
   { code: 'SECL',    label: 'Special Emergency (Calamity) Leave' },
   { code: 'AL',      label: 'Adoption Leave' },
-  { code: 'WL',      label: 'Wellness Leave' },
+  { code: 'WL',      label: 'Wellness Leave (5 days/year)' },
 ]
 
 const otherPurposeOptions = [
@@ -241,6 +248,18 @@ const typeByCode = computed(() => {
   for (const t of props.leaveTypes) map[t.code] = t
   return map
 })
+
+// Soft eligibility check — only greys out a leave type (never hides/blocks filing) when
+// BOTH the employee's employment_type is on file AND the leave type restricts
+// applicable_employment_types. If either is unset, the type stays enabled — this keeps
+// filing unaffected while employee_profiles.employment_type coverage is still incomplete.
+const isEligibleByEmploymentType = (code) => {
+  const lt = typeByCode.value[code]
+  if (!lt || !props.employmentType) return true
+  const allowed = lt.applicable_employment_types
+  if (!allowed || !allowed.length) return true
+  return allowed.includes(props.employmentType)
+}
 
 const selectedCode     = ref('')
 const otherPurposeCode = ref('')
