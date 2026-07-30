@@ -489,6 +489,77 @@ function onDateChange(row) {
   }
 }
 
+// ── Click-to-schedule calendar wiring ──────────────────────────────────────
+// Exposes the Setup tab's undated draft rows to SectionAssessmentCalendar
+// so a teacher can click a day and assign that date to a row, instead of
+// only using the per-row date picker in the table. The calendar defers to
+// the exact same dateCounts/deadline/schedule-day checks used elsewhere on
+// this page — the server still re-validates on Save regardless.
+const pendingAssessmentRows = computed(() => {
+  const rows = []
+  for (const cat of currentLeafCategories.value) {
+    if (!canEditCategory(cat)) continue
+    for (const row of assessmentDraft.value[cat.id] ?? []) {
+      if (row.activity_date || !row.title) continue // already dated, or an unused placeholder row
+      rows.push({
+        key:       `${cat.id}:${row.assessment_number}`,
+        label:     `${cat.code}${row.assessment_number} — ${row.title}`,
+        is_graded: row.is_graded,
+        is_major:  isMajorRow(row),
+        _row:      row,
+      })
+    }
+  }
+  return rows
+})
+
+// Schedule-day + plotting-deadline feasibility for a candidate date, mirrors
+// the same two checks onDateChange() applies per-row (fail-open on schedule
+// when no scheduledDays are known yet; admins bypass both like elsewhere).
+function calendarDateFeasibility(dateStr) {
+  if (!props.isAdmin && props.scheduledDays.length) {
+    const weekday = WEEKDAY_ORDER[(new Date(`${dateStr}T00:00:00`).getDay() + 6) % 7]
+    if (!props.scheduledDays.includes(weekday)) {
+      return { ok: false, reason: `${classRecord.subject_name ?? 'This subject'} has no scheduled class with this section on ${weekday}s.` }
+    }
+  }
+  if (!props.isAdmin && new Date() > plottingDeadline(dateStr)) {
+    const deadline = plottingDeadline(dateStr).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+    return { ok: false, reason: `Plotting deadline passed — must be plotted by 12:00 NN of the Friday before (${deadline}).` }
+  }
+  return { ok: true, reason: null }
+}
+
+function onCalendarSchedule({ key, date }) {
+  const row = pendingAssessmentRows.value.find(r => r.key === key)?._row
+  if (!row) return
+  row.activity_date = date
+  onDateChange(row)
+  // onDateChange() reverts activity_date to _prevDate ('') if its own re-check
+  // fails — surface that as a toast since the calendar's own picker already
+  // reported the same class of error before emitting.
+  if (!row.activity_date) {
+    Swal.fire('Could not schedule', row._dateWarning ?? 'That date is no longer available.', 'warning')
+  }
+}
+
+function onCalendarApplyToSections({ date }) {
+  // Only offer the contextual prompt when there's somewhere to apply to —
+  // reuses the exact same modal/endpoint as the "Apply This Setup to Other
+  // Sections…" banner; no separate code path.
+  if (!sameSubjectRecords.value.length) return
+  Swal.fire({
+    icon: 'question',
+    title: 'Apply to other sections?',
+    text: `You just scheduled an assessment for ${date}. Apply this quarter's whole setup to other sections you teach for ${classRecord.subject_name}?`,
+    showCancelButton: true,
+    confirmButtonText: 'Choose sections…',
+    cancelButtonText: 'Not now',
+  }).then((result) => {
+    if (result.isConfirmed) openApplyToSectionsModal()
+  })
+}
+
 // ── Copy assessments ──────────────────────────────────────────────────────────
 
 const copyingFrom = ref(false)
@@ -957,7 +1028,7 @@ async function saveQuarterOption() {
                 :disabled="!classRecord.section_id"
                 :title="!classRecord.section_id ? 'No section linked to this class record' : ''"
                 @click="showSectionCalendar = true">
-                <CalendarDaysIcon class="h-3.5 w-3.5" /> View Section Calendar
+                <CalendarDaysIcon class="h-3.5 w-3.5" /> {{ pendingAssessmentRows.length ? 'Schedule via Calendar' : 'View Section Calendar' }}
               </AppButton>
               <template v-if="!isReadOnly">
                 <AppButton v-if="!isLocked" variant="warning" size="sm" @click="lockQuarter">
@@ -1416,6 +1487,11 @@ async function saveQuarterOption() {
     :show="showSectionCalendar"
     :section-label="classRecord.year_level_section"
     :days="sectionCalendarDays"
+    :editable="!isLocked && !isReadOnly && canEditCategory({ subject_id: null })"
+    :pending-rows="pendingAssessmentRows"
+    :disabled-dates="calendarDateFeasibility"
     @close="showSectionCalendar = false"
+    @schedule="onCalendarSchedule"
+    @apply-to-sections="onCalendarApplyToSections"
   />
 </template>

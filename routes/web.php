@@ -2314,6 +2314,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Weekly Assessment Tracker — must be registered BEFORE the {classRecord} wildcard
     Route::get('/class-records/wat',         [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'index'])->name('class-records.wat.index');
+    Route::get('/class-records/wat/my-tracker', [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'myTracker'])->name('class-records.wat.my-tracker');
     Route::get('/class-records/wat/print',   [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'printForm'])->name('class-records.wat.print');
     Route::get('/class-records/wat/review',  [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'review'])->name('class-records.wat.review');
     Route::post('/class-records/wat/review', [\App\Http\Controllers\ClassRecord\WeeklyAssessmentTrackerController::class, 'storeReview'])->name('class-records.wat.review.store');

@@ -3,6 +3,73 @@
  * only the rules the Setup tab needs to evaluate client-side).
  */
 
+// Mirrors WatRuleService::DAILY_GRADED_MAX / DAILY_MAJOR_MAX /
+// WEEKLY_GRADED_MAX / WEEKLY_MAJOR_MAX. Visual/UX feedback only — the
+// server (ClassRecordAssessmentController::upsert / applyToSections) is the
+// authoritative check and re-validates independently on save.
+export const WAT_LIMITS = {
+  dailyGraded:  3,
+  dailyMajor:   2,
+  weeklyGraded: 15,
+  weeklyMajor:  6,
+}
+
+/** Monday (YYYY-MM-DD) of the week containing dateStr (YYYY-MM-DD). */
+export function weekStartOf(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`)
+  const monday = new Date(d)
+  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  const y = monday.getFullYear()
+  const m = String(monday.getMonth() + 1).padStart(2, '0')
+  const day = String(monday.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/**
+ * Given a Map<date, {graded, major}> of per-day counts already plotted for
+ * a section (server baseline + live unsaved draft — see Show.vue's
+ * dateCounts computed), returns whether placing one more graded/major
+ * assessment on `date` would breach the daily or weekly cap. Weekly total is
+ * summed across the 5 weekdays sharing `date`'s Monday–Friday window.
+ *
+ * @param {Map<string, {graded:number, major:number}>} dateCounts
+ * @param {string} date        YYYY-MM-DD
+ * @param {boolean} isGraded
+ * @param {boolean} isMajor
+ * @returns {{ok: boolean, reason: ?string}}
+ */
+export function checkWatCap(dateCounts, date, isGraded, isMajor) {
+  if (!isGraded) return { ok: true, reason: null }
+
+  const day = dateCounts.get(date) ?? { graded: 0, major: 0 }
+  if (day.graded + 1 > WAT_LIMITS.dailyGraded) {
+    return { ok: false, reason: `Section already has ${WAT_LIMITS.dailyGraded} graded assessments on ${date} — pick another date.` }
+  }
+  if (isMajor && day.major + 1 > WAT_LIMITS.dailyMajor) {
+    return { ok: false, reason: `Section already has ${WAT_LIMITS.dailyMajor} major assessments on ${date} — pick another date.` }
+  }
+
+  const monday = weekStartOf(date)
+  let weekGraded = 0
+  let weekMajor  = 0
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(`${monday}T00:00:00`)
+    d.setDate(d.getDate() + i)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const c = dateCounts.get(key) ?? { graded: 0, major: 0 }
+    weekGraded += c.graded
+    weekMajor  += c.major
+  }
+  if (weekGraded + 1 > WAT_LIMITS.weeklyGraded) {
+    return { ok: false, reason: `Section already has ${WAT_LIMITS.weeklyGraded} graded assessments this week — pick another week.` }
+  }
+  if (isMajor && weekMajor + 1 > WAT_LIMITS.weeklyMajor) {
+    return { ok: false, reason: `Section already has ${WAT_LIMITS.weeklyMajor} major assessments this week — pick another week.` }
+  }
+
+  return { ok: true, reason: null }
+}
+
 /**
  * True when today falls within the Monday–Sunday week containing
  * activityDate (YYYY-MM-DD). Mirrors

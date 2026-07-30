@@ -85,6 +85,37 @@ class WeeklyAssessmentTrackerController extends Controller
         ]);
     }
 
+    // ── GET /class-records/wat/my-tracker ─────────────────────────────────────
+
+    /**
+     * Individual Faculty WAT Tracker — a teacher's own plotted assessments
+     * across every class record they own this school year (any section,
+     * any subject), for one Mon–Fri week. Open to any authenticated user
+     * with at least one class record this SY (teacher_id or PEHM co-teacher);
+     * unlike index()/review(), this carries no coordinator/ACIDAA gate since
+     * it only ever surfaces the caller's own data.
+     */
+    public function myTracker(Request $request)
+    {
+        $user = Auth::user();
+        $sy   = $this->currentSchoolYear();
+
+        $weekStart = Carbon::parse($request->query('week', now()->toDateString()))
+            ->startOfWeek(Carbon::MONDAY)->toDateString();
+
+        $hasRecords = ClassRecord::where('school_year_id', $sy->id)
+            ->where('status', '<>', 'archived')
+            ->where(fn ($q) => $q->where('teacher_id', $user->id)
+                ->orWhereHas('coTeachers', fn ($ct) => $ct->where('user_id', $user->id)))
+            ->exists();
+
+        return Inertia::render('ClassRecord/Wat/MyTracker', [
+            'weekStart'  => $weekStart,
+            'tracker'    => $hasRecords ? WatRuleService::facultyWeekData($user->id, $sy->id, $weekStart) : null,
+            'schoolYear' => $sy->only(['id', 'name']),
+        ]);
+    }
+
     // ── GET /class-records/wat/print ──────────────────────────────────────────
 
     /**
