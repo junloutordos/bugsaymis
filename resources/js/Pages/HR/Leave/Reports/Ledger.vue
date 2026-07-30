@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppCard from '@/Components/AppCard.vue'
@@ -12,14 +12,15 @@ import EmptyState from '@/Components/EmptyState.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
-  transactions: Object,
-  summary:      Array,
-  leaveTypes:   Array,
-  employees:    Array,
-  txTypes:      Array,
-  filters:      Object,
-  currentYear:  Number,
-  years:        Array,
+  transactions:   Object,
+  summary:        Array,
+  balanceSummary: { type: Array, default: () => [] },
+  leaveTypes:     Array,
+  employees:      Array,
+  txTypes:        Array,
+  filters:        Object,
+  currentYear:    Number,
+  years:          Array,
 })
 
 const f = ref({
@@ -83,6 +84,13 @@ const txTypeBadgeColor = (type) => ({
 
 const signed = (n) => { const v = Number(n); return v >= 0 ? `+${v.toFixed(4)}` : v.toFixed(4) }
 const fmtDt  = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'
+
+const balanceColor = (bal) => {
+  const n = Number(bal)
+  if (n <= 0) return 'text-red-600'
+  if (n <= 5) return 'text-amber-600'
+  return 'text-emerald-600'
+}
 
 const txData    = props.transactions?.data ?? []
 const curPage   = props.transactions?.current_page ?? 1
@@ -152,6 +160,78 @@ const total     = props.transactions?.total ?? 0
           <span class="font-bold">{{ Number(s.total_amount) >= 0 ? '+' : '' }}{{ Number(s.total_amount).toFixed(2) }}d</span>
         </div>
       </div>
+
+      <!-- Per-employee balance summary -->
+      <AppCard :padded="false" title="Employee Balance Summary"
+               :subtitle="`${balanceSummary.length} record(s) — current standing per employee / leave type for ${f.year}.`">
+        <AppTable :is-empty="!balanceSummary.length" :skeleton-cols="7" :card="false">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
+              <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Leave Type</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Earned</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Carried Over</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Used</th>
+              <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Balance</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </template>
+
+          <tr v-for="row in balanceSummary" :key="row.id" class="hover:bg-indigo-50/40">
+            <td class="px-4 py-3">
+              <p class="font-medium text-slate-800 text-xs">{{ row.user?.name ?? '—' }}</p>
+              <p class="text-xs text-slate-400">{{ row.user?.badge_id ?? '' }}</p>
+            </td>
+            <td class="px-4 py-3 text-xs font-medium text-slate-700">{{ row.leave_type?.code ?? '—' }}</td>
+            <td class="px-4 py-3 text-right text-slate-600 text-xs">{{ Number(row.earned).toFixed(4) }}</td>
+            <td class="px-4 py-3 text-right text-slate-600 text-xs">{{ Number(row.carried_over).toFixed(4) }}</td>
+            <td class="px-4 py-3 text-right text-red-600 font-medium text-xs">{{ Number(row.used).toFixed(4) }}</td>
+            <td class="px-4 py-3 text-right font-bold text-xs" :class="balanceColor(row.balance)">{{ Number(row.balance).toFixed(4) }}</td>
+            <td class="px-4 py-3 text-right">
+              <Link :href="route('hr.leave-credits.ledger', row.user_id)"
+                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">
+                Full Ledger →
+              </Link>
+            </td>
+          </tr>
+
+          <template #mobileCard>
+            <div v-for="row in balanceSummary" :key="row.id" class="p-4 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-slate-800 text-sm">{{ row.user?.name ?? '—' }}</p>
+                  <p class="text-xs text-slate-400">{{ row.user?.badge_id ?? '' }}</p>
+                </div>
+                <span class="text-xs font-medium text-slate-700">{{ row.leave_type?.code ?? '—' }}</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <p class="text-slate-400">Earned</p>
+                  <p class="text-slate-600">{{ Number(row.earned).toFixed(4) }}</p>
+                </div>
+                <div>
+                  <p class="text-slate-400">Used</p>
+                  <p class="text-red-600 font-medium">{{ Number(row.used).toFixed(4) }}</p>
+                </div>
+                <div>
+                  <p class="text-slate-400">Balance</p>
+                  <p class="font-bold" :class="balanceColor(row.balance)">{{ Number(row.balance).toFixed(4) }}</p>
+                </div>
+              </div>
+              <div class="flex justify-end pt-1">
+                <Link :href="route('hr.leave-credits.ledger', row.user_id)"
+                      class="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">
+                  Full Ledger →
+                </Link>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No leave credit balances found for the selected filters" />
+          </template>
+        </AppTable>
+      </AppCard>
 
       <!-- Table -->
       <AppCard :padded="false">
