@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { EyeIcon, PencilSquareIcon } from "@heroicons/vue/24/outline"
 import { storageUrl } from "@/Composables/useStorage.js"
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -11,6 +11,8 @@ import AppIconButton from '@/Components/AppIconButton.vue'
 import AppTable from '@/Components/AppTable.vue'
 import AppModal from '@/Components/AppModal.vue'
 import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTabs from '@/Components/AppTabs.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
 
@@ -20,6 +22,12 @@ const props = defineProps({
   writable_columns: { type: Array, default: () => [] },
   editing: Number,
   can_manage_students: Boolean,
+  tab: { type: String, default: 'active' },
+  filters: { type: Object, default: () => ({}) },
+  tab_counts: { type: Object, default: () => ({ active: 0, inactive: 0 }) },
+  section_options: { type: Array, default: () => [] },
+  grade_options: { type: Array, default: () => [] },
+  current_school_year: String,
 })
 
 const students = ref(props.students?.data ?? props.students ?? [])
@@ -35,13 +43,41 @@ const page = usePage()
 const csrfToken = ref(page.props.csrf_token ?? page.props.csrfToken ?? null)
 
 const searchQuery = ref(page.props.q ?? '')
+const activeTab = ref(props.tab ?? 'active')
+const filterSectionId = ref(props.filters?.section_id ?? '')
+const filterGradeLevel = ref(props.filters?.grade_level ?? '')
+const filterSex = ref(props.filters?.sex ?? '')
+
+const tabs = computed(() => [
+  { key: 'active', label: `Active (${props.tab_counts?.active ?? 0})` },
+  { key: 'inactive', label: `Inactive (${props.tab_counts?.inactive ?? 0})` },
+])
 
 // Server-driven list; filteredStudents reflects server paginator data
 const filteredStudents = computed(() => students.value)
 
-const performSearch = () => {
-  router.get(route('students.index'), { q: searchQuery.value }, { replace: true, preserveState: false })
+const applyFilters = ({ resetPage = true } = {}) => {
+  router.get(route('students.index'), {
+    q: searchQuery.value || undefined,
+    tab: activeTab.value,
+    section_id: filterSectionId.value || undefined,
+    grade_level: filterGradeLevel.value || undefined,
+    sex: filterSex.value || undefined,
+    ...(resetPage ? {} : { page: page.props.students?.current_page }),
+  }, { replace: true, preserveState: false })
 }
+
+const performSearch = () => applyFilters()
+
+let searchDebounceTimer = null
+watch(searchQuery, () => {
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => applyFilters(), 400)
+})
+
+watch(activeTab, () => applyFilters())
+watch([filterSectionId, filterGradeLevel, filterSex], () => applyFilters())
+
 
 const writableColumnSet = computed(() => new Set(props.writable_columns))
 const editableColumns = computed(() => columns.value.filter(c => {
@@ -114,13 +150,23 @@ const openView = (student) => { viewStudent.value = student; showViewModal.value
 const closeView = () => { viewStudent.value = null; showViewModal.value = false }
 
 // Only show these student fields in the table
-const visibleFields = [
+const visibleFields = computed(() => [
   { label: 'PISAYSYSTEMID', keys: ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id'] },
   { label: 'Name', keys: [], type: 'name' },
   { label: 'Official Email', keys: ['student_email','email'], type: 'email' },
   { label: 'AGE', keys: ['birthday','birthdate','dob'], type: 'age' },
   { label: 'Sex', keys: ['sex','gender'] },
-]
+  ...(activeTab.value === 'active'
+    ? [{ label: 'Grade & Section', keys: [], type: 'section' }]
+    : []),
+])
+
+const sectionLabel = (student) => {
+  const grade = student?.current_grade_level
+  const section = student?.current_section_name
+  if (!grade && !section) return '—'
+  return `${grade ? `Grade ${grade}` : ''}${grade && section ? ' — ' : ''}${section ?? ''}`.trim() || '—'
+}
 
 const getFieldValue = (student, keys) => {
   for (const k of keys) {
@@ -174,6 +220,7 @@ const getAge = (student, keys) => {
 }
 
 const pager = computed(() => page.props.students || null)
+const students_total = computed(() => pager.value?.total ?? filteredStudents.value.length)
 const prevUrl = computed(() => pager.value?.prev_page_url ?? null)
 const nextUrl = computed(() => pager.value?.next_page_url ?? null)
 const currentPage = computed(() => pager.value?.current_page ?? null)
@@ -338,8 +385,20 @@ const confirmCrop = async () => {
     <div class="space-y-5">
       <AppPageHeader title="Students" subtitle="Browse and view student records" />
 
-      <AppFilterBar>
-        <AppInput v-model="searchQuery" type="text" placeholder="Search students..." @keydown.enter="performSearch" class="w-full sm:w-64" />
+      <AppTabs v-model="activeTab" :tabs="tabs" />
+
+      <AppFilterBar :result-label="`${students_total} student${students_total === 1 ? '' : 's'}`">
+        <AppInput v-model="searchQuery" type="text" placeholder="Search name, email, LRN, PISAY ID..." @keydown.enter="performSearch" class="w-full sm:w-64" />
+        <AppSelect v-model="filterSectionId" placeholder="All Sections" class="w-full sm:w-44">
+          <option v-for="sec in section_options" :key="sec.id" :value="sec.id">Grade {{ sec.levelid }} — {{ sec.sectionname }}</option>
+        </AppSelect>
+        <AppSelect v-model="filterGradeLevel" placeholder="All Grades" class="w-full sm:w-36">
+          <option v-for="g in grade_options" :key="g" :value="g">Grade {{ g }}</option>
+        </AppSelect>
+        <AppSelect v-model="filterSex" placeholder="All Sexes" class="w-full sm:w-32">
+          <option value="M">Male</option>
+          <option value="F">Female</option>
+        </AppSelect>
         <template #actions>
           <AppButton size="sm" @click="performSearch">Search</AppButton>
         </template>
@@ -359,6 +418,7 @@ const confirmCrop = async () => {
           <td v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-sm text-slate-700">
             <span v-if="vf.type === 'age'">{{ getAge(student, vf.keys) }}</span>
             <span v-else-if="vf.type === 'name'" class="font-medium text-slate-800">{{ formatName(student) }}</span>
+            <span v-else-if="vf.type === 'section'">{{ sectionLabel(student) }}</span>
             <span v-else-if="vf.type === 'email'">
               <span v-if="!emailOf(student)" class="text-slate-400">—</span>
               <span v-else-if="isOfficialEmail(student)">{{ emailOf(student) }}</span>
@@ -387,6 +447,7 @@ const confirmCrop = async () => {
                 <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ getFieldValue(student, ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id']) }}</div>
                 <div class="text-xs mt-0.5" :class="!emailOf(student) ? 'text-slate-400' : (isOfficialEmail(student) ? 'text-slate-500' : 'text-warning-600')">{{ emailOf(student) ?? 'No email' }}</div>
                 <div class="text-xs text-slate-500">Age: {{ getAge(student, ['birthday','birthdate','dob']) }} · Sex: {{ getFieldValue(student, ['sex','gender']) }}</div>
+                <div v-if="activeTab === 'active'" class="text-xs text-slate-500">{{ sectionLabel(student) }}</div>
               </div>
               <div class="flex items-center gap-1">
                 <AppIconButton label="View" @click="openView(student)">
