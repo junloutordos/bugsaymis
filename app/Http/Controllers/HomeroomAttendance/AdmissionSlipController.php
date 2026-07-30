@@ -58,18 +58,24 @@ class AdmissionSlipController extends Controller
             'sections'  => $sections,
             'sectionId' => $sectionId,
             // Already shaped by AdmissionSlipService::pending() — a mix of
-            // whole-day homeroom infractions and derived subject-level
-            // cutting mismatches, each tagged with `type` + `infraction_type`
-            // (absence/tardy/cutting, matching the slip's own enum values).
-            'pending'   => $pending->values(),
+            // whole-day homeroom infractions, teacher-asserted cut class, and
+            // detected subject-level cutting mismatches, each tagged with
+            // `type` + `infraction_type` (absence/tardy/cut_class/
+            // cutting_suspected, matching the slip's own enum values) plus a
+            // human-readable `infraction_type_label` for display.
+            'pending'   => $pending->map(fn ($item) => [
+                ...$item,
+                'infraction_type_label' => AdmissionSlip::INFRACTION_TYPE_LABELS[$item['infraction_type']] ?? ucfirst($item['infraction_type']),
+            ])->values(),
             'issued'    => $issued->map(fn (AdmissionSlip $slip) => [
-                'id'             => $slip->id,
-                'student_name'   => trim("{$slip->student->lastname}, {$slip->student->firstname} {$slip->student->middlename}"),
-                'infraction_date'=> $slip->infraction_date->toDateString(),
-                'infraction_type'=> $slip->infraction_type,
-                'excused_status' => $slip->excused_status,
-                'print_url'      => route('homeroom-attendance.admission-slips.print', $slip),
-                'document_url'   => $slip->supporting_document_path
+                'id'                     => $slip->id,
+                'student_name'           => trim("{$slip->student->lastname}, {$slip->student->firstname} {$slip->student->middlename}"),
+                'infraction_date'        => $slip->infraction_date->toDateString(),
+                'infraction_type'        => $slip->infraction_type,
+                'infraction_type_label'  => $slip->infraction_type_label,
+                'excused_status'         => $slip->excused_status,
+                'print_url'              => route('homeroom-attendance.admission-slips.print', $slip),
+                'document_url'           => $slip->supporting_document_path
                     ? route('homeroom-attendance.admission-slips.document', $slip)
                     : null,
             ])->values(),
@@ -84,7 +90,7 @@ class AdmissionSlipController extends Controller
             'student_id'        => ['required', 'integer'],
             'section_id'        => ['required', 'integer'],
             'infraction_date'   => ['required', 'date'],
-            'infraction_type'   => ['required', 'in:absence,tardy,cutting'],
+            'infraction_type'   => ['required', 'in:absence,tardy,cut_class,cutting_suspected'],
             'excused_status'    => ['required', 'in:excused,unexcused'],
             'reason'            => ['nullable', 'string', 'max:255'],
             'document_base64'   => ['nullable', 'string'],

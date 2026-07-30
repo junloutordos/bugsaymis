@@ -8,6 +8,7 @@ use App\Services\HomeroomAttendance\DailyAttendanceService;
 use App\Services\HomeroomAttendance\RosterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DailyAttendanceController extends Controller
@@ -38,8 +39,33 @@ class DailyAttendanceController extends Controller
         $attendanceDate = $this->attendance->findDate($sectionId, $date);
         $recordsByStudent = $attendanceDate ? $attendanceDate->records->keyBy('student_id') : collect();
 
-        $roster = $students->map(function ($student) use ($recordsByStudent) {
+        // Read-only visibility only — the adviser cannot set or clear this.
+        // Cut Class (CIM 3.6/3.6.2) can only be witnessed and asserted by the
+        // subject teacher on the Class Record Attendance grid; this just
+        // surfaces what's already been marked there so the adviser isn't
+        // blind to it for their own advisory students.
+        $cuttingSubjectsByStudent = DB::table('class_record_attendance_records as car')
+            ->join('class_record_attendance_dates as cad', 'cad.id', '=', 'car.class_record_attendance_date_id')
+            ->join('class_record_students as crs', 'crs.id', '=', 'car.class_record_student_id')
+            ->join('class_record_quarters as crq', 'crq.id', '=', 'crs.class_record_quarter_id')
+            ->join('class_records as cr', 'cr.id', '=', 'crq.class_record_id')
+            // cad.subject_id scopes the shared PEHM case (PE/Health/Music each
+            // have their own subject-scoped dates); cr.subject_id covers a
+            // normal single-subject record where cad.subject_id is null.
+            ->leftJoin('subjects', 'subjects.id', '=', DB::raw('COALESCE(cad.subject_id, cr.subject_id)'))
+            ->where('cr.section_id', $sectionId)
+            ->where('cad.date', $date)
+            ->where('car.status', 'cut_class')
+            ->select('crs.student_id', 'subjects.name as subject_name')
+            ->get()
+            ->groupBy('student_id');
+
+        $roster = $students->map(function ($student) use ($recordsByStudent, $cuttingSubjectsByStudent) {
             $record = $recordsByStudent->get($student->id);
+            $cuttingSubjects = $cuttingSubjectsByStudent->get($student->id, collect())
+                ->pluck('subject_name')
+                ->filter()
+                ->values();
 
             return [
                 'student_id'         => $student->id,
@@ -49,6 +75,7 @@ class DailyAttendanceController extends Controller
                 'incomplete_uniform' => $record->incomplete_uniform ?? false,
                 'excused_status'     => $record->excused_status ?? 'n_a',
                 'remarks'            => $record->remarks ?? null,
+                'cut_class_subjects' => $cuttingSubjects,
             ];
         });
 

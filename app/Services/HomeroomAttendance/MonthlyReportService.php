@@ -70,9 +70,9 @@ class MonthlyReportService
 
                 $excusedAbsences = $studentRecords->where('status', 'absent')->where('excused_status', 'excused')->count();
                 $unexcusedAbsences = $studentRecords->where('status', 'absent')->where('excused_status', '!=', 'excused')->count();
-                // Cutting is never a status anyone picks — it's a subject
-                // Absent while this same date's Homeroom record says
-                // Present/Tardy (see AdmissionSlipService::pending()).
+                // Cutting counts both a teacher-asserted Cut Class status and
+                // the detected Absent+Present/Tardy mismatch safety net (see
+                // cuttingCountsForMonth()).
                 $cutting = (int) ($cuttingCountsByStudent[$student->id] ?? 0);
                 $tardy = $studentRecords->where('status', 'tardy')->count();
                 $incUniform = $studentRecords->where('incomplete_uniform', true)->count();
@@ -112,8 +112,21 @@ class MonthlyReportService
     }
 
     /**
-     * Cutting instances per student for the month — a subject's Absent
-     * record where the same date's Homeroom record says Present/Tardy.
+     * Cutting instances per student for the month — the union of two
+     * signals, deduplicated by the underlying class_record_attendance_records
+     * row so a single incident is never counted twice:
+     *   1. Teacher-asserted: status = 'cut_class' (CIM 3.6/3.6.2 — only the
+     *      subject teacher can witness this, set directly on the Class
+     *      Record Attendance grid).
+     *   2. Detected mismatch (secondary safety net): a subject's Absent
+     *      record where the same date's Homeroom record says Present/Tardy
+     *      — kept in case a teacher marks Absent without using the Cut Class
+     *      status directly.
+     * These two are already mutually exclusive per row (a row's status is
+     * either 'cut_class' or 'absent', never both), so a plain UNION of the
+     * two row-id sets can't double count — the DISTINCT on car.id is just
+     * defensive.
+     *
      * Counted the same way absences are: excused_status 'n_a' still counts
      * as unexcused for the deduction/tally until a slip resolves it.
      *
@@ -121,7 +134,18 @@ class MonthlyReportService
      */
     private function cuttingCountsForMonth(int $sectionId, Carbon $start, Carbon $end): array
     {
-        return DB::table('class_record_attendance_records as car')
+        $assertedRows = DB::table('class_record_attendance_records as car')
+            ->join('class_record_attendance_dates as cad', 'cad.id', '=', 'car.class_record_attendance_date_id')
+            ->join('class_record_students as crs', 'crs.id', '=', 'car.class_record_student_id')
+            ->join('class_record_quarters as crq', 'crq.id', '=', 'crs.class_record_quarter_id')
+            ->join('class_records as cr', 'cr.id', '=', 'crq.class_record_id')
+            ->where('cr.section_id', $sectionId)
+            ->where('car.status', 'cut_class')
+            ->where('car.excused_status', '!=', 'excused')
+            ->whereBetween('cad.date', [$start->toDateString(), $end->toDateString()])
+            ->select('car.id as car_id', 'crs.student_id');
+
+        $suspectedRows = DB::table('class_record_attendance_records as car')
             ->join('class_record_attendance_dates as cad', 'cad.id', '=', 'car.class_record_attendance_date_id')
             ->join('class_record_students as crs', 'crs.id', '=', 'car.class_record_student_id')
             ->join('homeroom_attendance_dates as had', function ($join) use ($sectionId) {
@@ -135,9 +159,14 @@ class MonthlyReportService
             ->where('car.excused_status', '!=', 'excused')
             ->whereIn('har.status', ['present', 'tardy'])
             ->whereBetween('cad.date', [$start->toDateString(), $end->toDateString()])
-            ->groupBy('crs.student_id')
-            ->select('crs.student_id', DB::raw('COUNT(*) as cutting_count'))
+            ->select('car.id as car_id', 'crs.student_id');
+
+        return DB::query()
+            ->fromSub($assertedRows->union($suspectedRows), 'cutting_rows')
+            ->groupBy('student_id')
+            ->select('student_id', DB::raw('COUNT(DISTINCT car_id) as cutting_count'))
             ->pluck('cutting_count', 'student_id')
+            ->map(fn ($count) => (int) $count)
             ->all();
     }
 

@@ -32,6 +32,29 @@ class AdmissionSlip extends Model
         'issued_at'       => 'datetime',
     ];
 
+    protected $appends = ['infraction_type_label'];
+
+    /**
+     * Human-readable label per infraction_type — 'cutting' is the legacy
+     * value (pre-dates the cut_class/cutting_suspected split, kept in the
+     * enum only so historical rows still display correctly); 'cut_class' is
+     * a direct teacher assertion (CIM 3.6/3.6.2), 'cutting_suspected' is the
+     * system-detected mismatch safety net (subject Absent + homeroom
+     * Present/Tardy).
+     */
+    public const INFRACTION_TYPE_LABELS = [
+        'absence'           => 'Absence',
+        'tardy'             => 'Tardy',
+        'cutting'           => 'Cut Class',
+        'cut_class'         => 'Cut Class',
+        'cutting_suspected' => 'Cut Class (suspected)',
+    ];
+
+    public function getInfractionTypeLabelAttribute(): string
+    {
+        return self::INFRACTION_TYPE_LABELS[$this->infraction_type] ?? ucfirst($this->infraction_type);
+    }
+
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class, 'student_id');

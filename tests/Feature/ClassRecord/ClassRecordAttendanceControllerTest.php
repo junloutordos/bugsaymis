@@ -102,6 +102,54 @@ class ClassRecordAttendanceControllerTest extends TestCase
         ]);
     }
 
+    /**
+     * CIM 3.6/3.6.2 — cut class can only be witnessed and asserted by the
+     * subject teacher (student on campus but skips/leaves this period). It
+     * must be a directly-selectable status on this endpoint.
+     */
+    public function test_teacher_can_mark_cut_class(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id, 'family_name' => 'Doe', 'given_name' => 'Jane',
+            'sequence_number' => 1, 'is_active' => true,
+        ]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.attendance.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'records' => [['date_id' => $date->id, 'student_id' => $student->id, 'status' => 'cut_class']],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_attendance_records', [
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'cut_class',
+            'synced_from_homeroom' => false,
+        ]);
+    }
+
+    public function test_upsert_rejects_an_invalid_status_value(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id, 'family_name' => 'Doe', 'given_name' => 'Jane',
+            'sequence_number' => 1, 'is_active' => true,
+        ]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.attendance.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'records' => [['date_id' => $date->id, 'student_id' => $student->id, 'status' => 'excused']],
+            ])
+            ->assertStatus(422);
+    }
+
     public function test_upsert_rejects_a_date_belonging_to_another_class_record(): void
     {
         $teacher = User::factory()->create();
