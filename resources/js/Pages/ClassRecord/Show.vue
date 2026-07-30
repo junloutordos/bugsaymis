@@ -595,10 +595,24 @@ const showFinalGrades    = ref(false)
 const finalGrades        = ref([])
 const finalGradesLoading = ref(false)
 const finalGradesError   = ref(null)
+const finalGradesMode    = ref('numeric')  // 'numeric' | 'compliance' — set from the API response
 
 const allQuartersExist = computed(() =>
   [1, 2, 3, 4].every(q => (props.classRecord.quarters ?? []).some(qt => qt.quarter === q))
 )
+
+// The record's OWN pass label (e.g. "Completed") — used to color-code the
+// remark column green/red without re-deriving the rule client-side.
+const complianceSyPassLabel = computed(() => props.classRecord.grading_option?.compliance_pass_label ?? 'Completed')
+
+const finalGradesSyRuleLabel = computed(() => {
+  const rule = props.classRecord.grading_option?.compliance_sy_rule
+  return rule === 'average_threshold' ? 'average of all 4 quarters vs. threshold' : 'every quarter must pass'
+})
+
+function fmtCompliancePct(val) {
+  return val === null || val === undefined ? '—' : `${Number(val).toFixed(2)}%`
+}
 
 async function loadFinalGrades() {
   finalGradesLoading.value = true
@@ -606,6 +620,7 @@ async function loadFinalGrades() {
   try {
     const { data } = await axios.get(route('class-records.final-grades', props.classRecord.id))
     finalGrades.value = data.students ?? []
+    finalGradesMode.value = data.gradingMode ?? 'numeric'
     if (data.message && !data.students?.length) {
       finalGradesError.value = data.message
     }
@@ -1134,6 +1149,10 @@ async function saveQuarterOption() {
             :siblings="props.siblings"
             :owned-subject-ids="ownedSubjectIds"
             :is-admin="isAdmin"
+            :is-compliance-mode="currentGradingOption?.grading_mode === 'compliance'"
+            :compliance-pass-threshold="Number(currentGradingOption?.compliance_pass_threshold ?? 0.75)"
+            :compliance-pass-label="currentGradingOption?.compliance_pass_label ?? 'Completed'"
+            :compliance-fail-label="currentGradingOption?.compliance_fail_label ?? 'Not Completed'"
             @reload="router.reload({ only: ['classRecord'] })"
           />
         </div>
@@ -1187,7 +1206,13 @@ async function saveQuarterOption() {
           <!-- Table -->
           <template v-else-if="finalGrades.length">
             <p class="text-xs text-slate-500 mb-4">
-              Final annual grade = simple average of Q1–Q4 grade equivalents, rounded to 3 decimal places.
+              <template v-if="finalGradesMode === 'compliance'">
+                School-year remark is computed from Q1–Q4 compliance percentages per the grading option's
+                configured rule ({{ finalGradesSyRuleLabel }}).
+              </template>
+              <template v-else>
+                Final annual grade = simple average of Q1–Q4 grade equivalents, rounded to 3 decimal places.
+              </template>
             </p>
             <div class="overflow-x-auto rounded-xl border border-slate-100">
               <table class="min-w-full text-sm">
@@ -1195,12 +1220,22 @@ async function saveQuarterOption() {
                   <tr>
                     <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 w-10">#</th>
                     <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Student</th>
-                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q1 GE</th>
-                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q2 GE</th>
-                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q3 GE</th>
-                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q4 GE</th>
-                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-20">Final GE</th>
-                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500">Rating</th>
+                    <template v-if="finalGradesMode === 'compliance'">
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-20">Q1 %</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-20">Q2 %</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-20">Q3 %</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-20">Q4 %</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-24">Average %</th>
+                      <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500">Remark</th>
+                    </template>
+                    <template v-else>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q1 GE</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q2 GE</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q3 GE</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q4 GE</th>
+                      <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-20">Final GE</th>
+                      <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500">Rating</th>
+                    </template>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -1211,12 +1246,24 @@ async function saveQuarterOption() {
                       {{ student.familyName }}, {{ student.givenName }}
                       <span v-if="student.middleInitial"> {{ student.middleInitial }}.</span>
                     </td>
-                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q1GE).toFixed(3) }}</td>
-                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q2GE).toFixed(3) }}</td>
-                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q3GE).toFixed(3) }}</td>
-                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q4GE).toFixed(3) }}</td>
-                    <td class="px-3 py-2.5 text-center font-mono font-bold text-slate-800">{{ Number(student.finalGE).toFixed(3) }}</td>
-                    <td class="px-3 py-2.5 text-sm" :class="adjectivalColor(student.adjectival)">{{ student.adjectival }}</td>
+                    <template v-if="finalGradesMode === 'compliance'">
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ fmtCompliancePct(student.q1Compliance) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ fmtCompliancePct(student.q2Compliance) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ fmtCompliancePct(student.q3Compliance) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ fmtCompliancePct(student.q4Compliance) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono font-bold text-slate-800">{{ fmtCompliancePct(student.averageCompliance) }}</td>
+                      <td class="px-3 py-2.5 text-sm font-medium" :class="student.remark === complianceSyPassLabel ? 'text-emerald-600' : 'text-red-600'">
+                        {{ student.remark }}
+                      </td>
+                    </template>
+                    <template v-else>
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q1GE).toFixed(3) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q2GE).toFixed(3) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q3GE).toFixed(3) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q4GE).toFixed(3) }}</td>
+                      <td class="px-3 py-2.5 text-center font-mono font-bold text-slate-800">{{ Number(student.finalGE).toFixed(3) }}</td>
+                      <td class="px-3 py-2.5 text-sm" :class="adjectivalColor(student.adjectival)">{{ student.adjectival }}</td>
+                    </template>
                   </tr>
                 </tbody>
               </table>

@@ -176,6 +176,37 @@ class ClassRecordQuarterController extends Controller
             return ['id' => $student->id, 'scores' => $scores];
         })->toArray();
 
+        $studentMap = $quarter->students->keyBy('id');
+
+        // Compliance-mode subjects (e.g. Values Education) have no numeric
+        // GE/adjectival or running-grade carry-forward at all — each quarter
+        // stands alone as a completion percentage + a pass/fail remark using
+        // the option's own configurable threshold/rule/labels.
+        if ($gradingOption?->isComplianceMode()) {
+            $result = $this->grader->computeFullComplianceClassRecord([
+                'gradingOption' => ['categories' => $categories],
+                'students' => $students,
+                'passThreshold' => $gradingOption->compliance_pass_threshold ?? 0.75,
+                'passLabel' => $gradingOption->compliance_pass_label ?? 'Completed',
+                'failLabel' => $gradingOption->compliance_fail_label ?? 'Not Completed',
+            ]);
+
+            $result['students'] = array_map(function ($s) use ($studentMap) {
+                $model = $studentMap->get($s['studentId']);
+
+                return array_merge($s, [
+                    'familyName' => $model?->family_name,
+                    'givenName' => $model?->given_name,
+                    'middleInitial' => $model?->middle_initial,
+                    'sex' => $model?->sex,
+                    'sequenceNumber' => $model?->sequence_number,
+                    'masterStudentId' => $model?->student_id,
+                ]);
+            }, $result['students']);
+
+            return response()->json(array_merge($result, ['gradingMode' => 'compliance']));
+        }
+
         // Load previous quarter running grades (Q2-Q4)
         $previousGrades = [];
         if ($q > 1) {
@@ -210,7 +241,6 @@ class ClassRecordQuarterController extends Controller
         ]);
 
         // Attach student names to results
-        $studentMap = $quarter->students->keyBy('id');
         $result['students'] = array_map(function ($s) use ($studentMap) {
             $model = $studentMap->get($s['studentId']);
 
@@ -224,7 +254,7 @@ class ClassRecordQuarterController extends Controller
             ]);
         }, $result['students']);
 
-        return response()->json($result);
+        return response()->json(array_merge($result, ['gradingMode' => 'numeric']));
     }
 
     /**

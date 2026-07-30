@@ -4,6 +4,7 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
   computeStudentGrade,
+  computeStudentCompliance,
   adjectivalColor,
 } from '@/Utils/ClassRecord/gradeUtils.js'
 import ManageStudentsModal from './ManageStudentsModal.vue'
@@ -28,6 +29,13 @@ const props = defineProps({
   // subject to isLocked) since categories with no subject_id are unscoped.
   ownedSubjectIds: { type: Array,   default: () => [] },
   isAdmin:         { type: Boolean, default: false },
+  // True when this record's grading option is compliance-mode (e.g. Values
+  // Education) — the score grid renders checkboxes instead of number inputs
+  // and the summary columns show Compliance %/Remarks instead of GE/Adjectival.
+  isComplianceMode: { type: Boolean, default: false },
+  compliancePassThreshold: { type: Number, default: 0.75 },
+  compliancePassLabel:     { type: String, default: 'Completed' },
+  complianceFailLabel:     { type: String, default: 'Not Completed' },
 })
 
 const emit = defineEmits(['reload'])
@@ -181,6 +189,18 @@ const computedGrades = computed(() => {
     for (const a of allAssessments.value) {
       scoreMap[a.id] = getScore(sid, a.id)
     }
+
+    if (props.isComplianceMode) {
+      result[sid] = computeStudentCompliance(
+        catsForComputation,
+        scoreMap,
+        props.compliancePassThreshold,
+        props.compliancePassLabel,
+        props.complianceFailLabel,
+      )
+      continue
+    }
+
     const prevGrade = props.previousGrades[sid] ?? null
     result[sid] = computeStudentGrade(
       catsForComputation,
@@ -194,7 +214,9 @@ const computedGrades = computed(() => {
 })
 
 // Class statistics (GE scale: lower = better, 1.000 = Excellent, 5.000 = Failed)
+// Not applicable in compliance mode — there is no GE/adjectival to average.
 const classStats = computed(() => {
+  if (props.isComplianceMode) return null
   const grades = students.value.map(s => computedGrades.value[s.id]).filter(Boolean)
   if (!grades.length) return null
 
@@ -215,9 +237,11 @@ const classStats = computed(() => {
   }
 })
 
-// At-risk students (by quarter grade this quarter)
+// At-risk students (by quarter grade this quarter) — not applicable in
+// compliance mode, which has no adjectival/failed concept at the category level.
 const atRiskCounts = computed(() => {
   const failed = [], conditional = [], fair = []
+  if (props.isComplianceMode) return { failed, conditional, fair }
   for (const student of students.value) {
     const grade = computedGrades.value[student.id]
     if (!grade) continue
@@ -231,6 +255,9 @@ const atRiskCounts = computed(() => {
 
 function rowBg(studentId, isEven) {
   const grade = computedGrades.value[studentId]
+  if (props.isComplianceMode) {
+    return grade && grade.passed === false ? 'bg-red-50' : (isEven ? 'bg-white' : 'bg-slate-50/40')
+  }
   const adj = (grade?.adjectivalEquivalent ?? '').toLowerCase()
   if (adj === 'failed') return 'bg-red-50'
   if (adj.includes('condition')) return 'bg-orange-50'
@@ -383,7 +410,7 @@ const showRunning = computed(() => props.quarterNumber > 1)
             </th>
 
             <!-- Summary group -->
-            <th :colspan="showRunning ? 6 : 3"
+            <th :colspan="isComplianceMode ? 2 : (showRunning ? 6 : 3)"
               class="border border-slate-200 px-2 py-1.5 text-center font-bold text-slate-600 bg-slate-50">
               Summary
             </th>
@@ -397,7 +424,7 @@ const showRunning = computed(() => props.quarterNumber > 1)
               <th v-for="a in assessmentsByCategory[cat.id]" :key="a.id"
                 class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[56px]">
                 <div>{{ cat.code }}{{ a.assessment_number }}</div>
-                <div class="text-[10px] text-slate-400 font-normal">/{{ a.max_score }}</div>
+                <div v-if="!isComplianceMode" class="text-[10px] text-slate-400 font-normal">/{{ a.max_score }}</div>
               </th>
               <!-- T, %, W% -->
               <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-500 min-w-[44px]">T</th>
@@ -405,17 +432,23 @@ const showRunning = computed(() => props.quarterNumber > 1)
               <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-500 min-w-[48px]">W%</th>
             </template>
 
-            <!-- Summary: TW%, Score%, GE, Adj, [Running GE, Running Adj] for Q2+ -->
-            <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[52px]">TW%</th>
-            <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[52px]">Score%</th>
-            <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[44px]">GE</th>
-            <template v-if="showRunning">
-              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[56px]">Run GE</th>
-              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[80px]">Adjectival</th>
-              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[80px]">Run Adj</th>
+            <!-- Summary: compliance mode = %/Remark; numeric = TW%, Score%, GE, Adj, [Running GE, Running Adj] for Q2+ -->
+            <template v-if="isComplianceMode">
+              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[70px]">Compliance %</th>
+              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[100px]">Remarks</th>
             </template>
             <template v-else>
-              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[90px]">Adjectival</th>
+              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[52px]">TW%</th>
+              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[52px]">Score%</th>
+              <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[44px]">GE</th>
+              <template v-if="showRunning">
+                <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[56px]">Run GE</th>
+                <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[80px]">Adjectival</th>
+                <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[80px]">Run Adj</th>
+              </template>
+              <template v-else>
+                <th class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-600 min-w-[90px]">Adjectival</th>
+              </template>
             </template>
           </tr>
         </thead>
@@ -444,10 +477,20 @@ const showRunning = computed(() => props.quarterNumber > 1)
 
             <!-- Score inputs + computed per category -->
             <template v-for="cat in categories" :key="cat.id">
-              <!-- Assessment inputs -->
+              <!-- Assessment inputs: checkbox in compliance mode, number in numeric mode -->
               <td v-for="a in assessmentsByCategory[cat.id]" :key="a.id"
-                class="border border-slate-200 p-0.5">
+                class="border border-slate-200 p-0.5 text-center">
                 <input
+                  v-if="isComplianceMode"
+                  type="checkbox"
+                  :checked="getScore(student.id, a.id) === Number(a.max_score)"
+                  :disabled="isLocked || !canEditCategory(cat)"
+                  :title="!canEditCategory(cat) ? 'Read-only — this subject is taught by a different teacher on this shared record.' : 'Complied with this activity'"
+                  @change="setScore(student.id, a.id, $event.target.checked ? a.max_score : 0)"
+                  class="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-400 disabled:opacity-40"
+                />
+                <input
+                  v-else
                   type="number"
                   :min="0" :max="a.max_score" step="0.5"
                   :value="getScore(student.id, a.id) ?? ''"
@@ -483,7 +526,15 @@ const showRunning = computed(() => props.quarterNumber > 1)
             </template>
 
             <!-- Summary columns -->
-            <template v-if="computedGrades[student.id]">
+            <template v-if="computedGrades[student.id] && isComplianceMode">
+              <td class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-700 bg-indigo-50/50 tabular-nums">
+                {{ computedGrades[student.id].compliancePercentage.toFixed(2) }}%
+              </td>
+              <td :class="['border border-slate-200 px-2 py-1 text-center text-[11px] font-medium', computedGrades[student.id].passed ? 'text-emerald-600' : 'text-red-600']">
+                {{ computedGrades[student.id].remark }}
+              </td>
+            </template>
+            <template v-else-if="computedGrades[student.id]">
               <td class="border border-slate-200 px-2 py-1 text-center font-semibold text-slate-700 bg-indigo-50/50 tabular-nums">
                 {{ (computedGrades[student.id].twPct * 100).toFixed(2) }}%
               </td>
@@ -511,7 +562,7 @@ const showRunning = computed(() => props.quarterNumber > 1)
               </template>
             </template>
             <template v-else>
-              <td v-for="_ in showRunning ? 6 : 3" :key="_" class="border border-slate-200 px-2 py-1 text-center text-slate-300">—</td>
+              <td v-for="_ in isComplianceMode ? 2 : (showRunning ? 6 : 3)" :key="_" class="border border-slate-200 px-2 py-1 text-center text-slate-300">—</td>
             </template>
           </tr>
         </tbody>

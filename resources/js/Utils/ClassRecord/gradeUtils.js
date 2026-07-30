@@ -128,6 +128,40 @@ export function computeFinalGrade(q1GE, q2GE, q3GE, q4GE, stanineLookup) {
   return { finalGE, adjectivalEquivalent }
 }
 
+/**
+ * Compute one student's quarter-level compliance result — mirrors
+ * GradeComputationService::computeComplianceCategory(). Reuses the same
+ * weighted-sum category math as the numeric path (computeCategoryScore);
+ * only the output differs: a completion percentage + pass/fail remark
+ * instead of a GE/adjectival, using the grading option's own configurable
+ * threshold and label text.
+ *
+ * @param {Array} categories - [{ id, code, weight, assessments: [{ id, maxScore }] }]
+ * @param {Object} scoresMap - { [`${assessmentId}`]: number|null } — 1 = complied, 0/null = did not
+ * @param {number} passThreshold - 0–1, e.g. 0.75
+ * @param {string} passLabel
+ * @param {string} failLabel
+ */
+export function computeStudentCompliance(categories, scoresMap, passThreshold, passLabel, failLabel) {
+  const categoryResults = categories.map(cat => {
+    const rawScores = cat.assessments.map(a => scoresMap[a.id] ?? null)
+    const maxScores = cat.assessments.map(a => Number(a.maxScore ?? a.max_score))
+    const result    = computeCategoryScore(rawScores, maxScores, Number(cat.weight))
+    return { catId: cat.id, catCode: cat.code, weight: Number(cat.weight), ...result }
+  })
+
+  const totalWeightedPercentage = categoryResults.reduce((s, r) => s + r.weightedPercentage, 0)
+  const compliancePercentage    = Math.round(totalWeightedPercentage * 100 * 100) / 100
+  const passed                  = totalWeightedPercentage >= passThreshold
+
+  return {
+    categoryResults,
+    compliancePercentage,
+    passed,
+    remark: passed ? passLabel : failLabel,
+  }
+}
+
 /** CSS class for adjectival badge coloring */
 export function adjectivalColor(adj) {
   if (!adj) return 'text-slate-400'
