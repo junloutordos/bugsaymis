@@ -26,8 +26,7 @@ class ClassRecordFinalGradeController extends Controller
     /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
     private function canView(ClassRecord $classRecord): bool
     {
-        return $this->isAdmin()
-            || $classRecord->teacher_id === Auth::id()
+        return $classRecord->canView(Auth::user())
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 

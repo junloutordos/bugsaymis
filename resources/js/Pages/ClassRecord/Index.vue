@@ -393,6 +393,12 @@
                     :class="['flex-1 rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400', isSubNameInvalid(idx, cidx) ? 'border-red-400' : 'border-slate-200']" />
                   <input v-model="sub.code" type="text" maxlength="10" placeholder="Code"
                     :class="['w-20 rounded border px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400', isSubCodeInvalid(idx, cidx) ? 'border-red-400' : 'border-slate-200']" />
+                  <select v-if="sharedGroupSubjects.length" v-model="sub.subject_id"
+                    title="Restrict this sub-category to one subject's teacher (PEHM-style shared record)"
+                    class="w-32 rounded border border-slate-200 px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                    <option :value="null">Any teacher</option>
+                    <option v-for="subj in sharedGroupSubjects" :key="subj.id" :value="subj.id">{{ subj.name }}</option>
+                  </select>
                   <div class="flex items-center gap-1">
                     <input v-model.number="sub.weight" type="number" min="0.01" max="1" step="0.05"
                       class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
@@ -466,6 +472,7 @@ const props = defineProps({
   gradingOptions:    Array,
   managedGradingOptions: { type: Array, default: () => [] },
   gradingOptionUnits:    { type: Array, default: () => [] },
+  sharedGroupSubjects:   { type: Array, default: () => [] },
   isAdmin:           { type: Boolean, default: false },
   canManageGradingOptions: { type: Boolean, default: false },
   currentSchoolYear: { type: String, default: null },
@@ -792,7 +799,7 @@ function removeCategory(idx) {
 function addSubCategory(idx) {
   const cat = manageCategories.value[idx]
   if (!cat.children) cat.children = []
-  cat.children.push({ id: null, name: '', code: '', weight: 0, max_assessments: 1 })
+  cat.children.push({ id: null, name: '', code: '', weight: 0, max_assessments: 1, subject_id: null })
 }
 
 function removeSubCategory(idx, cidx) {

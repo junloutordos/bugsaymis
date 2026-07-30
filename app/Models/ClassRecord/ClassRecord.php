@@ -100,6 +100,82 @@ class ClassRecord extends Model
     }
 
     /**
+     * Co-teacher pivot rows for this record — currently only populated for
+     * shared PEHM (PE/Health/Music) records. Empty for every normal
+     * single-teacher record.
+     */
+    public function coTeachers(): HasMany
+    {
+        return $this->hasMany(ClassRecordTeacher::class);
+    }
+
+    /**
+     * User IDs allowed to write to the given subject's portion of this
+     * record. Falls back to the single teacher_id when there are no
+     * co-teacher pivot rows (every existing/non-PEHM record) — the $subjectId
+     * argument is ignored in that case, since there's nothing to scope.
+     *
+     * @return array<int>
+     */
+    public function teacherIdsFor(?int $subjectId = null): array
+    {
+        if (! $this->relationLoaded('coTeachers')) {
+            $this->load('coTeachers');
+        }
+
+        if ($this->coTeachers->isEmpty()) {
+            return $this->teacher_id ? [(int) $this->teacher_id] : [];
+        }
+
+        $rows = $subjectId === null
+            ? $this->coTeachers
+            : $this->coTeachers->where('subject_id', $subjectId);
+
+        return $rows->pluck('user_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+    }
+
+    /** Every teacher who has any edit access to this record, across all subjects. */
+    public function allTeacherIds(): array
+    {
+        if (! $this->relationLoaded('coTeachers')) {
+            $this->load('coTeachers');
+        }
+
+        if ($this->coTeachers->isEmpty()) {
+            return $this->teacher_id ? [(int) $this->teacher_id] : [];
+        }
+
+        return $this->coTeachers->pluck('user_id')
+            ->push($this->teacher_id)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Can $user edit this record? Pass $subjectId to scope the check to one
+     * subject's leaves/attendance on a shared record (e.g. the PE teacher may
+     * only edit PE); omit it for record-wide actions (roster, submit,
+     * archive) that any of the record's teachers may perform.
+     */
+    public function canEdit(User $user, ?int $subjectId = null): bool
+    {
+        if ($user->hasPermission('class-records.admin')) {
+            return true;
+        }
+
+        return in_array((int) $user->id, $this->teacherIdsFor($subjectId), true);
+    }
+
+    /** Read-only access follows the same teacher set as canEdit(), subject-agnostic. */
+    public function canView(User $user): bool
+    {
+        return $this->canEdit($user);
+    }
+
+    /**
      * Other class records that split the same subject+section+teacher this SY
      * into separate categories (e.g. STEM Research "Ongoing" vs "Completed").
      * There is no explicit link column — sibling-ness is derived from sharing

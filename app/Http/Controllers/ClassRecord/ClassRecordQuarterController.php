@@ -35,8 +35,7 @@ class ClassRecordQuarterController extends Controller
     /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
     private function canView(ClassRecord $classRecord): bool
     {
-        return $this->isAdmin()
-            || $classRecord->teacher_id === Auth::id()
+        return $classRecord->canView(Auth::user())
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
@@ -54,7 +53,7 @@ class ClassRecordQuarterController extends Controller
 
     public function show(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         $quarter = $this->resolveQuarter($classRecord, $q);
         $quarter->load([
@@ -69,7 +68,7 @@ class ClassRecordQuarterController extends Controller
 
     public function lock(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -97,7 +96,7 @@ class ClassRecordQuarterController extends Controller
 
     public function setGradingOption(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $data = $request->validate([
@@ -133,7 +132,7 @@ class ClassRecordQuarterController extends Controller
 
     public function grades(ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
 
         $quarter = ClassRecordQuarter::where('class_record_id', $classRecord->id)

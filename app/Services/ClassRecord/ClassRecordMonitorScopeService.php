@@ -55,7 +55,13 @@ class ClassRecordMonitorScopeService
             ->all();
     }
 
-    /** Can this monitor view (read-only) the given class record? */
+    /**
+     * Can this monitor view (read-only) the given class record? Checks EVERY
+     * teacher on the record (the primary teacher_id plus any PEHM co-teacher
+     * pivot rows) — an AUH whose unit covers any one of the record's
+     * teachers can view the whole shared record, not just their own unit's
+     * slice of it.
+     */
     public function canView(User $user, ClassRecord $classRecord): bool
     {
         if (! $this->canMonitor($user)) {
@@ -63,7 +69,10 @@ class ClassRecordMonitorScopeService
         }
 
         $facultyIds = $this->facultyIdsInScope($user);
+        if ($facultyIds === null) {
+            return true;
+        }
 
-        return $facultyIds === null || in_array((int) $classRecord->teacher_id, $facultyIds, true);
+        return ! empty(array_intersect($classRecord->allTeacherIds(), $facultyIds));
     }
 }

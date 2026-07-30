@@ -98,7 +98,46 @@ const currentGradingOption = computed(() =>
   currentQuarterData.value?.grading_option ?? props.classRecord.grading_option
 )
 
+// ── Shared (PEHM) record co-teacher scoping ───────────────────────────────────
+// Which subject_id(s), if any, the CURRENT user owns on this record — empty
+// for a normal (non-shared) record, or for an admin/monitor who isn't
+// personally one of the co-teachers. Used to scope which grading-category
+// columns and attendance dates this user may edit vs. view read-only.
+const ownedSubjectIds = computed(() => {
+  const userId = page.props.auth?.user?.id
+  const coTeachers = props.classRecord.co_teachers ?? []
+  return coTeachers
+    .filter(ct => ct.user_id === userId)
+    .map(ct => ct.subject_id)
+})
+
+// Every distinct subject on a shared record, for the attendance subject
+// switcher — empty for a normal (non-shared) record.
+const sharedSubjects = computed(() => {
+  const coTeachers = props.classRecord.co_teachers ?? []
+  const seen = new Map()
+  for (const ct of coTeachers) {
+    if (ct.subject_id && !seen.has(ct.subject_id)) {
+      seen.set(ct.subject_id, { id: ct.subject_id, name: ct.subject?.name ?? `Subject #${ct.subject_id}` })
+    }
+  }
+  return [...seen.values()]
+})
+
 const currentLeafCategories = computed(() => leavesOf(currentGradingOption.value))
+
+/**
+ * Can the current user edit THIS leaf category's assessments in the Setup
+ * tab? Same rule as ScoreGrid's canEditCategory() — a category with no
+ * subject_id (normal case) is always editable subject to isLocked/isReadOnly;
+ * a subject-tagged leaf on a shared PEHM record is scoped to whichever
+ * teacher owns that subject. Admins always pass.
+ */
+function canEditCategory(cat) {
+  if (props.isAdmin) return true
+  if (!cat.subject_id) return true
+  return ownedSubjectIds.value.includes(cat.subject_id)
+}
 
 const isLocked   = computed(() => currentQuarterData.value?.is_locked ?? false)
 // Past school year, or viewing as a CID Chief / Academic Unit Head monitor —
@@ -788,6 +827,16 @@ async function saveQuarterOption() {
         </template>
       </AppPageHeader>
 
+      <!-- Co-teacher roster: only shown for a shared (e.g. PEHM) record -->
+      <div v-if="classRecord.co_teachers?.length" class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="text-slate-500 font-medium">Shared with:</span>
+        <span v-for="ct in classRecord.co_teachers" :key="ct.id"
+          class="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-medium">
+          {{ ct.subject?.name ?? 'Subject' }} — {{ ct.user?.name ?? '—' }}
+          <span v-if="ct.is_primary" class="text-indigo-400">(primary)</span>
+        </span>
+      </div>
+
       <!-- Read-only banner: past school year, or a CID Chief / AUH monitor view -->
       <div v-if="isReadOnly"
         class="flex items-start gap-3 rounded-xl border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">
@@ -991,7 +1040,7 @@ async function saveQuarterOption() {
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-32">Category</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date <span class="text-danger-500">*</span></th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score <span class="text-danger-500">*</span></th>
-                      <th v-if="!isLocked && !isReadOnly" class="px-2 py-2 w-8"></th>
+                      <th v-if="!isLocked && !isReadOnly && canEditCategory(cat)" class="px-2 py-2 w-8"></th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
@@ -1002,13 +1051,13 @@ async function saveQuarterOption() {
                       </td>
                       <td class="px-4 py-2">
                         <input v-model="row.title" type="text"
-                          :disabled="isLocked || isReadOnly"
+                          :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           :placeholder="`${cat.code}${row.assessment_number} title…`"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
                       <td class="px-4 py-2">
                         <select v-model="row.is_graded"
-                          :disabled="isLocked || isReadOnly"
+                          :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
                           <option :value="true">Graded</option>
                           <option :value="false">Non-graded</option>
@@ -1017,18 +1066,18 @@ async function saveQuarterOption() {
                       </td>
                       <td class="px-4 py-2">
                         <AppDatePicker v-model="row.activity_date"
-                          :disabled="isLocked || isReadOnly"
+                          :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           :disabled-weekdays="disabledWeekdays"
                           @change="onDateChange(row)" />
                         <p v-if="row._dateWarning" class="text-red-500 text-[11px] mt-1">{{ row._dateWarning }}</p>
                       </td>
                       <td class="px-4 py-2">
                         <input v-model.number="row.max_score" type="number" min="0.01" step="0.5"
-                          :disabled="isLocked || isReadOnly"
+                          :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           placeholder="e.g. 30"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
-                      <td v-if="!isLocked && !isReadOnly" class="px-2 py-2 text-center">
+                      <td v-if="!isLocked && !isReadOnly && canEditCategory(cat)" class="px-2 py-2 text-center">
                         <span v-if="row._pendingDeletion"
                           class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap cursor-pointer"
                           title="Awaiting Assistant CID Chief for Academic Affairs approval"
@@ -1050,12 +1099,15 @@ async function saveQuarterOption() {
                 </table>
               </div>
               <!-- Add row button per category -->
-              <div v-if="!isLocked && !isReadOnly" class="mt-1.5">
+              <div v-if="!isLocked && !isReadOnly && canEditCategory(cat)" class="mt-1.5">
                 <button @click="addAssessmentRow(cat.id)"
                   class="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
                   <PlusIcon class="h-3.5 w-3.5" /> Add {{ cat.code }} Row
                 </button>
               </div>
+              <p v-else-if="!canEditCategory(cat)" class="text-[11px] text-slate-400 mt-1.5 italic">
+                Read-only — this subject is taught by a different teacher on this shared record.
+              </p>
             </div>
           </div>
 
@@ -1080,6 +1132,8 @@ async function saveQuarterOption() {
             :subject-type="classRecord.subject?.subject_type ?? null"
             :section-id="classRecord.section_id ?? null"
             :siblings="props.siblings"
+            :owned-subject-ids="ownedSubjectIds"
+            :is-admin="isAdmin"
             @reload="router.reload({ only: ['classRecord'] })"
           />
         </div>
@@ -1091,6 +1145,9 @@ async function saveQuarterOption() {
             :quarter-number="activeQuarter"
             :quarter-data="currentQuarterData"
             :is-locked="isLocked || isReadOnly"
+            :shared-subjects="sharedSubjects"
+            :owned-subject-ids="ownedSubjectIds"
+            :is-admin="isAdmin"
           />
         </div>
 

@@ -38,8 +38,7 @@ class ClassRecordAssessmentController extends Controller
     /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
     private function canView(ClassRecord $classRecord): bool
     {
-        return $this->isAdmin()
-            || $classRecord->teacher_id === Auth::id()
+        return $classRecord->canView(Auth::user())
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
@@ -134,7 +133,7 @@ class ClassRecordAssessmentController extends Controller
 
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -162,12 +161,27 @@ class ClassRecordAssessmentController extends Controller
         $optionId = $quarter->grading_option_id ?? $classRecord->grading_option_id;
         $option = GradingOption::with('categories')->find($optionId);
         $leafIds = $option ? $option->leafCategories()->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
+        $isAdminUser = $this->isAdmin();
         foreach ($validated['assessments'] as $item) {
             abort_unless(
                 in_array((int) $item['grading_category_id'], $leafIds, true),
                 422,
                 'One or more assessments reference a category that is not part of this quarter\'s grading option.',
             );
+
+            // On a shared (e.g. PEHM) record, a leaf tagged with a subject_id
+            // may only be written to by that subject's teacher — this is what
+            // keeps the PE teacher from editing Music's assessments and vice
+            // versa. Leaves with no subject_id (the normal case) stay scoped
+            // to any of the record's teachers, same as canEdit(null) above.
+            $category = $categories[$item['grading_category_id']];
+            if (! $isAdminUser) {
+                abort_unless(
+                    $classRecord->canEdit(Auth::user(), $category->subject_id),
+                    403,
+                    "You do not have edit access to \"{$category->name}\" on this class record.",
+                );
+            }
         }
 
         // Existing rows are matched by their stable primary key, not by
@@ -388,7 +402,7 @@ class ClassRecordAssessmentController extends Controller
 
     public function copyFrom(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $targetQuarter = $this->resolveQuarter($classRecord, $q);
@@ -450,7 +464,7 @@ class ClassRecordAssessmentController extends Controller
 
     public function copyFromRecord(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $targetQuarter = $this->resolveQuarter($classRecord, $q);
@@ -463,7 +477,7 @@ class ClassRecordAssessmentController extends Controller
 
         $sourceRecord = ClassRecord::findOrFail($validated['source_class_record_id']);
         abort_unless(
-            $this->isAdmin() || $sourceRecord->teacher_id === Auth::id(),
+            $sourceRecord->canEdit(Auth::user()),
             403,
             'You do not have access to that class record.'
         );
@@ -535,7 +549,7 @@ class ClassRecordAssessmentController extends Controller
      */
     public function applyToSections(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         $sourceQuarter = $this->resolveQuarter($classRecord, $q);
 
@@ -563,7 +577,7 @@ class ClassRecordAssessmentController extends Controller
             $target = ClassRecord::with('section:id,levelid,sectionname')->find($targetId);
             $label  = $target?->year_level_section ?: "Class Record #{$targetId}";
 
-            if (! $this->isAdmin() && $target?->teacher_id !== Auth::id()) {
+            if (! $target?->canEdit(Auth::user())) {
                 $skipped[] = ['class_record_id' => $targetId, 'label' => $label, 'reason' => 'You do not have access to that class record.'];
                 continue;
             }
@@ -750,7 +764,7 @@ class ClassRecordAssessmentController extends Controller
      */
     public function requestDeletion(Request $request, ClassRecord $classRecord, int $q, ClassRecordAssessment $assessment): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -797,6 +811,24 @@ class ClassRecordAssessmentController extends Controller
                 route('approvals.inbox'),
                 "\"{$assessment->title}\" — {$classRecord->subject_name}"
             );
+        }
+
+        // On a shared (e.g. PEHM) record, courtesy-notify the OTHER
+        // co-teachers that one of their shared record's assessments has a
+        // pending deletion request — they don't approve it (only ACIDAA
+        // does), but it's their shared record too.
+        $otherTeacherIds = array_diff($classRecord->allTeacherIds(), [Auth::id()]);
+        if ($otherTeacherIds) {
+            foreach (User::whereIn('id', $otherTeacherIds)->get() as $coTeacher) {
+                NotificationService::notifyUser(
+                    $coTeacher,
+                    'Assessment Deletion Request',
+                    "#{$deletionRequest->id}",
+                    'Pending approval',
+                    route('class-records.page.show', $classRecord),
+                    "\"{$assessment->title}\" on your shared class record — requested by ".Auth::user()->name,
+                );
+            }
         }
 
         return response()->json([

@@ -15,17 +15,22 @@ class ClassRecordCheckedMail extends Mailable
     public function __construct(
         public ClassRecord $classRecord,
         public User        $checkedBy,
+        public ?User        $recipient = null,
     ) {}
 
     public function build(): static
     {
         $subject = $this->classRecord->subject_name;
         $section = $this->classRecord->year_level_section;
+        // Defaults to the primary teacher for backward compatibility — every
+        // existing call site that doesn't pass $recipient keeps working
+        // exactly as before. Co-teacher notifications pass their own User.
+        $recipient = $this->recipient ?? $this->classRecord->teacher;
 
         return $this->subject("Class Record Checked — {$subject} ({$section})")
                     ->view('emails.document_status')
                     ->with([
-                        'recipientName' => $this->classRecord->teacher->name,
+                        'recipientName' => $recipient->name,
                         'headline'      => 'Your Class Record Has Been Checked',
                         'intro'         => "Your class record for <strong>{$subject}</strong> ({$section}) has been reviewed and marked as <strong>Checked</strong> by <strong>{$this->checkedBy->name}</strong>.",
                         'extraRows'     => [

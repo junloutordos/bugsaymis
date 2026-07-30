@@ -5,11 +5,13 @@ namespace App\Http\Controllers\ClassRecord;
 use App\Http\Controllers\Controller;
 use App\Mail\ClassRecord\ClassRecordCheckedMail;
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\ClassRecordTeacher;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\User;
 use App\Services\ClassRecord\GradingOptionScopeService;
 use App\Services\DigitalSignatureService;
 use App\Services\NotificationService;
@@ -80,12 +82,41 @@ class ClassRecordController extends Controller
             ->get(['id', 'teacher_id', 'subject_id', 'section_id', 'category_label'])
             ->groupBy(fn ($r) => $r->teacher_id.'_'.$r->subject_id.'_'.$r->section_id);
 
-        $result = $assignments->map(function ($la) use ($existingByPair) {
+        // For subjects in a shared group (PE/Health/Music), a record already
+        // exists for this section+SY+group even if it was created under a
+        // DIFFERENT sibling subject_id (e.g. the PE teacher already made the
+        // shared record; the Music teacher's own subject_id won't match it).
+        // These are surfaced separately as "joinable" — the assignment is
+        // still "creatable" from this teacher's own perspective, just via
+        // joining rather than a fresh POST /class-records.
+        $groupSubjectIds = Subject::whereNotNull('subject_group')->pluck('subject_group', 'id');
+        $joinableQuery = ClassRecord::where('school_year_id', $currentSY->id)
+            ->where('status', '<>', 'archived')
+            ->whereNotNull('subject_id');
+        $joinableByGroupSection = $joinableQuery
+            ->get(['id', 'subject_id', 'section_id', 'subject_name', 'year_level_section'])
+            ->filter(fn ($r) => $groupSubjectIds->has($r->subject_id))
+            ->groupBy(fn ($r) => $groupSubjectIds[$r->subject_id].'_'.$r->section_id);
+
+        $result = $assignments->map(function ($la) use ($existingByPair, $groupSubjectIds, $joinableByGroupSection) {
             $isCrossSection = in_array($la->subject?->subject_type, ['elective', 'science_core'], true);
             $grade = (int) ($la->subject?->grade_level ?? 0);
             $scopeLabel = $la->section?->sectionname
                 ?? ($grade === 0 ? 'Grades 11–12 — Cross-section' : "Grade {$grade} — Cross-section");
             $existingRecords = $existingByPair->get($la->user_id.'_'.$la->subject_id.'_'.$la->section_id, collect());
+
+            // Shared records this teacher could JOIN instead of creating a new
+            // one — only relevant for a subject in a shared group, and only
+            // records NOT already created under this exact subject_id (those
+            // are already covered by existing_records above).
+            $subjectGroup = $groupSubjectIds->get($la->subject_id);
+            $joinable = collect();
+            if ($subjectGroup !== null) {
+                $joinable = $joinableByGroupSection
+                    ->get($subjectGroup.'_'.$la->section_id, collect())
+                    ->where('subject_id', '!=', $la->subject_id)
+                    ->values();
+            }
 
             return [
                 'load_assignment_id' => $la->id,
@@ -94,6 +125,7 @@ class ClassRecordController extends Controller
                 'subject_id' => $la->subject_id,
                 'subject_name' => $la->subject?->name,
                 'subject_type' => $la->subject?->subject_type,
+                'subject_group' => $subjectGroup,
                 'academic_unit_id' => $la->subject?->academic_unit_id,
                 'academic_unit_code' => $la->subject?->academicUnit?->code,
                 'grade_level' => $grade,
@@ -107,6 +139,11 @@ class ClassRecordController extends Controller
                     'id' => $r->id,
                     'category_label' => $r->category_label,
                 ])->values(),
+                'joinable_records' => $joinable->map(fn ($r) => [
+                    'id' => $r->id,
+                    'subject_name' => $r->subject_name,
+                    'year_level_section' => $r->year_level_section,
+                ])->values(),
             ];
         });
 
@@ -114,6 +151,119 @@ class ClassRecordController extends Controller
             'assignments' => $result,
             'school_year' => $currentSY->name,
         ]);
+    }
+
+    // ── POST /class-records/{classRecord}/join ────────────────────────────────
+    // Attaches the caller (or, for an admin, a specified teacher) as a
+    // co-teacher of an existing shared class record for their own subject —
+    // used when a PE/Health/Music teacher's subject already has a shared
+    // record on this section (created by one of the other two teachers),
+    // instead of creating a duplicate class_records row.
+
+    public function join(Request $request, ClassRecord $classRecord): JsonResponse
+    {
+        $validated = $request->validate([
+            'subject_id' => 'required|integer|exists:subjects,id',
+            // Admins may join a teacher on another's behalf.
+            'teacher_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $isAdmin = $this->isAdmin();
+        $teacherId = ($isAdmin && ! empty($validated['teacher_id'])) ? (int) $validated['teacher_id'] : Auth::id();
+
+        abort_if($classRecord->isArchived(), 422, 'This class record has been archived.');
+        abort_unless($classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year.');
+
+        $subject = Subject::findOrFail($validated['subject_id']);
+        abort_unless($subject->subject_group !== null, 422, 'This subject does not support shared class records.');
+        abort_unless(
+            $subject->subject_group === Subject::find($classRecord->subject_id)?->subject_group,
+            422,
+            'That subject is not part of the same shared group as this class record.',
+        );
+        abort_unless(
+            $subject->grade_level === Subject::find($classRecord->subject_id)?->grade_level,
+            422,
+            'That subject is a different grade level than this class record.',
+        );
+
+        // A teacher may not join twice under the same subject, and a subject
+        // slot on a shared record can only be held by one teacher at a time
+        // (joining again re-assigns it rather than duplicating the row).
+        $existing = $classRecord->coTeachers()->where('subject_id', $subject->id)->first();
+        if ($existing && (int) $existing->user_id === $teacherId) {
+            return response()->json([
+                'message' => 'You are already a teacher on this shared class record for that subject.',
+                'data' => $classRecord->fresh()->load('coTeachers.subject:id,name', 'coTeachers.user:id,name'),
+            ]);
+        }
+        abort_if(
+            $existing && ! $isAdmin,
+            422,
+            "Another teacher already owns {$subject->name} on this shared class record.",
+        );
+
+        DB::transaction(function () use ($classRecord, $subject, $teacherId) {
+            // Ensure the primary teacher_id also has a pivot row for its own
+            // subject the first time anyone joins — otherwise allTeacherIds()/
+            // teacherIdsFor() still work via the teacher_id fallback, but
+            // having an explicit row keeps coTeachers a complete roster once
+            // the record becomes genuinely shared.
+            if (! $classRecord->coTeachers()->where('user_id', $classRecord->teacher_id)->exists()) {
+                $primarySubjectId = $classRecord->subject_id;
+                if ($primarySubjectId) {
+                    ClassRecordTeacher::create([
+                        'class_record_id' => $classRecord->id,
+                        'subject_id' => $primarySubjectId,
+                        'user_id' => $classRecord->teacher_id,
+                        'is_primary' => true,
+                    ]);
+                }
+            }
+
+            ClassRecordTeacher::updateOrCreate(
+                ['class_record_id' => $classRecord->id, 'subject_id' => $subject->id],
+                ['user_id' => $teacherId, 'is_primary' => false],
+            );
+
+            $classRecord->refresh();
+            $this->syncSharedDisplayLabel($classRecord);
+        });
+
+        return response()->json([
+            'message' => "Joined this shared class record as the {$subject->name} teacher.",
+            'data' => $classRecord->fresh()->load('coTeachers.subject:id,name', 'coTeachers.user:id,name'),
+        ]);
+    }
+
+    /**
+     * Once a record has co-teachers, its subject_name becomes a synthesized
+     * "group — subject / subject / subject" label (e.g. "PEHM — PE / Health
+     * / Music") reflecting every subject currently attached, instead of just
+     * the creator's own subject name. subject_id itself is left pointing at
+     * the original creator's subject for legacy-field compatibility —
+     * anything reading ->subject_id/->subject directly still gets a valid
+     * single subject; category_label is untouched (it means something else:
+     * splitting ONE subject's records, e.g. "Ongoing" vs "Completed").
+     */
+    private function syncSharedDisplayLabel(ClassRecord $classRecord): void
+    {
+        $classRecord->loadMissing('coTeachers.subject:id,name,subject_group');
+        $subjectIds = $classRecord->coTeachers->pluck('subject_id')->unique();
+        if ($subjectIds->count() < 2) {
+            return;
+        }
+
+        $group = $classRecord->coTeachers->first()->subject?->subject_group ?? 'Shared';
+        $names = $classRecord->coTeachers
+            ->sortBy('subject_id')
+            ->pluck('subject.name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->implode(' / ');
+
+        $classRecord->update(['subject_name' => "{$group} — {$names}"]);
     }
 
     // ── GET /class-records ────────────────────────────────────────────────────
@@ -124,7 +274,11 @@ class ClassRecordController extends Controller
             ->orderByDesc('created_at');
 
         if (! $this->isAdmin()) {
-            $query->where('teacher_id', Auth::id());
+            $userId = Auth::id();
+            $query->where(function ($q) use ($userId) {
+                $q->where('teacher_id', $userId)
+                    ->orWhereHas('coTeachers', fn ($ctq) => $ctq->where('user_id', $userId));
+            });
         }
 
         if ($request->filled('school_year')) {
@@ -426,7 +580,7 @@ class ClassRecordController extends Controller
 
     public function show(ClassRecord $classRecord): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         $classRecord->load([
             'teacher:id,name,position',
@@ -442,7 +596,7 @@ class ClassRecordController extends Controller
 
     public function update(Request $request, ClassRecord $classRecord): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record belongs to a past school year and cannot be modified.');
         abort_if($classRecord->status === 'submitted' && ! $this->isAdmin(), 403,
             'Cannot edit a submitted class record.');
@@ -517,7 +671,7 @@ class ClassRecordController extends Controller
 
     public function destroy(Request $request, ClassRecord $classRecord): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if($classRecord->isArchived(), 422, 'This class record is already archived.');
 
         $user = Auth::user();
@@ -550,7 +704,7 @@ class ClassRecordController extends Controller
 
     public function restore(ClassRecord $classRecord): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isArchived(), 422, 'Only archived class records can be restored.');
 
         $classRecord->update([
@@ -567,7 +721,7 @@ class ClassRecordController extends Controller
 
     public function submit(ClassRecord $classRecord): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
         abort_if($classRecord->status !== 'draft', 422, 'Only draft records can be submitted.');
 
@@ -592,18 +746,26 @@ class ClassRecordController extends Controller
             'checked_by_id' => Auth::id(),
         ]);
 
-        $classRecord->load('teacher');
+        $classRecord->load('teacher', 'coTeachers.user');
         $checker = Auth::user();
 
-        NotificationService::notifyUser(
-            user: $classRecord->teacher,
-            requestType: 'Class Record',
-            referenceNo: "{$classRecord->subject_name} — {$classRecord->year_level_section}",
-            newStatus: 'Checked',
-            url: route('class-records.page.show', $classRecord),
-        );
+        // On a shared (e.g. PEHM) record every co-teacher gets notified, not
+        // just the primary teacher_id — each of them owns part of what was
+        // just checked. allTeacherIds() already de-dupes and falls back to
+        // just [teacher_id] for a normal single-teacher record.
+        $recipients = User::whereIn('id', $classRecord->allTeacherIds())->get();
 
-        Mail::to($classRecord->teacher)->queue(new ClassRecordCheckedMail($classRecord, $checker));
+        foreach ($recipients as $recipient) {
+            NotificationService::notifyUser(
+                user: $recipient,
+                requestType: 'Class Record',
+                referenceNo: "{$classRecord->subject_name} — {$classRecord->year_level_section}",
+                newStatus: 'Checked',
+                url: route('class-records.page.show', $classRecord),
+            );
+
+            Mail::to($recipient)->queue(new ClassRecordCheckedMail($classRecord, $checker, $recipient));
+        }
 
         return response()->json(['message' => 'Class record marked as checked.']);
     }

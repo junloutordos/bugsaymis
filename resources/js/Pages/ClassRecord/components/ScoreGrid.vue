@@ -22,6 +22,12 @@ const props = defineProps({
   subjectType:     { type: String,  default: null },
   sectionId:       { type: Number,  default: null },
   siblings:        { type: Array,   default: () => [] },
+  // On a shared (e.g. PEHM) record, the subject_id(s) the CURRENT user owns —
+  // null/empty means "not a shared record" or "admin/monitor with no owned
+  // subject", both of which fall through to normal (every category editable,
+  // subject to isLocked) since categories with no subject_id are unscoped.
+  ownedSubjectIds: { type: Array,   default: () => [] },
+  isAdmin:         { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['reload'])
@@ -40,6 +46,19 @@ const categories = computed(() => {
     }))
     .sort((a, b) => a.sort_order - b.sort_order)
 })
+
+/**
+ * Can the current user edit scores under this category? A category with no
+ * subject_id (the normal, non-shared case) is always editable (subject to
+ * isLocked/read-only elsewhere) — this only restricts leaves that ARE
+ * subject-tagged on a shared PEHM record, to whichever teacher owns that
+ * subject. Admins always pass.
+ */
+function canEditCategory(cat) {
+  if (props.isAdmin) return true
+  if (!cat.subject_id) return true
+  return props.ownedSubjectIds.includes(cat.subject_id)
+}
 
 const students = computed(() =>
   [...(props.quarterData?.students ?? [])].sort((a, b) => a.sequence_number - b.sequence_number)
@@ -432,7 +451,8 @@ const showRunning = computed(() => props.quarterNumber > 1)
                   type="number"
                   :min="0" :max="a.max_score" step="0.5"
                   :value="getScore(student.id, a.id) ?? ''"
-                  :disabled="isLocked"
+                  :disabled="isLocked || !canEditCategory(cat)"
+                  :title="!canEditCategory(cat) ? 'Read-only — this subject is taught by a different teacher on this shared record.' : null"
                   :ref="el => setRef(student.id, a.id, el)"
                   @input="setScore(student.id, a.id, $event.target.value)"
                   @keydown="onKeydown($event, sIdx, allAssessments.indexOf(a))"

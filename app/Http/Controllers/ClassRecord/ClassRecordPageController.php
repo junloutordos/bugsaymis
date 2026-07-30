@@ -38,7 +38,11 @@ class ClassRecordPageController extends Controller
             ->orderByDesc('updated_at');
 
         if (! $this->isAdmin()) {
-            $query->where('teacher_id', Auth::id());
+            $userId = Auth::id();
+            $query->where(function ($q) use ($userId) {
+                $q->where('teacher_id', $userId)
+                    ->orWhereHas('coTeachers', fn ($ctq) => $ctq->where('user_id', $userId));
+            });
         }
 
         if ($request->filled('school_year')) {
@@ -75,6 +79,12 @@ class ClassRecordPageController extends Controller
                     'name' => preg_replace('/^Academic Unit Head\s*-\s*/i', '', $designation->name),
                 ])
                 ->values(),
+            // Subjects that share a class record across teachers (PE/Health/
+            // Music) — offered as the per-leaf subject picker when a manager
+            // is setting up a shared grading option's categories.
+            'sharedGroupSubjects' => \App\Models\FacultyLoading\Subject::whereNotNull('subject_group')
+                ->orderBy('grade_level')->orderBy('name')
+                ->get(['id', 'name', 'subject_group', 'grade_level']),
             'isAdmin' => $isAdmin,
             'canManageGradingOptions' => $this->optionScope->canManage($user),
             'filters' => $request->only(['school_year', 'status']),
@@ -89,12 +99,14 @@ class ClassRecordPageController extends Controller
      */
     public function show(ClassRecord $classRecord)
     {
-        $isOwner = $classRecord->teacher_id === Auth::id();
+        $isOwner = $classRecord->canEdit(Auth::user());
         $isMonitorView = ! $this->isAdmin() && ! $isOwner && $this->monitorScope->canView(Auth::user(), $classRecord);
-        abort_unless($this->isAdmin() || $isOwner || $isMonitorView, 403);
+        abort_unless($isOwner || $isMonitorView, 403);
 
         $classRecord->load([
             'teacher:id,name,position',
+            'coTeachers.subject:id,name',
+            'coTeachers.user:id,name,position',
             'subject:id,name,subject_type,grade_level,academic_unit_id,has_ilp',
             'subject.academicUnit:id,code',
             'section:id,levelid,sectionname',

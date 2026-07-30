@@ -28,8 +28,7 @@ class ClassRecordScoreController extends Controller
     /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
     private function canView(ClassRecord $classRecord): bool
     {
-        return $this->isAdmin()
-            || $classRecord->teacher_id === Auth::id()
+        return $classRecord->canView(Auth::user())
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
@@ -65,7 +64,10 @@ class ClassRecordScoreController extends Controller
 
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        // Record-wide gate first (must be at least one of the record's
+        // teachers, or admin) — the finer per-assessment subject check
+        // happens below once we know which leaf category each score targets.
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
 
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
         $quarter = $this->resolveQuarter($classRecord, $q);
@@ -78,10 +80,29 @@ class ClassRecordScoreController extends Controller
             'scores.*.score'              => 'nullable|numeric|min:0',
         ]);
 
-        // Collect assessment max_scores for validation
+        // Collect assessment max_scores + owning leaf category's subject_id
+        // for validation (max_score check, and PEHM subject-scoped gating).
         $assessmentIds = collect($validated['scores'])->pluck('assessment_id')->unique();
-        $maxScores     = ClassRecordAssessment::whereIn('id', $assessmentIds)
-            ->pluck('max_score', 'id');
+        $assessments   = ClassRecordAssessment::with('gradingCategory:id,subject_id,name')
+            ->whereIn('id', $assessmentIds)
+            ->get()
+            ->keyBy('id');
+        $maxScores = $assessments->map(fn ($a) => $a->max_score);
+
+        // On a shared (e.g. PEHM) record, a score may only be written by the
+        // teacher who owns that assessment's leaf category's subject — same
+        // rule as the assessment upsert endpoint. Leaves with no subject_id
+        // (the normal case) stay scoped to any of the record's teachers.
+        if (! $this->isAdmin()) {
+            $subjectIds = $assessments->pluck('gradingCategory.subject_id')->unique();
+            foreach ($subjectIds as $subjectId) {
+                abort_unless(
+                    $classRecord->canEdit(Auth::user(), $subjectId),
+                    403,
+                    'You do not have edit access to one or more of these assessments.',
+                );
+            }
+        }
 
         // Validate each score does not exceed max_score
         foreach ($validated['scores'] as $item) {

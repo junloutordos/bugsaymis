@@ -81,7 +81,7 @@ class GradingOptionController extends Controller
 
         return response()->json([
             'message' => 'Grading option created.',
-            'data'    => $option->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
+            'data'    => $option->fresh()->load(['categories.subject:id,name', 'ownerDesignation:id,code,name']),
         ], 201);
     }
 
@@ -144,7 +144,7 @@ class GradingOptionController extends Controller
 
         return response()->json([
             'message' => 'Grading option updated.',
-            'data'    => $gradingOption->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
+            'data'    => $gradingOption->fresh()->load(['categories.subject:id,name', 'ownerDesignation:id,code,name']),
         ]);
     }
 
@@ -191,7 +191,7 @@ class GradingOptionController extends Controller
 
         return response()->json([
             'message' => 'Categories updated.',
-            'data'    => $gradingOption->fresh()->load(['categories', 'ownerDesignation:id,code,name']),
+            'data'    => $gradingOption->fresh()->load(['categories.subject:id,name', 'ownerDesignation:id,code,name']),
         ]);
     }
 
@@ -216,6 +216,7 @@ class GradingOptionController extends Controller
             'categories.*.sort_order'                 => 'required|integer|min:0',
             'categories.*.weight'                     => 'nullable|numeric|min:0|max:1',
             'categories.*.max_assessments'            => 'nullable|integer|min:1|max:20',
+            'categories.*.subject_id'                 => 'nullable|integer|exists:subjects,id',
             'categories.*.children'                   => 'nullable|array',
             'categories.*.children.*.id'              => 'nullable|integer',
             'categories.*.children.*.name'            => 'required|string|max:255',
@@ -223,6 +224,7 @@ class GradingOptionController extends Controller
             'categories.*.children.*.weight'          => 'required|numeric|min:0.0001|max:1',
             'categories.*.children.*.max_assessments' => 'required|integer|min:1|max:20',
             'categories.*.children.*.sort_order'      => 'required|integer|min:0',
+            'categories.*.children.*.subject_id'      => 'nullable|integer|exists:subjects,id',
         ]);
 
         // A top-level category with no children is a leaf and must carry its
@@ -298,6 +300,7 @@ class GradingOptionController extends Controller
                 [
                     'grading_option_id' => $option->id,
                     'parent_id'         => null,
+                    'subject_id'        => $isParent ? null : ($cat['subject_id'] ?? null),
                     'name'              => $cat['name'],
                     'code'              => strtoupper($cat['code']),
                     // A parent's stored weight is the sum of its children (display only).
@@ -315,6 +318,7 @@ class GradingOptionController extends Controller
                     [
                         'grading_option_id' => $option->id,
                         'parent_id'         => $parent->id,
+                        'subject_id'        => $child['subject_id'] ?? null,
                         'name'              => $child['name'],
                         'code'              => strtoupper($child['code']),
                         'weight'            => (float) $child['weight'],

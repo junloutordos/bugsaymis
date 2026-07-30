@@ -34,8 +34,7 @@ class ClassRecordIlaController extends Controller
     /** Read-only access: admin, the owning teacher, or a scoped monitor (CID Chief / AUH). */
     private function canView(ClassRecord $classRecord): bool
     {
-        return $this->isAdmin()
-            || $classRecord->teacher_id === Auth::id()
+        return $classRecord->canView(Auth::user())
             || $this->monitorScope->canView(Auth::user(), $classRecord);
     }
 
@@ -82,7 +81,7 @@ class ClassRecordIlaController extends Controller
 
     public function storeDate(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
@@ -108,7 +107,7 @@ class ClassRecordIlaController extends Controller
 
     public function destroyDate(ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
@@ -132,7 +131,7 @@ class ClassRecordIlaController extends Controller
      */
     public function updateTitle(Request $request, ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
@@ -154,7 +153,7 @@ class ClassRecordIlaController extends Controller
 
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
@@ -230,7 +229,7 @@ class ClassRecordIlaController extends Controller
      */
     public function gradeDate(Request $request, ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
@@ -340,7 +339,7 @@ class ClassRecordIlaController extends Controller
      */
     public function ungradeDate(ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse
     {
-        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
         $this->assertIlpSubject($classRecord);
         abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
