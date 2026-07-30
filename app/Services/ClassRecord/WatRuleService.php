@@ -10,6 +10,7 @@ use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\QuarterExamWindow;
 use App\Models\ClassRecord\WatReview;
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
 use App\Models\User;
 use Carbon\Carbon;
@@ -509,6 +510,111 @@ class WatRuleService
                 ->where('school_year_id', $schoolYearId)
                 ->where('week_start', $monday->toDateString())
                 ->first(),
+        ];
+    }
+
+    // ── Teacher-level plotting compliance (CID/ACIDAA analytics) ─────────────
+
+    /**
+     * Per-teacher plotting compliance for one section's grade-week — built on
+     * top of weekData()'s existing items (no separate query for what's
+     * already plotted) plus the section's 'teaching' LoadAssignment roster,
+     * so a teacher who plotted NOTHING this week still appears (they'd
+     * otherwise be invisible — there's no assessment row to find them by).
+     *
+     * Visibility-only: this does not change any WAT rule. Non-plotters are
+     * classified so CID can tell genuine non-compliance apart from a
+     * teacher who simply had no room left in the section's shared cap:
+     *
+     *  - 'not_yet_due'   : the plotting deadline for this week hasn't passed
+     *  - 'blocked_by_cap': deadline has passed, teacher plotted nothing, AND
+     *                      the section's weekly graded/major budget was
+     *                      already exhausted by (other) teachers before it did
+     *  - 'not_plotted'   : deadline has passed, teacher plotted nothing, and
+     *                      the section still had room — genuine non-compliance
+     *  - 'plotted'       : teacher plotted at least one graded assessment
+     *
+     * @return array{
+     *   week_start: string, week_end: string,
+     *   remaining: array{weekly_graded:int, weekly_major:int},
+     *   teachers: array<int, array>,
+     * }
+     */
+    public static function teacherBreakdown(int $sectionId, int $schoolYearId, string $weekStart): array
+    {
+        $monday = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
+        $week   = self::weekData($sectionId, $schoolYearId, $monday->toDateString());
+
+        // Deadline for the week is judged off Monday (the week's own plotting
+        // cutoff is "Friday before Monday, 12NN") — same anchor violatesPlottingDeadline()
+        // uses when called per-item elsewhere.
+        $deadlinePassed = now()->greaterThan(self::plottingDeadline($monday->toDateString()));
+
+        $remainingGraded = max(0, self::WEEKLY_GRADED_MAX - $week['totals']['graded']);
+        $remainingMajor  = max(0, self::WEEKLY_MAJOR_MAX - $week['totals']['major']);
+        $capExhausted    = $remainingGraded <= 0 || $remainingMajor <= 0;
+
+        // Roster: every teacher with a 'teaching' LoadAssignment on this
+        // section this school year — this is what surfaces a zero-plot
+        // teacher who has no item in $week['days'] to be found by at all.
+        $roster = LoadAssignment::where('section_id', $sectionId)
+            ->where('school_year_id', $schoolYearId)
+            ->where('assignment_type', 'teaching')
+            ->whereNotNull('user_id')
+            ->with('subject:id,name', 'faculty:id,name')
+            ->get()
+            ->unique(fn ($a) => $a->user_id.'|'.$a->subject_id);
+
+        $items = collect($week['days'])->flatMap(fn ($d) => $d['items']);
+
+        $byTeacher = $roster->groupBy('user_id')->map(function ($assignments, $userId) use ($items, $deadlinePassed, $capExhausted) {
+            $teacherName = $assignments->first()->faculty?->name;
+            $subjects    = $assignments->pluck('subject.name')->filter()->unique()->values();
+
+            // Matched on teacher_name (resolved from the roster's faculty
+            // relation) rather than subject — a co-taught synthetic Science
+            // Core/Elective row pooled into this section's items carries the
+            // ORIGINAL owning teacher's name from weekData(), same name this
+            // roster entry resolves to, so it's correctly attributed even
+            // though the row's section_id differs from $sectionId.
+            $mine = $items->filter(function ($item) use ($teacherName) {
+                return $item['teacher_name'] === $teacherName;
+            })->values();
+
+            $graded = $mine->where('is_graded', true);
+            $major  = $graded->where('is_major', true);
+
+            $plottedCount = $graded->count();
+            $lastPlottedAt = $mine->pluck('plotted_at')->filter()->sort()->last();
+
+            $status = 'plotted';
+            if ($plottedCount === 0) {
+                $status = ! $deadlinePassed
+                    ? 'not_yet_due'
+                    : ($capExhausted ? 'blocked_by_cap' : 'not_plotted');
+            }
+
+            return [
+                'user_id'         => (int) $userId,
+                'teacher_name'    => $teacherName,
+                'subjects'        => $subjects->all(),
+                'graded_count'    => $graded->count(),
+                'major_count'     => $major->count(),
+                'plotted'         => $plottedCount > 0,
+                'last_plotted_at' => $lastPlottedAt,
+                'status'          => $status,
+            ];
+        })->values()->sortBy('teacher_name')->values()->all();
+
+        return [
+            'week_start'      => $week['week_start'],
+            'week_end'        => $week['week_end'],
+            'deadline_passed' => $deadlinePassed,
+            'remaining'       => [
+                'weekly_graded' => $remainingGraded,
+                'weekly_major'  => $remainingMajor,
+            ],
+            'teachers'        => $byTeacher,
         ];
     }
 }

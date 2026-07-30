@@ -138,6 +138,21 @@ function complianceColor(pct) {
   if (pct >= 60) return 'bg-amber-500'
   return 'bg-danger-500'
 }
+
+// ── Remaining WAT slots — self-check before plotting ──────────────────────────
+// Reframes wat.totals/wat.limits (already computed server-side) as "how much
+// room is left this week", so teachers can coordinate with co-teachers on
+// the same section before hitting the shared cap — visibility only, does
+// not change any WAT rule.
+const remainingGraded = computed(() => props.wat ? Math.max(0, props.wat.limits.weekly_graded - props.wat.totals.graded) : null)
+const remainingMajor  = computed(() => props.wat ? Math.max(0, props.wat.limits.weekly_major - props.wat.totals.major) : null)
+
+function remainingColor(remaining) {
+  if (remaining === null) return 'slate'
+  if (remaining <= 0) return 'red'
+  if (remaining <= 2) return 'amber'
+  return 'green'
+}
 </script>
 
 <template>
@@ -230,6 +245,17 @@ function complianceColor(pct) {
             <AppBadge :color="wat.totals.major > wat.limits.weekly_major && !wat.totals.has_exam_window ? 'red' : 'slate'">
               {{ wat.totals.major }} / {{ wat.limits.weekly_major }} major this week
             </AppBadge>
+            <AppBadge :color="remainingColor(remainingGraded)" title="Graded slots left this week before the section hits its WAT cap">
+              {{ remainingGraded }} graded slot(s) left
+            </AppBadge>
+            <AppBadge :color="remainingColor(remainingMajor)" title="Major slots left this week before the section hits its WAT cap">
+              {{ remainingMajor }} major slot(s) left
+            </AppBadge>
+          </div>
+
+          <div v-if="remainingGraded <= 0 || remainingMajor <= 0" class="mt-3 flex items-center gap-2 bg-amber-50 border border-amber-100 text-amber-700 rounded-lg px-3 py-2 text-xs">
+            <ExclamationTriangleIcon class="w-4 h-4 shrink-0" />
+            This section has no {{ remainingGraded <= 0 ? 'graded' : 'major' }} slots left this week — coordinate with co-teachers on this section before plotting, or wait until next week.
           </div>
 
           <div v-if="wat.totals.over_weekly && wat.totals.has_exam_window" class="mt-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg px-3 py-2 text-xs">

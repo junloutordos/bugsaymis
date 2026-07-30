@@ -6,7 +6,9 @@ import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import Swal from 'sweetalert2'
-import { ChevronLeftIcon, ChevronRightIcon, CheckBadgeIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import {
+  ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CheckBadgeIcon, EyeIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   weekStart:  { type: String, required: true },
@@ -59,6 +61,33 @@ async function markReviewed(row) {
 function viewSection(row) {
   router.get(route('class-records.wat.index'), { section: row.id, week: props.weekStart })
 }
+
+// ── Teacher-level compliance drill-down ─────────────────────────────────────
+const expandedSectionId = ref(null)
+
+function toggleTeacherBreakdown(row) {
+  expandedSectionId.value = expandedSectionId.value === row.id ? null : row.id
+}
+
+const statusMeta = {
+  plotted:         { label: 'Plotted',              color: 'green' },
+  not_yet_due:      { label: 'Not yet due',           color: 'slate' },
+  blocked_by_cap:   { label: 'Blocked — section maxed out', color: 'amber' },
+  not_plotted:      { label: 'Not plotted',           color: 'red' },
+}
+
+function statusLabel(status) {
+  return statusMeta[status]?.label ?? status
+}
+
+function statusColor(status) {
+  return statusMeta[status]?.color ?? 'slate'
+}
+
+function fmtDt(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 </script>
 
 <template>
@@ -110,7 +139,8 @@ function viewSection(row) {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="row in summary" :key="row.id" class="hover:bg-slate-50/40">
+              <template v-for="row in summary" :key="row.id">
+              <tr class="hover:bg-slate-50/40">
                 <td class="px-4 py-2.5 font-medium text-slate-800">Grade {{ row.level }} — {{ row.name }}</td>
                 <td class="px-4 py-2.5 text-center">
                   <span :class="row.graded_count > limits.weekly_graded ? 'text-danger-600 font-bold' : 'text-slate-600'">
@@ -140,6 +170,11 @@ function viewSection(row) {
                 </td>
                 <td class="px-4 py-2.5">
                   <div class="flex justify-end gap-1.5">
+                    <AppButton size="sm" variant="secondary" @click="toggleTeacherBreakdown(row)"
+                               :title="expandedSectionId === row.id ? 'Hide teacher breakdown' : 'Show teacher breakdown'">
+                      <ChevronDownIcon class="w-4 h-4 transition-transform" :class="{ 'rotate-180': expandedSectionId === row.id }" />
+                      Teachers
+                    </AppButton>
                     <AppButton size="sm" variant="secondary" @click="viewSection(row)">
                       <EyeIcon class="w-4 h-4" />
                     </AppButton>
@@ -149,6 +184,52 @@ function viewSection(row) {
                   </div>
                 </td>
               </tr>
+
+              <!-- Teacher-level plotting compliance drill-down -->
+              <tr v-if="expandedSectionId === row.id" class="bg-slate-50/60">
+                <td colspan="6" class="px-4 py-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                      Teacher Plotting Compliance — Grade {{ row.level }} {{ row.name }}
+                    </h4>
+                    <p class="text-xs text-slate-400">
+                      {{ row.teacher_breakdown.remaining.weekly_graded }} graded / {{ row.teacher_breakdown.remaining.weekly_major }} major slot(s) remaining this week
+                    </p>
+                  </div>
+
+                  <div v-if="!row.teacher_breakdown.teachers.length" class="text-xs text-slate-400 py-4 text-center">
+                    No subject teachers with a teaching load found for this section.
+                  </div>
+
+                  <div v-else class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                    <table class="min-w-full text-xs">
+                      <thead class="bg-slate-50">
+                        <tr>
+                          <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wide">Teacher</th>
+                          <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wide">Subject(s)</th>
+                          <th class="px-3 py-2 text-center font-semibold text-slate-500 uppercase tracking-wide">Graded</th>
+                          <th class="px-3 py-2 text-center font-semibold text-slate-500 uppercase tracking-wide">Major</th>
+                          <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wide">Last Plotted</th>
+                          <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100">
+                        <tr v-for="t in row.teacher_breakdown.teachers" :key="t.user_id">
+                          <td class="px-3 py-2 font-medium text-slate-800">{{ t.teacher_name ?? '—' }}</td>
+                          <td class="px-3 py-2 text-slate-600">{{ t.subjects.join(', ') || '—' }}</td>
+                          <td class="px-3 py-2 text-center text-slate-600">{{ t.graded_count }}</td>
+                          <td class="px-3 py-2 text-center text-slate-600">{{ t.major_count }}</td>
+                          <td class="px-3 py-2 text-slate-500">{{ fmtDt(t.last_plotted_at) }}</td>
+                          <td class="px-3 py-2">
+                            <AppBadge :color="statusColor(t.status)">{{ statusLabel(t.status) }}</AppBadge>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+              </template>
               <tr v-if="!summary.length">
                 <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">
                   No sections with class records this school year.
