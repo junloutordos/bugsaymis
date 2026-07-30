@@ -21,6 +21,7 @@ class Subject extends Model
         'lab_hours',
         'load_units',
         'subject_type',
+        'subject_group',
         'grade_level',
         'semester',
         'sessions_per_week',
