@@ -75,7 +75,7 @@ const isSpecialChief = computed(() =>
 // Visible leave types per employee category:
 // Teaching (regular) → WL only (Service Credits tracked separately)
 // Teaching (special chief, SSD/CID) → VL, SL, WL (+ SC row for Service Credits)
-// Non-Teaching → VL, SL, CTO, WL
+// Non-Teaching → VL, SL, CTO, WL, FL, SPL
 const visibleLeaveTypes = computed(() => {
   if (!selected.value) return []
   if (isTeaching.value && !isSpecialChief.value) {
@@ -84,7 +84,7 @@ const visibleLeaveTypes = computed(() => {
   if (isSpecialChief.value) {
     return (props.leaveTypes ?? []).filter(lt => ['VL', 'SL', 'WL'].includes(lt.code))
   }
-  return props.leaveTypes ?? []   // VL, SL, CTO, WL
+  return props.leaveTypes ?? []   // VL, SL, CTO, WL, FL, SPL
 })
 
 const openModal = (emp) => {
@@ -104,7 +104,7 @@ const openModal = (emp) => {
     .filter(lt => {
       if (teaching && !specialChief) return lt.code === 'WL'
       if (specialChief)              return ['VL', 'SL', 'WL'].includes(lt.code)
-      return true   // Non-teaching: VL, SL, CTO, WL
+      return true   // Non-teaching: VL, SL, CTO, WL, FL, SPL
     })
     .map(lt => ({ leave_type_code: lt.code, label: lt.name, amount: '' }))
   showModal.value = true
@@ -169,7 +169,7 @@ const categoryBadgeColor = (cat) => {
 
       <AppPageHeader
         title="Initialize Leave Credits"
-        subtitle="Set opening balances for employees migrating from manual or legacy records. Teaching: Wellness Leave + Service Credits. SSD/CID Division Chiefs (Teaching): VL · SL · Wellness Leave + Service Credits. Non-Teaching: VL · SL · CTO · Wellness Leave."
+        subtitle="Set opening balances for employees migrating from manual or legacy records. Teaching: Wellness Leave + Service Credits. SSD/CID Division Chiefs (Teaching): VL · SL · Wellness Leave + Service Credits. Non-Teaching: VL · SL · CTO · Wellness Leave · Mandatory/Forced Leave · Special Privilege Leave."
       />
 
       <!-- Flash -->
@@ -245,7 +245,7 @@ const categoryBadgeColor = (cat) => {
           <AppBadge :color="categoryBadgeColor(selected.emp_category)">{{ selected.emp_category }}</AppBadge>
           <span v-if="isTeaching && !isSpecialChief" class="text-xs text-blue-600 font-medium">· Wellness Leave + Service Credits</span>
           <span v-else-if="isSpecialChief" class="text-xs text-blue-600 font-medium">· VL · SL · Wellness Leave + Service Credits</span>
-          <span v-else class="text-xs text-amber-600 font-medium">· VL · SL · CTO · Wellness Leave</span>
+          <span v-else class="text-xs text-amber-600 font-medium">· VL · SL · CTO · Wellness Leave · FL · SPL</span>
         </div>
 
         <div class="space-y-5">
