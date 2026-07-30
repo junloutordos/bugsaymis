@@ -617,6 +617,88 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->where('summary.1.graded_count', 1));
     }
 
+    // ── Archived class records are excluded from the WAT ─────────────────────
+    // Regression: an archived class record's plotted assessments kept
+    // surfacing in the tracker and consuming the section's daily/weekly cap,
+    // double-counting against the fresh record a teacher creates to replace it.
+
+    public function test_wat_week_data_excludes_an_archived_records_assessment(): void
+    {
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+
+        // Active record with a plotted assessment on Monday.
+        $activeRecord = $this->makeClassRecord($section, $subject, $teacher);
+        $this->makeAssessmentInRecord($activeRecord, 1, '2025-09-01');
+
+        // Archived record with its own plotted assessment on the same day.
+        $archivedRecord = $this->makeClassRecord($section, $subject, $teacher);
+        $this->makeAssessmentInRecord($archivedRecord, 2, '2025-09-01');
+        $archivedRecord->update(['status' => 'archived', 'archived_at' => now()]);
+
+        $wat = \App\Services\ClassRecord\WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
+        $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
+
+        // Only the active record's single assessment survives.
+        $this->assertCount(1, $monday['items']);
+        $this->assertSame(1, $monday['graded_count']);
+        $this->assertSame(1, $wat['totals']['graded']);
+    }
+
+    public function test_wat_cap_ignores_an_archived_records_assessments(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+
+        // An archived record already carrying the full daily cap (3 graded) —
+        // it must NOT block plotting on a fresh record for the same day.
+        $archivedRecord = $this->makeClassRecord($section, $subject, $teacher);
+        $this->makeAssessmentInRecord($archivedRecord, 1, '2025-09-01');
+        $this->makeAssessmentInRecord($archivedRecord, 2, '2025-09-01');
+        $this->makeAssessmentInRecord($archivedRecord, 3, '2025-09-01');
+        $archivedRecord->update(['status' => 'archived', 'archived_at' => now()]);
+
+        $freshRecord = $this->makeClassRecord($section, $subject, $teacher);
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $freshRecord->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number'   => 1,
+                    'title'               => 'Quiz 1',
+                    'is_graded'           => true,
+                    'activity_date'       => '2025-09-01',
+                    'max_score'           => 20,
+                ]],
+            ])
+            ->assertOk();
+    }
+
+    public function test_review_summary_excludes_an_archived_records_assessment(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+
+        $activeRecord = $this->makeClassRecord($section, $subject, $teacher);
+        $this->makeAssessmentInRecord($activeRecord, 1, '2025-09-01');
+
+        $archivedRecord = $this->makeClassRecord($section, $subject, $teacher);
+        $this->makeAssessmentInRecord($archivedRecord, 2, '2025-09-01');
+        $archivedRecord->update(['status' => 'archived', 'archived_at' => now()]);
+
+        $this->actingAs($admin)
+            ->get(route('class-records.wat.review', ['week' => '2025-09-01']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.0.name', 'Emerald')
+                ->where('summary.0.graded_count', 1));
+    }
+
     // ── Teacher-level plotting compliance (visibility-only analytics) ────────
 
     public function test_teacher_breakdown_marks_a_teacher_with_plotted_assessments_as_plotted(): void

@@ -72,13 +72,21 @@ class ClassRecordAssessment extends Model
      * Base query joining assessments up to their class record, scoped to a
      * single school year. Single source of truth for the "max 3 assessments
      * per section per day" rule's underlying join.
+     *
+     * Archived class records are excluded: once a teacher archives a record
+     * (status = 'archived') and plots on a fresh one, the archived record's
+     * assessments must stop surfacing in the Weekly Assessment Tracker and
+     * stop consuming the section's daily/weekly plotting budget — otherwise
+     * they double-count against the new record. Restoring the record
+     * (restore() flips status back) automatically brings them back.
      */
     public static function schoolYearScopeQuery(int $schoolYearId)
     {
         return static::query()
             ->join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
             ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
-            ->where('cr.school_year_id', $schoolYearId);
+            ->where('cr.school_year_id', $schoolYearId)
+            ->where('cr.status', '<>', 'archived');
     }
 
     public static function sectionScopeQuery(int $sectionId, int $schoolYearId)
