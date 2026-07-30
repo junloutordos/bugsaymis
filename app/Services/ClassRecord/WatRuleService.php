@@ -310,7 +310,11 @@ class WatRuleService
         $ilaDates = ClassRecordIlaDate::where('is_graded', false)
             ->whereBetween('date', [$monday->toDateString(), $monday->copy()->addDays(6)->toDateString()])
             ->whereHas('quarter.classRecord', function ($q) use ($poolSectionIds, $schoolYearId) {
-                $q->whereIn('section_id', $poolSectionIds)->where('school_year_id', $schoolYearId);
+                $q->whereIn('section_id', $poolSectionIds)
+                    ->where('school_year_id', $schoolYearId)
+                    // Same archived-record exclusion as schoolYearScopeQuery():
+                    // a pending ILA date on an archived record must not surface.
+                    ->where('status', '<>', 'archived');
             })
             ->with([
                 'quarter.classRecord:id,subject_name,subject_id,teacher_id,section_id,category_label',
