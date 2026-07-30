@@ -69,12 +69,6 @@ const applyFilters = ({ resetPage = true } = {}) => {
 
 const performSearch = () => applyFilters()
 
-let searchDebounceTimer = null
-watch(searchQuery, () => {
-  clearTimeout(searchDebounceTimer)
-  searchDebounceTimer = setTimeout(() => applyFilters(), 400)
-})
-
 watch(activeTab, () => applyFilters())
 watch([filterSectionId, filterGradeLevel, filterSex], () => applyFilters())
 
