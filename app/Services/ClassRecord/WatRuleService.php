@@ -16,6 +16,7 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -30,10 +31,14 @@ use Illuminate\Support\Facades\DB;
  */
 class WatRuleService
 {
-    public const DAILY_GRADED_MAX  = 3;
-    public const DAILY_MAJOR_MAX   = 2;
+    public const DAILY_GRADED_MAX = 3;
+
+    public const DAILY_MAJOR_MAX = 2;
+
     public const WEEKLY_GRADED_MAX = 15;
-    public const WEEKLY_MAJOR_MAX  = 6;
+
+    public const WEEKLY_MAJOR_MAX = 6;
+
     public const MAJOR_WEIGHT_SHARE = 0.10;
 
     public const OCCURRENCE_DATE_SQL = 'CASE
@@ -41,6 +46,7 @@ class WatRuleService
         THEN class_record_assessments.activity_date
         ELSE crad.activity_date
     END';
+
     public const OCCURRENCE_PLOTTED_AT_SQL = 'CASE
         WHEN crad.id IS NULL OR crad.is_primary = 1
         THEN class_record_assessments.plotted_at
@@ -75,12 +81,12 @@ class WatRuleService
     public static function deriveType(?string $categoryCode, int $assessmentNumber): ?string
     {
         return match (strtoupper((string) $categoryCode)) {
-            'FA', 'QZ'       => 'formative',
+            'FA', 'QZ' => 'formative',
             'AA', 'P1', 'P2' => 'alternative',
-            'ILA'            => 'ila',
+            'ILA' => 'ila',
             'QE', 'SE', 'PE' => match ($assessmentNumber) {
-                1       => 'long_test_1',
-                2       => 'long_test_2',
+                1 => 'long_test_1',
+                2 => 'long_test_2',
                 default => null,
             },
             default => null,
@@ -131,7 +137,7 @@ class WatRuleService
     public static function isWithinScheduledWeek(string $activityDate): bool
     {
         $start = Carbon::parse($activityDate)->startOfWeek(Carbon::MONDAY);
-        $end   = Carbon::parse($activityDate)->endOfWeek(Carbon::SUNDAY);
+        $end = Carbon::parse($activityDate)->endOfWeek(Carbon::SUNDAY);
 
         return now()->between($start, $end);
     }
@@ -199,22 +205,36 @@ class WatRuleService
         return $syntheticIds->push($sectionId)->unique()->values()->all();
     }
 
-    public static function gradeCountsOnDate(int $sectionId, int $grade, int $schoolYearId, string $date, array $excludeIds = []): array
-    {
+    public static function gradeCountsOnDate(
+        int $sectionId,
+        int $grade,
+        int $schoolYearId,
+        string $date,
+        array $excludeIds = [],
+        array $candidateOccurrences = []
+    ): array {
         $sectionIds = self::poolSectionIds($sectionId, $grade);
 
         return self::counts(
             self::assessmentOccurrencesQuery($schoolYearId)
                 ->whereIn('cr.section_id', $sectionIds)
                 ->whereRaw(self::OCCURRENCE_DATE_SQL.' = ?', [$date]),
-            $excludeIds
+            $schoolYearId,
+            $excludeIds,
+            $candidateOccurrences
         );
     }
 
-    public static function gradeCountsInWeek(int $sectionId, int $grade, int $schoolYearId, string $weekStart, array $excludeIds = []): array
-    {
+    public static function gradeCountsInWeek(
+        int $sectionId,
+        int $grade,
+        int $schoolYearId,
+        string $weekStart,
+        array $excludeIds = [],
+        array $candidateOccurrences = []
+    ): array {
         $sectionIds = self::poolSectionIds($sectionId, $grade);
-        $monday     = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
+        $monday = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
 
         return self::counts(
             self::assessmentOccurrencesQuery($schoolYearId)
@@ -223,13 +243,29 @@ class WatRuleService
                     self::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
                     [$monday->toDateString(), $monday->copy()->addDays(6)->toDateString()]
                 ),
-            $excludeIds
+            $schoolYearId,
+            $excludeIds,
+            $candidateOccurrences
         );
     }
 
-    private static function counts($query, array $excludeIds): array
-    {
-        $row = $query
+    /**
+     * Count WAT load, consolidating simultaneous Elective or Science Core
+     * assessments into one block. Assessments have no time column of their
+     * own, so a block is resolved from the subject's sole matching schedule
+     * slot for its section + weekday. Missing or ambiguous schedules safely
+     * fall back to individual counting.
+     *
+     * Rows remain separate in tracker displays; only cap arithmetic is
+     * consolidated. A block is major when any assessment inside it is major.
+     */
+    private static function counts(
+        $query,
+        int $schoolYearId,
+        array $excludeIds,
+        array $candidateOccurrences = []
+    ): array {
+        $rows = $query
             ->when($excludeIds, fn ($q) => $q->whereNotIn('class_record_assessments.id', $excludeIds))
             // Long Test/Quarterly Exam entries inside a configured exam window never
             // count toward the cap — every subject legitimately sits its final exam
@@ -245,20 +281,186 @@ class WatRuleService
                             ->whereRaw(self::OCCURRENCE_DATE_SQL.' <= qew.end_date');
                     });
             })
-            ->selectRaw('
-                COUNT(DISTINCT CASE
-                    WHEN class_record_assessments.is_graded = 1
-                    THEN class_record_assessments.id
-                END) as graded,
-                COUNT(DISTINCT CASE
-                    WHEN class_record_assessments.is_major = 1
-                        AND class_record_assessments.is_graded = 1
-                    THEN class_record_assessments.id
-                END) as major
-            ')
-            ->first();
+            ->leftJoin('subjects as wat_subjects', 'wat_subjects.id', '=', 'cr.subject_id')
+            ->select([
+                'class_record_assessments.id as assessment_id',
+                'class_record_assessments.is_graded',
+                'class_record_assessments.is_major',
+                'cr.section_id',
+                'cr.subject_id',
+                'wat_subjects.subject_type',
+            ])
+            ->selectRaw(self::OCCURRENCE_DATE_SQL.' as activity_date')
+            ->get()
+            ->map(fn ($row) => [
+                'assessment_key' => 'db:'.$row->assessment_id,
+                'activity_date' => $row->activity_date instanceof Carbon
+                    ? $row->activity_date->toDateString()
+                    : (string) $row->activity_date,
+                'section_id' => (int) $row->section_id,
+                'subject_id' => (int) $row->subject_id,
+                'subject_type' => $row->subject_type,
+                'is_graded' => (bool) $row->is_graded,
+                'is_major' => (bool) $row->is_major,
+            ]);
 
-        return ['graded' => (int) $row->graded, 'major' => (int) $row->major];
+        $rows = $rows->concat(collect($candidateOccurrences)->map(fn ($row) => [
+            'assessment_key' => 'candidate:'.(string) $row['assessment_key'],
+            'activity_date' => Carbon::parse($row['activity_date'])->toDateString(),
+            'section_id' => (int) $row['section_id'],
+            'subject_id' => (int) $row['subject_id'],
+            'subject_type' => $row['subject_type'] ?? null,
+            'is_graded' => (bool) ($row['is_graded'] ?? true),
+            'is_major' => (bool) ($row['is_major'] ?? false),
+        ]));
+
+        return self::consolidatedCounts($rows, $schoolYearId);
+    }
+
+    /**
+     * @param Collection<int, array{
+     *   assessment_key:string, activity_date:string, section_id:int,
+     *   subject_id:int, subject_type:?string, is_graded:bool, is_major:bool
+     * }> $rows
+     */
+    private static function consolidatedCounts(Collection $rows, int $schoolYearId): array
+    {
+        $gradedRows = $rows->where('is_graded', true)->values();
+        if ($gradedRows->isEmpty()) {
+            return ['graded' => 0, 'major' => 0];
+        }
+
+        $specialRows = $gradedRows->filter(
+            fn ($row) => in_array($row['subject_type'], ['elective', 'science_core'], true)
+        );
+        $unresolvedSpecialRows = $specialRows->filter(
+            fn ($row) => ! array_key_exists('resolved_slot', $row)
+        );
+
+        $scheduleByPairDate = self::scheduleSlotsForRows($unresolvedSpecialRows, $schoolYearId);
+
+        // Each occurrence connects to its assessment token (preserving the
+        // existing "multi-date assessment counts once per week" rule) and,
+        // when resolvable, its shared block token. Connected components are
+        // the effective WAT units.
+        $parent = [];
+        $find = function (string $token) use (&$parent, &$find): string {
+            $parent[$token] ??= $token;
+            if ($parent[$token] !== $token) {
+                $parent[$token] = $find($parent[$token]);
+            }
+
+            return $parent[$token];
+        };
+        $union = function (string $left, string $right) use (&$parent, $find): void {
+            $leftRoot = $find($left);
+            $rightRoot = $find($right);
+            if ($leftRoot !== $rightRoot) {
+                $parent[$rightRoot] = $leftRoot;
+            }
+        };
+
+        $rowTokens = $gradedRows->map(function ($row) use ($scheduleByPairDate, $union) {
+            $assessmentToken = 'assessment|'.$row['assessment_key'];
+            $tokens = [$assessmentToken];
+
+            if (in_array($row['subject_type'], ['elective', 'science_core'], true)) {
+                $slot = array_key_exists('resolved_slot', $row)
+                    ? $row['resolved_slot']
+                    : $scheduleByPairDate->get(self::scheduleSlotKey($row));
+                if ($slot) {
+                    $blockToken = 'block|'.$row['subject_type'].'|'.$row['activity_date'].'|'.$slot;
+                    $union($assessmentToken, $blockToken);
+                    $tokens[] = $blockToken;
+                }
+            }
+
+            return ['tokens' => $tokens, 'is_major' => $row['is_major']];
+        });
+
+        $gradedRoots = $rowTokens
+            ->map(fn ($row) => $find($row['tokens'][0]))
+            ->unique();
+        $majorRoots = $rowTokens
+            ->where('is_major', true)
+            ->map(fn ($row) => $find($row['tokens'][0]))
+            ->unique();
+
+        return ['graded' => $gradedRoots->count(), 'major' => $majorRoots->count()];
+    }
+
+    private static function scheduleSlotKey(array $row): string
+    {
+        return $row['section_id'].'|'.$row['subject_id'].'|'.$row['activity_date'];
+    }
+
+    /**
+     * Resolve exactly one class period for each section/subject/date. Academic
+     * term dates matter because the same subject may move to another time in
+     * the next semester. Zero or multiple matching periods are ambiguous and
+     * return null, which deliberately disables block consolidation.
+     */
+    private static function scheduleSlotsForRows(Collection $rows, int $schoolYearId): Collection
+    {
+        $rows = $rows
+            ->filter(fn ($row) => $row['section_id'] && $row['subject_id'] && $row['activity_date'])
+            ->unique(fn ($row) => self::scheduleSlotKey($row))
+            ->values();
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $pairs = $rows
+            ->map(fn ($row) => [
+                'section_id' => $row['section_id'],
+                'subject_id' => $row['subject_id'],
+            ])
+            ->unique(fn ($pair) => $pair['section_id'].'|'.$pair['subject_id'])
+            ->values();
+
+        $query = ClassSchedule::query()
+            ->occupying()
+            ->where('class_schedules.school_year_id', $schoolYearId)
+            ->join('academic_terms as wat_terms', 'wat_terms.id', '=', 'class_schedules.academic_term_id')
+            ->where(function ($outer) use ($pairs) {
+                foreach ($pairs as $pair) {
+                    $outer->orWhere(function ($inner) use ($pair) {
+                        $inner->where('class_schedules.section_id', $pair['section_id'])
+                            ->where('class_schedules.subject_id', $pair['subject_id']);
+                    });
+                }
+            });
+
+        $schedules = $query->get([
+            'class_schedules.section_id',
+            'class_schedules.subject_id',
+            'class_schedules.day_of_week',
+            'class_schedules.start_time',
+            'class_schedules.end_time',
+            'wat_terms.start_date as term_start_date',
+            'wat_terms.end_date as term_end_date',
+        ]);
+
+        return $rows->mapWithKeys(function ($row) use ($schedules) {
+            $day = Carbon::parse($row['activity_date'])->format('l');
+            $matchingSchedules = $schedules
+                ->filter(fn ($schedule) => (int) $schedule->section_id === (int) $row['section_id']
+                    && (int) $schedule->subject_id === (int) $row['subject_id']
+                    && $schedule->day_of_week === $day);
+            $inTermSchedules = $matchingSchedules
+                ->filter(fn ($schedule) => $row['activity_date'] >= Carbon::parse($schedule->term_start_date)->toDateString()
+                    && $row['activity_date'] <= Carbon::parse($schedule->term_end_date)->toDateString());
+            // Legacy/test records can carry dates just outside their term. In
+            // that case a single unambiguous school-year slot is still useful;
+            // differing semester slots remain ambiguous and do not consolidate.
+            $slots = ($inTermSchedules->isNotEmpty() ? $inTermSchedules : $matchingSchedules)
+                ->map(fn ($schedule) => substr((string) $schedule->start_time, 0, 5)
+                    .'|'.substr((string) $schedule->end_time, 0, 5))
+                ->unique()
+                ->values();
+
+            return [self::scheduleSlotKey($row) => $slots->count() === 1 ? $slots->first() : null];
+        });
     }
 
     // ── Schedule-day check (warn-only) ────────────────────────────────────────
@@ -310,6 +512,7 @@ class WatRuleService
         $rows = self::assessmentOccurrencesQuery($schoolYearId)
             ->whereIn('cr.section_id', $poolSectionIds)
             ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
+            ->leftJoin('subjects as wat_subjects', 'wat_subjects.id', '=', 'cr.subject_id')
             ->leftJoin('sections as sec', 'sec.id', '=', 'cr.section_id')
             ->whereRaw(
                 self::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
@@ -332,6 +535,7 @@ class WatRuleService
                 'cr.subject_name',
                 'cr.category_label',
                 'cr.teacher_id',
+                'wat_subjects.subject_type',
                 'gc.name as category_name',
                 'gc.code as category_code',
                 'sec.sectionname as row_section_name',
@@ -362,17 +566,17 @@ class WatRuleService
             ->get(['id', 'class_record_quarter_id', 'date', 'title']);
 
         $teachers = User::whereIn('id', $rows->pluck('teacher_id')
-                ->concat($ilaDates->pluck('quarter.classRecord.teacher_id'))
-                ->filter()->unique())
+            ->concat($ilaDates->pluck('quarter.classRecord.teacher_id'))
+            ->filter()->unique())
             ->get(['id', 'name'])->keyBy('id');
 
         // Compliance: students with a recorded score / quarter roster size
-        $quarterIds    = $rows->pluck('class_record_quarter_id')->unique()->values();
-        $rosterCounts  = ClassRecordStudent::whereIn('class_record_quarter_id', $quarterIds)
+        $quarterIds = $rows->pluck('class_record_quarter_id')->unique()->values();
+        $rosterCounts = ClassRecordStudent::whereIn('class_record_quarter_id', $quarterIds)
             ->selectRaw('class_record_quarter_id, COUNT(*) as n')
             ->groupBy('class_record_quarter_id')
             ->pluck('n', 'class_record_quarter_id');
-        $scoreCounts   = ClassRecordScore::whereIn('class_record_assessment_id', $rows->pluck('id'))
+        $scoreCounts = ClassRecordScore::whereIn('class_record_assessment_id', $rows->pluck('id'))
             ->whereNotNull('score')
             ->selectRaw('class_record_assessment_id, COUNT(*) as n')
             ->groupBy('class_record_assessment_id')
@@ -386,45 +590,46 @@ class WatRuleService
         // item. Falls back to null (rendered as "—") when subject_id is
         // absent (e.g. an elective/other class record with no subject link)
         // or no matching schedule row exists.
-        $schedulePairs = $rows
+        $scheduleRows = $rows
             ->filter(fn ($row) => $row->section_id && $row->subject_id)
-            ->map(fn ($row) => ['section_id' => (int) $row->section_id, 'subject_id' => (int) $row->subject_id])
+            ->map(fn ($row) => [
+                'section_id' => (int) $row->section_id,
+                'subject_id' => (int) $row->subject_id,
+                'activity_date' => $row->activity_date instanceof Carbon
+                    ? $row->activity_date->toDateString()
+                    : Carbon::parse((string) $row->activity_date)->toDateString(),
+            ])
             ->concat($ilaDates
-                ->map(fn ($ilaDate) => $ilaDate->quarter->classRecord)
-                ->filter(fn ($cr) => $cr && $cr->section_id && $cr->subject_id)
-                ->map(fn ($cr) => ['section_id' => (int) $cr->section_id, 'subject_id' => (int) $cr->subject_id]))
-            ->unique(fn ($pair) => $pair['section_id'].'|'.$pair['subject_id'])
+                ->filter(fn ($ilaDate) => $ilaDate->quarter->classRecord?->section_id
+                    && $ilaDate->quarter->classRecord?->subject_id)
+                ->map(fn ($ilaDate) => [
+                    'section_id' => (int) $ilaDate->quarter->classRecord->section_id,
+                    'subject_id' => (int) $ilaDate->quarter->classRecord->subject_id,
+                    'activity_date' => $ilaDate->date->toDateString(),
+                ]))
+            ->unique(fn ($row) => self::scheduleSlotKey($row))
             ->values();
 
-        $schedulesByKey = [];
-        if ($schedulePairs->isNotEmpty()) {
-            $query = ClassSchedule::query()->occupying();
-            $query->where(function ($outer) use ($schedulePairs) {
-                foreach ($schedulePairs as $pair) {
-                    $outer->orWhere(function ($inner) use ($pair) {
-                        $inner->where('section_id', $pair['section_id'])
-                            ->where('subject_id', $pair['subject_id']);
-                    });
-                }
-            });
+        $scheduleSlots = self::scheduleSlotsForRows($scheduleRows, $schoolYearId);
 
-            foreach ($query->get(['section_id', 'subject_id', 'day_of_week', 'start_time', 'end_time']) as $schedule) {
-                $key = $schedule->section_id.'|'.$schedule->subject_id.'|'.$schedule->day_of_week;
-                $schedulesByKey[$key] ??= ['start_time' => $schedule->start_time, 'end_time' => $schedule->end_time];
-            }
-        }
-
-        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts, $schedulesByKey, $sectionId) {
-            $roster    = (int) ($rosterCounts[$row->class_record_quarter_id] ?? 0);
+        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts, $scheduleSlots, $sectionId) {
+            $roster = (int) ($rosterCounts[$row->class_record_quarter_id] ?? 0);
             $submitted = (int) ($scoreCounts[$row->id] ?? 0);
-            $date      = $row->activity_date instanceof Carbon
+            $date = $row->activity_date instanceof Carbon
                 ? $row->activity_date
                 : Carbon::parse((string) $row->activity_date);
 
             $scheduleKey = $row->section_id && $row->subject_id
-                ? $row->section_id.'|'.$row->subject_id.'|'.$date->format('l')
+                ? self::scheduleSlotKey([
+                    'section_id' => $row->section_id,
+                    'subject_id' => $row->subject_id,
+                    'activity_date' => $date->toDateString(),
+                ])
                 : null;
-            $schedule    = $scheduleKey ? ($schedulesByKey[$scheduleKey] ?? null) : null;
+            $scheduleSlot = $scheduleKey ? $scheduleSlots->get($scheduleKey) : null;
+            [$scheduleStart, $scheduleEnd] = $scheduleSlot
+                ? explode('|', $scheduleSlot, 2)
+                : [null, null];
 
             // Rows pooled in from a Science Core/Elective synthetic section
             // (grade-wide, not this specific homeroom) are tagged so the
@@ -438,38 +643,42 @@ class WatRuleService
             $subjectName = $row->category_label ? "{$row->subject_name} — {$row->category_label}" : $row->subject_name;
 
             return [
-                'id'              => $row->assessment_date_id
+                'id' => $row->assessment_date_id
                     ? "{$row->id}:{$row->assessment_date_id}"
                     : (string) $row->id,
-                'assessment_id'   => $row->id,
+                'assessment_id' => $row->id,
                 'class_record_id' => $row->class_record_id,
-                'date'            => $date->toDateString(),
-                'title'           => $row->title,
-                'subject_name'    => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,
-                'teacher_name'    => $teachers[$row->teacher_id]?->name,
+                'date' => $date->toDateString(),
+                'title' => $row->title,
+                'subject_name' => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,
+                'teacher_name' => $teachers[$row->teacher_id]?->name,
                 'assessment_type' => $row->assessment_type,
-                'type_label'      => ClassRecordAssessment::TYPES[$row->assessment_type] ?? $row->category_name,
-                'category_code'   => $row->category_code,
-                'is_graded'       => (bool) $row->is_graded,
-                'is_major'        => (bool) $row->is_major,
-                'plotted_at'      => $row->plotted_at,
-                'roster_count'    => $roster,
+                'type_label' => ClassRecordAssessment::TYPES[$row->assessment_type] ?? $row->category_name,
+                'category_code' => $row->category_code,
+                'is_graded' => (bool) $row->is_graded,
+                'is_major' => (bool) $row->is_major,
+                '_wat_section_id' => (int) $row->section_id,
+                '_wat_subject_id' => (int) $row->subject_id,
+                '_wat_subject_type' => $row->subject_type,
+                '_wat_slot' => $scheduleSlot,
+                'plotted_at' => $row->plotted_at,
+                'roster_count' => $roster,
                 'submitted_count' => $row->is_graded ? $submitted : null,
-                'compliance'      => ($row->is_graded && $roster > 0)
+                'compliance' => ($row->is_graded && $roster > 0)
                     ? round($submitted / $roster * 100, 1)
                     : null,
-                'time_label'      => $schedule
-                    ? substr((string) $schedule['start_time'], 0, 5).'–'.substr((string) $schedule['end_time'], 0, 5)
+                'time_label' => $scheduleSlot
+                    ? $scheduleStart.'–'.$scheduleEnd
                     : null,
             ];
         });
 
-        $ilaItems = $ilaDates->map(function ($ilaDate) use ($teachers, $sectionId, $schedulesByKey) {
+        $ilaItems = $ilaDates->map(function ($ilaDate) use ($teachers, $sectionId, $scheduleSlots) {
             $classRecord = $ilaDate->quarter->classRecord;
-            $pooledTag   = null;
+            $pooledTag = null;
             if ($classRecord && (int) $classRecord->section_id !== $sectionId) {
                 $sectionName = (string) $classRecord->section?->sectionname;
-                $pooledTag   = str_starts_with($sectionName, 'SCI-')
+                $pooledTag = str_starts_with($sectionName, 'SCI-')
                     ? 'Science Core'
                     : (str_starts_with($sectionName, 'ELEC-') ? 'Elective' : null);
             }
@@ -478,31 +687,38 @@ class WatRuleService
                 : $classRecord?->subject_name;
 
             $scheduleKey = $classRecord?->section_id && $classRecord?->subject_id
-                ? $classRecord->section_id.'|'.$classRecord->subject_id.'|'.$ilaDate->date->format('l')
+                ? self::scheduleSlotKey([
+                    'section_id' => $classRecord->section_id,
+                    'subject_id' => $classRecord->subject_id,
+                    'activity_date' => $ilaDate->date->toDateString(),
+                ])
                 : null;
-            $schedule = $scheduleKey ? ($schedulesByKey[$scheduleKey] ?? null) : null;
+            $scheduleSlot = $scheduleKey ? $scheduleSlots->get($scheduleKey) : null;
+            [$scheduleStart, $scheduleEnd] = $scheduleSlot
+                ? explode('|', $scheduleSlot, 2)
+                : [null, null];
 
             return [
-                'id'              => 'ila-'.$ilaDate->id,
-                'ila_date_id'     => $ilaDate->id,
+                'id' => 'ila-'.$ilaDate->id,
+                'ila_date_id' => $ilaDate->id,
                 'class_record_id' => $classRecord?->id,
-                'date'            => $ilaDate->date->toDateString(),
-                'title'           => $ilaDate->title ?: 'Independent Learning Activity',
-                'subject_name'    => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,
-                'teacher_name'    => $teachers[$classRecord?->teacher_id]?->name,
+                'date' => $ilaDate->date->toDateString(),
+                'title' => $ilaDate->title ?: 'Independent Learning Activity',
+                'subject_name' => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,
+                'teacher_name' => $teachers[$classRecord?->teacher_id]?->name,
                 'assessment_type' => 'ila',
-                'type_label'      => ClassRecordAssessment::TYPES['ila'],
-                'category_code'   => null,
-                'is_graded'       => false,
-                'is_major'        => false,
-                'plotted_at'      => null,
-                'roster_count'    => null,
+                'type_label' => ClassRecordAssessment::TYPES['ila'],
+                'category_code' => null,
+                'is_graded' => false,
+                'is_major' => false,
+                'plotted_at' => null,
+                'roster_count' => null,
                 'submitted_count' => null,
-                'compliance'      => null,
-                'time_label'      => $schedule
-                    ? substr((string) $schedule['start_time'], 0, 5).'–'.substr((string) $schedule['end_time'], 0, 5)
+                'compliance' => null,
+                'time_label' => $scheduleSlot
+                    ? $scheduleStart.'–'.$scheduleEnd
                     : null,
-                'source'          => 'ila_pending',
+                'source' => 'ila_pending',
             ];
         });
 
@@ -517,47 +733,66 @@ class WatRuleService
             fn ($w) => $date >= $w->start_date->toDateString() && $date <= $w->end_date->toDateString()
         );
 
-        $days = collect(range(0, 4))->map(function ($offset) use ($monday, $items, $isExamWindowDate) {
-            $date    = $monday->copy()->addDays($offset)->toDateString();
+        $days = collect(range(0, 4))->map(function ($offset) use ($monday, $items, $isExamWindowDate, $schoolYearId) {
+            $date = $monday->copy()->addDays($offset)->toDateString();
             $dayRows = $items->where('date', $date)->values();
-            $graded  = $dayRows->where('is_graded', true)->count();
-            $major   = $dayRows->where('is_graded', true)->where('is_major', true)->count();
+            $counts = self::trackerItemCounts($dayRows, $schoolYearId);
+            $graded = $counts['graded'];
+            $major = $counts['major'];
 
             return [
-                'date'            => $date,
-                'items'           => $dayRows,
-                'graded_count'    => $graded,
-                'major_count'     => $major,
-                'over_daily'      => $graded > self::DAILY_GRADED_MAX || $major > self::DAILY_MAJOR_MAX,
-                'is_exam_window'  => $isExamWindowDate($date),
+                'date' => $date,
+                'items' => $dayRows,
+                'graded_count' => $graded,
+                'major_count' => $major,
+                'over_daily' => $graded > self::DAILY_GRADED_MAX || $major > self::DAILY_MAJOR_MAX,
+                'is_exam_window' => $isExamWindowDate($date),
             ];
         });
 
-        $weekGraded = $items->where('is_graded', true)->unique('assessment_id')->count();
-        $weekMajor  = $items->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
+        $weekCounts = self::trackerItemCounts($items, $schoolYearId);
+        $weekGraded = $weekCounts['graded'];
+        $weekMajor = $weekCounts['major'];
 
         return [
-            'week_start'   => $monday->toDateString(),
-            'week_end'     => $friday->toDateString(),
-            'days'         => $days,
-            'totals'       => [
-                'graded'           => $weekGraded,
-                'major'            => $weekMajor,
-                'over_weekly'      => $weekGraded > self::WEEKLY_GRADED_MAX || $weekMajor > self::WEEKLY_MAJOR_MAX,
-                'has_exam_window'  => $days->contains('is_exam_window', true),
+            'week_start' => $monday->toDateString(),
+            'week_end' => $friday->toDateString(),
+            'days' => $days,
+            'totals' => [
+                'graded' => $weekGraded,
+                'major' => $weekMajor,
+                'over_weekly' => $weekGraded > self::WEEKLY_GRADED_MAX || $weekMajor > self::WEEKLY_MAJOR_MAX,
+                'has_exam_window' => $days->contains('is_exam_window', true),
             ],
-            'limits'       => [
-                'daily_graded'  => self::DAILY_GRADED_MAX,
-                'daily_major'   => self::DAILY_MAJOR_MAX,
+            'limits' => [
+                'daily_graded' => self::DAILY_GRADED_MAX,
+                'daily_major' => self::DAILY_MAJOR_MAX,
                 'weekly_graded' => self::WEEKLY_GRADED_MAX,
-                'weekly_major'  => self::WEEKLY_MAJOR_MAX,
+                'weekly_major' => self::WEEKLY_MAJOR_MAX,
             ],
-            'review'       => WatReview::with('reviewedBy:id,name')
+            'review' => WatReview::with('reviewedBy:id,name')
                 ->where('section_id', $sectionId)
                 ->where('school_year_id', $schoolYearId)
                 ->where('week_start', $monday->toDateString())
                 ->first(),
         ];
+    }
+
+    private static function trackerItemCounts(Collection $items, int $schoolYearId): array
+    {
+        return self::consolidatedCounts(
+            $items->map(fn ($item) => [
+                'assessment_key' => (string) ($item['assessment_id'] ?? $item['id']),
+                'activity_date' => $item['date'],
+                'section_id' => (int) ($item['_wat_section_id'] ?? 0),
+                'subject_id' => (int) ($item['_wat_subject_id'] ?? 0),
+                'subject_type' => $item['_wat_subject_type'] ?? null,
+                'resolved_slot' => $item['_wat_slot'] ?? null,
+                'is_graded' => (bool) $item['is_graded'],
+                'is_major' => (bool) $item['is_major'],
+            ]),
+            $schoolYearId
+        );
     }
 
     // ── Teacher-level plotting compliance (CID/ACIDAA analytics) ─────────────
@@ -587,10 +822,14 @@ class WatRuleService
      *   teachers: array<int, array>,
      * }
      */
-    public static function teacherBreakdown(int $sectionId, int $schoolYearId, string $weekStart): array
-    {
+    public static function teacherBreakdown(
+        int $sectionId,
+        int $schoolYearId,
+        string $weekStart,
+        ?array $preparedWeek = null
+    ): array {
         $monday = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
-        $week   = self::weekData($sectionId, $schoolYearId, $monday->toDateString());
+        $week = $preparedWeek ?? self::weekData($sectionId, $schoolYearId, $monday->toDateString());
 
         // Deadline for the week is judged off Monday (the week's own plotting
         // cutoff is "Friday before Monday, 12NN") — same anchor violatesPlottingDeadline()
@@ -598,8 +837,8 @@ class WatRuleService
         $deadlinePassed = now()->greaterThan(self::plottingDeadline($monday->toDateString()));
 
         $remainingGraded = max(0, self::WEEKLY_GRADED_MAX - $week['totals']['graded']);
-        $remainingMajor  = max(0, self::WEEKLY_MAJOR_MAX - $week['totals']['major']);
-        $capExhausted    = $remainingGraded <= 0 || $remainingMajor <= 0;
+        $remainingMajor = max(0, self::WEEKLY_MAJOR_MAX - $week['totals']['major']);
+        $capExhausted = $remainingGraded <= 0 || $remainingMajor <= 0;
 
         // Roster: every teacher with a 'teaching' LoadAssignment on this
         // section this school year — this is what surfaces a zero-plot
@@ -616,7 +855,7 @@ class WatRuleService
 
         $byTeacher = $roster->groupBy('user_id')->map(function ($assignments, $userId) use ($items, $deadlinePassed, $capExhausted) {
             $teacherName = $assignments->first()->faculty?->name;
-            $subjects    = $assignments->pluck('subject.name')->filter()->unique()->values();
+            $subjects = $assignments->pluck('subject.name')->filter()->unique()->values();
 
             // Matched on teacher_name (resolved from the roster's faculty
             // relation) rather than subject — a co-taught synthetic Science
@@ -629,7 +868,7 @@ class WatRuleService
             })->values();
 
             $graded = $mine->where('is_graded', true);
-            $major  = $graded->where('is_major', true);
+            $major = $graded->where('is_major', true);
 
             $plottedCount = $graded->unique('assessment_id')->count();
             $lastPlottedAt = $mine->pluck('plotted_at')->filter()->sort()->last();
@@ -642,26 +881,26 @@ class WatRuleService
             }
 
             return [
-                'user_id'         => (int) $userId,
-                'teacher_name'    => $teacherName,
-                'subjects'        => $subjects->all(),
-                'graded_count'    => $graded->count(),
-                'major_count'     => $major->count(),
-                'plotted'         => $plottedCount > 0,
+                'user_id' => (int) $userId,
+                'teacher_name' => $teacherName,
+                'subjects' => $subjects->all(),
+                'graded_count' => $graded->count(),
+                'major_count' => $major->count(),
+                'plotted' => $plottedCount > 0,
                 'last_plotted_at' => $lastPlottedAt,
-                'status'          => $status,
+                'status' => $status,
             ];
         })->values()->sortBy('teacher_name')->values()->all();
 
         return [
-            'week_start'      => $week['week_start'],
-            'week_end'        => $week['week_end'],
+            'week_start' => $week['week_start'],
+            'week_end' => $week['week_end'],
             'deadline_passed' => $deadlinePassed,
-            'remaining'       => [
+            'remaining' => [
                 'weekly_graded' => $remainingGraded,
-                'weekly_major'  => $remainingMajor,
+                'weekly_major' => $remainingMajor,
             ],
-            'teachers'        => $byTeacher,
+            'teachers' => $byTeacher,
         ];
     }
 
@@ -711,12 +950,12 @@ class WatRuleService
 
         $bySection = $records->groupBy('section_id');
 
-        $sections  = [];
+        $sections = [];
         $dayBucket = collect(range(0, 4))->mapWithKeys(fn ($o) => [$monday->copy()->addDays($o)->toDateString() => collect()]);
 
         foreach ($bySection as $sectionId => $sectionRecords) {
             $first = $sectionRecords->first();
-            $week  = self::weekData((int) $sectionId, $schoolYearId, $monday->toDateString());
+            $week = self::weekData((int) $sectionId, $schoolYearId, $monday->toDateString());
 
             // This teacher's own items only — matched by teacher_name the
             // same way teacherBreakdown() does, since a pooled Science
@@ -730,57 +969,58 @@ class WatRuleService
             foreach ($mine as $item) {
                 if ($dayBucket->has($item['date'])) {
                     $dayBucket[$item['date']]->push($item + [
-                        'section_id'   => (int) $sectionId,
+                        'section_id' => (int) $sectionId,
                         'section_name' => $first->section?->sectionname,
-                        'grade'        => $first->section?->levelid,
+                        'grade' => $first->section?->levelid,
                     ]);
                 }
             }
 
             $gradedMine = $mine->where('is_graded', true)->unique('assessment_id')->count();
-            $majorMine  = $mine->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
+            $majorMine = $mine->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
 
             $sections[] = [
-                'section_id'    => (int) $sectionId,
-                'section_name'  => $first->section?->sectionname,
-                'grade'         => $first->section?->levelid,
-                'subjects'      => $sectionRecords->pluck('subject_name')->unique()->values()->all(),
-                'graded_count'  => $gradedMine,
-                'major_count'   => $majorMine,
-                'remaining'     => [
+                'section_id' => (int) $sectionId,
+                'section_name' => $first->section?->sectionname,
+                'grade' => $first->section?->levelid,
+                'subjects' => $sectionRecords->pluck('subject_name')->unique()->values()->all(),
+                'graded_count' => $gradedMine,
+                'major_count' => $majorMine,
+                'remaining' => [
                     // Room left in the SECTION's shared budget (pools every
                     // teacher on it, not just this one) — matches what the
                     // section-scoped tracker/upsert endpoint actually enforces.
                     'weekly_graded' => max(0, self::WEEKLY_GRADED_MAX - $week['totals']['graded']),
-                    'weekly_major'  => max(0, self::WEEKLY_MAJOR_MAX - $week['totals']['major']),
+                    'weekly_major' => max(0, self::WEEKLY_MAJOR_MAX - $week['totals']['major']),
                 ],
                 'section_totals' => [
                     'graded' => $week['totals']['graded'],
-                    'major'  => $week['totals']['major'],
+                    'major' => $week['totals']['major'],
                 ],
             ];
         }
 
         $days = $dayBucket->map(function ($items, $date) {
             $sorted = $items->sortBy('section_name')->values();
+
             return [
-                'date'         => $date,
-                'items'        => $sorted,
+                'date' => $date,
+                'items' => $sorted,
                 'graded_count' => $sorted->where('is_graded', true)->count(),
-                'major_count'  => $sorted->where('is_graded', true)->where('is_major', true)->count(),
+                'major_count' => $sorted->where('is_graded', true)->where('is_major', true)->count(),
             ];
         })->values();
 
         $weekItems = $days->flatMap(fn ($day) => $day['items']);
         $weekGraded = $weekItems->where('is_graded', true)->unique('assessment_id')->count();
-        $weekMajor  = $weekItems->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
+        $weekMajor = $weekItems->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
 
         return [
             'week_start' => $monday->toDateString(),
-            'week_end'   => $friday->toDateString(),
-            'totals'     => ['graded' => $weekGraded, 'major' => $weekMajor],
-            'sections'   => collect($sections)->sortBy('section_name')->values()->all(),
-            'days'       => $days->all(),
+            'week_end' => $friday->toDateString(),
+            'totals' => ['graded' => $weekGraded, 'major' => $weekMajor],
+            'sections' => collect($sections)->sortBy('section_name')->values()->all(),
+            'days' => $days->all(),
         ];
     }
 }

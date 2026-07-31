@@ -199,6 +199,15 @@ class AssessmentPlottingService
                     $quarterNumber,
                     $occurrenceDate,
                 ));
+                $candidateOccurrences = $countedDates->map(fn ($occurrenceDate) => [
+                    'assessment_key' => 'new',
+                    'activity_date' => $occurrenceDate,
+                    'section_id' => $record->section_id,
+                    'subject_id' => $record->subject_id,
+                    'subject_type' => $record->subject?->subject_type,
+                    'is_graded' => true,
+                    'is_major' => $isMajor,
+                ]);
 
                 foreach ($countedDates as $occurrenceDate) {
                     $day = WatRuleService::gradeCountsOnDate(
@@ -206,13 +215,15 @@ class AssessmentPlottingService
                         $grade,
                         $record->school_year_id,
                         $occurrenceDate,
+                        [],
+                        $candidateOccurrences->where('activity_date', $occurrenceDate)->values()->all(),
                     );
                     $this->failUnless(
-                        $day['graded'] + 1 <= WatRuleService::DAILY_GRADED_MAX,
+                        $day['graded'] <= WatRuleService::DAILY_GRADED_MAX,
                         "{$occurrenceDate} already has the maximum number of graded assessments.",
                     );
                     $this->failUnless(
-                        ! $isMajor || $day['major'] + 1 <= WatRuleService::DAILY_MAJOR_MAX,
+                        ! $isMajor || $day['major'] <= WatRuleService::DAILY_MAJOR_MAX,
                         "{$occurrenceDate} already has the maximum number of major assessments.",
                     );
                 }
@@ -224,13 +235,18 @@ class AssessmentPlottingService
                         $grade,
                         $record->school_year_id,
                         $weekStart,
+                        [],
+                        $candidateOccurrences->filter(
+                            fn ($candidate) => Carbon::parse($candidate['activity_date'])
+                                ->startOfWeek(Carbon::MONDAY)->toDateString() === $weekStart
+                        )->values()->all(),
                     );
                     $this->failUnless(
-                        $week['graded'] + 1 <= WatRuleService::WEEKLY_GRADED_MAX,
+                        $week['graded'] <= WatRuleService::WEEKLY_GRADED_MAX,
                         "The week containing {$weekDates->first()} already has the maximum number of graded assessments.",
                     );
                     $this->failUnless(
-                        ! $isMajor || $week['major'] + 1 <= WatRuleService::WEEKLY_MAJOR_MAX,
+                        ! $isMajor || $week['major'] <= WatRuleService::WEEKLY_MAJOR_MAX,
                         "The week containing {$weekDates->first()} already has the maximum number of major assessments.",
                     );
                 }

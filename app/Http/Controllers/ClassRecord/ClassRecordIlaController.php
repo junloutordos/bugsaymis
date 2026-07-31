@@ -22,9 +22,7 @@ use Illuminate\Support\Facades\DB;
 
 class ClassRecordIlaController extends Controller
 {
-    public function __construct(private readonly ClassRecordMonitorScopeService $monitorScope)
-    {
-    }
+    public function __construct(private readonly ClassRecordMonitorScopeService $monitorScope) {}
 
     private function isAdmin(): bool
     {
@@ -66,13 +64,12 @@ class ClassRecordIlaController extends Controller
             ->orderBy('date')
             ->get(['id', 'date', 'is_auto_generated', 'sort_order', 'title', 'is_graded', 'class_record_assessment_id']);
 
-        $records = ClassRecordIlaRecord::whereHas('ilaDate', fn ($sq) =>
-                $sq->where('class_record_quarter_id', $quarter->id)
-            )
+        $records = ClassRecordIlaRecord::whereHas('ilaDate', fn ($sq) => $sq->where('class_record_quarter_id', $quarter->id)
+        )
             ->get(['class_record_ila_date_id', 'class_record_student_id', 'status'])
             ->mapWithKeys(fn ($r) => [
-                "{$r->class_record_student_id}_{$r->class_record_ila_date_id}" => $r->status,
-            ]);
+            "{$r->class_record_student_id}_{$r->class_record_ila_date_id}" => $r->status,
+        ]);
 
         return response()->json(['dates' => $dates, 'records' => $records]);
     }
@@ -161,10 +158,10 @@ class ClassRecordIlaController extends Controller
         abort_if($quarter->is_locked, 403, 'Quarter is locked.');
 
         $validated = $request->validate([
-            'records'              => 'required|array|min:1',
-            'records.*.date_id'    => 'required|integer|exists:class_record_ila_dates,id',
+            'records' => 'required|array|min:1',
+            'records.*.date_id' => 'required|integer|exists:class_record_ila_dates,id',
             'records.*.student_id' => 'required|integer|exists:class_record_students,id',
-            'records.*.status'     => 'nullable|in:compliant,non_compliant',
+            'records.*.status' => 'nullable|in:compliant,non_compliant',
         ]);
 
         // "exists" only proves the IDs are valid rows *somewhere* — without this,
@@ -182,7 +179,7 @@ class ClassRecordIlaController extends Controller
             ->pluck('id');
         abort_if($validStudentIds->count() !== $studentIds->count(), 422, 'One or more students do not belong to this class record.');
 
-        $now      = now();
+        $now = now();
         $toUpsert = [];
 
         foreach ($validated['records'] as $item) {
@@ -196,10 +193,10 @@ class ClassRecordIlaController extends Controller
             } else {
                 $toUpsert[] = [
                     'class_record_ila_date_id' => $item['date_id'],
-                    'class_record_student_id'  => $item['student_id'],
-                    'status'                   => $status,
-                    'created_at'               => $now,
-                    'updated_at'               => $now,
+                    'class_record_student_id' => $item['student_id'],
+                    'status' => $status,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
             }
         }
@@ -212,7 +209,7 @@ class ClassRecordIlaController extends Controller
             );
         }
 
-        return response()->json(['message' => count($toUpsert) . ' record(s) saved.']);
+        return response()->json(['message' => count($toUpsert).' record(s) saved.']);
     }
 
     // ── POST /class-records/{cr}/quarters/{q}/ila/dates/{ilaDate}/grade ───────
@@ -248,41 +245,64 @@ class ClassRecordIlaController extends Controller
 
         $validated = $request->validate([
             'grading_category_id' => 'required|integer|exists:grading_categories,id',
-            'title'                => 'required|string|max:255',
-            'max_score'            => 'required|numeric|min:0.01',
+            'title' => 'required|string|max:255',
+            'max_score' => 'required|numeric|min:0.01',
         ]);
 
         $category = GradingCategory::findOrFail($validated['grading_category_id']);
         $optionId = $quarter->grading_option_id ?? $classRecord->grading_option_id;
-        $option   = GradingOption::with('categories')->find($optionId);
-        $leafIds  = $option ? $option->leafCategories()->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
+        $option = GradingOption::with('categories')->find($optionId);
+        $leafIds = $option ? $option->leafCategories()->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
         abort_unless(in_array($category->id, $leafIds, true), 422, "That category is not part of this quarter's grading option.");
 
         $grade = $classRecord->section?->levelid;
         abort_if($grade === null, 422, 'This class record has no section linked.');
 
         $assessmentType = WatRuleService::deriveType($category->code, 1);
-        $isMajor        = WatRuleService::isMajor($assessmentType, $category);
+        $isMajor = WatRuleService::isMajor($assessmentType, $category);
 
         // Daily/weekly caps — pooled with Science Core/Elective synthetic
         // sections, same rule as any other plotted assessment. ILA dates are
         // only ever generated on days the schedule already meets, so the
         // schedule-day check (WatRuleService::meetsOnDate) is redundant here.
-        $dayCounts = WatRuleService::gradeCountsOnDate($classRecord->section_id, $grade, $classRecord->school_year_id, $date);
-        if ($dayCounts['graded'] + 1 > WatRuleService::DAILY_GRADED_MAX) {
-            abort(422, 'This section would have '.($dayCounts['graded'] + 1)." graded assessments on {$date} — the WAT limit is ".WatRuleService::DAILY_GRADED_MAX.' graded assessments per day.');
+        $candidate = [[
+            'assessment_key' => 'ila:'.$ilaDate->id,
+            'activity_date' => $date,
+            'section_id' => $classRecord->section_id,
+            'subject_id' => $classRecord->subject_id,
+            'subject_type' => $classRecord->subject?->subject_type,
+            'is_graded' => true,
+            'is_major' => $isMajor,
+        ]];
+        $dayCounts = WatRuleService::gradeCountsOnDate(
+            $classRecord->section_id,
+            $grade,
+            $classRecord->school_year_id,
+            $date,
+            [],
+            $candidate
+        );
+        if ($dayCounts['graded'] > WatRuleService::DAILY_GRADED_MAX) {
+            abort(422, 'This section would have '.$dayCounts['graded']." graded assessments on {$date} — the WAT limit is ".WatRuleService::DAILY_GRADED_MAX.' graded assessments per day.');
         }
-        if ($isMajor && $dayCounts['major'] + 1 > WatRuleService::DAILY_MAJOR_MAX) {
-            abort(422, 'This section would have '.($dayCounts['major'] + 1)." major assessments on {$date} — the WAT limit is ".WatRuleService::DAILY_MAJOR_MAX.' major assessments per day.');
+        if ($isMajor && $dayCounts['major'] > WatRuleService::DAILY_MAJOR_MAX) {
+            abort(422, 'This section would have '.$dayCounts['major']." major assessments on {$date} — the WAT limit is ".WatRuleService::DAILY_MAJOR_MAX.' major assessments per day.');
         }
 
-        $weekStart  = Carbon::parse($date)->startOfWeek(Carbon::MONDAY)->toDateString();
-        $weekCounts = WatRuleService::gradeCountsInWeek($classRecord->section_id, $grade, $classRecord->school_year_id, $weekStart);
-        if ($weekCounts['graded'] + 1 > WatRuleService::WEEKLY_GRADED_MAX) {
-            abort(422, 'This section would have '.($weekCounts['graded'] + 1)." graded assessments in the week of {$weekStart} — the WAT limit is ".WatRuleService::WEEKLY_GRADED_MAX.' graded assessments per week.');
+        $weekStart = Carbon::parse($date)->startOfWeek(Carbon::MONDAY)->toDateString();
+        $weekCounts = WatRuleService::gradeCountsInWeek(
+            $classRecord->section_id,
+            $grade,
+            $classRecord->school_year_id,
+            $weekStart,
+            [],
+            $candidate
+        );
+        if ($weekCounts['graded'] > WatRuleService::WEEKLY_GRADED_MAX) {
+            abort(422, 'This section would have '.$weekCounts['graded']." graded assessments in the week of {$weekStart} — the WAT limit is ".WatRuleService::WEEKLY_GRADED_MAX.' graded assessments per week.');
         }
-        if ($isMajor && $weekCounts['major'] + 1 > WatRuleService::WEEKLY_MAJOR_MAX) {
-            abort(422, 'This section would have '.($weekCounts['major'] + 1)." major assessments in the week of {$weekStart} — the WAT limit is ".WatRuleService::WEEKLY_MAJOR_MAX.' major assessments per week.');
+        if ($isMajor && $weekCounts['major'] > WatRuleService::WEEKLY_MAJOR_MAX) {
+            abort(422, 'This section would have '.$weekCounts['major']." major assessments in the week of {$weekStart} — the WAT limit is ".WatRuleService::WEEKLY_MAJOR_MAX.' major assessments per week.');
         }
 
         $nextNumber = 1 + (int) ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)
@@ -294,16 +314,16 @@ class ClassRecordIlaController extends Controller
         DB::transaction(function () use (&$assessment, $quarter, $category, $assessmentType, $isMajor, $nextNumber, $nextSort, $validated, $date, $ilaDate) {
             $assessment = ClassRecordAssessment::create([
                 'class_record_quarter_id' => $quarter->id,
-                'grading_category_id'     => $category->id,
-                'assessment_type'         => $assessmentType,
-                'is_graded'               => true,
-                'is_major'                => $isMajor,
-                'assessment_number'       => $nextNumber,
-                'title'                   => $validated['title'],
-                'activity_date'           => $date,
-                'plotted_at'              => now(),
-                'max_score'               => $validated['max_score'],
-                'sort_order'              => $nextSort,
+                'grading_category_id' => $category->id,
+                'assessment_type' => $assessmentType,
+                'is_graded' => true,
+                'is_major' => $isMajor,
+                'assessment_number' => $nextNumber,
+                'title' => $validated['title'],
+                'activity_date' => $date,
+                'plotted_at' => now(),
+                'max_score' => $validated['max_score'],
+                'sort_order' => $nextSort,
             ]);
 
             $records = ClassRecordIlaRecord::where('class_record_ila_date_id', $ilaDate->id)->get();
@@ -312,17 +332,17 @@ class ClassRecordIlaController extends Controller
                     continue;
                 }
                 ClassRecordScore::create([
-                    'class_record_student_id'    => $record->class_record_student_id,
+                    'class_record_student_id' => $record->class_record_student_id,
                     'class_record_assessment_id' => $assessment->id,
-                    'score'                      => $record->status === 'compliant' ? $validated['max_score'] : 0,
+                    'score' => $record->status === 'compliant' ? $validated['max_score'] : 0,
                 ]);
             }
 
             $ilaDate->update([
-                'is_graded'                  => true,
+                'is_graded' => true,
                 'class_record_assessment_id' => $assessment->id,
-                'graded_by_id'               => Auth::id(),
-                'graded_decided_at'          => now(),
+                'graded_by_id' => Auth::id(),
+                'graded_decided_at' => now(),
             ]);
         });
 
@@ -355,10 +375,10 @@ class ClassRecordIlaController extends Controller
         DB::transaction(function () use ($ilaDate) {
             $assessmentId = $ilaDate->class_record_assessment_id;
             $ilaDate->update([
-                'is_graded'                  => false,
+                'is_graded' => false,
                 'class_record_assessment_id' => null,
-                'graded_by_id'               => null,
-                'graded_decided_at'          => null,
+                'graded_by_id' => null,
+                'graded_decided_at' => null,
             ]);
             if ($assessmentId) {
                 ClassRecordAssessment::whereKey($assessmentId)->delete(); // cascades to class_record_scores

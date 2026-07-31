@@ -8,8 +8,8 @@ use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\AcademicTerm;
-use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\FacultyLoad;
@@ -20,7 +20,12 @@ use App\Models\FacultyLoading\Subject;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ClassRecord\WatRuleService;
+use App\Services\FacultyLoading\HeadAdvisoryService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Smalot\PdfParser\Parser;
 use Tests\TestCase;
 
 class WeeklyAssessmentTrackerTest extends TestCase
@@ -28,8 +33,11 @@ class WeeklyAssessmentTrackerTest extends TestCase
     use RefreshDatabase;
 
     private SchoolYear $sy;
+
     private AcademicTerm $term;
+
     private GradingOption $option;
+
     private GradingCategory $category;
 
     protected function setUp(): void
@@ -168,6 +176,38 @@ class WeeklyAssessmentTrackerTest extends TestCase
             'assessment_type' => 'formative', 'is_graded' => true, 'is_major' => false,
             'assessment_number' => $number, 'title' => "Quiz {$number}", 'activity_date' => $date,
             'plotted_at' => now(), 'max_score' => 20, 'sort_order' => $number,
+        ]);
+    }
+
+    private function makeSchedule(
+        Section $section,
+        Subject $subject,
+        User $teacher,
+        string $start,
+        string $end
+    ): ClassSchedule {
+        static $roomNumber = 0;
+        $roomNumber++;
+        $room = Classroom::create([
+            'school_year_id' => $this->sy->id,
+            'name' => "WAT Room {$roomNumber}",
+            'code' => "WAT-R{$roomNumber}",
+            'classroom_type' => 'lecture',
+            'capacity' => 40,
+            'is_available' => true,
+        ]);
+
+        return ClassSchedule::create([
+            'user_id' => $teacher->id,
+            'subject_id' => $subject->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->sy->id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => $start,
+            'end_time' => $end,
+            'status' => 'active',
         ]);
     }
 
@@ -317,12 +357,12 @@ class WeeklyAssessmentTrackerTest extends TestCase
     // page — assert on the Content-Type header and the actual rendered PDF
     // text, extracted via smalot/pdfparser, rather than Inertia props.
 
-    private function assertPdfTextContains(\Illuminate\Testing\TestResponse $response, string $needle): void
+    private function assertPdfTextContains(TestResponse $response, string $needle): void
     {
         $response->assertOk();
         $this->assertSame('application/pdf', $response->headers->get('content-type'));
 
-        $pdf = (new \Smalot\PdfParser\Parser())->parseContent($response->streamedContent());
+        $pdf = (new Parser)->parseContent($response->streamedContent());
         $this->assertStringContainsString($needle, $pdf->getText());
     }
 
@@ -353,7 +393,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $section = $this->makeSection(['adviser' => $adviser->id]);
         $subject = $this->makeSubject();
 
-        app(\App\Services\FacultyLoading\HeadAdvisoryService::class)->syncSectionAdviser($section, null);
+        app(HeadAdvisoryService::class)->syncSectionAdviser($section, null);
         $this->assignCoordinator($coordinator, 'COORD', 'COORD-HRG8', 'HR Coordinator (G8)');
 
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
@@ -433,7 +473,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         ]);
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $wat = \App\Services\ClassRecord\WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
+        $wat = WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
         $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
         $this->assertSame('08:00–09:00', $monday['items'][0]['time_label']);
     }
@@ -446,7 +486,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         // No ClassSchedule row created for this subject/section at all.
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $wat = \App\Services\ClassRecord\WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
+        $wat = WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
         $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
         $this->assertNull($monday['items'][0]['time_label']);
     }
@@ -503,7 +543,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $subject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
         $this->makeClassRecordWithAssessment($scienceCore, $subject, $teacher, '2025-09-01');
 
-        $wat = \App\Services\ClassRecord\WatRuleService::weekData($homeroom->id, $this->sy->id, '2025-09-01');
+        $wat = WatRuleService::weekData($homeroom->id, $this->sy->id, '2025-09-01');
         $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
 
         $this->assertCount(1, $monday['items']);
@@ -533,16 +573,150 @@ class WeeklyAssessmentTrackerTest extends TestCase
             ->postJson(route('class-records.assessments.upsert', ['classRecord' => $homeroomRecord->id, 'q' => 1]), [
                 'assessments' => [[
                     'grading_category_id' => $this->category->id,
-                    'assessment_number'   => 1,
-                    'title'               => 'Quiz 1',
-                    'is_graded'           => true,
-                    'activity_date'       => '2025-09-01',
-                    'max_score'           => 20,
+                    'assessment_number' => 1,
+                    'title' => 'Quiz 1',
+                    'is_graded' => true,
+                    'activity_date' => '2025-09-01',
+                    'max_score' => 20,
                 ]],
             ]);
 
         $response->assertStatus(422);
         $this->assertStringContainsString('4 graded assessments', $response->json('message'));
+    }
+
+    public function test_same_time_electives_count_as_one_wat_unit_but_remain_visible(): void
+    {
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $electiveA = $this->makeSection(['levelid' => 11, 'sectionname' => 'ELEC-A-G11']);
+        $electiveB = $this->makeSection(['levelid' => 11, 'sectionname' => 'ELEC-B-G11']);
+        $subjectA = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+        $subjectB = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+        $this->makeSchedule($electiveA, $subjectA, $teacher, '08:00:00', '09:00:00');
+        $this->makeSchedule($electiveB, $subjectB, $teacher, '08:00:00', '09:00:00');
+        $this->makeClassRecordWithAssessment($electiveA, $subjectA, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($electiveB, $subjectB, $teacher, '2025-09-01');
+
+        $counts = WatRuleService::gradeCountsOnDate(
+            $homeroom->id,
+            11,
+            $this->sy->id,
+            '2025-09-01'
+        );
+        $wat = WatRuleService::weekData(
+            $homeroom->id,
+            $this->sy->id,
+            '2025-09-01'
+        );
+        $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
+
+        $this->assertSame(['graded' => 1, 'major' => 0], $counts);
+        $this->assertSame(1, $monday['graded_count']);
+        $this->assertCount(2, $monday['items']);
+        $this->assertSame(1, $wat['totals']['graded']);
+    }
+
+    public function test_same_time_science_core_subjects_count_as_one_and_any_major_marks_the_block_major(): void
+    {
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $scienceA = $this->makeSection(['levelid' => 11, 'sectionname' => 'SCI-A-G11']);
+        $scienceB = $this->makeSection(['levelid' => 11, 'sectionname' => 'SCI-B-G11']);
+        $subjectA = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
+        $subjectB = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
+        $this->makeSchedule($scienceA, $subjectA, $teacher, '10:00:00', '11:00:00');
+        $this->makeSchedule($scienceB, $subjectB, $teacher, '10:00:00', '11:00:00');
+        $this->makeClassRecordWithAssessment($scienceA, $subjectA, $teacher, '2025-09-01');
+        $major = $this->makeClassRecordWithAssessment($scienceB, $subjectB, $teacher, '2025-09-01');
+        $major->update(['is_major' => true]);
+
+        $counts = WatRuleService::gradeCountsOnDate(
+            $homeroom->id,
+            11,
+            $this->sy->id,
+            '2025-09-01'
+        );
+
+        $this->assertSame(['graded' => 1, 'major' => 1], $counts);
+    }
+
+    public function test_shared_block_grouping_requires_same_type_and_exact_unambiguous_time(): void
+    {
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $electiveA = $this->makeSection(['levelid' => 11, 'sectionname' => 'ELEC-A-G11']);
+        $electiveB = $this->makeSection(['levelid' => 11, 'sectionname' => 'ELEC-B-G11']);
+        $science = $this->makeSection(['levelid' => 11, 'sectionname' => 'SCI-A-G11']);
+        $unscheduled = $this->makeSection(['levelid' => 11, 'sectionname' => 'ELEC-NO-SCHEDULE-G11']);
+        $electiveSubjectA = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+        $electiveSubjectB = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+        $scienceSubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
+        $unscheduledSubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective']);
+        $this->makeSchedule($electiveA, $electiveSubjectA, $teacher, '08:00:00', '09:00:00');
+        $this->makeSchedule($electiveB, $electiveSubjectB, $teacher, '09:00:00', '10:00:00');
+        $this->makeSchedule($science, $scienceSubject, $teacher, '08:00:00', '09:00:00');
+        $this->makeClassRecordWithAssessment($electiveA, $electiveSubjectA, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($electiveB, $electiveSubjectB, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($science, $scienceSubject, $teacher, '2025-09-01');
+        $this->makeClassRecordWithAssessment($unscheduled, $unscheduledSubject, $teacher, '2025-09-01');
+
+        $counts = WatRuleService::gradeCountsOnDate(
+            $homeroom->id,
+            11,
+            $this->sy->id,
+            '2025-09-01'
+        );
+
+        $this->assertSame(4, $counts['graded']);
+    }
+
+    public function test_new_elective_in_an_existing_full_block_does_not_consume_another_wat_slot(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $sections = collect(range(1, 4))->map(
+            fn ($n) => $this->makeSection(['levelid' => 11, 'sectionname' => "ELEC-{$n}-G11"])
+        );
+        $subjects = collect(range(1, 4))->map(
+            fn () => $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective'])
+        );
+        $starts = ['08:00:00', '09:00:00', '10:00:00', '08:00:00'];
+        $ends = ['09:00:00', '10:00:00', '11:00:00', '09:00:00'];
+
+        foreach (range(0, 3) as $index) {
+            $this->makeSchedule($sections[$index], $subjects[$index], $teacher, $starts[$index], $ends[$index]);
+        }
+        foreach (range(0, 2) as $index) {
+            $this->makeClassRecordWithAssessment(
+                $sections[$index],
+                $subjects[$index],
+                $teacher,
+                '2025-09-01'
+            );
+        }
+        $target = $this->makeClassRecord($sections[3], $subjects[3], $teacher);
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $target->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number' => 1,
+                    'title' => 'Shared Block Quiz',
+                    'is_graded' => true,
+                    'activity_date' => '2025-09-01',
+                    'max_score' => 20,
+                ]],
+            ])
+            ->assertOk();
+
+        $counts = WatRuleService::gradeCountsOnDate(
+            $sections[3]->id,
+            11,
+            $this->sy->id,
+            '2025-09-01'
+        );
+        $this->assertSame(3, $counts['graded']);
     }
 
     // ── Sibling homerooms never pool with each other ─────────────────────────
@@ -559,7 +733,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $subject = $this->makeSubject(['grade_level' => 7]);
         $this->makeClassRecordWithAssessment($sapphire, $subject, $teacher, '2025-09-01');
 
-        $wat = \App\Services\ClassRecord\WatRuleService::weekData($opal->id, $this->sy->id, '2025-09-01');
+        $wat = WatRuleService::weekData($opal->id, $this->sy->id, '2025-09-01');
         $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
 
         $this->assertSame(0, $monday['graded_count']);
@@ -586,11 +760,11 @@ class WeeklyAssessmentTrackerTest extends TestCase
             ->postJson(route('class-records.assessments.upsert', ['classRecord' => $opalRecord->id, 'q' => 1]), [
                 'assessments' => [[
                     'grading_category_id' => $this->category->id,
-                    'assessment_number'   => 1,
-                    'title'               => 'Quiz 1',
-                    'is_graded'           => true,
-                    'activity_date'       => '2025-09-01',
-                    'max_score'           => 20,
+                    'assessment_number' => 1,
+                    'title' => 'Quiz 1',
+                    'is_graded' => true,
+                    'activity_date' => '2025-09-01',
+                    'max_score' => 20,
                 ]],
             ]);
 
@@ -637,7 +811,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->makeAssessmentInRecord($archivedRecord, 2, '2025-09-01');
         $archivedRecord->update(['status' => 'archived', 'archived_at' => now()]);
 
-        $wat = \App\Services\ClassRecord\WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
+        $wat = WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
         $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
 
         // Only the active record's single assessment survives.
@@ -667,11 +841,11 @@ class WeeklyAssessmentTrackerTest extends TestCase
             ->postJson(route('class-records.assessments.upsert', ['classRecord' => $freshRecord->id, 'q' => 1]), [
                 'assessments' => [[
                     'grading_category_id' => $this->category->id,
-                    'assessment_number'   => 1,
-                    'title'               => 'Quiz 1',
-                    'is_graded'           => true,
-                    'activity_date'       => '2025-09-01',
-                    'max_score'           => 20,
+                    'assessment_number' => 1,
+                    'title' => 'Quiz 1',
+                    'is_graded' => true,
+                    'activity_date' => '2025-09-01',
+                    'max_score' => 20,
                 ]],
             ])
             ->assertOk();
@@ -709,7 +883,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->assignTeachingLoad($teacher, $subject, $section);
         $this->makeClassRecordWithAssessment($section, $subject, $teacher, '2025-09-01');
 
-        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
+        $breakdown = WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
         $row = collect($breakdown['teachers'])->firstWhere('user_id', $teacher->id);
 
         $this->assertNotNull($row);
@@ -727,9 +901,9 @@ class WeeklyAssessmentTrackerTest extends TestCase
 
         // A week far enough in the future that "now" is still before its
         // Friday-noon plotting deadline.
-        $future = now()->addMonths(2)->startOfWeek(\Carbon\Carbon::MONDAY)->toDateString();
+        $future = now()->addMonths(2)->startOfWeek(Carbon::MONDAY)->toDateString();
 
-        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, $future);
+        $breakdown = WatRuleService::teacherBreakdown($section->id, $this->sy->id, $future);
         $row = collect($breakdown['teachers'])->firstWhere('user_id', $teacher->id);
 
         $this->assertNotNull($row);
@@ -751,7 +925,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
         // slots used — plenty of room left, so the non-plotter has no excuse.
         $this->makeClassRecordWithAssessment($section, $subjectA, $plotter, '2025-09-01');
 
-        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
+        $breakdown = WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
         $row = collect($breakdown['teachers'])->firstWhere('user_id', $nonPlotter->id);
 
         $this->assertNotNull($row);
@@ -783,7 +957,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
             }
         }
 
-        $breakdown = \App\Services\ClassRecord\WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
+        $breakdown = WatRuleService::teacherBreakdown($section->id, $this->sy->id, '2025-09-01');
         $row = collect($breakdown['teachers'])->firstWhere('user_id', $nonPlotter->id);
 
         $this->assertNotNull($row);
