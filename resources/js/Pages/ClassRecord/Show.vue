@@ -433,7 +433,7 @@ const calendarDaysWithPending = computed(() => {
       entry.items.push({
         id:            `pending-${cat.id}-${row.assessment_number}`,
         title:         row.title || '(untitled)',
-        subject_name:  classRecord.subject_name,
+        subject_name:  props.classRecord.subject_name,
         teacher_name:  null,
         category_code: cat.code,
         is_graded:     row.is_graded,
@@ -572,7 +572,7 @@ function calendarDateFeasibility(dateStr) {
   if (!props.isAdmin && props.scheduledDays.length) {
     const weekday = WEEKDAY_ORDER[(new Date(`${dateStr}T00:00:00`).getDay() + 6) % 7]
     if (!props.scheduledDays.includes(weekday)) {
-      return { ok: false, reason: `${classRecord.subject_name ?? 'This subject'} has no scheduled class with this section on ${weekday}s.` }
+      return { ok: false, reason: `${props.classRecord.subject_name ?? 'This subject'} has no scheduled class with this section on ${weekday}s.` }
     }
   }
   if (!props.isAdmin && new Date() > plottingDeadline(dateStr)) {
@@ -620,7 +620,7 @@ function onCalendarApplyToSections({ date }) {
   Swal.fire({
     icon: 'question',
     title: 'Apply to other sections?',
-    text: `You just scheduled an assessment for ${date}. Apply this quarter's whole setup to other sections you teach for ${classRecord.subject_name}?`,
+    text: `You just scheduled an assessment for ${date}. Apply this quarter's whole setup to other sections you teach for ${props.classRecord.subject_name}?`,
     showCancelButton: true,
     confirmButtonText: 'Choose sections…',
     cancelButtonText: 'Not now',
