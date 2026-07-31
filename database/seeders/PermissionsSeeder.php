@@ -24,18 +24,18 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Roles',    'name' => 'roles.assign',     'description' => 'Assign roles to users'],
 
             // ── HR ────────────────────────────────────────────────────────────
-            ['module' => 'HR',       'name' => 'hr.dashboard.view','description' => 'View the comprehensive HR dashboard (HR, Recruitment, PMS, L&D, SALN, Rewards)'],
+            ['module' => 'HR',       'name' => 'hr.dashboard.view', 'description' => 'View the comprehensive HR dashboard (HR, Recruitment, PMS, L&D, SALN, Rewards)'],
             ['module' => 'HR',       'name' => 'hr.view',          'description' => 'View HR module'],
-            ['module' => 'HR',       'name' => 'hr.employees.view','description' => 'View employee list'],
-            ['module' => 'HR',       'name' => 'hr.employees.manage','description' => 'Manage employees'],
-            ['module' => 'HR',       'name' => 'hr.attendance.view','description' => 'View attendance logs'],
+            ['module' => 'HR',       'name' => 'hr.employees.view', 'description' => 'View employee list'],
+            ['module' => 'HR',       'name' => 'hr.employees.manage', 'description' => 'Manage employees'],
+            ['module' => 'HR',       'name' => 'hr.attendance.view', 'description' => 'View attendance logs'],
             ['module' => 'HR',       'name' => 'hr.pds.view',      'description' => 'View own PDS'],
             ['module' => 'HR',       'name' => 'hr.pds.manage',    'description' => 'Manage all PDS records'],
             ['module' => 'HR',       'name' => 'hr.schedule.view', 'description' => 'View schedules'],
-            ['module' => 'HR',       'name' => 'hr.schedule.manage','description' => 'Manage schedules'],
+            ['module' => 'HR',       'name' => 'hr.schedule.manage', 'description' => 'Manage schedules'],
             ['module' => 'HR',       'name' => 'hr.gatepass.view', 'description' => 'View gate passes'],
-            ['module' => 'HR',       'name' => 'hr.gatepass.create','description' => 'Create gate passes'],
-            ['module' => 'HR',       'name' => 'hr.gatepass.approve','description' => 'Approve gate passes'],
+            ['module' => 'HR',       'name' => 'hr.gatepass.create', 'description' => 'Create gate passes'],
+            ['module' => 'HR',       'name' => 'hr.gatepass.approve', 'description' => 'Approve gate passes'],
 
             // ── WFH ───────────────────────────────────────────────────────────
             ['module' => 'WFH',      'name' => 'wfh.view',         'description' => 'Access WFH dashboard'],
@@ -86,7 +86,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'IT',       'name' => 'it.requests.create', 'description' => 'Submit IT job requests'],
             ['module' => 'IT',       'name' => 'it.requests.manage', 'description' => 'Manage all IT job requests'],
             ['module' => 'IT',       'name' => 'it.equipment.view',  'description' => 'View ICT equipment'],
-            ['module' => 'IT',       'name' => 'it.equipment.manage','description' => 'Manage ICT equipment & PMS'],
+            ['module' => 'IT',       'name' => 'it.equipment.manage', 'description' => 'Manage ICT equipment & PMS'],
             ['module' => 'Computer Laboratories', 'name' => 'computer_labs.book', 'description' => 'Request use of an available computer laboratory'],
             ['module' => 'Computer Laboratories', 'name' => 'computer_labs.manage', 'description' => 'Manage computer laboratory schedules and booking requests'],
 
@@ -102,12 +102,12 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Atlas',    'name' => 'atlas.workspace-sync.manage', 'description' => 'Run Workspace directory scans and approve/reject proposed email corrections'],
 
             // ── Facilities & Services ─────────────────────────────────────────
-            ['module' => 'Facilities','name' => 'facilities.view',       'description' => 'View facility requests'],
-            ['module' => 'Facilities','name' => 'facilities.create',     'description' => 'Submit facility requests'],
-            ['module' => 'Facilities','name' => 'facilities.manage',     'description' => 'Manage facility requests (GSU Head / Admin)'],
-            ['module' => 'Facilities','name' => 'lostfound.manage',      'description' => 'Lost & Found: receive turnovers, custody, matching, release (GSU / Admin)'],
-            ['module' => 'Facilities','name' => 'facilities.dc-approve', 'description' => 'Division Chief in-app approval of facility, work, and service requests'],
-            ['module' => 'Facilities','name' => 'facilities.fad-approve','description' => 'FAD Chief in-app approval of facility, work, and service requests'],
+            ['module' => 'Facilities', 'name' => 'facilities.view',       'description' => 'View facility requests'],
+            ['module' => 'Facilities', 'name' => 'facilities.create',     'description' => 'Submit facility requests'],
+            ['module' => 'Facilities', 'name' => 'facilities.manage',     'description' => 'Manage facility requests (GSU Head / Admin)'],
+            ['module' => 'Facilities', 'name' => 'lostfound.manage',      'description' => 'Lost & Found: receive turnovers, custody, matching, release (GSU / Admin)'],
+            ['module' => 'Facilities', 'name' => 'facilities.dc-approve', 'description' => 'Division Chief in-app approval of facility, work, and service requests'],
+            ['module' => 'Facilities', 'name' => 'facilities.fad-approve', 'description' => 'FAD Chief in-app approval of facility, work, and service requests'],
             ['module' => 'Vehicles', 'name' => 'vehicles.view',          'description' => 'View vehicle requests'],
             ['module' => 'Vehicles', 'name' => 'vehicles.create',        'description' => 'Submit vehicle requests'],
             ['module' => 'Vehicles', 'name' => 'vehicles.manage',        'description' => 'Manage vehicle requests (GSU Head / Admin)'],
@@ -118,14 +118,14 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Messengerial', 'name' => 'messengerial.create',     'description' => 'Submit messengerial requests'],
             ['module' => 'Messengerial', 'name' => 'messengerial.manage',     'description' => 'Manage all messengerial requests (Records / Admin)'],
             ['module' => 'Messengerial', 'name' => 'messengerial.dc-approve', 'description' => 'Division Chief in-app approval of messengerial requests'],
-            ['module' => 'Messengerial', 'name' => 'messengerial.ocd-approve','description' => 'OCD in-app approval of messengerial requests'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.ocd-approve', 'description' => 'OCD in-app approval of messengerial requests'],
 
             // ── Documents ─────────────────────────────────────────────────────
-            ['module' => 'Documents','name' => 'documents.view',     'description' => 'View documents'],
-            ['module' => 'Documents','name' => 'documents.create',   'description' => 'Upload documents'],
-            ['module' => 'Documents','name' => 'documents.update',   'description' => 'Edit documents'],
-            ['module' => 'Documents','name' => 'documents.delete',   'description' => 'Delete documents'],
-            ['module' => 'Documents','name' => 'documents.approve',  'description' => 'Approve document routing'],
+            ['module' => 'Documents', 'name' => 'documents.view',     'description' => 'View documents'],
+            ['module' => 'Documents', 'name' => 'documents.create',   'description' => 'Upload documents'],
+            ['module' => 'Documents', 'name' => 'documents.update',   'description' => 'Edit documents'],
+            ['module' => 'Documents', 'name' => 'documents.delete',   'description' => 'Delete documents'],
+            ['module' => 'Documents', 'name' => 'documents.approve',  'description' => 'Approve document routing'],
 
             // ── Library ───────────────────────────────────────────────────────
             ['module' => 'Library',  'name' => 'library.view',       'description' => 'View library collections'],
@@ -171,15 +171,15 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Student Health', 'name' => 'students.health.manage', 'description' => 'Add and edit student medical records'],
 
             // ── Procurement — Purchase Request (PR) ───────────────────────────
-            ['module' => 'Procurement','name' => 'procurement.view',          'description' => 'View procurement records (legacy)'],
-            ['module' => 'Procurement','name' => 'procurement.create',        'description' => 'Create procurement requests (legacy)'],
-            ['module' => 'Procurement','name' => 'procurement.approve',       'description' => 'Approve procurement requests (legacy)'],
-            ['module' => 'Procurement','name' => 'procurement.pr.view',       'description' => 'View Purchase Requests'],
-            ['module' => 'Procurement','name' => 'procurement.pr.create',     'description' => 'Create and edit own Purchase Requests'],
-            ['module' => 'Procurement','name' => 'procurement.pr.dc_sign',    'description' => 'Division Chief: sign Purchase Requests'],
-            ['module' => 'Procurement','name' => 'procurement.pr.number',     'description' => 'Procurement Officer: assign official PR numbers'],
-            ['module' => 'Procurement','name' => 'procurement.pr.ocd_sign',   'description' => 'OCD: sign and approve Purchase Requests'],
-            ['module' => 'Procurement','name' => 'procurement.pr.bo_initial', 'description' => 'Budget Officer: initial supplemental PR documents'],
+            ['module' => 'Procurement', 'name' => 'procurement.view',          'description' => 'View procurement records (legacy)'],
+            ['module' => 'Procurement', 'name' => 'procurement.create',        'description' => 'Create procurement requests (legacy)'],
+            ['module' => 'Procurement', 'name' => 'procurement.approve',       'description' => 'Approve procurement requests (legacy)'],
+            ['module' => 'Procurement', 'name' => 'procurement.pr.view',       'description' => 'View Purchase Requests'],
+            ['module' => 'Procurement', 'name' => 'procurement.pr.create',     'description' => 'Create and edit own Purchase Requests'],
+            ['module' => 'Procurement', 'name' => 'procurement.pr.dc_sign',    'description' => 'Division Chief: sign Purchase Requests'],
+            ['module' => 'Procurement', 'name' => 'procurement.pr.number',     'description' => 'Procurement Officer: assign official PR numbers'],
+            ['module' => 'Procurement', 'name' => 'procurement.pr.ocd_sign',   'description' => 'OCD: sign and approve Purchase Requests'],
+            ['module' => 'Procurement', 'name' => 'procurement.pr.bo_initial', 'description' => 'Budget Officer: initial supplemental PR documents'],
 
             // ── Procurement — Obligation Request Status (ORS) ─────────────────
             ['module' => 'ORS',        'name' => 'procurement.ors.view',         'description' => 'View ORS records'],
@@ -287,9 +287,19 @@ class PermissionsSeeder extends Seeder
 
             // ── Activity Management System (AMS) ─────────────────────────────
             ['module' => 'AMS', 'name' => 'activities.manage',  'description' => 'Create and manage own activities, participants, and certificates'],
-            ['module' => 'AMS', 'name' => 'activities.view_all','description' => 'View all activities read-only (HR Office)'],
+            ['module' => 'AMS', 'name' => 'activities.view_all', 'description' => 'View all activities read-only (HR Office)'],
             ['module' => 'AMS', 'name' => 'activities.monitor', 'description' => 'Monitor all activities and evaluation analytics (Evaluation Committee/Management)'],
             ['module' => 'AMS', 'name' => 'activities.evaluation_committee', 'description' => 'Monitor evaluation results and analytics for activities (assignable to individual evaluation committee members)'],
+
+            // ── Alternative Learning Program ─────────────────────────────────
+            ['module' => 'ALP', 'name' => 'alp.view',              'description' => 'View ALP programs and assigned records'],
+            ['module' => 'ALP', 'name' => 'alp.manage',            'description' => 'Manage ALP reference data and annual cycles'],
+            ['module' => 'ALP', 'name' => 'alp.advise',            'description' => 'Manage an assigned ALP as adviser'],
+            ['module' => 'ALP', 'name' => 'alp.coordinate',        'description' => 'Review and monitor all ALP programs'],
+            ['module' => 'ALP', 'name' => 'alp.registrar-certify', 'description' => 'Certify academic standing of ALP officers'],
+            ['module' => 'ALP', 'name' => 'alp.approve',           'description' => 'Recommend or approve ALP accreditation and activities'],
+            ['module' => 'ALP', 'name' => 'alp.reports',           'description' => 'View and export consolidated ALP reports'],
+            ['module' => 'ALP', 'name' => 'alp.audit',             'description' => 'View ALP compliance and audit history'],
 
             // ── Chat ──────────────────────────────────────────────────────────
             ['module' => 'Chat',   'name' => 'chat.access',            'description' => 'Access the real-time messaging module'],
@@ -298,7 +308,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view',              'description' => 'View faculty loads and schedules'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view_own',        'description' => 'Faculty: view own load and schedule'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.manage',          'description' => 'CID/AUH: assign subjects, schedules, classrooms'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.load_assignments','description' => 'Assign/revoke designation load assignments'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.load_assignments', 'description' => 'Assign/revoke designation load assignments'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.approve',         'description' => 'Campus Director: approve overloads'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.reports',         'description' => 'View faculty load and schedule reports'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.subjects',        'description' => 'Manage subject catalog'],
@@ -382,7 +392,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Property', 'name' => 'property.reports',  'description' => 'Generate RPCI, RPCPPE, and depreciation reports'],
             ['module' => 'Property', 'name' => 'property.dispose',  'description' => 'Create BSRs and process property disposal records'],
             ['module' => 'Property', 'name' => 'work-orders.view',  'description' => 'View work orders for property repair and maintenance'],
-            ['module' => 'Property', 'name' => 'work-orders.manage','description' => 'Create and update work orders'],
+            ['module' => 'Property', 'name' => 'work-orders.manage', 'description' => 'Create and update work orders'],
 
         ];
 
@@ -393,6 +403,6 @@ class PermissionsSeeder extends Seeder
             );
         }
 
-        $this->command->info('Permissions seeded: ' . count($permissions) . ' permissions upserted.');
+        $this->command->info('Permissions seeded: '.count($permissions).' permissions upserted.');
     }
 }

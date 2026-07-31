@@ -2541,6 +2541,7 @@ require __DIR__.'/administration.php';
 require __DIR__.'/science-lab.php';
 require __DIR__.'/discipline.php';
 require __DIR__.'/residence-hall.php';
+require __DIR__.'/alp.php';
 // ── Atlas Module Monitor ──────────────────────────────────────────────────────
 Route::middleware(['auth', 'permission:atlas.modules.view'])
     ->prefix('atlas')

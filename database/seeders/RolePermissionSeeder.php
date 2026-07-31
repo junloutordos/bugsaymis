@@ -15,7 +15,9 @@ class RolePermissionSeeder extends Seeder
         // Helper: resolve role and sync a subset of permissions
         $assign = function (string $roleName, array $permissionNames) {
             $role = Role::where('name', $roleName)->first();
-            if (! $role) return;
+            if (! $role) {
+                return;
+            }
             $ids = Permission::whereIn('name', $permissionNames)->pluck('id')->toArray();
             $role->permissions()->syncWithoutDetaching($ids);
         };
@@ -360,7 +362,7 @@ class RolePermissionSeeder extends Seeder
         ]);
         // CID Chief & Guidance can view discipline cases (oversight).
         $assign('CID Chief', ['discipline.view', 'discipline.report']);
-        $assign('Guidance',  ['discipline.view']);
+        $assign('Guidance', ['discipline.view']);
         // Any faculty/staff (and advisers/division chiefs) may file an Anecdotal Report.
         foreach (['Faculty', 'Staff', 'DivisionChief', 'CID Chief', 'OCD'] as $r) {
             $assign($r, ['discipline.file', 'discipline.view']);
@@ -418,21 +420,21 @@ class RolePermissionSeeder extends Seeder
 
         // ── Student / Parent — very limited read-only ─────────────────────────
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
-        $assign('Parent',  ['library.view', 'messengerial.view', 'messengerial.create']);
+        $assign('Parent', ['library.view', 'messengerial.view', 'messengerial.create']);
 
         // ── Class Records ─────────────────────────────────────────────────────
         $assign('CID Chief', ['class-records.view', 'class-records.manage', 'class-records.admin']);
         // AUHs manage the shared grading options only — NOT full class-records.admin
-        $assign('AUH',       ['class-records.grading-options']);
-        $assign('Faculty',   ['class-records.view', 'class-records.manage', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
-        $assign('Staff',     ['class-records.view', 'students.clearance.sign']);
+        $assign('AUH', ['class-records.grading-options']);
+        $assign('Faculty', ['class-records.view', 'class-records.manage', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
+        $assign('Staff', ['class-records.view', 'students.clearance.sign']);
         $assign('CID Chief', ['students.clearance.view', 'students.clearance.sign', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
 
         // ── Homeroom Attendance ────────────────────────────────────────────────
         // Coordinator-review is granted broadly to Faculty (same convention as
         // WAT) — actual eligibility to log/approve for a specific section is
         // gated at runtime via AdvisoryScheduleScopeService, not this permission.
-        $assign('Faculty',   ['homeroom-attendance.log', 'homeroom-attendance.coordinator-review']);
+        $assign('Faculty', ['homeroom-attendance.log', 'homeroom-attendance.coordinator-review']);
         $assign('CID Chief', ['homeroom-attendance.admin', 'homeroom-attendance.settings.manage', 'homeroom-attendance.coordinator-review', 'academic-calendar.manage']);
 
         // ── Teacher Class Attendance (NFC Tap-In) ─────────────────────────────
@@ -441,22 +443,28 @@ class RolePermissionSeeder extends Seeder
 
         // ── CID Dashboard ─────────────────────────────────────────────────────
         $assign('CID Chief', ['cid.dashboard']);
-        $assign('AUH',       ['cid.dashboard']);
+        $assign('AUH', ['cid.dashboard']);
+
+        // ── Alternative Learning Program ─────────────────────────────────────
+        $assign('CID Chief', ['alp.view', 'alp.manage', 'alp.advise', 'alp.coordinate', 'alp.approve', 'alp.reports', 'alp.audit']);
+        $assign('Faculty', ['alp.view', 'alp.advise']);
+        $assign('Registrar', ['alp.view', 'alp.registrar-certify']);
+        $assign('OCD', ['alp.view', 'alp.approve']);
 
         // ── CID Competitions & Winnings ───────────────────────────────────────
         $assign('CID Chief', ['cid.competitions.view', 'cid.competitions.manage']);
-        $assign('AUH',       ['cid.competitions.view']);
-        $assign('Faculty',   ['cid.competitions.view']);
-        $assign('Staff',     ['cid.competitions.view']);
+        $assign('AUH', ['cid.competitions.view']);
+        $assign('Faculty', ['cid.competitions.view']);
+        $assign('Staff', ['cid.competitions.view']);
 
         // ── PPMP ──────────────────────────────────────────────────────────────
         $assign('Faculty', ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
-        $assign('Staff',   ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
+        $assign('Staff', ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
         $assign('DivisionChief', ['ppmp.review', 'ppmp.approve', 'ppmp.view_all', 'ppmp.export']);
-        $assign('OCD',     ['ppmp.review', 'ppmp.approve', 'ppmp.consolidate', 'ppmp.view_all', 'ppmp.export']);
-        $assign('HR',      ['ppmp.view_all', 'ppmp.export']);
+        $assign('OCD', ['ppmp.review', 'ppmp.approve', 'ppmp.consolidate', 'ppmp.view_all', 'ppmp.export']);
+        $assign('HR', ['ppmp.view_all', 'ppmp.export']);
         $assign('Procurement Officer', ['ppmp.bac_review', 'ppmp.view_all', 'ppmp.export']);
-        $assign('FAD Chief',           ['ppmp.bac_review', 'ppmp.view_all', 'ppmp.export']);
+        $assign('FAD Chief', ['ppmp.bac_review', 'ppmp.view_all', 'ppmp.export']);
 
         // ── Org Structure ─────────────────────────────────────────────────────
         $assign('HR', [
@@ -497,7 +505,7 @@ class RolePermissionSeeder extends Seeder
 
         // ── Knowledge Management (OED Issuances) ──────────────────────────────
         // OCD + Records can upload/manage; Administrator bypasses via isSuperAdmin()
-        $assign('OCD',     ['km.view', 'km.manage']);
+        $assign('OCD', ['km.view', 'km.manage']);
         $assign('Records', ['km.view', 'km.manage']);
 
         // Campus-wide view access for all other employee roles
@@ -531,16 +539,16 @@ class RolePermissionSeeder extends Seeder
         // ── Purchase Requests (PR) ────────────────────────────────────────────
         $prBasic = ['procurement.view', 'procurement.create', 'procurement.pr.view', 'procurement.pr.create'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD', 'HR', 'MIS',
-                  'Registrar', 'Librarian', 'Nurse', 'Guidance', 'GSU Head',
-                  'Records', 'InformationOfficer', 'PMT', 'Dorm Manager',
-                  'Payroll Officer', 'Cashier', 'Recruitment Officer', 'HRMPSB',
-                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer'] as $r) {
+            'Registrar', 'Librarian', 'Nurse', 'Guidance', 'GSU Head',
+            'Records', 'InformationOfficer', 'PMT', 'Dorm Manager',
+            'Payroll Officer', 'Cashier', 'Recruitment Officer', 'HRMPSB',
+            'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer'] as $r) {
             $assign($r, $prBasic);
         }
-        $assign('DivisionChief',      ['procurement.pr.dc_sign']);
+        $assign('DivisionChief', ['procurement.pr.dc_sign']);
         $assign('Procurement Officer', ['procurement.pr.number']);
-        $assign('OCD',                ['procurement.pr.ocd_sign']);
-        $assign('Budget Officer',     ['procurement.pr.bo_initial']);
+        $assign('OCD', ['procurement.pr.ocd_sign']);
+        $assign('Budget Officer', ['procurement.pr.bo_initial']);
         $assign('FAD Chief', array_merge($prBasic, [
             'procurement.pr.dc_sign', 'procurement.pr.number',
             'procurement.pr.ocd_sign', 'procurement.pr.bo_initial',
@@ -549,14 +557,14 @@ class RolePermissionSeeder extends Seeder
         // ── Obligation Request Status (ORS) ───────────────────────────────────
         $orsBasic = ['procurement.ors.view', 'procurement.ors.create'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
-                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer', 'FAD Chief'] as $r) {
+            'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer', 'FAD Chief'] as $r) {
             $assign($r, $orsBasic);
         }
-        $assign('DivisionChief',  ['procurement.ors.dc_sign']);
+        $assign('DivisionChief', ['procurement.ors.dc_sign']);
         $assign('Budget Officer', ['procurement.ors.budget_sign']);
-        $assign('Bookkeeper',     ['procurement.ors.bookkeep']);
-        $assign('Accountant',     ['procurement.ors.account']);
-        $assign('OCD',            ['procurement.ors.ocd_sign']);
+        $assign('Bookkeeper', ['procurement.ors.bookkeep']);
+        $assign('Accountant', ['procurement.ors.account']);
+        $assign('OCD', ['procurement.ors.ocd_sign']);
         $assign('FAD Chief', [
             'procurement.ors.dc_sign', 'procurement.ors.budget_sign',
             'procurement.ors.bookkeep', 'procurement.ors.account', 'procurement.ors.ocd_sign',
@@ -565,15 +573,15 @@ class RolePermissionSeeder extends Seeder
         // ── Disbursement Vouchers (DV) ────────────────────────────────────────
         $dvBasic = ['procurement.dv.view', 'procurement.dv.create'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
-                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Cashier',
-                  'Procurement Officer', 'FAD Chief'] as $r) {
+            'Budget Officer', 'Bookkeeper', 'Accountant', 'Cashier',
+            'Procurement Officer', 'FAD Chief'] as $r) {
             $assign($r, $dvBasic);
         }
-        $assign('GSU Head',   ['procurement.dv.view', 'procurement.dv.delivery']);
+        $assign('GSU Head', ['procurement.dv.view', 'procurement.dv.delivery']);
         $assign('Bookkeeper', ['procurement.dv.bookkeep']);
         $assign('Accountant', ['procurement.dv.account']);
-        $assign('OCD',        ['procurement.dv.ocd_sign']);
-        $assign('Cashier',    ['procurement.dv.cashier']);
+        $assign('OCD', ['procurement.dv.ocd_sign']);
+        $assign('Cashier', ['procurement.dv.cashier']);
         $assign('FAD Chief', [
             'procurement.dv.delivery', 'procurement.dv.bookkeep',
             'procurement.dv.account', 'procurement.dv.ocd_sign', 'procurement.dv.cashier',
@@ -582,18 +590,18 @@ class RolePermissionSeeder extends Seeder
         // ── Purchase Orders (PO) ─────────────────────────────────────────────
         $poBasic = ['procurement.po.view', 'procurement.po.create'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
-                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer', 'FAD Chief'] as $r) {
+            'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer', 'FAD Chief'] as $r) {
             $assign($r, $poBasic);
         }
         $assign('Procurement Officer', ['procurement.po.review']);
-        $assign('OCD',                 ['procurement.po.sign']);
-        $assign('FAD Chief',           ['procurement.po.review', 'procurement.po.sign']);
+        $assign('OCD', ['procurement.po.sign']);
+        $assign('FAD Chief', ['procurement.po.review', 'procurement.po.sign']);
 
         // ── Request for Quotation (RFQ) ───────────────────────────────────────
         $rfqView = ['procurement.rfq.view'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
-                  'Budget Officer', 'Bookkeeper', 'Accountant',
-                  'Procurement Officer', 'FAD Chief'] as $r) {
+            'Budget Officer', 'Bookkeeper', 'Accountant',
+            'Procurement Officer', 'FAD Chief'] as $r) {
             $assign($r, $rfqView);
         }
         $assign('Procurement Officer', [
@@ -608,8 +616,8 @@ class RolePermissionSeeder extends Seeder
         // ── Supply & Property ─────────────────────────────────────────────────
         $supplyView = ['supply.view'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
-                  'Budget Officer', 'Bookkeeper', 'Accountant',
-                  'Procurement Officer', 'FAD Chief'] as $r) {
+            'Budget Officer', 'Bookkeeper', 'Accountant',
+            'Procurement Officer', 'FAD Chief'] as $r) {
             $assign($r, $supplyView);
         }
         $assign('Procurement Officer', ['supply.receive', 'supply.issue']);
@@ -618,8 +626,8 @@ class RolePermissionSeeder extends Seeder
         // ── Property ─────────────────────────────────────────────────────────
         $propertyView = ['property.view', 'work-orders.view'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
-                  'Budget Officer', 'Bookkeeper', 'Accountant',
-                  'Procurement Officer', 'FAD Chief'] as $r) {
+            'Budget Officer', 'Bookkeeper', 'Accountant',
+            'Procurement Officer', 'FAD Chief'] as $r) {
             $assign($r, $propertyView);
         }
         $assign('Procurement Officer', ['property.transfer', 'property.reports', 'work-orders.manage']);

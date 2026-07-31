@@ -1233,6 +1233,14 @@ export const menuItems = [
   },
 
   {
+    label: "Alternative Learning Program",
+    routeName: "alp.index",
+    href: route("alp.index"),
+    icon: SparklesIcon,
+    permissions: ["alp.view", "alp.manage", "alp.advise", "alp.coordinate", "alp.registrar-certify", "alp.approve", "alp.reports", "alp.audit"],
+  },
+
+  {
     label: "Science Laboratory",
     icon: BeakerIcon,
     permissions: ["lab.view", "lab.request", "lab.manage"],
