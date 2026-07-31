@@ -184,7 +184,8 @@ class WeeklyAssessmentTrackerTest extends TestCase
         Subject $subject,
         User $teacher,
         string $start,
-        string $end
+        string $end,
+        string $day = 'Monday'
     ): ClassSchedule {
         static $roomNumber = 0;
         $roomNumber++;
@@ -204,7 +205,7 @@ class WeeklyAssessmentTrackerTest extends TestCase
             'classroom_id' => $room->id,
             'school_year_id' => $this->sy->id,
             'academic_term_id' => $this->term->id,
-            'day_of_week' => 'Monday',
+            'day_of_week' => $day,
             'start_time' => $start,
             'end_time' => $end,
             'status' => 'active',
@@ -614,6 +615,61 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->assertSame(['graded' => 1, 'major' => 0], $counts);
         $this->assertSame(1, $monday['graded_count']);
         $this->assertCount(2, $monday['items']);
+        $this->assertSame(1, $wat['totals']['graded']);
+    }
+
+    public function test_electives_with_split_schedule_rows_share_the_same_configured_wat_window(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $sections = collect(range(1, 4))->map(
+            fn ($n) => $this->makeSection(['levelid' => 11, 'sectionname' => "ELEC-SPLIT-{$n}-G11"])
+        );
+        $subjects = collect(range(1, 4))->map(
+            fn () => $this->makeSubject(['grade_level' => 11, 'subject_type' => 'elective'])
+        );
+
+        // Production stores the same Tuesday elective window in both forms:
+        // one continuous row, or two consecutive bell-period rows.
+        $this->makeSchedule($sections[0], $subjects[0], $teacher, '13:50:00', '15:30:00', 'Tuesday');
+        foreach (range(1, 3) as $index) {
+            $this->makeSchedule($sections[$index], $subjects[$index], $teacher, '13:50:00', '14:40:00', 'Tuesday');
+            $this->makeSchedule($sections[$index], $subjects[$index], $teacher, '14:40:00', '15:30:00', 'Tuesday');
+        }
+        foreach (range(0, 2) as $index) {
+            $this->makeClassRecordWithAssessment(
+                $sections[$index],
+                $subjects[$index],
+                $teacher,
+                '2025-09-02'
+            );
+        }
+
+        $this->assertSame(
+            ['graded' => 1, 'major' => 0],
+            WatRuleService::gradeCountsOnDate($homeroom->id, 11, $this->sy->id, '2025-09-02')
+        );
+
+        $target = $this->makeClassRecord($sections[3], $subjects[3], $teacher);
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $target->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number' => 1,
+                    'title' => 'Shared Elective Window Quiz',
+                    'is_graded' => true,
+                    'activity_date' => '2025-09-02',
+                    'max_score' => 20,
+                ]],
+            ])
+            ->assertOk();
+
+        $wat = WatRuleService::weekData($homeroom->id, $this->sy->id, '2025-09-01');
+        $tuesday = collect($wat['days'])->firstWhere('date', '2025-09-02');
+
+        $this->assertSame(1, $tuesday['graded_count']);
+        $this->assertCount(4, $tuesday['items']);
         $this->assertSame(1, $wat['totals']['graded']);
     }
 
