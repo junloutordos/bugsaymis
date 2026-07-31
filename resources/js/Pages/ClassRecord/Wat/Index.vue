@@ -1,12 +1,10 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppBadge from '@/Components/AppBadge.vue'
-import AppModal from '@/Components/AppModal.vue'
-import WatWeeklyCalendar from './components/WatWeeklyCalendar.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
@@ -24,7 +22,6 @@ const props = defineProps({
   schoolYear:           { type: Object, default: null },
   canManageExamWindows: { type: Boolean, default: false },
   examWindows:          { type: Array, default: () => [] },
-  plottingRecords:      { type: Array, default: () => [] },
 })
 
 const selectedSection = ref(props.sectionId)
@@ -53,6 +50,10 @@ const weekLabel = computed(() => {
   const opts = { month: 'long', day: 'numeric', year: 'numeric' }
   return `${new Date(props.wat.week_start + 'T00:00:00').toLocaleDateString('en-PH', opts)} – ${new Date(props.wat.week_end + 'T00:00:00').toLocaleDateString('en-PH', opts)}`
 })
+
+function dayName(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric' })
+}
 
 function openPrint() {
   window.open(
@@ -131,6 +132,13 @@ async function clearExamWindow(row) {
   }
 }
 
+function complianceColor(pct) {
+  if (pct === null || pct === undefined) return 'bg-slate-200'
+  if (pct >= 90) return 'bg-emerald-500'
+  if (pct >= 60) return 'bg-amber-500'
+  return 'bg-danger-500'
+}
+
 // ── Remaining WAT slots — self-check before plotting ──────────────────────────
 // Reframes wat.totals/wat.limits (already computed server-side) as "how much
 // room is left this week", so teachers can coordinate with co-teachers on
@@ -144,104 +152,6 @@ function remainingColor(remaining) {
   if (remaining <= 0) return 'red'
   if (remaining <= 2) return 'amber'
   return 'green'
-}
-
-// ── Direct calendar plotting ─────────────────────────────────────────────────
-const showPlotModal = ref(false)
-const plottingRecord = ref(null)
-const savingPlot = ref(false)
-const plotError = ref(null)
-const plotForm = ref({
-  quarter: 1,
-  grading_category_id: null,
-  title: '',
-  max_score: '',
-  is_graded: true,
-  activity_date: '',
-  target_class_record_ids: [],
-})
-
-const eligibleQuarters = computed(() =>
-  (plottingRecord.value?.quarters ?? []).filter(q => !q.is_locked && q.categories.length)
-)
-
-const selectedPlotQuarter = computed(() =>
-  eligibleQuarters.value.find(q => q.number === Number(plotForm.value.quarter)) ?? null
-)
-
-const selectedPlotCategory = computed(() =>
-  selectedPlotQuarter.value?.categories.find(c => c.id === Number(plotForm.value.grading_category_id)) ?? null
-)
-
-watch(() => plotForm.value.quarter, () => {
-  plotForm.value.grading_category_id = selectedPlotQuarter.value?.categories[0]?.id ?? null
-})
-
-function openPlot({ date, record }) {
-  plottingRecord.value = record
-  const quarters = (record.quarters ?? []).filter(q => !q.is_locked && q.categories.length)
-  const first = quarters[0]
-  plotForm.value = {
-    quarter: first?.number ?? 1,
-    grading_category_id: first?.categories[0]?.id ?? null,
-    title: '',
-    max_score: '',
-    is_graded: true,
-    activity_date: date,
-    target_class_record_ids: [],
-  }
-  plotError.value = first ? null : 'This class record has no editable quarter with available grading categories.'
-  showPlotModal.value = true
-}
-
-async function savePlot() {
-  if (!plottingRecord.value || !selectedPlotQuarter.value || !selectedPlotCategory.value) return
-  savingPlot.value = true
-  plotError.value = null
-
-  try {
-    const { data } = await axios.post(
-      route('class-records.assessments.plot', {
-        classRecord: plottingRecord.value.id,
-        q: plotForm.value.quarter,
-      }),
-      {
-        grading_category_id: plotForm.value.grading_category_id,
-        title: plotForm.value.title,
-        max_score: plotForm.value.max_score,
-        is_graded: plotForm.value.is_graded,
-        activity_date: plotForm.value.activity_date,
-        target_class_record_ids: plotForm.value.target_class_record_ids,
-      },
-    )
-
-    showPlotModal.value = false
-    await router.reload({ only: ['wat', 'plottingRecords'] })
-
-    const skipped = data.skipped ?? []
-    if (skipped.length) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Assessment plotted',
-        html: `Saved to ${data.created.length} section(s).<br><br>` +
-          skipped.map(row => `<div class="text-left text-xs"><strong>${row.label}</strong>: ${row.reason}</div>`).join(''),
-      })
-    } else {
-      await Swal.fire({
-        icon: 'success',
-        title: 'Assessment plotted',
-        text: `Saved directly to Class Record Setup for ${data.created.length} section(s).`,
-        timer: 1800,
-        showConfirmButton: false,
-      })
-    }
-  } catch (err) {
-    plotError.value = Object.values(err.response?.data?.errors ?? {}).flat()[0]
-      ?? err.response?.data?.message
-      ?? 'Failed to plot the assessment.'
-  } finally {
-    savingPlot.value = false
-  }
 }
 </script>
 
@@ -382,11 +292,51 @@ async function savePlot() {
           </div>
         </div>
 
-        <WatWeeklyCalendar
-          :wat="wat"
-          :plotting-records="plottingRecords"
-          @plot="openPlot"
-        />
+        <!-- Day-by-day grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          <div v-for="day in wat.days" :key="day.date"
+            :class="['bg-white rounded-xl border p-3 flex flex-col', day.over_daily && !day.is_exam_window ? 'border-danger-200' : 'border-slate-100']">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                {{ dayName(day.date) }}
+                <AcademicCapIcon v-if="day.is_exam_window" class="w-3.5 h-3.5 text-indigo-500" title="Quarter Final Exam window — caps exempt for Long Test/Quarterly Exam entries" />
+              </h3>
+              <span :class="['text-[10px] font-bold', day.over_daily && !day.is_exam_window ? 'text-danger-600' : 'text-slate-400']"
+                :title="`${day.graded_count}/${wat.limits.daily_graded} graded · ${day.major_count}/${wat.limits.daily_major} major`">
+                {{ day.graded_count }}/{{ wat.limits.daily_graded }} · {{ day.major_count }}M/{{ wat.limits.daily_major }}
+              </span>
+            </div>
+
+            <div v-if="!day.items.length" class="flex-1 flex items-center justify-center text-[11px] text-slate-300 py-6">
+              No assessments
+            </div>
+
+            <div v-else class="space-y-2">
+              <div v-for="item in day.items" :key="item.id"
+                class="rounded-lg border border-slate-100 bg-slate-50/60 p-2">
+                <p class="text-xs font-semibold text-slate-800 leading-tight">{{ item.subject_name }}</p>
+                <p class="text-[11px] text-slate-600 leading-tight mt-0.5">{{ item.title }}</p>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-medium">{{ item.type_label }}</span>
+                  <span v-if="item.is_major" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
+                  <span v-if="!item.is_graded" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Non-graded</span>
+                </div>
+                <p class="text-[10px] text-slate-400 italic mt-1">{{ item.teacher_name }}</p>
+
+                <div v-if="item.compliance !== null" class="mt-1.5">
+                  <div class="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                    <span>Compliance</span>
+                    <span class="font-semibold">{{ item.compliance }}% ({{ item.submitted_count }}/{{ item.roster_count }})</span>
+                  </div>
+                  <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div :class="['h-full rounded-full', complianceColor(item.compliance)]"
+                      :style="{ width: Math.min(100, item.compliance) + '%' }"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
 
       <div v-else class="bg-white rounded-xl border border-slate-100 p-10 text-center text-sm text-slate-400">
@@ -394,76 +344,4 @@ async function savePlot() {
       </div>
     </div>
   </AdminLayout>
-
-  <AppModal :show="showPlotModal" size="lg" title="Plot Assessment"
-    :subtitle="plottingRecord ? `${plottingRecord.subject_name} · ${plottingRecord.section_label} · ${plotForm.activity_date}` : ''"
-    @close="showPlotModal = false">
-    <div class="space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Quarter</label>
-          <select v-model.number="plotForm.quarter"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option v-for="quarter in eligibleQuarters" :key="quarter.number" :value="quarter.number">
-              Quarter {{ quarter.number }}
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Setup Assessment</label>
-          <select v-model.number="plotForm.grading_category_id"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option v-for="category in selectedPlotQuarter?.categories ?? []" :key="category.id" :value="category.id">
-              {{ category.code }}{{ category.next_number }} — {{ category.name }}
-            </option>
-          </select>
-          <p v-if="selectedPlotCategory" class="mt-1 text-[11px] text-slate-400">
-            {{ selectedPlotCategory.type_label }}
-            <span v-if="selectedPlotCategory.is_major" class="font-semibold text-amber-600"> · Major assessment</span>
-          </p>
-        </div>
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Title / Description</label>
-        <input v-model.trim="plotForm.title" type="text" placeholder="e.g. Quiz 1 — Fractions"
-          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Maximum Score</label>
-          <input v-model="plotForm.max_score" type="number" min="0.01" step="0.01"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-        <label class="flex items-center gap-2 self-end rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-          <input v-model="plotForm.is_graded" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-          Include in grading
-        </label>
-      </div>
-
-      <div v-if="plottingRecord?.same_subject_targets?.length" class="rounded-xl border border-slate-200 p-3">
-        <p class="text-xs font-semibold text-slate-700">Also apply to other sections</p>
-        <p class="mb-2 text-[11px] text-slate-400">Only sections you handle for the same subject are shown. Each section is validated separately.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <label v-for="target in plottingRecord.same_subject_targets" :key="target.id"
-            class="flex items-center gap-2 text-xs text-slate-600">
-            <input v-model="plotForm.target_class_record_ids" type="checkbox" :value="target.id"
-              class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-            {{ target.label }}
-          </label>
-        </div>
-      </div>
-
-      <p v-if="plotError" class="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">{{ plotError }}</p>
-    </div>
-    <template #footer>
-      <AppButton variant="secondary" @click="showPlotModal = false">Cancel</AppButton>
-      <AppButton :loading="savingPlot"
-        :disabled="savingPlot || !selectedPlotCategory || !plotForm.title || !plotForm.max_score"
-        @click="savePlot">
-        Save to Class Record Setup
-      </AppButton>
-    </template>
-  </AppModal>
 </template>
