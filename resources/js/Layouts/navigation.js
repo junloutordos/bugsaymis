@@ -1714,8 +1714,18 @@ export const menuItems = [
     icon: DocumentTextIcon,
     routeName: "registrar.enrollment.index",
     href: route("registrar.enrollment.index"),
-    permissions: ["students.enrollment.view"],
+    permissions: [
+      "students.enrollment.view",
+      "homeroom-attendance.admission-slip.issue",
+    ],
     children: [
+      {
+        label: "Class Admission Slips",
+        routeName: "homeroom-attendance.admission-slips.index",
+        href: route("homeroom-attendance.admission-slips.index"),
+        icon: DocumentCheckIcon,
+        permissions: ["homeroom-attendance.admission-slip.issue"],
+      },
       {
         label: "Students",
         routeName: "students.index",
