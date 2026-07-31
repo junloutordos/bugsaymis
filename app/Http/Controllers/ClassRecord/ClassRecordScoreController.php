@@ -52,6 +52,9 @@ class ClassRecordScoreController extends Controller
         $scores = ClassRecordScore::whereHas('student', fn ($sq) =>
                 $sq->where('class_record_quarter_id', $quarter->id)
             )
+            ->whereHas('assessment', fn ($aq) =>
+                $aq->where('class_record_quarter_id', $quarter->id)->where('is_graded', true)
+            )
             ->get(['class_record_student_id', 'class_record_assessment_id', 'score'])
             ->mapWithKeys(fn ($s) =>
                 ["{$s->class_record_student_id}_{$s->class_record_assessment_id}" => $s->score]
@@ -85,8 +88,29 @@ class ClassRecordScoreController extends Controller
         $assessmentIds = collect($validated['scores'])->pluck('assessment_id')->unique();
         $assessments   = ClassRecordAssessment::with('gradingCategory:id,subject_id,name')
             ->whereIn('id', $assessmentIds)
+            ->where('class_record_quarter_id', $quarter->id)
             ->get()
             ->keyBy('id');
+        abort_unless(
+            $assessments->count() === $assessmentIds->count(),
+            422,
+            'One or more assessments do not belong to this Class Record quarter.',
+        );
+        abort_if(
+            $assessments->contains(fn ($assessment) => ! $assessment->is_graded),
+            422,
+            'Scores cannot be entered for non-graded assessments.',
+        );
+
+        $studentIds = collect($validated['scores'])->pluck('student_id')->unique();
+        $validStudentCount = ClassRecordStudent::where('class_record_quarter_id', $quarter->id)
+            ->whereIn('id', $studentIds)
+            ->count();
+        abort_unless(
+            $validStudentCount === $studentIds->count(),
+            422,
+            'One or more students do not belong to this Class Record quarter.',
+        );
         $maxScores = $assessments->map(fn ($a) => $a->max_score);
 
         // On a shared (e.g. PEHM) record, a score may only be written by the

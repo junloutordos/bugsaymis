@@ -11,6 +11,7 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\TeacherTapLog;
 use App\Models\User;
+use App\Services\ClassRecord\WatRuleService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -98,10 +99,14 @@ class FacultyDashboardService
         $weekStart = $today->copy()->startOfWeek()->toDateString();
         $weekEnd   = $today->copy()->endOfWeek()->toDateString();
 
-        $assessmentsThisWeek = ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+        $assessmentsThisWeek = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
             ->where('cr.teacher_id', $user->id)
-            ->whereBetween('class_record_assessments.activity_date', [$weekStart, $weekEnd])
-            ->count();
+            ->whereRaw(
+                WatRuleService::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
+                [$weekStart, $weekEnd]
+            )
+            ->distinct('class_record_assessments.id')
+            ->count('class_record_assessments.id');
 
         $todayClasses = ClassSchedule::where('user_id', $user->id)
             ->where('school_year_id', $schoolYearId)

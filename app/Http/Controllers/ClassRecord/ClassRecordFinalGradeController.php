@@ -256,7 +256,8 @@ class ClassRecordFinalGradeController extends Controller
                 'weight' => (float) $cat->weight,
                 'assessments' => $quarter->assessments
                     ->where('grading_category_id', $cat->id)
-                    ->sortBy('sort_order')
+                    ->where('is_graded', true)
+                    ->sortBy(fn ($assessment) => $assessment->chronologicalSortKey())
                     ->map(fn ($a) => ['id' => $a->id, 'maxScore' => (float) $a->max_score])
                     ->values()
                     ->toArray(),
@@ -322,7 +323,8 @@ class ClassRecordFinalGradeController extends Controller
                 'weight' => (float) $cat->weight,
                 'assessments' => $quarter->assessments
                     ->where('grading_category_id', $cat->id)
-                    ->sortBy('sort_order')
+                    ->where('is_graded', true)
+                    ->sortBy(fn ($assessment) => $assessment->chronologicalSortKey())
                     ->map(fn ($a) => ['id' => $a->id, 'maxScore' => (float) $a->max_score])
                     ->values()
                     ->toArray(),

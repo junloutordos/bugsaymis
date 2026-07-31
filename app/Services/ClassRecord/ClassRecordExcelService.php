@@ -30,6 +30,7 @@ class ClassRecordExcelService
     {
         $classRecord->loadMissing([
             'gradingOption.categories',
+            'quarters.assessments.dates',
             'quarters.assessments.gradingCategory',
             'quarters.students',
         ]);
@@ -52,6 +53,7 @@ class ClassRecordExcelService
     {
         $classRecord->loadMissing([
             'gradingOption.categories',
+            'quarters.assessments.dates',
             'quarters.assessments.gradingCategory',
             'quarters.students',
         ]);
@@ -106,7 +108,8 @@ class ClassRecordExcelService
         foreach ($categories as $cat) {
             $assessByCategory[$cat->id] = ($quarterData?->assessments ?? collect())
                 ->where('grading_category_id', $cat->id)
-                ->sortBy('sort_order')
+                ->where('is_graded', true)
+                ->sortBy(fn ($assessment) => $assessment->chronologicalSortKey())
                 ->values();
         }
 
@@ -361,7 +364,8 @@ class ClassRecordExcelService
             $cc = $catCols[$cat->id];
             foreach ($cc['assmnts'] as $i => $a) {
                 $label = $cat->code.$a->assessment_number.': '.$a->title;
-                $date = $a->activity_date ? ' ('.$a->activity_date.')' : '';
+                $dates = $a->activityDateStrings();
+                $date = $dates->isNotEmpty() ? ' ('.$dates->implode(', ').')' : '';
                 $ws->setCellValue("A{$logRow}", $label.$date);
                 $logRow++;
             }
@@ -416,7 +420,8 @@ class ClassRecordExcelService
         foreach ($categories as $cat) {
             $assessByCategory[$cat->id] = ($quarterData?->assessments ?? collect())
                 ->where('grading_category_id', $cat->id)
-                ->sortBy('sort_order')
+                ->where('is_graded', true)
+                ->sortBy(fn ($assessment) => $assessment->chronologicalSortKey())
                 ->values();
         }
 
@@ -615,7 +620,8 @@ class ClassRecordExcelService
             $cc = $catCols[$cat->id];
             foreach ($cc['assmnts'] as $i => $a) {
                 $label = $cat->code.$a->assessment_number.': '.$a->title;
-                $date = $a->activity_date ? ' ('.$a->activity_date.')' : '';
+                $dates = $a->activityDateStrings();
+                $date = $dates->isNotEmpty() ? ' ('.$dates->implode(', ').')' : '';
                 $ws->setCellValue("A{$logRow}", $label.$date);
                 $logRow++;
             }
@@ -708,6 +714,8 @@ class ClassRecordExcelService
                 'weight' => (float) $cat->weight,
                 'assessments' => ($quarterData->assessments ?? collect())
                     ->where('grading_category_id', $cat->id)
+                    ->where('is_graded', true)
+                    ->sortBy(fn ($assessment) => $assessment->chronologicalSortKey())
                     ->map(fn ($a) => ['id' => $a->id, 'maxScore' => (float) $a->max_score])
                     ->values()->toArray(),
             ];

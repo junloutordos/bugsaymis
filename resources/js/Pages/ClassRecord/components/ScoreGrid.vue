@@ -72,13 +72,26 @@ const students = computed(() =>
   [...(props.quarterData?.students ?? [])].sort((a, b) => a.sequence_number - b.sequence_number)
 )
 
+function earliestAssessmentDate(assessment) {
+  const dates = assessment.activity_dates?.length
+    ? assessment.activity_dates
+    : [assessment.activity_date].filter(Boolean)
+  return [...dates].sort()[0] ?? '9999-12-31'
+}
+
+function compareAssessmentsByDate(a, b) {
+  return earliestAssessmentDate(a).localeCompare(earliestAssessmentDate(b))
+    || Number(a.assessment_number) - Number(b.assessment_number)
+    || Number(a.id) - Number(b.id)
+}
+
 // Assessments grouped by category
 const assessmentsByCategory = computed(() => {
   const map = {}
   for (const cat of categories.value) {
     map[cat.id] = (props.quarterData?.assessments ?? [])
-      .filter(a => a.grading_category_id === cat.id)
-      .sort((a, b) => a.sort_order - b.sort_order)
+      .filter(a => a.grading_category_id === cat.id && a.is_graded !== false)
+      .sort(compareAssessmentsByDate)
   }
   return map
 })
@@ -385,7 +398,7 @@ const showRunning = computed(() => props.quarterNumber > 1)
 
     <!-- No assessments -->
     <div v-else-if="!allAssessments.length" class="py-12 text-center text-slate-400 text-sm">
-      No assessments configured. Go to the Setup tab to add assessments first.
+      No graded assessments configured. Non-graded activities remain available in Setup and the assessment calendar.
     </div>
 
     <!-- Score grid -->

@@ -12,6 +12,7 @@ class ClassRecordAssessmentDeletionRequest extends Model
 
     protected $fillable = [
         'class_record_assessment_id',
+        'class_record_assessment_date_id',
         'class_record_quarter_id',
         'title',
         'assessment_number',
@@ -29,14 +30,19 @@ class ClassRecordAssessmentDeletionRequest extends Model
 
     protected $casts = [
         'assessment_number' => 'integer',
-        'activity_date'     => 'date:Y-m-d',
-        'max_score'         => 'float',
-        'reviewed_at'       => 'datetime',
+        'activity_date' => 'date:Y-m-d',
+        'max_score' => 'float',
+        'reviewed_at' => 'datetime',
     ];
 
     public function assessment(): BelongsTo
     {
         return $this->belongsTo(ClassRecordAssessment::class, 'class_record_assessment_id');
+    }
+
+    public function assessmentDate(): BelongsTo
+    {
+        return $this->belongsTo(ClassRecordAssessmentDate::class, 'class_record_assessment_date_id');
     }
 
     public function quarter(): BelongsTo

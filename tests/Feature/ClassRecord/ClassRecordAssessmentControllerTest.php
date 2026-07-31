@@ -9,12 +9,15 @@ use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\ClassRecordStudent;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ClassRecord\WatRuleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -34,6 +37,7 @@ class ClassRecordAssessmentControllerTest extends TestCase
     use RefreshDatabase;
 
     private SchoolYear $sy;
+    private AcademicTerm $term;
     private GradingOption $option;
     private GradingCategory $category;
 
@@ -44,6 +48,10 @@ class ClassRecordAssessmentControllerTest extends TestCase
         $this->sy = SchoolYear::create([
             'name' => '2025-2026', 'start_date' => '2025-08-01', 'end_date' => '2026-06-30',
             'is_current' => true, 'status' => 'active',
+        ]);
+        $this->term = AcademicTerm::create([
+            'school_year_id' => $this->sy->id, 'name' => '1st Semester', 'term_type' => '1st_semester',
+            'start_date' => '2025-08-01', 'end_date' => '2025-12-31', 'is_current' => true,
         ]);
         $this->option = GradingOption::create(['name' => 'Default', 'is_active' => true]);
         $this->category = GradingCategory::create([
@@ -133,6 +141,204 @@ class ClassRecordAssessmentControllerTest extends TestCase
             ->assertJsonValidationErrors(['assessments.0.activity_date']);
     }
 
+    public function test_non_graded_assessment_does_not_require_a_max_score(): void
+    {
+        $admin = $this->admin();
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number' => 1,
+                    'title' => 'Reading Day',
+                    'is_graded' => false,
+                    'activity_date' => '2026-09-07',
+                    'activity_dates' => ['2026-09-07'],
+                    'max_score' => null,
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $quarter->id,
+            'title' => 'Reading Day',
+            'is_graded' => false,
+            'max_score' => 0,
+        ]);
+    }
+
+    public function test_graded_assessment_still_requires_a_positive_max_score(): void
+    {
+        $admin = $this->admin();
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number' => 1,
+                    'title' => 'Quiz',
+                    'is_graded' => true,
+                    'activity_date' => '2026-09-07',
+                    'activity_dates' => ['2026-09-07'],
+                    'max_score' => null,
+                ]],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['assessments']);
+    }
+
+    public function test_changing_a_scored_assessment_to_non_graded_requires_confirmation_and_removes_scores(): void
+    {
+        $admin = $this->admin();
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+        $assessment = $this->makeAssessment($quarter, 1, 'Quiz');
+        $assessment->syncActivityDates(['2026-09-07']);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id,
+            'family_name' => 'Dela Cruz',
+            'given_name' => 'Juan',
+            'sex' => 'M',
+            'sequence_number' => 1,
+            'is_active' => true,
+        ]);
+        ClassRecordScore::create([
+            'class_record_student_id' => $student->id,
+            'class_record_assessment_id' => $assessment->id,
+            'score' => 18,
+        ]);
+        $payload = $this->payloadFor($assessment);
+        $payload['is_graded'] = false;
+        $payload['max_score'] = null;
+        $payload['activity_dates'] = ['2026-09-07'];
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), ['assessments' => [$payload]])
+            ->assertStatus(409)
+            ->assertJson([
+                'requires_confirmation' => true,
+                'score_count' => 1,
+            ]);
+
+        $this->assertTrue($assessment->fresh()->is_graded);
+        $this->assertDatabaseHas('class_record_scores', [
+            'class_record_assessment_id' => $assessment->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), [
+                'assessments' => [$payload],
+                'confirm_non_graded_score_removal' => true,
+            ])
+            ->assertOk();
+
+        $assessment->refresh();
+        $this->assertFalse($assessment->is_graded);
+        $this->assertSame('0.00', $assessment->max_score);
+        $this->assertDatabaseMissing('class_record_scores', [
+            'class_record_assessment_id' => $assessment->id,
+        ]);
+
+        ClassRecordScore::create([
+            'class_record_student_id' => $student->id,
+            'class_record_assessment_id' => $assessment->id,
+            'score' => 0,
+        ]);
+        $this->actingAs($admin)
+            ->getJson(route('class-records.scores.index', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]))
+            ->assertOk()
+            ->assertExactJson([]);
+    }
+
+    public function test_score_endpoint_rejects_a_non_graded_assessment(): void
+    {
+        $admin = $this->admin();
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+        $assessment = $this->makeAssessment($quarter, 1, 'Reading Day');
+        $assessment->update(['is_graded' => false, 'max_score' => 0]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id,
+            'family_name' => 'Dela Cruz',
+            'given_name' => 'Juan',
+            'sex' => 'M',
+            'sequence_number' => 1,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.scores.upsert', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), [
+                'scores' => [[
+                    'student_id' => $student->id,
+                    'assessment_id' => $assessment->id,
+                    'score' => 0,
+                ]],
+            ])
+            ->assertUnprocessable()
+            ->assertJson(['message' => 'Scores cannot be entered for non-graded assessments.']);
+
+        $this->assertDatabaseMissing('class_record_scores', [
+            'class_record_assessment_id' => $assessment->id,
+        ]);
+    }
+
+    public function test_calendar_can_plot_a_non_graded_assessment_without_a_max_score(): void
+    {
+        $admin = $this->admin();
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.plot', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), [
+                'grading_category_id' => $this->category->id,
+                'title' => 'Consultation',
+                'is_graded' => false,
+                'activity_date' => '2026-09-07',
+                'activity_dates' => ['2026-09-07', '2026-09-09'],
+                'max_score' => null,
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $quarter->id,
+            'title' => 'Consultation',
+            'is_graded' => false,
+            'max_score' => 0,
+        ]);
+    }
+
+    public function test_assessment_chronological_order_uses_earliest_date_then_number(): void
+    {
+        $teacher = User::factory()->create();
+        $quarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $this->makeSubject());
+        $later = $this->makeAssessment($quarter, 3, 'Later');
+        $sameDateSecond = $this->makeAssessment($quarter, 2, 'Same Date Second');
+        $sameDateFirst = $this->makeAssessment($quarter, 1, 'Same Date First');
+        $later->syncActivityDates(['2026-09-14', '2026-09-16']);
+        $sameDateSecond->syncActivityDates(['2026-09-07']);
+        $sameDateFirst->syncActivityDates(['2026-09-07']);
+
+        $ordered = $quarter->fresh()->assessments
+            ->pluck('title')
+            ->values()
+            ->all();
+
+        $this->assertSame(['Same Date First', 'Same Date Second', 'Later'], $ordered);
+    }
+
     public function test_calendar_plot_appends_to_setup_and_applies_to_same_subject_without_removing_existing_rows(): void
     {
         $admin = $this->admin();
@@ -153,6 +359,7 @@ class ClassRecordAssessmentControllerTest extends TestCase
                 'max_score' => 25,
                 'is_graded' => true,
                 'activity_date' => '2026-09-07',
+                'activity_dates' => ['2026-09-07', '2026-09-09'],
                 'target_class_record_ids' => [$targetQuarter->class_record_id],
             ])
             ->assertCreated()
@@ -167,6 +374,63 @@ class ClassRecordAssessmentControllerTest extends TestCase
             'title' => 'Calendar Quiz',
             'activity_date' => '2026-09-07',
         ]);
+        $sourceCreatedId = ClassRecordAssessment::where('class_record_quarter_id', $sourceQuarter->id)
+            ->where('title', 'Calendar Quiz')
+            ->value('id');
+        $targetCreatedId = ClassRecordAssessment::where('class_record_quarter_id', $targetQuarter->id)
+            ->where('title', 'Calendar Quiz')
+            ->value('id');
+        foreach ([$sourceCreatedId, $targetCreatedId] as $assessmentId) {
+            $this->assertDatabaseHas('class_record_assessment_dates', [
+                'class_record_assessment_id' => $assessmentId,
+                'activity_date' => '2026-09-07',
+                'is_primary' => true,
+            ]);
+            $this->assertDatabaseHas('class_record_assessment_dates', [
+                'class_record_assessment_id' => $assessmentId,
+                'activity_date' => '2026-09-09',
+                'is_primary' => false,
+            ]);
+        }
+
+        $sourceRecord = $sourceQuarter->classRecord;
+        $mondayCounts = WatRuleService::gradeCountsOnDate(
+            $sourceRecord->section_id,
+            8,
+            $this->sy->id,
+            '2026-09-07'
+        );
+        $wednesdayCounts = WatRuleService::gradeCountsOnDate(
+            $sourceRecord->section_id,
+            8,
+            $this->sy->id,
+            '2026-09-09'
+        );
+        $weekCounts = WatRuleService::gradeCountsInWeek(
+            $sourceRecord->section_id,
+            8,
+            $this->sy->id,
+            '2026-09-07'
+        );
+        $this->assertSame(1, $mondayCounts['graded']);
+        $this->assertSame(1, $wednesdayCounts['graded']);
+        $this->assertSame(1, $weekCounts['graded'], 'A multi-date assessment counts once in its week.');
+        $weekData = WatRuleService::weekData(
+            $sourceRecord->section_id,
+            $this->sy->id,
+            '2026-09-07'
+        );
+        $this->assertSame(1, $weekData['totals']['graded']);
+        $myWeekData = WatRuleService::facultyWeekData(
+            $admin->id,
+            $this->sy->id,
+            '2026-09-07'
+        );
+        $this->assertSame(
+            2,
+            $myWeekData['totals']['graded'],
+            'The source and target assessments each count once despite having two dates.'
+        );
         $this->assertDatabaseHas('class_record_assessments', [
             'class_record_quarter_id' => $targetQuarter->id,
             'assessment_number' => 2,
@@ -190,6 +454,45 @@ class ClassRecordAssessmentControllerTest extends TestCase
 
         $this->assertDatabaseHas('class_record_assessments', ['id' => $keep->id]);
         $this->assertDatabaseMissing('class_record_assessments', ['id' => $remove->id]);
+    }
+
+    public function test_legacy_primary_date_update_remains_authoritative_during_rolling_deployment(): void
+    {
+        $teacher = User::factory()->create();
+        $quarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $this->makeSubject());
+        $assessment = $this->makeAssessment($quarter, 1, 'Performance Task');
+        $assessment->syncActivityDates(['2026-09-07', '2026-09-09']);
+
+        // Simulate the currently deployed blue code, which only knows about
+        // the legacy activity_date column.
+        $assessment->update([
+            'activity_date' => '2026-09-08',
+            'plotted_at' => now(),
+        ]);
+        $assessment = $assessment->fresh('dates');
+
+        $this->assertSame(
+            ['2026-09-08', '2026-09-09'],
+            $assessment->activityDateStrings()->all()
+        );
+        $this->assertSame(
+            1,
+            WatRuleService::gradeCountsOnDate(
+                $quarter->classRecord->section_id,
+                8,
+                $this->sy->id,
+                '2026-09-08'
+            )['graded']
+        );
+        $this->assertSame(
+            0,
+            WatRuleService::gradeCountsOnDate(
+                $quarter->classRecord->section_id,
+                8,
+                $this->sy->id,
+                '2026-09-07'
+            )['graded']
+        );
     }
 
     public function test_removing_an_assessment_with_scores_is_blocked_and_nothing_is_deleted(): void
@@ -264,7 +567,7 @@ class ClassRecordAssessmentControllerTest extends TestCase
         $subject = $this->makeSubject();
         $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
         $assessment = $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
-        $assessment->update(['activity_date' => '2026-09-07']);
+        $assessment->syncActivityDates(['2026-09-07', '2026-09-09']);
 
         $targetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
 
@@ -280,6 +583,13 @@ class ClassRecordAssessmentControllerTest extends TestCase
             'class_record_quarter_id' => $targetQuarter->id,
             'title'                   => 'Quiz 1',
             'activity_date'           => '2026-09-07',
+        ]);
+        $targetAssessmentId = ClassRecordAssessment::where('class_record_quarter_id', $targetQuarter->id)
+            ->where('title', 'Quiz 1')
+            ->value('id');
+        $this->assertDatabaseHas('class_record_assessment_dates', [
+            'class_record_assessment_id' => $targetAssessmentId,
+            'activity_date' => '2026-09-09',
         ]);
     }
 
@@ -326,6 +636,93 @@ class ClassRecordAssessmentControllerTest extends TestCase
             ->assertJsonCount(1, 'skipped');
 
         $this->assertSame('Already has assessments this quarter.', $response->json('skipped.0.reason'));
+    }
+
+    public function test_apply_to_sections_skips_a_target_when_the_subject_does_not_meet_on_the_copied_date(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $assessment = $this->makeAssessment($sourceQuarter, 1, 'Monday Quiz');
+        $assessment->update(['activity_date' => '2026-09-07']); // Monday
+
+        $targetSection = $this->makeSection();
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $targetSection, $subject);
+        ClassSchedule::create([
+            'user_id' => $teacher->id,
+            'subject_id' => $subject->id,
+            'section_id' => $targetSection->id,
+            'school_year_id' => $this->sy->id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '08:00:00',
+            'end_time' => '09:00:00',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(0, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertStringContainsString('no scheduled class', $response->json('skipped.0.reason'));
+        $this->assertDatabaseMissing('class_record_assessments', [
+            'class_record_quarter_id' => $targetQuarter->id,
+            'title' => 'Monday Quiz',
+        ]);
+    }
+
+    public function test_apply_to_sections_rejects_a_locked_source_quarter(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+        $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $sourceQuarter->update(['is_locked' => true]);
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $subject);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertStatus(422)
+            ->assertSeeText('Unlock this quarter');
+    }
+
+    public function test_apply_to_sections_uses_subject_id_instead_of_matching_only_by_name(): void
+    {
+        $teacher = User::factory()->create();
+        $sourceSubject = $this->makeSubject();
+        $differentSubject = Subject::create([
+            'school_year_id' => $this->sy->id,
+            'code' => 'DIFFERENT',
+            'name' => $sourceSubject->name,
+            'credit_units' => 3,
+            'lecture_hours' => 3,
+            'load_units' => 3,
+            'subject_type' => 'lecture',
+            'grade_level' => 8,
+            'sessions_per_week' => 5,
+            'minutes_per_session' => 60,
+            'is_active' => true,
+        ]);
+
+        $sourceQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $sourceSubject);
+        $this->makeAssessment($sourceQuarter, 1, 'Quiz 1');
+        $targetQuarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $differentSubject);
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $sourceQuarter->class_record_id, 'q' => 1,
+            ]), ['target_class_record_ids' => [$targetQuarter->class_record_id]])
+            ->assertOk()
+            ->assertJsonCount(0, 'applied')
+            ->assertJsonCount(1, 'skipped');
+
+        $this->assertSame('Different subject.', $response->json('skipped.0.reason'));
     }
 
     // ── Resubmitting unchanged rows must not double-count toward the cap ─────

@@ -36,6 +36,34 @@ class WatRuleService
     public const WEEKLY_MAJOR_MAX  = 6;
     public const MAJOR_WEIGHT_SHARE = 0.10;
 
+    public const OCCURRENCE_DATE_SQL = 'CASE
+        WHEN crad.id IS NULL OR crad.is_primary = 1
+        THEN class_record_assessments.activity_date
+        ELSE crad.activity_date
+    END';
+    public const OCCURRENCE_PLOTTED_AT_SQL = 'CASE
+        WHEN crad.id IS NULL OR crad.is_primary = 1
+        THEN class_record_assessments.plotted_at
+        ELSE crad.plotted_at
+    END';
+
+    /**
+     * One row per assessment occurrence. The legacy primary date stays
+     * authoritative so writes from blue instances remain visible during a
+     * rolling deployment; child rows contribute the additional dates.
+     */
+    public static function assessmentOccurrencesQuery(int $schoolYearId)
+    {
+        return ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+            ->leftJoin(
+                'class_record_assessment_dates as crad',
+                'crad.class_record_assessment_id',
+                '=',
+                'class_record_assessments.id'
+            )
+            ->whereRaw(self::OCCURRENCE_DATE_SQL.' IS NOT NULL');
+    }
+
     // ── Type derivation from the grading-option category ─────────────────────
 
     /**
@@ -176,9 +204,9 @@ class WatRuleService
         $sectionIds = self::poolSectionIds($sectionId, $grade);
 
         return self::counts(
-            ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+            self::assessmentOccurrencesQuery($schoolYearId)
                 ->whereIn('cr.section_id', $sectionIds)
-                ->where('class_record_assessments.activity_date', $date),
+                ->whereRaw(self::OCCURRENCE_DATE_SQL.' = ?', [$date]),
             $excludeIds
         );
     }
@@ -189,12 +217,12 @@ class WatRuleService
         $monday     = Carbon::parse($weekStart)->startOfWeek(Carbon::MONDAY);
 
         return self::counts(
-            ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+            self::assessmentOccurrencesQuery($schoolYearId)
                 ->whereIn('cr.section_id', $sectionIds)
-                ->whereBetween('class_record_assessments.activity_date', [
-                    $monday->toDateString(),
-                    $monday->copy()->addDays(6)->toDateString(),
-                ]),
+                ->whereRaw(
+                    self::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
+                    [$monday->toDateString(), $monday->copy()->addDays(6)->toDateString()]
+                ),
             $excludeIds
         );
     }
@@ -213,13 +241,20 @@ class WatRuleService
                             ->from('quarter_exam_windows as qew')
                             ->whereColumn('qew.school_year_id', 'cr.school_year_id')
                             ->whereColumn('qew.quarter', 'crq.quarter')
-                            ->whereColumn('class_record_assessments.activity_date', '>=', 'qew.start_date')
-                            ->whereColumn('class_record_assessments.activity_date', '<=', 'qew.end_date');
+                            ->whereRaw(self::OCCURRENCE_DATE_SQL.' >= qew.start_date')
+                            ->whereRaw(self::OCCURRENCE_DATE_SQL.' <= qew.end_date');
                     });
             })
             ->selectRaw('
-                COALESCE(SUM(class_record_assessments.is_graded), 0)  as graded,
-                COALESCE(SUM(class_record_assessments.is_major AND class_record_assessments.is_graded), 0) as major
+                COUNT(DISTINCT CASE
+                    WHEN class_record_assessments.is_graded = 1
+                    THEN class_record_assessments.id
+                END) as graded,
+                COUNT(DISTINCT CASE
+                    WHEN class_record_assessments.is_major = 1
+                        AND class_record_assessments.is_graded = 1
+                    THEN class_record_assessments.id
+                END) as major
             ')
             ->first();
 
@@ -272,26 +307,25 @@ class WatRuleService
         $grade = Section::where('id', $sectionId)->value('levelid');
         $poolSectionIds = $grade !== null ? self::poolSectionIds($sectionId, (int) $grade) : [$sectionId];
 
-        $rows = ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+        $rows = self::assessmentOccurrencesQuery($schoolYearId)
             ->whereIn('cr.section_id', $poolSectionIds)
             ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
             ->leftJoin('sections as sec', 'sec.id', '=', 'cr.section_id')
-            ->whereBetween('class_record_assessments.activity_date', [
-                $monday->toDateString(),
-                $monday->copy()->addDays(6)->toDateString(),
-            ])
-            ->orderBy('class_record_assessments.activity_date')
+            ->whereRaw(
+                self::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
+                [$monday->toDateString(), $monday->copy()->addDays(6)->toDateString()]
+            )
+            ->orderByRaw(self::OCCURRENCE_DATE_SQL)
             ->orderBy('cr.subject_name')
-            ->get([
+            ->select([
                 'class_record_assessments.id',
                 'class_record_assessments.class_record_quarter_id',
                 'class_record_assessments.title',
                 'class_record_assessments.assessment_type',
                 'class_record_assessments.is_graded',
                 'class_record_assessments.is_major',
-                'class_record_assessments.activity_date',
-                'class_record_assessments.plotted_at',
                 'class_record_assessments.max_score',
+                'crad.id as assessment_date_id',
                 'cr.id as class_record_id',
                 'cr.subject_id',
                 'cr.section_id',
@@ -301,7 +335,10 @@ class WatRuleService
                 'gc.name as category_name',
                 'gc.code as category_code',
                 'sec.sectionname as row_section_name',
-            ]);
+            ])
+            ->selectRaw(self::OCCURRENCE_DATE_SQL.' as activity_date')
+            ->selectRaw(self::OCCURRENCE_PLOTTED_AT_SQL.' as plotted_at')
+            ->get();
 
         // Non-graded ILA dates (the default) are still surfaced in the WAT
         // grid — informational only, never counted toward the graded/major
@@ -401,7 +438,10 @@ class WatRuleService
             $subjectName = $row->category_label ? "{$row->subject_name} — {$row->category_label}" : $row->subject_name;
 
             return [
-                'id'              => $row->id,
+                'id'              => $row->assessment_date_id
+                    ? "{$row->id}:{$row->assessment_date_id}"
+                    : (string) $row->id,
+                'assessment_id'   => $row->id,
                 'class_record_id' => $row->class_record_id,
                 'date'            => $date->toDateString(),
                 'title'           => $row->title,
@@ -493,8 +533,8 @@ class WatRuleService
             ];
         });
 
-        $weekGraded = $items->where('is_graded', true)->count();
-        $weekMajor  = $items->where('is_graded', true)->where('is_major', true)->count();
+        $weekGraded = $items->where('is_graded', true)->unique('assessment_id')->count();
+        $weekMajor  = $items->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
 
         return [
             'week_start'   => $monday->toDateString(),
@@ -591,7 +631,7 @@ class WatRuleService
             $graded = $mine->where('is_graded', true);
             $major  = $graded->where('is_major', true);
 
-            $plottedCount = $graded->count();
+            $plottedCount = $graded->unique('assessment_id')->count();
             $lastPlottedAt = $mine->pluck('plotted_at')->filter()->sort()->last();
 
             $status = 'plotted';
@@ -697,8 +737,8 @@ class WatRuleService
                 }
             }
 
-            $gradedMine = $mine->where('is_graded', true)->count();
-            $majorMine  = $mine->where('is_graded', true)->where('is_major', true)->count();
+            $gradedMine = $mine->where('is_graded', true)->unique('assessment_id')->count();
+            $majorMine  = $mine->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
 
             $sections[] = [
                 'section_id'    => (int) $sectionId,
@@ -731,8 +771,9 @@ class WatRuleService
             ];
         })->values();
 
-        $weekGraded = $days->sum('graded_count');
-        $weekMajor  = $days->sum('major_count');
+        $weekItems = $days->flatMap(fn ($day) => $day['items']);
+        $weekGraded = $weekItems->where('is_graded', true)->unique('assessment_id')->count();
+        $weekMajor  = $weekItems->where('is_graded', true)->where('is_major', true)->unique('assessment_id')->count();
 
         return [
             'week_start' => $monday->toDateString(),

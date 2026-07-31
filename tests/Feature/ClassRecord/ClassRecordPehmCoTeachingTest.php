@@ -155,6 +155,110 @@ class ClassRecordPehmCoTeachingTest extends TestCase
         ]);
     }
 
+    public function test_apply_setup_on_shared_record_copies_only_the_co_teachers_subject_and_preserves_other_subjects(): void
+    {
+        $peTeacher = User::factory()->create();
+        $musicTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1');
+        $musicSubject = $this->makeSubject('Music 1', 'MUS1');
+
+        $peLeaf = GradingCategory::create([
+            'grading_option_id' => $this->option->id,
+            'subject_id' => $peSubject->id,
+            'name' => 'PE Summative',
+            'code' => 'PES',
+            'weight' => 0.5,
+            'max_assessments' => 5,
+            'sort_order' => 1,
+        ]);
+        $musicLeaf = GradingCategory::create([
+            'grading_option_id' => $this->option->id,
+            'subject_id' => $musicSubject->id,
+            'name' => 'Music Summative',
+            'code' => 'MUS',
+            'weight' => 0.5,
+            'max_assessments' => 5,
+            'sort_order' => 2,
+        ]);
+
+        $source = $this->makeRecord($peTeacher, $peSubject);
+        $this->attachCoTeacher($source, $peSubject, $peTeacher, true);
+        $this->attachCoTeacher($source, $musicSubject, $musicTeacher);
+        $sourceQuarter = $this->makeQuarter($source);
+
+        foreach ([[$peLeaf, 'PE Quiz'], [$musicLeaf, 'Music Quiz']] as [$category, $title]) {
+            ClassRecordAssessment::create([
+                'class_record_quarter_id' => $sourceQuarter->id,
+                'grading_category_id' => $category->id,
+                'assessment_number' => 1,
+                'title' => $title,
+                'assessment_type' => 'alternative',
+                'is_graded' => true,
+                'is_major' => false,
+                'activity_date' => '2026-09-07',
+                'max_score' => 20,
+                'sort_order' => 1,
+            ]);
+        }
+
+        $targetSection = Section::create([
+            'levelid' => 8,
+            'sectionname' => 'Ruby',
+            'syid' => $this->sy->id,
+            'school_year_id' => $this->sy->id,
+            'is_active' => true,
+        ]);
+        $target = ClassRecord::create([
+            'subject_id' => $peSubject->id,
+            'section_id' => $targetSection->id,
+            'grading_option_id' => $this->option->id,
+            'school_year_id' => $this->sy->id,
+            'school_year' => $this->sy->name,
+            'subject_name' => $peSubject->name,
+            'year_level_section' => 'G-8 Ruby',
+            'teacher_id' => $peTeacher->id,
+            'status' => 'draft',
+        ]);
+        $this->attachCoTeacher($target, $peSubject, $peTeacher, true);
+        $this->attachCoTeacher($target, $musicSubject, $musicTeacher);
+        $targetQuarter = $this->makeQuarter($target);
+        $existingPe = ClassRecordAssessment::create([
+            'class_record_quarter_id' => $targetQuarter->id,
+            'grading_category_id' => $peLeaf->id,
+            'assessment_number' => 1,
+            'title' => 'Existing PE Quiz',
+            'assessment_type' => 'alternative',
+            'is_graded' => true,
+            'is_major' => false,
+            'activity_date' => '2026-09-08',
+            'max_score' => 20,
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($musicTeacher)
+            ->postJson(route('class-records.assessments.apply-to-sections', [
+                'classRecord' => $source->id,
+                'q' => 1,
+            ]), ['target_class_record_ids' => [$target->id]])
+            ->assertOk()
+            ->assertJsonCount(1, 'applied')
+            ->assertJsonPath('applied.0.count', 1);
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'id' => $existingPe->id,
+            'title' => 'Existing PE Quiz',
+        ]);
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $targetQuarter->id,
+            'grading_category_id' => $musicLeaf->id,
+            'title' => 'Music Quiz',
+        ]);
+        $this->assertDatabaseMissing('class_record_assessments', [
+            'class_record_quarter_id' => $targetQuarter->id,
+            'title' => 'PE Quiz',
+        ]);
+    }
+
     // ── Co-teacher access: scores ──────────────────────────────────────────────
 
     public function test_co_teacher_cannot_enter_scores_for_a_leaf_they_do_not_own(): void

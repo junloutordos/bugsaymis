@@ -170,22 +170,38 @@ function buildDraft(quarter) {
     draft[cat.id] = []
     const existing = (quarter?.assessments ?? [])
       .filter(a => a.grading_category_id === cat.id)
-      .sort((a, b) => a.assessment_number - b.assessment_number)
+      .sort((a, b) => {
+        const aDate = [...(a.activity_dates?.length ? a.activity_dates : [a.activity_date]).filter(Boolean)].sort()[0] ?? '9999-12-31'
+        const bDate = [...(b.activity_dates?.length ? b.activity_dates : [b.activity_date]).filter(Boolean)].sort()[0] ?? '9999-12-31'
+        return aDate.localeCompare(bDate)
+          || Number(a.assessment_number) - Number(b.assessment_number)
+          || Number(a.id) - Number(b.id)
+      })
 
     // Show at least max_assessments rows OR all saved rows, whichever is more
     const rowCount = Math.max(cat.max_assessments, existing.length)
-    for (let n = 1; n <= rowCount; n++) {
+    const usedNumbers = new Set(existing.map(a => Number(a.assessment_number)))
+    const displayNumbers = existing.map(a => Number(a.assessment_number))
+    for (let n = 1; displayNumbers.length < rowCount; n++) {
+      if (!usedNumbers.has(n)) displayNumbers.push(n)
+    }
+    for (const n of displayNumbers) {
       const found = existing.find(a => a.assessment_number === n)
+      const foundDates = found
+        ? [...new Set((found.activity_dates?.length ? found.activity_dates : [found.activity_date]).filter(Boolean))].sort()
+        : []
       draft[cat.id].push({
         grading_category_id: cat.id,
         assessment_number:   n,
         title:               found?.title ?? '',
         is_graded:           found ? !!found.is_graded : true,
-        activity_date:       found?.activity_date ?? '',
+        activity_date:       foundDates[0] ?? '',
+        activity_dates:      foundDates,
         max_score:           found?.max_score ?? '',
         _saved:              !!found,
         _db_id:              found?.id ?? null,  // track DB id for delete validation
-        _prevDate:           found?.activity_date ?? '',
+        _dateInput:          '',
+        _savedDates:         [...foundDates],
         _dateWarning:        null,
         _pendingDeletion:    !!found?.pending_deletion_request,
       })
@@ -194,21 +210,47 @@ function buildDraft(quarter) {
   return draft
 }
 
+function setupSignature(draft) {
+  return JSON.stringify(
+    Object.entries(draft ?? {})
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .flatMap(([, rows]) => rows.map(row => ({
+        id: row._db_id ?? null,
+        category: Number(row.grading_category_id),
+        number: Number(row.assessment_number),
+        title: String(row.title ?? ''),
+        graded: !!row.is_graded,
+        dates: [...(row.activity_dates ?? [])].sort(),
+        maxScore: String(row.max_score ?? ''),
+      })))
+  )
+}
+
+const setupDirty = computed(() =>
+  setupSignature(assessmentDraft.value) !== setupSignature(buildDraft(currentQuarterData.value))
+)
+
 function addAssessmentRow(catId) {
   const rows = assessmentDraft.value[catId]
-  const nextNum = rows.length + 1
+  const nextNum = Math.max(0, ...rows.map(row => Number(row.assessment_number) || 0)) + 1
   rows.push({
     grading_category_id: catId,
     assessment_number:   nextNum,
     title:               '',
     is_graded:           true,
     activity_date:       '',
+    activity_dates:      [],
     max_score:           '',
     _saved:              false,
     _db_id:              null,
-    _prevDate:           '',
+    _dateInput:          '',
+    _savedDates:         [],
     _dateWarning:        null,
   })
+}
+
+function onAssessmentGradingChange(row) {
+  if (!row.is_graded) row.max_score = ''
 }
 
 async function removeAssessmentRow(catId, idx) {
@@ -225,8 +267,9 @@ async function removeAssessmentRow(catId, idx) {
   // instead; the row stays until ACIDAA acts on it. Outside that window
   // (week hasn't arrived yet, or has already passed) fall through to a
   // direct delete, same as an unplotted row.
-  if (row._db_id && row.activity_date && isWithinScheduledWeek(row.activity_date)) {
+  if (row._db_id && (row.activity_dates ?? []).some(isWithinScheduledWeek)) {
     requestDeletionRow.value = row
+    requestDeletionDate.value = null
     requestDeletionReason.value = ''
     showRequestDeletionModal.value = true
     return
@@ -247,14 +290,19 @@ async function removeAssessmentRow(catId, idx) {
   }
 
   assessmentDraft.value[catId].splice(idx, 1)
-  // Re-number remaining rows
-  assessmentDraft.value[catId].forEach((r, i) => { r.assessment_number = i + 1 })
+  // Compact numbering by the existing assessment sequence, not by the
+  // chronological display order. Dates control position; labels/types such
+  // as LT1/LT2 must not be reassigned merely because an earlier date exists.
+  const remainingByNumber = [...assessmentDraft.value[catId]]
+    .sort((a, b) => Number(a.assessment_number) - Number(b.assessment_number))
+  remainingByNumber.forEach((r, i) => { r.assessment_number = i + 1 })
 }
 
 // ── Request deletion of a plotted assessment (ACIDAA approval required) ───────
 
 const showRequestDeletionModal = ref(false)
 const requestDeletionRow = ref(null)
+const requestDeletionDate = ref(null)
 const requestDeletionReason = ref('')
 const submittingDeletionRequest = ref(false)
 
@@ -268,10 +316,14 @@ async function submitDeletionRequest() {
       route('class-records.assessments.request-deletion', {
         classRecord: props.classRecord.id, q: activeQuarter.value, assessment: row._db_id,
       }),
-      { reason: requestDeletionReason.value }
+      {
+        reason: requestDeletionReason.value,
+        activity_date: requestDeletionDate.value,
+      }
     )
-    row._pendingDeletion = true
+    if (!requestDeletionDate.value) row._pendingDeletion = true
     showRequestDeletionModal.value = false
+    router.reload({ only: ['classRecord'] })
     await Swal.fire({
       icon: 'success', title: 'Deletion requested',
       text: 'Awaiting Assistant CID Chief for Academic Affairs approval.',
@@ -313,18 +365,18 @@ async function saveSetup() {
 
   for (const a of allRows) {
     const hasTitle = !!a.title
-    const hasDate  = !!a.activity_date
+    const hasDate  = (a.activity_dates?.length ?? 0) > 0
     const hasScore = a.max_score !== '' && a.max_score !== null && a.max_score !== undefined
 
     if (!hasTitle && !hasDate && !hasScore) continue // untouched placeholder row
 
-    if (!hasTitle || !hasDate || !hasScore) {
+    if (!hasTitle || !hasDate || (a.is_graded && !hasScore)) {
       const cat = currentLeafCategories.value.find(c => c.id === a.grading_category_id)
       const label = cat ? `${cat.code}${a.assessment_number}` : `Row ${a.assessment_number}`
       const missing = []
       if (!hasTitle) missing.push('Title')
       if (!hasDate)  missing.push('Activity Date')
-      if (!hasScore) missing.push('Max Score')
+      if (a.is_graded && !hasScore) missing.push('Max Score')
       incomplete.push(`${label}: missing ${missing.join(', ')}`)
       continue
     }
@@ -336,7 +388,8 @@ async function saveSetup() {
       title:                a.title,
       is_graded:            a.is_graded,
       activity_date:        a.activity_date,
-      max_score:            a.max_score,
+      activity_dates:       a.activity_dates,
+      max_score:            a.is_graded ? a.max_score : null,
     })
   }
 
@@ -353,10 +406,30 @@ async function saveSetup() {
   }
 
   try {
-    const { data } = await axios.post(
+    const submit = (confirmScoreRemoval = false) => axios.post(
       route('class-records.assessments.upsert', { classRecord: props.classRecord.id, q: activeQuarter.value }),
-      { assessments }
+      {
+        assessments,
+        confirm_non_graded_score_removal: confirmScoreRemoval,
+      }
     )
+    let response
+    try {
+      response = await submit()
+    } catch (err) {
+      if (err.response?.status !== 409 || !err.response?.data?.requires_confirmation) throw err
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Remove saved scores?',
+        text: err.response.data.message,
+        showCancelButton: true,
+        confirmButtonText: 'Remove scores and continue',
+        confirmButtonColor: '#dc2626',
+      })
+      if (!result.isConfirmed) return
+      response = await submit(true)
+    }
+    const { data } = response
     if (data.warnings?.length) {
       await Swal.fire({ icon: 'warning', title: 'Saved — please double-check', html: data.warnings.join('<br>') })
     } else {
@@ -418,35 +491,37 @@ function isMajorRow(row) {
 // server-side section calendar so a stale/leftover row (dated via a prior
 // calendar click or table edit, never saved) is visible and removable
 // instead of silently consuming a day's WAT budget with no on-screen trace.
-// Server-saved rows for this quarter are already present via
-// sectionCalendarDays (they're real, persisted rows) — only rows with no
-// _db_id are added here, tagged is_pending so the calendar can render them
-// distinctly (e.g. a dashed/amber treatment) from confirmed entries.
+// Server-saved occurrences are already present via sectionCalendarDays.
+// Only newly added dates are overlaid here and tagged is_pending so the
+// calendar can distinguish them from confirmed entries.
 const calendarDaysWithPending = computed(() => {
   const byDate = new Map(sectionCalendarDays.value.map(d => [d.date, { ...d, items: [...d.items] }]))
 
   for (const cat of currentLeafCategories.value) {
     for (const row of assessmentDraft.value[cat.id] ?? []) {
-      if (!row.activity_date || row._db_id) continue
-      const date = row.activity_date
-      const entry = byDate.get(date) ?? { date, count: 0, graded_count: 0, major_count: 0, items: [] }
-      entry.items.push({
-        id:            `pending-${cat.id}-${row.assessment_number}`,
-        title:         row.title || '(untitled)',
-        subject_name:  props.classRecord.subject_name,
-        teacher_name:  null,
-        category_code: cat.code,
-        is_graded:     row.is_graded,
-        is_major:      isMajorRow(row),
-        is_own_record: true,
-        is_pending:    true,
-      })
-      entry.count += 1
-      if (row.is_graded) {
-        entry.graded_count = (entry.graded_count ?? 0) + 1
-        if (isMajorRow(row)) entry.major_count = (entry.major_count ?? 0) + 1
+      for (const date of row.activity_dates ?? []) {
+        if ((row._savedDates ?? []).includes(date)) continue
+        const entry = byDate.get(date) ?? { date, count: 0, graded_count: 0, major_count: 0, items: [] }
+        entry.items.push({
+          id:            `pending-${cat.id}-${row.assessment_number}-${date}`,
+          title:         row.title || '(untitled)',
+          subject_name:  props.classRecord.subject_name,
+          teacher_name:  null,
+          category_code: cat.code,
+          is_graded:     row.is_graded,
+          is_major:      isMajorRow(row),
+          is_own_record: true,
+          is_pending:    true,
+          occurrence_number: (row.activity_dates ?? []).indexOf(date) + 1,
+          occurrence_total: (row.activity_dates ?? []).length,
+        })
+        entry.count += 1
+        if (row.is_graded) {
+          entry.graded_count = (entry.graded_count ?? 0) + 1
+          if (isMajorRow(row)) entry.major_count = (entry.major_count ?? 0) + 1
+        }
+        byDate.set(date, entry)
       }
-      byDate.set(date, entry)
     }
   }
 
@@ -482,8 +557,8 @@ const dateCounts = computed(() => {
   }
   for (const rows of Object.values(assessmentDraft.value)) {
     for (const row of rows) {
-      if (row.activity_date && row.is_graded) {
-        bump(row.activity_date, 1, isMajorRow(row) ? 1 : 0)
+      for (const date of row.activity_dates ?? []) {
+        if (row.is_graded) bump(date, 1, isMajorRow(row) ? 1 : 0)
       }
     }
   }
@@ -506,26 +581,47 @@ const meetingDaysLabel = computed(() =>
 )
 
 function onDateChange(row) {
-  if (!row.activity_date) {
+  const date = row._dateInput
+  if (!date) {
     row._dateWarning = null
-    row._prevDate     = ''
     return
   }
-  const counts = dateCounts.value.get(row.activity_date) ?? { graded: 0, major: 0 }
-  if (row.is_graded && counts.graded > WAT.dailyGraded) {
-    row._dateWarning  = `Section already has ${WAT.dailyGraded} graded assessments on ${row.activity_date} — pick another date.`
-    row.activity_date = row._prevDate
-  } else if (row.is_graded && isMajorRow(row) && counts.major > WAT.dailyMajor) {
-    row._dateWarning  = `Section already has ${WAT.dailyMajor} major assessments on ${row.activity_date} — pick another date.`
-    row.activity_date = row._prevDate
-  } else if (!props.isAdmin && new Date() > plottingDeadline(row.activity_date)) {
-    const deadline = plottingDeadline(row.activity_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+  if ((row.activity_dates ?? []).includes(date)) {
+    row._dateWarning = 'That date is already selected.'
+    row._dateInput = ''
+    return
+  }
+  const counts = dateCounts.value.get(date) ?? { graded: 0, major: 0 }
+  if (row.is_graded && counts.graded >= WAT.dailyGraded) {
+    row._dateWarning  = `Section already has ${WAT.dailyGraded} graded assessments on ${date} — pick another date.`
+    row._dateInput = ''
+  } else if (row.is_graded && isMajorRow(row) && counts.major >= WAT.dailyMajor) {
+    row._dateWarning  = `Section already has ${WAT.dailyMajor} major assessments on ${date} — pick another date.`
+    row._dateInput = ''
+  } else if (!props.isAdmin && new Date() > plottingDeadline(date)) {
+    const deadline = plottingDeadline(date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
     row._dateWarning  = `Plotting deadline passed — assessments must be plotted by 12:00 NN of the Friday before their week (${deadline}).`
-    row.activity_date = row._prevDate
+    row._dateInput = ''
   } else {
     row._dateWarning = null
-    row._prevDate    = row.activity_date
+    row.activity_dates = [...(row.activity_dates ?? []), date].sort()
+    row.activity_date = row.activity_dates[0] ?? ''
+    row._dateInput = ''
   }
+}
+
+async function removeActivityDate(row, date) {
+  if (row._db_id && (row._savedDates ?? []).includes(date) && isWithinScheduledWeek(date)) {
+    requestDeletionRow.value = row
+    requestDeletionDate.value = date
+    requestDeletionReason.value = ''
+    showRequestDeletionModal.value = true
+    return
+  }
+
+  row.activity_dates = (row.activity_dates ?? []).filter(value => value !== date)
+  row.activity_date = row.activity_dates[0] ?? ''
+  row._dateWarning = null
 }
 
 // ── Click-to-schedule calendar wiring ──────────────────────────────────────
@@ -582,7 +678,7 @@ function calendarDateFeasibility(dateStr) {
   return { ok: true, reason: null }
 }
 
-async function onCalendarSchedule({ catId, title, maxScore, date, targetRecordIds }) {
+async function onCalendarSchedule({ catId, title, isGraded, maxScore, date, dates, targetRecordIds }) {
   try {
     const { data } = await axios.post(
       route('class-records.assessments.plot', {
@@ -593,8 +689,9 @@ async function onCalendarSchedule({ catId, title, maxScore, date, targetRecordId
         grading_category_id: catId,
         title,
         max_score: maxScore,
-        is_graded: true,
+        is_graded: isGraded,
         activity_date: date,
+        activity_dates: dates ?? [date],
         target_class_record_ids: targetRecordIds,
       },
     )
@@ -636,13 +733,15 @@ async function onCalendarSchedule({ catId, title, maxScore, date, targetRecordId
 // than splicing the row out entirely, so its title/max-score (if any were
 // typed) aren't lost — same soft-touch as un-dating a row in the table.
 function onCalendarClearPending(item) {
-  const match = /^pending-(\d+)-(\d+)$/.exec(item.id)
+  const match = /^pending-(\d+)-(\d+)-(\d{4}-\d{2}-\d{2})$/.exec(item.id)
   if (!match) return
-  const [, catId, assessmentNumber] = match.map(Number)
+  const catId = Number(match[1])
+  const assessmentNumber = Number(match[2])
+  const date = match[3]
   const row = (assessmentDraft.value[catId] ?? []).find(r => r.assessment_number === assessmentNumber)
   if (!row) return
-  row.activity_date = ''
-  row._prevDate      = ''
+  row.activity_dates = (row.activity_dates ?? []).filter(value => value !== date)
+  row.activity_date = row.activity_dates[0] ?? ''
   row._dateWarning   = null
 }
 
@@ -715,8 +814,61 @@ const applyPastYearRecords = computed(() =>
 )
 
 function openApplyToSectionsModal() {
+  if (setupDirty.value) {
+    Swal.fire('Save Setup First', 'Save your current Setup changes before applying them to other sections.', 'warning')
+    return
+  }
   applyToSectionIds.value = []
   showApplyToSectionsModal.value = true
+}
+
+const sourceApplyCategoryIds = computed(() => {
+  const ids = (currentQuarterData.value?.assessments ?? [])
+    .filter(assessment => {
+      if (props.isAdmin || !(props.classRecord.co_teachers?.length)) return true
+      const category = currentLeafCategories.value.find(cat => cat.id === assessment.grading_category_id)
+      return category ? canEditCategory(category) : false
+    })
+    .map(assessment => Number(assessment.grading_category_id))
+
+  return [...new Set(ids)]
+})
+
+function applyTargetStatus(record) {
+  const quarter = (record.apply_quarters ?? []).find(row => row.number === activeQuarter.value)
+  if (!quarter) return { ok: false, reason: 'Quarter information is unavailable.' }
+  if (quarter.is_locked) return { ok: false, reason: 'Quarter is locked.' }
+
+  const sourceOptionId = currentQuarterData.value?.effective_grading_option_id
+    ?? currentQuarterData.value?.grading_option_id
+    ?? props.classRecord.grading_option_id
+  if (Number(quarter.effective_grading_option_id) !== Number(sourceOptionId)) {
+    return { ok: false, reason: 'Uses a different grading option.' }
+  }
+
+  const editableIds = new Set((quarter.editable_category_ids ?? []).map(Number))
+  if (sourceApplyCategoryIds.value.some(id => !editableIds.has(id))) {
+    return { ok: false, reason: 'You do not have access to the matching category on this section.' }
+  }
+
+  const categoryScoped = !props.isAdmin && (props.classRecord.co_teachers?.length ?? 0) > 0
+  if (categoryScoped) {
+    const existingIds = new Set((quarter.assessment_category_ids ?? []).map(Number))
+    if (sourceApplyCategoryIds.value.some(id => existingIds.has(id))) {
+      return { ok: false, reason: 'Your PEHM subject already has assessments in this quarter.' }
+    }
+  } else if (quarter.assessment_count > 0) {
+    return { ok: false, reason: 'Setup already contains assessments.' }
+  }
+
+  if ((quarter.schedule_conflicts ?? []).length) {
+    return {
+      ok: false,
+      reason: `Class does not meet on ${quarter.schedule_conflicts.join(', ')}.`,
+    }
+  }
+
+  return { ok: true, reason: 'Ready to apply.' }
 }
 
 async function applyToSections() {
@@ -1168,9 +1320,12 @@ async function saveQuarterOption() {
             class="mb-4 flex flex-wrap items-center gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
             <DocumentDuplicateIcon class="h-4 w-4 text-indigo-400 shrink-0" />
             <span class="text-slate-600">Teach other sections of {{ classRecord.subject_name }}?</span>
-            <AppButton variant="secondary" size="sm" @click="openApplyToSectionsModal">
+            <AppButton variant="secondary" size="sm" :disabled="setupDirty"
+              :title="setupDirty ? 'Save Setup before applying it to other sections.' : ''"
+              @click="openApplyToSectionsModal">
               Apply This Setup to Other Sections…
             </AppButton>
+            <span v-if="setupDirty" class="text-amber-600">Save Setup first to include your latest changes.</span>
           </div>
 
           <!-- WAT plotting rules reminder -->
@@ -1210,8 +1365,8 @@ async function saveQuarterOption() {
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-16">#</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description <span class="text-danger-500">*</span></th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-32">Category</th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date <span class="text-danger-500">*</span></th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score <span class="text-danger-500">*</span></th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 min-w-56">Activity Dates <span class="text-danger-500">*</span></th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score <span class="text-slate-400">(graded only)</span></th>
                       <th v-if="!isLocked && !isReadOnly && canEditCategory(cat)" class="px-2 py-2 w-8"></th>
                     </tr>
                   </thead>
@@ -1230,6 +1385,7 @@ async function saveQuarterOption() {
                       <td class="px-4 py-2">
                         <select v-model="row.is_graded"
                           :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
+                          @change="onAssessmentGradingChange(row)"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
                           <option :value="true">Graded</option>
                           <option :value="false">Non-graded</option>
@@ -1237,17 +1393,31 @@ async function saveQuarterOption() {
                         <span v-if="isMajorRow(row)" class="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
                       </td>
                       <td class="px-4 py-2">
-                        <AppDatePicker v-model="row.activity_date"
+                        <div v-if="row.activity_dates?.length" class="mb-1.5 flex flex-wrap gap-1">
+                          <span v-for="(date, dateIndex) in row.activity_dates" :key="date"
+                            class="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700">
+                            {{ date }}
+                            <span v-if="dateIndex === 0" class="text-[9px] font-semibold uppercase text-indigo-400">Primary</span>
+                            <button v-if="!isLocked && !isReadOnly && canEditCategory(cat)" type="button"
+                              class="text-indigo-400 hover:text-red-500" title="Remove this date"
+                              @click="removeActivityDate(row, date)">
+                              <XMarkIcon class="h-3 w-3" />
+                            </button>
+                          </span>
+                        </div>
+                        <AppDatePicker v-model="row._dateInput"
                           :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           :disabled-weekdays="disabledWeekdays"
                           @change="onDateChange(row)" />
+                        <p class="mt-1 text-[10px] text-slate-400">Choose another date to add it to the same assessment.</p>
                         <p v-if="row._dateWarning" class="text-red-500 text-[11px] mt-1">{{ row._dateWarning }}</p>
                       </td>
                       <td class="px-4 py-2">
-                        <input v-model.number="row.max_score" type="number" min="0.01" step="0.5"
+                        <input v-if="row.is_graded" v-model.number="row.max_score" type="number" min="0.01" step="0.5"
                           :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           placeholder="e.g. 30"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
+                        <span v-else class="text-xs italic text-slate-400">Not applicable</span>
                       </td>
                       <td v-if="!isLocked && !isReadOnly && canEditCategory(cat)" class="px-2 py-2 text-center">
                         <span v-if="row._pendingDeletion"
@@ -1256,7 +1426,7 @@ async function saveQuarterOption() {
                           @click="removeAssessmentRow(cat.id, rIdx)">
                           <ClockIcon class="h-3 w-3" /> Deletion Requested
                         </span>
-                        <AppIconButton v-else-if="row._db_id && row.activity_date"
+                        <AppIconButton v-else-if="row._db_id && row.activity_dates?.length"
                           label="Request deletion (already plotted / announced to students)" variant="danger" size="sm"
                           @click="removeAssessmentRow(cat.id, rIdx)">
                           <ExclamationTriangleIcon class="h-4 w-4" />
@@ -1476,7 +1646,10 @@ async function saveQuarterOption() {
     <div class="space-y-3">
       <p v-if="requestDeletionRow" class="text-sm text-slate-600">
         <strong>{{ requestDeletionRow.title || 'Untitled assessment' }}</strong>
-        — {{ requestDeletionRow.activity_date }}
+        — {{ requestDeletionDate || requestDeletionRow.activity_dates?.join(', ') }}
+      </p>
+      <p v-if="requestDeletionDate" class="mt-1 text-xs text-slate-400">
+        Only this implementation date will be removed. The assessment and its scores will remain.
       </p>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Reason for Deletion <span class="text-danger-500">*</span></label>
@@ -1500,10 +1673,17 @@ async function saveQuarterOption() {
     <div class="space-y-3">
       <div v-if="applyEligibleRecords.length" class="space-y-1.5 max-h-64 overflow-y-auto">
         <label v-for="r in applyEligibleRecords" :key="r.id"
-          class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+          :class="['flex items-start gap-2 rounded-lg border px-3 py-2 text-sm',
+            applyTargetStatus(r).ok ? 'border-slate-200 hover:bg-slate-50 cursor-pointer' : 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-70']">
           <input type="checkbox" :value="r.id" v-model="applyToSectionIds"
+            :disabled="!applyTargetStatus(r).ok"
             class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-          <span>{{ r.year_level_section }} <span class="text-slate-400">({{ r.school_year }})</span></span>
+          <span class="min-w-0">
+            <span class="block">{{ r.year_level_section }} <span class="text-slate-400">({{ r.school_year }})</span></span>
+            <span :class="['block text-[11px]', applyTargetStatus(r).ok ? 'text-emerald-600' : 'text-slate-400']">
+              {{ applyTargetStatus(r).reason }}
+            </span>
+          </span>
         </label>
       </div>
       <p v-else class="text-sm text-slate-400">No other current-school-year sections found for this subject.</p>

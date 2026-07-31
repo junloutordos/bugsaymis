@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\CidSchedule;
 use App\Models\ClassRecord\ClassRecord;
-use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\FacultyLoading\TeacherTapLog;
 use App\Models\User;
+use App\Services\ClassRecord\WatRuleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -162,23 +162,24 @@ class CidDashboardController extends Controller
     {
         if (! $schoolYearId) return [];
 
-        $rows = ClassRecordAssessment::select([
+        $rows = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
+            ->select([
                 'class_record_assessments.id',
                 'class_record_assessments.title',
-                'class_record_assessments.activity_date',
+                'crad.id as assessment_date_id',
                 'cr.section_id',
                 'cr.subject_name',
                 'cr.teacher_id',
                 'gc.name as category_name',
                 'gc.code as category_code',
             ])
-            ->join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
-            ->join('class_records as cr',           'crq.class_record_id',                             '=', 'cr.id')
             ->join('grading_categories as gc',      'class_record_assessments.grading_category_id',    '=', 'gc.id')
-            ->where('cr.school_year_id', $schoolYearId)
-            ->whereNotNull('class_record_assessments.activity_date')
-            ->whereBetween('class_record_assessments.activity_date', [$start->toDateString(), $end->toDateString()])
-            ->orderBy('class_record_assessments.activity_date')
+            ->whereRaw(
+                WatRuleService::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
+                [$start->toDateString(), $end->toDateString()]
+            )
+            ->selectRaw(WatRuleService::OCCURRENCE_DATE_SQL.' as activity_date')
+            ->orderByRaw(WatRuleService::OCCURRENCE_DATE_SQL)
             ->get();
 
         $sectionIds = $rows->pluck('section_id')->filter()->unique()->values()->toArray();
@@ -188,7 +189,7 @@ class CidDashboardController extends Controller
         $teachers   = User::whereIn('id', $teacherIds)->get(['id', 'name'])->keyBy('id');
 
         return $rows->map(fn ($row) => [
-            'id'             => 'cr_' . $row->id,
+            'id'             => 'cr_'.$row->id.'_'.($row->assessment_date_id ?? 'legacy'),
             'title'          => "[{$row->category_code}] {$row->title}",
             'type'           => 'assessment',
             'source'         => 'class_record',
@@ -244,15 +245,14 @@ class CidDashboardController extends Controller
         $weekStart = $today->copy()->startOfWeek()->toDateString();
         $weekEnd   = $today->copy()->endOfWeek()->toDateString();
 
-        $assessmentsToday = ClassRecordAssessment::join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
-            ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
-            ->where('cr.school_year_id', $schoolYearId)
-            ->where('class_record_assessments.activity_date', $todayStr)
-            ->count();
+        $assessmentsToday = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
+            ->whereRaw(WatRuleService::OCCURRENCE_DATE_SQL.' = ?', [$todayStr])
+            ->distinct('class_record_assessments.id')
+            ->count('class_record_assessments.id');
 
-        $sectionsAtMax = ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
-            ->select('cr.section_id', DB::raw('COUNT(*) as cnt'))
-            ->where('class_record_assessments.activity_date', $todayStr)
+        $sectionsAtMax = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
+            ->select('cr.section_id', DB::raw('COUNT(DISTINCT class_record_assessments.id) as cnt'))
+            ->whereRaw(WatRuleService::OCCURRENCE_DATE_SQL.' = ?', [$todayStr])
             ->whereNotNull('cr.section_id')
             ->groupBy('cr.section_id')
             ->havingRaw('cnt >= 3')
@@ -291,14 +291,14 @@ class CidDashboardController extends Controller
         $monthEnd   = $today->copy()->endOfMonth()->toDateString();
 
         // Assessment load by section this month (from class record assessments)
-        $loadRows = ClassRecordAssessment::select('cr.section_id', DB::raw('COUNT(*) as count'))
-            ->join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
-            ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
+        $loadRows = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
+            ->select('cr.section_id', DB::raw('COUNT(DISTINCT class_record_assessments.id) as count'))
             ->leftJoin('sections as s', 'cr.section_id', '=', 's.id')
             ->addSelect('s.sectionname', 's.levelid')
-            ->where('cr.school_year_id', $schoolYearId)
-            ->whereNotNull('class_record_assessments.activity_date')
-            ->whereBetween('class_record_assessments.activity_date', [$monthStart, $monthEnd])
+            ->whereRaw(
+                WatRuleService::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
+                [$monthStart, $monthEnd]
+            )
             ->whereNotNull('cr.section_id')
             ->groupBy('cr.section_id', 's.sectionname', 's.levelid')
             ->orderByDesc('count')
