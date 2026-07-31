@@ -20,7 +20,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('consultations', function (Blueprint $table) {
-            $table->integer('student_id')->nullable()->after('requestor')->index();
+            $table->integer('student_id')->nullable()->index();
         });
 
         if (
