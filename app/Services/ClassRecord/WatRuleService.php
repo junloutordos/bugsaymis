@@ -15,6 +15,7 @@ use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Section;
 use App\Models\User;
+use App\Services\FacultyLoading\SchedulingConstants;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -337,7 +338,8 @@ class WatRuleService
             fn ($row) => ! array_key_exists('resolved_slot', $row)
         );
 
-        $scheduleByPairDate = self::scheduleSlotsForRows($unresolvedSpecialRows, $schoolYearId);
+        $scheduleByPairDate = self::scheduleResolutionForRows($unresolvedSpecialRows, $schoolYearId)
+            ->map(fn ($resolution) => $resolution['wat_block']);
 
         // Each occurrence connects to its assessment token (preserving the
         // existing "multi-date assessment counts once per week" rule) and,
@@ -395,12 +397,23 @@ class WatRuleService
     }
 
     /**
-     * Resolve exactly one class period for each section/subject/date. Academic
-     * term dates matter because the same subject may move to another time in
-     * the next semester. Zero or multiple matching periods are ambiguous and
-     * return null, which deliberately disables block consolidation.
+     * Resolve the display slot and WAT counting block for each
+     * section/subject/date. Academic term dates matter because the same subject
+     * may move to another time in the next semester.
+     *
+     * Electives use the grade's canonical elective window as their WAT block
+     * whenever any of their schedule rows overlaps it. This covers production
+     * schedules where one elective is stored as a single 100-minute row while
+     * another is stored as two consecutive 50-minute rows. The display slot
+     * remains conservative: zero or multiple distinct rows render no single
+     * time rather than claiming an inaccurate class duration.
+     *
+     * Outside a configured elective window, the existing exact-slot fallback
+     * remains in force. Science Core classes also retain exact-slot grouping.
+     *
+     * @return Collection<string, array{display_slot:?string, wat_block:?string}>
      */
-    private static function scheduleSlotsForRows(Collection $rows, int $schoolYearId): Collection
+    private static function scheduleResolutionForRows(Collection $rows, int $schoolYearId): Collection
     {
         $rows = $rows
             ->filter(fn ($row) => $row['section_id'] && $row['subject_id'] && $row['activity_date'])
@@ -422,6 +435,7 @@ class WatRuleService
             ->occupying()
             ->where('class_schedules.school_year_id', $schoolYearId)
             ->join('academic_terms as wat_terms', 'wat_terms.id', '=', 'class_schedules.academic_term_id')
+            ->join('sections as wat_schedule_sections', 'wat_schedule_sections.id', '=', 'class_schedules.section_id')
             ->where(function ($outer) use ($pairs) {
                 foreach ($pairs as $pair) {
                     $outer->orWhere(function ($inner) use ($pair) {
@@ -437,11 +451,14 @@ class WatRuleService
             'class_schedules.day_of_week',
             'class_schedules.start_time',
             'class_schedules.end_time',
+            'wat_schedule_sections.levelid as grade_level',
             'wat_terms.start_date as term_start_date',
             'wat_terms.end_date as term_end_date',
         ]);
 
-        return $rows->mapWithKeys(function ($row) use ($schedules) {
+        $electiveWindows = [];
+
+        return $rows->mapWithKeys(function ($row) use ($schedules, &$electiveWindows) {
             $day = Carbon::parse($row['activity_date'])->format('l');
             $matchingSchedules = $schedules
                 ->filter(fn ($schedule) => (int) $schedule->section_id === (int) $row['section_id']
@@ -453,13 +470,49 @@ class WatRuleService
             // Legacy/test records can carry dates just outside their term. In
             // that case a single unambiguous school-year slot is still useful;
             // differing semester slots remain ambiguous and do not consolidate.
-            $slots = ($inTermSchedules->isNotEmpty() ? $inTermSchedules : $matchingSchedules)
+            $selectedSchedules = $inTermSchedules->isNotEmpty() ? $inTermSchedules : $matchingSchedules;
+            $slots = $selectedSchedules
                 ->map(fn ($schedule) => substr((string) $schedule->start_time, 0, 5)
                     .'|'.substr((string) $schedule->end_time, 0, 5))
                 ->unique()
                 ->values();
+            $displaySlot = $slots->count() === 1 ? $slots->first() : null;
+            $watBlock = $displaySlot;
 
-            return [self::scheduleSlotKey($row) => $slots->count() === 1 ? $slots->first() : null];
+            if (($row['subject_type'] ?? null) === 'elective') {
+                $grades = $selectedSchedules->pluck('grade_level')
+                    ->filter(fn ($grade) => $grade !== null)
+                    ->map(fn ($grade) => (int) $grade)
+                    ->unique()
+                    ->values();
+
+                if ($grades->count() === 1) {
+                    $grade = $grades->first();
+                    $windowKey = $grade.'|'.$day;
+                    $windows = $electiveWindows[$windowKey]
+                        ??= SchedulingConstants::getElectiveWindows($grade, $day);
+                    $matchingWindows = collect($windows)->filter(
+                        fn ($window) => $selectedSchedules->contains(
+                            fn ($schedule) => SchedulingConstants::timesOverlap(
+                                substr((string) $schedule->start_time, 0, 5),
+                                substr((string) $schedule->end_time, 0, 5),
+                                $window['start'],
+                                $window['end']
+                            )
+                        )
+                    )->values();
+
+                    if ($matchingWindows->count() === 1) {
+                        $window = $matchingWindows->first();
+                        $watBlock = $window['start'].'|'.$window['end'];
+                    }
+                }
+            }
+
+            return [self::scheduleSlotKey($row) => [
+                'display_slot' => $displaySlot,
+                'wat_block' => $watBlock,
+            ]];
         });
     }
 
@@ -595,6 +648,7 @@ class WatRuleService
             ->map(fn ($row) => [
                 'section_id' => (int) $row->section_id,
                 'subject_id' => (int) $row->subject_id,
+                'subject_type' => $row->subject_type,
                 'activity_date' => $row->activity_date instanceof Carbon
                     ? $row->activity_date->toDateString()
                     : Carbon::parse((string) $row->activity_date)->toDateString(),
@@ -610,9 +664,9 @@ class WatRuleService
             ->unique(fn ($row) => self::scheduleSlotKey($row))
             ->values();
 
-        $scheduleSlots = self::scheduleSlotsForRows($scheduleRows, $schoolYearId);
+        $scheduleResolutions = self::scheduleResolutionForRows($scheduleRows, $schoolYearId);
 
-        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts, $scheduleSlots, $sectionId) {
+        $items = $rows->map(function ($row) use ($teachers, $rosterCounts, $scoreCounts, $scheduleResolutions, $sectionId) {
             $roster = (int) ($rosterCounts[$row->class_record_quarter_id] ?? 0);
             $submitted = (int) ($scoreCounts[$row->id] ?? 0);
             $date = $row->activity_date instanceof Carbon
@@ -626,7 +680,9 @@ class WatRuleService
                     'activity_date' => $date->toDateString(),
                 ])
                 : null;
-            $scheduleSlot = $scheduleKey ? $scheduleSlots->get($scheduleKey) : null;
+            $scheduleResolution = $scheduleKey ? $scheduleResolutions->get($scheduleKey) : null;
+            $scheduleSlot = $scheduleResolution['display_slot'] ?? null;
+            $watBlock = $scheduleResolution['wat_block'] ?? null;
             [$scheduleStart, $scheduleEnd] = $scheduleSlot
                 ? explode('|', $scheduleSlot, 2)
                 : [null, null];
@@ -661,6 +717,7 @@ class WatRuleService
                 '_wat_subject_id' => (int) $row->subject_id,
                 '_wat_subject_type' => $row->subject_type,
                 '_wat_slot' => $scheduleSlot,
+                '_wat_block' => $watBlock,
                 'plotted_at' => $row->plotted_at,
                 'roster_count' => $roster,
                 'submitted_count' => $row->is_graded ? $submitted : null,
@@ -673,7 +730,7 @@ class WatRuleService
             ];
         });
 
-        $ilaItems = $ilaDates->map(function ($ilaDate) use ($teachers, $sectionId, $scheduleSlots) {
+        $ilaItems = $ilaDates->map(function ($ilaDate) use ($teachers, $sectionId, $scheduleResolutions) {
             $classRecord = $ilaDate->quarter->classRecord;
             $pooledTag = null;
             if ($classRecord && (int) $classRecord->section_id !== $sectionId) {
@@ -693,7 +750,8 @@ class WatRuleService
                     'activity_date' => $ilaDate->date->toDateString(),
                 ])
                 : null;
-            $scheduleSlot = $scheduleKey ? $scheduleSlots->get($scheduleKey) : null;
+            $scheduleResolution = $scheduleKey ? $scheduleResolutions->get($scheduleKey) : null;
+            $scheduleSlot = $scheduleResolution['display_slot'] ?? null;
             [$scheduleStart, $scheduleEnd] = $scheduleSlot
                 ? explode('|', $scheduleSlot, 2)
                 : [null, null];
@@ -787,7 +845,7 @@ class WatRuleService
                 'section_id' => (int) ($item['_wat_section_id'] ?? 0),
                 'subject_id' => (int) ($item['_wat_subject_id'] ?? 0),
                 'subject_type' => $item['_wat_subject_type'] ?? null,
-                'resolved_slot' => $item['_wat_slot'] ?? null,
+                'resolved_slot' => $item['_wat_block'] ?? null,
                 'is_graded' => (bool) $item['is_graded'],
                 'is_major' => (bool) $item['is_major'],
             ]),
