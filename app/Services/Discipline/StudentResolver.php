@@ -82,10 +82,7 @@ class StudentResolver
         $grade = '';
         $sectionName = '';
 
-        $sectionStudent = DB::table('section_students')
-            ->where('studentid', $student->id)
-            ->orderByDesc('id')
-            ->first();
+        $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
 
         if ($sectionStudent) {
             if (! empty($sectionStudent->levelid)) {

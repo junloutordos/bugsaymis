@@ -37,8 +37,8 @@ class ConsultationScheduledMail extends Mailable
                 $requestor['name'] = $student->name ?? $requestor['name'];
                 $requestor['sex'] = $student->sex ?? null;
 
-                // get latest section_students row (table uses studentid/levelid/sectionid)
-                $sectionStudent = DB::table('section_students')->where('studentid', $student->id)->orderByDesc('id')->first();
+                // resolve current school-year grade/section (falls back to legacy mirror)
+                $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
                 if ($sectionStudent) {
                     $levelId = $sectionStudent->levelid ?? $sectionStudent->level_id ?? null;
                     if ($levelId) {
