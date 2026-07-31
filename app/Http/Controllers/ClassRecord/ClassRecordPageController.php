@@ -146,12 +146,15 @@ class ClassRecordPageController extends Controller
 
         // Other class records by the same teacher for the same subject (for copy-from-section feature).
         // Archived records are excluded — they're soft-deleted and must never resurface as a copy source.
-        $sameSubjectRecords = ClassRecord::where('teacher_id', $classRecord->teacher_id)
+        $sameSubjectRecords = ClassRecord::with('coTeachers')
             ->where('id', '!=', $classRecord->id)
             ->where('status', '<>', 'archived')
             ->whereRaw('LOWER(subject_name) = LOWER(?)', [$classRecord->subject_name])
             ->orderByDesc('school_year')
-            ->get(['id', 'subject_name', 'year_level_section', 'school_year']);
+            ->get(['id', 'teacher_id', 'subject_id', 'section_id', 'subject_name', 'year_level_section', 'school_year'])
+            ->filter(fn (ClassRecord $record) => $record->canEdit(Auth::user())
+                && (int) $record->section_id !== (int) $classRecord->section_id)
+            ->values();
 
         // Sibling records splitting this exact subject+section+teacher+SY into
         // separate categories (e.g. STEM Research "Ongoing" vs "Completed") —

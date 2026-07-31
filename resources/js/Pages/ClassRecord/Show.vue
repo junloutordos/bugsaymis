@@ -582,51 +582,51 @@ function calendarDateFeasibility(dateStr) {
   return { ok: true, reason: null }
 }
 
-function onCalendarSchedule({ catId, title, date }) {
-  const cat = pendingAssessmentCategories.value.find(c => c.catId === catId)
+async function onCalendarSchedule({ catId, title, maxScore, date, targetRecordIds }) {
+  try {
+    const { data } = await axios.post(
+      route('class-records.assessments.plot', {
+        classRecord: props.classRecord.id,
+        q: activeQuarter.value,
+      }),
+      {
+        grading_category_id: catId,
+        title,
+        max_score: maxScore,
+        is_graded: true,
+        activity_date: date,
+        target_class_record_ids: targetRecordIds,
+      },
+    )
 
-  // Prefer retargeting a leftover unsaved-but-dated row (see
-  // pendingAssessmentCategories) over creating a new one — this is what
-  // stops a second calendar click on the same category from silently
-  // stacking a duplicate draft row that then double-counts toward the
-  // daily/weekly cap. If there are several (shouldn't normally happen),
-  // retarget the most recently added one and leave the rest for the
-  // teacher to review/remove in the table.
-  let row = cat?.unsavedDatedRows?.[cat.unsavedDatedRows.length - 1] ?? cat?.openRow
+    await loadSectionCalendar()
+    router.reload({ only: ['classRecord'] })
 
-  if (!row) {
-    // No existing open/unsaved row for this category — create one, same
-    // as clicking "Add {code} Row" in the table.
-    addAssessmentRow(catId)
-    row = assessmentDraft.value[catId][assessmentDraft.value[catId].length - 1]
+    if (data.skipped?.length) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Assessment saved',
+        html: `Saved directly to ${data.created.length} Class Record Setup(s).<br><br>` +
+          data.skipped.map(row => `<div class="text-left text-xs"><strong>${row.label}</strong>: ${row.reason}</div>`).join(''),
+      })
+    } else {
+      await Swal.fire({
+        icon: 'success',
+        title: 'Assessment saved to Setup',
+        text: `Saved directly to ${data.created.length} section(s).`,
+        timer: 1600,
+        showConfirmButton: false,
+      })
+    }
+  } catch (err) {
+    Swal.fire(
+      'Could not save assessment',
+      Object.values(err.response?.data?.errors ?? {}).flat()[0]
+        ?? err.response?.data?.message
+        ?? 'That assessment could not be saved.',
+      'error',
+    )
   }
-
-  if (title) row.title = title
-  row.activity_date = date
-  onDateChange(row)
-  // onDateChange() reverts activity_date to _prevDate ('') if its own re-check
-  // fails — surface that as a toast since the calendar's own picker already
-  // reported the same class of error before emitting.
-  if (!row.activity_date) {
-    Swal.fire('Could not schedule', row._dateWarning ?? 'That date is no longer available.', 'warning')
-  }
-}
-
-function onCalendarApplyToSections({ date }) {
-  // Only offer the contextual prompt when there's somewhere to apply to —
-  // reuses the exact same modal/endpoint as the "Apply This Setup to Other
-  // Sections…" banner; no separate code path.
-  if (!sameSubjectRecords.value.length) return
-  Swal.fire({
-    icon: 'question',
-    title: 'Apply to other sections?',
-    text: `You just scheduled an assessment for ${date}. Apply this quarter's whole setup to other sections you teach for ${props.classRecord.subject_name}?`,
-    showCancelButton: true,
-    confirmButtonText: 'Choose sections…',
-    cancelButtonText: 'Not now',
-  }).then((result) => {
-    if (result.isConfirmed) openApplyToSectionsModal()
-  })
 }
 
 // Removes a stale/leftover unsaved-but-dated row directly from the calendar
@@ -1576,10 +1576,10 @@ async function saveQuarterOption() {
     :days="calendarDaysWithPending"
     :editable="pendingAssessmentCategories.length > 0"
     :pending-rows="pendingAssessmentCategories"
+    :same-subject-records="applyEligibleRecords"
     :disabled-dates="calendarDateFeasibility"
     @close="showSectionCalendar = false"
     @schedule="onCalendarSchedule"
-    @apply-to-sections="onCalendarApplyToSections"
     @clear-pending="onCalendarClearPending"
   />
 </template>

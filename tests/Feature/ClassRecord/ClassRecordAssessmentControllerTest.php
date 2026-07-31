@@ -12,6 +12,8 @@ use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -91,6 +93,20 @@ class ClassRecordAssessmentControllerTest extends TestCase
         ]);
     }
 
+    private function admin(): User
+    {
+        $permission = Permission::firstOrCreate(
+            ['name' => 'class-records.admin'],
+            ['module' => 'Class Records', 'description' => 'Admin'],
+        );
+        $role = Role::create(['name' => 'ClassRecordAdmin_'.uniqid()]);
+        $role->permissions()->attach($permission->id);
+        $user = User::factory()->create();
+        $user->roles()->attach($role->id);
+
+        return $user->fresh();
+    }
+
     private function payloadFor(ClassRecordAssessment $a): array
     {
         return [
@@ -115,6 +131,48 @@ class ClassRecordAssessmentControllerTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['assessments.0.activity_date']);
+    }
+
+    public function test_calendar_plot_appends_to_setup_and_applies_to_same_subject_without_removing_existing_rows(): void
+    {
+        $admin = $this->admin();
+        $subject = $this->makeSubject();
+        $sourceQuarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $subject);
+        $targetQuarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $subject);
+
+        $sourceExisting = $this->makeAssessment($sourceQuarter, 1, 'Existing Source Quiz');
+        $targetExisting = $this->makeAssessment($targetQuarter, 1, 'Existing Target Quiz');
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.plot', [
+                'classRecord' => $sourceQuarter->class_record_id,
+                'q' => 1,
+            ]), [
+                'grading_category_id' => $this->category->id,
+                'title' => 'Calendar Quiz',
+                'max_score' => 25,
+                'is_graded' => true,
+                'activity_date' => '2026-09-07',
+                'target_class_record_ids' => [$targetQuarter->class_record_id],
+            ])
+            ->assertCreated()
+            ->assertJsonCount(2, 'created')
+            ->assertJsonCount(0, 'skipped');
+
+        $this->assertDatabaseHas('class_record_assessments', ['id' => $sourceExisting->id]);
+        $this->assertDatabaseHas('class_record_assessments', ['id' => $targetExisting->id]);
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $sourceQuarter->id,
+            'assessment_number' => 2,
+            'title' => 'Calendar Quiz',
+            'activity_date' => '2026-09-07',
+        ]);
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $targetQuarter->id,
+            'assessment_number' => 2,
+            'title' => 'Calendar Quiz',
+            'activity_date' => '2026-09-07',
+        ]);
     }
 
     public function test_removing_an_assessment_from_the_payload_deletes_it(): void

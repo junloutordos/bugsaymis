@@ -20,10 +20,11 @@ const props = defineProps({
   // and get the original browse-only behaviour.
   editable:      { type: Boolean, default: false },
   pendingRows:   { type: Array, default: () => [] }, // [{ key, label, catId, openRow }]
+  sameSubjectRecords: { type: Array, default: () => [] },
   disabledDates: { type: Function, default: null },  // (dateStr) => { ok: boolean, reason: ?string } — schedule-day / deadline check
 })
 
-const emit = defineEmits(['close', 'schedule', 'apply-to-sections', 'clear-pending'])
+const emit = defineEmits(['close', 'schedule', 'clear-pending'])
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -105,6 +106,8 @@ const showPicker     = ref(false)
 const pickerDate     = ref(null)
 const pickerCatKey   = ref(null)
 const pickerTitle    = ref('')
+const pickerMaxScore = ref('')
+const pickerTargetIds = ref([])
 const pickerWarning  = ref(null)
 
 function scheduleFeasibility(date) {
@@ -129,6 +132,8 @@ function selectDay(cell) {
     pickerDate.value    = cell.date
     pickerCatKey.value  = props.pendingRows[0]?.key ?? null
     pickerTitle.value   = props.pendingRows[0]?.openRow?.title ?? ''
+    pickerMaxScore.value = props.pendingRows[0]?.openRow?.max_score ?? ''
+    pickerTargetIds.value = []
     pickerWarning.value = null
     showPicker.value    = true
   }
@@ -138,6 +143,7 @@ const pickerCategory = computed(() => props.pendingRows.find(r => r.key === pick
 
 watch(pickerCatKey, () => {
   pickerTitle.value = pickerCategory.value?.openRow?.title ?? ''
+  pickerMaxScore.value = pickerCategory.value?.openRow?.max_score ?? ''
 })
 
 const pickerFeasibility = computed(() =>
@@ -145,20 +151,20 @@ const pickerFeasibility = computed(() =>
 )
 
 function confirmSchedule() {
-  if (!pickerCategory.value || !pickerDate.value || !pickerTitle.value.trim()) return
+  if (!pickerCategory.value || !pickerDate.value || !pickerTitle.value.trim() || Number(pickerMaxScore.value) <= 0) return
   const feasibility = pickerFeasibility.value
   if (!feasibility.ok) {
     pickerWarning.value = feasibility.reason
     return
   }
-  emit('schedule', { catId: pickerCategory.value.catId, title: pickerTitle.value.trim(), date: pickerDate.value })
+  emit('schedule', {
+    catId: pickerCategory.value.catId,
+    title: pickerTitle.value.trim(),
+    maxScore: Number(pickerMaxScore.value),
+    date: pickerDate.value,
+    targetRecordIds: pickerTargetIds.value,
+  })
   showPicker.value = false
-
-  // Offer the "apply to other sections" contextual action right after a
-  // successful placement, only when this class record actually has other
-  // sections of the same subject to apply to (caller decides via the
-  // emitted event whether that list is non-empty).
-  emit('apply-to-sections', { date: pickerDate.value, catId: pickerCategory.value.catId })
 }
 
 function closePicker() {
@@ -195,7 +201,7 @@ function close() {
 
         <div v-if="editable" class="mb-2 text-[11px] text-slate-500 flex items-center gap-1.5">
           <PlusIcon class="w-3.5 h-3.5 text-indigo-400" />
-          Click a day to schedule an assessment on it. Days at the WAT cap are greyed out.
+          Click a day to create and save an assessment directly to Class Record Setup. Days at the WAT cap are greyed out.
         </div>
 
         <div class="grid grid-cols-7 mb-1">
@@ -315,15 +321,30 @@ function close() {
           <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Title / Description</label>
           <input v-model="pickerTitle" type="text" placeholder="e.g. Quiz 1 — Fractions"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <p class="text-[11px] text-slate-400 mt-1">Max score and other details can still be set/edited in the table below.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Maximum Score</label>
+          <input v-model="pickerMaxScore" type="number" min="0.01" step="0.01"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div v-if="sameSubjectRecords.length" class="rounded-lg border border-slate-200 p-3">
+          <p class="text-xs font-semibold text-slate-700">Also apply to other sections</p>
+          <p class="mb-2 text-[11px] text-slate-400">Each selected section will be checked against its own Setup and WAT limits.</p>
+          <div class="space-y-1.5">
+            <label v-for="record in sameSubjectRecords" :key="record.id" class="flex items-center gap-2 text-xs text-slate-600">
+              <input v-model="pickerTargetIds" type="checkbox" :value="record.id"
+                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              {{ record.year_level_section }}
+            </label>
+          </div>
         </div>
         <p v-if="!pickerFeasibility.ok" class="text-xs text-danger-600">{{ pickerFeasibility.reason }}</p>
         <p v-if="pickerWarning" class="text-xs text-danger-600">{{ pickerWarning }}</p>
       </div>
       <template #footer>
         <AppButton variant="secondary" @click="closePicker">Cancel</AppButton>
-        <AppButton :disabled="!pickerCategory || !pickerTitle.trim() || !pickerFeasibility.ok" @click="confirmSchedule">
-          Schedule
+        <AppButton :disabled="!pickerCategory || !pickerTitle.trim() || Number(pickerMaxScore) <= 0 || !pickerFeasibility.ok" @click="confirmSchedule">
+          Save Assessment
         </AppButton>
       </template>
     </AppModal>
