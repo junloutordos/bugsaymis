@@ -262,7 +262,7 @@
     <!-- Add/Edit Preset Modal -->
     <Teleport to="body">
       <div v-if="presetModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl mx-4 flex flex-col max-h-[90vh]">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh]">
           <div class="px-6 py-4 border-b border-slate-100 shrink-0">
             <h3 class="text-base font-semibold text-slate-800">
               {{ presetModal.mode === 'add' ? 'New Schedule Preset' : 'Edit Preset' }}
@@ -286,11 +286,11 @@
                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Copy Mon to all active days</button>
               </div>
               <div class="border border-slate-200 rounded-lg overflow-hidden">
-                <div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_40px] bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                <div class="grid grid-cols-[70px_1fr_1fr_1fr_1fr_32px] gap-2 bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
                   <span>Day</span><span>Time In</span><span>Lunch Start</span><span>Lunch End</span><span>Time Out</span><span></span>
                 </div>
                 <div v-for="d in allDays" :key="d"
-                  class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_40px] items-center px-3 py-2 border-t border-slate-100"
+                  class="grid grid-cols-[70px_1fr_1fr_1fr_1fr_32px] gap-2 items-center px-3 py-2 border-t border-slate-100"
                   :class="presetForm.daily_schedules[d] ? 'bg-white' : 'bg-slate-50/60 opacity-60'">
                   <label class="flex items-center gap-2 cursor-pointer select-none">
                     <input type="checkbox" :checked="!!presetForm.daily_schedules[d]"
@@ -301,19 +301,19 @@
                   <input v-if="presetForm.daily_schedules[d]"
                     v-model="presetForm.daily_schedules[d].time_in"
                     type="time"
-                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                  <span v-else class="text-xs text-slate-400 italic mr-1">Rest day</span>
+                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  <span v-else class="text-xs text-slate-400 italic">Rest day</span>
                   <input v-if="presetForm.daily_schedules[d]"
                     v-model="presetForm.daily_schedules[d].lunch_start"
                     type="time"
                     placeholder="12:00"
-                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                   <span v-else></span>
                   <input v-if="presetForm.daily_schedules[d]"
                     v-model="presetForm.daily_schedules[d].lunch_end"
                     type="time"
                     placeholder="13:00"
-                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                   <span v-else></span>
                   <input v-if="presetForm.daily_schedules[d]"
                     v-model="presetForm.daily_schedules[d].time_out"
