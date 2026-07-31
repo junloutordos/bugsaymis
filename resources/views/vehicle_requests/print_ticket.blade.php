@@ -26,6 +26,7 @@
       body, td, th { font-size:10px }
     }
     .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
+    .sig-img { max-height:55px; max-width:170px; object-fit:contain; display:block; margin:0 auto 4px; }
   </style>
 </head>
 <body onload="window.print()">
@@ -154,9 +155,9 @@
         <div style="width:48%">
           <div style="font-style:italic">Requested by:</div>
           @if(isset($sigs['submission']['uri']))
-            <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+            <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" class="sig-img" />
           @elseif(!empty($requesterSigUri))
-            <img src="{{ $requesterSigUri }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+            <img src="{{ $requesterSigUri }}" alt="requestor signature" class="sig-img" />
           @endif
           <div style="border-bottom:1px solid #000;width:78%;margin:0 auto"></div>
           @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
@@ -172,7 +173,7 @@
           @php $dcName = $request->divisionChief->name ?? '—'; @endphp
           <div style="font-style:italic">Noted:</div>
           @if(!empty($dcSigUri))
-            <img src="{{ $dcSigUri }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+            <img src="{{ $dcSigUri }}" alt="division chief signature" class="sig-img" />
           @else
             <div style="height:48px"></div>
           @endif
@@ -196,9 +197,9 @@
         <div style="width:48%">
           <div style="text-align:center">
             @if(isset($sigs['fad_approval']['uri']))
-              <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+              <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD chief signature" class="sig-img" />
             @elseif(!empty($fadSigUri))
-              <img src="{{ $fadSigUri }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+              <img src="{{ $fadSigUri }}" alt="FAD chief signature" class="sig-img" />
             @else
               <div style="height:48px"></div>
             @endif
@@ -209,9 +210,9 @@
         </div>
         <div style="width:48%;text-align:center">
           @if(isset($sigs['ocd_approval']['uri']))
-            <img src="{{ $sigs['ocd_approval']['uri'] }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+            <img src="{{ $sigs['ocd_approval']['uri'] }}" alt="Director signature" class="sig-img" />
           @elseif(!empty($directorSig))
-            <img src="{{ $directorSig }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+            <img src="{{ $directorSig }}" alt="Director signature" class="sig-img" />
           @else
             <div style="height:40px"></div>
           @endif
@@ -303,9 +304,9 @@
             <div style="width:48%">
               <div style="font-style:italic">Requested by:</div>
               @if(isset($sigs['submission']['uri']))
-                <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" class="sig-img" />
               @elseif(!empty($requesterSigUri))
-                <img src="{{ $requesterSigUri }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                <img src="{{ $requesterSigUri }}" alt="requestor signature" class="sig-img" />
               @endif
               <div style="border-bottom:1px solid #000;width:78%;margin:0 auto"></div>
               @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
@@ -320,7 +321,7 @@
             <div style="width:48%">
               <div style="font-style:italic">Noted:</div>
               @if(!empty($dcSigUri))
-                <img src="{{ $dcSigUri }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                <img src="{{ $dcSigUri }}" alt="division chief signature" class="sig-img" />
               @else
                 <div style="height:48px"></div>
               @endif
@@ -344,9 +345,9 @@
             <div style="width:48%">
               <div style="text-align:center">
                 @if(isset($sigs['fad_approval']['uri']))
-                  <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                  <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD chief signature" class="sig-img" />
                 @elseif(!empty($fadSigUri))
-                  <img src="{{ $fadSigUri }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                  <img src="{{ $fadSigUri }}" alt="FAD chief signature" class="sig-img" />
                 @else
                   <div style="height:40px"></div>
                 @endif
@@ -357,9 +358,9 @@
             </div>
             <div style="width:48%;text-align:center">
               @if(isset($sigs['ocd_approval']['uri']))
-                <img src="{{ $sigs['ocd_approval']['uri'] }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                <img src="{{ $sigs['ocd_approval']['uri'] }}" alt="Director signature" class="sig-img" />
               @elseif(!empty($directorSig))
-                <img src="{{ $directorSig }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                <img src="{{ $directorSig }}" alt="Director signature" class="sig-img" />
               @else
                 <div style="height:40px"></div>
               @endif
@@ -490,9 +491,9 @@
                   <div style="font-weight:bold;margin-bottom:6px">Recommending Approval</div>
                   <div style="text-align:center">
                     @if(isset($sigs['fad_approval']['uri']))
-                      <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                      <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD signature" class="sig-img" />
                     @elseif(!empty($fadSigUri))
-                      <img src="{{ $fadSigUri }}" alt="FAD signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                      <img src="{{ $fadSigUri }}" alt="FAD signature" class="sig-img" />
                     @else
                       <div style="height:48px"></div>
                     @endif
@@ -505,9 +506,9 @@
                   <div style="font-weight:bold;margin-bottom:6px">Approval</div>
                   <div style="text-align:center">
                     @if(isset($sigs['ocd_approval']['uri']))
-                      <img src="{{ $sigs['ocd_approval']['uri'] }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                      <img src="{{ $sigs['ocd_approval']['uri'] }}" alt="Director signature" class="sig-img" />
                     @elseif(!empty($directorSig))
-                      <img src="{{ $directorSig }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                      <img src="{{ $directorSig }}" alt="Director signature" class="sig-img" />
                     @else
                       <div style="height:48px"></div>
                     @endif

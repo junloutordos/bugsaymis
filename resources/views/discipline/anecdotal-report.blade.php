@@ -25,6 +25,7 @@
     .footer-code { margin-top: 14px; font-size: 8px; color: #666; }
     .badge { display:inline-block; padding:1px 6px; border:1px solid #999; border-radius:3px; font-size:9px; }
     .signed { font-size:8px; color:#059669; margin-top:2px; }
+    .sig-img { max-height:55px; max-width:170px; object-fit:contain; }
 </style>
 </head>
 <body>
@@ -125,7 +126,7 @@
             </td>
             <td style="width:33%">
                 <span class="label">Received By</span>
-                @if($receivedSig)<div><img src="{{ $receivedSig }}" style="max-height:34px;max-width:150px;"></div>@endif
+                @if($receivedSig)<div><img src="{{ $receivedSig }}" class="sig-img"></div>@endif
                 <span class="value">{{ $case->receiver?->name }}</span>
                 @if(!empty($signedBadges['received']))<div class="signed">&#10003; Digitally Signed · {{ $signedBadges['received'] }}</div>@endif
             </td>
@@ -150,7 +151,7 @@
         <tr>
             <td style="width:50%">
                 <span class="label">Resolved By</span>
-                @if($resolvedSig)<div><img src="{{ $resolvedSig }}" style="max-height:34px;max-width:150px;"></div>@endif
+                @if($resolvedSig)<div><img src="{{ $resolvedSig }}" class="sig-img"></div>@endif
                 <span class="value">{{ $case->resolver?->name }}</span>
                 @if(!empty($signedBadges['resolved']))<div class="signed">&#10003; Digitally Signed · {{ $signedBadges['resolved'] }}</div>@endif
             </td>

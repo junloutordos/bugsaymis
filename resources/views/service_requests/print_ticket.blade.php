@@ -81,6 +81,7 @@
             font-size: 10px;
         }
         .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
+        .sig-img { max-height:55px; max-width:170px; object-fit:contain; display:block; margin:0 auto 4px; }
     </style>
 </head>
 
@@ -173,9 +174,9 @@
                     } catch (\Throwable $e) { $reqSig = null; }
                 @endphp
                 @if(isset($sigs['submission']['uri']))
-                    <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                    <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" class="sig-img" />
                 @elseif($reqSig)
-                    <img src="{{ asset('storage/' . $reqSig) }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                    <img src="{{ asset('storage/' . $reqSig) }}" alt="requestor signature" class="sig-img" />
                 @else
                     <div class="line mt-30"></div>
                 @endif
@@ -215,9 +216,9 @@
                 } catch (\Throwable $e) { $dcSig = null; $dcName = null; }
             @endphp
             @if(isset($sigs['dc_approval']['uri']))
-                <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" class="sig-img" />
             @elseif($dcSig)
-                <img src="{{ asset('storage/' . $dcSig) }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ asset('storage/' . $dcSig) }}" alt="division chief signature" class="sig-img" />
             @else
                 <div class="line mt-30"></div>
             @endif
@@ -266,9 +267,9 @@
     <div class="mt-30">
         <div style="text-align:left;">
             @if(isset($sigs['fad_approval']['uri']))
-                <img src="{{ $sigs['fad_approval']['uri'] }}" alt="fad signature" style="max-height:70px; display:block; margin:0 0 6px 0;" />
+                <img src="{{ $sigs['fad_approval']['uri'] }}" alt="fad signature" class="sig-img" />
             @elseif($fadSig)
-                <img src="{{ asset('storage/' . $fadSig) }}" alt="fad signature" style="max-height:70px; display:block; margin:0 0 6px 0;" />
+                <img src="{{ asset('storage/' . $fadSig) }}" alt="fad signature" class="sig-img" />
             @else
                 <div class="line mt-30" style="margin:0 0 0 0;"></div>
             @endif

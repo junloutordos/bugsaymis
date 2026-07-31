@@ -30,7 +30,7 @@
   .meta-label { padding:9px 14px; color:#64748b; font-weight:600; width:42%; background:#f8fafc; }
   .meta-value { padding:9px 14px; flex:1; }
   .sig-block { background:#f8fafc; border-radius:8px; padding:14px; text-align:center; margin-bottom:16px; }
-  .sig-img   { max-height:55px; max-width:180px; margin:4px 0; }
+  .sig-img   { max-height:55px; max-width:170px; object-fit:contain; margin:4px 0; }
   .sig-name  { font-weight:700; font-size:13px; border-top:1px solid #cbd5e1; padding-top:6px; margin-top:4px; display:inline-block; }
   .hash-box  { background:#f1f5f9; border-radius:6px; padding:10px 14px; font-family:monospace; font-size:10px; color:#64748b; word-break:break-all; margin-bottom:14px; }
   .footer    { border-top:1px solid #f1f5f9; padding:14px 24px; font-size:11px; color:#94a3b8; text-align:center; }

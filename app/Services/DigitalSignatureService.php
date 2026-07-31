@@ -34,6 +34,15 @@ class DigitalSignatureService
     }
 
     /**
+     * Standard canvas dimensions (px) that every normalized signature is
+     * resized/padded to fit within, so all signatures render at a consistent
+     * visible size regardless of how they were drawn or uploaded.
+     */
+    private const NORMALIZED_WIDTH = 400;
+    private const NORMALIZED_HEIGHT = 150;
+    private const CROP_PADDING = 6;
+
+    /**
      * Save a base64-encoded signature image to S3.
      * Returns the S3 key stored in users.electronic_signature.
      */
@@ -42,6 +51,7 @@ class DigitalSignatureService
         // Strip the data URI prefix (data:image/png;base64,...)
         $base64 = preg_replace('/^data:image\/\w+;base64,/', '', $base64DataUri);
         $imageData = base64_decode($base64);
+        $imageData = $this->normalizeSignatureImage($imageData) ?? $imageData;
 
         $s3Key = "signatures/user_{$user->id}_" . time() . '.png';
 
@@ -157,6 +167,143 @@ class DigitalSignatureService
             : hash_equals($this->hmacSign($message), $record->signature);
 
         return $valid ? $record : null;
+    }
+
+    // ── Signature image normalization ─────────────────────────────────────────
+
+    /**
+     * Auto-crop a signature image to the bounding box of its ink (non-transparent /
+     * non-white pixels), then resize+pad it onto a standard transparent canvas so
+     * every stored signature — however it was drawn or uploaded — renders at a
+     * consistent, legible size across all print/PDF templates.
+     *
+     * Returns re-encoded PNG binary data, or null if the image could not be
+     * processed (caller should fall back to the original data).
+     */
+    public function normalizeSignatureImage(string $imageData): ?string
+    {
+        if (! extension_loaded('gd')) {
+            return null;
+        }
+
+        $src = @imagecreatefromstring($imageData);
+        if ($src === false) {
+            return null;
+        }
+
+        imagesavealpha($src, true);
+        $srcWidth  = imagesx($src);
+        $srcHeight = imagesy($src);
+
+        $bbox = $this->inkBoundingBox($src, $srcWidth, $srcHeight);
+        if ($bbox === null) {
+            // Blank/empty image — nothing to normalize, keep original.
+            imagedestroy($src);
+            return null;
+        }
+
+        [$minX, $minY, $maxX, $maxY] = $bbox;
+
+        // Pad the crop box a little so strokes aren't clipped at the edge.
+        $minX = max(0, $minX - self::CROP_PADDING);
+        $minY = max(0, $minY - self::CROP_PADDING);
+        $maxX = min($srcWidth - 1, $maxX + self::CROP_PADDING);
+        $maxY = min($srcHeight - 1, $maxY + self::CROP_PADDING);
+
+        $cropWidth  = $maxX - $minX + 1;
+        $cropHeight = $maxY - $minY + 1;
+
+        $cropped = imagecreatetruecolor($cropWidth, $cropHeight);
+        imagesavealpha($cropped, true);
+        imagealphablending($cropped, false);
+        $transparent = imagecolorallocatealpha($cropped, 0, 0, 0, 127);
+        imagefill($cropped, 0, 0, $transparent);
+        imagealphablending($cropped, true);
+
+        imagecopy($cropped, $src, 0, 0, $minX, $minY, $cropWidth, $cropHeight);
+        imagedestroy($src);
+
+        // Scale proportionally to fit within the standard canvas, then center it.
+        $scale = min(
+            self::NORMALIZED_WIDTH / $cropWidth,
+            self::NORMALIZED_HEIGHT / $cropHeight
+        );
+        // Don't upscale tiny signatures excessively — cap scale factor to avoid
+        // pixelating a very small crop into a blurry oversized image.
+        $scale = min($scale, 4.0);
+
+        $targetWidth  = max(1, (int) round($cropWidth * $scale));
+        $targetHeight = max(1, (int) round($cropHeight * $scale));
+
+        $canvas = imagecreatetruecolor(self::NORMALIZED_WIDTH, self::NORMALIZED_HEIGHT);
+        imagesavealpha($canvas, true);
+        imagealphablending($canvas, false);
+        $canvasTransparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
+        imagefill($canvas, 0, 0, $canvasTransparent);
+        imagealphablending($canvas, true);
+
+        $offsetX = (int) round((self::NORMALIZED_WIDTH - $targetWidth) / 2);
+        $offsetY = (int) round((self::NORMALIZED_HEIGHT - $targetHeight) / 2);
+
+        imagecopyresampled(
+            $canvas, $cropped,
+            $offsetX, $offsetY, 0, 0,
+            $targetWidth, $targetHeight, $cropWidth, $cropHeight
+        );
+        imagedestroy($cropped);
+
+        ob_start();
+        imagepng($canvas);
+        $output = ob_get_clean();
+        imagedestroy($canvas);
+
+        return $output ?: null;
+    }
+
+    /**
+     * Compute the bounding box of "ink" pixels in the image — pixels that are
+     * neither fully transparent nor near-white (to handle signatures drawn on
+     * an opaque white background instead of a transparent one).
+     *
+     * Returns [minX, minY, maxX, maxY] or null if no ink pixels were found.
+     */
+    private function inkBoundingBox($image, int $width, int $height): ?array
+    {
+        // Sample on a grid for performance on large uploaded images, then
+        // refine — for typical signature sizes (a few hundred px) this is
+        // effectively a full scan anyway.
+        $step = max(1, (int) floor(min($width, $height) / 300));
+
+        $minX = null; $minY = null; $maxX = null; $maxY = null;
+        $whiteThreshold = 245; // RGB values above this (all channels) treated as blank paper
+
+        for ($y = 0; $y < $height; $y += $step) {
+            for ($x = 0; $x < $width; $x += $step) {
+                $rgba = imagecolorat($image, $x, $y);
+                $alpha = ($rgba >> 24) & 0x7F; // 0 = opaque, 127 = fully transparent
+                if ($alpha >= 120) {
+                    continue; // fully/near transparent — not ink
+                }
+
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                if ($r >= $whiteThreshold && $g >= $whiteThreshold && $b >= $whiteThreshold) {
+                    continue; // near-white background — not ink
+                }
+
+                if ($minX === null || $x < $minX) $minX = $x;
+                if ($minY === null || $y < $minY) $minY = $y;
+                if ($maxX === null || $x > $maxX) $maxX = $x;
+                if ($maxY === null || $y > $maxY) $maxY = $y;
+            }
+        }
+
+        if ($minX === null) {
+            return null;
+        }
+
+        return [$minX, $minY, $maxX, $maxY];
     }
 
     // ── Internal signing helpers ──────────────────────────────────────────────

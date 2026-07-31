@@ -23,6 +23,7 @@
     .field-value       { font-weight: bold; font-size: 11px; text-decoration: underline; word-break: break-word; }
     .field-value-plain { font-weight: bold; font-size: 11px; word-break: break-word; }
     .sig-name { display: inline-block; font-weight: bold; font-size: 11px; border-bottom: 1.5px solid #000; padding-bottom: 1px; margin-top: 2px; min-width: 90px; }
+    .sig-img { max-height:55px; max-width:170px; object-fit:contain; }
     .sig-pos  { font-size: 9.5px; margin-top: 2px; color: #333; }
     .section-label { font-size: 10px; color: #333; font-weight: normal; padding: 5px 10px 3px; border-bottom: none; }
     .footer { font-size: 9px; color: #555; margin-top: 6px; }
@@ -48,7 +49,7 @@
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
                 @if($requesterSig)
-                  <img src="{{ $requesterSig }}" alt="" style="display:block;height:36px;width:auto;">
+                  <img src="{{ $requesterSig }}" alt="" class="sig-img">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif
@@ -82,7 +83,7 @@
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
                 @if($dcSig)
-                  <img src="{{ $dcSig }}" alt="" style="display:block;height:36px;width:auto;">
+                  <img src="{{ $dcSig }}" alt="" class="sig-img">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif
@@ -146,7 +147,7 @@
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
                 @if($assignedSig)
-                  <img src="{{ $assignedSig }}" alt="" style="display:block;height:36px;width:auto;">
+                  <img src="{{ $assignedSig }}" alt="" class="sig-img">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif
@@ -174,7 +175,7 @@
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
                 @if($directorSig)
-                  <img src="{{ $directorSig }}" alt="" style="display:block;height:36px;width:auto;">
+                  <img src="{{ $directorSig }}" alt="" class="sig-img">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif
@@ -229,7 +230,7 @@
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
                 @if($assignedSig)
-                  <img src="{{ $assignedSig }}" alt="" style="display:block;height:36px;width:auto;">
+                  <img src="{{ $assignedSig }}" alt="" class="sig-img">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif
@@ -254,7 +255,7 @@
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
                 @if($completionSig)
-                  <img src="{{ $completionSig }}" alt="" style="display:block;height:36px;width:auto;">
+                  <img src="{{ $completionSig }}" alt="" class="sig-img">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif

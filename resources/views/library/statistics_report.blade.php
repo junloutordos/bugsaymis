@@ -14,6 +14,7 @@
         .summary { margin: 12px 0; font-weight: bold }
         .print-btn { position: fixed; right: 20px; top: 20px }
         @media print { .print-btn { display: none } }
+        .sig-img { max-height:55px; max-width:170px; object-fit:contain; display:block; margin:0 auto 4px; }
     </style>
 </head>
 <body>
@@ -242,7 +243,7 @@
         <div style="width:260px; text-align:center;">
             <div style="font-size:12px; margin-bottom:4px; text-align:left">Prepared by:</div>
             @if($clerkSig)
-                <img src="{{ asset('storage/' . $clerkSig) }}" alt="prepared signature" style="max-height:60px; display:block; margin:0 auto 4px;" />
+                <img src="{{ asset('storage/' . $clerkSig) }}" alt="prepared signature" class="sig-img" />
             @else
                 <div style="height:60px;"></div>
             @endif
@@ -253,7 +254,7 @@
         <div style="width:260px; text-align:center;">
             <div style="font-size:12px; margin-bottom:4px; text-align:left">&nbsp;</div>
             @if($librarianSig)
-                <img src="{{ asset('storage/' . $librarianSig) }}" alt="librarian signature" style="max-height:60px; display:block; margin:0 auto 4px;" />
+                <img src="{{ asset('storage/' . $librarianSig) }}" alt="librarian signature" class="sig-img" />
             @else
                 <div style="height:60px;"></div>
             @endif

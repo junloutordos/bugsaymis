@@ -84,7 +84,9 @@
         }
 
         .sig-img {
-            max-height: 60px;
+            max-height: 55px;
+            max-width: 170px;
+            object-fit: contain;
             display: block;
             margin: 0 auto -32px; /* lift following text so the signature sits over the name */
             z-index: 2;

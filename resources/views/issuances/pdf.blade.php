@@ -36,7 +36,7 @@ body { font-family:Arial, sans-serif; font-size:10pt; color:#1e293b; line-height
 /* ── Signature block ── */
 .sig-block { margin-top:30px; }
 .sig-block .signed-by { font-size:8.5pt; color:#64748b; margin-bottom:4px; }
-.sig-img   { max-height:50px; max-width:160px; }
+.sig-img   { max-height:55px; max-width:170px; object-fit:contain; }
 .sig-name  { font-weight:bold; font-size:10pt; border-top:1px solid #334155; padding-top:4px; margin-top:4px; display:inline-block; min-width:200px; }
 .sig-pos   { font-size:8.5pt; color:#475569; }
 
