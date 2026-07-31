@@ -9,6 +9,7 @@ use App\Models\ClassRecord\ClassRecordAttendanceRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordStudent;
 use App\Services\ClassRecord\ClassRecordMonitorScopeService;
+use App\Services\ClassRecord\ClinicExcusedCutClassService;
 use App\Services\HomeroomAttendance\SubjectAttendanceSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,8 +21,8 @@ class ClassRecordAttendanceController extends Controller
     public function __construct(
         private readonly ClassRecordMonitorScopeService $monitorScope,
         private readonly SubjectAttendanceSyncService $subjectSync,
-    ) {
-    }
+        private readonly ClinicExcusedCutClassService $clinicExcuses,
+    ) {}
 
     private function isAdmin(): bool
     {
@@ -38,6 +39,7 @@ class ClassRecordAttendanceController extends Controller
     private function resolveQuarter(ClassRecord $classRecord, int $q): ClassRecordQuarter
     {
         abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
+
         return ClassRecordQuarter::where('class_record_id', $classRecord->id)
             ->where('quarter', $q)
             ->firstOrFail();
@@ -95,19 +97,39 @@ class ClassRecordAttendanceController extends Controller
             ->orderBy('date')
             ->get(['id', 'date', 'sort_order', 'subject_id']);
 
-        $records = ClassRecordAttendanceRecord::whereHas('attendanceDate', fn ($sq) =>
-                $sq->where('class_record_quarter_id', $quarter->id)->where('subject_id', $subjectId)
-            )
-            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'excused_status', 'synced_from_homeroom', 'incomplete_uniform', 'remarks'])
+        $records = ClassRecordAttendanceRecord::whereHas('attendanceDate', fn ($sq) => $sq->where('class_record_quarter_id', $quarter->id)->where('subject_id', $subjectId)
+        )
+            ->get([
+            'id',
+            'class_record_attendance_date_id',
+            'class_record_student_id',
+            'status',
+            'excused_status',
+            'admission_slip_id',
+            'clinic_consultation_id',
+            'excused_by',
+            'excused_at',
+            'synced_from_homeroom',
+            'incomplete_uniform',
+            'remarks',
+        ])
             ->mapWithKeys(fn ($r) => [
-                "{$r->class_record_student_id}_{$r->class_record_attendance_date_id}" => [
-                    'status'             => $r->status,
-                    'excused'            => $r->excused_status,
-                    'synced'             => $r->synced_from_homeroom,
-                    'incomplete_uniform' => $r->incomplete_uniform,
-                    'remarks'            => $r->remarks,
-                ],
-            ]);
+            "{$r->class_record_student_id}_{$r->class_record_attendance_date_id}" => [
+                'id' => $r->id,
+                'status' => $r->status,
+                'excused' => $r->excused_status,
+                'resolution_source' => $r->clinic_consultation_id
+                    ? 'clinic'
+                    : ($r->admission_slip_id ? 'registrar' : null),
+                'clinic_reference' => $r->clinic_consultation_id
+                    ? 'CS-'.str_pad((string) $r->clinic_consultation_id, 6, '0', STR_PAD_LEFT)
+                    : null,
+                'excused_at' => $r->excused_at?->toIso8601String(),
+                'synced' => $r->synced_from_homeroom,
+                'incomplete_uniform' => $r->incomplete_uniform,
+                'remarks' => $r->remarks,
+            ],
+        ]);
 
         return response()->json(['dates' => $dates, 'records' => $records, 'subject_id' => $subjectId]);
     }
@@ -117,7 +139,7 @@ class ClassRecordAttendanceController extends Controller
     public function storeDates(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
         $validated = $request->validate([
-            'date'       => 'required|date',
+            'date' => 'required|date',
             'subject_id' => 'nullable|integer|exists:subjects,id',
         ]);
         $subjectId = $this->resolveSubjectId($classRecord, $validated['subject_id'] ?? null);
@@ -159,13 +181,13 @@ class ClassRecordAttendanceController extends Controller
                 $now = now();
                 $rows = $missingStudentIds->map(fn ($studentId) => [
                     'class_record_attendance_date_id' => $date->id,
-                    'class_record_student_id'         => $studentId,
-                    'status'                           => 'present',
-                    'excused_status'                   => 'n_a',
-                    'synced_from_homeroom'             => false,
-                    'incomplete_uniform'                => false,
-                    'created_at'                        => $now,
-                    'updated_at'                        => $now,
+                    'class_record_student_id' => $studentId,
+                    'status' => 'present',
+                    'excused_status' => 'n_a',
+                    'synced_from_homeroom' => false,
+                    'incomplete_uniform' => false,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ])->values()->all();
 
                 DB::table('class_record_attendance_records')->insert($rows);
@@ -188,6 +210,11 @@ class ClassRecordAttendanceController extends Controller
         $quarter = $this->resolveQuarter($classRecord, $q);
         abort_unless($attendanceDate->class_record_quarter_id === $quarter->id, 404);
         abort_if($quarter->is_locked, 403, 'Quarter is locked.');
+        abort_if(
+            $attendanceDate->records()->where('excused_status', '<>', 'n_a')->exists(),
+            422,
+            'This date contains resolved attendance and cannot be removed.',
+        );
 
         $attendanceDate->delete();
 
@@ -199,9 +226,9 @@ class ClassRecordAttendanceController extends Controller
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
         $validated = $request->validate([
-            'subject_id'           => 'nullable|integer|exists:subjects,id',
-            'records'              => 'required|array|min:1',
-            'records.*.date_id'    => 'required|integer|exists:class_record_attendance_dates,id',
+            'subject_id' => 'nullable|integer|exists:subjects,id',
+            'records' => 'required|array|min:1',
+            'records.*.date_id' => 'required|integer|exists:class_record_attendance_dates,id',
             'records.*.student_id' => 'required|integer|exists:class_record_students,id',
             // Present/Absent/Tardy/Cut Class. Excused/Unexcused is no longer a
             // status a subject teacher picks; it's set by the Homeroom
@@ -210,10 +237,10 @@ class ClassRecordAttendanceController extends Controller
             // the subject teacher — the student was on campus but skipped or
             // left this specific class period — so it's only ever set here,
             // never on the Homeroom whole-day attendance.
-            'records.*.status'     => 'nullable|in:present,absent,tardy,cut_class',
+            'records.*.status' => 'nullable|in:present,absent,tardy,cut_class',
             // Optional subject-period context. Remarks do not sync into the
             // Homeroom whole-day record because they describe different scopes.
-            'records.*.remarks'    => 'nullable|string|max:500',
+            'records.*.remarks' => 'nullable|string|max:500',
             // Incomplete Uniform (IU) is an independent flag, not a status —
             // a student can be Present AND flagged IU on the same day. Synced
             // one-directionally into Homeroom's own `incomplete_uniform`
@@ -253,17 +280,34 @@ class ClassRecordAttendanceController extends Controller
             ->keyBy('id');
         abort_if($validStudents->count() !== $studentIds->count(), 422, 'One or more students do not belong to this class record.');
 
-        $now      = now();
+        // A Registrar admission slip or a teacher-verified clinic slip is an
+        // audited resolution. The normal bulk attendance save may preserve
+        // it, but must never silently change the underlying status.
+        $resolvedRecords = ClassRecordAttendanceRecord::query()
+            ->whereIn('class_record_attendance_date_id', $dateIds)
+            ->whereIn('class_record_student_id', $studentIds)
+            ->where('excused_status', '<>', 'n_a')
+            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status'])
+            ->keyBy(fn ($record) => "{$record->class_record_student_id}_{$record->class_record_attendance_date_id}");
+
+        $now = now();
         $toUpsert = [];
-        $iuSyncs  = []; // [global_student_id, date string] pairs to push to Homeroom after saving.
+        $iuSyncs = []; // [global_student_id, date string] pairs to push to Homeroom after saving.
 
         foreach ($validated['records'] as $item) {
-            $status            = $item['status'] ?? null;
+            $status = $item['status'] ?? null;
             $incompleteUniform = (bool) ($item['incomplete_uniform'] ?? false);
-            $remarks           = isset($item['remarks']) ? trim($item['remarks']) : null;
-            $remarks           = in_array($status, ['absent', 'tardy', 'cut_class'], true) && $remarks !== ''
+            $remarks = isset($item['remarks']) ? trim($item['remarks']) : null;
+            $remarks = in_array($status, ['absent', 'tardy', 'cut_class'], true) && $remarks !== ''
                 ? $remarks
                 : null;
+
+            $resolvedRecord = $resolvedRecords->get("{$item['student_id']}_{$item['date_id']}");
+            abort_if(
+                $resolvedRecord && $resolvedRecord->status !== $status,
+                422,
+                'Resolved attendance cannot be changed. Contact the Registrar if a correction is required.',
+            );
 
             // A cell with no status AND no IU flag has no reason to exist as a row.
             if ($status === null && ! $incompleteUniform) {
@@ -274,17 +318,17 @@ class ClassRecordAttendanceController extends Controller
             } else {
                 $toUpsert[] = [
                     'class_record_attendance_date_id' => $item['date_id'],
-                    'class_record_student_id'         => $item['student_id'],
-                    'status'                          => $status,
+                    'class_record_student_id' => $item['student_id'],
+                    'status' => $status,
                     // A manual save from the subject teacher is always an
                     // explicit override — clear this so a later Homeroom
                     // Attendance resync never clobbers it again (see
                     // SubjectAttendanceSyncService).
-                    'synced_from_homeroom'            => false,
-                    'incomplete_uniform'              => $incompleteUniform,
-                    'remarks'                         => $remarks,
-                    'created_at'                      => $now,
-                    'updated_at'                      => $now,
+                    'synced_from_homeroom' => false,
+                    'incomplete_uniform' => $incompleteUniform,
+                    'remarks' => $remarks,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
 
                 if ($incompleteUniform) {
@@ -309,6 +353,80 @@ class ClassRecordAttendanceController extends Controller
             $this->subjectSync->syncIncompleteUniform($globalStudentId, $dateStr, Auth::id());
         }
 
-        return response()->json(['message' => count($toUpsert) . ' record(s) saved.']);
+        return response()->json(['message' => count($toUpsert).' record(s) saved.']);
+    }
+
+    // ── GET /class-records/{cr}/quarters/{q}/attendance/records/{record}/clinic-consultations ──
+
+    public function clinicConsultations(
+        ClassRecord $classRecord,
+        int $q,
+        ClassRecordAttendanceRecord $attendanceRecord,
+    ): JsonResponse {
+        $this->authorizeClinicExcuse($classRecord, $q, $attendanceRecord);
+
+        $consultations = $this->clinicExcuses
+            ->candidates($attendanceRecord)
+            ->map(fn ($consultation) => [
+                'id' => $consultation->id,
+                'reference' => 'CS-'.str_pad((string) $consultation->id, 6, '0', STR_PAD_LEFT),
+                'date_attended' => $consultation->date_attended?->toIso8601String(),
+                'time_in' => $consultation->time_start,
+                'time_out' => $consultation->time_out ?? $consultation->time_end,
+                'verified_by' => $consultation->nurse?->name ?? 'School Nurse',
+            ])
+            ->values();
+
+        return response()->json(['consultations' => $consultations]);
+    }
+
+    // ── POST /class-records/{cr}/quarters/{q}/attendance/records/{record}/excuse-via-clinic ──
+
+    public function excuseViaClinic(
+        Request $request,
+        ClassRecord $classRecord,
+        int $q,
+        ClassRecordAttendanceRecord $attendanceRecord,
+    ): JsonResponse {
+        $this->authorizeClinicExcuse($classRecord, $q, $attendanceRecord);
+
+        $validated = $request->validate([
+            'consultation_id' => ['required', 'integer', 'exists:consultations,id'],
+        ]);
+
+        $updated = $this->clinicExcuses->excuse(
+            $attendanceRecord,
+            (int) $validated['consultation_id'],
+            Auth::id(),
+        );
+
+        return response()->json([
+            'message' => 'Cut Class marked as ECC using the verified clinic slip.',
+            'excused_status' => $updated->excused_status,
+            'clinic_reference' => 'CS-'.str_pad((string) $updated->clinic_consultation_id, 6, '0', STR_PAD_LEFT),
+        ]);
+    }
+
+    private function authorizeClinicExcuse(
+        ClassRecord $classRecord,
+        int $q,
+        ClassRecordAttendanceRecord $attendanceRecord,
+    ): void {
+        $quarter = $this->resolveQuarter($classRecord, $q);
+        $attendanceRecord->loadMissing(['attendanceDate', 'student']);
+
+        abort_unless(
+            $attendanceRecord->attendanceDate?->class_record_quarter_id === $quarter->id
+            && $attendanceRecord->student?->class_record_quarter_id === $quarter->id,
+            404,
+        );
+        abort_unless(
+            $classRecord->canEdit(Auth::user(), $attendanceRecord->attendanceDate->subject_id),
+            403,
+        );
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
+        abort_if($quarter->is_locked, 403, 'Quarter is locked.');
+        abort_unless($attendanceRecord->status === 'cut_class', 422, 'Only a Cut Class record can be marked ECC.');
+        abort_unless($attendanceRecord->excused_status === 'n_a', 422, 'This Cut Class record has already been resolved.');
     }
 }

@@ -6,7 +6,7 @@ import AppButton from '@/Components/AppButton.vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import AppModal from '@/Components/AppModal.vue'
 import { confirmDelete } from '@/Composables/useConfirm.js'
-import { ChatBubbleLeftEllipsisIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ChatBubbleLeftEllipsisIcon, PlusIcon, ShieldCheckIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecordId: { type: Number, required: true },
@@ -55,6 +55,7 @@ const STATUSES = [
   { value: 'tardy',     code: 'T',  label: 'Tardy',     cls: 'bg-amber-100 text-amber-700' },
   { value: 'cut_class', code: 'CC', label: 'Cut Class', cls: 'bg-orange-100 text-orange-700' },
 ]
+const ECC_STATUS = { value: 'cut_class', code: 'ECC', label: 'Excused Cutting Class', cls: 'bg-emerald-100 text-emerald-700' }
 const STATUS_BY_VALUE = Object.fromEntries(STATUSES.map(s => [s.value, s]))
 // Cycle for cells that already have an explicit record: null (default/Present) → absent → tardy → back to null.
 const STATUS_CYCLE = [null, ...STATUSES.map(status => status.value)]
@@ -75,6 +76,11 @@ const newDateInput   = ref('')
 const addingDate     = ref(false)
 const remarkCell     = ref(null)
 const remarkDraft    = ref('')
+const clinicCell     = ref(null)
+const clinicConsultations = ref([])
+const selectedClinicConsultationId = ref(null)
+const loadingClinicConsultations = ref(false)
+const confirmingClinicConsultation = ref(false)
 
 const students = computed(() =>
   (props.quarterData?.students ?? []).filter(s => s.is_active !== false)
@@ -95,6 +101,20 @@ function effectiveStatus(studentId, dateId) {
 }
 function excusedStatus(studentId, dateId) {
   return cell(studentId, dateId)?.excused ?? 'n_a'
+}
+function isResolved(studentId, dateId) {
+  return excusedStatus(studentId, dateId) !== 'n_a'
+}
+function isClinicExcusedCutClass(studentId, dateId) {
+  const record = cell(studentId, dateId)
+  return effectiveStatus(studentId, dateId) === 'cut_class'
+    && record?.excused === 'excused'
+    && record?.resolution_source === 'clinic'
+}
+function displayedStatus(studentId, dateId) {
+  return isClinicExcusedCutClass(studentId, dateId)
+    ? ECC_STATUS
+    : STATUS_BY_VALUE[effectiveStatus(studentId, dateId)]
 }
 function isDefaulted(studentId, dateId) {
   return !cell(studentId, dateId)
@@ -136,7 +156,7 @@ watch(selectedSubjectId, load)
 // ── Attendance toggle ────────────────────────────────────────────────────────
 
 function cycleAttendance(studentId, dateId) {
-  if (props.isLocked || !canEditSelectedSubject.value) return
+  if (props.isLocked || !canEditSelectedSubject.value || isResolved(studentId, dateId)) return
   const key  = `${studentId}_${dateId}`
   const prev = records.value[key] ?? { status: null }
 
@@ -182,6 +202,90 @@ function applyRemark() {
   records.value[key] = { ...prev, remarks: normalized }
   pendingChanges.add(key)
   closeRemarks()
+}
+
+// ── Clinic-verified Excused Cutting Class (ECC) ─────────────────────────────
+
+async function openClinicVerification(student, date) {
+  const record = cell(student.id, date.id)
+  if (
+    props.isLocked
+    || !canEditSelectedSubject.value
+    || !record?.id
+    || effectiveStatus(student.id, date.id) !== 'cut_class'
+    || isResolved(student.id, date.id)
+  ) return
+
+  clinicCell.value = { student, date, record }
+  clinicConsultations.value = []
+  selectedClinicConsultationId.value = null
+  loadingClinicConsultations.value = true
+
+  try {
+    const { data } = await axios.get(route('class-records.attendance.clinic-consultations', {
+      classRecord: props.classRecordId,
+      q: props.quarterNumber,
+      attendanceRecord: record.id,
+    }))
+    clinicConsultations.value = data.consultations ?? []
+    if (clinicConsultations.value.length === 1) {
+      selectedClinicConsultationId.value = clinicConsultations.value[0].id
+    }
+  } catch (err) {
+    clinicCell.value = null
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to find matching clinic consultations.', 'error')
+  } finally {
+    loadingClinicConsultations.value = false
+  }
+}
+
+function closeClinicVerification() {
+  if (confirmingClinicConsultation.value) return
+  clinicCell.value = null
+  clinicConsultations.value = []
+  selectedClinicConsultationId.value = null
+}
+
+async function confirmClinicVerification() {
+  if (!clinicCell.value || !selectedClinicConsultationId.value) return
+  confirmingClinicConsultation.value = true
+
+  try {
+    await axios.post(route('class-records.attendance.excuse-via-clinic', {
+      classRecord: props.classRecordId,
+      q: props.quarterNumber,
+      attendanceRecord: clinicCell.value.record.id,
+    }), {
+      consultation_id: selectedClinicConsultationId.value,
+    })
+    clinicCell.value = null
+    clinicConsultations.value = []
+    selectedClinicConsultationId.value = null
+    await load()
+    await Swal.fire({
+      icon: 'success',
+      title: 'Marked ECC',
+      text: 'The completed clinic slip was verified. No Registrar admission slip is required.',
+      timer: 1800,
+      showConfirmButton: false,
+    })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to verify the clinic slip.', 'error')
+  } finally {
+    confirmingClinicConsultation.value = false
+  }
+}
+
+function formatClinicTime(value) {
+  if (!value) return '—'
+  const raw = String(value)
+  const time = raw.includes('T') ? raw.split('T')[1] : raw
+  const [hours, minutes] = time.split(':').map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return raw
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString('en-PH', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 // IU (Incomplete Uniform) toggles independently of the status cycle — a
@@ -293,18 +397,19 @@ function formatDate(d) {
 // ── Totals ───────────────────────────────────────────────────────────────────
 
 function studentTotals(studentId) {
-  let present = 0, absences = 0, tardies = 0, cuts = 0, ius = 0
+  let present = 0, absences = 0, tardies = 0, cuts = 0, excusedCuts = 0, ius = 0
   for (const d of dates.value) {
     const status = effectiveStatus(studentId, d.id)
     if (status === 'present') present++
     if (status === 'absent') absences++
     if (status === 'tardy') tardies++
-    if (status === 'cut_class') cuts++
+    if (status === 'cut_class' && excusedStatus(studentId, d.id) === 'excused') excusedCuts++
+    else if (status === 'cut_class') cuts++
     if (isIncompleteUniform(studentId, d.id)) ius++
   }
   const total = dates.value.length
   const pct = total > 0 ? Math.round((present / total) * 100) : null
-  return { total, present, absences, tardies, cuts, ius, pct }
+  return { total, present, absences, tardies, cuts, excusedCuts, ius, pct }
 }
 
 function presentCountForDate(dateId) {
@@ -335,7 +440,9 @@ function presentCountForDate(dateId) {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <p class="text-xs text-slate-500">
         Cells default to <span class="font-semibold">P</span> —
-        click to cycle Present → Absent → Tardy → Cut Class. Excused/Unexcused is decided by the Homeroom Adviser/Registrar and shown read-only.
+        click to cycle Present → Absent → Tardy → Cut Class. A saved CC can be marked
+        <span class="font-semibold text-emerald-600">ECC</span> by verifying the student's completed Health Services clinic slip;
+        other Excused/Unexcused determinations remain with the Registrar.
         Check <span class="font-semibold text-yellow-600">IU</span> below a cell to flag Incomplete Uniform — independent of the status, and synced to Homeroom's Inc. Uniform checkbox.
         For A, T, or CC, use the remark link to add optional subject-period context.
       </p>
@@ -394,6 +501,7 @@ function presentCountForDate(dateId) {
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-red-400 uppercase tracking-wide w-14 border-r border-slate-100">Absences</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide w-14 border-r border-slate-100">Tardies</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-orange-500 uppercase tracking-wide w-14 border-r border-slate-100">Cuts</th>
+            <th class="px-3 py-2.5 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wide w-14 border-r border-slate-100">ECC</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-yellow-600 uppercase tracking-wide w-14 border-r border-slate-100">IU</th>
             <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Present %</th>
           </tr>
@@ -418,24 +526,43 @@ function presentCountForDate(dateId) {
                 @click="cycleAttendance(student.id, d.id)"
                 :class="[
                   'min-w-[30px] h-6 px-1 rounded-md text-[11px] font-bold transition-colors',
-                  STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.cls,
+                  displayedStatus(student.id, d.id)?.cls,
                   isDefaulted(student.id, d.id) ? 'opacity-60' : '',
                   pendingChanges.has(`${student.id}_${d.id}`) ? 'ring-1 ring-offset-1 ring-indigo-400' : '',
-                  isLocked ? 'cursor-default' : 'cursor-pointer',
+                  (isLocked || !canEditSelectedSubject || isResolved(student.id, d.id)) ? 'cursor-default' : 'cursor-pointer',
                 ]"
-                :disabled="isLocked"
-                :title="isLocked
+                :disabled="isLocked || !canEditSelectedSubject || isResolved(student.id, d.id)"
+                :title="isLocked || !canEditSelectedSubject
                   ? ''
+                  : (isResolved(student.id, d.id)
+                    ? `${displayedStatus(student.id, d.id)?.label} — resolved attendance is read-only`
                   : (isDefaulted(student.id, d.id)
                     ? 'Defaults to Present — click to mark an exception'
-                    : STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.label)">
-                {{ STATUS_BY_VALUE[effectiveStatus(student.id, d.id)]?.code }}
+                    : displayedStatus(student.id, d.id)?.label))">
+                {{ displayedStatus(student.id, d.id)?.code }}
               </button>
-              <div v-if="excusedStatus(student.id, d.id) !== 'n_a'"
+              <div v-if="excusedStatus(student.id, d.id) !== 'n_a' && !isClinicExcusedCutClass(student.id, d.id)"
                 class="mt-0.5 text-[9px] font-semibold"
                 :class="excusedStatus(student.id, d.id) === 'excused' ? 'text-emerald-600' : 'text-red-500'">
                 {{ EXCUSED_LABELS[excusedStatus(student.id, d.id)] }}
               </div>
+              <div v-else-if="isClinicExcusedCutClass(student.id, d.id)"
+                class="mt-0.5 text-[8px] font-semibold text-emerald-600"
+                :title="`Verified clinic slip ${cell(student.id, d.id)?.clinic_reference}`">
+                {{ cell(student.id, d.id)?.clinic_reference }}
+              </div>
+              <button v-if="effectiveStatus(student.id, d.id) === 'cut_class'
+                  && excusedStatus(student.id, d.id) === 'n_a'
+                  && cell(student.id, d.id)?.id
+                  && !isLocked
+                  && canEditSelectedSubject"
+                type="button"
+                class="mx-auto mt-0.5 flex items-center justify-center gap-0.5 text-[8px] font-semibold text-emerald-600 hover:text-emerald-700"
+                title="Verify a completed Health Services clinic slip and mark this CC as ECC"
+                @click.stop="openClinicVerification(student, d)">
+                <ShieldCheckIcon class="h-2.5 w-2.5" />
+                Clinic slip
+              </button>
               <button v-if="isExceptionStatus(student.id, d.id)"
                 type="button"
                 class="mx-auto mt-0.5 flex items-center justify-center gap-0.5 text-[8px] font-semibold transition-colors"
@@ -472,6 +599,10 @@ function presentCountForDate(dateId) {
               {{ studentTotals(student.id).cuts || '—' }}
             </td>
             <td class="px-3 py-2 text-center border-r border-slate-100 font-mono"
+              :class="studentTotals(student.id).excusedCuts > 0 ? 'text-emerald-600 font-semibold' : 'text-slate-300'">
+              {{ studentTotals(student.id).excusedCuts || '—' }}
+            </td>
+            <td class="px-3 py-2 text-center border-r border-slate-100 font-mono"
               :class="studentTotals(student.id).ius > 0 ? 'text-yellow-600 font-semibold' : 'text-slate-300'">
               {{ studentTotals(student.id).ius || '—' }}
             </td>
@@ -494,7 +625,7 @@ function presentCountForDate(dateId) {
               class="px-1 py-2 text-center text-xs font-semibold border-r border-slate-200 text-emerald-600">
               {{ presentCountForDate(d.id) }}
             </td>
-            <td colspan="6" />
+            <td colspan="7" />
           </tr>
         </tfoot>
       </table>
@@ -507,7 +638,9 @@ function presentCountForDate(dateId) {
         Mark <span class="font-semibold text-orange-600">Cut Class</span> when a student was on campus but skipped or left this
         period without valid reason (CIM 3.6/3.6.2) — only you, the subject teacher, can witness this. As a backup, a student
         marked Absent here while Homeroom Attendance says Present/Tardy that day is still automatically flagged to the
-        Registrar too, in case Cut Class wasn't used. Check <span class="font-semibold text-yellow-600">IU</span> to flag
+        Registrar too, in case Cut Class wasn't used. When the student returns with a clinic slip, save CC first and use
+        <span class="font-semibold text-emerald-600">Clinic slip</span> to verify a matching completed Health Services visit;
+        the cell becomes ECC and no Registrar admission slip is needed. Check <span class="font-semibold text-yellow-600">IU</span> to flag
         Incomplete Uniform for a specific date — it's synced to the Homeroom Adviser's Inc. Uniform checkbox for that day and
         never clears a box the adviser already checked themselves.
       </p>
@@ -518,15 +651,71 @@ function presentCountForDate(dateId) {
           </span>
           {{ s.label }}
         </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span :class="['inline-flex items-center justify-center min-w-[26px] h-5 px-1 rounded-md text-[11px] font-bold', ECC_STATUS.cls]">
+            {{ ECC_STATUS.code }}
+          </span>
+          {{ ECC_STATUS.label }}
+        </span>
       </div>
     </div>
   </template>
 
   <AppModal
+    :show="!!clinicCell"
+    title="Verify Clinic Slip"
+    :subtitle="clinicCell
+      ? `${clinicCell.student.family_name}, ${clinicCell.student.given_name} · ${formatDate(clinicCell.date.date)}`
+      : ''"
+    size="md"
+    @close="closeClinicVerification">
+    <div v-if="loadingClinicConsultations" class="py-8 text-center text-sm text-slate-400">
+      Finding completed clinic consultations…
+    </div>
+    <div v-else-if="!clinicConsultations.length" class="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+      No completed Health Services consultation matches this student and date. Ask the clinic to complete the consultation
+      record before marking this Cut Class as ECC.
+    </div>
+    <div v-else class="space-y-3">
+      <p class="text-sm text-slate-600">
+        Compare the printed clinic slip number and visit times, then select the matching record.
+        Medical details remain private.
+      </p>
+      <label v-for="consultation in clinicConsultations" :key="consultation.id"
+        class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+        :class="selectedClinicConsultationId === consultation.id
+          ? 'border-emerald-400 bg-emerald-50'
+          : 'border-slate-200 hover:bg-slate-50'">
+        <input v-model="selectedClinicConsultationId" type="radio" :value="consultation.id"
+          class="mt-1 border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+        <span class="min-w-0">
+          <span class="block text-sm font-semibold text-slate-700">{{ consultation.reference }}</span>
+          <span class="block text-xs text-slate-500">
+            {{ formatClinicTime(consultation.time_in) }}–{{ formatClinicTime(consultation.time_out) }}
+            · Verified by {{ consultation.verified_by }}
+          </span>
+        </span>
+      </label>
+    </div>
+
+    <template #footer>
+      <AppButton variant="secondary" :disabled="confirmingClinicConsultation" @click="closeClinicVerification">
+        Cancel
+      </AppButton>
+      <AppButton
+        :loading="confirmingClinicConsultation"
+        :disabled="loadingClinicConsultations || !selectedClinicConsultationId"
+        @click="confirmClinicVerification">
+        Mark as ECC
+      </AppButton>
+    </template>
+  </AppModal>
+
+  <AppModal
     :show="!!remarkCell"
     title="Attendance Remark"
     :subtitle="remarkCell
-      ? `${remarkCell.student.family_name}, ${remarkCell.student.given_name} · ${formatDate(remarkCell.date.date)} · ${STATUS_BY_VALUE[effectiveStatus(remarkCell.student.id, remarkCell.date.id)]?.label}`
+      ? `${remarkCell.student.family_name}, ${remarkCell.student.given_name} · ${formatDate(remarkCell.date.date)} · ${displayedStatus(remarkCell.student.id, remarkCell.date.id)?.label}`
       : ''"
     size="md"
     @close="closeRemarks">

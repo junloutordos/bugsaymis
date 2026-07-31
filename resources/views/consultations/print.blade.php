@@ -29,7 +29,8 @@
     </div>
 
     <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-      <div><span class="label">Date:</span> <u>{{ optional($consultation->created_at)->format('F j, Y') }}</u></div>
+      <div><span class="label">Clinic Slip No.:</span> <u>CS-{{ str_pad((string) $consultation->id, 6, '0', STR_PAD_LEFT) }}</u></div>
+      <div><span class="label">Date:</span> <u>{{ optional($consultation->date_attended ?? $consultation->created_at)->format('F j, Y') }}</u></div>
       <div><span class="label">Time In:</span> <u>{{ $consultation->time_start ?? '—' }}</u></div>
       <div><span class="label">Time Out:</span> <u>{{ $consultation->time_out ?? '—' }}</u></div>
     </div>

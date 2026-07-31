@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use App\Models\Consultation;
-use App\Models\User;
-use App\Models\PhysicianSchedule;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\ConsultationCreatedMail;
 use App\Mail\ConsultationScheduledMail;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Models\ClassRecord\ClassRecordAttendanceRecord;
+use App\Models\Consultation;
+use App\Models\PhysicianSchedule;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\StudentSectionResolver;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 class ConsultationController extends Controller
 {
@@ -48,30 +50,30 @@ class ConsultationController extends Controller
                     $studentQuery = DB::table('students');
 
                     $nameCols = [];
-                    foreach (['lastname','firstname','middle_name','name'] as $c) {
+                    foreach (['lastname', 'firstname', 'middle_name', 'name'] as $c) {
                         if (Schema::hasColumn('students', $c)) {
-                            $nameCols[] = "IFNULL(" . $c . ", '')";
+                            $nameCols[] = 'IFNULL('.$c.", '')";
                         }
                     }
 
                     $pisayCols = [];
-                    foreach (['pisaysystemid','pisay_id','pisay_system_id'] as $c) {
+                    foreach (['pisaysystemid', 'pisay_id', 'pisay_system_id'] as $c) {
                         if (Schema::hasColumn('students', $c)) {
-                            $pisayCols[] = "IFNULL(" . $c . ", '')";
+                            $pisayCols[] = 'IFNULL('.$c.", '')";
                         }
                     }
 
                     $lower = strtolower($search);
-                    if (!empty($nameCols) || !empty($pisayCols)) {
+                    if (! empty($nameCols) || ! empty($pisayCols)) {
                         $studentQuery->where(function ($sq) use ($nameCols, $pisayCols, $lower) {
-                            if (!empty($nameCols)) {
-                                $sq->whereRaw('LOWER(CONCAT_WS(" ", ' . implode(', ', $nameCols) . ')) LIKE ?', ["%{$lower}%"]);
+                            if (! empty($nameCols)) {
+                                $sq->whereRaw('LOWER(CONCAT_WS(" ", '.implode(', ', $nameCols).')) LIKE ?', ["%{$lower}%"]);
                             }
-                            if (!empty($pisayCols)) {
-                                if (!empty($nameCols)) {
-                                    $sq->orWhereRaw('LOWER(CONCAT_WS(" ", ' . implode(', ', $pisayCols) . ')) LIKE ?', ["%{$lower}%"]);
+                            if (! empty($pisayCols)) {
+                                if (! empty($nameCols)) {
+                                    $sq->orWhereRaw('LOWER(CONCAT_WS(" ", '.implode(', ', $pisayCols).')) LIKE ?', ["%{$lower}%"]);
                                 } else {
-                                    $sq->whereRaw('LOWER(CONCAT_WS(" ", ' . implode(', ', $pisayCols) . ')) LIKE ?', ["%{$lower}%"]);
+                                    $sq->whereRaw('LOWER(CONCAT_WS(" ", '.implode(', ', $pisayCols).')) LIKE ?', ["%{$lower}%"]);
                                 }
                             }
                         });
@@ -90,14 +92,14 @@ class ConsultationController extends Controller
 
                     $combinedIds = array_values(array_unique(array_merge($studentIds, $userIds)));
 
-                    if (!empty($combinedIds)) {
+                    if (! empty($combinedIds)) {
                         $q->whereIn('requestor_id', $combinedIds);
                     }
                 }
 
                 // Also search reason and status
                 $q->orWhere('reason', 'like', "%{$search}%")
-                  ->orWhere('status', 'like', "%{$search}%");
+                    ->orWhere('status', 'like', "%{$search}%");
             });
         }
 
@@ -116,7 +118,7 @@ class ConsultationController extends Controller
                 'office' => null,
             ];
 
-            if (!empty($consult->requestor_type) && $consult->requestor_type === 'student' && !empty($consult->requestor_id)) {
+            if (! empty($consult->requestor_type) && $consult->requestor_type === 'student' && ! empty($consult->requestor_id)) {
                 $student = DB::table('students')->where('id', $consult->requestor_id)->first();
                 if ($student) {
                     // Prefer explicit lastname, firstname fields when available
@@ -139,10 +141,14 @@ class ConsultationController extends Controller
 
                     if ($last || $first) {
                         $nameParts = [];
-                        if ($last) $nameParts[] = $last;
-                        if ($first) $nameParts[] = $first;
+                        if ($last) {
+                            $nameParts[] = $last;
+                        }
+                        if ($first) {
+                            $nameParts[] = $first;
+                        }
                         // Format as "lastname, firstname" when both present
-                        $requestor['name'] = $last && $first ? ($last . ', ' . $first) : implode(' ', $nameParts);
+                        $requestor['name'] = $last && $first ? ($last.', '.$first) : implode(' ', $nameParts);
                     } else {
                         $requestor['name'] = $student->name ?? $requestor['name'];
                     }
@@ -151,27 +157,27 @@ class ConsultationController extends Controller
 
                     // Attach photo path if available
                     $photoField = null;
-                    foreach (['img','image','photo','student_image'] as $pf) {
+                    foreach (['img', 'image', 'photo', 'student_image'] as $pf) {
                         if (isset($student->$pf) && $student->$pf) {
                             $photoField = $student->$pf;
                             break;
                         }
                     }
                     if ($photoField) {
-                        $requestor['photo'] = '/storage/students_profile_picture/' . rawurlencode($photoField);
+                        $requestor['photo'] = '/storage/students_profile_picture/'.rawurlencode($photoField);
                     }
 
-                    $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
+                    $sectionStudent = app(StudentSectionResolver::class)->latestForStudent($student->id);
                     if ($sectionStudent) {
                         $levelId = $sectionStudent->levelid ?? null;
                         if ($levelId) {
-                            $requestor['grade_level'] = 'Grade ' . $levelId;
+                            $requestor['grade_level'] = 'Grade '.$levelId;
                         }
                         $section = DB::table('sections')->where('id', $sectionStudent->sectionid)->first();
                         if ($section) {
                             // sections table may use different column names; try common variants
                             $sectionName = null;
-                            foreach (['sectionname','section_name','name','section'] as $col) {
+                            foreach (['sectionname', 'section_name', 'name', 'section'] as $col) {
                                 if (isset($section->$col) && $section->$col !== null && $section->$col !== '') {
                                     $sectionName = $section->$col;
                                     break;
@@ -182,16 +188,16 @@ class ConsultationController extends Controller
                     }
                 }
             } else {
-                if (!empty($consult->requestor_id)) {
+                if (! empty($consult->requestor_id)) {
                     $u = DB::table('users')->where('id', $consult->requestor_id)->first();
                     if ($u) {
                         $requestor['name'] = $u->name ?? $requestor['name'];
                         $requestor['sex'] = $u->sex ?? null;
                         $requestor['office'] = $u->office ?? null;
                         // Attach user photo if present (common fields)
-                        foreach (['profile_picture','profile_photo','image','avatar','photo'] as $pf) {
+                        foreach (['profile_picture', 'profile_photo', 'image', 'avatar', 'photo'] as $pf) {
                             if (isset($u->$pf) && $u->$pf) {
-                                $requestor['photo'] = '/storage/' . rawurlencode($u->$pf);
+                                $requestor['photo'] = '/storage/'.rawurlencode($u->$pf);
                                 break;
                             }
                         }
@@ -205,10 +211,10 @@ class ConsultationController extends Controller
             // When the consultation status is Scheduled, prefer the selected `physician_schedule` (via `schedule_id`) so
             // the UI shows the actual appointment slot the user chose; fall back to `scheduled_at` if no schedule exists.
             $dateDisplay = null;
-            if (!empty($consult->status) && strtolower($consult->status) === 'scheduled') {
-                if (!empty($consult->schedule_id)) {
+            if (! empty($consult->status) && strtolower($consult->status) === 'scheduled') {
+                if (! empty($consult->schedule_id)) {
                     $sched = DB::table('physician_schedule')->where('id', $consult->schedule_id)->first();
-                    if ($sched && !empty($sched->schedule_date)) {
+                    if ($sched && ! empty($sched->schedule_date)) {
                         $date = Carbon::parse($sched->schedule_date)->toFormattedDateString();
                         $start = $sched->time_start ?? null;
                         $end = $sched->time_end ?? null;
@@ -227,15 +233,15 @@ class ConsultationController extends Controller
                             }
                         }
                         if ($start && $end) {
-                            $date .= ' · ' . $start . ' - ' . $end;
+                            $date .= ' · '.$start.' - '.$end;
                         } elseif ($start) {
-                            $date .= ' · ' . $start;
+                            $date .= ' · '.$start;
                         }
                         $dateDisplay = $date;
                     }
                 }
 
-                if ((!isset($dateDisplay) || !$dateDisplay) && !empty($consult->scheduled_at)) {
+                if ((! isset($dateDisplay) || ! $dateDisplay) && ! empty($consult->scheduled_at)) {
                     try {
                         $dateDisplay = Carbon::parse($consult->scheduled_at)->toDayDateTimeString();
                     } catch (\Throwable $e) {
@@ -244,9 +250,9 @@ class ConsultationController extends Controller
                 }
             } else {
                 // Non-scheduled consultations: prefer a linked physician schedule when available, otherwise show scheduled_at
-                if (!empty($consult->schedule_id)) {
+                if (! empty($consult->schedule_id)) {
                     $sched = DB::table('physician_schedule')->where('id', $consult->schedule_id)->first();
-                    if ($sched && !empty($sched->schedule_date)) {
+                    if ($sched && ! empty($sched->schedule_date)) {
                         $date = Carbon::parse($sched->schedule_date)->toFormattedDateString();
                         $start = $sched->time_start ?? null;
                         $end = $sched->time_end ?? null;
@@ -265,15 +271,15 @@ class ConsultationController extends Controller
                             }
                         }
                         if ($start && $end) {
-                            $date .= ' · ' . $start . ' - ' . $end;
+                            $date .= ' · '.$start.' - '.$end;
                         } elseif ($start) {
-                            $date .= ' · ' . $start;
+                            $date .= ' · '.$start;
                         }
                         $dateDisplay = $date;
                     }
                 }
 
-                if ((!isset($dateDisplay) || !$dateDisplay) && !empty($consult->scheduled_at)) {
+                if ((! isset($dateDisplay) || ! $dateDisplay) && ! empty($consult->scheduled_at)) {
                     try {
                         $dateDisplay = Carbon::parse($consult->scheduled_at)->toDayDateTimeString();
                     } catch (\Throwable $e) {
@@ -286,29 +292,35 @@ class ConsultationController extends Controller
             // - selected_schedule_display: the physician schedule slot the user selected (from schedule_id), if any
             // - actual_scheduled_display: the actual scheduled_at value set by the nurse when scheduling
             $selectedScheduleDisplay = null;
-            if (!empty($consult->schedule_id)) {
+            if (! empty($consult->schedule_id)) {
                 $sched = DB::table('physician_schedule')->where('id', $consult->schedule_id)->first();
-                if ($sched && !empty($sched->schedule_date)) {
+                if ($sched && ! empty($sched->schedule_date)) {
                     $sdate = Carbon::parse($sched->schedule_date)->toFormattedDateString();
                     $sstart = $sched->time_start ?? null;
                     $send = $sched->time_end ?? null;
                     if ($sstart) {
-                        try { $sstart = Carbon::parse($sstart)->format('g:i A'); } catch (\Throwable $e) { }
+                        try {
+                            $sstart = Carbon::parse($sstart)->format('g:i A');
+                        } catch (\Throwable $e) {
+                        }
                     }
                     if ($send) {
-                        try { $send = Carbon::parse($send)->format('g:i A'); } catch (\Throwable $e) { }
+                        try {
+                            $send = Carbon::parse($send)->format('g:i A');
+                        } catch (\Throwable $e) {
+                        }
                     }
                     if ($sstart && $send) {
-                        $sdate .= ' · ' . $sstart . ' - ' . $send;
+                        $sdate .= ' · '.$sstart.' - '.$send;
                     } elseif ($sstart) {
-                        $sdate .= ' · ' . $sstart;
+                        $sdate .= ' · '.$sstart;
                     }
                     $selectedScheduleDisplay = $sdate;
                 }
             }
 
             $actualScheduledDisplay = null;
-            if (!empty($consult->scheduled_at)) {
+            if (! empty($consult->scheduled_at)) {
                 try {
                     $actualScheduledDisplay = Carbon::parse($consult->scheduled_at)->toDayDateTimeString();
                 } catch (\Throwable $e) {
@@ -319,6 +331,7 @@ class ConsultationController extends Controller
             $consult->selected_schedule_display = $selectedScheduleDisplay;
             $consult->actual_scheduled_display = $actualScheduledDisplay;
             $consult->date_scheduled_display = $dateDisplay;
+
             return $consult;
         });
 
@@ -346,12 +359,15 @@ class ConsultationController extends Controller
         ]);
 
         $user = $request->user();
-        $data = $request->only(['reason','contact','consultation_type','physician_schedule_id','scheduled_at']);
+        $data = $request->only(['reason', 'contact', 'consultation_type', 'physician_schedule_id', 'scheduled_at']);
 
         // Prefer explicit requestor_id/requestor_type from the request (e.g., staff-created appointments).
         if ($request->filled('requestor_id')) {
             $data['requestor_id'] = $request->input('requestor_id');
             $data['requestor_type'] = $request->input('requestor_type') ?? '';
+            if ($data['requestor_type'] === 'student') {
+                $data['student_id'] = (int) $data['requestor_id'];
+            }
         }
         // Support nurse/admin creating a student appointment: frontend may send `requestor_type=student` and
         // `requestor` (PISAY) or `pisay`. Try to resolve to a student record; if found, set requestor_id to the student id.
@@ -361,12 +377,16 @@ class ConsultationController extends Controller
             if ($pisay) {
                 $studentQuery = DB::table('students');
                 // check common pisay column names
-                $pisayCols = ['pisaysystemid','pisay_id','pisay_system_id'];
+                $pisayCols = ['pisaysystemid', 'pisay_id', 'pisay_system_id'];
                 $first = true;
                 foreach ($pisayCols as $c) {
                     if (Schema::hasColumn('students', $c)) {
-                        if ($first) { $studentQuery->where($c, $pisay); $first = false; }
-                        else { $studentQuery->orWhere($c, $pisay); }
+                        if ($first) {
+                            $studentQuery->where($c, $pisay);
+                            $first = false;
+                        } else {
+                            $studentQuery->orWhere($c, $pisay);
+                        }
                     }
                 }
                 if (! $first) {
@@ -377,6 +397,7 @@ class ConsultationController extends Controller
             if ($foundStudent) {
                 $data['requestor_id'] = $foundStudent->id;
                 $data['requestor_type'] = 'student';
+                $data['student_id'] = $foundStudent->id;
                 // clear free-text requestor field to avoid confusion if column exists
                 if (Schema::hasColumn('consultations', 'requestor')) {
                     $data['requestor'] = null;
@@ -389,23 +410,22 @@ class ConsultationController extends Controller
                 $data['requestor_id'] = null;
                 $data['requestor_type'] = 'student';
             }
-        }
-        elseif ($user) {
+        } elseif ($user) {
             // For authenticated users, store the user's id as requestor_id and mark as employee
             $data['requestor_id'] = $user->id;
             $data['requestor_type'] = 'employee';
         }
 
         // Normalize schedule fields: map incoming physician_schedule_id to schedule_id
-        if (!empty($data['physician_schedule_id'])) {
+        if (! empty($data['physician_schedule_id'])) {
             $data['schedule_id'] = $data['physician_schedule_id'];
             unset($data['physician_schedule_id']);
             // derive scheduled_at from the schedule if not explicitly provided
             if (empty($data['scheduled_at'])) {
                 $ps = PhysicianSchedule::find($data['schedule_id']);
-                if ($ps && !empty($ps->schedule_date)) {
+                if ($ps && ! empty($ps->schedule_date)) {
                     try {
-                        $dt = Carbon::parse($ps->schedule_date . ' ' . ($ps->time_start ?? '00:00:00'));
+                        $dt = Carbon::parse($ps->schedule_date.' '.($ps->time_start ?? '00:00:00'));
                         $data['scheduled_at'] = $dt->toDateTimeString();
                     } catch (\Throwable $e) {
                         // ignore parse errors
@@ -431,37 +451,57 @@ class ConsultationController extends Controller
                 'office' => null,
             ];
 
-            if (!empty($consult->requestor_type) && $consult->requestor_type === 'student' && !empty($consult->requestor_id)) {
+            if (! empty($consult->requestor_type) && $consult->requestor_type === 'student' && ! empty($consult->requestor_id)) {
                 $student = DB::table('students')->where('id', $consult->requestor_id)->first();
                 if ($student) {
                     $lastnameCols = ['lastname', 'last_name', 'lname'];
                     $firstnameCols = ['firstname', 'first_name', 'fname'];
-                    $last = null; $first = null;
-                    foreach ($lastnameCols as $c) { if (isset($student->$c) && $student->$c !== null && $student->$c !== '') { $last = $student->$c; break; } }
-                    foreach ($firstnameCols as $c) { if (isset($student->$c) && $student->$c !== null && $student->$c !== '') { $first = $student->$c; break; } }
+                    $last = null;
+                    $first = null;
+                    foreach ($lastnameCols as $c) {
+                        if (isset($student->$c) && $student->$c !== null && $student->$c !== '') {
+                            $last = $student->$c;
+                            break;
+                        }
+                    }
+                    foreach ($firstnameCols as $c) {
+                        if (isset($student->$c) && $student->$c !== null && $student->$c !== '') {
+                            $first = $student->$c;
+                            break;
+                        }
+                    }
                     if ($last || $first) {
                         $nameParts = [];
-                        if ($last) $nameParts[] = $last;
-                        if ($first) $nameParts[] = $first;
-                        $requestor['name'] = $last && $first ? ($last . ', ' . $first) : implode(' ', $nameParts);
+                        if ($last) {
+                            $nameParts[] = $last;
+                        }
+                        if ($first) {
+                            $nameParts[] = $first;
+                        }
+                        $requestor['name'] = $last && $first ? ($last.', '.$first) : implode(' ', $nameParts);
                     } else {
                         $requestor['name'] = $student->name ?? $requestor['name'];
                     }
                     $requestor['sex'] = $student->sex ?? null;
-                    $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
+                    $sectionStudent = app(StudentSectionResolver::class)->latestForStudent($student->id);
                     if ($sectionStudent) {
                         $levelId = $sectionStudent->levelid ?? null;
-                        if ($levelId) $requestor['grade_level'] = 'Grade ' . $levelId;
+                        if ($levelId) {
+                            $requestor['grade_level'] = 'Grade '.$levelId;
+                        }
                         $section = DB::table('sections')->where('id', $sectionStudent->sectionid)->first();
                         if ($section) {
-                            foreach (['sectionname','section_name','name','section'] as $col) {
-                                if (isset($section->$col) && $section->$col !== null && $section->$col !== '') { $requestor['section'] = $section->$col; break; }
+                            foreach (['sectionname', 'section_name', 'name', 'section'] as $col) {
+                                if (isset($section->$col) && $section->$col !== null && $section->$col !== '') {
+                                    $requestor['section'] = $section->$col;
+                                    break;
+                                }
                             }
                         }
                     }
                 }
             } else {
-                if (!empty($consult->requestor_id)) {
+                if (! empty($consult->requestor_id)) {
                     $u = DB::table('users')->where('id', $consult->requestor_id)->first();
                     if ($u) {
                         $requestor['name'] = $u->name ?? $requestor['name'];
@@ -472,13 +512,15 @@ class ConsultationController extends Controller
             }
 
             $dateScheduled = null;
-            if (!empty($consult->scheduled_at)) {
+            if (! empty($consult->scheduled_at)) {
                 $dateScheduled = Carbon::parse($consult->scheduled_at)->toDayDateTimeString();
             }
 
-            $nurseRole = \App\Models\Role::whereRaw('LOWER(name) = ?', ['nurse'])->first();
-            $nurseRecipients = User::where(function($q) use ($nurseRole) {
-                if ($nurseRole) $q->whereRaw('FIND_IN_SET(?, role_id)', [$nurseRole->id]);
+            $nurseRole = Role::whereRaw('LOWER(name) = ?', ['nurse'])->first();
+            $nurseRecipients = User::where(function ($q) use ($nurseRole) {
+                if ($nurseRole) {
+                    $q->whereRaw('FIND_IN_SET(?, role_id)', [$nurseRole->id]);
+                }
                 $q->orWhereRaw('LOWER(position) LIKE ?', ['%nurse%']);
             })->pluck('email')->filter()->unique();
 
@@ -497,7 +539,7 @@ class ConsultationController extends Controller
             report($e);
         }
 
-        return redirect()->route('consultations.index')->with('success','Consultation requested');
+        return redirect()->route('consultations.index')->with('success', 'Consultation requested');
     }
 
     public function update(Request $request, Consultation $consultation)
@@ -514,9 +556,14 @@ class ConsultationController extends Controller
         // 2) vitals editing: request includes vitals/medicines/time_start/time_out etc. -> update those fields
 
         $scheduling = $request->has('scheduled_at');
-        $vitalsKeys = ['temperature','temp','pulse_rate','pulse','heart_rate','oxygen','oxygen_saturation','spo2','blood_pressure','bp','action_taken','medicine_given','medicines','time_start','time_out','disposition','date_attended'];
+        $vitalsKeys = ['temperature', 'temp', 'pulse_rate', 'pulse', 'heart_rate', 'oxygen', 'oxygen_saturation', 'spo2', 'blood_pressure', 'bp', 'action_taken', 'medicine_given', 'medicines', 'time_start', 'time_out', 'disposition', 'date_attended'];
         $editingVitals = false;
-        foreach ($vitalsKeys as $k) { if ($request->has($k)) { $editingVitals = true; break; } }
+        foreach ($vitalsKeys as $k) {
+            if ($request->has($k)) {
+                $editingVitals = true;
+                break;
+            }
+        }
 
         if ($scheduling) {
             $rules = ['scheduled_at' => 'required|date'];
@@ -557,23 +604,57 @@ class ConsultationController extends Controller
 
             $request->validate($vRules);
 
-            if ($request->filled('temperature')) $consultation->temperature = $request->input('temperature');
-            if ($request->filled('temp')) $consultation->temperature = $request->input('temp');
-            if ($request->filled('pulse_rate')) $consultation->pulse_rate = $request->input('pulse_rate');
-            if ($request->filled('pulse')) $consultation->pulse_rate = $request->input('pulse');
-            if ($request->filled('heart_rate')) $consultation->pulse_rate = $request->input('heart_rate');
-            if ($request->filled('oxygen')) $consultation->oxygen = $request->input('oxygen');
-            if ($request->filled('oxygen_saturation')) $consultation->oxygen = $request->input('oxygen_saturation');
-            if ($request->filled('spo2')) $consultation->oxygen = $request->input('spo2');
-            if ($request->filled('blood_pressure')) $consultation->blood_pressure = $request->input('blood_pressure');
-            if ($request->filled('bp')) $consultation->blood_pressure = $request->input('bp');
-            if ($request->filled('medicine_given')) $consultation->medicine_given = $request->input('medicine_given');
-            if ($request->filled('medicines')) $consultation->medicine_given = $request->input('medicines');
-            if ($request->filled('action_taken')) $consultation->action_taken = $request->input('action_taken');
-            if ($request->filled('time_start')) $consultation->time_start = Carbon::parse($request->input('time_start'))->toDateTimeString();
-            if ($request->filled('time_out')) $consultation->time_out = Carbon::parse($request->input('time_out'))->toDateTimeString();
-            if ($request->filled('date_attended')) $consultation->date_attended = Carbon::parse($request->input('date_attended'))->toDateTimeString();
-            if ($request->filled('disposition')) $consultation->disposition = $request->input('disposition');
+            if ($request->filled('temperature')) {
+                $consultation->temperature = $request->input('temperature');
+            }
+            if ($request->filled('temp')) {
+                $consultation->temperature = $request->input('temp');
+            }
+            if ($request->filled('pulse_rate')) {
+                $consultation->pulse_rate = $request->input('pulse_rate');
+            }
+            if ($request->filled('pulse')) {
+                $consultation->pulse_rate = $request->input('pulse');
+            }
+            if ($request->filled('heart_rate')) {
+                $consultation->pulse_rate = $request->input('heart_rate');
+            }
+            if ($request->filled('oxygen')) {
+                $consultation->oxygen = $request->input('oxygen');
+            }
+            if ($request->filled('oxygen_saturation')) {
+                $consultation->oxygen = $request->input('oxygen_saturation');
+            }
+            if ($request->filled('spo2')) {
+                $consultation->oxygen = $request->input('spo2');
+            }
+            if ($request->filled('blood_pressure')) {
+                $consultation->blood_pressure = $request->input('blood_pressure');
+            }
+            if ($request->filled('bp')) {
+                $consultation->blood_pressure = $request->input('bp');
+            }
+            if ($request->filled('medicine_given')) {
+                $consultation->medicine_given = $request->input('medicine_given');
+            }
+            if ($request->filled('medicines')) {
+                $consultation->medicine_given = $request->input('medicines');
+            }
+            if ($request->filled('action_taken')) {
+                $consultation->action_taken = $request->input('action_taken');
+            }
+            if ($request->filled('time_start')) {
+                $consultation->time_start = Carbon::parse($request->input('time_start'))->toDateTimeString();
+            }
+            if ($request->filled('time_out')) {
+                $consultation->time_out = Carbon::parse($request->input('time_out'))->toDateTimeString();
+            }
+            if ($request->filled('date_attended')) {
+                $consultation->date_attended = Carbon::parse($request->input('date_attended'))->toDateTimeString();
+            }
+            if ($request->filled('disposition')) {
+                $consultation->disposition = $request->input('disposition');
+            }
         }
         // Always set nurse who performed the action
         $consultation->nurse_id = $user->id;
@@ -581,6 +662,12 @@ class ConsultationController extends Controller
         // If this update came from recording vitals, mark as Completed
         if ($editingVitals) {
             $consultation->status = 'Completed';
+            if (
+                ($consultation->student_id || $consultation->requestor_type === 'student')
+                && ! $consultation->date_attended
+            ) {
+                $consultation->date_attended = now();
+            }
         }
 
         $consultation->save();
@@ -589,7 +676,7 @@ class ConsultationController extends Controller
         if ($scheduling) {
             try {
                 $recipientEmail = null;
-                if (!empty($consultation->requestor_type) && $consultation->requestor_type === 'student' && !empty($consultation->requestor_id)) {
+                if (! empty($consultation->requestor_type) && $consultation->requestor_type === 'student' && ! empty($consultation->requestor_id)) {
                     $student = DB::table('students')->where('id', $consultation->requestor_id)->first();
                     if ($student) {
                         if (isset($student->student_email) && $student->student_email) {
@@ -600,15 +687,15 @@ class ConsultationController extends Controller
                     }
                 }
 
-                if (! $recipientEmail && !empty($consultation->requestor_id)) {
+                if (! $recipientEmail && ! empty($consultation->requestor_id)) {
                     $u = DB::table('users')->where('id', $consultation->requestor_id)->first();
-                    if ($u && !empty($u->email)) {
+                    if ($u && ! empty($u->email)) {
                         $recipientEmail = $u->email;
                     }
                 }
 
                 // fallback to consultations.email if present
-                if (! $recipientEmail && !empty($consultation->email)) {
+                if (! $recipientEmail && ! empty($consultation->email)) {
                     $recipientEmail = $consultation->email;
                 }
 
@@ -622,11 +709,11 @@ class ConsultationController extends Controller
                 report($e);
             }
 
-            return redirect()->route('consultations.index')->with('success','Consultation scheduled');
+            return redirect()->route('consultations.index')->with('success', 'Consultation scheduled');
         }
 
         // For vitals edits / other updates, don't send emails — just redirect with a generic message
-        return redirect()->route('consultations.index')->with('success','Consultation updated');
+        return redirect()->route('consultations.index')->with('success', 'Consultation updated');
     }
 
     /**
@@ -644,61 +731,87 @@ class ConsultationController extends Controller
             'photo' => null,
         ];
 
-        if (!empty($consultation->requestor_type) && $consultation->requestor_type === 'student' && !empty($consultation->requestor_id)) {
+        if (! empty($consultation->requestor_type) && $consultation->requestor_type === 'student' && ! empty($consultation->requestor_id)) {
             $student = DB::table('students')->where('id', $consultation->requestor_id)->first();
             if ($student) {
                 $lastnameCols = ['lastname', 'last_name', 'lname'];
                 $firstnameCols = ['firstname', 'first_name', 'fname'];
-                $last = null; $first = null;
-                foreach ($lastnameCols as $c) { if (isset($student->$c) && $student->$c) { $last = $student->$c; break; } }
-                foreach ($firstnameCols as $c) { if (isset($student->$c) && $student->$c) { $first = $student->$c; break; } }
+                $last = null;
+                $first = null;
+                foreach ($lastnameCols as $c) {
+                    if (isset($student->$c) && $student->$c) {
+                        $last = $student->$c;
+                        break;
+                    }
+                }
+                foreach ($firstnameCols as $c) {
+                    if (isset($student->$c) && $student->$c) {
+                        $first = $student->$c;
+                        break;
+                    }
+                }
                 if ($last || $first) {
-                    $requestor['name'] = $last && $first ? ($last . ', ' . $first) : trim(($last ?? '') . ' ' . ($first ?? ''));
+                    $requestor['name'] = $last && $first ? ($last.', '.$first) : trim(($last ?? '').' '.($first ?? ''));
                 } else {
                     $requestor['name'] = $student->name ?? $requestor['name'];
                 }
                 $requestor['sex'] = $student->sex ?? null;
                 $photoField = null;
-                foreach (['img','image','photo','student_image'] as $pf) {
-                    if (isset($student->$pf) && $student->$pf) { $photoField = $student->$pf; break; }
+                foreach (['img', 'image', 'photo', 'student_image'] as $pf) {
+                    if (isset($student->$pf) && $student->$pf) {
+                        $photoField = $student->$pf;
+                        break;
+                    }
                 }
-                if ($photoField) $requestor['photo'] = '/storage/students_profile_picture/' . rawurlencode($photoField);
+                if ($photoField) {
+                    $requestor['photo'] = '/storage/students_profile_picture/'.rawurlencode($photoField);
+                }
 
-                $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
+                $sectionStudent = app(StudentSectionResolver::class)->latestForStudent($student->id);
                 if ($sectionStudent) {
                     $levelId = $sectionStudent->levelid ?? null;
-                    if ($levelId) $requestor['grade_level'] = 'Grade ' . $levelId;
+                    if ($levelId) {
+                        $requestor['grade_level'] = 'Grade '.$levelId;
+                    }
                     $section = DB::table('sections')->where('id', $sectionStudent->sectionid)->first();
                     if ($section) {
-                        foreach (['sectionname','section_name','name','section'] as $col) {
-                            if (isset($section->$col) && $section->$col) { $requestor['section'] = $section->$col; break; }
+                        foreach (['sectionname', 'section_name', 'name', 'section'] as $col) {
+                            if (isset($section->$col) && $section->$col) {
+                                $requestor['section'] = $section->$col;
+                                break;
+                            }
                         }
                     }
                 }
             }
         } else {
-            if (!empty($consultation->requestor_id)) {
+            if (! empty($consultation->requestor_id)) {
                 $u = DB::table('users')->where('id', $consultation->requestor_id)->first();
                 if ($u) {
                     $requestor['name'] = $u->name ?? $requestor['name'];
                     $requestor['sex'] = $u->sex ?? null;
                     $requestor['office'] = $u->office ?? null;
-                    foreach (['profile_picture','profile_photo','image','avatar','photo'] as $pf) {
-                        if (isset($u->$pf) && $u->$pf) { $requestor['photo'] = '/storage/' . rawurlencode($u->$pf); break; }
+                    foreach (['profile_picture', 'profile_photo', 'image', 'avatar', 'photo'] as $pf) {
+                        if (isset($u->$pf) && $u->$pf) {
+                            $requestor['photo'] = '/storage/'.rawurlencode($u->$pf);
+                            break;
+                        }
                     }
                 }
             }
         }
 
         $nurse = null;
-        if (!empty($consultation->nurse_id)) {
+        if (! empty($consultation->nurse_id)) {
             $nurseRec = DB::table('users')->where('id', $consultation->nurse_id)->first();
-            if ($nurseRec) $nurse = $nurseRec->name ?? null;
+            if ($nurseRec) {
+                $nurse = $nurseRec->name ?? null;
+            }
         }
 
         return view('consultations.print', [
             'consultation' => $consultation,
-            'requestor' => (object)$requestor,
+            'requestor' => (object) $requestor,
             'nurse' => $nurse,
         ]);
     }
@@ -725,7 +838,7 @@ class ConsultationController extends Controller
                 $type = 'student';
             }
         }
-        if (!in_array($type, ['student', 'employee', 'both'])) {
+        if (! in_array($type, ['student', 'employee', 'both'])) {
             $type = 'student';
         }
 
@@ -767,7 +880,7 @@ class ConsultationController extends Controller
                 'sex' => null,
             ];
 
-            if (!empty($consult->requestor_id)) {
+            if (! empty($consult->requestor_id)) {
                 $student = DB::table('students')->where('id', $consult->requestor_id)->first();
             }
 
@@ -775,55 +888,80 @@ class ConsultationController extends Controller
                 // name preference: lastname, firstname or name
                 $lastnameCols = ['lastname', 'last_name', 'lname'];
                 $firstnameCols = ['firstname', 'first_name', 'fname'];
-                $last = null; $first = null;
-                foreach ($lastnameCols as $c) { if (isset($student->$c) && $student->$c !== null && $student->$c !== '') { $last = $student->$c; break; } }
-                foreach ($firstnameCols as $c) { if (isset($student->$c) && $student->$c !== null && $student->$c !== '') { $first = $student->$c; break; } }
+                $last = null;
+                $first = null;
+                foreach ($lastnameCols as $c) {
+                    if (isset($student->$c) && $student->$c !== null && $student->$c !== '') {
+                        $last = $student->$c;
+                        break;
+                    }
+                }
+                foreach ($firstnameCols as $c) {
+                    if (isset($student->$c) && $student->$c !== null && $student->$c !== '') {
+                        $first = $student->$c;
+                        break;
+                    }
+                }
                 if ($last || $first) {
-                    $requestor['name'] = $last && $first ? ($last . ', ' . $first) : trim(($last ?? '') . ' ' . ($first ?? ''));
+                    $requestor['name'] = $last && $first ? ($last.', '.$first) : trim(($last ?? '').' '.($first ?? ''));
                 } else {
                     $requestor['name'] = $student->name ?? $requestor['name'];
                 }
 
                 $requestor['grade_level'] = null;
                 $requestor['sex'] = $student->sex ?? null;
-                $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
+                $sectionStudent = app(StudentSectionResolver::class)->latestForStudent($student->id);
                 if ($sectionStudent) {
                     $levelId = $sectionStudent->levelid ?? null;
-                    if ($levelId) $requestor['grade_level'] = 'Grade ' . $levelId;
+                    if ($levelId) {
+                        $requestor['grade_level'] = 'Grade '.$levelId;
+                    }
                     $section = DB::table('sections')->where('id', $sectionStudent->sectionid)->first();
                     if ($section) {
-                        foreach (['sectionname','section_name','name','section'] as $col) {
-                            if (isset($section->$col) && $section->$col !== null && $section->$col !== '') { $requestor['section'] = $section->$col; break; }
+                        foreach (['sectionname', 'section_name', 'name', 'section'] as $col) {
+                            if (isset($section->$col) && $section->$col !== null && $section->$col !== '') {
+                                $requestor['section'] = $section->$col;
+                                break;
+                            }
                         }
                     }
                 }
             }
 
             // If no student found and this consultation is from an employee, try to load user + division
-            if (empty($student) && $consult->requestor_type === 'employee' && !empty($consult->requestor_id)) {
+            if (empty($student) && $consult->requestor_type === 'employee' && ! empty($consult->requestor_id)) {
                 $u = DB::table('users')->where('id', $consult->requestor_id)->first();
                 if ($u) {
                     $requestor['name'] = $u->name ?? $requestor['name'];
                     $requestor['sex'] = $u->sex ?? null;
                     // Determine division id column on users table
                     $divisionId = null;
-                    foreach (['divisionid','division_id','division'] as $col) {
-                        if (isset($u->$col) && $u->$col) { $divisionId = $u->$col; break; }
+                    foreach (['divisionid', 'division_id', 'division'] as $col) {
+                        if (isset($u->$col) && $u->$col) {
+                            $divisionId = $u->$col;
+                            break;
+                        }
                     }
                     // Lookup division name from divisions table if available
                     if ($divisionId) {
                         $division = DB::table('divisions')->where('id', $divisionId)->first();
                         if ($division) {
                             // try common name columns
-                            foreach (['name','division_name','division'] as $dn) {
-                                if (isset($division->$dn) && $division->$dn) { $requestor['office'] = $division->$dn; break; }
+                            foreach (['name', 'division_name', 'division'] as $dn) {
+                                if (isset($division->$dn) && $division->$dn) {
+                                    $requestor['office'] = $division->$dn;
+                                    break;
+                                }
                             }
                         }
                     }
                     // fallback: use user's office column if present
                     if (empty($requestor['office'])) {
-                        foreach (['office','department','division','unit'] as $of) {
-                            if (isset($u->$of) && $u->$of) { $requestor['office'] = $u->$of; break; }
+                        foreach (['office', 'department', 'division', 'unit'] as $of) {
+                            if (isset($u->$of) && $u->$of) {
+                                $requestor['office'] = $u->$of;
+                                break;
+                            }
                         }
                     }
                 }
@@ -833,11 +971,19 @@ class ConsultationController extends Controller
 
             // Consolidate vital signs into an array/string for display
             $vitals = [];
-            if (!empty($consult->temperature)) $vitals[] = 'Temp: ' . $consult->temperature;
-            if (!empty($consult->pulse_rate)) $vitals[] = 'Pulse: ' . $consult->pulse_rate;
-            if (!empty($consult->oxygen)) $vitals[] = 'SpO2: ' . $consult->oxygen;
-            if (!empty($consult->blood_pressure)) $vitals[] = 'BP: ' . $consult->blood_pressure;
-            $consult->vitals_display = !empty($vitals) ? implode(' ; ', $vitals) : null;
+            if (! empty($consult->temperature)) {
+                $vitals[] = 'Temp: '.$consult->temperature;
+            }
+            if (! empty($consult->pulse_rate)) {
+                $vitals[] = 'Pulse: '.$consult->pulse_rate;
+            }
+            if (! empty($consult->oxygen)) {
+                $vitals[] = 'SpO2: '.$consult->oxygen;
+            }
+            if (! empty($consult->blood_pressure)) {
+                $vitals[] = 'BP: '.$consult->blood_pressure;
+            }
+            $consult->vitals_display = ! empty($vitals) ? implode(' ; ', $vitals) : null;
 
             // Action taken, medicine, time_out, disposition
             $consult->action_taken_display = $consult->action_taken ?? null;
@@ -865,11 +1011,19 @@ class ConsultationController extends Controller
             abort(403);
         }
 
+        if (ClassRecordAttendanceRecord::where('clinic_consultation_id', $consultation->id)->exists()) {
+            return redirect()
+                ->route('consultations.index')
+                ->with('error', 'This consultation verifies an ECC attendance record and cannot be deleted.');
+        }
+
         try {
             $consultation->delete();
+
             return redirect()->route('consultations.index')->with('success', 'Consultation deleted');
         } catch (\Throwable $e) {
             logger()->error('Failed to delete consultation id='.$consultation->id.': '.$e->getMessage());
+
             return redirect()->route('consultations.index')->with('error', 'Failed to delete consultation');
         }
     }

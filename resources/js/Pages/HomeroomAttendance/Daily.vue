@@ -137,6 +137,11 @@ async function save() {
                 :title="`Marked Cut Class by: ${row.cut_class_subjects.join(', ')} (read-only — set on Class Record Attendance)`">
                 CC
               </span>
+              <span v-if="row.excused_cut_class_subjects?.length"
+                class="ml-1.5 inline-flex items-center rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"
+                :title="`Clinic-verified Excused Cutting Class: ${row.excused_cut_class_subjects.join(', ')} (read-only — verified by the subject teacher)`">
+                ECC
+              </span>
             </td>
             <td class="px-4 py-2">
               <div class="flex justify-center gap-1">
@@ -171,9 +176,10 @@ async function save() {
     </div>
 
     <p class="mt-3 text-xs text-slate-400">
-      Excused/Unexcused status for any Absent/Tardy/Cutting entry is set later by the Registrar when a Class Admission Slip is issued.
+      Excused/Unexcused status for an Absent or Tardy entry is set later by the Registrar when a Class Admission Slip is issued.
       An orange <span class="font-semibold text-orange-600">CC</span> badge means a subject teacher has marked that student Cut Class
-      today — this is set on the Class Record Attendance grid and is read-only here. A yellow subject badge next to Inc. Uniform means
+      today. A green <span class="font-semibold text-emerald-600">ECC</span> badge means the subject teacher verified a matching completed
+      Health Services clinic slip, so no Registrar admission slip is required. Both are read-only here. A yellow subject badge next to Inc. Uniform means
       a subject teacher already flagged it there — the checkbox is pre-checked for you but you may still adjust it.
     </p>
   </AdminLayout>

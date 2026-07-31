@@ -2,7 +2,9 @@
 
 namespace App\Models\ClassRecord;
 
+use App\Models\Consultation;
 use App\Models\HomeroomAttendance\AdmissionSlip;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -24,6 +26,9 @@ class ClassRecordAttendanceRecord extends Model
         'status',
         'excused_status',
         'admission_slip_id',
+        'clinic_consultation_id',
+        'excused_by',
+        'excused_at',
         'synced_from_homeroom',
         'incomplete_uniform',
         'remarks',
@@ -31,7 +36,8 @@ class ClassRecordAttendanceRecord extends Model
 
     protected $casts = [
         'synced_from_homeroom' => 'boolean',
-        'incomplete_uniform'   => 'boolean',
+        'incomplete_uniform' => 'boolean',
+        'excused_at' => 'datetime',
     ];
 
     public function attendanceDate(): BelongsTo
@@ -47,5 +53,15 @@ class ClassRecordAttendanceRecord extends Model
     public function admissionSlip(): BelongsTo
     {
         return $this->belongsTo(AdmissionSlip::class, 'admission_slip_id');
+    }
+
+    public function clinicConsultation(): BelongsTo
+    {
+        return $this->belongsTo(Consultation::class, 'clinic_consultation_id');
+    }
+
+    public function excusedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'excused_by');
     }
 }

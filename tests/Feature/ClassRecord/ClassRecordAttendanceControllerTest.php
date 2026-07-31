@@ -8,11 +8,13 @@ use App\Models\ClassRecord\ClassRecordAttendanceRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordStudent;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\Consultation;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -27,6 +29,7 @@ class ClassRecordAttendanceControllerTest extends TestCase
     use RefreshDatabase;
 
     private SchoolYear $sy;
+
     private GradingOption $option;
 
     protected function setUp(): void
@@ -308,5 +311,197 @@ class ClassRecordAttendanceControllerTest extends TestCase
                 'date' => '2026-08-03',
             ])
             ->assertStatus(403);
+    }
+
+    public function test_teacher_can_verify_matching_completed_clinic_slip_and_mark_cc_as_ecc(): void
+    {
+        $teacher = User::factory()->create();
+        $nurse = User::factory()->create(['name' => 'Nurse Santos']);
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create([
+            'class_record_quarter_id' => $quarter->id,
+            'date' => '2026-06-03',
+            'sort_order' => 1,
+        ]);
+        $globalStudentId = DB::table('students')->insertGetId([
+            'lastname' => 'Doe',
+            'firstname' => 'Jane',
+            'middlename' => '',
+            'sex' => 'F',
+            'batch' => '2026',
+        ]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id,
+            'student_id' => $globalStudentId,
+            'family_name' => 'Doe',
+            'given_name' => 'Jane',
+            'sequence_number' => 1,
+            'is_active' => true,
+        ]);
+        $attendance = ClassRecordAttendanceRecord::create([
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'cut_class',
+            'excused_status' => 'n_a',
+        ]);
+        $consultation = Consultation::create([
+            'student_id' => $globalStudentId,
+            'status' => 'Completed',
+            'reason' => 'Private medical complaint',
+            'date_attended' => '2026-06-03 10:05:00',
+            'time_start' => '10:05:00',
+            'nurse_id' => $nurse->id,
+        ]);
+
+        $this->actingAs($teacher)
+            ->getJson(route('class-records.attendance.clinic-consultations', [
+                'classRecord' => $record->id,
+                'q' => 1,
+                'attendanceRecord' => $attendance->id,
+            ]))
+            ->assertOk()
+            ->assertJsonCount(1, 'consultations')
+            ->assertJsonPath('consultations.0.id', $consultation->id)
+            ->assertJsonPath('consultations.0.verified_by', 'Nurse Santos')
+            ->assertJsonMissing(['reason' => 'Private medical complaint']);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.attendance.excuse-via-clinic', [
+                'classRecord' => $record->id,
+                'q' => 1,
+                'attendanceRecord' => $attendance->id,
+            ]), ['consultation_id' => $consultation->id])
+            ->assertOk()
+            ->assertJsonPath('excused_status', 'excused');
+
+        $this->assertDatabaseHas('class_record_attendance_records', [
+            'id' => $attendance->id,
+            'status' => 'cut_class',
+            'excused_status' => 'excused',
+            'clinic_consultation_id' => $consultation->id,
+            'excused_by' => $teacher->id,
+        ]);
+    }
+
+    public function test_clinic_verification_rejects_wrong_student_or_date_and_unauthorized_teacher(): void
+    {
+        $teacher = User::factory()->create();
+        $otherTeacher = User::factory()->create();
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create([
+            'class_record_quarter_id' => $quarter->id,
+            'date' => '2026-06-03',
+            'sort_order' => 1,
+        ]);
+        $globalStudentId = DB::table('students')->insertGetId([
+            'lastname' => 'Doe',
+            'firstname' => 'Jane',
+            'middlename' => '',
+            'sex' => 'F',
+            'batch' => '2026',
+        ]);
+        $otherStudentId = DB::table('students')->insertGetId([
+            'lastname' => 'Roe',
+            'firstname' => 'John',
+            'middlename' => '',
+            'sex' => 'M',
+            'batch' => '2026',
+        ]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id,
+            'student_id' => $globalStudentId,
+            'family_name' => 'Doe',
+            'given_name' => 'Jane',
+            'sequence_number' => 1,
+            'is_active' => true,
+        ]);
+        $attendance = ClassRecordAttendanceRecord::create([
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'cut_class',
+            'excused_status' => 'n_a',
+        ]);
+        $wrongConsultation = Consultation::create([
+            'student_id' => $otherStudentId,
+            'status' => 'Completed',
+            'date_attended' => '2026-06-04 10:05:00',
+        ]);
+
+        $route = route('class-records.attendance.excuse-via-clinic', [
+            'classRecord' => $record->id,
+            'q' => 1,
+            'attendanceRecord' => $attendance->id,
+        ]);
+
+        $this->actingAs($otherTeacher)
+            ->postJson($route, ['consultation_id' => $wrongConsultation->id])
+            ->assertForbidden();
+
+        $this->actingAs($teacher)
+            ->postJson($route, ['consultation_id' => $wrongConsultation->id])
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('class_record_attendance_records', [
+            'id' => $attendance->id,
+            'excused_status' => 'n_a',
+            'clinic_consultation_id' => null,
+        ]);
+    }
+
+    public function test_normal_attendance_save_cannot_change_a_resolved_ecc_record(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create([
+            'class_record_quarter_id' => $quarter->id,
+            'date' => '2026-06-03',
+            'sort_order' => 1,
+        ]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id,
+            'family_name' => 'Doe',
+            'given_name' => 'Jane',
+            'sequence_number' => 1,
+            'is_active' => true,
+        ]);
+        ClassRecordAttendanceRecord::create([
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'cut_class',
+            'excused_status' => 'excused',
+            'excused_by' => $teacher->id,
+            'excused_at' => now(),
+        ]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.attendance.upsert', [
+                'classRecord' => $record->id,
+                'q' => 1,
+            ]), [
+                'records' => [[
+                    'date_id' => $date->id,
+                    'student_id' => $student->id,
+                    'status' => 'present',
+                ]],
+            ])
+            ->assertStatus(422);
+
+        $this->actingAs($teacher)
+            ->deleteJson(route('class-records.attendance.destroy-date', [
+                'classRecord' => $record->id,
+                'q' => 1,
+                'attendanceDate' => $date->id,
+            ]))
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('class_record_attendance_records', [
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'cut_class',
+            'excused_status' => 'excused',
+        ]);
     }
 }

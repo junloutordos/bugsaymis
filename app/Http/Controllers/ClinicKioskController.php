@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Models\PhysicianSchedule;
 use App\Models\Consultation;
+use App\Models\PhysicianSchedule;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\StudentSectionResolver;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\ClinicKioskConsultationMail;
-use App\Models\User;
-use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class ClinicKioskController extends Controller
 {
@@ -59,12 +59,15 @@ class ClinicKioskController extends Controller
 
             // resolve student id from pisay if provided
             $studentId = null;
-            if (!empty($data['pisay'])) {
-                $cols = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => $c->Field)->all();
-                $pisayCandidates = ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id','pisayid'];
+            if (! empty($data['pisay'])) {
+                $cols = collect(DB::select('SHOW COLUMNS FROM students'))->map(fn ($c) => $c->Field)->all();
+                $pisayCandidates = ['pisaysystemid', 'pisaysystemID', 'pisaysystem_id', 'pisay_system_id', 'pisay_id', 'pisayid'];
                 $pisayCol = null;
                 foreach ($pisayCandidates as $c) {
-                    if (in_array($c, $cols)) { $pisayCol = $c; break; }
+                    if (in_array($c, $cols)) {
+                        $pisayCol = $c;
+                        break;
+                    }
                 }
 
                 // try exact match first, then try cleaned (remove non-alnum) match
@@ -77,9 +80,9 @@ class ClinicKioskController extends Controller
                     }
                 } else {
                     $clean = preg_replace('/[^A-Za-z0-9]/', '', $data['pisay']);
-                    $student = DB::table('students')->whereRaw('LOWER(CONCAT_WS(" ", '.implode(', ', array_map(fn($c)=>"`$c`", $cols)).')) LIKE ?', ["%{$data['pisay']}%"])->first();
+                    $student = DB::table('students')->whereRaw('LOWER(CONCAT_WS(" ", '.implode(', ', array_map(fn ($c) => "`$c`", $cols)).')) LIKE ?', ["%{$data['pisay']}%"])->first();
                     if (! $student) {
-                        $student = DB::table('students')->whereRaw('LOWER(CONCAT_WS(" ", '.implode(', ', array_map(fn($c)=>"`$c`", $cols)).')) LIKE ?', ["%{$clean}%"])->first();
+                        $student = DB::table('students')->whereRaw('LOWER(CONCAT_WS(" ", '.implode(', ', array_map(fn ($c) => "`$c`", $cols)).')) LIKE ?', ["%{$clean}%"])->first();
                     }
                 }
 
@@ -96,6 +99,7 @@ class ClinicKioskController extends Controller
             $consultationPayload = [
                 'requestor_id' => $studentId,
                 'requestor_type' => 'student',
+                'student_id' => $studentId,
                 'reason' => $data['concern'],
                 'consultation_type' => $data['consultation_type'],
                 'status' => $data['consultation_type'] === 'walk-in' ? 'active' : 'pending',
@@ -104,10 +108,10 @@ class ClinicKioskController extends Controller
 
             // If a schedule id was provided, attempt to populate scheduled_at from that schedule
             $scheduledAt = null;
-            if (!empty($data['physician_schedule_id'])) {
+            if (! empty($data['physician_schedule_id'])) {
                 $ps = PhysicianSchedule::find($data['physician_schedule_id']);
                 if ($ps) {
-                    $scheduledAt = Carbon::parse($ps->schedule_date . ' ' . ($ps->time_start ?? '00:00:00'));
+                    $scheduledAt = Carbon::parse($ps->schedule_date.' '.($ps->time_start ?? '00:00:00'));
                 }
             }
 
@@ -130,7 +134,7 @@ class ClinicKioskController extends Controller
                     'office' => null,
                 ];
 
-                if (!empty($consult->requestor_type) && $consult->requestor_type === 'student' && !empty($consult->requestor_id)) {
+                if (! empty($consult->requestor_type) && $consult->requestor_type === 'student' && ! empty($consult->requestor_id)) {
                     $student = DB::table('students')->where('id', $consult->requestor_id)->first();
                     if ($student) {
                         // Prefer explicit lastname, firstname fields when available
@@ -153,25 +157,29 @@ class ClinicKioskController extends Controller
 
                         if ($last || $first) {
                             $nameParts = [];
-                            if ($last) $nameParts[] = $last;
-                            if ($first) $nameParts[] = $first;
-                            $requestor['name'] = $last && $first ? ($last . ', ' . $first) : implode(' ', $nameParts);
+                            if ($last) {
+                                $nameParts[] = $last;
+                            }
+                            if ($first) {
+                                $nameParts[] = $first;
+                            }
+                            $requestor['name'] = $last && $first ? ($last.', '.$first) : implode(' ', $nameParts);
                         } else {
                             $requestor['name'] = $student->name ?? $requestor['name'];
                         }
 
                         $requestor['sex'] = $student->sex ?? null;
 
-                        $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
+                        $sectionStudent = app(StudentSectionResolver::class)->latestForStudent($student->id);
                         if ($sectionStudent) {
                             $levelId = $sectionStudent->levelid ?? null;
                             if ($levelId) {
-                                $requestor['grade_level'] = 'Grade ' . $levelId;
+                                $requestor['grade_level'] = 'Grade '.$levelId;
                             }
                             $section = DB::table('sections')->where('id', $sectionStudent->sectionid)->first();
                             if ($section) {
                                 $sectionName = null;
-                                foreach (['sectionname','section_name','name','section'] as $col) {
+                                foreach (['sectionname', 'section_name', 'name', 'section'] as $col) {
                                     if (isset($section->$col) && $section->$col !== null && $section->$col !== '') {
                                         $sectionName = $section->$col;
                                         break;
@@ -182,7 +190,7 @@ class ClinicKioskController extends Controller
                         }
                     }
                 } else {
-                    if (!empty($consult->requestor_id)) {
+                    if (! empty($consult->requestor_id)) {
                         $user = DB::table('users')->where('id', $consult->requestor_id)->first();
                         if ($user) {
                             $requestor['name'] = $user->name ?? $requestor['name'];
@@ -193,13 +201,15 @@ class ClinicKioskController extends Controller
                 }
 
                 $dateScheduled = null;
-                if (!empty($consult->scheduled_at)) {
+                if (! empty($consult->scheduled_at)) {
                     $dateScheduled = Carbon::parse($consult->scheduled_at)->toDayDateTimeString();
                 }
 
-                $nurseRole = \App\Models\Role::whereRaw('LOWER(name) = ?', ['nurse'])->first();
-                $nurseRecipients = User::where(function($q) use ($nurseRole) {
-                    if ($nurseRole) $q->whereRaw('FIND_IN_SET(?, role_id)', [$nurseRole->id]);
+                $nurseRole = Role::whereRaw('LOWER(name) = ?', ['nurse'])->first();
+                $nurseRecipients = User::where(function ($q) use ($nurseRole) {
+                    if ($nurseRole) {
+                        $q->whereRaw('FIND_IN_SET(?, role_id)', [$nurseRole->id]);
+                    }
                     $q->orWhereRaw('LOWER(position) LIKE ?', ['%nurse%']);
                 })->pluck('email')->filter()->unique();
 
@@ -220,6 +230,7 @@ class ClinicKioskController extends Controller
             }
 
             DB::commit();
+
             return redirect()->route('clinic.kiosk')->with('success', 'Clinic consultation logged.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -227,6 +238,7 @@ class ClinicKioskController extends Controller
                 throw $e;
             }
             Log::error('ClinicKiosk store failed', ['exception' => $e->getMessage()]);
+
             return back()->with('error', 'Failed to log visit.');
         }
     }
