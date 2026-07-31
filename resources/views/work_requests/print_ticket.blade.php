@@ -18,6 +18,7 @@
     .col { flex:1 }
     .right { text-align:right }
     .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
+    .sig-img { max-height:55px; max-width:170px; object-fit:contain; display:block; margin:4px auto; }
   </style>
 </head>
 <body onload="window.print()">
@@ -48,7 +49,7 @@
       <div class="col">
         <div><strong>Requested by:</strong></div>
         @if(isset($sigs['submission']['uri']))
-          <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:48px; display:block; margin:4px auto;" />
+          <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" class="sig-img" />
         @endif
         <div class="box">{{ optional($workRequest->requester)->name ?? '—' }}</div>
         @if(isset($sigs['submission']))
@@ -143,7 +144,7 @@
       <div class="col">
         <div class="label">FAD Chief</div>
         @if(isset($sigs['fad_approval']['uri']))
-          <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD signature" style="max-height:48px; display:block; margin:4px auto;" />
+          <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD signature" class="sig-img" />
         @endif
         <div class="box sign">&nbsp;</div>
         @if(isset($sigs['fad_approval']))

@@ -60,8 +60,8 @@
     .sig img {
       display: block;
       margin: 0 auto 0;
-      max-height: 54px;
-      max-width: 160px;
+      max-height: 55px;
+      max-width: 170px;
       object-fit: contain;
     }
     .sig .gap    { height: 56px; }

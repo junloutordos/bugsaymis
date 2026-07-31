@@ -56,6 +56,7 @@
             font-size: 11px;
         }
         .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
+        .sig-img { max-height:55px; max-width:170px; object-fit:contain; display:block; margin:0 auto 6px; }
         .signatures {
             display: flex;
             justify-content: space-between;
@@ -286,9 +287,9 @@
 
         <div class="sign {{ ($reqSig || isset($sigs['submission'])) ? 'with-image' : '' }}">
             @if(isset($sigs['submission']['uri']))
-                <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" class="sig-img" />
             @elseif($reqSigUri)
-                <img src="{{ $reqSigUri }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ $reqSigUri }}" alt="requestor signature" class="sig-img" />
             @endif
             <div class="line"></div>
             @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
@@ -298,9 +299,9 @@
 
         <div class="sign {{ ($dcSig || isset($sigs['dc_approval'])) ? 'with-image' : '' }}">
             @if(isset($sigs['dc_approval']['uri']))
-                <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" class="sig-img" />
             @elseif($dcSigUri)
-                <img src="{{ $dcSigUri }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ $dcSigUri }}" alt="division chief signature" class="sig-img" />
             @endif
             <div class="line"></div>
             @if(isset($sigs['dc_approval'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['dc_approval']['signed_at'])->format('M d, Y H:i') }}</div> @endif
@@ -310,9 +311,9 @@
 
         <div class="sign {{ ($fadSig || isset($sigs['fad_approval'])) ? 'with-image' : '' }}">
             @if(isset($sigs['fad_approval']['uri']))
-                <img src="{{ $sigs['fad_approval']['uri'] }}" alt="fad signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ $sigs['fad_approval']['uri'] }}" alt="fad signature" class="sig-img" />
             @elseif($fadSigUri)
-                <img src="{{ $fadSigUri }}" alt="fad signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                <img src="{{ $fadSigUri }}" alt="fad signature" class="sig-img" />
             @endif
             <div class="line"></div>
             @if(isset($sigs['fad_approval'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['fad_approval']['name'] }} · {{ optional($sigs['fad_approval']['signed_at'])->format('M d, Y H:i') }}</div> @endif
