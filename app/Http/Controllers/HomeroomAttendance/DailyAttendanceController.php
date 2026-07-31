@@ -16,8 +16,7 @@ class DailyAttendanceController extends Controller
     public function __construct(
         private RosterService $roster,
         private DailyAttendanceService $attendance,
-    ) {
-    }
+    ) {}
 
     // ── GET /homeroom-attendance ───────────────────────────────────────────────
 
@@ -56,7 +55,7 @@ class DailyAttendanceController extends Controller
             ->where('cr.section_id', $sectionId)
             ->where('cad.date', $date)
             ->where('car.status', 'cut_class')
-            ->select('crs.student_id', 'subjects.name as subject_name')
+            ->select('crs.student_id', 'subjects.name as subject_name', 'car.excused_status')
             ->get()
             ->groupBy('student_id');
 
@@ -87,6 +86,12 @@ class DailyAttendanceController extends Controller
         $roster = $students->map(function ($student) use ($recordsByStudent, $cuttingSubjectsByStudent, $iuSubjectsByStudent) {
             $record = $recordsByStudent->get($student->id);
             $cuttingSubjects = $cuttingSubjectsByStudent->get($student->id, collect())
+                ->where('excused_status', '<>', 'excused')
+                ->pluck('subject_name')
+                ->filter()
+                ->values();
+            $excusedCuttingSubjects = $cuttingSubjectsByStudent->get($student->id, collect())
+                ->where('excused_status', 'excused')
                 ->pluck('subject_name')
                 ->filter()
                 ->values();
@@ -96,24 +101,25 @@ class DailyAttendanceController extends Controller
                 ->values();
 
             return [
-                'student_id'         => $student->id,
-                'name'               => trim("{$student->lastname}, {$student->firstname} {$student->middlename}"),
-                'sex'                => $student->sex,
-                'status'             => $record->status ?? 'present',
+                'student_id' => $student->id,
+                'name' => trim("{$student->lastname}, {$student->firstname} {$student->middlename}"),
+                'sex' => $student->sex,
+                'status' => $record->status ?? 'present',
                 'incomplete_uniform' => $record->incomplete_uniform ?? false,
-                'excused_status'     => $record->excused_status ?? 'n_a',
-                'remarks'            => $record->remarks ?? null,
+                'excused_status' => $record->excused_status ?? 'n_a',
+                'remarks' => $record->remarks ?? null,
                 'cut_class_subjects' => $cuttingSubjects,
-                'iu_flagged_subjects'=> $iuSubjects,
+                'excused_cut_class_subjects' => $excusedCuttingSubjects,
+                'iu_flagged_subjects' => $iuSubjects,
             ];
         });
 
         return Inertia::render('HomeroomAttendance/Daily', [
-            'sections'  => $sections->map(fn (Section $s) => ['id' => $s->id, 'name' => $s->sectionname, 'level' => $s->levelid]),
+            'sections' => $sections->map(fn (Section $s) => ['id' => $s->id, 'name' => $s->sectionname, 'level' => $s->levelid]),
             'sectionId' => $sectionId,
-            'date'      => $date,
-            'roster'    => $roster->values(),
-            'schoolYear'=> $sy->only(['id', 'name']),
+            'date' => $date,
+            'roster' => $roster->values(),
+            'schoolYear' => $sy->only(['id', 'name']),
             'subjectSubmissions' => $subjectSubmissions,
         ]);
     }
@@ -127,13 +133,13 @@ class DailyAttendanceController extends Controller
         $term = $this->roster->currentAcademicTerm($sy);
 
         $data = $request->validate([
-            'section_id'                       => ['required', 'integer'],
-            'date'                              => ['required', 'date'],
-            'rows'                               => ['required', 'array', 'min:1'],
-            'rows.*.student_id'                 => ['required', 'integer'],
-            'rows.*.status'                      => ['required', 'in:present,absent,tardy'],
-            'rows.*.incomplete_uniform'          => ['sometimes', 'boolean'],
-            'rows.*.remarks'                      => ['nullable', 'string', 'max:255'],
+            'section_id' => ['required', 'integer'],
+            'date' => ['required', 'date'],
+            'rows' => ['required', 'array', 'min:1'],
+            'rows.*.student_id' => ['required', 'integer'],
+            'rows.*.status' => ['required', 'in:present,absent,tardy'],
+            'rows.*.incomplete_uniform' => ['sometimes', 'boolean'],
+            'rows.*.remarks' => ['nullable', 'string', 'max:255'],
         ]);
 
         abort_unless(

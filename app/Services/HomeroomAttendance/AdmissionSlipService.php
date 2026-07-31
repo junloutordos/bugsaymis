@@ -40,11 +40,11 @@ class AdmissionSlipService
             ->with(['attendanceDate', 'student'])
             ->get()
             ->map(fn (AttendanceRecord $r) => [
-                'type'            => 'homeroom',
-                'reference_id'    => $r->id,
-                'student_id'      => $r->student_id,
-                'student_name'    => trim("{$r->student->lastname}, {$r->student->firstname} {$r->student->middlename}"),
-                'date'            => $r->attendanceDate->date->toDateString(),
+                'type' => 'homeroom',
+                'reference_id' => $r->id,
+                'student_id' => $r->student_id,
+                'student_name' => trim("{$r->student->lastname}, {$r->student->firstname} {$r->student->middlename}"),
+                'date' => $r->attendanceDate->date->toDateString(),
                 'infraction_type' => $r->status === 'absent' ? 'absence' : $r->status,
             ]);
 
@@ -96,7 +96,7 @@ class AdmissionSlipService
         return $this->mapCuttingRows($rows, 'cutting_suspected');
     }
 
-    /** @param \Illuminate\Support\Collection<int, object{class_record_attendance_record_id:int, student_id:int, date:string}> $rows */
+    /** @param Collection<int, object{class_record_attendance_record_id:int, student_id:int, date:string}> $rows */
     private function mapCuttingRows(Collection $rows, string $infractionType): Collection
     {
         if ($rows->isEmpty()) {
@@ -106,13 +106,13 @@ class AdmissionSlipService
         $students = Student::whereIn('id', $rows->pluck('student_id')->unique())->get()->keyBy('id');
 
         return $rows->map(fn ($row) => [
-            'type'            => 'subject_cutting',
-            'reference_id'    => $row->class_record_attendance_record_id,
-            'student_id'      => $row->student_id,
-            'student_name'    => $students->has($row->student_id)
+            'type' => 'subject_cutting',
+            'reference_id' => $row->class_record_attendance_record_id,
+            'student_id' => $row->student_id,
+            'student_name' => $students->has($row->student_id)
                 ? trim("{$students[$row->student_id]->lastname}, {$students[$row->student_id]->firstname} {$students[$row->student_id]->middlename}")
                 : 'Unknown Student',
-            'date'            => $row->date,
+            'date' => $row->date,
             'infraction_type' => $infractionType,
         ]);
     }
@@ -121,21 +121,21 @@ class AdmissionSlipService
     {
         return DB::transaction(function () use ($data, $issuedByUserId) {
             $slip = AdmissionSlip::create([
-                'student_id'                => $data['student_id'],
-                'section_id'                => $data['section_id'],
-                'infraction_date'           => $data['infraction_date'],
-                'infraction_type'           => $data['infraction_type'],
-                'excused_status'            => $data['excused_status'],
-                'reason'                    => $data['reason'] ?? null,
-                'supporting_document_path'  => $data['supporting_document_path'] ?? null,
-                'issued_by'                 => $issuedByUserId,
-                'issued_at'                 => now(),
+                'student_id' => $data['student_id'],
+                'section_id' => $data['section_id'],
+                'infraction_date' => $data['infraction_date'],
+                'infraction_type' => $data['infraction_type'],
+                'excused_status' => $data['excused_status'],
+                'reason' => $data['reason'] ?? null,
+                'supporting_document_path' => $data['supporting_document_path'] ?? null,
+                'issued_by' => $issuedByUserId,
+                'issued_at' => now(),
             ]);
 
             if ($data['infraction_type'] === 'cut_class') {
                 // Teacher-asserted — the specific subject row(s) already
                 // carry status = 'cut_class' directly, no status remap needed.
-                ClassRecordAttendanceRecord::whereHas(
+                $updated = ClassRecordAttendanceRecord::whereHas(
                     'attendanceDate',
                     fn ($q) => $q->where('date', $data['infraction_date']),
                 )
@@ -143,14 +143,15 @@ class AdmissionSlipService
                     ->where('status', 'cut_class')
                     ->where('excused_status', 'n_a')
                     ->update([
-                        'excused_status'    => $data['excused_status'],
+                        'excused_status' => $data['excused_status'],
                         'admission_slip_id' => $slip->id,
                     ]);
+                abort_if($updated === 0, 422, 'This Cut Class incident has already been resolved.');
             } elseif ($data['infraction_type'] === 'cutting_suspected') {
                 // Detected mismatch — only the specific mismatched subject
                 // row(s) for this date — the homeroom record correctly stays
                 // Present/Tardy.
-                ClassRecordAttendanceRecord::whereHas(
+                $updated = ClassRecordAttendanceRecord::whereHas(
                     'attendanceDate',
                     fn ($q) => $q->where('date', $data['infraction_date']),
                 )
@@ -158,9 +159,10 @@ class AdmissionSlipService
                     ->where('status', 'absent')
                     ->where('excused_status', 'n_a')
                     ->update([
-                        'excused_status'    => $data['excused_status'],
+                        'excused_status' => $data['excused_status'],
                         'admission_slip_id' => $slip->id,
                     ]);
+                abort_if($updated === 0, 422, 'This suspected Cut Class incident has already been resolved.');
             } else {
                 $wholeDayStatus = $data['infraction_type'] === 'absence' ? 'absent' : 'tardy';
 
@@ -170,7 +172,7 @@ class AdmissionSlipService
                 )
                     ->where('student_id', $data['student_id'])
                     ->update([
-                        'excused_status'    => $data['excused_status'],
+                        'excused_status' => $data['excused_status'],
                         'admission_slip_id' => $slip->id,
                     ]);
 
@@ -184,7 +186,7 @@ class AdmissionSlipService
                     ->whereHas('student', fn ($q) => $q->where('student_id', $data['student_id']))
                     ->where('status', $wholeDayStatus)
                     ->update([
-                        'excused_status'    => $data['excused_status'],
+                        'excused_status' => $data['excused_status'],
                         'admission_slip_id' => $slip->id,
                     ]);
             }

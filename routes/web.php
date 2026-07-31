@@ -2396,6 +2396,8 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::post('/class-records/{classRecord}/quarters/{q}/attendance/dates',       [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'storeDates'])->name('class-records.attendance.store-dates');
     Route::delete('/class-records/{classRecord}/quarters/{q}/attendance/dates/{attendanceDate}', [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'destroyDate'])->name('class-records.attendance.destroy-date');
     Route::post('/class-records/{classRecord}/quarters/{q}/attendance/records',     [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'upsert'])->name('class-records.attendance.upsert');
+    Route::get('/class-records/{classRecord}/quarters/{q}/attendance/records/{attendanceRecord}/clinic-consultations', [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'clinicConsultations'])->name('class-records.attendance.clinic-consultations');
+    Route::post('/class-records/{classRecord}/quarters/{q}/attendance/records/{attendanceRecord}/excuse-via-clinic', [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'excuseViaClinic'])->name('class-records.attendance.excuse-via-clinic');
 
     // Independent Learning Activity (ILA) — auto-generated from scheduled ILP periods
     Route::get('/class-records/{classRecord}/quarters/{q}/ila',              [\App\Http\Controllers\ClassRecord\ClassRecordIlaController::class, 'index'])->name('class-records.ila.index');

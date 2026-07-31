@@ -18,9 +18,9 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\HomeroomAttendance\AdmissionSlipService;
 use App\Services\HomeroomAttendance\MonthlyReportService;
-use App\Services\HomeroomAttendance\RosterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
@@ -36,7 +36,9 @@ class CutClassIntegrationTest extends TestCase
     use RefreshDatabase;
 
     private SchoolYear $sy;
+
     private GradingOption $option;
+
     private Section $section;
 
     protected function setUp(): void
@@ -231,6 +233,93 @@ class CutClassIntegrationTest extends TestCase
         $carRow->refresh();
         $this->assertSame('unexcused', $carRow->excused_status);
         $this->assertSame($slip->id, $carRow->admission_slip_id);
+    }
+
+    public function test_clinic_excused_cut_class_skips_registrar_queue_and_monthly_cutting_deduction(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeClassRecord($teacher);
+        $quarter = ClassRecordQuarter::create([
+            'class_record_id' => $record->id,
+            'grading_option_id' => $this->option->id,
+            'quarter' => 1,
+            'is_locked' => false,
+        ]);
+        $student = $this->makeStudent();
+        $crStudent = $this->enroll($student, $quarter);
+        $date = ClassRecordAttendanceDate::create([
+            'class_record_quarter_id' => $quarter->id,
+            'date' => '2026-06-03',
+            'sort_order' => 1,
+        ]);
+        ClassRecordAttendanceRecord::create([
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $crStudent->id,
+            'status' => 'cut_class',
+            'excused_status' => 'excused',
+            'excused_by' => $teacher->id,
+            'excused_at' => now(),
+        ]);
+        $this->makeHomeroomRecord($student, '2026-06-03', 'present');
+
+        $pending = app(AdmissionSlipService::class)->pending($this->section->id);
+        $this->assertFalse($pending->contains(fn ($item) => $item['student_id'] === $student->id));
+
+        $report = app(MonthlyReportService::class)->generate(
+            $this->section->id,
+            $this->sy->id,
+            2026,
+            6,
+        );
+        $line = $report->lines->firstWhere('student_id', $student->id);
+
+        $this->assertNotNull($line);
+        $this->assertSame(0, $line->cutting_count);
+        $this->assertSame(0.0, (float) $line->deduction_points);
+    }
+
+    public function test_registrar_cannot_issue_a_stale_slip_after_cut_class_was_excused(): void
+    {
+        $teacher = User::factory()->create();
+        $registrar = User::factory()->create();
+        $record = $this->makeClassRecord($teacher);
+        $quarter = ClassRecordQuarter::create([
+            'class_record_id' => $record->id,
+            'grading_option_id' => $this->option->id,
+            'quarter' => 1,
+            'is_locked' => false,
+        ]);
+        $student = $this->makeStudent();
+        $crStudent = $this->enroll($student, $quarter);
+        $date = ClassRecordAttendanceDate::create([
+            'class_record_quarter_id' => $quarter->id,
+            'date' => '2026-06-03',
+            'sort_order' => 1,
+        ]);
+        ClassRecordAttendanceRecord::create([
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $crStudent->id,
+            'status' => 'cut_class',
+            'excused_status' => 'excused',
+            'excused_by' => $teacher->id,
+            'excused_at' => now(),
+        ]);
+
+        try {
+            app(AdmissionSlipService::class)->issue([
+                'student_id' => $student->id,
+                'section_id' => $this->section->id,
+                'infraction_date' => '2026-06-03',
+                'infraction_type' => 'cut_class',
+                'excused_status' => 'unexcused',
+            ], $registrar->id);
+
+            $this->fail('Expected the stale Registrar action to be rejected.');
+        } catch (HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+
+        $this->assertDatabaseCount('class_admission_slips', 0);
     }
 
     // ── MonthlyReportService::cuttingCountsForMonth() (via generate()) ──────
