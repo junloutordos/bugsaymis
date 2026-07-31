@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import AppModal from '@/Components/AppModal.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import AppButton from '@/Components/AppButton.vue'
@@ -12,13 +12,14 @@ const props = defineProps({
   days:         { type: Array, default: () => [] }, // [{ date, count, items: [...] }]
 
   // ── Editable / click-to-schedule mode ────────────────────────────────────
-  // When editable is true, clicking an empty (or non-full) day opens a
-  // picker of `pendingRows` (undated draft rows from the Setup tab) so the
-  // teacher can assign that date without leaving the calendar. Read-only
-  // callers (e.g. a plain "view section calendar" button) simply omit these
-  // props and get the original browse-only behaviour.
+  // When editable is true, clicking any current-month day opens a picker of
+  // `pendingRows` (this quarter's grading categories that still have room
+  // for a new/undated assessment) so the teacher can create or date an
+  // assessment without visiting the Setup table first. Read-only callers
+  // (e.g. a plain "view section calendar" button) simply omit these props
+  // and get the original browse-only behaviour.
   editable:      { type: Boolean, default: false },
-  pendingRows:   { type: Array, default: () => [] }, // [{ key, label, is_graded, is_major }]
+  pendingRows:   { type: Array, default: () => [] }, // [{ key, label, catId, openRow }]
   disabledDates: { type: Function, default: null },  // (dateStr) => { ok: boolean, reason: ?string } — schedule-day / deadline check
 })
 
@@ -99,63 +100,65 @@ function navigateMonth(delta) {
 const selectedDate  = ref(null)
 const selectedEntry = computed(() => selectedDate.value ? dayMap.value.get(selectedDate.value) ?? null : null)
 
-// ── Click-to-schedule picker ───────────────────────────────────────────────
-const showPicker    = ref(false)
-const pickerDate    = ref(null)
-const pickerRowKey   = ref(null)
-const pickerWarning = ref(null)
+// ── Click-to-schedule picker ────────────────────────────────────────────────
+const showPicker     = ref(false)
+const pickerDate     = ref(null)
+const pickerCatKey   = ref(null)
+const pickerTitle    = ref('')
+const pickerWarning  = ref(null)
 
-const availableRows = computed(() => props.pendingRows.filter(r => !r._scheduled))
-
-function scheduleFeasibility(date, row) {
-  if (!row) return { ok: true, reason: null }
+function scheduleFeasibility(date) {
   const scheduleCheck = props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null }
   if (!scheduleCheck.ok) return scheduleCheck
-  return checkWatCap(countsMap.value, date, row.is_graded, row.is_major)
+  // Generic graded/non-major check — the real is_major/is_graded value is
+  // only known once the row exists; this is a "is the day even open" gate,
+  // same conservative check cellFeasible() uses.
+  return checkWatCap(countsMap.value, date, true, false)
 }
 
 function cellFeasible(date) {
-  // Quick "is this day even worth clicking" check — used to grey out cells
-  // that are already at the daily cap for a generic graded/non-major row.
-  if (!props.editable || !availableRows.value.length) return { ok: false, reason: null }
-  const scheduleCheck = props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null }
-  if (!scheduleCheck.ok) return scheduleCheck
-  return checkWatCap(countsMap.value, date, true, false)
+  if (!props.editable || !props.pendingRows.length) return { ok: false, reason: null }
+  return scheduleFeasibility(date)
 }
 
 function selectDay(cell) {
   if (!cell.current) return
   selectedDate.value = cell.date
 
-  if (props.editable && availableRows.value.length) {
+  if (props.editable && props.pendingRows.length) {
     pickerDate.value    = cell.date
-    pickerRowKey.value  = availableRows.value[0]?.key ?? null
+    pickerCatKey.value  = props.pendingRows[0]?.key ?? null
+    pickerTitle.value   = props.pendingRows[0]?.openRow?.title ?? ''
     pickerWarning.value = null
-    showPicker.value     = true
+    showPicker.value    = true
   }
 }
 
-const pickerRow = computed(() => availableRows.value.find(r => r.key === pickerRowKey.value) ?? null)
+const pickerCategory = computed(() => props.pendingRows.find(r => r.key === pickerCatKey.value) ?? null)
+
+watch(pickerCatKey, () => {
+  pickerTitle.value = pickerCategory.value?.openRow?.title ?? ''
+})
 
 const pickerFeasibility = computed(() =>
-  pickerDate.value ? scheduleFeasibility(pickerDate.value, pickerRow.value) : { ok: true, reason: null }
+  pickerDate.value ? scheduleFeasibility(pickerDate.value) : { ok: true, reason: null }
 )
 
 function confirmSchedule() {
-  if (!pickerRow.value || !pickerDate.value) return
+  if (!pickerCategory.value || !pickerDate.value || !pickerTitle.value.trim()) return
   const feasibility = pickerFeasibility.value
   if (!feasibility.ok) {
     pickerWarning.value = feasibility.reason
     return
   }
-  emit('schedule', { key: pickerRow.value.key, date: pickerDate.value })
+  emit('schedule', { catId: pickerCategory.value.catId, title: pickerTitle.value.trim(), date: pickerDate.value })
   showPicker.value = false
 
   // Offer the "apply to other sections" contextual action right after a
   // successful placement, only when this class record actually has other
   // sections of the same subject to apply to (caller decides via the
   // emitted event whether that list is non-empty).
-  emit('apply-to-sections', { date: pickerDate.value, key: pickerRow.value.key })
+  emit('apply-to-sections', { date: pickerDate.value, catId: pickerCategory.value.catId })
 }
 
 function closePicker() {
@@ -210,7 +213,7 @@ function close() {
               !cell.current ? 'opacity-30' : '',
               cell.date === todayStr ? 'ring-2 ring-inset ring-indigo-400' : '',
               selectedDate === cell.date ? 'bg-indigo-50' : '',
-              cell.current && editable && !cellFeasible(cell.date).ok && availableRows.length
+              cell.current && editable && !cellFeasible(cell.date).ok && pendingRows.length
                 ? 'cursor-not-allowed bg-slate-50'
                 : 'cursor-pointer hover:bg-indigo-50',
             ]"
@@ -226,7 +229,7 @@ function close() {
                 :title="`${cell.entry.graded_count ?? cell.entry.count}/${WAT_LIMITS.dailyGraded} graded · ${cell.entry.major_count ?? 0}/${WAT_LIMITS.dailyMajor} major`">
                 {{ cell.entry.graded_count ?? cell.entry.count }}/{{ WAT_LIMITS.dailyGraded }}
               </span>
-              <PlusIcon v-else-if="cell.current && editable && availableRows.length && cellFeasible(cell.date).ok"
+              <PlusIcon v-else-if="cell.current && editable && pendingRows.length && cellFeasible(cell.date).ok"
                 class="w-3.5 h-3.5 text-indigo-300" />
             </div>
             <div v-if="cell.entry" class="space-y-0.5 overflow-hidden">
@@ -275,7 +278,7 @@ function close() {
           </div>
         </div>
 
-        <div v-if="editable && availableRows.length" class="mt-3 pt-3 border-t border-slate-100">
+        <div v-if="editable && pendingRows.length" class="mt-3 pt-3 border-t border-slate-100">
           <AppButton size="sm" variant="secondary" class="w-full justify-center"
             :disabled="!selectedDate"
             @click="selectedDate && selectDay({ date: selectedDate, current: true })">
@@ -291,20 +294,26 @@ function close() {
       @close="closePicker">
       <div class="space-y-3">
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assessment</label>
-          <select v-model="pickerRowKey"
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Category</label>
+          <select v-model="pickerCatKey"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option v-for="row in availableRows" :key="row.key" :value="row.key">
-              {{ row.label }}{{ row.is_major ? ' (Major)' : '' }}{{ row.is_graded === false ? ' (Non-graded)' : '' }}
+            <option v-for="cat in pendingRows" :key="cat.key" :value="cat.key">
+              {{ cat.label }}
             </option>
           </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Title / Description</label>
+          <input v-model="pickerTitle" type="text" placeholder="e.g. Quiz 1 — Fractions"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-[11px] text-slate-400 mt-1">Max score and other details can still be set/edited in the table below.</p>
         </div>
         <p v-if="!pickerFeasibility.ok" class="text-xs text-danger-600">{{ pickerFeasibility.reason }}</p>
         <p v-if="pickerWarning" class="text-xs text-danger-600">{{ pickerWarning }}</p>
       </div>
       <template #footer>
         <AppButton variant="secondary" @click="closePicker">Cancel</AppButton>
-        <AppButton :disabled="!pickerRow || !pickerFeasibility.ok" @click="confirmSchedule">
+        <AppButton :disabled="!pickerCategory || !pickerTitle.trim() || !pickerFeasibility.ok" @click="confirmSchedule">
           Schedule
         </AppButton>
       </template>
