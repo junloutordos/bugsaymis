@@ -490,27 +490,32 @@ function onDateChange(row) {
 }
 
 // ── Click-to-schedule calendar wiring ──────────────────────────────────────
-// Exposes the Setup tab's undated draft rows to SectionAssessmentCalendar
-// so a teacher can click a day and assign that date to a row, instead of
-// only using the per-row date picker in the table. The calendar defers to
-// the exact same dateCounts/deadline/schedule-day checks used elsewhere on
-// this page — the server still re-validates on Save regardless.
-const pendingAssessmentRows = computed(() => {
-  const rows = []
+// Exposes the Setup tab's assessment rows to SectionAssessmentCalendar so a
+// teacher can click a day and create/assign an assessment on it, instead of
+// only using the per-row date picker in the table. Every category that still
+// has editable room (either an existing untitled/undated placeholder row, or
+// simply "add another") is offered — the picker lets the teacher type the
+// title right there, so the calendar can be used as the primary entry point
+// without visiting the table first. The calendar defers to the exact same
+// dateCounts/deadline/schedule-day checks used elsewhere on this page — the
+// server still re-validates on Save regardless.
+const pendingAssessmentCategories = computed(() => {
+  const cats = []
   for (const cat of currentLeafCategories.value) {
     if (!canEditCategory(cat)) continue
-    for (const row of assessmentDraft.value[cat.id] ?? []) {
-      if (row.activity_date || !row.title) continue // already dated, or an unused placeholder row
-      rows.push({
-        key:       `${cat.id}:${row.assessment_number}`,
-        label:     `${cat.code}${row.assessment_number} — ${row.title}`,
-        is_graded: row.is_graded,
-        is_major:  isMajorRow(row),
-        _row:      row,
-      })
-    }
+    if (isLocked.value || isReadOnly.value) continue
+    // An existing row is offered if it has no date yet, regardless of
+    // whether it already has a title — the picker below fills in whichever
+    // of those two fields is still missing.
+    const openRow = (assessmentDraft.value[cat.id] ?? []).find(r => !r.activity_date)
+    cats.push({
+      key:      String(cat.id),
+      label:    `${cat.code} — ${cat.display_name}`,
+      catId:    cat.id,
+      openRow,
+    })
   }
-  return rows
+  return cats
 })
 
 // Schedule-day + plotting-deadline feasibility for a candidate date, mirrors
@@ -530,9 +535,18 @@ function calendarDateFeasibility(dateStr) {
   return { ok: true, reason: null }
 }
 
-function onCalendarSchedule({ key, date }) {
-  const row = pendingAssessmentRows.value.find(r => r.key === key)?._row
-  if (!row) return
+function onCalendarSchedule({ catId, title, date }) {
+  const cat = pendingAssessmentCategories.value.find(c => c.catId === catId)
+  let row = cat?.openRow
+
+  if (!row) {
+    // No existing open (undated) row for this category — create one, same
+    // as clicking "Add {code} Row" in the table.
+    addAssessmentRow(catId)
+    row = assessmentDraft.value[catId][assessmentDraft.value[catId].length - 1]
+  }
+
+  if (title) row.title = title
   row.activity_date = date
   onDateChange(row)
   // onDateChange() reverts activity_date to _prevDate ('') if its own re-check
@@ -1028,7 +1042,7 @@ async function saveQuarterOption() {
                 :disabled="!classRecord.section_id"
                 :title="!classRecord.section_id ? 'No section linked to this class record' : ''"
                 @click="showSectionCalendar = true">
-                <CalendarDaysIcon class="h-3.5 w-3.5" /> {{ pendingAssessmentRows.length ? 'Schedule via Calendar' : 'View Section Calendar' }}
+                <CalendarDaysIcon class="h-3.5 w-3.5" /> {{ pendingAssessmentCategories.length ? 'Schedule via Calendar' : 'View Section Calendar' }}
               </AppButton>
               <template v-if="!isReadOnly">
                 <AppButton v-if="!isLocked" variant="warning" size="sm" @click="lockQuarter">
@@ -1487,8 +1501,8 @@ async function saveQuarterOption() {
     :show="showSectionCalendar"
     :section-label="classRecord.year_level_section"
     :days="sectionCalendarDays"
-    :editable="!isLocked && !isReadOnly && canEditCategory({ subject_id: null })"
-    :pending-rows="pendingAssessmentRows"
+    :editable="pendingAssessmentCategories.length > 0"
+    :pending-rows="pendingAssessmentCategories"
     :disabled-dates="calendarDateFeasibility"
     @close="showSectionCalendar = false"
     @schedule="onCalendarSchedule"
