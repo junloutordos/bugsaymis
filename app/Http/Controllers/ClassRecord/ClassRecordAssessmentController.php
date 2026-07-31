@@ -246,10 +246,21 @@ class ClassRecordAssessmentController extends Controller
         // exam window are exempt: every subject legitimately sits its final
         // exam in the same campus-wide days, which isn't the cramming these
         // caps guard against.
+        //
+        // Only rows that are genuinely NEW (no id yet) or being RE-DATED
+        // (_date_changed) can push a day/week over the cap — an existing,
+        // unchanged row must never count twice. Every save resubmits the
+        // whole quarter (including rows nobody touched), so without this
+        // filter an unrelated edit (e.g. adding a new row on a different
+        // date) would recompute an already-over-cap day's total from
+        // scratch via $replacedIds-then-re-add and incorrectly block the
+        // entire save — even though that day's real, already-saved content
+        // isn't changing at all.
         $grade = $classRecord->section?->levelid;
         if ($grade !== null) {
             $replacedIds = $items->pluck('_existing')->filter()->pluck('id')->all();
             $datedGraded = $items->filter(fn ($i) => ! empty($i['activity_date']) && $i['is_graded']
+                && (empty($i['id']) || $i['_date_changed'])
                 && ! WatRuleService::isExamExempt($i['assessment_type'], $classRecord->school_year_id, $q, $i['activity_date']));
 
             foreach ($datedGraded->groupBy('activity_date') as $date => $group) {

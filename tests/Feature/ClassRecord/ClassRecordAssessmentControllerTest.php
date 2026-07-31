@@ -270,6 +270,152 @@ class ClassRecordAssessmentControllerTest extends TestCase
         $this->assertSame('Already has assessments this quarter.', $response->json('skipped.0.reason'));
     }
 
+    // ── Resubmitting unchanged rows must not double-count toward the cap ─────
+    // Regression: every Setup tab save resubmits the WHOLE quarter, including
+    // rows nobody touched. The cap check used to exclude those rows from the
+    // "existing" baseline (correctly) but then add them straight back in via
+    // their own group, landing right back at the full (possibly already
+    // over-cap, from OTHER subjects/sections pooling into the same grade)
+    // total — incorrectly blocking the entire save even when the change has
+    // nothing to do with that date.
+
+    public function test_saving_an_unrelated_new_row_succeeds_even_when_an_unchanged_existing_date_is_already_over_the_pooled_cap(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $section = $this->makeSection();
+
+        // Fill the grade's pooled daily cap for 2026-09-07 entirely from an
+        // UNRELATED subject/record — same section, different subject, same
+        // day. This is the "other subjects already maxed out this day"
+        // scenario reported in production (English 6 / Del Mundo, Jul 30).
+        $otherSubject = Subject::create([
+            'school_year_id' => $this->sy->id, 'code' => 'SUBJ2', 'name' => 'Subject 2',
+            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
+            'grade_level' => 8, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $busyQuarter = $this->makeRecordAndQuarter($teacher, $section, $otherSubject);
+        for ($i = 1; $i <= 3; $i++) {
+            $a = $this->makeAssessment($busyQuarter, $i, "Other Subject {$i}");
+            $a->update(['activity_date' => '2026-09-07']);
+        }
+
+        // This class record already has ONE assessment saved on that same
+        // now-over-cap day (its own, legitimately saved before the day
+        // became over-capacity) plus is now adding a brand-new row on a
+        // DIFFERENT, uncrowded day.
+        $quarter = $this->makeRecordAndQuarter($teacher, $section, $subject);
+        $existing = $this->makeAssessment($quarter, 1, 'Existing Quiz');
+        $existing->update(['activity_date' => '2026-09-07']);
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
+                'assessments' => [
+                    // Resubmitted UNCHANGED — same id, same date, same everything.
+                    $this->payloadFor($existing),
+                    // Genuinely new row, unrelated date.
+                    [
+                        'grading_category_id' => $this->category->id,
+                        'assessment_number'   => 2,
+                        'title'                => 'New Quiz',
+                        'is_graded'            => true,
+                        'activity_date'        => '2026-09-08',
+                        'max_score'            => 20,
+                    ],
+                ],
+            ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $quarter->id, 'title' => 'New Quiz', 'activity_date' => '2026-09-08',
+        ]);
+        // The unchanged row on the over-cap day is untouched, not duplicated
+        // or altered — its date/title/id all remain exactly as before.
+        $this->assertDatabaseHas('class_record_assessments', [
+            'id' => $existing->id, 'activity_date' => '2026-09-07', 'title' => 'Existing Quiz',
+        ]);
+    }
+
+    public function test_saving_a_genuinely_new_row_on_an_already_over_cap_day_is_still_blocked(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $section = $this->makeSection();
+
+        // Fill the grade's pooled daily cap for 2026-09-07 from another subject.
+        $otherSubject = Subject::create([
+            'school_year_id' => $this->sy->id, 'code' => 'SUBJ2', 'name' => 'Subject 2',
+            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
+            'grade_level' => 8, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $busyQuarter = $this->makeRecordAndQuarter($teacher, $section, $otherSubject);
+        for ($i = 1; $i <= 3; $i++) {
+            $a = $this->makeAssessment($busyQuarter, $i, "Other Subject {$i}");
+            $a->update(['activity_date' => '2026-09-07']);
+        }
+
+        $quarter = $this->makeRecordAndQuarter($teacher, $section, $subject);
+
+        // A genuinely NEW row (no id) dated on the already-full day must
+        // still be rejected — real enforcement is preserved, only the
+        // "unchanged row resubmission" false positive is fixed.
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number'   => 1,
+                    'title'                => 'New Quiz',
+                    'is_graded'            => true,
+                    'activity_date'        => '2026-09-07',
+                    'max_score'            => 20,
+                ]],
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('WAT limit', $response->json('message'));
+        $this->assertDatabaseMissing('class_record_assessments', [
+            'class_record_quarter_id' => $quarter->id, 'title' => 'New Quiz',
+        ]);
+    }
+
+    public function test_re_dating_an_existing_row_onto_an_already_over_cap_day_is_still_blocked(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = $this->makeSubject();
+        $section = $this->makeSection();
+
+        $otherSubject = Subject::create([
+            'school_year_id' => $this->sy->id, 'code' => 'SUBJ2', 'name' => 'Subject 2',
+            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
+            'grade_level' => 8, 'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $busyQuarter = $this->makeRecordAndQuarter($teacher, $section, $otherSubject);
+        for ($i = 1; $i <= 3; $i++) {
+            $a = $this->makeAssessment($busyQuarter, $i, "Other Subject {$i}");
+            $a->update(['activity_date' => '2026-09-07']);
+        }
+
+        $quarter = $this->makeRecordAndQuarter($teacher, $section, $subject);
+        $existing = $this->makeAssessment($quarter, 1, 'Existing Quiz');
+        $existing->update(['activity_date' => '2026-09-01']);
+
+        // MOVING an existing row's date onto the over-cap day is a real
+        // change (_date_changed = true) and must still be blocked.
+        $payload = $this->payloadFor($existing);
+        $payload['activity_date'] = '2026-09-07';
+
+        $response = $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
+                'assessments' => [$payload],
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('WAT limit', $response->json('message'));
+        $this->assertDatabaseHas('class_record_assessments', [
+            'id' => $existing->id, 'activity_date' => '2026-09-01',
+        ]);
+    }
+
     public function test_apply_to_sections_skips_target_that_would_exceed_the_daily_graded_cap(): void
     {
         $teacher = User::factory()->create();
