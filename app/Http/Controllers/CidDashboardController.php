@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ALP\AlpActivity;
 use App\Models\CidSchedule;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\FacultyLoading\SchoolYear;
@@ -23,17 +24,17 @@ class CidDashboardController extends Controller
         $this->authorize('cid.dashboard');
 
         $schoolYear = SchoolYear::where('is_current', true)->first();
-        $today      = Carbon::today();
-        $month      = $request->integer('month', $today->month);
-        $year       = $request->integer('year', $today->year);
+        $today = Carbon::today();
+        $month = $request->integer('month', $today->month);
+        $year = $request->integer('year', $today->year);
 
         $calendarStart = Carbon::create($year, $month, 1)->startOfMonth();
-        $calendarEnd   = $calendarStart->copy()->endOfMonth();
+        $calendarEnd = $calendarStart->copy()->endOfMonth();
 
         $calendarEvents = $this->getEvents($schoolYear?->id, $calendarStart, $calendarEnd);
-        $todayEvents    = $this->getEvents($schoolYear?->id, $today, $today);
-        $cards          = $this->getCards($schoolYear?->id, $today);
-        $charts         = $this->getCharts($schoolYear?->id, $today);
+        $todayEvents = $this->getEvents($schoolYear?->id, $today, $today);
+        $cards = $this->getCards($schoolYear?->id, $today);
+        $charts = $this->getCharts($schoolYear?->id, $today);
 
         $sections = Section::where('is_active', true)
             ->where('syid', $schoolYear?->syid ?? $schoolYear?->id)
@@ -41,29 +42,29 @@ class CidDashboardController extends Controller
             ->orderBy('sectionname')
             ->get(['id', 'sectionname', 'levelid'])
             ->map(fn ($s) => [
-                'id'    => $s->id,
-                'name'  => $s->sectionname,
+                'id' => $s->id,
+                'name' => $s->sectionname,
                 'label' => "Grade {$s->levelid} — {$s->sectionname}",
             ]);
 
         $subjects = Subject::orderBy('name')
             ->get(['id', 'name', 'code'])
             ->map(fn ($s) => [
-                'id'   => $s->id,
+                'id' => $s->id,
                 'name' => $s->name,
                 'code' => $s->code,
             ]);
 
         return Inertia::render('CID/Dashboard', [
-            'schoolYear'     => $schoolYear ? ['id' => $schoolYear->id, 'name' => $schoolYear->name] : null,
+            'schoolYear' => $schoolYear ? ['id' => $schoolYear->id, 'name' => $schoolYear->name] : null,
             'calendarEvents' => $calendarEvents,
-            'todayEvents'    => $todayEvents,
-            'cards'          => $cards,
-            'charts'         => $charts,
-            'sections'       => $sections,
-            'subjects'       => $subjects,
-            'currentMonth'   => $month,
-            'currentYear'    => $year,
+            'todayEvents' => $todayEvents,
+            'cards' => $cards,
+            'charts' => $charts,
+            'sections' => $sections,
+            'subjects' => $subjects,
+            'currentMonth' => $month,
+            'currentYear' => $year,
         ]);
     }
 
@@ -72,11 +73,11 @@ class CidDashboardController extends Controller
         $this->authorize('cid.dashboard');
 
         $schoolYear = SchoolYear::where('is_current', true)->first();
-        $month      = $request->integer('month');
-        $year       = $request->integer('year');
+        $month = $request->integer('month');
+        $year = $request->integer('year');
 
-        $start  = Carbon::create($year, $month, 1)->startOfMonth();
-        $end    = $start->copy()->endOfMonth();
+        $start = Carbon::create($year, $month, 1)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
         $events = $this->getEvents($schoolYear?->id, $start, $end);
 
         return response()->json($events);
@@ -87,14 +88,14 @@ class CidDashboardController extends Controller
         $this->authorize('cid.dashboard');
 
         $data = $request->validate([
-            'title'          => 'required|string|max:255',
-            'type'           => 'required|in:meeting,event,training,other',
+            'title' => 'required|string|max:255',
+            'type' => 'required|in:meeting,event,training,other',
             'scheduled_date' => 'required|date',
-            'section_id'     => 'nullable|integer',
-            'subject_id'     => 'nullable|integer',
-            'start_time'     => 'nullable|date_format:H:i',
-            'end_time'       => 'nullable|date_format:H:i|after_or_equal:start_time',
-            'description'    => 'nullable|string|max:1000',
+            'section_id' => 'nullable|integer',
+            'subject_id' => 'nullable|integer',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i|after_or_equal:start_time',
+            'description' => 'nullable|string|max:1000',
         ]);
 
         $schoolYear = SchoolYear::where('is_current', true)->firstOrFail();
@@ -102,7 +103,7 @@ class CidDashboardController extends Controller
         $schedule = CidSchedule::create([
             ...$data,
             'school_year_id' => $schoolYear->id,
-            'created_by'     => Auth::id(),
+            'created_by' => Auth::id(),
         ]);
 
         return response()->json(['schedule' => $this->formatCidEvent($schedule->load(['section', 'subject']))], 201);
@@ -113,14 +114,14 @@ class CidDashboardController extends Controller
         $this->authorize('cid.dashboard');
 
         $data = $request->validate([
-            'title'          => 'sometimes|required|string|max:255',
-            'type'           => 'sometimes|required|in:meeting,event,training,other',
+            'title' => 'sometimes|required|string|max:255',
+            'type' => 'sometimes|required|in:meeting,event,training,other',
             'scheduled_date' => 'sometimes|required|date',
-            'section_id'     => 'nullable|integer',
-            'subject_id'     => 'nullable|integer',
-            'start_time'     => 'nullable|date_format:H:i',
-            'end_time'       => 'nullable|date_format:H:i|after_or_equal:start_time',
-            'description'    => 'nullable|string|max:1000',
+            'section_id' => 'nullable|integer',
+            'subject_id' => 'nullable|integer',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i|after_or_equal:start_time',
+            'description' => 'nullable|string|max:1000',
         ]);
 
         $schedule->update($data);
@@ -132,6 +133,7 @@ class CidDashboardController extends Controller
     {
         $this->authorize('cid.dashboard');
         $schedule->delete();
+
         return response()->json(['ok' => true]);
     }
 
@@ -139,7 +141,9 @@ class CidDashboardController extends Controller
 
     private function getEvents(?int $schoolYearId, Carbon $start, Carbon $end): array
     {
-        if (! $schoolYearId) return [];
+        if (! $schoolYearId) {
+            return [];
+        }
 
         $cidEvents = CidSchedule::with(['section', 'subject', 'creator'])
             ->where('school_year_id', $schoolYearId)
@@ -152,7 +156,29 @@ class CidDashboardController extends Controller
 
         $crEvents = $this->getClassRecordAssessments($schoolYearId, $start, $end);
 
-        return collect(array_merge($cidEvents, $crEvents))
+        $alpEvents = AlpActivity::query()
+            ->with(['cycle.program:id,code,name', 'cycle.adviser:id,name'])
+            ->whereHas('cycle', fn ($q) => $q->where('school_year_id', $schoolYearId))
+            ->whereIn('status', ['approved', 'completed'])
+            ->whereDate('start_date', '<=', $end->toDateString())
+            ->whereDate('end_date', '>=', $start->toDateString())
+            ->get()
+            ->map(fn (AlpActivity $activity) => [
+                'id' => 'alp_'.$activity->id,
+                'title' => '[ALP] '.$activity->title,
+                'type' => 'activity',
+                'source' => 'alp',
+                'scheduled_date' => $activity->start_date->toDateString(),
+                'start_time' => $activity->start_time,
+                'end_time' => $activity->end_time,
+                'description' => $activity->cycle->program->name.' — '.str($activity->activity_type)->replace('_', ' ')->title(),
+                'section_id' => null,
+                'section_name' => null,
+                'subject_name' => null,
+                'created_by' => $activity->cycle->adviser?->name,
+            ])->toArray();
+
+        return collect(array_merge($cidEvents, $crEvents, $alpEvents))
             ->sortBy('scheduled_date')
             ->values()
             ->toArray();
@@ -160,7 +186,9 @@ class CidDashboardController extends Controller
 
     private function getClassRecordAssessments(?int $schoolYearId, Carbon $start, Carbon $end): array
     {
-        if (! $schoolYearId) return [];
+        if (! $schoolYearId) {
+            return [];
+        }
 
         $rows = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
             ->select([
@@ -173,7 +201,7 @@ class CidDashboardController extends Controller
                 'gc.name as category_name',
                 'gc.code as category_code',
             ])
-            ->join('grading_categories as gc',      'class_record_assessments.grading_category_id',    '=', 'gc.id')
+            ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
             ->whereRaw(
                 WatRuleService::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
                 [$start->toDateString(), $end->toDateString()]
@@ -183,49 +211,49 @@ class CidDashboardController extends Controller
             ->get();
 
         $sectionIds = $rows->pluck('section_id')->filter()->unique()->values()->toArray();
-        $sections   = Section::whereIn('id', $sectionIds)->get(['id', 'sectionname', 'levelid'])->keyBy('id');
+        $sections = Section::whereIn('id', $sectionIds)->get(['id', 'sectionname', 'levelid'])->keyBy('id');
 
         $teacherIds = $rows->pluck('teacher_id')->filter()->unique()->values()->toArray();
-        $teachers   = User::whereIn('id', $teacherIds)->get(['id', 'name'])->keyBy('id');
+        $teachers = User::whereIn('id', $teacherIds)->get(['id', 'name'])->keyBy('id');
 
         return $rows->map(fn ($row) => [
-            'id'             => 'cr_'.$row->id.'_'.($row->assessment_date_id ?? 'legacy'),
-            'title'          => "[{$row->category_code}] {$row->title}",
-            'type'           => 'assessment',
-            'source'         => 'class_record',
+            'id' => 'cr_'.$row->id.'_'.($row->assessment_date_id ?? 'legacy'),
+            'title' => "[{$row->category_code}] {$row->title}",
+            'type' => 'assessment',
+            'source' => 'class_record',
             'scheduled_date' => $row->activity_date instanceof Carbon
                 ? $row->activity_date->toDateString()
                 : (string) $row->activity_date,
-            'start_time'     => null,
-            'end_time'       => null,
-            'description'    => $row->subject_name . ' — ' . $row->category_name,
-            'section_id'     => $row->section_id,
-            'section_name'   => isset($sections[$row->section_id])
+            'start_time' => null,
+            'end_time' => null,
+            'description' => $row->subject_name.' — '.$row->category_name,
+            'section_id' => $row->section_id,
+            'section_name' => isset($sections[$row->section_id])
                 ? "Grade {$sections[$row->section_id]->levelid} — {$sections[$row->section_id]->sectionname}"
                 : null,
-            'subject_name'   => $row->subject_name,
-            'created_by'     => $teachers[$row->teacher_id]?->name ?? null,
+            'subject_name' => $row->subject_name,
+            'created_by' => $teachers[$row->teacher_id]?->name ?? null,
         ])->toArray();
     }
 
     private function formatCidEvent(CidSchedule $s): array
     {
         return [
-            'id'             => $s->id,
-            'title'          => $s->title,
-            'type'           => $s->type,
-            'source'         => 'cid',
+            'id' => $s->id,
+            'title' => $s->title,
+            'type' => $s->type,
+            'source' => 'cid',
             'scheduled_date' => $s->scheduled_date->toDateString(),
-            'start_time'     => $s->start_time,
-            'end_time'       => $s->end_time,
-            'description'    => $s->description,
-            'section_id'     => $s->section_id,
-            'section_name'   => $s->section
+            'start_time' => $s->start_time,
+            'end_time' => $s->end_time,
+            'description' => $s->description,
+            'section_id' => $s->section_id,
+            'section_name' => $s->section
                 ? "Grade {$s->section->levelid} — {$s->section->sectionname}"
                 : null,
-            'subject_id'     => $s->subject_id,
-            'subject_name'   => $s->subject?->name,
-            'created_by'     => $s->creator?->name,
+            'subject_id' => $s->subject_id,
+            'subject_name' => $s->subject?->name,
+            'created_by' => $s->creator?->name,
         ];
     }
 
@@ -233,17 +261,17 @@ class CidDashboardController extends Controller
     {
         if (! $schoolYearId) {
             return [
-                'assessments_today'         => 0,
-                'sections_at_max'           => 0,
-                'teachers_present_today'    => 0,
-                'class_records_pending'     => 0,
-                'activities_this_week'      => 0,
+                'assessments_today' => 0,
+                'sections_at_max' => 0,
+                'teachers_present_today' => 0,
+                'class_records_pending' => 0,
+                'activities_this_week' => 0,
             ];
         }
 
-        $todayStr  = $today->toDateString();
+        $todayStr = $today->toDateString();
         $weekStart = $today->copy()->startOfWeek()->toDateString();
-        $weekEnd   = $today->copy()->endOfWeek()->toDateString();
+        $weekEnd = $today->copy()->endOfWeek()->toDateString();
 
         $assessmentsToday = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
             ->whereRaw(WatRuleService::OCCURRENCE_DATE_SQL.' = ?', [$todayStr])
@@ -270,14 +298,19 @@ class CidDashboardController extends Controller
 
         $activitiesThisWeek = CidSchedule::where('school_year_id', $schoolYearId)
             ->whereBetween('scheduled_date', [$weekStart, $weekEnd])
-            ->count();
+            ->count()
+            + AlpActivity::whereHas('cycle', fn ($q) => $q->where('school_year_id', $schoolYearId))
+                ->whereIn('status', ['approved', 'completed'])
+                ->whereDate('start_date', '<=', $weekEnd)
+                ->whereDate('end_date', '>=', $weekStart)
+                ->count();
 
         return [
-            'assessments_today'      => $assessmentsToday,
-            'sections_at_max'        => $sectionsAtMax,
+            'assessments_today' => $assessmentsToday,
+            'sections_at_max' => $sectionsAtMax,
             'teachers_present_today' => $teachersPresentToday,
-            'class_records_pending'  => $classRecordsPending,
-            'activities_this_week'   => $activitiesThisWeek,
+            'class_records_pending' => $classRecordsPending,
+            'activities_this_week' => $activitiesThisWeek,
         ];
     }
 
@@ -288,7 +321,7 @@ class CidDashboardController extends Controller
         }
 
         $monthStart = $today->copy()->startOfMonth()->toDateString();
-        $monthEnd   = $today->copy()->endOfMonth()->toDateString();
+        $monthEnd = $today->copy()->endOfMonth()->toDateString();
 
         // Assessment load by section this month (from class record assessments)
         $loadRows = WatRuleService::assessmentOccurrencesQuery($schoolYearId)
@@ -308,31 +341,31 @@ class CidDashboardController extends Controller
             'section' => $row->sectionname
                 ? "Gr.{$row->levelid} {$row->sectionname}"
                 : "Section #{$row->section_id}",
-            'count'   => (int) $row->count,
+            'count' => (int) $row->count,
         ])->toArray();
 
         // Teacher attendance Mon–Fri this week
         $weekStart = $today->copy()->startOfWeek();
-        $weekDays  = [];
+        $weekDays = [];
         for ($i = 0; $i < 5; $i++) {
-            $day          = $weekStart->copy()->addDays($i);
-            $dayStr       = $day->toDateString();
+            $day = $weekStart->copy()->addDays($i);
+            $dayStr = $day->toDateString();
             $presentCount = TeacherTapLog::whereDate('tapped_at', $dayStr)
                 ->distinct('user_id')
                 ->count('user_id');
-            $weekDays[]   = [
-                'label'   => $day->format('D'),
-                'date'    => $dayStr,
+            $weekDays[] = [
+                'label' => $day->format('D'),
+                'date' => $dayStr,
                 'present' => $presentCount,
             ];
         }
 
         // Class record status breakdown
-        $checked   = ClassRecord::where('school_year_id', $schoolYearId)->active()->whereNotNull('checked_at')->count();
+        $checked = ClassRecord::where('school_year_id', $schoolYearId)->active()->whereNotNull('checked_at')->count();
         $unchecked = ClassRecord::where('school_year_id', $schoolYearId)->active()->whereNull('checked_at')->count();
 
         return [
-            'assessmentLoad'    => $assessmentLoad,
+            'assessmentLoad' => $assessmentLoad,
             'teacherAttendance' => $weekDays,
             'classRecordStatus' => [
                 ['label' => 'Checked', 'count' => $checked],

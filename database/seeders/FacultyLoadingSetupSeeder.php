@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\FacultyLoading\AcademicUnit;
-use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\GradeLevel;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -53,7 +53,7 @@ class FacultyLoadingSetupSeeder extends Seeder
             ['code' => 'ENG',    'name' => 'English',           'sort_order' => 3],
             ['code' => 'FIL',    'name' => 'Filipino',          'sort_order' => 4],
             ['code' => 'MATH',   'name' => 'Mathematics',       'sort_order' => 5],
-            ['code' => 'BIOCHEM','name' => 'BioChem',           'sort_order' => 6],
+            ['code' => 'BIOCHEM', 'name' => 'BioChem',           'sort_order' => 6],
             ['code' => 'SOCSCI', 'name' => 'Social Science',    'sort_order' => 7],
             ['code' => 'PEHM',   'name' => 'PEHM-VE',          'sort_order' => 8],
             ['code' => 'ENGRES', 'name' => 'Engres',            'sort_order' => 9],
@@ -103,18 +103,18 @@ class FacultyLoadingSetupSeeder extends Seeder
 
         // ── Categories ────────────────────────────────────────────────────────
 
-        $auh = $this->cat('AUH',         'Academic Unit Head',      'Academic Unit Head designation for each subject department',  1);
-        $stu = $this->cat('STUDENT_ORG', 'Student Organization',    'Student organisation adviser roles',                          2);
-        $ala = $this->cat('ALA',         'ALA Advisory',            'Academic Learning Associations advisory roles',               3);
-        $crd = $this->cat('COORD',       'Coordinatorship',         'Campus coordination and program officer roles',               4);
-        $sco = $this->cat('SCO',         'Student Conduct Officer', 'Student conduct and discipline officer roles',                5);
-        $hra = $this->cat('HR_ADV',      'HR Advisory',             'Homeroom advisory for Grades 7–10',                          6);
-        $hac = $this->cat('HR_ACAD',     'HR/Academic Advisory',    'Homeroom/Academic advisory for Grades 11–12',                7);
-        $res = $this->cat('RESEARCH',    'Research Advisory',       'Research group and thesis advisory roles',                   8);
-        $scl = $this->cat('SCALE',       'SCALE Advisory',          'SCALE section advisory for Senior High',                     9);
-        $spc = $this->cat('SPECIAL',     'Special Assignment',      'Special campus assignment roles',                           10);
-        $sup = $this->cat('SUPV',        'Supervisory',             'Supervisory roles with high load units',                    11);
-        $tch = $this->cat('TEACHING',    'Teaching Load',           'Regular classroom teaching assignments',                    12);
+        $auh = $this->cat('AUH', 'Academic Unit Head', 'Academic Unit Head designation for each subject department', 1);
+        $stu = $this->cat('STUDENT_ORG', 'Student Organization', 'Student organisation adviser roles', 2);
+        $ala = $this->cat('ALA', 'ALA Advisory', 'Academic Learning Associations advisory roles', 3);
+        $crd = $this->cat('COORD', 'Coordinatorship', 'Campus coordination and program officer roles', 4);
+        $sco = $this->cat('SCO', 'Student Conduct Officer', 'Student conduct and discipline officer roles', 5);
+        $hra = $this->cat('HR_ADV', 'HR Advisory', 'Homeroom advisory for Grades 7–10', 6);
+        $hac = $this->cat('HR_ACAD', 'HR/Academic Advisory', 'Homeroom/Academic advisory for Grades 11–12', 7);
+        $res = $this->cat('RESEARCH', 'Research Advisory', 'Research group and thesis advisory roles', 8);
+        $scl = $this->cat('SCALE', 'SCALE Advisory', 'SCALE section advisory for Senior High', 9);
+        $spc = $this->cat('SPECIAL', 'Special Assignment', 'Special campus assignment roles', 10);
+        $sup = $this->cat('SUPV', 'Supervisory', 'Supervisory roles with high load units', 11);
+        $tch = $this->cat('TEACHING', 'Teaching Load', 'Regular classroom teaching assignments', 12);
 
         // ── Academic Unit Head (1 per department, 6 units) ────────────────────
 
@@ -124,7 +124,7 @@ class FacultyLoadingSetupSeeder extends Seeder
             ['AUH-ENG',    'Academic Unit Head - English',           3, true,  3],
             ['AUH-FIL',    'Academic Unit Head - Filipino',          3, true,  4],
             ['AUH-MATH',   'Academic Unit Head - Mathematics',       3, true,  5],
-            ['AUH-BIOCHEM','Academic Unit Head - BioChem',           3, true,  6],
+            ['AUH-BIOCHEM', 'Academic Unit Head - BioChem',           3, true,  6],
             ['AUH-SOCSCI', 'Academic Unit Head - Social Science',    3, true,  7],
             ['AUH-PEHM',   'Academic Unit Head - PEHM-VE',          3, true,  8],
             ['AUH-ENGRES', 'Academic Unit Head - Engres',            3, true,  9],
@@ -148,7 +148,7 @@ class FacultyLoadingSetupSeeder extends Seeder
             ['ALA-FIL',    'Filipino Club Adviser',              3, false,  4],
             ['ALA-SS',     'Social Science Club Adviser',        3, false,  5],
             ['ALA-CS',     'Computer Science Club Adviser',      3, false,  6],
-            ['ALA-BIOCHEM','BioChem Club Adviser',               3, false,  7],
+            ['ALA-BIOCHEM', 'BioChem Club Adviser',               3, false,  7],
             ['ALA-PEHM',   'PEHM Club Adviser',                  2, false,  8],
             ['ALA-RES',    'Research Club Adviser',              2, false,  9],
             ['ALA-DRAMA',  'Drama Club Adviser',                 2, false, 10],
@@ -175,6 +175,7 @@ class FacultyLoadingSetupSeeder extends Seeder
             ['COORD-DORMITORY',  'Dormitory Coordinator',                 3, false, 13],
             ['COORD-NUTRITION',  'Nutrition Coordinator',                 2, false, 14],
             ['COORD-DISASTER',   'Disaster Risk Reduction Coordinator',   2, false, 15],
+            ['COORD-ALP',        'Alternative Learning Program Coordinator', 3, false, 16],
         ]);
 
         // ── Student Conduct Officer ───────────────────────────────────────────
@@ -248,37 +249,37 @@ class FacultyLoadingSetupSeeder extends Seeder
         // code-prefix → department code
         $mapping = [
             // Mathematics
-            'MATH'    => 'MATH',
-            'STAT'    => 'MATH',
-            'CALC'    => 'MATH',
-            'PRECAL'  => 'MATH',
+            'MATH' => 'MATH',
+            'STAT' => 'MATH',
+            'CALC' => 'MATH',
+            'PRECAL' => 'MATH',
             // Physics / Integrated Science (PISES)
-            'SCI'     => 'PISES',
-            'PHY'     => 'PISES',
+            'SCI' => 'PISES',
+            'PHY' => 'PISES',
             // Biology & Chemistry (BioChem)
-            'CHEM'    => 'BIOCHEM',
-            'BIO'     => 'BIOCHEM',
+            'CHEM' => 'BIOCHEM',
+            'BIO' => 'BIOCHEM',
             // English
-            'ENG'     => 'ENG',
+            'ENG' => 'ENG',
             // Filipino
-            'FIL'     => 'FIL',
+            'FIL' => 'FIL',
             // Social Science
-            'SS'      => 'SOCSCI',
+            'SS' => 'SOCSCI',
             // PEHM-VE
-            'PEHM'    => 'PEHM',
-            'VE'      => 'PEHM',
-            'PE'      => 'PEHM',
+            'PEHM' => 'PEHM',
+            'VE' => 'PEHM',
+            'PE' => 'PEHM',
             // Computer Science
-            'ICT'     => 'CS',
-            'CS'      => 'CS',
+            'ICT' => 'CS',
+            'CS' => 'CS',
             'ELEC-RO' => 'CS',
             // PEHM-VE electives
             'ELEC-ART' => 'PEHM',
             // PISES electives
             'ELEC-ENV' => 'PISES',
             // Engres (Research)
-            'RES'     => 'ENGRES',
-            'ENGRES'  => 'ENGRES',
+            'RES' => 'ENGRES',
+            'ENGRES' => 'ENGRES',
         ];
 
         $subjects = DB::table('subjects')->get(['id', 'code']);
@@ -309,17 +310,17 @@ class FacultyLoadingSetupSeeder extends Seeder
         return DesignationCategory::updateOrCreate(
             ['code' => $code],
             [
-                'name'        => $name,
+                'name' => $name,
                 'description' => $desc,
-                'sort_order'  => $sort,
-                'is_active'   => true,
+                'sort_order' => $sort,
+                'is_active' => true,
             ]
         );
     }
 
     /**
-     * @param array<array{0:string, 1:string, 2:int|float, 3:bool, 4:int}> $rows
-     *   Each row: [code, name, load_units, requires_unit, sort_order]
+     * @param  array<array{0:string, 1:string, 2:int|float, 3:bool, 4:int}>  $rows
+     *                                                                              Each row: [code, name, load_units, requires_unit, sort_order]
      */
     private function desigs(DesignationCategory $cat, array $rows): void
     {
@@ -328,12 +329,12 @@ class FacultyLoadingSetupSeeder extends Seeder
                 ['code' => $code],
                 [
                     'designation_category_id' => $cat->id,
-                    'name'         => $name,
-                    'load_units'   => $load,
-                    'requires_unit'=> $requiresUnit,
-                    'max_holders'  => null,
-                    'sort_order'   => $sort,
-                    'is_active'    => true,
+                    'name' => $name,
+                    'load_units' => $load,
+                    'requires_unit' => $requiresUnit,
+                    'max_holders' => null,
+                    'sort_order' => $sort,
+                    'is_active' => true,
                 ]
             );
         }
