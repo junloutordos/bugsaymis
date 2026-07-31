@@ -26,6 +26,7 @@ class ClassRecordAttendanceRecord extends Model
         'admission_slip_id',
         'synced_from_homeroom',
         'incomplete_uniform',
+        'remarks',
     ];
 
     protected $casts = [

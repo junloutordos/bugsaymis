@@ -42,15 +42,14 @@ class WeeklyAssessmentTrackerController extends Controller
     public function __construct(
         private AdvisoryScheduleScopeService $advisoryScope,
         private PersonNameFormatter $nameFormatter,
-    ) {
-    }
+    ) {}
 
     // ── GET /class-records/wat ────────────────────────────────────────────────
 
     public function index(Request $request)
     {
         $user = Auth::user();
-        $sy   = $this->currentSchoolYear();
+        $sy = $this->currentSchoolYear();
         $term = $this->currentAcademicTerm($sy);
 
         $canReview = $this->canReview($user, $sy->id);
@@ -70,15 +69,15 @@ class WeeklyAssessmentTrackerController extends Controller
         $isAdmin = $user->hasPermission('class-records.admin');
 
         return Inertia::render('ClassRecord/Wat/Index', [
-            'sections'             => $sections->values(),
-            'sectionId'            => $sectionId ?: null,
-            'weekStart'            => $weekStart,
-            'wat'                  => $sectionId ? WatRuleService::weekData($sectionId, $sy->id, $weekStart) : null,
-            'canReview'            => $canReview,
-            'isCoordinator'        => $isCoordinator,
-            'schoolYear'           => $sy->only(['id', 'name']),
+            'sections' => $sections->values(),
+            'sectionId' => $sectionId ?: null,
+            'weekStart' => $weekStart,
+            'wat' => $sectionId ? WatRuleService::weekData($sectionId, $sy->id, $weekStart) : null,
+            'canReview' => $canReview,
+            'isCoordinator' => $isCoordinator,
+            'schoolYear' => $sy->only(['id', 'name']),
             'canManageExamWindows' => $isAdmin,
-            'examWindows'          => $isAdmin
+            'examWindows' => $isAdmin
                 ? QuarterExamWindow::where('school_year_id', $sy->id)->orderBy('quarter')->get()
                 : [],
         ]);
@@ -97,7 +96,7 @@ class WeeklyAssessmentTrackerController extends Controller
     public function myTracker(Request $request)
     {
         $user = Auth::user();
-        $sy   = $this->currentSchoolYear();
+        $sy = $this->currentSchoolYear();
 
         $weekStart = Carbon::parse($request->query('week', now()->toDateString()))
             ->startOfWeek(Carbon::MONDAY)->toDateString();
@@ -109,8 +108,8 @@ class WeeklyAssessmentTrackerController extends Controller
             ->exists();
 
         return Inertia::render('ClassRecord/Wat/MyTracker', [
-            'weekStart'  => $weekStart,
-            'tracker'    => $hasRecords ? WatRuleService::facultyWeekData($user->id, $sy->id, $weekStart) : null,
+            'weekStart' => $weekStart,
+            'tracker' => $hasRecords ? WatRuleService::facultyWeekData($user->id, $sy->id, $weekStart) : null,
             'schoolYear' => $sy->only(['id', 'name']),
         ]);
     }
@@ -131,7 +130,7 @@ class WeeklyAssessmentTrackerController extends Controller
     public function printForm(Request $request): StreamedResponse
     {
         $user = Auth::user();
-        $sy   = $this->currentSchoolYear();
+        $sy = $this->currentSchoolYear();
         $term = $this->currentAcademicTerm($sy);
 
         // Printing (and reviewing) remain Coordinator/ACIDAA/admin-only —
@@ -142,7 +141,7 @@ class WeeklyAssessmentTrackerController extends Controller
         abort_unless($isCoordinator || $canReview, 403);
 
         $sectionId = (int) $request->query('section');
-        $sections  = $this->accessibleSections($user, $sy->id, $term->id, $canReview, $isCoordinator);
+        $sections = $this->accessibleSections($user, $sy->id, $term->id, $canReview, $isCoordinator);
         abort_unless($sections->pluck('id')->contains($sectionId), 403, 'You do not have access to that section.');
 
         $weekStart = Carbon::parse($request->query('week', now()->toDateString()))
@@ -162,13 +161,13 @@ class WeeklyAssessmentTrackerController extends Controller
             ->first();
 
         $section = $sections->firstWhere('id', $sectionId);
-        $wat     = WatRuleService::weekData($sectionId, $sy->id, $weekStart);
+        $wat = WatRuleService::weekData($sectionId, $sy->id, $weekStart);
 
         return $this->renderPdf($section, $wat, [
             'coordinatorName' => $coordinatorName,
-            'acidaaName'      => $acidaaUserId ? $this->nameFormatter->formal(User::findOrFail($acidaaUserId)) : null,
-            'cidChiefName'    => $cidChief ? $this->nameFormatter->formal($cidChief) : null,
-            'schoolYear'      => $sy->only(['id', 'name']),
+            'acidaaName' => $acidaaUserId ? $this->nameFormatter->formal(User::findOrFail($acidaaUserId)) : null,
+            'cidChiefName' => $cidChief ? $this->nameFormatter->formal($cidChief) : null,
+            'schoolYear' => $sy->only(['id', 'name']),
         ]);
     }
 
@@ -197,16 +196,16 @@ class WeeklyAssessmentTrackerController extends Controller
         ini_set('memory_limit', '256M');
 
         $mpdf = new Mpdf([
-            'mode'          => 'utf-8',
-            'format'        => 'A4',
-            'orientation'   => 'L',
-            'margin_left'   => 0,
-            'margin_right'  => 0,
-            'margin_top'    => $headerMm,
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'orientation' => 'L',
+            'margin_left' => 0,
+            'margin_right' => 0,
+            'margin_top' => $headerMm,
             'margin_bottom' => $footerMm,
             'margin_header' => 0,
             'margin_footer' => 0,
-            'tempDir'       => sys_get_temp_dir(),
+            'tempDir' => sys_get_temp_dir(),
         ]);
 
         $mpdf->SetHTMLHeader('<img src="'.$headerPath.'" style="width:100%; display:block;">');
@@ -221,9 +220,9 @@ class WeeklyAssessmentTrackerController extends Controller
         return new StreamedResponse(function () use ($pdfBytes) {
             echo $pdfBytes;
         }, 200, [
-            'Content-Type'        => 'application/pdf',
+            'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$filename.'"',
-            'Content-Length'      => strlen($pdfBytes),
+            'Content-Length' => strlen($pdfBytes),
         ]);
     }
 
@@ -232,76 +231,48 @@ class WeeklyAssessmentTrackerController extends Controller
     public function review(Request $request)
     {
         $user = Auth::user();
-        $sy   = $this->currentSchoolYear();
+        $sy = $this->currentSchoolYear();
         abort_unless($this->canReview($user, $sy->id), 403, 'Only the ACIDAA or a class records administrator can review the WAT.');
 
         $monday = Carbon::parse($request->query('week', now()->toDateString()))->startOfWeek(Carbon::MONDAY);
 
-        // Per-section, per-day graded/major tallies for the week. Science
-        // Core/Elective synthetic sections (SCI-/ELEC-) pool into every real
-        // homeroom's own tally at the same grade, same as the tracker/print
-        // view (WatRuleService::weekData()) — but two real homerooms never
-        // pool with each other, only with the grade's synthetic sections.
-        $rows = WatRuleService::assessmentOccurrencesQuery($sy->id)
-            ->join('sections as sec', 'sec.id', '=', 'cr.section_id')
-            ->whereNotNull('cr.section_id')
-            ->whereRaw(
-                WatRuleService::OCCURRENCE_DATE_SQL.' BETWEEN ? AND ?',
-                [$monday->toDateString(), $monday->copy()->addDays(6)->toDateString()]
-            )
-            ->selectRaw('
-                cr.section_id,
-                sec.levelid as grade,
-                sec.sectionname,
-                '.WatRuleService::OCCURRENCE_DATE_SQL.' as d,
-                COUNT(DISTINCT CASE WHEN class_record_assessments.is_graded = 1 THEN class_record_assessments.id END) as graded,
-                COUNT(DISTINCT CASE WHEN class_record_assessments.is_major = 1 AND class_record_assessments.is_graded = 1 THEN class_record_assessments.id END) as major,
-                GROUP_CONCAT(DISTINCT CASE WHEN class_record_assessments.is_graded = 1 THEN class_record_assessments.id END) as graded_ids,
-                GROUP_CONCAT(DISTINCT CASE WHEN class_record_assessments.is_major = 1 AND class_record_assessments.is_graded = 1 THEN class_record_assessments.id END) as major_ids
-            ')
-            ->groupBy('cr.section_id', 'sec.levelid', 'sec.sectionname', 'd')
-            ->get();
-
-        $isSynthetic = fn ($name) => str_starts_with((string) $name, 'SCI-') || str_starts_with((string) $name, 'ELEC-');
-        $syntheticByGrade = $rows->filter(fn ($r) => $isSynthetic($r->sectionname))->groupBy('grade');
-
         $sections = $this->accessibleSections($user, $sy->id, $this->currentAcademicTerm($sy)->id, true, false);
-        $reviews  = WatReview::with('reviewedBy:id,name')
+        $reviews = WatReview::with('reviewedBy:id,name')
             ->where('school_year_id', $sy->id)
             ->where('week_start', $monday->toDateString())
             ->get()
             ->keyBy('section_id');
 
-        $summary = $sections->map(function ($section) use ($rows, $syntheticByGrade, $reviews, $sy, $monday) {
-            $pooled = $rows->where('section_id', $section['id'])
-                ->concat($syntheticByGrade->get($section['level'], collect()));
-            $days = $pooled->groupBy('d')->map(fn ($g) => (object) [
-                'graded' => (int) $g->sum('graded'),
-                'major'  => (int) $g->sum('major'),
-            ]);
-            $weeklyGraded = $pooled->pluck('graded_ids')->filter()->flatMap(fn ($ids) => explode(',', $ids))->unique()->count();
-            $weeklyMajor = $pooled->pluck('major_ids')->filter()->flatMap(fn ($ids) => explode(',', $ids))->unique()->count();
+        $summary = $sections->map(function ($section) use ($reviews, $sy, $monday) {
+            $week = WatRuleService::weekData($section['id'], $sy->id, $monday->toDateString());
+            $weeklyGraded = $week['totals']['graded'];
+            $weeklyMajor = $week['totals']['major'];
 
             return array_merge($section, [
-                'graded_count'      => $weeklyGraded,
-                'major_count'       => $weeklyMajor,
-                'over_daily'        => $days->contains(fn ($d) => $d->graded > WatRuleService::DAILY_GRADED_MAX || $d->major > WatRuleService::DAILY_MAJOR_MAX),
-                'over_weekly'       => $weeklyGraded > WatRuleService::WEEKLY_GRADED_MAX || $weeklyMajor > WatRuleService::WEEKLY_MAJOR_MAX,
-                'review'            => $reviews->get($section['id']),
+                'graded_count' => $weeklyGraded,
+                'major_count' => $weeklyMajor,
+                'over_daily' => collect($week['days'])->contains('over_daily', true),
+                'over_weekly' => $week['totals']['over_weekly'],
+                'review' => $reviews->get($section['id']),
                 // Per-teacher plotting compliance for this section/week —
                 // visibility only, see WatRuleService::teacherBreakdown().
-                'teacher_breakdown' => WatRuleService::teacherBreakdown($section['id'], $sy->id, $monday->toDateString()),
+                'teacher_breakdown' => WatRuleService::teacherBreakdown(
+                    $section['id'],
+                    $sy->id,
+                    $monday->toDateString(),
+                    $week
+                ),
             ]);
         });
 
         return Inertia::render('ClassRecord/Wat/Review', [
-            'weekStart'  => $monday->toDateString(),
-            'summary'    => $summary->values(),
-            'limits'     => [
-                'daily_graded'  => WatRuleService::DAILY_GRADED_MAX,
-                'daily_major'   => WatRuleService::DAILY_MAJOR_MAX,
+            'weekStart' => $monday->toDateString(),
+            'summary' => $summary->values(),
+            'limits' => [
+                'daily_graded' => WatRuleService::DAILY_GRADED_MAX,
+                'daily_major' => WatRuleService::DAILY_MAJOR_MAX,
                 'weekly_graded' => WatRuleService::WEEKLY_GRADED_MAX,
-                'weekly_major'  => WatRuleService::WEEKLY_MAJOR_MAX,
+                'weekly_major' => WatRuleService::WEEKLY_MAJOR_MAX,
             ],
             'schoolYear' => $sy->only(['id', 'name']),
         ]);
@@ -312,26 +283,26 @@ class WeeklyAssessmentTrackerController extends Controller
     public function storeReview(Request $request)
     {
         $user = Auth::user();
-        $sy   = $this->currentSchoolYear();
+        $sy = $this->currentSchoolYear();
         abort_unless($this->canReview($user, $sy->id), 403, 'Only the ACIDAA or a class records administrator can review the WAT.');
 
         $validated = $request->validate([
             'section_id' => 'required|integer|exists:sections,id',
             'week_start' => 'required|date',
-            'remarks'    => 'nullable|string|max:2000',
+            'remarks' => 'nullable|string|max:2000',
         ]);
 
         WatReview::updateOrCreate(
             [
-                'section_id'     => $validated['section_id'],
+                'section_id' => $validated['section_id'],
                 'school_year_id' => $sy->id,
-                'week_start'     => Carbon::parse($validated['week_start'])->startOfWeek(Carbon::MONDAY)->toDateString(),
+                'week_start' => Carbon::parse($validated['week_start'])->startOfWeek(Carbon::MONDAY)->toDateString(),
             ],
             [
-                'status'         => 'reviewed',
-                'remarks'        => $validated['remarks'] ?? null,
+                'status' => 'reviewed',
+                'remarks' => $validated['remarks'] ?? null,
                 'reviewed_by_id' => $user->id,
-                'reviewed_at'    => now(),
+                'reviewed_at' => now(),
             ]
         );
 
@@ -418,8 +389,8 @@ class WeeklyAssessmentTrackerController extends Controller
         return $sections
             ->sortBy([['levelid', 'asc'], ['sectionname', 'asc']])
             ->map(fn ($s) => [
-                'id'    => $s->id,
-                'name'  => $s->sectionname,
+                'id' => $s->id,
+                'name' => $s->sectionname,
                 'level' => $s->levelid,
             ])
             ->values();

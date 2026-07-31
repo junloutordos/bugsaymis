@@ -10,13 +10,14 @@ const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
 import { Head, usePage, router } from "@inertiajs/vue3";
 import SidebarLink from "@/Components/SidebarLink.vue";
+import SidebarSearch from '@/Components/Layout/SidebarSearch.vue';
 import ProfileEditModal from '@/Components/ProfileEditModal.vue';
 import AdminTopbar from '@/Components/Layout/AdminTopbar.vue';
 import ReportDateRangeModal from '@/Components/Layout/ReportDateRangeModal.vue';
 import SessionExpiredOverlay from '@/Components/Layout/SessionExpiredOverlay.vue';
 import VersionHistoryModal from '@/Components/Layout/VersionHistoryModal.vue';
 import SignatureSetupModal from '@/Components/Layout/SignatureSetupModal.vue';
-import { ChevronDownIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
 import AppLoadingOverlay from '@/Components/AppLoadingOverlay.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
@@ -26,6 +27,8 @@ import { menuItems } from './navigation.js';
 const collapsed = ref(false);
 const mobileOpen = ref(false);
 const sidebarNav = ref(null);
+const sidebarSearch = ref(null);
+const sidebarSearchQuery = ref('');
 
 const expanded = ref({});
 const showVersionModal = ref(false);
@@ -84,6 +87,16 @@ let navTimer = null;
 let removeNavListener;
 let removeStartListener;
 let removeFinishListener;
+const handleSidebarSearchShortcut = (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
+    event.preventDefault();
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      mobileOpen.value = true;
+    }
+    sidebarSearch.value?.focus();
+  }
+};
+
 onMounted(() => {
   // Only show skeleton for GET navigations (page changes), not POST/PUT/PATCH/DELETE (saves)
   removeStartListener = router.on('start', (event) => {
@@ -102,10 +115,12 @@ onMounted(() => {
 
   removeNavListener = router.on('navigate', () => {
     mobileOpen.value = false;
+    sidebarSearchQuery.value = '';
     // Reset badge when navigating to Chat page
     if (route().current('chat.index')) chatUnreadCount.value = 0;
   });
 
+  window.addEventListener('keydown', handleSidebarSearchShortcut);
   fetchChatUnread();
   setupChatNotifications();
 
@@ -138,6 +153,7 @@ onUnmounted(() => {
   if (removeStartListener) removeStartListener();
   if (removeFinishListener) removeFinishListener();
   if (removeNavListener) removeNavListener();
+  window.removeEventListener('keydown', handleSidebarSearchShortcut);
   clearTimeout(navTimer);
   if (chatEchoChannel) {
     window.Echo?.leave(`user.${user?.id}`);
@@ -173,8 +189,9 @@ const sidebarUserKey = user.id ?? 'guest';
 const sidebarStorageKey = `atlas.sidebar.scroll.${sidebarUserKey}`;
 let scrollSaveFrame = null;
 
-const rememberSidebarScroll = () => {
+const rememberSidebarScroll = (force = false) => {
   if (!sidebarNav.value) return;
+  if (isSidebarSearching.value && !force) return;
 
   const position = sidebarNav.value.scrollTop;
   savedSidebarScrollByUser.set(sidebarUserKey, position);
@@ -396,9 +413,80 @@ const filterMenuByRole = (items, userRoleNames) =>
 
 const filteredMenu = computed(() => filterMenuByRole(menuItems, roleNames));
 
+const normalizeSidebarSearch = (value) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizedSidebarSearch = computed(() => normalizeSidebarSearch(sidebarSearchQuery.value));
+const isSidebarSearching = computed(() => normalizedSidebarSearch.value.length > 0);
+
+const sidebarItemMatches = (item, query, context = []) => {
+  const keywords = Array.isArray(item.keywords) ? item.keywords : [item.keywords];
+  const searchableText = [item.label, ...keywords, ...context]
+    .filter(Boolean)
+    .map(normalizeSidebarSearch)
+    .join(' ');
+
+  return query.split(' ').every((term) => searchableText.includes(term));
+};
+
+// Search only the already-authorized menu. This preserves the existing
+// permission boundary and prevents hidden module labels from being exposed.
+const searchedMenu = computed(() => {
+  const query = normalizedSidebarSearch.value;
+  if (!query) return filteredMenu.value;
+
+  return filteredMenu.value.flatMap((item) => {
+    // Section dividers add noise to a compact result list.
+    if (item.type === 'section') return [];
+
+    if (!item.children) {
+      return sidebarItemMatches(item, query) ? [item] : [];
+    }
+
+    const children = sidebarItemMatches(item, query)
+      ? item.children
+      : item.children.filter((child) => sidebarItemMatches(child, query, [item.label]));
+
+    return children.length ? [{ ...item, children }] : [];
+  });
+});
+
+const sidebarSearchResultCount = computed(() =>
+  searchedMenu.value.reduce(
+    (total, item) => total + (item.children?.length ?? (item.type === 'section' ? 0 : 1)),
+    0,
+  )
+);
+
+watch(sidebarSearchQuery, async (query, previousQuery) => {
+  const wasSearching = normalizeSidebarSearch(previousQuery).length > 0;
+  const nowSearching = normalizeSidebarSearch(query).length > 0;
+
+  if (!wasSearching && nowSearching) {
+    // Capture the normal menu position before the filtered DOM is rendered.
+    rememberSidebarScroll(true);
+  }
+
+  await nextTick();
+
+  if (nowSearching) {
+    if (sidebarNav.value) sidebarNav.value.scrollTop = 0;
+  } else if (wasSearching) {
+    await restoreSidebarScroll();
+  }
+});
 
 // --- Expand logic ---
-const toggleExpand = (label) => (expanded.value[label] = !expanded.value[label]);
+const toggleExpand = (label) => {
+  if (isSidebarSearching.value) return;
+  expanded.value[label] = !expanded.value[label];
+};
+const isSidebarGroupOpen = (item) => isSidebarSearching.value || expanded.value[item.label];
 
 // Display-only: does this group contain the currently active route?
 const groupHasActive = (item) => item.children?.some((c) => isActive(c.routeName)) ?? false;
@@ -457,13 +545,22 @@ watch(() => page.url, async () => {
         </button>
       </div>
 
+      <SidebarSearch
+        ref="sidebarSearch"
+        v-model="sidebarSearchQuery"
+        :collapsed="collapsed"
+        :searching="isSidebarSearching"
+        :result-count="sidebarSearchResultCount"
+        @expand="collapsed = false"
+      />
+
       <!-- Navigation -->
       <nav
         ref="sidebarNav"
         class="sidebar-nav flex-1 overflow-y-auto px-2 py-3 space-y-0.5"
         @scroll.passive="scheduleSidebarScrollSave"
       >
-        <template v-for="item in filteredMenu" :key="item.label">
+        <template v-for="item in searchedMenu" :key="item.label">
 
           <!-- Section label -->
           <div
@@ -491,9 +588,10 @@ watch(() => page.url, async () => {
           <div v-else>
             <button
               @click="toggleExpand(item.label)"
+              :aria-expanded="isSidebarGroupOpen(item)"
               :title="collapsed ? item.label : null"
               class="group relative flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
-              :class="expanded[item.label] || groupHasActive(item)
+              :class="isSidebarGroupOpen(item) || groupHasActive(item)
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
             >
@@ -503,12 +601,12 @@ watch(() => page.url, async () => {
                 class="h-4 w-4 shrink-0 transition-colors"
                 :class="[
                   collapsed ? 'mx-auto' : 'mr-2.5',
-                  expanded[item.label] || groupHasActive(item) ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'
+                  isSidebarGroupOpen(item) || groupHasActive(item) ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'
                 ]"
               />
               <span v-if="!collapsed" class="flex-1 truncate text-left">{{ item.label }}</span>
               <span
-                v-if="!collapsed && !expanded[item.label] && getGroupBadge(item) > 0"
+                v-if="!collapsed && !isSidebarGroupOpen(item) && getGroupBadge(item) > 0"
                 class="ml-1 shrink-0 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-400 text-slate-900"
               >{{ getGroupBadge(item) }}</span>
               <span
@@ -518,11 +616,11 @@ watch(() => page.url, async () => {
               <ChevronDownIcon
                 v-if="!collapsed"
                 class="h-3.5 w-3.5 ml-1 shrink-0 text-slate-400 transition-transform duration-200"
-                :class="{ 'rotate-180 text-indigo-600': expanded[item.label] }"
+                :class="{ 'rotate-180 text-indigo-600': isSidebarGroupOpen(item) }"
               />
             </button>
 
-            <div class="sidebar-group" :class="{ 'sidebar-group-open': expanded[item.label] }">
+            <div class="sidebar-group" :class="{ 'sidebar-group-open': isSidebarGroupOpen(item) }">
             <div
               class="sidebar-group-inner mt-0.5 ml-4 pl-3 border-l space-y-0.5"
               :class="groupHasActive(item) ? 'border-indigo-100' : 'border-slate-200'"
@@ -576,6 +674,20 @@ watch(() => page.url, async () => {
             </div>
           </div>
         </template>
+
+        <div
+          v-if="isSidebarSearching && sidebarSearchResultCount === 0"
+          class="flex flex-col items-center px-4 py-10 text-center">
+          <MagnifyingGlassIcon class="h-8 w-8 text-slate-300" />
+          <p class="mt-3 text-sm font-medium text-slate-600">No modules found</p>
+          <p class="mt-1 text-xs text-slate-400">Try a different module or sidebar entry.</p>
+          <button
+            type="button"
+            class="mt-3 text-xs font-medium text-indigo-600 hover:text-indigo-700 focus:outline-none focus:underline"
+            @click="sidebarSearchQuery = ''">
+            Clear search
+          </button>
+        </div>
       </nav>
 
       <!-- Version footer -->

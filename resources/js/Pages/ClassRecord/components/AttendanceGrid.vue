@@ -4,8 +4,9 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 import AppButton from '@/Components/AppButton.vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
+import AppModal from '@/Components/AppModal.vue'
 import { confirmDelete } from '@/Composables/useConfirm.js'
-import { PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ChatBubbleLeftEllipsisIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecordId: { type: Number, required: true },
@@ -72,6 +73,8 @@ const saving         = ref(false)
 const showAddDate    = ref(false)
 const newDateInput   = ref('')
 const addingDate     = ref(false)
+const remarkCell     = ref(null)
+const remarkDraft    = ref('')
 
 const students = computed(() =>
   (props.quarterData?.students ?? []).filter(s => s.is_active !== false)
@@ -101,6 +104,12 @@ function isDefaulted(studentId, dateId) {
 // into Homeroom's own Inc. Uniform checkbox once saved.
 function isIncompleteUniform(studentId, dateId) {
   return cell(studentId, dateId)?.incomplete_uniform ?? false
+}
+function isExceptionStatus(studentId, dateId) {
+  return ['absent', 'tardy', 'cut_class'].includes(effectiveStatus(studentId, dateId))
+}
+function attendanceRemark(studentId, dateId) {
+  return cell(studentId, dateId)?.remarks ?? ''
 }
 
 async function load() {
@@ -141,13 +150,38 @@ function cycleAttendance(studentId, dateId) {
     nextStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]
   }
 
+  const nextRemarks = nextStatus === null || nextStatus === 'present' ? null : (prev.remarks ?? null)
+
   if (nextStatus === null && !prev.incomplete_uniform) {
     // Nothing exceptional left to record for this cell — safe to drop the row.
     delete records.value[key]
   } else {
-    records.value[key] = { ...prev, status: nextStatus }
+    records.value[key] = { ...prev, status: nextStatus, remarks: nextRemarks }
   }
   pendingChanges.add(key)
+}
+
+function openRemarks(student, date) {
+  if (!isExceptionStatus(student.id, date.id)) return
+  remarkCell.value = { student, date }
+  remarkDraft.value = attendanceRemark(student.id, date.id)
+}
+
+function closeRemarks() {
+  remarkCell.value = null
+  remarkDraft.value = ''
+}
+
+function applyRemark() {
+  if (!remarkCell.value || props.isLocked || !canEditSelectedSubject.value) return
+  const { student, date } = remarkCell.value
+  const key = `${student.id}_${date.id}`
+  const prev = records.value[key] ?? { status: effectiveStatus(student.id, date.id) }
+  const normalized = remarkDraft.value.trim() || null
+
+  records.value[key] = { ...prev, remarks: normalized }
+  pendingChanges.add(key)
+  closeRemarks()
 }
 
 // IU (Incomplete Uniform) toggles independently of the status cycle — a
@@ -187,6 +221,7 @@ async function saveAttendance() {
         date_id:    d.id,
         status:     effectiveStatus(s.id, d.id),
         incomplete_uniform: isIncompleteUniform(s.id, d.id),
+        remarks:    isExceptionStatus(s.id, d.id) ? (attendanceRemark(s.id, d.id).trim() || null) : null,
       })
     }
   }
@@ -302,6 +337,7 @@ function presentCountForDate(dateId) {
         Cells default to <span class="font-semibold">P</span> —
         click to cycle Present → Absent → Tardy → Cut Class. Excused/Unexcused is decided by the Homeroom Adviser/Registrar and shown read-only.
         Check <span class="font-semibold text-yellow-600">IU</span> below a cell to flag Incomplete Uniform — independent of the status, and synced to Homeroom's Inc. Uniform checkbox.
+        For A, T, or CC, use the remark link to add optional subject-period context.
       </p>
       <div class="flex items-center gap-2 shrink-0">
         <template v-if="!isLocked && canEditSelectedSubject">
@@ -400,6 +436,15 @@ function presentCountForDate(dateId) {
                 :class="excusedStatus(student.id, d.id) === 'excused' ? 'text-emerald-600' : 'text-red-500'">
                 {{ EXCUSED_LABELS[excusedStatus(student.id, d.id)] }}
               </div>
+              <button v-if="isExceptionStatus(student.id, d.id)"
+                type="button"
+                class="mx-auto mt-0.5 flex items-center justify-center gap-0.5 text-[8px] font-semibold transition-colors"
+                :class="attendanceRemark(student.id, d.id) ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'"
+                :title="attendanceRemark(student.id, d.id) || 'Add an optional remark'"
+                @click.stop="openRemarks(student, d)">
+                <ChatBubbleLeftEllipsisIcon class="h-2.5 w-2.5" />
+                {{ attendanceRemark(student.id, d.id) ? 'Remark' : '+ Remark' }}
+              </button>
               <label v-if="!isLocked && canEditSelectedSubject" class="mt-0.5 flex items-center justify-center gap-0.5 cursor-pointer"
                 title="Incomplete Uniform (IU) — flags independently of Present/Absent/Tardy/Cut Class; syncs to Homeroom's Inc. Uniform checkbox.">
                 <input type="checkbox" :checked="isIncompleteUniform(student.id, d.id)" @change="toggleIncompleteUniform(student.id, d.id)"
@@ -476,4 +521,38 @@ function presentCountForDate(dateId) {
       </div>
     </div>
   </template>
+
+  <AppModal
+    :show="!!remarkCell"
+    title="Attendance Remark"
+    :subtitle="remarkCell
+      ? `${remarkCell.student.family_name}, ${remarkCell.student.given_name} · ${formatDate(remarkCell.date.date)} · ${STATUS_BY_VALUE[effectiveStatus(remarkCell.student.id, remarkCell.date.id)]?.label}`
+      : ''"
+    size="md"
+    @close="closeRemarks">
+    <label for="attendance-remark" class="block text-sm font-medium text-slate-700">
+      Remarks <span class="font-normal text-slate-400">(optional)</span>
+    </label>
+    <textarea
+      id="attendance-remark"
+      v-model="remarkDraft"
+      rows="4"
+      maxlength="500"
+      :readonly="isLocked || !canEditSelectedSubject"
+      placeholder="Add relevant context for this absence, tardiness, or cut class…"
+      class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 read-only:bg-slate-50" />
+    <div class="mt-1 flex items-center justify-between text-xs text-slate-400">
+      <span>Visible in this subject's Class Record attendance.</span>
+      <span>{{ remarkDraft.length }}/500</span>
+    </div>
+
+    <template #footer>
+      <AppButton variant="secondary" @click="closeRemarks">
+        {{ isLocked || !canEditSelectedSubject ? 'Close' : 'Cancel' }}
+      </AppButton>
+      <AppButton v-if="!isLocked && canEditSelectedSubject" @click="applyRemark">
+        Apply Remark
+      </AppButton>
+    </template>
+  </AppModal>
 </template>
