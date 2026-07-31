@@ -1335,6 +1335,7 @@ async function saveQuarterOption() {
             :quarter-data="currentQuarterData"
             :is-locked="isLocked || isReadOnly"
             :leaf-categories="currentLeafCategories"
+            @reload="router.reload({ only: ['classRecord'] })"
           />
         </div>
 
