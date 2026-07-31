@@ -414,6 +414,45 @@ function isMajorRow(row) {
   return Math.round((cat.weight / Math.max(1, cat.max_assessments)) * 1e6) / 1e6 >= 0.10
 }
 
+// Overlays this quarter's own unsaved-but-dated draft rows onto the
+// server-side section calendar so a stale/leftover row (dated via a prior
+// calendar click or table edit, never saved) is visible and removable
+// instead of silently consuming a day's WAT budget with no on-screen trace.
+// Server-saved rows for this quarter are already present via
+// sectionCalendarDays (they're real, persisted rows) — only rows with no
+// _db_id are added here, tagged is_pending so the calendar can render them
+// distinctly (e.g. a dashed/amber treatment) from confirmed entries.
+const calendarDaysWithPending = computed(() => {
+  const byDate = new Map(sectionCalendarDays.value.map(d => [d.date, { ...d, items: [...d.items] }]))
+
+  for (const cat of currentLeafCategories.value) {
+    for (const row of assessmentDraft.value[cat.id] ?? []) {
+      if (!row.activity_date || row._db_id) continue
+      const date = row.activity_date
+      const entry = byDate.get(date) ?? { date, count: 0, graded_count: 0, major_count: 0, items: [] }
+      entry.items.push({
+        id:            `pending-${cat.id}-${row.assessment_number}`,
+        title:         row.title || '(untitled)',
+        subject_name:  classRecord.subject_name,
+        teacher_name:  null,
+        category_code: cat.code,
+        is_graded:     row.is_graded,
+        is_major:      isMajorRow(row),
+        is_own_record: true,
+        is_pending:    true,
+      })
+      entry.count += 1
+      if (row.is_graded) {
+        entry.graded_count = (entry.graded_count ?? 0) + 1
+        if (isMajorRow(row)) entry.major_count = (entry.major_count ?? 0) + 1
+      }
+      byDate.set(date, entry)
+    }
+  }
+
+  return [...byDate.values()]
+})
+
 // Monday of the date's week, minus 3 days = the preceding Friday, cutoff at
 // 12:00 NN (not end of day) so coordinators/CID Chief have the Friday
 // afternoon to review the week's plotted assessments.
@@ -504,15 +543,23 @@ const pendingAssessmentCategories = computed(() => {
   for (const cat of currentLeafCategories.value) {
     if (!canEditCategory(cat)) continue
     if (isLocked.value || isReadOnly.value) continue
-    // An existing row is offered if it has no date yet, regardless of
-    // whether it already has a title — the picker below fills in whichever
-    // of those two fields is still missing.
-    const openRow = (assessmentDraft.value[cat.id] ?? []).find(r => !r.activity_date)
+    const rows = assessmentDraft.value[cat.id] ?? []
+    // An undated row is the natural target for a new date. A row that
+    // already has a date but was never saved (_db_id is null) is a leftover
+    // from an earlier, uncommitted attempt — e.g. dated via the calendar,
+    // then the page was reused before Save was clicked. Surfacing it here
+    // (instead of only ever creating a fresh row) prevents the picker from
+    // silently stacking a second draft entry on top of the first, which
+    // used to double-count toward the daily/weekly cap client-side while
+    // the teacher could see only one (the earlier, still-unsaved) entry.
+    const openRow = rows.find(r => !r.activity_date)
+    const unsavedDatedRows = rows.filter(r => r.activity_date && !r._db_id)
     cats.push({
       key:      String(cat.id),
       label:    `${cat.code} — ${cat.display_name}`,
       catId:    cat.id,
       openRow,
+      unsavedDatedRows,
     })
   }
   return cats
@@ -537,10 +584,18 @@ function calendarDateFeasibility(dateStr) {
 
 function onCalendarSchedule({ catId, title, date }) {
   const cat = pendingAssessmentCategories.value.find(c => c.catId === catId)
-  let row = cat?.openRow
+
+  // Prefer retargeting a leftover unsaved-but-dated row (see
+  // pendingAssessmentCategories) over creating a new one — this is what
+  // stops a second calendar click on the same category from silently
+  // stacking a duplicate draft row that then double-counts toward the
+  // daily/weekly cap. If there are several (shouldn't normally happen),
+  // retarget the most recently added one and leave the rest for the
+  // teacher to review/remove in the table.
+  let row = cat?.unsavedDatedRows?.[cat.unsavedDatedRows.length - 1] ?? cat?.openRow
 
   if (!row) {
-    // No existing open (undated) row for this category — create one, same
+    // No existing open/unsaved row for this category — create one, same
     // as clicking "Add {code} Row" in the table.
     addAssessmentRow(catId)
     row = assessmentDraft.value[catId][assessmentDraft.value[catId].length - 1]
@@ -572,6 +627,23 @@ function onCalendarApplyToSections({ date }) {
   }).then((result) => {
     if (result.isConfirmed) openApplyToSectionsModal()
   })
+}
+
+// Removes a stale/leftover unsaved-but-dated row directly from the calendar
+// (the "Unsaved" badge + X button in the day-detail panel) — the synthetic
+// id `pending-{catId}-{assessmentNumber}` set in calendarDaysWithPending()
+// is parsed back to find and clear that exact row. Clears the date rather
+// than splicing the row out entirely, so its title/max-score (if any were
+// typed) aren't lost — same soft-touch as un-dating a row in the table.
+function onCalendarClearPending(item) {
+  const match = /^pending-(\d+)-(\d+)$/.exec(item.id)
+  if (!match) return
+  const [, catId, assessmentNumber] = match.map(Number)
+  const row = (assessmentDraft.value[catId] ?? []).find(r => r.assessment_number === assessmentNumber)
+  if (!row) return
+  row.activity_date = ''
+  row._prevDate      = ''
+  row._dateWarning   = null
 }
 
 // ── Copy assessments ──────────────────────────────────────────────────────────
@@ -1500,12 +1572,13 @@ async function saveQuarterOption() {
   <SectionAssessmentCalendar
     :show="showSectionCalendar"
     :section-label="classRecord.year_level_section"
-    :days="sectionCalendarDays"
+    :days="calendarDaysWithPending"
     :editable="pendingAssessmentCategories.length > 0"
     :pending-rows="pendingAssessmentCategories"
     :disabled-dates="calendarDateFeasibility"
     @close="showSectionCalendar = false"
     @schedule="onCalendarSchedule"
     @apply-to-sections="onCalendarApplyToSections"
+    @clear-pending="onCalendarClearPending"
   />
 </template>
