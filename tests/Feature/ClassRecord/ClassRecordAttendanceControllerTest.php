@@ -4,6 +4,7 @@ namespace Tests\Feature\ClassRecord;
 
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAttendanceDate;
+use App\Models\ClassRecord\ClassRecordAttendanceRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordStudent;
 use App\Models\ClassRecord\GradingOption;
@@ -130,6 +131,101 @@ class ClassRecordAttendanceControllerTest extends TestCase
             'status' => 'cut_class',
             'synced_from_homeroom' => false,
         ]);
+    }
+
+    public function test_teacher_can_add_an_optional_remark_to_an_exception_status(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id, 'family_name' => 'Doe', 'given_name' => 'Jane',
+            'sequence_number' => 1, 'is_active' => true,
+        ]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.attendance.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'records' => [[
+                    'date_id' => $date->id,
+                    'student_id' => $student->id,
+                    'status' => 'tardy',
+                    'remarks' => '  Arrived 10 minutes late.  ',
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_attendance_records', [
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'tardy',
+            'remarks' => 'Arrived 10 minutes late.',
+        ]);
+
+        $this->actingAs($teacher)
+            ->getJson(route('class-records.attendance.index', ['classRecord' => $record->id, 'q' => 1]))
+            ->assertOk()
+            ->assertJsonPath("records.{$student->id}_{$date->id}.remarks", 'Arrived 10 minutes late.');
+    }
+
+    public function test_remark_is_cleared_when_status_changes_to_present(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id, 'family_name' => 'Doe', 'given_name' => 'Jane',
+            'sequence_number' => 1, 'is_active' => true,
+        ]);
+        ClassRecordAttendanceRecord::create([
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'absent',
+            'remarks' => 'Initially absent.',
+        ]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.attendance.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'records' => [[
+                    'date_id' => $date->id,
+                    'student_id' => $student->id,
+                    'status' => 'present',
+                    'remarks' => 'This must not remain.',
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_attendance_records', [
+            'class_record_attendance_date_id' => $date->id,
+            'class_record_student_id' => $student->id,
+            'status' => 'present',
+            'remarks' => null,
+        ]);
+    }
+
+    public function test_upsert_rejects_a_remark_longer_than_500_characters(): void
+    {
+        $teacher = User::factory()->create();
+        $record = $this->makeRecord($teacher);
+        $quarter = $this->makeQuarter($record);
+        $date = ClassRecordAttendanceDate::create(['class_record_quarter_id' => $quarter->id, 'date' => '2026-08-03', 'sort_order' => 1]);
+        $student = ClassRecordStudent::create([
+            'class_record_quarter_id' => $quarter->id, 'family_name' => 'Doe', 'given_name' => 'Jane',
+            'sequence_number' => 1, 'is_active' => true,
+        ]);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.attendance.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'records' => [[
+                    'date_id' => $date->id,
+                    'student_id' => $student->id,
+                    'status' => 'absent',
+                    'remarks' => str_repeat('x', 501),
+                ]],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('records.0.remarks');
     }
 
     public function test_upsert_rejects_an_invalid_status_value(): void

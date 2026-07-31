@@ -98,13 +98,14 @@ class ClassRecordAttendanceController extends Controller
         $records = ClassRecordAttendanceRecord::whereHas('attendanceDate', fn ($sq) =>
                 $sq->where('class_record_quarter_id', $quarter->id)->where('subject_id', $subjectId)
             )
-            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'excused_status', 'synced_from_homeroom', 'incomplete_uniform'])
+            ->get(['class_record_attendance_date_id', 'class_record_student_id', 'status', 'excused_status', 'synced_from_homeroom', 'incomplete_uniform', 'remarks'])
             ->mapWithKeys(fn ($r) => [
                 "{$r->class_record_student_id}_{$r->class_record_attendance_date_id}" => [
                     'status'             => $r->status,
                     'excused'            => $r->excused_status,
                     'synced'             => $r->synced_from_homeroom,
                     'incomplete_uniform' => $r->incomplete_uniform,
+                    'remarks'            => $r->remarks,
                 ],
             ]);
 
@@ -210,6 +211,9 @@ class ClassRecordAttendanceController extends Controller
             // left this specific class period — so it's only ever set here,
             // never on the Homeroom whole-day attendance.
             'records.*.status'     => 'nullable|in:present,absent,tardy,cut_class',
+            // Optional subject-period context. Remarks do not sync into the
+            // Homeroom whole-day record because they describe different scopes.
+            'records.*.remarks'    => 'nullable|string|max:500',
             // Incomplete Uniform (IU) is an independent flag, not a status —
             // a student can be Present AND flagged IU on the same day. Synced
             // one-directionally into Homeroom's own `incomplete_uniform`
@@ -256,6 +260,10 @@ class ClassRecordAttendanceController extends Controller
         foreach ($validated['records'] as $item) {
             $status            = $item['status'] ?? null;
             $incompleteUniform = (bool) ($item['incomplete_uniform'] ?? false);
+            $remarks           = isset($item['remarks']) ? trim($item['remarks']) : null;
+            $remarks           = in_array($status, ['absent', 'tardy', 'cut_class'], true) && $remarks !== ''
+                ? $remarks
+                : null;
 
             // A cell with no status AND no IU flag has no reason to exist as a row.
             if ($status === null && ! $incompleteUniform) {
@@ -274,6 +282,7 @@ class ClassRecordAttendanceController extends Controller
                     // SubjectAttendanceSyncService).
                     'synced_from_homeroom'            => false,
                     'incomplete_uniform'              => $incompleteUniform,
+                    'remarks'                         => $remarks,
                     'created_at'                      => $now,
                     'updated_at'                      => $now,
                 ];
@@ -292,7 +301,7 @@ class ClassRecordAttendanceController extends Controller
             DB::table('class_record_attendance_records')->upsert(
                 $toUpsert,
                 ['class_record_attendance_date_id', 'class_record_student_id'],
-                ['status', 'synced_from_homeroom', 'incomplete_uniform', 'updated_at']
+                ['status', 'synced_from_homeroom', 'incomplete_uniform', 'remarks', 'updated_at']
             );
         }
 
