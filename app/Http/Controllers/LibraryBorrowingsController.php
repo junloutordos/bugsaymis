@@ -134,12 +134,8 @@ class LibraryBorrowingsController extends Controller
             $b->section_name = null;
             try {
                 if (isset($type) && $type === 'student') {
-                    // find latest section assignment for this student (prefer by syid/id)
-                    $ss = DB::table('section_students')
-                        ->where('studentid', $b->borrower_id)
-                        ->orderByDesc('syid')
-                        ->orderByDesc('id')
-                        ->first();
+                    // resolve current-SY section (falls back to legacy mirror)
+                    $ss = app(\App\Services\StudentSectionResolver::class)->latestForStudent($b->borrower_id);
 
                     if ($ss && isset($ss->sectionid) && $ss->sectionid) {
                         $sec = DB::table('sections')->where('id', $ss->sectionid)->first();

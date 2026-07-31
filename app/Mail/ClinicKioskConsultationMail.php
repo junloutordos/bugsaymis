@@ -63,7 +63,7 @@ class ClinicKioskConsultationMail extends Mailable
 
                 $requestor['sex'] = $student->sex ?? null;
 
-                $sectionStudent = DB::table('section_students')->where('studentid', $student->id)->orderByDesc('id')->first();
+                $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
                 if ($sectionStudent) {
                     $levelId = $sectionStudent->levelid ?? null;
                     if ($levelId) {

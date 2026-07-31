@@ -161,7 +161,7 @@ class ConsultationController extends Controller
                         $requestor['photo'] = '/storage/students_profile_picture/' . rawurlencode($photoField);
                     }
 
-                    $sectionStudent = DB::table('section_students')->where('studentid', $student->id)->orderByDesc('id')->first();
+                    $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
                     if ($sectionStudent) {
                         $levelId = $sectionStudent->levelid ?? null;
                         if ($levelId) {
@@ -448,7 +448,7 @@ class ConsultationController extends Controller
                         $requestor['name'] = $student->name ?? $requestor['name'];
                     }
                     $requestor['sex'] = $student->sex ?? null;
-                    $sectionStudent = DB::table('section_students')->where('studentid', $student->id)->orderByDesc('id')->first();
+                    $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
                     if ($sectionStudent) {
                         $levelId = $sectionStudent->levelid ?? null;
                         if ($levelId) $requestor['grade_level'] = 'Grade ' . $levelId;
@@ -664,7 +664,7 @@ class ConsultationController extends Controller
                 }
                 if ($photoField) $requestor['photo'] = '/storage/students_profile_picture/' . rawurlencode($photoField);
 
-                $sectionStudent = DB::table('section_students')->where('studentid', $student->id)->orderByDesc('id')->first();
+                $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
                 if ($sectionStudent) {
                     $levelId = $sectionStudent->levelid ?? null;
                     if ($levelId) $requestor['grade_level'] = 'Grade ' . $levelId;
@@ -786,7 +786,7 @@ class ConsultationController extends Controller
 
                 $requestor['grade_level'] = null;
                 $requestor['sex'] = $student->sex ?? null;
-                $sectionStudent = DB::table('section_students')->where('studentid', $student->id)->orderByDesc('id')->first();
+                $sectionStudent = app(\App\Services\StudentSectionResolver::class)->latestForStudent($student->id);
                 if ($sectionStudent) {
                     $levelId = $sectionStudent->levelid ?? null;
                     if ($levelId) $requestor['grade_level'] = 'Grade ' . $levelId;
