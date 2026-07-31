@@ -15,6 +15,7 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\User;
 use App\Services\ClassRecord\ClassRecordMonitorScopeService;
+use App\Services\ClassRecord\AssessmentPlottingService;
 use App\Services\ClassRecord\WatRuleService;
 use App\Services\NotificationService;
 use App\Services\PersonNameFormatter;
@@ -26,8 +27,10 @@ use Illuminate\Support\Facades\DB;
 
 class ClassRecordAssessmentController extends Controller
 {
-    public function __construct(private readonly ClassRecordMonitorScopeService $monitorScope)
-    {
+    public function __construct(
+        private readonly ClassRecordMonitorScopeService $monitorScope,
+        private readonly AssessmentPlottingService $plottingService,
+    ) {
     }
 
     private function isAdmin(): bool
@@ -419,6 +422,47 @@ class ClassRecordAssessmentController extends Controller
             'warnings' => $warnings,
             'data'     => $upserted,
         ]);
+    }
+
+    // ── POST /class-records/{cr}/quarters/{q}/assessments/plot ──────────────
+
+    /**
+     * Append one calendar-plotted assessment without replacing the rest of
+     * the quarter Setup. Optional targets apply that same assessment to other
+     * editable class records for the same subject.
+     */
+    public function plot(Request $request, ClassRecord $classRecord, int $q): JsonResponse
+    {
+        abort_unless($classRecord->canEdit(Auth::user()), 403);
+
+        $validated = $request->validate([
+            'grading_category_id'       => 'required|integer|exists:grading_categories,id',
+            'title'                     => 'required|string|max:255',
+            'is_graded'                 => 'sometimes|boolean',
+            'activity_date'             => 'required|date',
+            'max_score'                 => 'required|numeric|min:0.01',
+            'target_class_record_ids'   => 'sometimes|array',
+            'target_class_record_ids.*' => 'integer|distinct|exists:class_records,id',
+        ]);
+
+        $result = $this->plottingService->plot(
+            $classRecord,
+            $q,
+            (int) $validated['grading_category_id'],
+            [
+                'title' => $validated['title'],
+                'is_graded' => $validated['is_graded'] ?? true,
+                'activity_date' => $validated['activity_date'],
+                'max_score' => $validated['max_score'],
+            ],
+            $validated['target_class_record_ids'] ?? [],
+            Auth::user(),
+        );
+
+        return response()->json([
+            'message' => count($result['created']).' assessment placement(s) saved.',
+            ...$result,
+        ], 201);
     }
 
     // ── POST /class-records/{cr}/quarters/{q}/assessments/copy-from ──────────

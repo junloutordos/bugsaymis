@@ -2371,6 +2371,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     // Assessments
     Route::get('/class-records/{classRecord}/quarters/{q}/assessments',                   [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'index'])->name('class-records.assessments.index');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments',                   [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'upsert'])->name('class-records.assessments.upsert');
+    Route::post('/class-records/{classRecord}/quarters/{q}/assessments/plot',              [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'plot'])->name('class-records.assessments.plot');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from',        [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFrom'])->name('class-records.assessments.copy-from');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from-record', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFromRecord'])->name('class-records.assessments.copy-from-record');
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/apply-to-sections', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'applyToSections'])->name('class-records.assessments.apply-to-sections');

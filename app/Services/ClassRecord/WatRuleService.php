@@ -402,6 +402,7 @@ class WatRuleService
 
             return [
                 'id'              => $row->id,
+                'class_record_id' => $row->class_record_id,
                 'date'            => $date->toDateString(),
                 'title'           => $row->title,
                 'subject_name'    => $pooledTag ? "{$subjectName} ({$pooledTag})" : $subjectName,

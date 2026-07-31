@@ -15,6 +15,8 @@ const props = defineProps({
   leafCategories: { type: Array, default: () => [] },
 })
 
+const emit = defineEmits(['reload'])
+
 // ── Status vocabulary ────────────────────────────────────────────────────────
 
 const STATUSES = {
@@ -230,6 +232,7 @@ async function gradeDate(dateObj) {
       formValues
     )
     dateObj.is_graded = true
+    emit('reload')
     await Swal.fire({
       icon: 'success', title: 'ILA graded!',
       text: 'Scores were seeded from the compliance marks already recorded — adjust individual scores in the Weekly Assessment Tracker if needed.',
@@ -249,6 +252,7 @@ async function ungradeDate(dateObj) {
       route('class-records.ila.ungrade-date', { classRecord: props.classRecordId, q: props.quarterNumber, ilaDate: dateObj.id })
     )
     dateObj.is_graded = false
+    emit('reload')
   } catch (err) {
     Swal.fire('Cannot un-grade this ILA date', err.response?.data?.message ?? 'Failed to un-grade this ILA date.', 'error')
   }

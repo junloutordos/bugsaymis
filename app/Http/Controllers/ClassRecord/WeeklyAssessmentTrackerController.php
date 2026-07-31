@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ClassRecord;
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
+use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\QuarterExamWindow;
 use App\Models\ClassRecord\WatReview;
 use App\Models\FacultyLoading\AcademicTerm;
@@ -12,6 +13,7 @@ use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\User;
 use App\Services\ClassRecord\WatRuleService;
 use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
@@ -75,6 +77,9 @@ class WeeklyAssessmentTrackerController extends Controller
             'sectionId'            => $sectionId ?: null,
             'weekStart'            => $weekStart,
             'wat'                  => $sectionId ? WatRuleService::weekData($sectionId, $sy->id, $weekStart) : null,
+            'plottingRecords'      => $sectionId
+                ? $this->plottingRecords($user, $sectionId, $sy->id)
+                : [],
             'canReview'            => $canReview,
             'isCoordinator'        => $isCoordinator,
             'schoolYear'           => $sy->only(['id', 'name']),
@@ -440,5 +445,136 @@ class WeeklyAssessmentTrackerController extends Controller
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Editable class-record Setup choices behind the WAT calendar. The
+     * selected homeroom and its pooled Science Core/Elective sections are
+     * considered because all of them consume the same WAT budget.
+     */
+    private function plottingRecords(User $user, int $sectionId, int $schoolYearId): array
+    {
+        $grade = Section::whereKey($sectionId)->value('levelid');
+        $poolSectionIds = $grade === null
+            ? [$sectionId]
+            : WatRuleService::poolSectionIds($sectionId, (int) $grade);
+
+        $allEditable = ClassRecord::with([
+            'section:id,levelid,sectionname',
+            'coTeachers',
+            'gradingOption.categories',
+            'quarters.gradingOption.categories',
+            'quarters.assessments:id,class_record_quarter_id,grading_category_id,assessment_number',
+        ])
+            ->where('school_year_id', $schoolYearId)
+            ->where('status', '<>', 'archived')
+            ->get()
+            ->filter(fn (ClassRecord $record) => $record->canEdit($user))
+            ->values();
+
+        $sources = $allEditable->whereIn('section_id', $poolSectionIds)->values();
+        if ($sources->isEmpty()) {
+            return [];
+        }
+
+        $pairs = $sources
+            ->filter(fn ($record) => $record->section_id && $record->subject_id)
+            ->map(fn ($record) => [
+                'section_id' => (int) $record->section_id,
+                'subject_id' => (int) $record->subject_id,
+            ])
+            ->unique(fn ($pair) => $pair['section_id'].'|'.$pair['subject_id'])
+            ->values();
+
+        $schedules = collect();
+        if ($pairs->isNotEmpty()) {
+            $schedules = ClassSchedule::query()
+                ->occupying()
+                ->where('school_year_id', $schoolYearId)
+                ->where(function ($outer) use ($pairs) {
+                    foreach ($pairs as $pair) {
+                        $outer->orWhere(function ($inner) use ($pair) {
+                            $inner->where('section_id', $pair['section_id'])
+                                ->where('subject_id', $pair['subject_id']);
+                        });
+                    }
+                })
+                ->get(['section_id', 'subject_id', 'day_of_week', 'start_time', 'end_time']);
+        }
+
+        return $sources->map(function (ClassRecord $record) use ($user, $allEditable, $schedules) {
+            $sameSubjectTargets = $allEditable
+                ->filter(function (ClassRecord $candidate) use ($record) {
+                    if ($candidate->id === $record->id
+                        || (int) $candidate->section_id === (int) $record->section_id) {
+                        return false;
+                    }
+                    if ($record->subject_id && $candidate->subject_id) {
+                        return (int) $record->subject_id === (int) $candidate->subject_id;
+                    }
+
+                    return strcasecmp((string) $record->subject_name, (string) $candidate->subject_name) === 0;
+                })
+                ->map(fn (ClassRecord $candidate) => [
+                    'id' => $candidate->id,
+                    'label' => $candidate->year_level_section,
+                ])
+                ->sortBy('label')
+                ->values()
+                ->all();
+
+            $quarters = collect(range(1, 4))->map(function (int $quarterNumber) use ($record, $user) {
+                /** @var ClassRecordQuarter|null $quarter */
+                $quarter = $record->quarters->firstWhere('quarter', $quarterNumber);
+                $option = $quarter?->gradingOption ?? $record->gradingOption;
+                $assessments = $quarter?->assessments ?? collect();
+
+                $categories = $option?->leafCategories()
+                    ->filter(fn ($category) => $record->canEdit($user, $category->subject_id))
+                    ->map(function ($category) use ($assessments) {
+                        $nextNumber = ((int) $assessments
+                            ->where('grading_category_id', $category->id)
+                            ->max('assessment_number')) + 1;
+                        $type = WatRuleService::deriveType($category->code, $nextNumber);
+
+                        return [
+                            'id' => $category->id,
+                            'code' => $category->code,
+                            'name' => $category->name,
+                            'next_number' => $nextNumber,
+                            'type_label' => ClassRecordAssessment::TYPES[$type] ?? $category->name,
+                            'is_major' => WatRuleService::isMajor($type, $category),
+                        ];
+                    })
+                    ->values()
+                    ->all() ?? [];
+
+                return [
+                    'number' => $quarterNumber,
+                    'is_locked' => (bool) ($quarter?->is_locked ?? false),
+                    'categories' => $categories,
+                ];
+            })->values()->all();
+
+            $periods = $schedules
+                ->where('section_id', $record->section_id)
+                ->where('subject_id', $record->subject_id)
+                ->map(fn ($schedule) => [
+                    'day' => $schedule->day_of_week,
+                    'start_time' => substr((string) $schedule->start_time, 0, 5),
+                    'end_time' => substr((string) $schedule->end_time, 0, 5),
+                ])
+                ->values()
+                ->all();
+
+            return [
+                'id' => $record->id,
+                'subject_name' => $record->display_name,
+                'section_label' => $record->year_level_section,
+                'quarters' => $quarters,
+                'periods' => $periods,
+                'same_subject_targets' => $sameSubjectTargets,
+            ];
+        })->values()->all();
     }
 }
