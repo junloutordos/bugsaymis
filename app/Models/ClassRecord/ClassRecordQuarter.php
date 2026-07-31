@@ -47,7 +47,11 @@ class ClassRecordQuarter extends Model
 
     public function assessments(): HasMany
     {
-        return $this->hasMany(ClassRecordAssessment::class)->orderBy('sort_order');
+        return $this->hasMany(ClassRecordAssessment::class)
+            ->orderByRaw('CASE WHEN activity_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('activity_date')
+            ->orderBy('assessment_number')
+            ->orderBy('id');
     }
 
     public function students(): HasMany

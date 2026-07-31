@@ -11,6 +11,7 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Quiz\Quiz;
 use App\Services\ClassRecord\ClassRecordMonitorScopeService;
 use App\Services\ClassRecord\GradingOptionScopeService;
+use App\Services\ClassRecord\WatRuleService;
 use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -99,8 +100,9 @@ class ClassRecordPageController extends Controller
      */
     public function show(ClassRecord $classRecord)
     {
-        $isOwner = $classRecord->canEdit(Auth::user());
-        $isMonitorView = ! $this->isAdmin() && ! $isOwner && $this->monitorScope->canView(Auth::user(), $classRecord);
+        $user = Auth::user();
+        $isOwner = $classRecord->canEdit($user);
+        $isMonitorView = ! $this->isAdmin() && ! $isOwner && $this->monitorScope->canView($user, $classRecord);
         abort_unless($isOwner || $isMonitorView, 403);
 
         $classRecord->load([
@@ -112,6 +114,7 @@ class ClassRecordPageController extends Controller
             'section:id,levelid,sectionname',
             'gradingOption.categories',
             'quarters.gradingOption.categories',
+            'quarters.assessments.dates',
             'quarters.assessments.gradingCategory',
             'quarters.assessments.pendingDeletionRequest',
             'quarters.students',
@@ -122,6 +125,10 @@ class ClassRecordPageController extends Controller
         $defaultOptionId = $classRecord->grading_option_id;
         $classRecord->quarters->each(function ($qtr) use ($defaultOptionId) {
             $qtr->setAttribute('effective_grading_option_id', $qtr->grading_option_id ?? $defaultOptionId);
+            $qtr->assessments->each(fn ($assessment) => $assessment->setAttribute(
+                'activity_dates',
+                $assessment->activityDateStrings()->all()
+            ));
         });
 
         $currentSY = SchoolYear::where('is_current', true)->first();
@@ -146,15 +153,109 @@ class ClassRecordPageController extends Controller
 
         // Other class records by the same teacher for the same subject (for copy-from-section feature).
         // Archived records are excluded — they're soft-deleted and must never resurface as a copy source.
-        $sameSubjectRecords = ClassRecord::with('coTeachers')
+        $sameSubjectRecords = ClassRecord::with([
+                'coTeachers',
+                'gradingOption.categories',
+                'quarters.gradingOption.categories',
+                'quarters.assessments:id,class_record_quarter_id,grading_category_id',
+            ])
             ->where('id', '!=', $classRecord->id)
             ->where('status', '<>', 'archived')
-            ->whereRaw('LOWER(subject_name) = LOWER(?)', [$classRecord->subject_name])
+            ->when(
+                $classRecord->subject_id,
+                fn ($q) => $q->where('subject_id', $classRecord->subject_id),
+                fn ($q) => $q->whereRaw('LOWER(subject_name) = LOWER(?)', [$classRecord->subject_name]),
+            )
             ->orderByDesc('school_year')
-            ->get(['id', 'teacher_id', 'subject_id', 'section_id', 'subject_name', 'year_level_section', 'school_year'])
-            ->filter(fn (ClassRecord $record) => $record->canEdit(Auth::user())
+            ->get(['id', 'teacher_id', 'subject_id', 'section_id', 'grading_option_id', 'school_year_id', 'subject_name', 'year_level_section', 'school_year'])
+            ->filter(fn (ClassRecord $record) => $record->canEdit($user)
                 && (int) $record->section_id !== (int) $classRecord->section_id)
             ->values();
+
+        $isAdmin = $this->isAdmin();
+        $isCategoryScoped = ! $isAdmin && $classRecord->coTeachers->isNotEmpty();
+        $sourceQuarters = $classRecord->quarters->keyBy('quarter');
+        $sourceOwnedCategoryIds = collect(range(1, 4))->mapWithKeys(function (int $number) use ($classRecord, $user) {
+            $quarter = $classRecord->quarters->firstWhere('quarter', $number);
+            $option = $quarter?->gradingOption ?? $classRecord->gradingOption;
+
+            return [$number => $option?->leafCategories()
+                ->filter(fn ($category) => $classRecord->canEdit($user, $category->subject_id))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all() ?? []];
+        });
+
+        $sameSubjectRecords->each(function (ClassRecord $record) use (
+            $user,
+            $isAdmin,
+            $isCategoryScoped,
+            $sourceQuarters,
+            $sourceOwnedCategoryIds
+        ) {
+            $record->setAttribute('apply_quarters', collect(range(1, 4))->map(function (int $number) use (
+                $record,
+                $user,
+                $isAdmin,
+                $isCategoryScoped,
+                $sourceQuarters,
+                $sourceOwnedCategoryIds
+            ) {
+                $quarter = $record->quarters->firstWhere('quarter', $number);
+                $option = $quarter?->gradingOption ?? $record->gradingOption;
+                $assessments = $quarter?->assessments ?? collect();
+                $editableCategoryIds = $option?->leafCategories()
+                    ->filter(fn ($category) => $record->canEdit($user, $category->subject_id))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all() ?? [];
+
+                $sourceAssessments = $sourceQuarters->get($number)?->assessments ?? collect();
+                if ($isCategoryScoped) {
+                    $ownedIds = $sourceOwnedCategoryIds->get($number, []);
+                    $sourceAssessments = $sourceAssessments->filter(
+                        fn ($assessment) => in_array((int) $assessment->grading_category_id, $ownedIds, true)
+                    );
+                }
+
+                $scheduleConflicts = [];
+                if (! $isAdmin) {
+                    foreach ($sourceAssessments as $assessment) {
+                        foreach ($assessment->activityDateStrings() as $date) {
+                            if (WatRuleService::isExamExempt(
+                                $assessment->assessment_type,
+                                $record->school_year_id,
+                                $number,
+                                $date,
+                            )) {
+                                continue;
+                            }
+                            if (WatRuleService::meetsOnDate(
+                                $record->subject_id,
+                                $record->section_id,
+                                $record->school_year_id,
+                                $date,
+                            ) === false) {
+                                $scheduleConflicts[] = $date;
+                            }
+                        }
+                    }
+                }
+
+                return [
+                    'number' => $number,
+                    'is_locked' => (bool) ($quarter?->is_locked ?? false),
+                    'effective_grading_option_id' => $quarter?->grading_option_id ?? $record->grading_option_id,
+                    'assessment_count' => $assessments->count(),
+                    'assessment_category_ids' => $assessments->pluck('grading_category_id')
+                        ->map(fn ($id) => (int) $id)->unique()->values()->all(),
+                    'editable_category_ids' => $editableCategoryIds,
+                    'schedule_conflicts' => array_values(array_unique($scheduleConflicts)),
+                ];
+            })->values()->all());
+        });
 
         // Sibling records splitting this exact subject+section+teacher+SY into
         // separate categories (e.g. STEM Research "Ongoing" vs "Completed") —

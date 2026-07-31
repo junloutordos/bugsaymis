@@ -167,6 +167,18 @@ class ClassRecordComplianceGradingTest extends TestCase
                 'is_graded' => true, 'is_major' => false, 'max_score' => 1, 'sort_order' => $i,
             ]);
         }
+        $nonGraded = ClassRecordAssessment::create([
+            'class_record_quarter_id' => $quarter->id, 'grading_category_id' => $category->id,
+            'assessment_number' => 5, 'title' => 'Unscored Reflection', 'assessment_type' => 'formative',
+            'is_graded' => false, 'is_major' => false, 'max_score' => 0, 'sort_order' => 5,
+        ]);
+        // Simulate stale legacy data from before non-graded score writes were
+        // blocked. It must not affect the 3-of-4 compliance calculation.
+        ClassRecordScore::create([
+            'class_record_student_id' => $student->id,
+            'class_record_assessment_id' => $nonGraded->id,
+            'score' => 0,
+        ]);
 
         // Complied with 3 of 4 (checkbox checked = score equals max_score = 1).
         $this->actingAs($teacher)
@@ -367,10 +379,25 @@ class ClassRecordComplianceGradingTest extends TestCase
             'class_record_quarter_id' => $quarter->id, 'family_name' => 'Doe', 'given_name' => 'Jane',
             'sequence_number' => 1, 'is_active' => true,
         ]);
-        ClassRecordAssessment::create([
+        $graded = ClassRecordAssessment::create([
             'class_record_quarter_id' => $quarter->id, 'grading_category_id' => $category->id,
             'assessment_number' => 1, 'title' => 'Quiz 1', 'assessment_type' => 'formative',
             'is_graded' => true, 'is_major' => false, 'max_score' => 20, 'sort_order' => 1,
+        ]);
+        $nonGraded = ClassRecordAssessment::create([
+            'class_record_quarter_id' => $quarter->id, 'grading_category_id' => $category->id,
+            'assessment_number' => 2, 'title' => 'Practice Only', 'assessment_type' => 'formative',
+            'is_graded' => false, 'is_major' => false, 'max_score' => 100, 'sort_order' => 2,
+        ]);
+        ClassRecordScore::create([
+            'class_record_student_id' => $student->id,
+            'class_record_assessment_id' => $graded->id,
+            'score' => 20,
+        ]);
+        ClassRecordScore::create([
+            'class_record_student_id' => $student->id,
+            'class_record_assessment_id' => $nonGraded->id,
+            'score' => 0,
         ]);
 
         $response = $this->actingAs($teacher)
@@ -378,6 +405,7 @@ class ClassRecordComplianceGradingTest extends TestCase
 
         $response->assertOk();
         $response->assertJson(['gradingMode' => 'numeric']);
+        $this->assertEquals(100.0, $response->json('students.0.percentageScore'));
         $this->assertArrayHasKey('gradeEquivalent', $response->json('students.0'));
         $this->assertArrayNotHasKey('compliancePercentage', $response->json('students.0'));
     }

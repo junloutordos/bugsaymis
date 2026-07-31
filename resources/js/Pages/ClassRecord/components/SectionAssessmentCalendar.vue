@@ -104,8 +104,11 @@ const selectedEntry = computed(() => selectedDate.value ? dayMap.value.get(selec
 // ── Click-to-schedule picker ────────────────────────────────────────────────
 const showPicker     = ref(false)
 const pickerDate     = ref(null)
+const pickerDates    = ref([])
+const pickerAdditionalDate = ref('')
 const pickerCatKey   = ref(null)
 const pickerTitle    = ref('')
+const pickerIsGraded = ref(true)
 const pickerMaxScore = ref('')
 const pickerTargetIds = ref([])
 const pickerWarning  = ref(null)
@@ -121,7 +124,7 @@ function scheduleFeasibility(date) {
 
 function cellFeasible(date) {
   if (!props.editable || !props.pendingRows.length) return { ok: false, reason: null }
-  return scheduleFeasibility(date)
+  return props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null }
 }
 
 function selectDay(cell) {
@@ -130,8 +133,11 @@ function selectDay(cell) {
 
   if (props.editable && props.pendingRows.length) {
     pickerDate.value    = cell.date
+    pickerDates.value   = [cell.date]
+    pickerAdditionalDate.value = ''
     pickerCatKey.value  = props.pendingRows[0]?.key ?? null
     pickerTitle.value   = props.pendingRows[0]?.openRow?.title ?? ''
+    pickerIsGraded.value = props.pendingRows[0]?.openRow?.is_graded ?? true
     pickerMaxScore.value = props.pendingRows[0]?.openRow?.max_score ?? ''
     pickerTargetIds.value = []
     pickerWarning.value = null
@@ -143,15 +149,51 @@ const pickerCategory = computed(() => props.pendingRows.find(r => r.key === pick
 
 watch(pickerCatKey, () => {
   pickerTitle.value = pickerCategory.value?.openRow?.title ?? ''
+  pickerIsGraded.value = pickerCategory.value?.openRow?.is_graded ?? true
   pickerMaxScore.value = pickerCategory.value?.openRow?.max_score ?? ''
 })
 
+watch(pickerIsGraded, (isGraded) => {
+  if (!isGraded) pickerMaxScore.value = ''
+})
+
 const pickerFeasibility = computed(() =>
-  pickerDate.value ? scheduleFeasibility(pickerDate.value) : { ok: true, reason: null }
+  pickerDates.value.length
+    ? pickerDates.value.map(date => ({
+        date,
+        ...(pickerIsGraded.value
+          ? scheduleFeasibility(date)
+          : (props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null })),
+      })).find(result => !result.ok)
+      ?? { ok: true, reason: null }
+    : { ok: true, reason: null }
 )
 
+function addPickerDate() {
+  const date = pickerAdditionalDate.value
+  if (!date || pickerDates.value.includes(date)) return
+  const feasibility = pickerIsGraded.value
+    ? scheduleFeasibility(date)
+    : (props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null })
+  if (!feasibility.ok) {
+    pickerWarning.value = `${date}: ${feasibility.reason}`
+    return
+  }
+  pickerDates.value = [...pickerDates.value, date].sort()
+  pickerDate.value = pickerDates.value[0]
+  pickerAdditionalDate.value = ''
+  pickerWarning.value = null
+}
+
+function removePickerDate(date) {
+  if (pickerDates.value.length === 1) return
+  pickerDates.value = pickerDates.value.filter(value => value !== date)
+  pickerDate.value = pickerDates.value[0] ?? null
+}
+
 function confirmSchedule() {
-  if (!pickerCategory.value || !pickerDate.value || !pickerTitle.value.trim() || Number(pickerMaxScore.value) <= 0) return
+  if (!pickerCategory.value || !pickerDates.value.length || !pickerTitle.value.trim()
+    || (pickerIsGraded.value && Number(pickerMaxScore.value) <= 0)) return
   const feasibility = pickerFeasibility.value
   if (!feasibility.ok) {
     pickerWarning.value = feasibility.reason
@@ -160,8 +202,10 @@ function confirmSchedule() {
   emit('schedule', {
     catId: pickerCategory.value.catId,
     title: pickerTitle.value.trim(),
-    maxScore: Number(pickerMaxScore.value),
-    date: pickerDate.value,
+    isGraded: pickerIsGraded.value,
+    maxScore: pickerIsGraded.value ? Number(pickerMaxScore.value) : null,
+    date: pickerDates.value[0],
+    dates: pickerDates.value,
     targetRecordIds: pickerTargetIds.value,
   })
   showPicker.value = false
@@ -243,6 +287,7 @@ function close() {
                 :class="['rounded px-1 py-0.5 truncate leading-tight text-[11px] border',
                   item.is_pending ? 'bg-amber-50 border-amber-200 border-dashed text-amber-700' : 'bg-red-50 border-red-100 text-red-700']">
                 [{{ item.category_code }}] {{ item.title }}{{ item.is_pending ? ' (unsaved)' : '' }}
+                <span v-if="item.occurrence_total > 1"> · Day {{ item.occurrence_number }}/{{ item.occurrence_total }}</span>
               </div>
               <div v-if="cell.entry.items.length > 2" class="text-slate-400 pl-1">
                 +{{ cell.entry.items.length - 2 }} more
@@ -284,6 +329,9 @@ function close() {
             </div>
             <div class="flex flex-wrap gap-1 mt-1">
               <span v-if="item.is_pending" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Unsaved</span>
+              <span v-if="item.occurrence_total > 1" class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-semibold uppercase tracking-wide">
+                Day {{ item.occurrence_number }} of {{ item.occurrence_total }}
+              </span>
               <span v-if="item.is_major" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
               <span v-if="item.is_graded === false" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Non-graded</span>
             </div>
@@ -323,9 +371,41 @@ function close() {
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Grading</label>
+          <select v-model="pickerIsGraded"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option :value="true">Graded</option>
+            <option :value="false">Non-graded</option>
+          </select>
+        </div>
+        <div v-if="pickerIsGraded">
           <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Maximum Score</label>
           <input v-model="pickerMaxScore" type="number" min="0.01" step="0.01"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Implementation Dates</label>
+          <div class="mb-2 flex flex-wrap gap-1">
+            <span v-for="(date, index) in pickerDates" :key="date"
+              class="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-[11px] text-indigo-700">
+              {{ date }}
+              <span v-if="index === 0" class="text-[9px] font-semibold uppercase text-indigo-400">Primary</span>
+              <button v-if="pickerDates.length > 1" type="button" class="text-indigo-400 hover:text-red-500"
+                title="Remove date" @click="removePickerDate(date)">
+                <XMarkIcon class="h-3 w-3" />
+              </button>
+            </span>
+          </div>
+          <div class="flex gap-2">
+            <input v-model="pickerAdditionalDate" type="date"
+              class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <AppButton type="button" size="sm" variant="secondary" :disabled="!pickerAdditionalDate" @click="addPickerDate">
+              Add Date
+            </AppButton>
+          </div>
+          <p class="mt-1 text-[11px] text-slate-400">
+            {{ pickerIsGraded ? 'One assessment and score column will be used across all selected dates.' : 'This activity will appear in Setup and WAT, but not in Scores & Grades.' }}
+          </p>
         </div>
         <div v-if="sameSubjectRecords.length" class="rounded-lg border border-slate-200 p-3">
           <p class="text-xs font-semibold text-slate-700">Also apply to other sections</p>
@@ -343,7 +423,7 @@ function close() {
       </div>
       <template #footer>
         <AppButton variant="secondary" @click="closePicker">Cancel</AppButton>
-        <AppButton :disabled="!pickerCategory || !pickerTitle.trim() || Number(pickerMaxScore) <= 0 || !pickerFeasibility.ok" @click="confirmSchedule">
+        <AppButton :disabled="!pickerCategory || !pickerTitle.trim() || (pickerIsGraded && Number(pickerMaxScore) <= 0) || !pickerFeasibility.ok" @click="confirmSchedule">
           Save Assessment
         </AppButton>
       </template>

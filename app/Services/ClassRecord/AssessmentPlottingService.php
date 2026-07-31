@@ -146,14 +146,24 @@ class AssessmentPlottingService
         $quarter = $this->quarter($record, $quarterNumber);
         $this->failUnless(! $quarter->is_locked, "Quarter {$quarterNumber} is locked.");
 
-        $date = Carbon::parse($attributes['activity_date'])->toDateString();
+        $dates = collect($attributes['activity_dates'] ?? [$attributes['activity_date']])
+            ->push($attributes['activity_date'])
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->unique()
+            ->sort()
+            ->values();
+        $date = $dates->first();
         $isAdmin = $user->hasPermission('class-records.admin');
 
-        if (! $isAdmin && WatRuleService::violatesPlottingDeadline($date)) {
-            $deadline = WatRuleService::plottingDeadline($date)->format('D, M d, Y \a\t 12:00 NN');
-            throw ValidationException::withMessages([
-                'activity_date' => "The plotting deadline for this week was {$deadline}. Same-week plotting is not allowed.",
-            ]);
+        if (! $isAdmin) {
+            foreach ($dates as $occurrenceDate) {
+                if (WatRuleService::violatesPlottingDeadline($occurrenceDate)) {
+                    $deadline = WatRuleService::plottingDeadline($occurrenceDate)->format('D, M d, Y \a\t 12:00 NN');
+                    throw ValidationException::withMessages([
+                        'activity_dates' => "{$occurrenceDate} missed the plotting deadline of {$deadline}. Same-week plotting is not allowed.",
+                    ]);
+                }
+            }
         }
 
         return DB::transaction(function () use (
@@ -163,6 +173,7 @@ class AssessmentPlottingService
             $category,
             $attributes,
             $date,
+            $dates,
             $isAdmin
         ) {
             // Serialize category numbering on this quarter so two calendar
@@ -180,63 +191,78 @@ class AssessmentPlottingService
                 ? (bool) $attributes['is_graded']
                 : true;
             $isMajor = WatRuleService::isMajor($assessmentType, $category);
-            $isExamExempt = WatRuleService::isExamExempt(
-                $assessmentType,
-                $record->school_year_id,
-                $quarterNumber,
-                $date,
-            );
-
-            if ($isGraded && ! $isExamExempt && $record->section?->levelid !== null) {
+            if ($isGraded && $record->section?->levelid !== null) {
                 $grade = (int) $record->section->levelid;
-                $day = WatRuleService::gradeCountsOnDate(
-                    $record->section_id,
-                    $grade,
+                $countedDates = $dates->reject(fn ($occurrenceDate) => WatRuleService::isExamExempt(
+                    $assessmentType,
                     $record->school_year_id,
-                    $date,
-                );
-                $week = WatRuleService::gradeCountsInWeek(
-                    $record->section_id,
-                    $grade,
-                    $record->school_year_id,
-                    $date,
-                );
+                    $quarterNumber,
+                    $occurrenceDate,
+                ));
 
-                $this->failUnless(
-                    $day['graded'] + 1 <= WatRuleService::DAILY_GRADED_MAX,
-                    'This section already has the maximum number of graded assessments for that day.',
-                );
-                $this->failUnless(
-                    ! $isMajor || $day['major'] + 1 <= WatRuleService::DAILY_MAJOR_MAX,
-                    'This section already has the maximum number of major assessments for that day.',
-                );
-                $this->failUnless(
-                    $week['graded'] + 1 <= WatRuleService::WEEKLY_GRADED_MAX,
-                    'This section already has the maximum number of graded assessments for that week.',
-                );
-                $this->failUnless(
-                    ! $isMajor || $week['major'] + 1 <= WatRuleService::WEEKLY_MAJOR_MAX,
-                    'This section already has the maximum number of major assessments for that week.',
-                );
+                foreach ($countedDates as $occurrenceDate) {
+                    $day = WatRuleService::gradeCountsOnDate(
+                        $record->section_id,
+                        $grade,
+                        $record->school_year_id,
+                        $occurrenceDate,
+                    );
+                    $this->failUnless(
+                        $day['graded'] + 1 <= WatRuleService::DAILY_GRADED_MAX,
+                        "{$occurrenceDate} already has the maximum number of graded assessments.",
+                    );
+                    $this->failUnless(
+                        ! $isMajor || $day['major'] + 1 <= WatRuleService::DAILY_MAJOR_MAX,
+                        "{$occurrenceDate} already has the maximum number of major assessments.",
+                    );
+                }
+
+                foreach ($countedDates->groupBy(fn ($occurrenceDate) => Carbon::parse($occurrenceDate)
+                    ->startOfWeek(Carbon::MONDAY)->toDateString()) as $weekStart => $weekDates) {
+                    $week = WatRuleService::gradeCountsInWeek(
+                        $record->section_id,
+                        $grade,
+                        $record->school_year_id,
+                        $weekStart,
+                    );
+                    $this->failUnless(
+                        $week['graded'] + 1 <= WatRuleService::WEEKLY_GRADED_MAX,
+                        "The week containing {$weekDates->first()} already has the maximum number of graded assessments.",
+                    );
+                    $this->failUnless(
+                        ! $isMajor || $week['major'] + 1 <= WatRuleService::WEEKLY_MAJOR_MAX,
+                        "The week containing {$weekDates->first()} already has the maximum number of major assessments.",
+                    );
+                }
             }
 
-            if (! $isAdmin && ! $isExamExempt) {
-                $meets = WatRuleService::meetsOnDate(
-                    $record->subject_id,
-                    $record->section_id,
-                    $record->school_year_id,
-                    $date,
-                );
-                $this->failUnless(
-                    $meets !== false,
-                    "{$record->subject_name} has no scheduled class with this section on "
-                        .Carbon::parse($date)->format('l, M d').'.',
-                );
+            if (! $isAdmin) {
+                foreach ($dates as $occurrenceDate) {
+                    if (WatRuleService::isExamExempt(
+                        $assessmentType,
+                        $record->school_year_id,
+                        $quarterNumber,
+                        $occurrenceDate,
+                    )) {
+                        continue;
+                    }
+                    $meets = WatRuleService::meetsOnDate(
+                        $record->subject_id,
+                        $record->section_id,
+                        $record->school_year_id,
+                        $occurrenceDate,
+                    );
+                    $this->failUnless(
+                        $meets !== false,
+                        "{$record->subject_name} has no scheduled class with this section on "
+                            .Carbon::parse($occurrenceDate)->format('l, M d').'.',
+                    );
+                }
             }
 
             $nextSort = ((int) $existing->max('sort_order')) + 1;
 
-            return ClassRecordAssessment::create([
+            $assessment = ClassRecordAssessment::create([
                 'class_record_quarter_id' => $quarter->id,
                 'grading_category_id' => $category->id,
                 'assessment_type' => $assessmentType,
@@ -246,9 +272,12 @@ class AssessmentPlottingService
                 'title' => $attributes['title'],
                 'activity_date' => $date,
                 'plotted_at' => now(),
-                'max_score' => $attributes['max_score'],
+                'max_score' => $isGraded ? (float) $attributes['max_score'] : 0,
                 'sort_order' => $nextSort,
             ]);
+            $assessment->syncActivityDates($dates->all());
+
+            return $assessment;
         }, 3);
     }
 

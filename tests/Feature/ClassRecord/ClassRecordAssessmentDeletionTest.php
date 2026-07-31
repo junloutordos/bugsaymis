@@ -307,6 +307,47 @@ class ClassRecordAssessmentDeletionTest extends TestCase
         $this->assertSame('approved', $deletionRequest->fresh()->status);
     }
 
+    public function test_acidaa_can_remove_one_date_without_deleting_the_multi_date_assessment(): void
+    {
+        $teacher = User::factory()->create();
+        $acidaa = $this->makeAcidaaUser();
+        $quarter = $this->makeRecordAndQuarter($teacher, $this->makeSection(), $this->makeSubject());
+        $assessment = $this->makeAssessment($quarter, 1, 'Performance Task', '2026-09-07');
+        $assessment->syncActivityDates(['2026-09-07', '2026-09-09']);
+
+        $this->actingAs($teacher)
+            ->postJson(route('class-records.assessments.request-deletion', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1, 'assessment' => $assessment->id,
+            ]), [
+                'reason' => 'The second session was cancelled.',
+                'activity_date' => '2026-09-09',
+            ])
+            ->assertOk();
+
+        $deletionRequest = ClassRecordAssessmentDeletionRequest::where(
+            'class_record_assessment_id',
+            $assessment->id
+        )->firstOrFail();
+        $this->assertNotNull($deletionRequest->class_record_assessment_date_id);
+
+        $this->actingAs($acidaa)
+            ->postJson(route('approvals.approve', [
+                'type' => 'assessment_deletion_requests',
+                'id' => $deletionRequest->id,
+            ]))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('class_record_assessments', ['id' => $assessment->id]);
+        $this->assertDatabaseHas('class_record_assessment_dates', [
+            'class_record_assessment_id' => $assessment->id,
+            'activity_date' => '2026-09-07',
+        ]);
+        $this->assertDatabaseMissing('class_record_assessment_dates', [
+            'class_record_assessment_id' => $assessment->id,
+            'activity_date' => '2026-09-09',
+        ]);
+    }
+
     public function test_non_acidaa_user_cannot_approve_a_deletion_request(): void
     {
         $teacher = User::factory()->create();
