@@ -402,18 +402,19 @@ const showRunning = computed(() => props.quarterNumber > 1)
     </div>
 
     <!-- Score grid -->
-    <div v-else class="overflow-x-auto rounded-xl border border-slate-100 shadow-sm">
+    <div v-else
+      class="relative isolate max-h-[calc(100vh-14rem)] overflow-auto overscroll-contain rounded-xl border border-slate-100 shadow-sm">
       <table class="text-xs border-collapse" style="min-width: max-content;">
         <!-- ── Two-row header ──────────────────────────────────────── -->
-        <thead>
+        <thead class="sticky top-0 z-30 bg-slate-50 shadow-[0_2px_4px_rgba(15,23,42,0.10)]">
           <!-- Row 1: Group headers -->
           <tr class="bg-slate-100">
             <!-- Fixed left cols spanning 2 rows -->
-            <th rowspan="2" class="sticky left-0 z-20 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold w-8">#</th>
-            <th rowspan="2" class="sticky left-8 z-20 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold whitespace-nowrap">Family Name</th>
-            <th rowspan="2" class="sticky left-32 z-20 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold whitespace-nowrap">Given Name</th>
-            <th rowspan="2" class="sticky left-56 z-20 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold w-10">MI</th>
-            <th rowspan="2" class="sticky left-64 z-20 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold w-10">Sex</th>
+            <th rowspan="2" class="sticky left-0 z-40 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold w-8">#</th>
+            <th rowspan="2" class="sticky left-8 z-40 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold whitespace-nowrap">Family Name</th>
+            <th rowspan="2" class="sticky left-32 z-40 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold whitespace-nowrap">Given Name</th>
+            <th rowspan="2" class="sticky left-56 z-40 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold w-10">MI</th>
+            <th rowspan="2" class="sticky left-64 z-40 bg-slate-100 border border-slate-200 px-2 py-1.5 text-slate-500 font-semibold w-10">Sex</th>
 
             <!-- Category group headers -->
             <th v-for="cat in categories" :key="cat.id"
