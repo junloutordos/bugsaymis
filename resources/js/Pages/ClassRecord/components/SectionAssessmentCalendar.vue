@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import AppModal from '@/Components/AppModal.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import AppButton from '@/Components/AppButton.vue'
-import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { checkWatCap, WAT_LIMITS } from '@/Utils/ClassRecord/watUtils.js'
 
 const props = defineProps({
@@ -23,7 +23,7 @@ const props = defineProps({
   disabledDates: { type: Function, default: null },  // (dateStr) => { ok: boolean, reason: ?string } — schedule-day / deadline check
 })
 
-const emit = defineEmits(['close', 'schedule', 'apply-to-sections'])
+const emit = defineEmits(['close', 'schedule', 'apply-to-sections', 'clear-pending'])
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -234,8 +234,9 @@ function close() {
             </div>
             <div v-if="cell.entry" class="space-y-0.5 overflow-hidden">
               <div v-for="item in cell.entry.items.slice(0, 2)" :key="item.id"
-                class="rounded px-1 py-0.5 truncate leading-tight text-[11px] bg-red-50 border border-red-100 text-red-700">
-                [{{ item.category_code }}] {{ item.title }}
+                :class="['rounded px-1 py-0.5 truncate leading-tight text-[11px] border',
+                  item.is_pending ? 'bg-amber-50 border-amber-200 border-dashed text-amber-700' : 'bg-red-50 border-red-100 text-red-700']">
+                [{{ item.category_code }}] {{ item.title }}{{ item.is_pending ? ' (unsaved)' : '' }}
               </div>
               <div v-if="cell.entry.items.length > 2" class="text-slate-400 pl-1">
                 +{{ cell.entry.items.length - 2 }} more
@@ -266,15 +267,23 @@ function close() {
             </AppBadge>
           </div>
           <div v-for="item in selectedEntry.items" :key="item.id"
-            :class="['rounded-lg p-2.5 border', item.is_own_record ? 'border-indigo-100 bg-indigo-50/60' : 'border-slate-100 bg-slate-50/60']">
-            <p class="text-sm font-medium text-slate-800 leading-tight">[{{ item.category_code }}] {{ item.title }}</p>
+            :class="['rounded-lg p-2.5 border', item.is_pending ? 'border-amber-200 border-dashed bg-amber-50/60' : (item.is_own_record ? 'border-indigo-100 bg-indigo-50/60' : 'border-slate-100 bg-slate-50/60')]">
+            <div class="flex items-start justify-between gap-2">
+              <p class="text-sm font-medium text-slate-800 leading-tight">[{{ item.category_code }}] {{ item.title }}</p>
+              <button v-if="item.is_pending" type="button" title="Remove this unsaved entry"
+                class="text-amber-500 hover:text-amber-700 shrink-0"
+                @click="emit('clear-pending', item)">
+                <XMarkIcon class="w-4 h-4" />
+              </button>
+            </div>
             <div class="flex flex-wrap gap-1 mt-1">
+              <span v-if="item.is_pending" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Unsaved</span>
               <span v-if="item.is_major" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">Major</span>
               <span v-if="item.is_graded === false" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Non-graded</span>
             </div>
             <p class="text-xs text-slate-500 mt-0.5">{{ item.subject_name }}</p>
             <p v-if="item.teacher_name" class="text-xs text-slate-400 italic">{{ item.teacher_name }}</p>
-            <p v-if="item.is_own_record" class="text-[11px] text-indigo-500 mt-0.5">This class record</p>
+            <p v-if="item.is_own_record && !item.is_pending" class="text-[11px] text-indigo-500 mt-0.5">This class record</p>
           </div>
         </div>
 
