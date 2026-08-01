@@ -113,8 +113,8 @@ class TravelController extends Controller
         return Inertia::render('Travel/Show', [
             'travel' => $this->formatTravel($travel, true),
             'lookups' => [
-                'travelOrders' => Issuance::where('type', 'TO')->latest()->limit(100)->get(['id', 'control_number', 'title', 'status']),
-                'specialOrders' => Issuance::where('type', 'SO')->latest()->limit(100)->get(['id', 'control_number', 'title', 'status']),
+                'travelOrders' => Issuance::whereNull('parent_issuance_id')->where('type', 'TO')->latest()->limit(100)->get(['id', 'control_number', 'title', 'status']),
+                'specialOrders' => Issuance::whereNull('parent_issuance_id')->where('type', 'SO')->latest()->limit(100)->get(['id', 'control_number', 'title', 'status']),
                 'vehicleRequests' => VehicleRequest::latest()->limit(100)->get(['id', 'purpose', 'destination', 'status', 'date_needed']),
                 'orsRecords' => OblRequest::latest()->limit(100)->get(['id', 'ors_number', 'activity_title', 'status', 'amount']),
                 'dvRecords' => DisbursementVoucher::latest()->limit(100)->get(['id', 'dv_number', 'activity_title', 'status', 'net_amount']),

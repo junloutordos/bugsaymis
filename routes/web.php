@@ -354,6 +354,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/',                       [\App\Http\Controllers\IssuanceController::class, 'index'])->name('index');
         Route::get('/create',                 [\App\Http\Controllers\IssuanceController::class, 'create'])->name('create')->middleware('permission:issuances.manage');
         Route::post('/',                      [\App\Http\Controllers\IssuanceController::class, 'store'])->name('store')->middleware('permission:issuances.manage');
+        Route::get('/{issuance}/supplements/create', [\App\Http\Controllers\IssuanceController::class, 'createSupplement'])->name('supplements.create')->middleware('permission:issuances.manage');
+        Route::post('/{issuance}/supplements', [\App\Http\Controllers\IssuanceController::class, 'storeSupplement'])->name('supplements.store')->middleware('permission:issuances.manage');
 
         // Settings (manage only) — must be defined before /{issuance} to avoid route clash
         Route::middleware('permission:issuances.manage')->group(function () {
@@ -366,6 +368,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
         Route::get('/{issuance}',             [\App\Http\Controllers\IssuanceController::class, 'show'])->name('show');
         Route::post('/{issuance}/release',    [\App\Http\Controllers\IssuanceController::class, 'release'])->name('release')->middleware('permission:issuances.manage');
+        Route::post('/{issuance}/archive',    [\App\Http\Controllers\IssuanceController::class, 'archive'])->name('archive')->middleware('permission:issuances.manage');
+        Route::post('/{issuance}/unarchive',  [\App\Http\Controllers\IssuanceController::class, 'unarchive'])->name('unarchive')->middleware('permission:issuances.manage');
+        Route::delete('/{issuance}',          [\App\Http\Controllers\IssuanceController::class, 'destroy'])->name('destroy')->middleware('permission:issuances.manage');
         Route::post('/{issuance}/acknowledge',[\App\Http\Controllers\IssuanceController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/{issuance}/pdf',         [\App\Http\Controllers\IssuanceController::class, 'downloadPdf'])->name('pdf');
         Route::get('/{issuance}/scan',        [\App\Http\Controllers\IssuanceController::class, 'viewScan'])->name('scan');

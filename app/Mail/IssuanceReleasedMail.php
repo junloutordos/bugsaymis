@@ -20,7 +20,7 @@ class IssuanceReleasedMail extends Mailable
     public function build(): static
     {
         $mail = $this
-            ->subject("[{$this->issuance->control_number}] {$this->issuance->type_label}: {$this->issuance->title}")
+            ->subject("[{$this->issuance->display_number}] " . ($this->issuance->isSupplement() ? $this->issuance->document_kind_label : $this->issuance->type_label) . ": {$this->issuance->title}")
             ->view('emails.issuance_released')
             ->with([
                 'issuance'      => $this->issuance,
@@ -36,7 +36,7 @@ class IssuanceReleasedMail extends Mailable
         try {
             $pdf = Storage::disk('s3')->get('issuances/' . $this->issuance->control_number . '.pdf');
             if ($pdf !== null) {
-                $mail->attachData($pdf, $this->issuance->control_number . '.pdf', ['mime' => 'application/pdf']);
+                $mail->attachData($pdf, $this->issuance->display_number . '.pdf', ['mime' => 'application/pdf']);
             }
         } catch (\Throwable) {
             // PDF not ready or unavailable — email sent without attachment; user can download from app

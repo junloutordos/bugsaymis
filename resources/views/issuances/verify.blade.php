@@ -109,6 +109,46 @@
     @endif
 
     @if($valid)
+    @if($issuance->archived_at)
+    <div class="status warning">
+      <div class="status-icon">🗄️</div>
+      <div>
+        <div class="status-title" style="color:#475569;">Archived Official Record</div>
+        <div class="status-sub">This remains an authentic released document, but it has been moved to the records archive.</div>
+      </div>
+    </div>
+    @endif
+    @if($parentIssuance)
+    <div class="status warning">
+      <div class="status-icon">↩</div>
+      <div>
+        <div class="status-title" style="color:#1d4ed8;">Related Document</div>
+        <div class="status-sub">
+          {{ $issuance->display_number }} supplements
+          <a href="{{ route('issuances.verify', $parentIssuance->qr_token) }}" style="color:#1d4ed8;font-weight:600;">{{ $parentIssuance->control_number }}</a>.
+        </div>
+      </div>
+    </div>
+    @endif
+
+    @if($supplements->isNotEmpty())
+    <div class="status {{ $supplements->contains(fn($item) => in_array($item->document_kind, ['erratum', 'corrigendum'], true)) ? 'tampered' : 'warning' }}">
+      <div class="status-icon">⚠️</div>
+      <div>
+        <div class="status-title" style="color:#c2410c;">Official Related Document{{ $supplements->count() === 1 ? '' : 's' }} Available</div>
+        <div class="status-sub">Review the following signed records together with this issuance:</div>
+        <ul style="margin:8px 0 0 16px;font-size:12px;line-height:1.6;">
+          @foreach($supplements as $item)
+          <li>
+            <a href="{{ route('issuances.verify', $item->qr_token) }}" style="color:#1d4ed8;font-weight:600;">{{ $item->display_number }}</a>
+            — {{ $item->title }}{{ $item->archived_at ? ' (archived)' : '' }}
+          </li>
+          @endforeach
+        </ul>
+      </div>
+    </div>
+    @endif
+
     <div class="doc-section">
       <div class="doc-hint">System Copy — compare this with the printed document in your hand. If the text, names, dates, or amounts differ, the printed copy may have been altered.</div>
       <iframe src="{{ $documentUrl }}" title="Original document"></iframe>
@@ -118,11 +158,11 @@
     <div class="meta">
       <div class="meta-row">
         <div class="meta-label">Control No.</div>
-        <div class="meta-value"><strong>{{ $issuance->control_number }}</strong></div>
+        <div class="meta-value"><strong>{{ $issuance->display_number }}</strong></div>
       </div>
       <div class="meta-row">
         <div class="meta-label">Type</div>
-        <div class="meta-value"><span class="badge">{{ $issuance->type_label }}</span></div>
+        <div class="meta-value"><span class="badge">{{ $issuance->isSupplement() ? $issuance->document_kind_label : $issuance->type_label }}</span></div>
       </div>
       <div class="meta-row">
         <div class="meta-label">Title</div>

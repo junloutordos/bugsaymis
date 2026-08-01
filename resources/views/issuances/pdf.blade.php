@@ -51,8 +51,13 @@ body { font-family:Arial, sans-serif; font-size:10pt; color:#1e293b; line-height
 
 {{-- Issuance type header --}}
 <div class="issuance-header">
-  <div class="issuance-type">{{ $issuance->type_label }}</div>
-  <div class="control-no">No. {{ $issuance->series_no }}, S. {{ $issuance->year }}</div>
+  <div class="issuance-type">{{ $issuance->isSupplement() ? $issuance->document_kind_label : $issuance->type_label }}</div>
+  <div class="control-no">
+    {{ $issuance->isSupplement() ? $issuance->display_number : 'No. '.$issuance->series_no.', S. '.$issuance->year }}
+  </div>
+  @if($issuance->isSupplement() && $issuance->parentIssuance)
+  <div class="subject-line">Supplement to: {{ $issuance->parentIssuance->title }}</div>
+  @endif
 </div>
 
 {{-- Body content (editor mode only — scan mode uses stampQrOnScan) --}}

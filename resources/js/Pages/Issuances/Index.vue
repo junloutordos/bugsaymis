@@ -53,12 +53,14 @@ watch(search, (val) => {
 })
 
 const pendingCount = computed(() =>
-  (props.issuances ?? []).filter(i => !i.my_acknowledged_at && i.status === 'released').length
+  (props.issuances ?? []).filter(i => !i.archived_at && !i.my_acknowledged_at && i.status === 'released').length
 )
 
 // Text search is handled server-side; only type/year/tab filter client-side here
 const filtered = computed(() => {
   return (props.issuances ?? []).filter(i => {
+    if (activeTab.value === 'archived' && !i.archived_at) return false
+    if (activeTab.value !== 'archived' && i.archived_at) return false
     if (activeTab.value === 'pending' && (i.my_acknowledged_at || i.status !== 'released')) return false
     if (activeTab.value === 'released' && i.status !== 'released') return false
     if (activeTab.value === 'draft' && i.status !== 'draft') return false
@@ -141,9 +143,11 @@ const showSettings = ref(false)
           { key:'all',      label:'All' },
           { key:'released', label:'Released' },
           { key:'draft',    label:'Drafts' },
+          { key:'archived', label:'Archived' },
         ] : [
           { key:'all',     label:'My Issuances' },
           { key:'pending', label:'For My Acknowledgment' },
+          { key:'archived', label:'Archived' },
         ]" :key="tab.key"
           @click="activeTab = tab.key"
           class="px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2"
@@ -198,6 +202,7 @@ const showSettings = ref(false)
           </td>
           <td class="px-4 py-3 max-w-[200px]">
             <p class="text-sm font-medium text-slate-800 truncate">{{ i.title }}</p>
+            <p v-if="i.supplements_count" class="mt-0.5 text-[10px] font-medium text-indigo-600">{{ i.supplements_count }} related document(s)</p>
           </td>
           <td class="hidden md:table-cell px-4 py-3">
             <AppBadge :color="typeColor(i.type)">{{ i.type }}</AppBadge>
@@ -206,6 +211,7 @@ const showSettings = ref(false)
           <td class="hidden lg:table-cell px-4 py-3 text-xs text-slate-500">{{ fmtDate(i.released_at ?? i.created_at) }}</td>
           <td class="px-4 py-3">
             <AppBadge :color="statusColor(i.status)" class="capitalize">{{ i.status }}</AppBadge>
+            <AppBadge v-if="i.archived_at" color="slate" class="ml-1">Archived</AppBadge>
           </td>
           <td v-if="isAdmin" class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">
             {{ i.acknowledged_count }}/{{ i.recipients_count }}
@@ -224,8 +230,10 @@ const showSettings = ref(false)
               <div>
                 <p class="font-mono text-xs font-bold text-indigo-700">{{ i.control_number }}</p>
                 <p class="text-sm font-medium text-slate-800">{{ i.title }}</p>
+                <p v-if="i.supplements_count" class="text-[10px] font-medium text-indigo-600">{{ i.supplements_count }} related document(s)</p>
               </div>
               <AppBadge :color="statusColor(i.status)" class="capitalize">{{ i.status }}</AppBadge>
+              <AppBadge v-if="i.archived_at" color="slate">Archived</AppBadge>
             </div>
             <div class="flex items-center gap-2">
               <AppBadge :color="typeColor(i.type)">{{ i.type }}</AppBadge>

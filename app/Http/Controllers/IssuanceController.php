@@ -15,10 +15,12 @@ use App\Models\User;
 use App\Services\DigitalSignatureService;
 use App\Services\IssuanceService;
 use App\Services\NotificationService;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -39,9 +41,11 @@ class IssuanceController extends Controller
         $isAdmin = $user->hasPermission('issuances.manage');
         $search  = trim($request->input('search', ''));
 
-        $query = Issuance::with(['creator:id,name,position'])
+        $query = Issuance::whereNull('parent_issuance_id')
+            ->with(['creator:id,name,position'])
             ->withCount([
                 'recipients',
+                'supplements',
                 'recipients as acknowledged_count' => fn($q) => $q->whereNotNull('acknowledged_at'),
             ]);
 
@@ -57,7 +61,11 @@ class IssuanceController extends Controller
                 $q->where('title', 'LIKE', $like)
                   ->orWhere('control_number', 'LIKE', $like)
                   ->orWhereHas('creator', fn($c) => $c->where('name', 'LIKE', $like))
-                  ->orWhere('content_text', 'LIKE', $like);
+                  ->orWhere('content_text', 'LIKE', $like)
+                  ->orWhereHas('supplements', fn ($s) => $s
+                      ->where('title', 'LIKE', $like)
+                      ->orWhere('reference_number', 'LIKE', $like)
+                      ->orWhere('content_text', 'LIKE', $like));
             });
         }
 
@@ -68,6 +76,8 @@ class IssuanceController extends Controller
             'control_number'   => $i->control_number,
             'title'            => $i->title,
             'status'           => $i->status,
+            'archived_at'      => $i->archived_at?->toISOString(),
+            'supplements_count'=> $i->supplements_count,
             'recipient_type'   => $i->recipient_type,
             'recipients_count' => $i->recipients_count,
             'acknowledged_count' => $i->acknowledged_count,
@@ -101,6 +111,101 @@ class IssuanceController extends Controller
         ]);
     }
 
+    public function createSupplement(Request $request, Issuance $issuance)
+    {
+        abort_if(! $request->user()->hasPermission('issuances.manage'), 403);
+        abort_if($issuance->isSupplement(), 422, 'Supplemental documents must be attached to a primary issuance.');
+        abort_if(! $issuance->isReleased(), 422, 'Only released issuances can receive supplemental documents.');
+        abort_if($issuance->isArchived(), 422, 'Unarchive the issuance before adding a supplemental document.');
+
+        return Inertia::render('Issuances/CreateSupplement', [
+            'parentIssuance' => [
+                'id' => $issuance->id,
+                'control_number' => $issuance->control_number,
+                'title' => $issuance->title,
+                'recipients_count' => $issuance->recipients()->count(),
+            ],
+            'kindLabels' => Issuance::supplementKindLabels(),
+            'hasPin' => ! empty($request->user()->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($request->user()),
+        ]);
+    }
+
+    public function storeSupplement(Request $request, Issuance $issuance)
+    {
+        abort_if(! $request->user()->hasPermission('issuances.manage'), 403);
+        abort_if($issuance->isSupplement() || ! $issuance->isReleased() || $issuance->isArchived(), 422,
+            'Supplemental documents can only be added to an active released issuance.');
+
+        $validated = $request->validate([
+            'document_kind' => ['required', Rule::in(array_keys(Issuance::supplementKindLabels()))],
+            'title' => 'required|string|max:500',
+            'content' => 'nullable|string',
+            'scan_base64' => 'nullable|string',
+            'scan_filename' => 'nullable|string|max:255',
+            'scan_mime' => 'required_with:scan_base64|nullable|string|in:application/pdf,image/jpeg,image/png',
+            'should_release' => 'nullable|boolean',
+            'pin' => 'nullable|string',
+        ]);
+        abort_if(empty($validated['content']) && empty($validated['scan_base64']), 422,
+            'Enter document content or upload a scanned document.');
+        if ($validated['should_release'] ?? false) {
+            $this->assertSigningPin($request, $validated);
+        }
+
+        $supplement = DB::transaction(function () use ($issuance, $validated, $request) {
+            $parent = Issuance::whereKey($issuance->id)->lockForUpdate()->firstOrFail();
+            $number = ((int) $parent->supplements()
+                ->where('document_kind', $validated['document_kind'])->max('supplement_no')) + 1;
+            $kindLabel = Issuance::supplementKindLabels()[$validated['document_kind']];
+            $technicalNumber = 'SUP-' . substr(str_replace('-', '', (string) Str::uuid()), 0, 26);
+            $referenceNumber = "{$kindLabel} No. {$number} to {$parent->control_number}";
+
+            $attachmentPath = $attachmentFilename = $attachmentMime = null;
+            if (! empty($validated['scan_base64'])) {
+                $raw = base64_decode(preg_replace('/^data:[^;]+;base64,/', '', $validated['scan_base64']), true);
+                abort_if($raw === false, 422, 'The uploaded document is not valid base64 data.');
+                abort_if(strlen($raw) > 20 * 1024 * 1024, 422, 'The uploaded document may not exceed 20 MB.');
+                $ext = match ($validated['scan_mime'] ?? '') {
+                    'application/pdf' => 'pdf', 'image/png' => 'png', default => 'jpg',
+                };
+                $attachmentPath = 'issuances/supplements/' . $technicalNumber . '.' . $ext;
+                $attachmentFilename = $validated['scan_filename'] ?? ($technicalNumber . '.' . $ext);
+                $attachmentMime = $validated['scan_mime'];
+                Storage::disk('s3')->put($attachmentPath, $raw);
+            }
+
+            return Issuance::create([
+                'parent_issuance_id' => $parent->id,
+                'document_kind' => $validated['document_kind'],
+                'supplement_no' => $number,
+                'reference_number' => $referenceNumber,
+                'type' => $parent->type,
+                'control_number' => $technicalNumber,
+                'series_no' => $parent->series_no,
+                'year' => $parent->year,
+                'month' => $parent->month,
+                'title' => $validated['title'],
+                'content' => $validated['content'] ?? null,
+                'attachment_path' => $attachmentPath,
+                'attachment_filename' => $attachmentFilename,
+                'attachment_mime' => $attachmentMime,
+                'recipient_type' => $parent->recipient_type,
+                'status' => 'draft',
+                'created_by' => $request->user()->id,
+            ]);
+        });
+
+        AuditLogger::logModelEvent($supplement, 'created');
+
+        if ($validated['should_release'] ?? false) {
+            $this->doRelease($request, $supplement, $validated);
+            return redirect()->route('issuances.show', $supplement)->with('success', "{$supplement->display_number} signed and released.");
+        }
+
+        return redirect()->route('issuances.show', $supplement)->with('success', "Draft {$supplement->display_number} saved.");
+    }
+
     // ── Store (save draft) ────────────────────────────────────────────────────
 
     public function store(Request $request)
@@ -122,6 +227,9 @@ class IssuanceController extends Controller
             'should_release'     => 'nullable|boolean',
             'pin'                => 'nullable|string',
         ]);
+        if ($validated['should_release'] ?? false) {
+            $this->assertSigningPin($request, $validated);
+        }
 
         $year  = now()->year;
         $month = now()->month;
@@ -172,15 +280,37 @@ class IssuanceController extends Controller
 
     private function doRelease(Request $request, Issuance $issuance, array $data): void
     {
+        $this->assertSigningPin($request, $data);
+
         DB::transaction(function () use ($issuance, $data) {
             $issuance->content_hash   = $this->svc->computeHash($issuance);
-            $issuance->recipient_type = $data['recipient_type'];
+            $issuance->recipient_type = $issuance->isSupplement()
+                ? $issuance->parentIssuance->recipient_type
+                : $data['recipient_type'];
             $issuance->status         = 'released';
             $issuance->released_at    = now();
             $issuance->save();
-            $this->svc->buildRecipients($issuance, $data);
+            if ($issuance->isSupplement()) {
+                $rows = $issuance->parentIssuance->recipients()->get(['user_id', 'office_id'])->map(fn ($recipient) => [
+                    'issuance_id' => $issuance->id,
+                    'user_id' => $recipient->user_id,
+                    'office_id' => $recipient->office_id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])->all();
+                if ($rows) IssuanceRecipient::insert($rows);
+            } else {
+                $this->svc->buildRecipients($issuance, $data);
+            }
             $issuance->recipients()->update(['notified_at' => now()]);
         });
+
+        AuditLogger::log([
+            'action' => $issuance->isSupplement() ? 'issuance_supplement_released' : 'issuance_released',
+            'auditable_type' => Issuance::class,
+            'auditable_id' => $issuance->id,
+            'new_values' => ['status' => 'released', 'released_at' => $issuance->released_at],
+        ]);
 
         // Sign synchronously (fast — just a DB write)
         try {
@@ -189,7 +319,7 @@ class IssuanceController extends Controller
                 Issuance::class,
                 $issuance->id,
                 'release',
-                "{$issuance->type_label}: {$issuance->title}",
+                ($issuance->isSupplement() ? $issuance->display_number : $issuance->type_label) . ": {$issuance->title}",
                 $issuance->content_hash,
             );
         } catch (\Throwable $e) {
@@ -217,6 +347,14 @@ class IssuanceController extends Controller
         }
     }
 
+    private function assertSigningPin(Request $request, array $data): void
+    {
+        if (! empty($request->user()->signature_pin)) {
+            abort_if(empty($data['pin']) || ! $this->sigService->verifyPin($request->user(), $data['pin']), 422,
+                'The digital signature PIN is incorrect.');
+        }
+    }
+
     // ── Show ──────────────────────────────────────────────────────────────────
 
     public function show(Request $request, Issuance $issuance)
@@ -230,7 +368,27 @@ class IssuanceController extends Controller
             abort_if(! $isRecipient || $issuance->status !== 'released', 403);
         }
 
-        $issuance->load(['creator:id,name,position', 'signature.signer:id,name,position,electronic_signature']);
+        $issuance->load([
+            'creator:id,name,position', 'signature.signer:id,name,position,electronic_signature',
+            'parentIssuance:id,control_number,title,status,archived_at',
+        ]);
+
+        $supplements = $issuance->isSupplement() ? collect() : $issuance->supplements()
+            ->when(! $isAdmin, fn ($q) => $q->where('status', 'released')
+                ->whereHas('recipients', fn ($r) => $r->where('user_id', $user->id)))
+            ->withCount(['recipients', 'recipients as acknowledged_count' => fn ($q) => $q->whereNotNull('acknowledged_at')])
+            ->get()->map(fn ($s) => [
+                'id' => $s->id,
+                'kind' => $s->document_kind,
+                'kind_label' => $s->document_kind_label,
+                'reference_number' => $s->display_number,
+                'title' => $s->title,
+                'status' => $s->status,
+                'archived_at' => $s->archived_at?->toISOString(),
+                'released_at' => $s->released_at?->toISOString(),
+                'recipients_count' => $s->recipients_count,
+                'acknowledged_count' => $s->acknowledged_count,
+            ]);
 
         $recipients = $issuance->recipients()
             ->with(['user:id,name,position,office_id', 'office:id,name'])
@@ -261,6 +419,15 @@ class IssuanceController extends Controller
                 'type'             => $issuance->type,
                 'type_label'       => $issuance->type_label,
                 'control_number'   => $issuance->control_number,
+                'display_number'   => $issuance->display_number,
+                'document_kind'    => $issuance->document_kind,
+                'document_kind_label' => $issuance->document_kind_label,
+                'is_supplement'    => $issuance->isSupplement(),
+                'parent_issuance'  => $issuance->parentIssuance ? [
+                    'id' => $issuance->parentIssuance->id,
+                    'control_number' => $issuance->parentIssuance->control_number,
+                    'title' => $issuance->parentIssuance->title,
+                ] : null,
                 'title'            => $issuance->title,
                 'content'          => $issuance->content,
                 'attachment_path'  => $issuance->attachment_path,
@@ -268,6 +435,8 @@ class IssuanceController extends Controller
                 'attachment_filename' => $issuance->attachment_filename,
                 'recipient_type'   => $issuance->recipient_type,
                 'status'           => $issuance->status,
+                'archived_at'      => $issuance->archived_at?->toISOString(),
+                'archive_reason'   => $issuance->archive_reason,
                 'content_hash'     => $issuance->content_hash,
                 'qr_token'         => $issuance->qr_token,
                 'qr_svg'           => $qrSvg,
@@ -281,6 +450,7 @@ class IssuanceController extends Controller
                 ] : null,
             ],
             'recipients'  => $recipients,
+            'supplements' => $supplements,
             'isAdmin'     => $isAdmin,
             'hasPin'      => ! empty($user->signature_pin),
             'signatureUri'=> $isAdmin ? $this->sigService->getSignatureDataUri($user) : null,
@@ -297,9 +467,14 @@ class IssuanceController extends Controller
     {
         abort_if(! $request->user()->hasPermission('issuances.manage'), 403);
         abort_if(! $issuance->isEditable(), 422, 'Only draft issuances can be released.');
+        abort_if($issuance->isArchived(), 422, 'Restore this draft from the archive before releasing it.');
+        if ($issuance->isSupplement()) {
+            abort_if(! $issuance->parentIssuance?->isReleased() || $issuance->parentIssuance?->isArchived(), 422,
+                'The parent issuance must be active and released.');
+        }
 
         $validated = $request->validate([
-            'recipient_type' => 'required|in:all,office,individual,division',
+            'recipient_type' => [$issuance->isSupplement() ? 'nullable' : 'required', Rule::in(['all', 'office', 'individual', 'division'])],
             'office_ids'     => 'nullable|array',
             'user_ids'       => 'nullable|array',
             'division_ids'   => 'nullable|array',
@@ -309,7 +484,59 @@ class IssuanceController extends Controller
 
         $this->doRelease($request, $issuance, $validated);
 
-        return back()->with('success', "{$issuance->control_number} released to recipients.");
+        return back()->with('success', "{$issuance->display_number} released to recipients.");
+    }
+
+    public function archive(Request $request, Issuance $issuance)
+    {
+        abort_if(! $request->user()->hasPermission('issuances.manage'), 403);
+        abort_if($issuance->isArchived(), 422, 'This record is already archived.');
+        $validated = $request->validate(['reason' => 'nullable|string|max:500']);
+        $issuance->update([
+            'archived_at' => now(),
+            'archived_by' => $request->user()->id,
+            'archive_reason' => $validated['reason'] ?? null,
+        ]);
+        AuditLogger::log([
+            'action' => 'issuance_archived',
+            'auditable_type' => Issuance::class,
+            'auditable_id' => $issuance->id,
+            'new_values' => ['archived_at' => $issuance->archived_at, 'archive_reason' => $issuance->archive_reason],
+        ]);
+
+        return back()->with('success', "{$issuance->display_number} archived.");
+    }
+
+    public function unarchive(Request $request, Issuance $issuance)
+    {
+        abort_if(! $request->user()->hasPermission('issuances.manage'), 403);
+        abort_if(! $issuance->isArchived(), 422, 'This record is not archived.');
+        $issuance->update(['archived_at' => null, 'archived_by' => null, 'archive_reason' => null]);
+        AuditLogger::log([
+            'action' => 'issuance_unarchived',
+            'auditable_type' => Issuance::class,
+            'auditable_id' => $issuance->id,
+            'old_values' => ['archived' => true],
+            'new_values' => ['archived' => false],
+        ]);
+
+        return back()->with('success', "{$issuance->display_number} restored from the archive.");
+    }
+
+    public function destroy(Request $request, Issuance $issuance)
+    {
+        abort_if(! $request->user()->hasPermission('issuances.manage'), 403);
+        abort_if(! $issuance->isEditable(), 422, 'Released issuances and supplemental documents cannot be deleted. Archive them instead.');
+        abort_if($issuance->supplements()->exists(), 422, 'Delete the draft supplemental documents before deleting this issuance.');
+
+        $attachmentPath = $issuance->attachment_path;
+        $pdfPath = 'issuances/' . $issuance->control_number . '.pdf';
+        AuditLogger::logModelEvent($issuance, 'deleted');
+        $issuance->delete();
+        if ($attachmentPath) Storage::disk('s3')->delete($attachmentPath);
+        Storage::disk('s3')->delete($pdfPath);
+
+        return redirect()->route('issuances.index')->with('success', 'Draft deleted permanently.');
     }
 
     // ── Acknowledge ───────────────────────────────────────────────────────────

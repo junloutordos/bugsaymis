@@ -111,8 +111,8 @@ class ProcessIssuanceRelease implements ShouldQueue
                 NotificationService::notifyUser(
                     $u,
                     'Issuance',
-                    $issuance->control_number,
-                    "{$issuance->type_label}: {$issuance->title}",
+                    $issuance->display_number,
+                    ($issuance->isSupplement() ? $issuance->document_kind_label : $issuance->type_label) . ": {$issuance->title}",
                     route('issuances.show', $issuance->id),
                 );
             } catch (\Throwable $e) {

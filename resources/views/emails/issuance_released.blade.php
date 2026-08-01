@@ -1,6 +1,6 @@
 @extends('emails.layouts.base')
 
-@section('header-title')Official Issuance — {{ $issuance->type_label }}@endsection
+@section('header-title')Official {{ $issuance->isSupplement() ? $issuance->document_kind_label : 'Issuance — '.$issuance->type_label }}@endsection
 @section('header-subtitle','Philippine Science High School – Caraga Region Campus')
 
 @section('content')
@@ -24,8 +24,8 @@
 <p class="lead">A new official issuance has been released and addressed to you. Please review the document and acknowledge receipt at your earliest convenience.</p>
 
 <table class="details" role="presentation">
-    <tr><td class="lbl">Control Number</td><td class="val"><strong style="font-size:15px;font-family:monospace;">{{ $issuance->control_number }}</strong></td></tr>
-    <tr><td class="lbl">Type</td><td class="val"><span class="badge badge-blue">{{ $issuance->type_label }}</span></td></tr>
+    <tr><td class="lbl">Reference</td><td class="val"><strong style="font-size:15px;font-family:monospace;">{{ $issuance->display_number }}</strong></td></tr>
+    <tr><td class="lbl">Type</td><td class="val"><span class="badge badge-blue">{{ $issuance->isSupplement() ? $issuance->document_kind_label : $issuance->type_label }}</span></td></tr>
     <tr><td class="lbl">Title / Subject</td><td class="val">{{ $issuance->title }}</td></tr>
     <tr><td class="lbl">Addressed To</td><td class="val">{{ $recipientLabel }}</td></tr>
     <tr><td class="lbl">Signed By</td><td class="val">

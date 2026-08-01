@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Administration\CoaCertificate;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
@@ -12,6 +13,13 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class CertificateOfAppearanceService
 {
+    private const PDF_RENDER_VERSION = 'v2';
+
+    public function __construct(
+        private DigitalSignatureService $signatureService,
+        private PersonNameFormatter $nameFormatter,
+    ) {}
+
     // ── Control number generation ─────────────────────────────────────────────
 
     /**
@@ -56,13 +64,54 @@ class CertificateOfAppearanceService
         return QrCode::format('svg')->size($size)->margin(1)->generate($url);
     }
 
+    /**
+     * Preserve the exact electronic signature used for this certificate. User
+     * signature uploads replace the profile image, while issued certificates
+     * must remain reproducible with the image used at signing time.
+     */
+    public function snapshotSignature(User $signer, CoaCertificate $cert): ?string
+    {
+        $dataUri = $this->signatureService->getSignatureDataUri($signer);
+        if (! $dataUri || ! preg_match('/^data:image\/[^;]+;base64,(.+)$/s', $dataUri, $matches)) {
+            return null;
+        }
+
+        $imageData = base64_decode($matches[1], true);
+        if ($imageData === false) {
+            return null;
+        }
+
+        $path = "signatures/documents/coa/certificate_{$cert->id}.png";
+        Storage::disk('s3')->put($path, $imageData, ['ContentType' => 'image/png']);
+
+        return $path;
+    }
+
     // ── PDF generation ────────────────────────────────────────────────────────
+
+    public function pdfPath(CoaCertificate $cert): string
+    {
+        return 'coa/' . self::PDF_RENDER_VERSION . '/' . $cert->control_number . '.pdf';
+    }
 
     public function generatePdf(CoaCertificate $cert): string
     {
-        $cert->loadMissing(['visit', 'signature.signer:id,name,position']);
+        $cert->loadMissing([
+            'visit',
+            'signature.signer:id,name,position,prenominal_title,postnominal_title',
+        ]);
 
-        $html = view('coa.pdf', ['cert' => $cert, 'visit' => $cert->visit])->render();
+        $signatureUri = $this->resolveSignatureUri($cert);
+        $signerName = $cert->signature?->signer
+            ? $this->nameFormatter->formal($cert->signature->signer)
+            : 'PSHS-CRC';
+
+        $html = view('coa.pdf', [
+            'cert'         => $cert,
+            'visit'        => $cert->visit,
+            'signatureUri' => $signatureUri,
+            'signerName'   => $signerName,
+        ])->render();
 
         $headerImg = public_path('images/report_header.jpeg');
         $footerImg = public_path('images/report_footer.jpeg');
@@ -91,10 +140,32 @@ class CertificateOfAppearanceService
 
         $pdfContent = $mpdf->Output('', 'S');
 
-        $path = 'coa/' . $cert->control_number . '.pdf';
+        $path = $this->pdfPath($cert);
         Storage::disk('s3')->put($path, $pdfContent);
 
         return $path;
+    }
+
+    /**
+     * Resolve the image that was associated with the signing event. Older COA
+     * signatures did not snapshot the path, so retain the signer fallback for
+     * certificates issued before this fix.
+     */
+    private function resolveSignatureUri(CoaCertificate $cert): ?string
+    {
+        $signature = $cert->signature;
+        if (! $signature) {
+            return null;
+        }
+
+        $snapshotPath = $signature->metadata['signature_path'] ?? null;
+        $signatureUri = $this->signatureService->getImageDataUriFromPath($snapshotPath);
+
+        if (! $signatureUri && $signature->signer) {
+            $signatureUri = $this->signatureService->getSignatureDataUri($signature->signer);
+        }
+
+        return $signatureUri;
     }
 
     // Stamp QR onto the mPDF instance via the native Image() API.

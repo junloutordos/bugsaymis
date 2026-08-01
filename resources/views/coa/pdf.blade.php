@@ -18,7 +18,7 @@ body { font-family:Arial, sans-serif; font-size:11pt; color:#1e293b; line-height
 .sig-block { margin-top:46px; }
 .sig-block .signed-by { font-size:8.5pt; color:#64748b; margin-bottom:4px; }
 .sig-img   { max-height:55px; max-width:170px; object-fit:contain; }
-.sig-name  { font-weight:bold; font-size:11pt; border-top:1px solid #334155; padding-top:4px; margin-top:4px; display:inline-block; min-width:220px; }
+.sig-name  { font-weight:bold; font-size:11pt; margin-top:4px; }
 .sig-pos   { font-size:8.5pt; color:#475569; }
 </style>
 </head>
@@ -57,8 +57,12 @@ body { font-family:Arial, sans-serif; font-size:11pt; color:#1e293b; line-height
 
 <div class="sig-block">
     <div class="signed-by">Issued and digitally signed by:</div>
-    <div style="height:14px;"></div>
-    <div class="sig-name">{{ $issuer?->name ?? 'PSHS-CRC' }}</div>
+    @if($signatureUri)
+    <img src="{{ $signatureUri }}" class="sig-img" alt="Digital Signature" />
+    @else
+    <div style="height:50px;"></div>
+    @endif
+    <div class="sig-name">{{ $signerName }}</div>
     <div class="sig-pos">{{ $issuer?->position ?? 'Philippine Science High School – Caraga Region Campus' }}</div>
     @if($sig)
     <div style="font-size:7.5pt; color:#64748b; margin-top:3px;">
