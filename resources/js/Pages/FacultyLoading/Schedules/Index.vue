@@ -24,6 +24,9 @@
                   :disabled="!schedules.length" @click="printAll" :class="toolItemClass">
                   <PrinterIcon class="h-4 w-4 text-slate-400" /> Print All
                 </button>
+                <Link :href="route('faculty-loading.schedules.day-adjustments.index', { term_id: filters.term_id })" :class="toolItemClass">
+                  <CalendarDaysIcon class="h-4 w-4 text-slate-400" /> Adjusted Day Schedules
+                </Link>
                 <Link v-if="!scheduleLocked" :href="route('faculty-loading.auto-schedule.index')" :class="toolItemClass">
                   <SparklesIcon class="h-4 w-4 text-slate-400" /> AI Generate
                 </Link>
@@ -1220,7 +1223,7 @@ import AutoPlacePreviewModal from '@/Components/FacultyLoading/AutoPlacePreviewM
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
-  ArchiveBoxIcon, ArrowsRightLeftIcon, ArrowUturnLeftIcon, BoltIcon, CalendarIcon, CheckCircleIcon, ChevronDownIcon, ClockIcon, ExclamationCircleIcon,
+  ArchiveBoxIcon, ArrowsRightLeftIcon, ArrowUturnLeftIcon, BoltIcon, CalendarDaysIcon, CalendarIcon, CheckCircleIcon, ChevronDownIcon, ClockIcon, ExclamationCircleIcon,
   ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, PencilSquareIcon, PlusIcon, PrinterIcon, ScaleIcon, SparklesIcon, TrashIcon,
   WrenchScrewdriverIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
