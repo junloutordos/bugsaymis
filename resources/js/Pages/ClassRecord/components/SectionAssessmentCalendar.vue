@@ -4,7 +4,7 @@ import AppModal from '@/Components/AppModal.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import AppButton from '@/Components/AppButton.vue'
 import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
-import { checkWatCap, WAT_LIMITS } from '@/Utils/ClassRecord/watUtils.js'
+import { checkWatCap, WAT_LIMITS, watCountsFromCalendarDays } from '@/Utils/ClassRecord/watUtils.js'
 
 const props = defineProps({
   show:         { type: Boolean, default: false },
@@ -48,15 +48,7 @@ const dayMap = computed(() => {
 // Per-day {graded, major} counts derived straight from `days` — same shape
 // Show.vue's own dateCounts computed uses, so checkWatCap() behaves
 // identically here and there.
-const countsMap = computed(() => {
-  const map = new Map()
-  for (const d of props.days) {
-    const graded = d.graded_count ?? d.items?.filter(i => i.is_graded !== false).length ?? d.count ?? 0
-    const major  = d.major_count ?? d.items?.filter(i => i.is_major).length ?? 0
-    map.set(d.date, { graded, major })
-  }
-  return map
-})
+const countsMap = computed(() => watCountsFromCalendarDays(props.days))
 
 function formatDate(d) {
   const y   = d.getFullYear()

@@ -14,6 +14,31 @@ export const WAT_LIMITS = {
   weeklyMajor:  6,
 }
 
+/**
+ * Converts section-calendar days into the count map consumed by WAT checks.
+ * Prefer the server's consolidated totals because visible elective/science
+ * rows that share a configured block count as one WAT unit. The item-based
+ * fallback keeps the helper compatible with callers that only provide rows.
+ *
+ * @param {Array<{date:string, graded_count?:number, major_count?:number, count?:number, items?:Array}>} days
+ * @returns {Map<string, {graded:number, major:number}>}
+ */
+export function watCountsFromCalendarDays(days) {
+  const map = new Map()
+  for (const day of days ?? []) {
+    const graded = day.graded_count
+      ?? day.items?.filter(item => item.is_graded !== false).length
+      ?? day.count
+      ?? 0
+    const major = day.major_count
+      ?? day.items?.filter(item => item.is_major).length
+      ?? 0
+
+    map.set(day.date, { graded, major })
+  }
+  return map
+}
+
 /** Monday (YYYY-MM-DD) of the week containing dateStr (YYYY-MM-DD). */
 export function weekStartOf(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`)
