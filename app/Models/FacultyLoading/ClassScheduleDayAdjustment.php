@@ -16,6 +16,10 @@ class ClassScheduleDayAdjustment extends Model
         'ceremony_start_time',
         'ceremony_end_time',
         'shift_minutes',
+        'activity_title',
+        'activity_start_time',
+        'activity_end_time',
+        'class_duration_minutes',
         'reason',
         'status',
         'schedule_snapshot',
@@ -30,6 +34,7 @@ class ClassScheduleDayAdjustment extends Model
         'postponed_from_date' => 'date:Y-m-d',
         'effective_date' => 'date:Y-m-d',
         'shift_minutes' => 'integer',
+        'class_duration_minutes' => 'integer',
         'schedule_snapshot' => 'array',
         'published_at' => 'datetime',
         'cancelled_at' => 'datetime',
@@ -58,6 +63,16 @@ class ClassScheduleDayAdjustment extends Model
     public function isPublished(): bool
     {
         return $this->status === 'published';
+    }
+
+    public function hasFlagCeremony(): bool
+    {
+        return in_array($this->adjustment_type, ['flag_ceremony', 'flag_ceremony_shortened_classes'], true);
+    }
+
+    public function hasShortenedClasses(): bool
+    {
+        return in_array($this->adjustment_type, ['shortened_classes', 'flag_ceremony_shortened_classes'], true);
     }
 
     public function scopePublished($query)

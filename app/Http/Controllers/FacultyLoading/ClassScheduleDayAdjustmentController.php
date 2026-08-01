@@ -50,11 +50,16 @@ class ClassScheduleDayAdjustmentController extends Controller
             ->get()
             ->map(fn ($adjustment) => [
                 'id' => $adjustment->id,
-                'postponed_from_date' => $adjustment->postponed_from_date->toDateString(),
+                'adjustment_type' => $adjustment->adjustment_type,
+                'postponed_from_date' => $adjustment->postponed_from_date?->toDateString(),
                 'effective_date' => $adjustment->effective_date->toDateString(),
                 'weekday' => $adjustment->effective_date->englishDayOfWeek,
                 'reason' => $adjustment->reason,
                 'shift_minutes' => $adjustment->shift_minutes,
+                'activity_title' => $adjustment->activity_title,
+                'activity_start_time' => $adjustment->activity_start_time ? substr((string) $adjustment->activity_start_time, 0, 5) : null,
+                'activity_end_time' => $adjustment->activity_end_time ? substr((string) $adjustment->activity_end_time, 0, 5) : null,
+                'class_duration_minutes' => $adjustment->class_duration_minutes,
                 'status' => $adjustment->status,
                 'created_by' => $adjustment->createdBy?->name,
                 'published_by' => $adjustment->publishedBy?->name,
@@ -102,15 +107,20 @@ class ClassScheduleDayAdjustmentController extends Controller
 
         $data = $this->validatedData($request);
 
-        ClassScheduleDayAdjustment::create([
-            ...$data,
-            'adjustment_type' => 'flag_ceremony',
-            'ceremony_start_time' => '07:30',
-            'ceremony_end_time' => '08:00',
-            'shift_minutes' => 30,
-            'status' => 'draft',
-            'created_by' => Auth::id(),
-        ]);
+        DB::transaction(function () use ($data) {
+            $adjustment = ClassScheduleDayAdjustment::create([
+                ...$data,
+                'ceremony_start_time' => '07:30',
+                'ceremony_end_time' => '08:00',
+                'shift_minutes' => $this->hasFlag($data['adjustment_type']) ? 30 : 0,
+                'class_duration_minutes' => $this->hasShortenedClasses($data['adjustment_type']) ? 30 : null,
+                'status' => 'draft',
+                'created_by' => Auth::id(),
+            ]);
+
+            // Validate fit and generated campus conflicts before keeping the draft.
+            $this->adjustedSchedules->generate($adjustment);
+        });
 
         return back()->with('success', 'Adjusted-day schedule saved as a draft.');
     }
@@ -120,7 +130,16 @@ class ClassScheduleDayAdjustmentController extends Controller
         $this->authorize('faculty_loading.manage');
         abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be edited.');
 
-        $adjustment->update($this->validatedData($request, $adjustment));
+        $data = $this->validatedData($request, $adjustment);
+
+        DB::transaction(function () use ($adjustment, $data) {
+            $adjustment->update([
+                ...$data,
+                'shift_minutes' => $this->hasFlag($data['adjustment_type']) ? 30 : 0,
+                'class_duration_minutes' => $this->hasShortenedClasses($data['adjustment_type']) ? 30 : null,
+            ]);
+            $this->adjustedSchedules->generate($adjustment->fresh());
+        });
 
         return back()->with('success', 'Adjusted-day draft updated.');
     }
@@ -185,11 +204,16 @@ class ClassScheduleDayAdjustmentController extends Controller
         return Inertia::render('FacultyLoading/Schedules/PrintAdjustedDay', [
             'adjustment' => [
                 'id' => $adjustment->id,
-                'postponed_from_date' => $adjustment->postponed_from_date->toDateString(),
+                'adjustment_type' => $adjustment->adjustment_type,
+                'postponed_from_date' => $adjustment->postponed_from_date?->toDateString(),
                 'effective_date' => $adjustment->effective_date->toDateString(),
                 'reason' => $adjustment->reason,
                 'status' => $adjustment->status,
                 'shift_minutes' => $adjustment->shift_minutes,
+                'activity_title' => $adjustment->activity_title,
+                'activity_start_time' => $adjustment->activity_start_time ? substr((string) $adjustment->activity_start_time, 0, 5) : null,
+                'activity_end_time' => $adjustment->activity_end_time ? substr((string) $adjustment->activity_end_time, 0, 5) : null,
+                'class_duration_minutes' => $adjustment->class_duration_minutes,
             ],
             'term' => [
                 'label' => $adjustment->academicTerm->full_label,
@@ -214,24 +238,74 @@ class ClassScheduleDayAdjustmentController extends Controller
     {
         $data = $request->validate([
             'academic_term_id' => ['required', 'integer', 'exists:academic_terms,id'],
-            'postponed_from_date' => ['required', 'date'],
-            'effective_date' => ['required', 'date', 'after:postponed_from_date'],
+            'adjustment_type' => ['nullable', 'in:flag_ceremony,shortened_classes,flag_ceremony_shortened_classes'],
+            'postponed_from_date' => ['nullable', 'date'],
+            'effective_date' => ['required', 'date'],
+            'activity_title' => ['nullable', 'string', 'max:255'],
+            'activity_start_time' => ['nullable', 'date_format:H:i'],
+            'activity_end_time' => ['nullable', 'date_format:H:i'],
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
+        $data['adjustment_type'] ??= 'flag_ceremony';
+
         $term = AcademicTerm::findOrFail($data['academic_term_id']);
-        $this->validateAffectedMonday($data['postponed_from_date'], $term);
-
-        $expectedDate = $this->calendar->nextSchoolDayAfter(
-            $data['postponed_from_date'],
-            self::GRADES,
-            $term->end_date?->toDateString(),
-        );
-
-        if ($data['effective_date'] !== $expectedDate) {
+        $effectiveDate = Carbon::parse($data['effective_date']);
+        if (($term->start_date && $effectiveDate->lt($term->start_date)) || ($term->end_date && $effectiveDate->gt($term->end_date))) {
             throw ValidationException::withMessages([
-                'effective_date' => "The adjusted schedule must use the next common school day, {$expectedDate}.",
+                'effective_date' => 'The adjusted date must fall within the selected academic term.',
             ]);
+        }
+
+        if ($this->hasFlag($data['adjustment_type'])) {
+            if (empty($data['postponed_from_date'])) {
+                throw ValidationException::withMessages([
+                    'postponed_from_date' => 'The postponed Monday is required for a transferred flag ceremony.',
+                ]);
+            }
+
+            $this->validateAffectedMonday($data['postponed_from_date'], $term);
+            $expectedDate = $this->calendar->nextSchoolDayAfter(
+                $data['postponed_from_date'],
+                self::GRADES,
+                $term->end_date?->toDateString(),
+            );
+
+            if ($data['effective_date'] !== $expectedDate) {
+                throw ValidationException::withMessages([
+                    'effective_date' => "The adjusted schedule must use the next common school day, {$expectedDate}.",
+                ]);
+            }
+        } else {
+            $data['postponed_from_date'] = null;
+        }
+
+        if ($this->hasShortenedClasses($data['adjustment_type'])) {
+            foreach (['activity_title', 'activity_start_time', 'activity_end_time'] as $field) {
+                if (empty($data[$field])) {
+                    throw ValidationException::withMessages([
+                        $field => 'This field is required for a shortened-class day.',
+                    ]);
+                }
+            }
+
+            if ($data['activity_end_time'] <= $data['activity_start_time']) {
+                throw ValidationException::withMessages([
+                    'activity_end_time' => 'The activity end time must be after its start time.',
+                ]);
+            }
+
+            $allGradesOpen = collect(self::GRADES)
+                ->every(fn (int $grade) => $this->calendar->isSchoolDay($data['effective_date'], $grade));
+            if (! $allGradesOpen) {
+                throw ValidationException::withMessages([
+                    'effective_date' => 'The shortened-class adjustment must fall on a school day for all grade levels.',
+                ]);
+            }
+        } else {
+            $data['activity_title'] = null;
+            $data['activity_start_time'] = null;
+            $data['activity_end_time'] = null;
         }
 
         $duplicate = ClassScheduleDayAdjustment::where('academic_term_id', $term->id)
@@ -246,6 +320,16 @@ class ClassScheduleDayAdjustmentController extends Controller
         }
 
         return $data;
+    }
+
+    private function hasFlag(string $type): bool
+    {
+        return in_array($type, ['flag_ceremony', 'flag_ceremony_shortened_classes'], true);
+    }
+
+    private function hasShortenedClasses(string $type): bool
+    {
+        return in_array($type, ['shortened_classes', 'flag_ceremony_shortened_classes'], true);
     }
 
     private function validateAffectedMonday(string $date, AcademicTerm $term): void
