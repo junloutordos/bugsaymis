@@ -87,4 +87,11 @@ return [
         'device_id' => env('SMS_GATE_DEVICE_ID'),
     ],
 
+    'bedrock' => [
+        'region' => env('BEDROCK_REGION', 'us-east-1'),
+        // Cross-region inference profile ID for Claude Sonnet 5, e.g. 'us.anthropic.claude-sonnet-5-...-v1:0'
+        // Confirm the current ID with: aws bedrock list-inference-profiles --region us-east-1
+        'inference_profile_id' => env('BEDROCK_INFERENCE_PROFILE_ID'),
+    ],
+
 ];
