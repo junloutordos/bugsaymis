@@ -22,7 +22,9 @@ class ClassScheduleDayAdjustmentTest extends TestCase
     use RefreshDatabase;
 
     private User $manager;
+
     private AcademicTerm $term;
+
     private ClassSchedule $tuesdayClass;
 
     protected function setUp(): void
@@ -123,6 +125,18 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
     public function test_draft_and_publish_freeze_a_shifted_copy_without_changing_weekly_schedule(): void
     {
+        $this->manager->update([
+            'name' => 'Patacsil, Melba Cruz',
+            'position' => 'Chief, Curriculum and Instruction Division',
+            'postnominal_title' => 'Ph.D.',
+        ]);
+        User::factory()->create([
+            'name' => 'Dela Cruz, Juan Santos',
+            'position' => 'Campus Director',
+            'postnominal_title' => 'CESO III',
+            'status' => 'active',
+        ]);
+
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
             'postponed_from_date' => '2026-08-03',
@@ -156,6 +170,8 @@ class ClassScheduleDayAdjustmentTest extends TestCase
                 ->component('FacultyLoading/Schedules/PrintAdjustedDay')
                 ->has('snapshot.grades', 6)
                 ->where('snapshot.grades.0.sections.0.entries.0.start_time', '08:00')
+                ->where('signatories.prepared.name', 'MELBA C. PATACSIL, Ph.D.')
+                ->where('signatories.approved.name', 'JUAN S. DELA CRUZ, CESO III')
             );
 
         $this->actingAs($this->manager)

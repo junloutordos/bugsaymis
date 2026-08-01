@@ -183,7 +183,11 @@ class ClassScheduleDayAdjustmentController extends Controller
         $this->authorize('faculty_loading.manage');
         abort_if($adjustment->status === 'cancelled', 404);
 
-        $adjustment->loadMissing(['academicTerm.schoolYear', 'publishedBy:id,name', 'createdBy:id,name']);
+        $adjustment->loadMissing([
+            'academicTerm.schoolYear',
+            'publishedBy:id,name,position,prenominal_title,postnominal_title',
+            'createdBy:id,name,position,prenominal_title,postnominal_title',
+        ]);
         $snapshot = $this->adjustedSchedules->printableSnapshot($adjustment);
         $grade = $request->integer('grade');
 
@@ -198,7 +202,7 @@ class ClassScheduleDayAdjustmentController extends Controller
         $director = User::where('position', 'like', '%Director%')
             ->where('position', 'not like', '%Assistant%')
             ->where('status', '<>', 'inactive')
-            ->first(['id', 'name', 'position']);
+            ->first(['id', 'name', 'position', 'prenominal_title', 'postnominal_title']);
         $prepared = $adjustment->publishedBy ?? $adjustment->createdBy;
 
         return Inertia::render('FacultyLoading/Schedules/PrintAdjustedDay', [
