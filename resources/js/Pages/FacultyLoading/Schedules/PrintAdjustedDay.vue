@@ -11,8 +11,10 @@
       </header>
 
       <div class="adjustment-note">
-        <strong>Flag Ceremony {{ formatRange(snapshot.ceremony.start, snapshot.ceremony.end) }}</strong>
-        <span>All classes and student bell periods are shifted {{ adjustment.shift_minutes }} minutes.</span>
+        <strong v-if="showsFlagCeremony">Flag Ceremony {{ formatRange(snapshot.ceremony.start, snapshot.ceremony.end) }}</strong>
+        <span v-if="showsFlagCeremony">Classes and bell periods shift {{ adjustment.shift_minutes }} minutes.</span>
+        <strong v-if="showsShortenedClasses">{{ snapshot.class_duration_minutes }}-Minute Classes</strong>
+        <span v-if="snapshot.activity">{{ snapshot.activity.title }} · {{ formatRange(snapshot.activity.start, snapshot.activity.end) }}</span>
         <span class="reason">Reason: {{ adjustment.reason }}</span>
       </div>
 
@@ -32,18 +34,21 @@
               :class="{ half: minute % 60 !== 0 }" :style="pointStyle(minute)" />
 
             <div v-for="section in grade.sections" :key="section.id" class="section-column">
-              <div class="ceremony-block" :style="rangeStyle(snapshot.ceremony.start, snapshot.ceremony.end)">
-                <strong>Flag Ceremony</strong><span>{{ formatDisplayRange(snapshot.ceremony.start, snapshot.ceremony.end) }}</span>
+              <div v-if="snapshot.ceremony" class="ceremony-block" :class="durationClass(snapshot.ceremony.start, snapshot.ceremony.end)"
+                :style="rangeStyle(snapshot.ceremony.start, snapshot.ceremony.end)">
+                <strong>Flag Ceremony</strong><span class="block-time">{{ formatDisplayRange(snapshot.ceremony.start, snapshot.ceremony.end) }}</span>
               </div>
               <div v-for="band in section.bands" :key="`${band.type}-${band.start}-${band.end}`"
-                class="schedule-band" :class="bandClass(band.type)" :style="rangeStyle(band.start, band.end)">
-                <strong>{{ band.label }}</strong><span>{{ formatDisplayRange(band.start, band.end) }}</span>
+                class="schedule-band" :class="[bandClass(band.type), durationClass(band.start, band.end)]" :style="rangeStyle(band.start, band.end)">
+                <strong>{{ band.label }}</strong><span class="block-time">{{ formatDisplayRange(band.start, band.end) }}</span>
               </div>
               <div v-for="entry in section.entries" :key="entry.id" class="class-entry"
-                :class="durationClass(entry)" :style="rangeStyle(entry.start_time, entry.end_time)">
-                <strong>{{ entryTitle(entry) }}</strong>
-                <small>{{ formatDisplayRange(entry.start_time, entry.end_time) }}</small>
-                <span v-if="duration(entry) >= 30">{{ entry.faculty?.name ?? 'TBA' }}</span>
+                :class="durationClass(entry.start_time, entry.end_time)" :style="rangeStyle(entry.start_time, entry.end_time)">
+                <div class="entry-main">
+                  <strong>{{ entryTitle(entry) }}</strong>
+                  <small>{{ formatDisplayRange(entry.start_time, entry.end_time) }}</small>
+                </div>
+                <span v-if="duration(entry.start_time, entry.end_time) >= 30" class="faculty-name">{{ entry.faculty?.name ?? 'TBA' }}</span>
               </div>
             </div>
             <div v-if="!grade.sections.length" class="empty-grade">No active sections found for this grade.</div>
@@ -85,6 +90,8 @@ const gridMarks = computed(() => {
 const timeMarks = computed(() => gridMarks.value.filter(minute => minute % 60 === 0 || minute === startMinutes.value || minute === endMinutes.value))
 const documentTitle = computed(() => `ADJUSTED CLASS SCHEDULE — ${props.adjustment.effective_date}`)
 const formattedEffectiveDate = computed(() => new Date(`${props.adjustment.effective_date}T00:00:00`).toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
+const showsFlagCeremony = computed(() => props.snapshot.has_flag_ceremony ?? Boolean(props.snapshot.ceremony))
+const showsShortenedClasses = computed(() => props.snapshot.has_shortened_classes ?? Boolean(props.snapshot.activity))
 
 function timeToMinutes(time) {
   const [hours, minutes] = String(time ?? '00:00').split(':').map(Number)
@@ -115,10 +122,10 @@ function rangeStyle(start, end) {
   const to = Math.min(endMinutes.value, timeToMinutes(end))
   return { top: `${((from - startMinutes.value) / spanMinutes.value) * 100}%`, height: `${(Math.max(0, to - from) / spanMinutes.value) * 100}%` }
 }
-function duration(entry) { return timeToMinutes(entry.end_time) - timeToMinutes(entry.start_time) }
-function durationClass(entry) {
-  if (duration(entry) <= 20) return 'very-short'
-  if (duration(entry) <= 30) return 'short'
+function duration(start, end) { return timeToMinutes(end) - timeToMinutes(start) }
+function durationClass(start, end) {
+  if (duration(start, end) <= 20) return 'very-short'
+  if (duration(start, end) <= 30) return 'short'
   return ''
 }
 function entryTitle(entry) {
@@ -126,6 +133,7 @@ function entryTitle(entry) {
   return entry.subject?.code ?? entry.subject?.name ?? 'TBA'
 }
 function bandClass(type) {
+  if (type === 'OFFICIAL_ACTIVITY') return 'official-activity'
   if (type === 'ELECTIVE') return 'elective'
   if (type === 'SCIENCE_CORE') return 'science-core'
   if (type === 'LUNCH' || type === 'RECESS') return 'break'
@@ -172,19 +180,30 @@ html, body { margin: 0; padding: 0; background: #d1d5db; }
 .ceremony-block, .schedule-band, .class-entry { position: absolute; left: .5mm; right: .5mm; z-index: 2; overflow: hidden; padding: .6mm 1mm; text-align: center; line-height: 1.12; }
 .ceremony-block { background: #fef3c7; border: .25mm solid #f59e0b; color: #92400e; font-size: 6.8pt; }
 .ceremony-block strong, .ceremony-block span, .schedule-band strong, .schedule-band span, .class-entry strong, .class-entry span, .class-entry small { display: block; }
+.ceremony-block.short, .ceremony-block.very-short, .schedule-band.short, .schedule-band.very-short { display: flex; align-items: center; gap: .8mm; padding: 0 .7mm; text-align: left; line-height: 1; }
+.ceremony-block.short strong, .ceremony-block.very-short strong, .schedule-band.short strong, .schedule-band.very-short strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ceremony-block.short .block-time, .ceremony-block.very-short .block-time, .schedule-band.short .block-time, .schedule-band.very-short .block-time { flex: none; margin-left: auto; white-space: nowrap; font-size: 5pt; }
+.ceremony-block.very-short, .schedule-band.very-short { font-size: 5pt; }
 .schedule-band { z-index: 1; background: #f8fafc; border: .2mm dashed #94a3b8; color: #475569; font-size: 6pt; }
 .schedule-band.break { background: #f1f5f9; }
 .schedule-band.elective { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
 .schedule-band.science-core { background: #f5f3ff; border-color: #8b5cf6; color: #5b21b6; }
+.schedule-band.official-activity { background: #ede9fe; border-color: #7c3aed; color: #4c1d95; font-size: 7pt; }
 .class-entry { background: #dbeafe; border: .25mm solid #60a5fa; color: #1e3a8a; font-size: 6.3pt; }
+.entry-main { min-width: 0; }
 .class-entry strong { font-size: 7pt; }
-.class-entry span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.class-entry .faculty-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .class-entry small { margin: .3mm 0; white-space: nowrap; font-size: 5.7pt; font-weight: 700; }
-.class-entry.short { padding: .25mm .7mm; }
-.class-entry.short span { display: none; }
-.class-entry.very-short { display: flex; align-items: center; justify-content: space-between; padding: 0 .7mm; }
-.class-entry.very-short span { display: none; }
-.class-entry.very-short small { margin: 0; }
+.class-entry.short { display: flex; flex-direction: column; justify-content: center; padding: .15mm .6mm; line-height: 1; }
+.class-entry.short .entry-main { display: flex; align-items: center; gap: .8mm; }
+.class-entry.short .entry-main strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 6.1pt; }
+.class-entry.short .entry-main small { flex: none; margin: 0 0 0 auto; font-size: 5.1pt; }
+.class-entry.short .faculty-name { margin-top: .25mm; font-size: 4.8pt; line-height: 1; }
+.class-entry.very-short { display: flex; align-items: center; padding: 0 .6mm; }
+.class-entry.very-short .entry-main { display: flex; width: 100%; align-items: center; gap: .6mm; }
+.class-entry.very-short .entry-main strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 5.4pt; }
+.class-entry.very-short .entry-main small { flex: none; margin: 0 0 0 auto; font-size: 4.8pt; }
+.class-entry.very-short .faculty-name { display: none; }
 .empty-grade { grid-column: 1 / -1; padding: 20mm; text-align: center; font-size: 9pt; color: #64748b; }
 .signatories { display: grid; grid-template-columns: 1fr 1fr; gap: 35mm; margin: 3mm 20mm 0; }
 .signatories > div { display: flex; min-height: 14mm; flex-direction: column; justify-content: flex-end; text-align: center; font-size: 6.5pt; }

@@ -174,4 +174,87 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame('Tuesday', $this->tuesdayClass->fresh()->day_of_week);
         $this->assertSame('07:30:00', $this->tuesdayClass->fresh()->start_time);
     }
+
+    public function test_official_activity_compresses_classes_and_preserves_break_sequence(): void
+    {
+        $secondClass = $this->tuesdayClass->replicate();
+        $secondClass->start_time = '08:40';
+        $secondClass->end_time = '09:30';
+        $secondClass->save();
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Research Congress',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Official afternoon activity',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->assertNull($adjustment->postponed_from_date);
+        $this->assertSame(30, $adjustment->class_duration_minutes);
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $adjustment->refresh();
+        $section = collect($adjustment->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0];
+
+        $this->assertSame('07:30', $section['entries'][0]['start_time']);
+        $this->assertSame('08:00', $section['entries'][0]['end_time']);
+        $this->assertSame('08:20', $section['entries'][1]['start_time']);
+        $this->assertSame('08:50', $section['entries'][1]['end_time']);
+        $this->assertContains('Research Congress', array_column($section['bands'], 'label'));
+        $this->assertSame('07:30:00', $this->tuesdayClass->fresh()->start_time);
+    }
+
+    public function test_shortened_classes_must_finish_before_the_activity(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Early Assembly',
+            'activity_start_time' => '07:45',
+            'activity_end_time' => '17:00',
+            'reason' => 'Official activity',
+        ])->assertSessionHasErrors('activity_start_time');
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 0);
+    }
+
+    public function test_transferred_flag_ceremony_can_be_combined_with_shortened_classes(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'flag_ceremony_shortened_classes',
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Foundation Day Program',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Holiday transfer and official afternoon activity',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $snapshot = $adjustment->fresh()->schedule_snapshot;
+        $section = collect($snapshot['grades'])->firstWhere('grade_level', 7)['sections'][0];
+
+        $this->assertTrue($snapshot['has_flag_ceremony']);
+        $this->assertTrue($snapshot['has_shortened_classes']);
+        $this->assertSame('08:00', $section['entries'][0]['start_time']);
+        $this->assertSame('08:30', $section['entries'][0]['end_time']);
+        $this->assertSame('07:30', $snapshot['ceremony']['start']);
+        $this->assertContains('Foundation Day Program', array_column($section['bands'], 'label'));
+        $this->assertSame('07:30:00', $this->tuesdayClass->fresh()->start_time);
+    }
 }

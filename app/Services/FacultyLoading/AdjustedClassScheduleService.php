@@ -6,6 +6,7 @@ use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\ClassScheduleDayAdjustment;
 use App\Models\FacultyLoading\Section;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class AdjustedClassScheduleService
 {
@@ -23,7 +24,12 @@ class AdjustedClassScheduleService
 
         $term = $adjustment->academicTerm;
         $day = Carbon::parse($adjustment->effective_date)->englishDayOfWeek;
-        $shift = (int) $adjustment->shift_minutes;
+        $hasFlag = $adjustment->hasFlagCeremony();
+        $hasShortenedClasses = $adjustment->hasShortenedClasses();
+        $shift = $hasFlag ? (int) $adjustment->shift_minutes : 0;
+        $classDuration = $hasShortenedClasses ? (int) ($adjustment->class_duration_minutes ?: 30) : null;
+        $activityStart = $hasShortenedClasses ? substr((string) $adjustment->activity_start_time, 0, 5) : null;
+        $activityEnd = $hasShortenedClasses ? substr((string) $adjustment->activity_end_time, 0, 5) : null;
 
         $overrideColumns = array_merge(
             ...array_values(Section::LUNCH_OVERRIDE_COLUMNS),
@@ -57,13 +63,14 @@ class AdjustedClassScheduleService
         $grades = [];
         foreach (range(7, 12) as $gradeLevel) {
             $gradeSections = [];
+            $classSlots = SchedulingConstants::getClassSlots($gradeLevel, $day);
 
             foreach ($sections->where('levelid', $gradeLevel) as $section) {
                 $entries = ($scheduleRows->get($section->id) ?? collect())
-                    ->map(function (ClassSchedule $schedule) use ($shift) {
+                    ->map(function (ClassSchedule $schedule) use ($classSlots, $classDuration, $shift) {
                         $entry = $schedule->toCalendarArray();
-                        $entry['start_time'] = $this->shiftTime((string) $schedule->start_time, $shift);
-                        $entry['end_time'] = $this->shiftTime((string) $schedule->end_time, $shift);
+                        $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $classSlots, $classDuration, $shift);
+                        $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $classSlots, $classDuration, $shift);
 
                         return $entry;
                     })
@@ -94,14 +101,29 @@ class AdjustedClassScheduleService
                 }
 
                 $bands = collect($bands)
+                    ->when($hasShortenedClasses, fn ($items) => $items->reject(
+                        fn (array $band) => in_array($band['type'] ?? '', ['CONSULT', 'ACTIVITY', 'FLAG_RETREAT'], true),
+                    ))
                     ->map(fn (array $band) => [
                         ...$band,
-                        'start' => $this->shiftTime((string) $band['start'], $shift),
-                        'end' => $this->shiftTime((string) $band['end'], $shift),
+                        'start' => $this->transformTime((string) $band['start'], $classSlots, $classDuration, $shift),
+                        'end' => $this->transformTime((string) $band['end'], $classSlots, $classDuration, $shift),
                     ])
+                    ->when($activityStart, fn ($items) => $items->filter(
+                        fn (array $band) => $band['end'] <= $activityStart,
+                    ))
                     ->sortBy('start')
                     ->values()
                     ->all();
+
+                if ($activityStart && $activityEnd) {
+                    $bands[] = [
+                        'start' => $activityStart,
+                        'end' => $activityEnd,
+                        'type' => 'OFFICIAL_ACTIVITY',
+                        'label' => $adjustment->activity_title,
+                    ];
+                }
 
                 $gradeSections[] = [
                     'id' => (int) $section->id,
@@ -117,24 +139,41 @@ class AdjustedClassScheduleService
             ];
         }
 
-        $allEnds = collect($grades)
-            ->flatMap(fn (array $grade) => $grade['sections'])
-            ->flatMap(fn (array $section) => [
-                ...array_column($section['entries'], 'end_time'),
-                ...array_column($section['bands'], 'end'),
-            ])
-            ->filter();
+        if ($activityStart) {
+            $lateEntry = collect($grades)
+                ->flatMap(fn (array $grade) => $grade['sections'])
+                ->flatMap(fn (array $section) => $section['entries'])
+                ->first(fn (array $entry) => $entry['end_time'] > $activityStart);
+
+            if ($lateEntry) {
+                $label = $lateEntry['subject']['code'] ?? $lateEntry['subject']['name'] ?? 'A class';
+                throw ValidationException::withMessages([
+                    'activity_start_time' => "{$label} still ends at {$lateEntry['end_time']}. Choose a later activity start time.",
+                ]);
+            }
+
+            $this->assertNoGeneratedConflicts($grades);
+        }
 
         return [
             'effective_date' => $adjustment->effective_date->toDateString(),
             'weekday' => $day,
-            'ceremony' => [
+            'adjustment_type' => $adjustment->adjustment_type,
+            'has_flag_ceremony' => $hasFlag,
+            'has_shortened_classes' => $hasShortenedClasses,
+            'class_duration_minutes' => $classDuration,
+            'ceremony' => $hasFlag ? [
                 'start' => substr((string) $adjustment->ceremony_start_time, 0, 5),
                 'end' => substr((string) $adjustment->ceremony_end_time, 0, 5),
                 'label' => 'Flag Ceremony',
-            ],
-            'calendar_start' => substr((string) $adjustment->ceremony_start_time, 0, 5),
-            'calendar_end' => $allEnds->max() ?: $this->shiftTime('17:00', $shift),
+            ] : null,
+            'activity' => $hasShortenedClasses ? [
+                'title' => $adjustment->activity_title,
+                'start' => $activityStart,
+                'end' => $activityEnd,
+            ] : null,
+            'calendar_start' => '07:30',
+            'calendar_end' => '17:00',
             'grades' => $grades,
         ];
     }
@@ -147,11 +186,53 @@ class AdjustedClassScheduleService
             : $this->generate($adjustment);
     }
 
-    private function shiftTime(string $time, int $minutes): string
+    /**
+     * Compress each completed canonical class period to the requested duration,
+     * then apply an optional campus-wide shift (the transferred flag ceremony).
+     */
+    private function transformTime(string $time, array $classSlots, ?int $classDuration, int $shift): string
     {
-        return Carbon::createFromFormat(strlen($time) > 5 ? 'H:i:s' : 'H:i', $time)
-            ->addMinutes($minutes)
-            ->format('H:i');
+        $sourceMinutes = SchedulingConstants::toMinutes(substr($time, 0, 5));
+        $minutes = $sourceMinutes;
+
+        if ($classDuration !== null) {
+            foreach ($classSlots as $slot) {
+                $slotEnd = SchedulingConstants::toMinutes($slot['end']);
+                if ($slotEnd > $sourceMinutes) {
+                    continue;
+                }
+
+                $slotMinutes = $slotEnd - SchedulingConstants::toMinutes($slot['start']);
+                $minutes -= max(0, $slotMinutes - $classDuration);
+            }
+        }
+
+        return SchedulingConstants::fromMinutes($minutes + $shift);
+    }
+
+    /** Ensure campus-wide compression does not create new faculty or room overlaps. */
+    private function assertNoGeneratedConflicts(array $grades): void
+    {
+        $entries = collect($grades)
+            ->flatMap(fn (array $grade) => $grade['sections'])
+            ->flatMap(fn (array $section) => $section['entries'])
+            ->values();
+
+        foreach (['faculty' => 'faculty', 'classroom' => 'room'] as $relation => $label) {
+            $groups = $entries->filter(fn (array $entry) => isset($entry[$relation]['id']))
+                ->groupBy(fn (array $entry) => $entry[$relation]['id']);
+
+            foreach ($groups as $rows) {
+                $sorted = $rows->sortBy('start_time')->values();
+                for ($index = 1; $index < $sorted->count(); $index++) {
+                    if ($sorted[$index]['start_time'] < $sorted[$index - 1]['end_time']) {
+                        throw ValidationException::withMessages([
+                            'activity_start_time' => "The compressed timetable creates a {$label} conflict. Review the preview or choose another activity time.",
+                        ]);
+                    }
+                }
+            }
+        }
     }
 
     /** @return array{start:string,end:string}|null */
