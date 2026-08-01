@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test:js": "node --test tests/js/*.test.mjs"
   },
   "devDependencies": {
     "@inertiajs/vue3": "^2.0.0",

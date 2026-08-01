@@ -10,7 +10,7 @@ import AppBadge from '@/Components/AppBadge.vue'
 import AppModal from '@/Components/AppModal.vue'
 import AppTabs from '@/Components/AppTabs.vue'
 import { confirmAction } from '@/Composables/useConfirm.js'
-import { isWithinScheduledWeek } from '@/Utils/ClassRecord/watUtils.js'
+import { isWithinScheduledWeek, watCountsFromCalendarDays } from '@/Utils/ClassRecord/watUtils.js'
 import Swal from 'sweetalert2'
 import {
   LockClosedIcon,
@@ -465,12 +465,6 @@ async function loadSectionCalendar() {
 
 onMounted(loadSectionCalendar)
 
-// IDs of assessments already saved under the quarter currently being edited —
-// excluded from the server baseline below since the live draft rows replace them.
-const currentQuarterAssessmentIds = computed(() =>
-  new Set((currentQuarterData.value?.assessments ?? []).map(a => a.id))
-)
-
 // ── WAT rules (mirrors WatRuleService — server re-validates authoritatively) ──
 const WAT = { dailyGraded: 3, dailyMajor: 2, weeklyGraded: 15, weeklyMajor: 6 }
 
@@ -541,29 +535,11 @@ function plottingDeadline(dateStr) {
   return friday
 }
 
-// Per-date graded/major counts for this section across the whole school year:
-// server baseline (other quarters/subjects) + this quarter's live, unsaved draft.
-const dateCounts = computed(() => {
-  const map = new Map()
-  const bump = (date, graded, major) => {
-    const entry = map.get(date) ?? { graded: 0, major: 0 }
-    entry.graded += graded
-    entry.major  += major
-    map.set(date, entry)
-  }
-  for (const day of sectionCalendarDays.value) {
-    const others = day.items.filter(i => !currentQuarterAssessmentIds.value.has(i.id) && i.is_graded !== false)
-    bump(day.date, others.length, others.filter(i => i.is_major).length)
-  }
-  for (const rows of Object.values(assessmentDraft.value)) {
-    for (const row of rows) {
-      for (const date of row.activity_dates ?? []) {
-        if (row.is_graded) bump(date, 1, isMajorRow(row) ? 1 : 0)
-      }
-    }
-  }
-  return map
-})
+// Per-date totals use the server's consolidated WAT counts, with unsaved dates
+// already overlaid exactly once by calendarDaysWithPending. This is important
+// for elective/science blocks: their visible rows remain separate in the
+// calendar but a shared configured block consumes only one WAT unit.
+const dateCounts = computed(() => watCountsFromCalendarDays(calendarDaysWithPending.value))
 
 // ── Schedule-day restriction ──────────────────────────────────────────────────
 // Faculty may only date assessments on days the class meets per the schedule.
