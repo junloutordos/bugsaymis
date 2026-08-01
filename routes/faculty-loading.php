@@ -15,6 +15,7 @@ use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
 use App\Http\Controllers\FacultyLoading\ScheduleAnalyticsController;
 use App\Http\Controllers\FacultyLoading\BellScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
+use App\Http\Controllers\FacultyLoading\ClassScheduleDayAdjustmentController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleScopeLockController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleApprovalController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleSwapController;
@@ -120,6 +121,17 @@ Route::middleware(['web', 'auth', 'verified'])
         Route::middleware('permission:faculty_loading.manage')
             ->get('/schedules/print-batch', [ClassScheduleController::class, 'printBatchSchedules'])
             ->name('schedules.print-batch');
+
+        Route::middleware('permission:faculty_loading.manage')
+            ->prefix('schedules/day-adjustments')->name('schedules.day-adjustments.')->group(function () {
+                Route::get('/', [ClassScheduleDayAdjustmentController::class, 'index'])->name('index');
+                Route::get('/suggest', [ClassScheduleDayAdjustmentController::class, 'suggest'])->name('suggest');
+                Route::post('/', [ClassScheduleDayAdjustmentController::class, 'store'])->name('store');
+                Route::put('/{adjustment}', [ClassScheduleDayAdjustmentController::class, 'update'])->name('update');
+                Route::post('/{adjustment}/publish', [ClassScheduleDayAdjustmentController::class, 'publish'])->name('publish');
+                Route::post('/{adjustment}/cancel', [ClassScheduleDayAdjustmentController::class, 'cancel'])->name('cancel');
+                Route::get('/{adjustment}/print', [ClassScheduleDayAdjustmentController::class, 'print'])->name('print');
+            });
 
         Route::middleware('permission:faculty_loading.manage')
             ->prefix('schedules/scope-locks')->name('schedules.scope-locks.')->group(function () {
