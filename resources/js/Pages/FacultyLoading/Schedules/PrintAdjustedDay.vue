@@ -6,17 +6,9 @@
 
     <main class="sheet-body">
       <header class="document-heading">
-        <h1>Grade {{ grade.grade_level }} - Adjusted Class Schedule</h1>
+        <h1>GRADE {{ grade.grade_level }} - ADJUSTED CLASS SCHEDULE</h1>
         <p>{{ formattedEffectiveDate }}</p>
       </header>
-
-      <div class="adjustment-note">
-        <strong v-if="showsFlagCeremony">Flag Ceremony {{ formatRange(snapshot.ceremony.start, snapshot.ceremony.end) }}</strong>
-        <span v-if="showsFlagCeremony">Classes and bell periods shift {{ adjustment.shift_minutes }} minutes.</span>
-        <strong v-if="showsShortenedClasses">{{ snapshot.class_duration_minutes }}-Minute Classes</strong>
-        <span v-if="snapshot.activity">{{ snapshot.activity.title }} · {{ formatRange(snapshot.activity.start, snapshot.activity.end) }}</span>
-        <span class="reason">Reason: {{ adjustment.reason }}</span>
-      </div>
 
       <div class="schedule-grid" :style="{ '--section-count': Math.max(grade.sections.length, 1) }">
         <div class="section-headings">
@@ -90,8 +82,6 @@ const gridMarks = computed(() => {
 const timeMarks = computed(() => gridMarks.value.filter(minute => minute % 60 === 0 || minute === startMinutes.value || minute === endMinutes.value))
 const documentTitle = computed(() => `ADJUSTED CLASS SCHEDULE — ${props.adjustment.effective_date}`)
 const formattedEffectiveDate = computed(() => new Date(`${props.adjustment.effective_date}T00:00:00`).toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
-const showsFlagCeremony = computed(() => props.snapshot.has_flag_ceremony ?? Boolean(props.snapshot.ceremony))
-const showsShortenedClasses = computed(() => props.snapshot.has_shortened_classes ?? Boolean(props.snapshot.activity))
 
 function timeToMinutes(time) {
   const [hours, minutes] = String(time ?? '00:00').split(':').map(Number)
@@ -156,15 +146,13 @@ onMounted(async () => {
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #d1d5db; }
 .adjusted-sheet { position: relative; width: 297mm; height: 210mm; margin: 4mm auto; overflow: hidden; background: white; color: #0f172a; font-family: Arial, Helvetica, sans-serif; box-shadow: 0 1mm 3mm rgba(15, 23, 42, .25); }
-.report-header, .report-footer { position: absolute; left: 0; width: 100%; object-fit: fill; }
+.report-header, .report-footer { position: absolute; left: 0; display: block; width: 100%; height: 25mm; object-fit: contain; }
 .report-header { top: 0; height: 25mm; }
-.report-footer { bottom: 0; height: 12mm; }
-.sheet-body { position: absolute; inset: 24mm 10mm 11mm; }
+.report-footer { bottom: 0; }
+.sheet-body { position: absolute; inset: 25mm 10mm 25mm; }
 .document-heading { border-bottom: .5mm solid #1e3a8a; padding: 1.5mm 0; text-align: center; }
 .document-heading h1 { margin: 0; font-size: 14pt; font-weight: 800; color: #172554; }
 .document-heading p { margin: 1mm 0 0; font-size: 8pt; color: #475569; }
-.adjustment-note { display: flex; align-items: center; gap: 4mm; min-height: 8mm; border: .25mm solid #f59e0b; background: #fffbeb; padding: 1.5mm 2.5mm; font-size: 7.5pt; color: #78350f; }
-.adjustment-note .reason { margin-left: auto; max-width: 105mm; text-align: right; }
 .schedule-grid { border: .3mm solid #94a3b8; }
 .section-headings { display: grid; grid-template-columns: 20mm repeat(var(--section-count), minmax(0, 1fr)); min-height: 8mm; background: #eff6ff; border-bottom: .3mm solid #94a3b8; }
 .time-heading, .section-heading { display: flex; align-items: center; justify-content: center; border-right: .2mm solid #cbd5e1; font-size: 8pt; font-weight: 700; text-transform: uppercase; }
