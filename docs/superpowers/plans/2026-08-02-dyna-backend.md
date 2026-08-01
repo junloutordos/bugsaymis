@@ -765,12 +765,29 @@ git commit -m "feat(dyna): add GetHeadcountTool"
 
 **Files:**
 - Create: `app/Services/Atlas/Dyna/Tools/GetLeaveTrendsTool.php`
+- Modify: `app/Models/HR/LeaveApplication.php` (add `HasFactory` — see note below)
+- Create: `database/factories/HR/LeaveApplicationFactory.php`
 - Test: `tests/Feature/Atlas/Dyna/GetLeaveTrendsToolTest.php`
 
 **Interfaces:**
 - Consumes: `App\Models\HR\LeaveApplication` (existing, `user()` BelongsTo confirmed),
   `DynaTool` interface (Task 4).
 - Produces: `GetLeaveTrendsTool` implementing `DynaTool`, `name() === 'get_leave_trends'`.
+
+**Notes from execution:**
+- `LeaveApplication` did not have the `HasFactory` trait, so `LeaveApplication::factory()`
+  wasn't callable — added `use HasFactory;` (non-breaking addition) alongside the model's
+  existing `SoftDeletes, HasApprovalSnapshots` traits, and created
+  `database/factories/HR/LeaveApplicationFactory.php` (required columns per
+  `database/migrations/2026_03_22_000007_create_leave_applications_table.php`: `user_id`,
+  `leave_type_id` — via `LeaveType::factory()`, which already existed — `date_from`,
+  `date_to`, `days_applied`; `status` defaults to `'pending'` in the schema but the factory
+  sets it explicitly).
+- `whereBetween('created_at', [$input['from_date'], $input['to_date']])` on raw date strings
+  has a real boundary bug: the upper bound gets treated as midnight, silently excluding same-day
+  records created later that day. Fixed with
+  `Carbon::parse($input['to_date'])->endOfDay()` (and `startOfDay()` on the lower bound) —
+  see the implementation below.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -830,6 +847,7 @@ namespace App\Services\Atlas\Dyna\Tools;
 
 use App\Models\HR\LeaveApplication;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 
 class GetLeaveTrendsTool implements DynaTool
 {
@@ -860,7 +878,10 @@ class GetLeaveTrendsTool implements DynaTool
     public function execute(User $user, array $input): array
     {
         $query = LeaveApplication::query()
-            ->whereBetween('created_at', [$input['from_date'], $input['to_date']]);
+            ->whereBetween('created_at', [
+                Carbon::parse($input['from_date'])->startOfDay(),
+                Carbon::parse($input['to_date'])->endOfDay(),
+            ]);
 
         if (! $user->hasAnyRole(['Administrator', 'OCD'])) {
             $query->whereHas('user', fn ($q) => $q->where('division_id', $user->division_id));
@@ -877,10 +898,7 @@ class GetLeaveTrendsTool implements DynaTool
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test --filter=GetLeaveTrendsToolTest"`
-Expected: PASS. If `LeaveApplication::factory()` doesn't exist yet, create a minimal
-`database/factories/HR/LeaveApplicationFactory.php` with the columns this test needs
-(`user_id`, `status`, `created_at`, plus whatever other columns are `NOT NULL` on that table —
-check `database/migrations` for the leave_applications table before writing it).
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
