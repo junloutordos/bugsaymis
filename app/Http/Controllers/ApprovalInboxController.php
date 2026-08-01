@@ -14,6 +14,7 @@ use App\Models\FacilityRequest;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
 use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\LoadAssignment;
+use App\Models\HR\HrDocumentRequest;
 use App\Models\HR\LeaveApplication;
 use App\Models\ITJobRequest;
 use App\Models\MessengerialRequest;
@@ -24,9 +25,11 @@ use App\Models\VehicleRequest;
 use App\Models\WorkRequest;
 use App\Services\ApprovalInboxService;
 use App\Services\DigitalSignatureService;
+use App\Services\HR\HrDocumentRequestService;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -45,6 +48,7 @@ class ApprovalInboxController extends Controller
         'class_schedules',
         'computer_lab_schedules',
         'assessment_deletion_requests',
+        'hr_document_requests',
     ];
 
     /**
@@ -96,6 +100,8 @@ class ApprovalInboxController extends Controller
             throw $e;
         } catch (HttpException $e) {
             throw $e;
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             logger()->error('ApprovalInboxController::approve error', [
                 'type' => $type,
@@ -131,6 +137,8 @@ class ApprovalInboxController extends Controller
         } catch (HttpResponseException $e) {
             throw $e;
         } catch (HttpException $e) {
+            throw $e;
+        } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
             logger()->error('ApprovalInboxController::decline error', [
@@ -274,6 +282,14 @@ class ApprovalInboxController extends Controller
                 }
 
                 return [ClassRecordAssessmentDeletionRequest::class, $record];
+
+            case 'hr_document_requests':
+                $record = HrDocumentRequest::with('type')->find($id);
+                if (! $record) {
+                    abort(404);
+                }
+
+                return [HrDocumentRequest::class, $record];
         }
 
         abort(404);
@@ -431,6 +447,12 @@ class ApprovalInboxController extends Controller
                     break;
                 }
                 abort(403);
+
+            case 'hr_document_requests':
+                if ($isOCD && $user->hasPermission('hr.document-requests.ocd-approve')) {
+                    break;
+                }
+                abort(403);
         }
     }
 
@@ -452,6 +474,7 @@ class ApprovalInboxController extends Controller
             'class_schedules' => ['pending_ocd'],
             'computer_lab_schedules' => ['pending_approval'],
             'assessment_deletion_requests' => ['pending'],
+            'hr_document_requests' => ['pending_ocd_approval'],
         ];
 
         $allowed = $pendingStatuses[$type] ?? [];
@@ -586,6 +609,12 @@ class ApprovalInboxController extends Controller
             case 'assessment_deletion_requests':
                 return app(ClassRecordAssessmentController::class)
                     ->approveDeletionRequest($request, $record);
+
+            case 'hr_document_requests':
+                app(HrDocumentRequestService::class)
+                    ->approveByOcd($record, $user, (string) $request->input('pin'));
+
+                return back()->with('success', 'HR document request approved and signed.');
         }
 
         abort(404);
@@ -712,6 +741,12 @@ class ApprovalInboxController extends Controller
             case 'assessment_deletion_requests':
                 return app(ClassRecordAssessmentController::class)
                     ->declineDeletionRequest($request, $record);
+
+            case 'hr_document_requests':
+                app(HrDocumentRequestService::class)
+                    ->returnByOcd($record, $user, $request->input('reason'));
+
+                return back()->with('success', 'HR document request returned to HR for revision.');
         }
 
         abort(404);

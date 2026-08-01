@@ -61,6 +61,7 @@ class DatabaseSeeder extends Seeder
         $this->call(HolidaysSeeder::class);
         $this->call(AllowanceTypesSeeder::class);
         $this->call(PayrollPermissionsSeeder::class);
+        $this->call(HrDocumentRequestSeeder::class);
 
         // Organizational Structure Module
         $this->call(OrgStructurePermissionsSeeder::class);

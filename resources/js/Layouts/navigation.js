@@ -386,6 +386,20 @@ export const menuItems = [
         permissions: ["hr.employee.view"],
       },
       {
+        label: "My Document Requests",
+        routeName: "hr.document-requests.index",
+        href: route('hr.document-requests.index'),
+        icon: DocumentTextIcon,
+        permissions: ["hr.document-requests.file"],
+      },
+      {
+        label: "Document Request Processing",
+        routeName: "hr.document-requests.manage",
+        href: route('hr.document-requests.manage'),
+        icon: QueueListIcon,
+        permissions: ["hr.document-requests.process"],
+      },
+      {
         label: "Work Schedules",
         routeName: "hr.schedules.index",
         href: route("hr.schedules.index"),

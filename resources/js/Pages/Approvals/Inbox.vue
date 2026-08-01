@@ -185,7 +185,7 @@
                 Close
               </AppButton>
               <AppButton v-if="selectedItem.view_url" variant="secondary" as="a" :href="selectedItem.view_url" target="_blank">
-                <ArrowTopRightOnSquareIcon class="w-4 h-4" /> View Full Schedule
+                <ArrowTopRightOnSquareIcon class="w-4 h-4" /> View Full Record
               </AppButton>
               <AppButton variant="danger" :disabled="isSubmitting" @click="showDecline = true">
                 <XCircleIcon class="w-4 h-4" /> Decline
