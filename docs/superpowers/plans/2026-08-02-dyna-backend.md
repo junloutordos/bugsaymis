@@ -624,6 +624,13 @@ git commit -m "feat(dyna): add DynaTool contract and DynaToolRegistry"
 - Consumes: `App\Models\User::employees()` scope (existing), `DynaTool` interface (Task 4).
 - Produces: `GetHeadcountTool` implementing `DynaTool`, `name() === 'get_headcount'`.
 
+**Schema note (found during execution):** `divisions.division_name` is the real column —
+not `name` — per `database/migrations/2025_09_26_015744_create_divisions_table.php`; it's
+`string`, required, no default. `divisions.status` is an enum of `active`/`not_active` (not
+`inactive`). No `Division` factory existed yet — created
+`database/factories/DivisionFactory.php` (`division_name` + `status: 'active'`) as part of
+this task.
+
 - [ ] **Step 1: Write the failing test**
 
 ```php
@@ -730,7 +737,7 @@ class GetHeadcountTool implements DynaTool
         if (! empty($input['group_by_division'])) {
             return $query->with('division')
                 ->get()
-                ->groupBy(fn (User $u) => $u->division?->name ?? 'Unassigned')
+                ->groupBy(fn (User $u) => $u->division?->division_name ?? 'Unassigned')
                 ->map->count()
                 ->toArray();
         }
@@ -743,8 +750,7 @@ class GetHeadcountTool implements DynaTool
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test --filter=GetHeadcountToolTest"`
-Expected: PASS. If `Division::factory()` doesn't exist, create a minimal
-`database/factories/DivisionFactory.php` first (`['name' => fake()->word(), 'status' => 'active']`).
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
