@@ -6,7 +6,7 @@ import AppModal from '@/Components/AppModal.vue'
 import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, EyeIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  equipment: Array, labRooms: Array, statuses: Array, frequencies: Array, filters: Object,
+  equipment: Array, labRooms: Array, endUsers: Array, statuses: Array, frequencies: Array, filters: Object,
 })
 
 const search = ref(props.filters.search || '')
@@ -25,7 +25,7 @@ const statusTone = {
 }
 
 const form = useForm({
-  property_no: '', description: '', model: '', serial_number: '', room_id: '', unit: '',
+  property_no: '', description: '', specifications: '', model: '', serial_number: '', room_id: '', end_user_id: '', unit: '',
   category: '', date_acquired: '', unit_cost: '', status: 'active',
   calibration_required: false, calibration_frequency: '', pm_required: false, pm_frequency: '', remarks: '',
 })
@@ -73,8 +73,8 @@ function remove(e) {
         <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>
             <th class="px-4 py-3 text-left">Property No</th>
-            <th class="px-4 py-3 text-left">Description</th>
-            <th class="px-4 py-3 text-left">Model / Serial</th>
+            <th class="px-4 py-3 text-left">Equipment / Specifications</th>
+            <th class="px-4 py-3 text-left">End User</th>
             <th class="px-4 py-3 text-left">Location</th>
             <th class="px-4 py-3 text-left">Cal / PM</th>
             <th class="px-4 py-3 text-left">Status</th>
@@ -86,9 +86,9 @@ function remove(e) {
             <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ e.property_no || '—' }}</td>
             <td class="px-4 py-3">
               <div class="font-medium text-slate-800">{{ e.description }}</div>
-              <div class="text-xs text-slate-400">{{ e.unit || e.category || '' }}</div>
+              <div class="max-w-xs truncate text-xs text-slate-400">{{ e.specifications || e.model || e.category || '' }}</div>
             </td>
-            <td class="px-4 py-3 text-xs text-slate-500">{{ e.model || '—' }}<br>{{ e.serial_number || '' }}</td>
+            <td class="px-4 py-3 text-xs text-slate-500">{{ e.end_user || '—' }}</td>
             <td class="px-4 py-3">{{ e.room || '—' }}</td>
             <td class="px-4 py-3 text-xs">
               <span v-if="e.calibration_required" class="mr-1 rounded bg-violet-50 px-1.5 py-0.5 text-violet-600">Cal {{ e.calibration_frequency }}</span>
@@ -110,7 +110,8 @@ function remove(e) {
     <AppModal :show="showModal" :title="editing ? 'Edit Equipment' : 'Add Equipment'" size="2xl" @close="showModal = false">
       <div class="grid grid-cols-2 gap-4">
         <label class="text-sm">Property No<input v-model="form.property_no" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
-        <label class="text-sm">Description *<input v-model="form.description" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /><span v-if="form.errors.description" class="text-xs text-rose-600">{{ form.errors.description }}</span></label>
+        <label class="text-sm">Equipment Name *<input v-model="form.description" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /><span v-if="form.errors.description" class="text-xs text-rose-600">{{ form.errors.description }}</span></label>
+        <label class="col-span-2 text-sm">Description / Specifications<textarea v-model="form.specifications" rows="2" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"></textarea></label>
         <label class="text-sm">Model<input v-model="form.model" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Serial Number<input v-model="form.serial_number" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Location (Lab)
@@ -119,6 +120,11 @@ function remove(e) {
           </select>
         </label>
         <label class="text-sm">Unit<input v-model="form.unit" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+        <label class="text-sm">End User
+          <select v-model="form.end_user_id" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+            <option value="">—</option><option v-for="user in endUsers" :key="user.id" :value="user.id">{{ user.name }}</option>
+          </select>
+        </label>
         <label class="text-sm">Category<input v-model="form.category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Date Acquired<input type="date" v-model="form.date_acquired" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Unit Cost<input type="number" step="0.01" v-model="form.unit_cost" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>

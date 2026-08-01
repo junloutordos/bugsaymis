@@ -9,6 +9,7 @@ use App\Models\ScienceLab\LabReagentRequest;
 use App\Services\ScienceLab\LabControlNumberService;
 use App\Services\ScienceLab\LabInventoryService;
 use App\Services\ScienceLab\LabPdfService;
+use App\Services\ScienceLab\LabRequestWorkflowService;
 use App\Traits\SignsLabDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +24,7 @@ class LabReagentRequestController extends Controller
     public function __construct(
         private LabControlNumberService $controlNumbers,
         private LabInventoryService $inventory,
+        private LabRequestWorkflowService $workflow,
     ) {}
 
     public function index(Request $request)
@@ -100,11 +102,14 @@ class LabReagentRequestController extends Controller
 
     public function endorse(Request $request, LabReagentRequest $reagentRequest)
     {
+        abort_if($reagentRequest->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
+
         return $this->stamp($request, $reagentRequest, 'endorsed', 'endorsed_by_id', 'endorsed_at', ['pending'], 'endorsement');
     }
 
     public function approve(Request $request, LabReagentRequest $reagentRequest)
     {
+        abort_if($reagentRequest->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(Auth::user()->hasPermission('lab.manage'), 403);
 
         return $this->stamp($request, $reagentRequest, 'approved', 'approved_by_id', 'approved_at', ['pending', 'endorsed'], 'approval');
@@ -122,6 +127,7 @@ class LabReagentRequestController extends Controller
             'items'                 => ['required', 'array'],
             'items.*.id'            => ['required', 'integer'],
             'items.*.issued_amount' => ['nullable', 'string', 'max:100'],
+            'received_by_name'      => ['nullable', 'string', 'max:150'],
         ]);
 
         try {
@@ -150,6 +156,8 @@ class LabReagentRequestController extends Controller
                 $reagentRequest->update([
                     'released_by_id' => Auth::id(),
                     'released_at'    => now(),
+                    'received_by_name' => $data['received_by_name'] ?? $reagentRequest->requester_name,
+                    'received_at'    => now(),
                     'status'         => 'released',
                 ]);
             });
@@ -157,11 +165,16 @@ class LabReagentRequestController extends Controller
             return back()->withErrors(['release' => $e->getMessage()]);
         }
 
+        if ($reagentRequest->bundle) {
+            $this->workflow->syncCompletion($reagentRequest->bundle, Auth::user());
+        }
+
         return back()->with('success', 'Reagents released and inventory updated.');
     }
 
     public function decline(Request $request, LabReagentRequest $reagentRequest)
     {
+        abort_if($reagentRequest->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(Auth::user()->hasPermission('lab.manage'), 403);
         $data = $request->validate(['decline_reason' => ['required', 'string', 'max:500']]);
         $reagentRequest->update(['status' => 'declined', 'decline_reason' => $data['decline_reason']]);

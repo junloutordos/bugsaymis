@@ -10,6 +10,7 @@ use App\Http\Controllers\ScienceLab\LaboratoryController;
 use App\Http\Controllers\ScienceLab\LabReagentRequestController;
 use App\Http\Controllers\ScienceLab\LabReportController;
 use App\Http\Controllers\ScienceLab\LabReservationController;
+use App\Http\Controllers\ScienceLab\LabRequestBundleController;
 use App\Http\Controllers\ScienceLab\LabSafetyController;
 use App\Http\Controllers\ScienceLab\LabWasteController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,16 @@ Route::middleware(['auth', 'permission:lab.view|lab.request|lab.manage'])
     ->group(function () {
 
         Route::get('/', [LabDashboardController::class, 'index'])->name('dashboard');
+
+        // Unified requester journey + SRA/SRS operational queue.
+        Route::get('/requests', [LabRequestBundleController::class, 'index'])->name('requests.index');
+        Route::post('/requests', [LabRequestBundleController::class, 'store'])->name('requests.store');
+        Route::put('/requests/{bundle}', [LabRequestBundleController::class, 'update'])->name('requests.update');
+        Route::post('/requests/{bundle}/endorse', [LabRequestBundleController::class, 'endorse'])->name('requests.endorse');
+        Route::post('/requests/{bundle}/approve', [LabRequestBundleController::class, 'approve'])->name('requests.approve');
+        Route::post('/requests/{bundle}/cancel', [LabRequestBundleController::class, 'cancel'])->name('requests.cancel');
+        Route::post('/requests/{bundle}/decline', [LabRequestBundleController::class, 'decline'])->name('requests.decline');
+        Route::post('/requests/{bundle}/complete', [LabRequestBundleController::class, 'complete'])->name('requests.complete');
 
         // ── Setup: Laboratories (rooms tagged as science labs) ──────────────────
         Route::middleware('permission:lab.manage')->group(function () {
@@ -90,6 +101,8 @@ Route::middleware(['auth', 'permission:lab.view|lab.request|lab.manage'])
             Route::post('/maintenance/tickets',              [LabMaintenanceController::class, 'storeTicket'])->name('maintenance.tickets.store');
             Route::put('/maintenance/tickets/{ticket}',      [LabMaintenanceController::class, 'updateTicket'])->name('maintenance.tickets.update');
             Route::post('/maintenance/service-logs',         [LabMaintenanceController::class, 'storeServiceLog'])->name('maintenance.service-logs.store');
+            Route::get('/maintenance/schedule/pdf',          [LabMaintenanceController::class, 'schedulePdf'])->name('maintenance.schedule.pdf');
+            Route::get('/maintenance/equipment/{equipment}/service-form/pdf', [LabMaintenanceController::class, 'servicePdf'])->name('maintenance.service-form.pdf');
 
             // ── Calibration (CID-09) ────────────────────────────────────────────
             Route::get('/calibration',                       [LabCalibrationController::class, 'index'])->name('calibration.index');
@@ -97,6 +110,7 @@ Route::middleware(['auth', 'permission:lab.view|lab.request|lab.manage'])
             Route::post('/calibration/schedules/{schedule}/submit', [LabCalibrationController::class, 'submit'])->name('calibration.schedules.submit');
             Route::post('/calibration/events',               [LabCalibrationController::class, 'storeEvent'])->name('calibration.events.store');
             Route::put('/calibration/events/{event}',        [LabCalibrationController::class, 'updateEvent'])->name('calibration.events.update');
+            Route::get('/calibration/schedule/pdf',          [LabCalibrationController::class, 'schedulePdf'])->name('calibration.schedule.pdf');
 
             // ── Safety & waste ──────────────────────────────────────────────────
             Route::get('/safety',                            [LabSafetyController::class, 'index'])->name('safety.index');

@@ -5,7 +5,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppModal from '@/Components/AppModal.vue'
 import { PlusIcon, PencilIcon, EyeIcon, ArrowDownTrayIcon, ScaleIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps({ consumables: Array, labRooms: Array, types: Array, filters: Object })
+const props = defineProps({ consumables: Array, labRooms: Array, endUsers: Array, types: Array, filters: Object })
 
 const typeFilter = ref(props.filters.type || '')
 const search = ref(props.filters.search || '')
@@ -16,8 +16,8 @@ const adjustFor = ref(null)
 
 const typeTone = { consumable: 'bg-slate-100 text-slate-600', reagent: 'bg-sky-50 text-sky-600', chemical: 'bg-rose-50 text-rose-600' }
 
-const form = useForm({ name: '', type: 'consumable', unit_of_measure: '', room_id: '', unit: '', is_chemical: false, reorder_level: 0, tracks_expiry: false, status: 'active', remarks: '', sds_base64: null })
-const receiveForm = useForm({ quantity: '', lot_no: '', received_date: '', expiry_date: '', unit_cost: '', reference_number: '', remarks: '' })
+const form = useForm({ name: '', description: '', type: 'consumable', unit_of_measure: '', room_id: '', storage: '', end_user_id: '', unit: '', cabinet: '', storage_code: '', code_description: '', brand: '', cas_number: '', container_size: '', hazards: '', is_chemical: false, reorder_level: 0, tracks_expiry: false, status: 'active', remarks: '', sds_base64: null })
+const receiveForm = useForm({ quantity: '', lot_no: '', received_date: '', manufactured_date: '', expiry_date: '', unit_cost: '', reference_number: '', remarks: '' })
 const adjustForm = useForm({ delta: '', reason: '' })
 
 function applyFilters() { router.get(route('science-lab.inventory.index'), { type: typeFilter.value, search: search.value }, { preserveState: true, replace: true }) }
@@ -31,7 +31,7 @@ function submitAdjust() { adjustForm.post(route('science-lab.inventory.adjust', 
 
 <template>
   <Head title="Inventory" />
-  <AdminLayout title="Consumables & Reagents">
+  <AdminLayout title="Non-Equipment Items, Reagents & Consumables">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2">
         <input v-model="search" @keyup.enter="applyFilters" placeholder="Search…" class="w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" />
@@ -46,14 +46,14 @@ function submitAdjust() { adjustForm.post(route('science-lab.inventory.adjust', 
       <table class="min-w-full divide-y divide-slate-100 text-sm">
         <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>
-            <th class="px-4 py-3 text-left">Item</th><th class="px-4 py-3 text-left">Type</th>
+            <th class="px-4 py-3 text-left">Item / Description</th><th class="px-4 py-3 text-left">Type</th>
             <th class="px-4 py-3 text-right">On Hand</th><th class="px-4 py-3 text-right">Reorder</th>
             <th class="px-4 py-3 text-left">SDS</th><th class="px-4 py-3"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50">
           <tr v-for="c in consumables" :key="c.id" class="hover:bg-slate-50/50">
-            <td class="px-4 py-3"><div class="font-medium text-slate-800">{{ c.name }}</div><div class="text-xs text-slate-400">{{ c.room || c.unit || '' }}</div></td>
+            <td class="px-4 py-3"><div class="font-medium text-slate-800">{{ c.name }}</div><div class="max-w-xs truncate text-xs text-slate-400">{{ c.description || c.code_description || c.storage || c.room || '' }}</div></td>
             <td class="px-4 py-3"><span :class="['rounded-full px-2 py-0.5 text-xs font-medium capitalize', typeTone[c.type]]">{{ c.type }}</span></td>
             <td class="px-4 py-3 text-right font-medium" :class="c.reorder_level > 0 && c.balance <= c.reorder_level ? 'text-amber-600' : 'text-slate-700'">{{ c.balance }} {{ c.unit_of_measure }}</td>
             <td class="px-4 py-3 text-right text-slate-500">{{ c.reorder_level }}</td>
@@ -71,18 +71,31 @@ function submitAdjust() { adjustForm.post(route('science-lab.inventory.adjust', 
     </div>
 
     <!-- Item modal -->
-    <AppModal :show="showModal" :title="editing ? 'Edit Item' : 'Add Item'" size="lg" @close="showModal = false">
+    <AppModal :show="showModal" :title="editing ? 'Edit Item' : 'Add Item'" size="2xl" @close="showModal = false">
       <div class="grid grid-cols-2 gap-4">
         <label class="col-span-2 text-sm">Name *<input v-model="form.name" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /><span v-if="form.errors.name" class="text-xs text-rose-600">{{ form.errors.name }}</span></label>
+        <label class="col-span-2 text-sm">Description / Specifications<textarea v-model="form.description" rows="2" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"></textarea></label>
         <label class="text-sm">Type<select v-model="form.type" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 capitalize"><option v-for="t in types" :key="t" :value="t">{{ t }}</option></select></label>
         <label class="text-sm">Unit of Measure<input v-model="form.unit_of_measure" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Location (Lab)<select v-model="form.room_id" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"><option value="">—</option><option v-for="r in labRooms" :key="r.id" :value="r.id">{{ r.name }}</option></select></label>
+        <label class="text-sm">Storage<input v-model="form.storage" placeholder="Shelf, cabinet, or storage area" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+        <label class="text-sm">End User<select v-model="form.end_user_id" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"><option value="">—</option><option v-for="user in endUsers" :key="user.id" :value="user.id">{{ user.name }}</option></select></label>
         <label class="text-sm">Owning Unit<input v-model="form.unit" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+        <template v-if="form.type === 'reagent' || form.type === 'chemical'">
+          <label class="text-sm">Cabinet<input v-model="form.cabinet" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+          <label class="text-sm">Storage Code<input v-model="form.storage_code" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+          <label class="col-span-2 text-sm">Code Description<input v-model="form.code_description" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+          <label class="text-sm">Brand<input v-model="form.brand" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+          <label class="text-sm">CAS Number<input v-model="form.cas_number" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+          <label class="text-sm">Container Size<input v-model="form.container_size" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+          <label class="text-sm">Hazards<input v-model="form.hazards" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+        </template>
         <label class="text-sm">Reorder Level<input type="number" step="0.001" v-model="form.reorder_level" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Status<select v-model="form.status" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" v-model="form.tracks_expiry" /> Track expiry (FEFO)</label>
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" v-model="form.is_chemical" /> Chemical (needs SDS)</label>
         <label class="col-span-2 text-sm">Safety Data Sheet (PDF)<input type="file" accept="application/pdf,image/*" @change="onSds" class="mt-1 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-indigo-600" /></label>
+        <label class="col-span-2 text-sm">Remarks<textarea v-model="form.remarks" rows="2" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"></textarea></label>
       </div>
       <template #footer>
         <button @click="showModal = false" class="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancel</button>
@@ -96,6 +109,7 @@ function submitAdjust() { adjustForm.post(route('science-lab.inventory.adjust', 
         <label class="text-sm">Quantity *<input type="number" step="0.001" v-model="receiveForm.quantity" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /><span v-if="receiveForm.errors.quantity" class="text-xs text-rose-600">{{ receiveForm.errors.quantity }}</span></label>
         <label class="text-sm">Lot No<input v-model="receiveForm.lot_no" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Received Date<input type="date" v-model="receiveForm.received_date" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
+        <label class="text-sm">Manufactured Date<input type="date" v-model="receiveForm.manufactured_date" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Expiry Date<input type="date" v-model="receiveForm.expiry_date" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Unit Cost<input type="number" step="0.0001" v-model="receiveForm.unit_cost" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>
         <label class="text-sm">Reference No<input v-model="receiveForm.reference_number" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label>

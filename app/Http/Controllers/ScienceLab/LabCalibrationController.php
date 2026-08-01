@@ -8,6 +8,7 @@ use App\Models\ScienceLab\LabCalibrationEvent;
 use App\Models\ScienceLab\LabCalibrationSchedule;
 use App\Models\ScienceLab\LabEquipment;
 use App\Traits\HandlesLabUploads;
+use App\Services\ScienceLab\LabPdfService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -110,6 +111,16 @@ class LabCalibrationController extends Controller
         $this->applyResult($event->refresh());
 
         return back()->with('success', 'Calibration record updated.');
+    }
+
+    public function schedulePdf(LabPdfService $pdf)
+    {
+        $schoolYear = SchoolYear::where('is_current', true)->first();
+        $schedules = LabCalibrationSchedule::with(['equipment.room:id,name', 'events', 'preparedBy:id,name', 'approver:id,name'])
+            ->when($schoolYear, fn ($query) => $query->where('school_year_id', $schoolYear->id))
+            ->orderBy('id')->get();
+
+        return $pdf->calibrationSchedule($schedules, $schoolYear?->name);
     }
 
     /**

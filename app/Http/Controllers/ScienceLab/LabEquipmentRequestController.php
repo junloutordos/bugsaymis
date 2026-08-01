@@ -9,6 +9,7 @@ use App\Models\ScienceLab\LabEquipmentRequest;
 use App\Models\ScienceLab\LabRepairTicket;
 use App\Services\ScienceLab\LabControlNumberService;
 use App\Services\ScienceLab\LabPdfService;
+use App\Services\ScienceLab\LabRequestWorkflowService;
 use App\Traits\SignsLabDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +21,10 @@ class LabEquipmentRequestController extends Controller
 {
     use SignsLabDocuments;
 
-    public function __construct(private LabControlNumberService $controlNumbers) {}
+    public function __construct(
+        private LabControlNumberService $controlNumbers,
+        private LabRequestWorkflowService $workflow,
+    ) {}
 
     public function index(Request $request)
     {
@@ -72,11 +76,14 @@ class LabEquipmentRequestController extends Controller
 
     public function endorse(Request $request, LabEquipmentRequest $equipmentRequest)
     {
+        abort_if($equipmentRequest->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
+
         return $this->stampSignature($request, $equipmentRequest, 'endorsed', 'endorsed_by_id', 'endorsed_at', ['pending'], 'endorsement');
     }
 
     public function approve(Request $request, LabEquipmentRequest $equipmentRequest)
     {
+        abort_if($equipmentRequest->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(Auth::user()->hasPermission('lab.manage'), 403);
 
         return $this->stampSignature($request, $equipmentRequest, 'approved', 'approved_by_id', 'approved_at', ['pending', 'endorsed'], 'approval');
@@ -91,6 +98,7 @@ class LabEquipmentRequestController extends Controller
             'items'                    => ['required', 'array'],
             'items.*.id'               => ['required', 'integer'],
             'items.*.issued_condition' => ['nullable', 'string', 'max:255'],
+            'received_by_name'         => ['nullable', 'string', 'max:150'],
         ]);
 
         DB::transaction(function () use ($equipmentRequest, $data) {
@@ -101,9 +109,14 @@ class LabEquipmentRequestController extends Controller
             $equipmentRequest->update([
                 'issued_by_id' => Auth::id(),
                 'issued_at'    => now(),
+                'received_by_name' => $data['received_by_name'] ?? $equipmentRequest->requester_name,
                 'status'       => 'issued',
             ]);
         });
+
+        if ($equipmentRequest->bundle) {
+            $this->workflow->syncCompletion($equipmentRequest->bundle, Auth::user());
+        }
 
         return back()->with('success', 'Equipment issued to borrower.');
     }
@@ -153,11 +166,16 @@ class LabEquipmentRequestController extends Controller
             ]);
         });
 
+        if ($equipmentRequest->bundle) {
+            $this->workflow->syncCompletion($equipmentRequest->bundle, Auth::user());
+        }
+
         return back()->with('success', 'Equipment checked in. Damaged items flagged for repair.');
     }
 
     public function decline(Request $request, LabEquipmentRequest $equipmentRequest)
     {
+        abort_if($equipmentRequest->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(Auth::user()->hasPermission('lab.manage'), 403);
         $data = $request->validate(['decline_reason' => ['required', 'string', 'max:500']]);
         $equipmentRequest->update(['status' => 'declined', 'decline_reason' => $data['decline_reason']]);
@@ -167,7 +185,7 @@ class LabEquipmentRequestController extends Controller
 
     public function pdf(LabEquipmentRequest $equipmentRequest, LabPdfService $pdf)
     {
-        $equipmentRequest->load(['items.equipment', 'requester:id,name', 'endorser:id,name', 'approver:id,name', 'schoolYear:id,name']);
+        $equipmentRequest->load(['items.equipment', 'requester:id,name', 'endorser:id,name', 'approver:id,name', 'issuer:id,name', 'returnReceiver:id,name', 'schoolYear:id,name']);
 
         return $pdf->equipmentRequest($equipmentRequest);
     }

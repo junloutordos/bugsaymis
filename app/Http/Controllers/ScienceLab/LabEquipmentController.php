@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\ScienceLab\LabEquipment;
 use App\Models\ScienceLab\ScienceLabProfile;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -18,7 +19,7 @@ class LabEquipmentController extends Controller
 
     public function index(Request $request)
     {
-        $query = LabEquipment::with('room:id,name');
+        $query = LabEquipment::with(['room:id,name', 'endUser:id,name']);
 
         if ($search = $request->string('search')->trim()->value()) {
             $query->where(fn ($q) => $q
@@ -38,10 +39,13 @@ class LabEquipmentController extends Controller
             'id' => $e->id,
             'property_no' => $e->property_no,
             'description' => $e->description,
+            'specifications' => $e->specifications,
             'model' => $e->model,
             'serial_number' => $e->serial_number,
             'room' => $e->room?->name,
             'room_id' => $e->room_id,
+            'end_user_id' => $e->end_user_id,
+            'end_user' => $e->endUser?->name,
             'unit' => $e->unit,
             'category' => $e->category,
             'date_acquired' => optional($e->date_acquired)->toDateString(),
@@ -59,6 +63,7 @@ class LabEquipmentController extends Controller
             'labRooms'    => $this->labRooms(),
             'statuses'    => self::STATUSES,
             'frequencies' => self::FREQUENCIES,
+            'endUsers'    => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
             'filters'     => $request->only('search', 'status', 'room_id'),
         ]);
     }
@@ -106,9 +111,11 @@ class LabEquipmentController extends Controller
         return $request->validate([
             'property_no'   => ['nullable', 'string', 'max:100'],
             'description'   => ['required', 'string', 'max:255'],
+            'specifications'=> ['nullable', 'string', 'max:2000'],
             'model'         => ['nullable', 'string', 'max:255'],
             'serial_number' => ['nullable', 'string', 'max:255'],
             'room_id'       => ['nullable', 'integer', 'exists:rooms,id'],
+            'end_user_id'   => ['nullable', 'integer', 'exists:users,id'],
             'unit'          => ['nullable', 'string', 'max:100'],
             'category'      => ['nullable', 'string', 'max:100'],
             'date_acquired' => ['nullable', 'date'],

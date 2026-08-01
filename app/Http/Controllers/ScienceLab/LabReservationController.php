@@ -72,6 +72,7 @@ class LabReservationController extends Controller
 
     public function endorse(Request $request, LabReservation $reservation)
     {
+        abort_if($reservation->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         $request->validate(['pin' => ['required', 'string']]);
         abort_unless(in_array($reservation->status, ['pending']), 422, 'Reservation is not pending endorsement.');
 
@@ -89,6 +90,7 @@ class LabReservationController extends Controller
 
     public function approve(Request $request, LabReservation $reservation)
     {
+        abort_if($reservation->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(Auth::user()->hasPermission('lab.manage'), 403);
         $request->validate(['pin' => ['required', 'string']]);
         abort_unless(in_array($reservation->status, ['pending', 'endorsed']), 422, 'Reservation cannot be approved from its current state.');
@@ -107,6 +109,7 @@ class LabReservationController extends Controller
 
     public function decline(Request $request, LabReservation $reservation)
     {
+        abort_if($reservation->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(Auth::user()->hasPermission('lab.manage'), 403);
         $data = $request->validate(['decline_reason' => ['required', 'string', 'max:500']]);
         $reservation->update(['status' => 'declined', 'decline_reason' => $data['decline_reason']]);
@@ -116,6 +119,7 @@ class LabReservationController extends Controller
 
     public function cancel(LabReservation $reservation)
     {
+        abort_if($reservation->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(
             $reservation->requested_by_id === Auth::id() || Auth::user()->hasPermission('lab.manage'),
             403
@@ -128,6 +132,7 @@ class LabReservationController extends Controller
 
     public function complete(LabReservation $reservation)
     {
+        abort_if($reservation->bundle_id, 409, 'Use the unified laboratory request workflow for this request.');
         abort_unless(Auth::user()->hasPermission('lab.manage'), 403);
         $reservation->update(['status' => 'completed']);
 

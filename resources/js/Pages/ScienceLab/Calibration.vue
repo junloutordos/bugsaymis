@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppModal from '@/Components/AppModal.vue'
-import { PlusIcon, CheckBadgeIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import { storageUrl } from '@/Composables/useStorage'
 
 const props = defineProps({ schedules: Array, equipment: Array, schoolYear: Object, frequencies: Array, canApprove: Boolean })
@@ -28,7 +28,7 @@ function submitEvent() { eventForm.post(route('science-lab.calibration.events.st
   <AdminLayout title="Calibration">
     <div class="mb-4 flex items-center justify-between">
       <p class="text-sm text-slate-500">CID-09 · SY {{ schoolYear?.name || '—' }}</p>
-      <button @click="showSchedule = true" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"><PlusIcon class="h-4 w-4" /> Add Schedule</button>
+      <div class="flex gap-2"><a :href="route('science-lab.calibration.schedule.pdf')" target="_blank" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><PrinterIcon class="h-4 w-4" /> Print CID-09</a><button @click="showSchedule = true" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"><PlusIcon class="h-4 w-4" /> Add Schedule</button></div>
     </div>
 
     <div class="space-y-3">
