@@ -1,0 +1,105 @@
+<?php
+
+namespace App\Services\Atlas\Dyna;
+
+use App\Models\Atlas\DynaConversation;
+use App\Models\Atlas\DynaMessage;
+use App\Models\User;
+
+class DynaOrchestratorService
+{
+    private const SYSTEM_PROMPT = <<<'TEXT'
+        You are Dyna, an analytics and insights assistant for Atlas, the campus management
+        system for Philippine Science High School - Caraga Region Campus. You answer questions
+        for the Campus Director and Division Chiefs (MANCOM) using the tools available to you.
+        Always call a tool to get real data before stating any number — never estimate or
+        invent statistics. If no tool can answer the question, say so plainly.
+        TEXT;
+
+    private const MAX_TOOL_TURNS = 5;
+
+    public function __construct(
+        private readonly DynaToolRegistry $tools,
+        private readonly DynaBedrockClientFactory $clientFactory,
+    ) {}
+
+    public function reply(User $user, DynaConversation $conversation, string $userMessage): string
+    {
+        DynaMessage::create([
+            'dyna_conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => $userMessage,
+            'created_at' => now(),
+        ]);
+
+        $client = $this->clientFactory->make();
+        $messages = $this->historyAsBedrockMessages($conversation);
+        $messages[] = ['role' => 'user', 'content' => [['text' => $userMessage]]];
+
+        $toolCallLog = [];
+
+        for ($turn = 0; $turn < self::MAX_TOOL_TURNS; $turn++) {
+            $result = $client->converse([
+                'modelId' => config('services.bedrock.inference_profile_id'),
+                'system' => [['text' => self::SYSTEM_PROMPT]],
+                'messages' => $messages,
+                'toolConfig' => $this->tools->toBedrockToolConfig(),
+                'inferenceConfig' => ['maxTokens' => 1024],
+            ]);
+
+            $assistantContent = $result['output']['message']['content'];
+            $messages[] = ['role' => 'assistant', 'content' => $assistantContent];
+
+            $toolUseBlocks = array_values(array_filter($assistantContent, fn ($b) => isset($b['toolUse'])));
+
+            if (empty($toolUseBlocks)) {
+                $finalText = collect($assistantContent)->pluck('text')->filter()->implode('');
+
+                DynaMessage::create([
+                    'dyna_conversation_id' => $conversation->id,
+                    'role' => 'assistant',
+                    'content' => $finalText,
+                    'tool_calls' => $toolCallLog ?: null,
+                    'created_at' => now(),
+                ]);
+
+                return $finalText;
+            }
+
+            $toolResultBlocks = [];
+            foreach ($toolUseBlocks as $block) {
+                $toolUse = $block['toolUse'];
+                $output = $this->tools->execute($toolUse['name'], $toolUse['input'] ?? [], $user);
+
+                $toolCallLog[] = ['name' => $toolUse['name'], 'input' => $toolUse['input'] ?? [], 'result' => $output];
+
+                $toolResultBlocks[] = ['toolResult' => [
+                    'toolUseId' => $toolUse['toolUseId'],
+                    'content' => [['json' => $output]],
+                ]];
+            }
+
+            $messages[] = ['role' => 'user', 'content' => $toolResultBlocks];
+        }
+
+        $fallback = "I wasn't able to complete that within the allowed number of tool calls — try narrowing the question.";
+
+        DynaMessage::create([
+            'dyna_conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => $fallback,
+            'tool_calls' => $toolCallLog ?: null,
+            'created_at' => now(),
+        ]);
+
+        return $fallback;
+    }
+
+    private function historyAsBedrockMessages(DynaConversation $conversation): array
+    {
+        return $conversation->messages->map(fn (DynaMessage $m) => [
+            'role' => $m->role,
+            'content' => [['text' => $m->content]],
+        ])->all();
+    }
+}
