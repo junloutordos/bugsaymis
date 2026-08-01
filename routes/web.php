@@ -25,6 +25,9 @@ Route::get('/privacy-policy', fn () => inertia('Privacy/Public'))->name('privacy
 // Account & data deletion instructions — public, no auth (required by Play Store account-deletion policy)
 Route::get('/account-deletion', fn () => inertia('AccountDeletion/Public'))->name('account-deletion.public');
 
+Route::get('/verify/hr-document/{token}', [\App\Http\Controllers\HR\HrDocumentVerificationController::class, 'show'])
+    ->name('hr.document-requests.verify');
+
 // Digital calling card — public, no auth
 Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
 
@@ -2039,6 +2042,38 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('employees.documents.destroy');
     Route::get('/documents/{employeeDocument}/download', [EmployeeDocumentController::class, 'download'])
         ->name('employees.documents.download');
+
+    // ── HR Document Requests ──────────────────────────────────────────────────
+    Route::get('/document-requests', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'index'])
+        ->name('document-requests.index');
+    Route::post('/document-requests', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'store'])
+        ->name('document-requests.store');
+    Route::get('/document-requests/manage', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'manage'])
+        ->name('document-requests.manage');
+    Route::get('/document-requests/issued/{issuedDocument}/download', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'download'])
+        ->name('document-requests.download');
+    Route::get('/document-requests/attachments/{attachment}', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'attachment'])
+        ->name('document-requests.attachments.download');
+    Route::get('/document-requests/{documentRequest}', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'show'])
+        ->name('document-requests.show');
+    Route::post('/document-requests/{documentRequest}/cancel', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'cancel'])
+        ->name('document-requests.cancel');
+    Route::post('/document-requests/{documentRequest}/resubmit', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'resubmit'])
+        ->name('document-requests.resubmit');
+    Route::post('/document-requests/{documentRequest}/start', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'start'])
+        ->name('document-requests.start');
+    Route::post('/document-requests/{documentRequest}/prepare', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'prepare'])
+        ->name('document-requests.prepare');
+    Route::post('/document-requests/{documentRequest}/return', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'returnToEmployee'])
+        ->name('document-requests.return');
+    Route::post('/document-requests/{documentRequest}/reject', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'reject'])
+        ->name('document-requests.reject');
+    Route::post('/document-requests/{documentRequest}/route-to-ocd', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'routeToOcd'])
+        ->name('document-requests.route-to-ocd');
+    Route::post('/document-requests/{documentRequest}/issue', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'issue'])
+        ->name('document-requests.issue');
+    Route::put('/document-request-types/{requestType}', [\App\Http\Controllers\HR\HrDocumentRequestController::class, 'updateType'])
+        ->name('document-request-types.update');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

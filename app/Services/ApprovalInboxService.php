@@ -10,6 +10,7 @@ use App\Models\FacilityRequest;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
 use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\LoadAssignment;
+use App\Models\HR\HrDocumentRequest;
 use App\Models\HR\LeaveApplication;
 use App\Models\ITJobRequest;
 use App\Models\MessengerialRequest;
@@ -229,6 +230,11 @@ class ApprovalInboxService
 
         // ── OCD ───────────────────────────────────────────────────────────────
         if ($isOCD) {
+            $hrDocumentRequests = HrDocumentRequest::with(['type', 'requester:id,name,position', 'processor:id,name'])
+                ->where('status', 'pending_ocd_approval')->latest()->get()
+                ->map(fn ($r) => $this->normaliseHrDocumentRequest($r))->values()->all();
+            $this->mergeOrAddTab($tabs, 'hr_document_requests', 'HR Document Requests', $hrDocumentRequests);
+
             $itOCD = ITJobRequest::with(['user:id,name', 'divisionChief:id,name', 'assignedTo:id,name'])
                 ->where('status', 'Pending OCD Approval')->latest()->get()
                 ->map(fn ($r) => $this->normaliseITJobRequest($r))->values()->all();
@@ -779,6 +785,41 @@ class ApprovalInboxService
                         ['label' => 'Division Chief',     'value' => $r->divisionChief?->name ?? '—'],
                         ['label' => 'DC Action',          'value' => $r->division_chief_action ?? '—'],
                         ['label' => 'DC Remarks',         'value' => $r->division_chief_remarks ?? '—', 'full' => true],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function normaliseHrDocumentRequest(HrDocumentRequest $r): array
+    {
+        return [
+            'id' => $r->id,
+            'type' => 'hr_document_requests',
+            'reference_no' => $r->reference_no,
+            'requester_name' => $r->requester?->name ?? '—',
+            'filed_at' => $r->submitted_at?->toISOString(),
+            'status' => 'Pending OCD Approval',
+            'summary' => $r->type?->name ?? 'HR Document',
+            'view_url' => route('hr.document-requests.show', $r),
+            'sections' => [
+                [
+                    'title' => 'Document Request',
+                    'fields' => [
+                        ['label' => 'Document Type', 'value' => $r->type?->name ?? '—'],
+                        ['label' => 'Employee Position', 'value' => $r->requester?->position ?? '—'],
+                        ['label' => 'Purpose', 'value' => $r->purpose, 'full' => true],
+                        ['label' => 'Addressed To', 'value' => $r->addressed_to ?? '—'],
+                        ['label' => 'Receiving Agency', 'value' => $r->destination_agency ?? '—'],
+                        ['label' => 'Prepared By', 'value' => $r->processor?->name ?? '—'],
+                        ['label' => 'Date Needed', 'value' => $r->needed_at?->format('M d, Y') ?? '—'],
+                    ],
+                ],
+                [
+                    'title' => 'Prepared Document',
+                    'fields' => [
+                        ['label' => 'Certification Body', 'value' => $r->document_payload['body'] ?? 'See full document workspace', 'full' => true],
+                        ['label' => 'Internal HR Notes', 'value' => $r->internal_notes ?? '—', 'full' => true],
                     ],
                 ],
             ],
