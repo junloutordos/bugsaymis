@@ -17,6 +17,9 @@ use App\Policies\Recruitment\JobItemPolicy;
 use App\Policies\Recruitment\PlacementPolicy;
 use App\Policies\WFHAccomplishmentPolicy;
 use App\Policies\WFHAttendancePolicy;
+use App\Services\Atlas\Dyna\DynaToolRegistry;
+use App\Services\Atlas\Dyna\Tools\GetHeadcountTool;
+use App\Services\Atlas\Dyna\Tools\GetLeaveTrendsTool;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
@@ -36,7 +39,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // DynaToolRegistry takes an array of DynaTool instances — the container can't
+        // auto-wire an array constructor param by type-hint alone, so it needs an
+        // explicit binding listing every registered Dyna tool.
+        $this->app->singleton(DynaToolRegistry::class, function ($app) {
+            return new DynaToolRegistry([
+                $app->make(GetHeadcountTool::class),
+                $app->make(GetLeaveTrendsTool::class),
+            ]);
+        });
     }
 
     /**

@@ -1383,6 +1383,7 @@ git commit -m "feat(dyna): add /api/dyna/login token issuance"
 
 **Files:**
 - Create: `app/Http/Controllers/Api/DynaController.php`
+- Modify: `app/Providers/AppServiceProvider.php` (see note below)
 - Modify: `routes/api.php` (already added in Task 9)
 - Test: `tests/Feature/Atlas/Dyna/DynaChatEndpointTest.php`
 
@@ -1392,6 +1393,34 @@ git commit -m "feat(dyna): add /api/dyna/login token issuance"
   a new `DynaConversation` when `conversation_id` is omitted, returns
   `{conversation_id, answer}`. `GET /api/dyna/conversations` lists the authenticated user's own
   conversations (id, title, updated_at) for the Mac app's history sidebar.
+
+**Real bug found during execution — container binding was missing:** the third test below
+(unmocked `DynaOrchestratorService`, real container resolution) failed with
+`Unresolvable dependency ... array $tools in DynaToolRegistry` — Laravel's container cannot
+auto-wire an array-typed constructor parameter by type-hint alone, even though `GetHeadcountTool`
+and `GetLeaveTrendsTool` themselves resolve fine individually. Task 4's registry design assumed
+this would "just work" via constructor injection; it does not. Fixed by adding an explicit
+singleton binding in `app/Providers/AppServiceProvider.php::register()`:
+
+```php
+use App\Services\Atlas\Dyna\DynaToolRegistry;
+use App\Services\Atlas\Dyna\Tools\GetHeadcountTool;
+use App\Services\Atlas\Dyna\Tools\GetLeaveTrendsTool;
+
+public function register(): void
+{
+    $this->app->singleton(DynaToolRegistry::class, function ($app) {
+        return new DynaToolRegistry([
+            $app->make(GetHeadcountTool::class),
+            $app->make(GetLeaveTrendsTool::class),
+        ]);
+    });
+}
+```
+
+Any future Dyna tool (payroll summary, IPCR completion, enrollment stats — the fast-follow
+tools noted at the top of this plan) must be added to this array too, or the container will
+silently keep resolving `DynaToolRegistry` without it.
 
 - [ ] **Step 1: Write the failing test**
 
