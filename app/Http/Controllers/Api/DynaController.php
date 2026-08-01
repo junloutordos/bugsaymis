@@ -44,4 +44,21 @@ class DynaController extends Controller
 
         return response()->json($conversations);
     }
+
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $conversation = DynaConversation::where('user_id', $request->user()->id)
+            ->with('messages')
+            ->findOrFail($id);
+
+        return response()->json([
+            'id' => $conversation->id,
+            'title' => $conversation->title,
+            'messages' => $conversation->messages->map(fn ($m) => [
+                'role' => $m->role,
+                'content' => $m->content,
+                'created_at' => $m->created_at,
+            ]),
+        ]);
+    }
 }
