@@ -91,7 +91,7 @@
       </AppCard>
     </div>
 
-    <AppModal v-model="showForm" :title="editingId ? 'Edit Adjusted Day' : 'New Adjusted Day'" size="lg">
+    <AppModal :show="showForm" :title="editingId ? 'Edit Adjusted Day' : 'New Adjusted Day'" size="lg" @close="showForm = false">
       <div class="space-y-4">
         <div class="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           First record the campus-wide Monday holiday or suspension in the Academic Calendar. The next day is calculated across Grades 7–12.
