@@ -12,7 +12,7 @@ class LabReservation extends Model
     protected $table = 'lab_reservations';
 
     protected $fillable = [
-        'control_no', 'school_year_id', 'grade_level_section', 'number_of_students', 'subject', 'teacher_in_charge', 'date_start', 'date_end', 'time_start', 'time_end', 'room_id', 'requested_by_id', 'requester_name', 'requester_type', 'student_group', 'endorsed_by_id', 'endorsed_at', 'approved_by_id', 'approved_at', 'status', 'decline_reason', 'remarks',
+        'bundle_id', 'control_no', 'school_year_id', 'grade_level_section', 'number_of_students', 'subject', 'teacher_in_charge', 'date_start', 'date_end', 'time_start', 'time_end', 'room_id', 'requested_by_id', 'requester_name', 'requester_type', 'student_group', 'endorsed_by_id', 'endorsed_at', 'approved_by_id', 'approved_at', 'status', 'decline_reason', 'remarks',
     ];
 
     protected $casts = [
@@ -24,6 +24,8 @@ class LabReservation extends Model
     ];
 
     public function room() { return $this->belongsTo(\App\Models\Room::class); }
+
+    public function bundle() { return $this->belongsTo(LabRequestBundle::class, 'bundle_id'); }
 
     public function requester() { return $this->belongsTo(\App\Models\User::class, 'requested_by_id'); }
 

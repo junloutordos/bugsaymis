@@ -34,6 +34,7 @@ class LabInventoryService
                 'lot_no'            => $data['lot_no'] ?? null,
                 'quantity'          => $data['quantity'],
                 'received_date'     => $data['received_date'] ?? now()->toDateString(),
+                'manufactured_date' => $data['manufactured_date'] ?? null,
                 'expiry_date'       => $data['expiry_date'] ?? null,
                 'unit_cost'         => $data['unit_cost'] ?? 0,
                 'status'            => 'available',

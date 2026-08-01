@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ScienceLab;
 use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\ScienceLab\LabFirstAidCheck;
+use App\Models\ScienceLab\LabConsumable;
 use App\Models\ScienceLab\LabSafetyOrientation;
 use App\Models\ScienceLab\LabSafetyProcedure;
 use App\Models\ScienceLab\ScienceLabProfile;
@@ -27,6 +28,9 @@ class LabSafetyController extends Controller
                                 ->orderByDesc('orientation_date')->limit(100)->get(),
             'firstAid'     => LabFirstAidCheck::with(['room:id,name', 'checkedBy:id,name'])
                                 ->orderByDesc('check_date')->limit(100)->get(),
+            'safetyDataSheets' => LabConsumable::with('room:id,name')
+                                ->whereNotNull('sds_path')->where('status', '<>', 'inactive')
+                                ->orderBy('name')->get(['id', 'name', 'type', 'room_id', 'cas_number', 'hazards', 'sds_path']),
             'labRooms'     => $this->labRooms(),
             'schoolYear'   => SchoolYear::where('is_current', true)->first(['id', 'name']),
         ]);
@@ -85,9 +89,14 @@ class LabSafetyController extends Controller
             'attendees'           => ['nullable', 'array'],
             'attendees.*'         => ['nullable', 'string', 'max:150'],
             'remarks'             => ['nullable', 'string', 'max:1000'],
+            'document_base64'     => ['nullable', 'string'],
         ]);
         $data['school_year_id'] = SchoolYear::where('is_current', true)->value('id');
         $data['conducted_by_id'] = Auth::id();
+        if ($path = $this->storeLabUpload($request->input('document_base64'), 'lab/safety-orientations')) {
+            $data['document_path'] = $path;
+        }
+        unset($data['document_base64']);
 
         LabSafetyOrientation::create($data);
 
@@ -99,11 +108,18 @@ class LabSafetyController extends Controller
         $data = $request->validate([
             'room_id'     => ['nullable', 'integer', 'exists:rooms,id'],
             'check_date'  => ['required', 'date'],
+            'means_of_verification' => ['nullable', 'string', 'max:255'],
+            'inclusion'   => ['nullable', 'string', 'max:255'],
+            'document_base64' => ['nullable', 'string'],
             'items'       => ['nullable', 'array'],
             'is_complete' => ['boolean'],
             'remarks'     => ['nullable', 'string', 'max:1000'],
         ]);
         $data['checked_by_id'] = Auth::id();
+        if ($path = $this->storeLabUpload($request->input('document_base64'), 'lab/first-aid-checks')) {
+            $data['document_path'] = $path;
+        }
+        unset($data['document_base64']);
 
         LabFirstAidCheck::create($data);
 

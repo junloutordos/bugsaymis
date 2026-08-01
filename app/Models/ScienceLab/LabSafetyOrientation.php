@@ -9,7 +9,7 @@ class LabSafetyOrientation extends Model
     protected $table = 'lab_safety_orientations';
 
     protected $fillable = [
-        'room_id', 'school_year_id', 'orientation_date', 'conducted_by_id', 'grade_level_section', 'topic', 'attendees', 'remarks',
+        'room_id', 'school_year_id', 'orientation_date', 'conducted_by_id', 'grade_level_section', 'topic', 'attendees', 'document_path', 'remarks',
     ];
 
     protected $casts = [

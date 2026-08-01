@@ -43,6 +43,11 @@ class CsmResponseController extends Controller
             'requester_fk' => 'user_id',
             'post_status'  => 'Rated',
         ],
+        'lab-request' => [
+            'class'        => \App\Models\ScienceLab\LabRequestBundle::class,
+            'requester_fk' => 'requested_by_id',
+            'post_status'  => 'completed',
+        ],
     ];
 
     public function store(Request $request)
@@ -150,6 +155,9 @@ class CsmResponseController extends Controller
             }
 
             $model->update($updates);
+            if ($type === 'lab-request') {
+                $model->update(['csm_completed_at' => now()]);
+            }
         });
 
         return back()->with('success', 'Thank you! Your Client Satisfaction Survey has been submitted.');

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppModal from '@/Components/AppModal.vue'
-import { PlusIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, PrinterIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ schedules: Array, tickets: Array, equipment: Array, schoolYear: Object, pmStatuses: Array, ticketStatuses: Array, frequencies: Array })
 
@@ -46,6 +46,7 @@ const ticketTone = { open: 'bg-rose-50 text-rose-600', in_repair: 'bg-amber-50 t
         <div class="mb-3 flex items-center justify-between">
           <div><h2 class="text-sm font-semibold text-slate-700">Preventive Maintenance Schedule</h2><p class="text-xs text-slate-400">CID-08 · SY {{ schoolYear?.name || '—' }} · click a month to cycle ✓ ○ ✗</p></div>
           <div class="flex gap-2">
+            <a :href="route('science-lab.maintenance.schedule.pdf')" target="_blank" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><PrinterIcon class="h-4 w-4" /> Print CID-08</a>
             <button @click="showLog = true" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">+ Service Log</button>
             <button @click="showSchedule = true" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"><PlusIcon class="h-4 w-4" /> Add to Schedule</button>
           </div>
@@ -85,7 +86,7 @@ const ticketTone = { open: 'bg-rose-50 text-rose-600', in_repair: 'bg-amber-50 t
                 <td class="px-4 py-3 max-w-xs truncate text-slate-600">{{ t.problem }}</td>
                 <td class="px-4 py-3 text-xs">{{ t.date_reported }}</td>
                 <td class="px-4 py-3"><span :class="['rounded-full px-2 py-0.5 text-xs font-medium capitalize', ticketTone[t.status]]">{{ t.status.replace('_',' ') }}</span></td>
-                <td class="px-4 py-3 text-right"><button @click="openTicketEdit(t)" class="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50">Update</button></td>
+                <td class="px-4 py-3 text-right whitespace-nowrap"><a v-if="t.lab_equipment_id" :href="route('science-lab.maintenance.service-form.pdf', t.lab_equipment_id)" target="_blank" class="mr-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">CID-10</a><button @click="openTicketEdit(t)" class="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50">Update</button></td>
               </tr>
               <tr v-if="!tickets.length"><td colspan="6" class="px-4 py-8 text-center text-slate-400">No repair tickets.</td></tr>
             </tbody>

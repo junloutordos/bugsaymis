@@ -14,6 +14,7 @@ class LabControlNumberService
     public const EQUIPMENT   = 'LAB-EQP';
     public const REAGENT     = 'LAB-RGT';
     public const REPAIR      = 'LAB-RPR';
+    public const BUNDLE      = 'LAB-REQ';
 
     /**
      * Next control number for the given prefix + table/column, sequential per year.

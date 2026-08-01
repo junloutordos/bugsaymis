@@ -7,6 +7,7 @@ use App\Models\Room;
 use App\Models\ScienceLab\LabConsumable;
 use App\Models\ScienceLab\LabConsumableLot;
 use App\Models\ScienceLab\ScienceLabProfile;
+use App\Models\User;
 use App\Services\ScienceLab\LabInventoryService;
 use App\Traits\HandlesLabUploads;
 use Illuminate\Http\Request;
@@ -24,24 +25,36 @@ class LabConsumableController extends Controller
 
     public function index(Request $request)
     {
-        $consumables = LabConsumable::with('room:id,name')
+        $consumables = LabConsumable::with(['room:id,name', 'endUser:id,name'])
             ->when($request->string('type')->value(), fn ($q, $t) => $q->where('type', $t))
             ->when($request->string('search')->value(), fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
             ->orderBy('name')->get()
             ->map(fn ($c) => [
                 'id' => $c->id,
                 'name' => $c->name,
+                'description' => $c->description,
                 'type' => $c->type,
                 'unit_of_measure' => $c->unit_of_measure,
                 'room' => $c->room?->name,
                 'room_id' => $c->room_id,
+                'storage' => $c->storage,
+                'end_user_id' => $c->end_user_id,
+                'end_user' => $c->endUser?->name,
                 'unit' => $c->unit,
+                'cabinet' => $c->cabinet,
+                'storage_code' => $c->storage_code,
+                'code_description' => $c->code_description,
+                'brand' => $c->brand,
+                'cas_number' => $c->cas_number,
+                'container_size' => $c->container_size,
+                'hazards' => $c->hazards,
                 'is_chemical' => $c->is_chemical,
                 'has_sds' => (bool) $c->sds_path,
                 'sds_path' => $c->sds_path,
                 'reorder_level' => (float) $c->reorder_level,
                 'tracks_expiry' => $c->tracks_expiry,
                 'status' => $c->status,
+                'remarks' => $c->remarks,
                 'balance' => $this->inventory->balance($c->id),
             ]);
 
@@ -49,6 +62,7 @@ class LabConsumableController extends Controller
             'consumables' => $consumables,
             'labRooms'    => $this->labRooms(),
             'types'       => self::TYPES,
+            'endUsers'    => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
             'filters'     => $request->only('type', 'search'),
         ]);
     }
@@ -102,6 +116,7 @@ class LabConsumableController extends Controller
             'lot_no'           => ['nullable', 'string', 'max:100'],
             'received_date'    => ['nullable', 'date'],
             'expiry_date'      => ['nullable', 'date'],
+            'manufactured_date'=> ['nullable', 'date'],
             'unit_cost'        => ['nullable', 'numeric', 'min:0'],
             'reference_number' => ['nullable', 'string', 'max:60'],
             'remarks'          => ['nullable', 'string', 'max:500'],
@@ -140,10 +155,20 @@ class LabConsumableController extends Controller
     {
         return $request->validate([
             'name'            => ['required', 'string', 'max:255'],
+            'description'     => ['nullable', 'string', 'max:2000'],
             'type'            => ['required', Rule::in(self::TYPES)],
             'unit_of_measure' => ['nullable', 'string', 'max:30'],
             'room_id'         => ['nullable', 'integer', 'exists:rooms,id'],
+            'storage'         => ['nullable', 'string', 'max:150'],
+            'end_user_id'     => ['nullable', 'integer', 'exists:users,id'],
             'unit'            => ['nullable', 'string', 'max:100'],
+            'cabinet'         => ['nullable', 'string', 'max:100'],
+            'storage_code'    => ['nullable', 'string', 'max:100'],
+            'code_description'=> ['nullable', 'string', 'max:255'],
+            'brand'           => ['nullable', 'string', 'max:150'],
+            'cas_number'      => ['nullable', 'string', 'max:100'],
+            'container_size'  => ['nullable', 'string', 'max:100'],
+            'hazards'         => ['nullable', 'string', 'max:2000'],
             'is_chemical'     => ['boolean'],
             'reorder_level'   => ['nullable', 'numeric', 'min:0'],
             'tracks_expiry'   => ['boolean'],

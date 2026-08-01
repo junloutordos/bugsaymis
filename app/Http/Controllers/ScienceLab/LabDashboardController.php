@@ -3,53 +3,32 @@
 namespace App\Http\Controllers\ScienceLab;
 
 use App\Http\Controllers\Controller;
+use App\Models\CsmResponse;
 use App\Models\ScienceLab\LabCalibrationEvent;
 use App\Models\ScienceLab\LabEquipment;
 use App\Models\ScienceLab\LabEquipmentRequest;
 use App\Models\ScienceLab\LabReagentRequest;
-use App\Models\ScienceLab\LabRepairTicket;
+use App\Models\ScienceLab\LabRequestBundle;
 use App\Models\ScienceLab\LabReservation;
 use App\Models\ScienceLab\ScienceLabProfile;
-use App\Services\ScienceLab\LabInventoryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class LabDashboardController extends Controller
 {
-    public function __construct(private LabInventoryService $inventory) {}
-
     public function index()
     {
         $today = Carbon::today();
 
-        $equipmentByStatus = LabEquipment::selectRaw('status, COUNT(*) as c')
-            ->groupBy('status')->pluck('c', 'status');
-
-        $calibrationDue = LabCalibrationEvent::with('equipment:id,description,property_no')
-            ->whereIn('status', ['scheduled', 'overdue'])
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', '<=', $today->copy()->addDays(30))
-            ->orderBy('due_date')
-            ->limit(10)->get();
-
-        $lowStock     = $this->inventory->lowStock();
-        $expiringSoon = $this->inventory->expiringSoon(30);
-
         $cards = [
-            'laboratories'      => ScienceLabProfile::where('status', 'active')->count(),
-            'equipment'         => LabEquipment::count(),
-            'equipmentActive'   => (int) ($equipmentByStatus['active'] ?? 0),
-            'equipmentDown'     => LabEquipment::whereIn('status', ['under_repair', 'out_of_service', 'for_disposal'])->count(),
-            'openRepairs'       => LabRepairTicket::whereIn('status', ['open', 'in_repair'])->count(),
-            'calibrationDue'    => LabCalibrationEvent::whereIn('status', ['scheduled', 'overdue'])
-                                    ->whereNotNull('due_date')->whereDate('due_date', '<=', $today->copy()->addDays(30))->count(),
-            'calibrationOverdue'=> LabCalibrationEvent::where('status', 'overdue')->count(),
-            'lowStock'          => $lowStock->count(),
-            'expiringSoon'      => $expiringSoon->count(),
-            'pendingReservations' => LabReservation::whereIn('status', ['pending', 'endorsed'])->count(),
-            'pendingEquipment'  => LabEquipmentRequest::whereIn('status', ['pending', 'endorsed', 'approved'])->count(),
-            'pendingReagents'   => LabReagentRequest::whereIn('status', ['pending', 'endorsed', 'approved'])->count(),
+            'laboratories' => ScienceLabProfile::where('status', 'active')->count(),
+            'equipment'    => LabEquipment::count(),
+            'requests'     => [
+                'reservation' => $this->requestCounts(LabReservation::class),
+                'equipment'   => $this->requestCounts(LabEquipmentRequest::class),
+                'reagent'     => $this->requestCounts(LabReagentRequest::class),
+            ],
         ];
 
         $upcoming = LabReservation::with('room:id,name')
@@ -64,32 +43,61 @@ class LabDashboardController extends Controller
                 'time_start' => $r->time_start, 'status' => $r->status,
             ]);
 
+        $calendarReservations = LabReservation::with('room:id,name')
+            ->whereIn('status', ['approved', 'completed'])
+            ->whereDate('date_start', '<=', $today->copy()->endOfMonth())
+            ->where(fn ($query) => $query->whereNull('date_end')->whereDate('date_start', '>=', $today->copy()->startOfMonth())
+                ->orWhereDate('date_end', '>=', $today->copy()->startOfMonth()))
+            ->orderBy('date_start')->orderBy('time_start')->get()
+            ->map(fn ($reservation) => [
+                'id' => $reservation->id,
+                'room' => $reservation->room?->name,
+                'subject' => $reservation->subject,
+                'date_start' => optional($reservation->date_start)->toDateString(),
+                'date_end' => optional($reservation->date_end)->toDateString(),
+                'time_start' => $reservation->time_start,
+            ]);
+
+        $csmResponses = CsmResponse::where('respondable_type', LabRequestBundle::class)->get();
+        $csmScores = $csmResponses->map(fn (CsmResponse $response) => $response->derivedRating())->filter();
+
+        $monthly = collect(range(5, 0))->map(function (int $monthsAgo) {
+            $month = now()->startOfMonth()->subMonths($monthsAgo);
+
+            return [
+                'label' => $month->format('M'),
+                'requests' => LabRequestBundle::whereBetween('created_at', [
+                    $month->copy()->startOfMonth(),
+                    $month->copy()->endOfMonth(),
+                ])->count(),
+            ];
+        });
+
         return Inertia::render('ScienceLab/Dashboard', [
-            'cards'          => $cards,
-            'calibrationDue' => $calibrationDue->map(fn ($e) => [
-                'id' => $e->id,
-                'equipment' => $e->equipment?->description,
-                'property_no' => $e->equipment?->property_no,
-                'due_date' => optional($e->due_date)->toDateString(),
-                'status' => $e->status,
-            ]),
-            'lowStock'       => $lowStock->map(fn ($c) => [
-                'id' => $c->id, 'name' => $c->name,
-                'balance' => $this->inventory->balance($c->id),
-                'reorder_level' => (float) $c->reorder_level,
-                'unit' => $c->unit_of_measure,
-            ])->values(),
-            'expiringSoon'   => $expiringSoon->map(fn ($l) => [
-                'id' => $l->id, 'name' => $l->consumable?->name,
-                'lot_no' => $l->lot_no, 'quantity' => (float) $l->quantity,
-                'expiry_date' => optional($l->expiry_date)->toDateString(),
-            ])->values(),
-            'upcoming'       => $upcoming,
+            'cards'    => $cards,
+            'upcoming' => $upcoming,
+            'calendar' => $calendarReservations,
+            'calendarMonth' => $today->format('Y-m'),
+            'csm'      => [
+                'responses' => $csmResponses->count(),
+                'average'   => $csmScores->isEmpty() ? null : round($csmScores->average(), 2),
+                'pending'   => LabRequestBundle::where('status', 'completed')->whereNull('csm_completed_at')->count(),
+            ],
+            'monthly' => $monthly,
             'can'            => [
                 'manage'  => Auth::user()->hasPermission('lab.manage'),
                 'reports' => Auth::user()->hasPermission('lab.reports'),
                 'approveCalibration' => Auth::user()->hasPermission('lab.calibration.approve'),
             ],
         ]);
+    }
+
+    private function requestCounts(string $model): array
+    {
+        return [
+            'total'    => $model::count(),
+            'pending'  => $model::whereIn('status', ['pending', 'pending_endorsement', 'endorsed', 'pending_approval'])->count(),
+            'approved' => $model::whereIn('status', ['approved', 'issued', 'returned', 'released', 'completed'])->count(),
+        ];
     }
 }

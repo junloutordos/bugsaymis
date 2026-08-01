@@ -25,6 +25,7 @@ class CSMFeedbackController extends Controller
         'App\\Models\\WorkRequest'    => 'Work Request',
         'App\\Models\\VehicleRequest' => 'Vehicle Request',
         'App\\Models\\ServiceRequest' => 'Service Request',
+        'App\\Models\\ScienceLab\\LabRequestBundle' => 'Science Laboratory Request',
     ];
 
     private function isAdmin(): bool

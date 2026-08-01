@@ -9,7 +9,7 @@ class LabFirstAidCheck extends Model
     protected $table = 'lab_first_aid_checks';
 
     protected $fillable = [
-        'room_id', 'check_date', 'items', 'is_complete', 'checked_by_id', 'remarks',
+        'room_id', 'check_date', 'means_of_verification', 'inclusion', 'document_path', 'items', 'is_complete', 'checked_by_id', 'remarks',
     ];
 
     protected $casts = [

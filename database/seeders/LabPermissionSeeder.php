@@ -32,7 +32,7 @@ class LabPermissionSeeder extends Seeder
     // Anyone who may request lab use.
     private const REQUEST_ROLES = [
         'Administrator', 'Science Research Assistant', 'CID Chief', 'AUH',
-        'Faculty', 'Staff', 'OCD',
+        'Faculty', 'Staff', 'Student', 'OCD',
     ];
 
     private const VIEW_ROLES = [

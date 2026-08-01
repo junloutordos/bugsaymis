@@ -10,6 +10,7 @@ use App\Models\ScienceLab\LabPmSchedule;
 use App\Models\ScienceLab\LabRepairTicket;
 use App\Models\ScienceLab\LabServiceLog;
 use App\Services\ScienceLab\LabControlNumberService;
+use App\Services\ScienceLab\LabPdfService;
 use App\Traits\HandlesLabUploads;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -165,5 +166,22 @@ class LabMaintenanceController extends Controller
         LabServiceLog::create($data);
 
         return back()->with('success', 'Service log entry added.');
+    }
+
+    public function schedulePdf(LabPdfService $pdf)
+    {
+        $schoolYear = SchoolYear::where('is_current', true)->first();
+        $schedules = LabPmSchedule::with(['equipment.room:id,name', 'records', 'preparedBy:id,name', 'notedBy:id,name'])
+            ->when($schoolYear, fn ($query) => $query->where('school_year_id', $schoolYear->id))
+            ->orderBy('id')->get();
+
+        return $pdf->preventiveMaintenance($schedules, $schoolYear?->name);
+    }
+
+    public function servicePdf(LabEquipment $equipment, LabPdfService $pdf)
+    {
+        $equipment->load('room:id,name');
+
+        return $pdf->serviceForm($equipment);
     }
 }
