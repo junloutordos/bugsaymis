@@ -68,21 +68,22 @@
                   <div v-if="item.published_by" class="mt-1 text-xs text-slate-400">by {{ item.published_by }}</div>
                   <div v-if="item.cancelled_by" class="mt-1 text-xs text-slate-400">by {{ item.cancelled_by }}</div>
                 </td>
-                <td class="px-4 py-3">
-                  <div class="flex justify-end gap-2">
-                    <button v-if="item.status === 'draft'" type="button" class="text-sm font-medium text-slate-600 hover:text-slate-900" @click="openEdit(item)">Edit</button>
-                    <a v-if="item.status !== 'cancelled'" :href="route('faculty-loading.schedules.day-adjustments.print', item.id)" target="_blank"
-                      class="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-                      {{ item.status === 'draft' ? 'Preview' : 'Print' }}
-                    </a>
-                    <select v-if="item.status !== 'cancelled'" aria-label="Print selected grade" @change="printGrade(item, $event)"
-                      class="rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-600">
-                      <option value="">Grade page…</option>
-                      <option v-for="grade in [7, 8, 9, 10, 11, 12]" :key="grade" :value="grade">Grade {{ grade }}</option>
-                    </select>
-                    <button v-if="item.status === 'draft'" type="button" class="text-sm font-medium text-emerald-600 hover:text-emerald-700" @click="publish(item)">Publish</button>
-                    <button v-if="item.status !== 'cancelled'" type="button" class="text-sm font-medium text-rose-600 hover:text-rose-700" @click="cancelAdjustment(item)">Cancel</button>
+                <td class="w-px whitespace-nowrap px-4 py-3">
+                  <div v-if="item.status !== 'cancelled'" class="flex items-center justify-end gap-1">
+                    <AppIconButton v-if="item.status === 'draft'" label="Edit adjustment" @click="openEdit(item)">
+                      <PencilSquareIcon class="h-4 w-4" />
+                    </AppIconButton>
+                    <AppIconButton :label="item.status === 'draft' ? 'Preview adjusted schedule' : 'Print adjusted schedule'" variant="primary" @click="choosePrint(item)">
+                      <PrinterIcon class="h-4 w-4" />
+                    </AppIconButton>
+                    <AppIconButton v-if="item.status === 'draft'" label="Publish adjustment" variant="success" @click="publish(item)">
+                      <CheckCircleIcon class="h-4 w-4" />
+                    </AppIconButton>
+                    <AppIconButton label="Cancel adjustment" variant="danger" @click="cancelAdjustment(item)">
+                      <XCircleIcon class="h-4 w-4" />
+                    </AppIconButton>
                   </div>
+                  <div v-else class="text-right text-sm text-slate-300" aria-label="No available actions">—</div>
                 </td>
               </tr>
             </tbody>
@@ -145,10 +146,19 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppFilterBar from '@/Components/AppFilterBar.vue'
 import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppModal from '@/Components/AppModal.vue'
 import EmptyState from '@/Components/EmptyState.vue'
-import { ArrowLeftIcon, CalendarDaysIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowLeftIcon,
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  PrinterIcon,
+  XCircleIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   term: { type: Object, default: null },
@@ -217,11 +227,30 @@ function saveDraft() {
   }
 }
 
-function printGrade(item, event) {
-  const grade = Number(event.target.value)
-  if (!grade) return
-  window.open(route('faculty-loading.schedules.day-adjustments.print', { adjustment: item.id, grade }), '_blank', 'noopener')
-  event.target.value = ''
+async function choosePrint(item) {
+  const result = await Swal.fire({
+    title: item.status === 'draft' ? 'Preview adjusted schedule' : 'Print adjusted schedule',
+    input: 'select',
+    inputOptions: {
+      all: 'All grade levels',
+      7: 'Grade 7',
+      8: 'Grade 8',
+      9: 'Grade 9',
+      10: 'Grade 10',
+      11: 'Grade 11',
+      12: 'Grade 12',
+    },
+    inputValue: 'all',
+    showCancelButton: true,
+    confirmButtonText: item.status === 'draft' ? 'Open preview' : 'Open print view',
+    confirmButtonColor: '#4f46e5',
+  })
+
+  if (!result.isConfirmed) return
+
+  const params = { adjustment: item.id }
+  if (result.value !== 'all') params.grade = Number(result.value)
+  window.open(route('faculty-loading.schedules.day-adjustments.print', params), '_blank', 'noopener')
 }
 
 async function publish(item) {
