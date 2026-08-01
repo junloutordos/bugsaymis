@@ -386,6 +386,20 @@ export const menuItems = [
         permissions: ["hr.employee.view"],
       },
       {
+        label: "Service Records",
+        routeName: "hr.service-records.index",
+        href: route('hr.service-records.index'),
+        icon: IdentificationIcon,
+        permissions: ["hr.service-records.view"],
+      },
+      {
+        label: "My Service Record",
+        routeName: "hr.service-records.my",
+        href: route('hr.service-records.my'),
+        icon: DocumentCheckIcon,
+        permissions: ["hr.service-records.view-own"],
+      },
+      {
         label: "My Document Requests",
         routeName: "hr.document-requests.index",
         href: route('hr.document-requests.index'),

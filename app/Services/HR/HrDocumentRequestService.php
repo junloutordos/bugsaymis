@@ -24,6 +24,7 @@ class HrDocumentRequestService
         private DigitalSignatureService $signatures,
         private PersonNameFormatter $names,
         private HrDocumentPdfService $pdfs,
+        private ServiceRecordService $serviceRecords,
     ) {}
 
     public function submit(User $requester, HrDocumentRequestType $type, array $data): HrDocumentRequest
@@ -189,6 +190,10 @@ class HrDocumentRequestService
         $allowed = $request->type->requires_ocd_approval ? ['ready_for_release'] : ['processing'];
         abort_unless(in_array($request->status, $allowed, true), 409, 'This request is not ready for issuance.');
         abort_if(empty($request->document_payload), 422, 'Prepare the document before issuing it.');
+        if ($request->type->template_key === 'service_record') {
+            abort_if(empty($request->document_payload['service_rows']), 422, 'The employee has no verified Service Record entries to issue.');
+            abort_if(empty($request->document_payload['service_record_snapshot']), 422, 'The Service Record snapshot is missing. Restart document preparation.');
+        }
 
         if (! $request->type->requires_ocd_approval) {
             $this->assertCanSign($issuer, (string) $pin);
@@ -223,6 +228,18 @@ class HrDocumentRequestService
 
             $path = $this->pdfs->generate($locked->fresh(), $issued);
             $issued->update(['s3_path' => $path]);
+            if ($locked->type->template_key === 'service_record') {
+                $snapshot = $locked->document_payload['service_record_snapshot'] ?? null;
+                abort_unless(is_array($snapshot), 422, 'The Service Record does not contain a frozen ledger snapshot.');
+                $locked->loadMissing('requester');
+                $this->serviceRecords->createVersion(
+                    $locked->requester,
+                    $snapshot,
+                    $issuer,
+                    $locked->id,
+                    $issued->id,
+                );
+            }
             $oldStatus = $locked->status;
             $locked->update(['status' => 'issued', 'issued_at' => now()]);
             $this->recordEvent($locked, $issuer, 'issued', $oldStatus, 'issued', null, [
@@ -239,7 +256,7 @@ class HrDocumentRequestService
 
     public function defaultPayload(HrDocumentRequest $request): array
     {
-        $request->loadMissing(['type', 'requester.employeeProfile', 'requester.pds.workExperience']);
+        $request->loadMissing(['type', 'requester.employeeProfile', 'requester.pds.personalInfo']);
         $user = $request->requester;
         $profile = $user->employeeProfile;
         $name = $this->names->formal($user);
@@ -264,23 +281,24 @@ class HrDocumentRequestService
             default => "This is to certify that {$name} is currently employed by the Philippine Science High School – Caraga Region Campus as {$user->position}".($appointmentDate ? " since {$appointmentDate}" : '').'.',
         };
 
-        $rows = $user->pds?->workExperience?->map(fn ($row) => [
-            'from' => $row->from_date,
-            'to' => $row->to_date ?: 'Present',
-            'position' => $row->position,
-            'agency' => $row->agency,
-            'appointment_status' => $row->appointment_status,
-            'government_service' => $row->government_service ? 'Yes' : 'No',
-        ])->values()->all() ?? [];
+        $serviceRecordSnapshot = $request->type->template_key === 'service_record'
+            ? $this->serviceRecords->snapshot($user)
+            : null;
+        $rows = $serviceRecordSnapshot['entries'] ?? [];
 
         return [
             'employee_name' => $name,
             'position' => $user->position,
             'employee_no' => $profile?->employee_no ?? $user->employee_no,
             'appointment_status' => $profile?->appointment_status,
+            'birth_date' => $serviceRecordSnapshot['birth_date'] ?? null,
+            'birth_place' => $serviceRecordSnapshot['birth_place'] ?? null,
             'body' => $body,
             'service_rows' => $rows,
-            'certification_clause' => 'This certification is issued upon the request of the above-named employee for the stated purpose.',
+            'service_record_snapshot' => $serviceRecordSnapshot,
+            'certification_clause' => $request->type->template_key === 'service_record'
+                ? 'This is to certify that the foregoing record is true and correct according to the official records of this Office, each period being supported by appointment and other papers on file.'
+                : 'This certification is issued upon the request of the above-named employee for the stated purpose.',
         ];
     }
 

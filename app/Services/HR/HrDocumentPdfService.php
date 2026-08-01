@@ -40,11 +40,12 @@ class HrDocumentPdfService
             'request', 'issued', 'signature', 'signatureUri', 'signer', 'signerName',
         ))->render();
 
+        $isServiceRecord = $request->type->template_key === 'service_record';
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
-            'format' => 'A4',
-            'margin_left' => 20,
-            'margin_right' => 20,
+            'format' => $isServiceRecord ? 'A4-L' : 'A4',
+            'margin_left' => $isServiceRecord ? 10 : 20,
+            'margin_right' => $isServiceRecord ? 10 : 20,
             'margin_top' => 42,
             'margin_bottom' => 24,
             'margin_header' => 0,
@@ -63,9 +64,10 @@ class HrDocumentPdfService
         $tmpSvg = sys_get_temp_dir().'/hrdoc_qr_'.$issued->id.'_'.time().'.svg';
         file_put_contents($tmpSvg, QrCode::format('svg')->size(90)->margin(1)->generate(route('hr.document-requests.verify', $issued->qr_token)));
         try {
-            $mpdf->Image($tmpSvg, 20, 248, 21, 21);
+            $qrY = $isServiceRecord ? 178 : 248;
+            $mpdf->Image($tmpSvg, $isServiceRecord ? 12 : 20, $qrY, 21, 21);
             $mpdf->SetFont('helvetica', '', 5);
-            $mpdf->SetXY(17, 269.5);
+            $mpdf->SetXY($isServiceRecord ? 9 : 17, $qrY + 21.5);
             $mpdf->Cell(27, 2.5, 'Scan to verify', 0, 0, 'C');
         } finally {
             @unlink($tmpSvg);

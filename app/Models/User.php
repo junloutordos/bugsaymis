@@ -336,6 +336,24 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\HR\EmployeeSchedule::class);
     }
 
+    public function serviceRecordEntries()
+    {
+        return $this->hasMany(\App\Models\HR\ServiceRecordEntry::class)
+            ->orderBy('service_from');
+    }
+
+    public function serviceRecordActions()
+    {
+        return $this->hasMany(\App\Models\HR\ServiceRecordAction::class)
+            ->orderBy('effective_from');
+    }
+
+    public function serviceRecordVersions()
+    {
+        return $this->hasMany(\App\Models\HR\ServiceRecordVersion::class)
+            ->latest('version');
+    }
+
     public function dtrRecords()
     {
         return $this->hasMany(\App\Models\HR\DtrRecord::class);

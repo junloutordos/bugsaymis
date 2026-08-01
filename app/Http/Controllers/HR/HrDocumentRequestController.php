@@ -125,7 +125,7 @@ class HrDocumentRequestController extends Controller
     public function start(Request $request, HrDocumentRequest $documentRequest)
     {
         $this->authorizeProcess($request);
-        $this->service->start($documentRequest->load(['type', 'requester.employeeProfile', 'requester.pds.workExperience']), $request->user());
+        $this->service->start($documentRequest->load(['type', 'requester.employeeProfile', 'requester.pds.personalInfo']), $request->user());
 
         return redirect()->route('hr.document-requests.show', $documentRequest)->with('success', 'Request accepted for processing.');
     }
@@ -148,8 +148,26 @@ class HrDocumentRequestController extends Controller
             'document_payload.service_rows.*.agency' => 'nullable|string|max:255',
             'document_payload.service_rows.*.appointment_status' => 'nullable|string|max:100',
             'document_payload.service_rows.*.government_service' => 'nullable|string|max:20',
+            'document_payload.service_record_snapshot' => 'nullable|array',
+            'document_payload.service_rows.*.employment_status' => 'nullable|string|max:100',
+            'document_payload.service_rows.*.appointment_nature' => 'nullable|string|max:100',
+            'document_payload.service_rows.*.salary_amount' => 'nullable|numeric|min:0',
+            'document_payload.service_rows.*.salary_basis' => 'nullable|string|max:20',
+            'document_payload.service_rows.*.salary_grade' => 'nullable|integer|min:1|max:33',
+            'document_payload.service_rows.*.salary_step' => 'nullable|integer|min:1|max:8',
+            'document_payload.service_rows.*.station_place' => 'nullable|string|max:255',
+            'document_payload.service_rows.*.branch_division' => 'nullable|string|max:255',
+            'document_payload.service_rows.*.lwop_periods' => 'nullable|array|max:30',
+            'document_payload.service_rows.*.separation_date' => 'nullable|string|max:50',
+            'document_payload.service_rows.*.separation_cause' => 'nullable|string|max:255',
+            'document_payload.birth_date' => 'nullable|string|max:50',
+            'document_payload.birth_place' => 'nullable|string|max:255',
             'internal_notes' => 'nullable|string|max:3000',
         ]);
+        if ($documentRequest->type->template_key === 'service_record'
+            && isset($data['document_payload']['service_record_snapshot'])) {
+            $data['document_payload']['service_record_snapshot']['entries'] = $data['document_payload']['service_rows'] ?? [];
+        }
         $this->service->saveDraft($documentRequest, $request->user(), $data['document_payload'], $data['internal_notes'] ?? null);
 
         return back()->with('success', 'Document draft saved.');
