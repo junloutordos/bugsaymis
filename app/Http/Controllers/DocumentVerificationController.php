@@ -177,12 +177,18 @@ class DocumentVerificationController extends Controller
      */
     public function showIssuance(string $token)
     {
-        $issuance = Issuance::where('qr_token', $token)->with(['creator:id,name,position', 'signature.signer:id,name,position,electronic_signature'])->first();
+        $issuance = Issuance::where('qr_token', $token)->with([
+            'creator:id,name,position', 'signature.signer:id,name,position,electronic_signature',
+            'parentIssuance:id,control_number,title,qr_token,status,archived_at',
+            'supplements' => fn ($q) => $q->where('status', 'released')
+                ->with('creator:id,name,position'),
+        ])->first();
 
         if (! $issuance || $issuance->status !== 'released') {
             return view('issuances.verify', [
                 'valid' => false, 'issuance' => null, 'tampered' => false,
                 'reason' => null, 'sig' => null, 'sigUri' => null, 'documentUrl' => null,
+                'supplements' => collect(), 'parentIssuance' => null,
             ]);
         }
 
@@ -228,6 +234,8 @@ class DocumentVerificationController extends Controller
             'sig'         => $sig,
             'sigUri'      => $sigUri,
             'documentUrl' => route('issuances.verify.document', $token),
+            'supplements' => $issuance->isSupplement() ? collect() : $issuance->supplements,
+            'parentIssuance' => $issuance->parentIssuance,
         ]);
     }
 
@@ -251,7 +259,7 @@ class DocumentVerificationController extends Controller
 
         return response($content, 200, [
             'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $issuance->control_number . '.pdf"',
+            'Content-Disposition' => 'inline; filename="' . $issuance->display_number . '.pdf"',
             'Cache-Control'       => 'private, max-age=300',
         ]);
     }

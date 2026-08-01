@@ -15,6 +15,7 @@ import {
   ChevronLeftIcon, DocumentArrowDownIcon,
   CheckCircleIcon, UserGroupIcon, ClockIcon, ShieldCheckIcon,
   PencilSquareIcon, EyeIcon, ArrowPathIcon,
+  PlusIcon, ArchiveBoxIcon, ArrowUturnLeftIcon, TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -26,6 +27,7 @@ const props = defineProps({
   signatureUri:     String,
   myAcknowledgedAt: String,
   verifyUrl:        String,
+  supplements:      Array,
 })
 
 // ── Release flow (for drafts) ──────────────────────────────────────────────
@@ -114,7 +116,7 @@ function resendEmail(recipient) {
   Swal.fire({
     icon: 'question',
     title: 'Resend issuance email?',
-    text: `${props.issuance.control_number} will be re-sent to ${recipient.user?.name ?? 'this recipient'}.`,
+    text: `${props.issuance.display_number} will be re-sent to ${recipient.user?.name ?? 'this recipient'}.`,
     showCancelButton: true,
     confirmButtonText: 'Resend',
   }).then((res) => {
@@ -145,7 +147,7 @@ function resendBulk(ids, label) {
   Swal.fire({
     icon: 'question',
     title: 'Resend issuance email?',
-    text: `${props.issuance.control_number} will be re-sent to ${ids.length} recipient(s)${label ? ` (${label})` : ''}.`,
+    text: `${props.issuance.display_number} will be re-sent to ${ids.length} recipient(s)${label ? ` (${label})` : ''}.`,
     showCancelButton: true,
     confirmButtonText: 'Resend',
   }).then((res) => {
@@ -173,11 +175,38 @@ function fmtDt(d) {
 const ackCount    = computed(() => (props.recipients ?? []).filter(r => r.acknowledged_at).length)
 const totalCount  = computed(() => (props.recipients ?? []).length)
 const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value / totalCount.value) * 100) : 0)
+
+function archiveRecord() {
+  Swal.fire({
+    icon: 'question', title: 'Archive this record?',
+    input: 'textarea', inputLabel: 'Archive note (optional)', inputPlaceholder: 'Reason or filing note…',
+    showCancelButton: true, confirmButtonText: 'Archive', confirmButtonColor: '#d97706',
+  }).then(result => {
+    if (result.isConfirmed) router.post(route('issuances.archive', props.issuance.id), { reason: result.value || null }, { preserveScroll: true })
+  })
+}
+
+function unarchiveRecord() {
+  Swal.fire({ icon: 'question', title: 'Restore from archive?', showCancelButton: true, confirmButtonText: 'Restore' })
+    .then(result => {
+      if (result.isConfirmed) router.post(route('issuances.unarchive', props.issuance.id), {}, { preserveScroll: true })
+    })
+}
+
+function deleteDraft() {
+  Swal.fire({
+    icon: 'warning', title: 'Delete this draft permanently?',
+    text: 'Its uploaded file and draft record will be removed. This cannot be undone.',
+    showCancelButton: true, confirmButtonText: 'Delete Draft', confirmButtonColor: '#dc2626',
+  }).then(result => {
+    if (result.isConfirmed) router.delete(route('issuances.destroy', props.issuance.id))
+  })
+}
 </script>
 
 <template>
-  <Head :title="`${issuance.control_number} — Issuance`" />
-  <AdminLayout :title="issuance.control_number">
+  <Head :title="`${issuance.display_number} — Issuance`" />
+  <AdminLayout :title="issuance.display_number">
     <div class="max-w-4xl space-y-5">
 
       <!-- Back -->
@@ -195,15 +224,20 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
           <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div class="flex-1">
               <div class="flex flex-wrap items-center gap-2 mb-2">
-                <span class="font-mono font-bold text-slate-800 text-base">{{ issuance.control_number }}</span>
-                <AppBadge :color="typeColor(issuance.type)">{{ issuance.type_label }}</AppBadge>
+                <span class="font-mono font-bold text-slate-800 text-base">{{ issuance.display_number }}</span>
+                <AppBadge :color="typeColor(issuance.type)">{{ issuance.is_supplement ? issuance.document_kind_label : issuance.type_label }}</AppBadge>
                 <AppBadge :color="statusColor(issuance.status)" class="capitalize">{{ issuance.status }}</AppBadge>
+                <AppBadge v-if="issuance.archived_at" color="slate">Archived</AppBadge>
               </div>
               <h1 class="text-xl font-semibold text-slate-800">{{ issuance.title }}</h1>
               <p class="text-xs text-slate-500 mt-1">
                 Issued by <strong>{{ issuance.creator?.name }}</strong>
                 <span v-if="issuance.released_at"> · Released {{ fmtDt(issuance.released_at) }}</span>
               </p>
+              <Link v-if="issuance.parent_issuance" :href="route('issuances.show', issuance.parent_issuance.id)"
+                class="mt-2 inline-block text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                Related to {{ issuance.parent_issuance.control_number }} — {{ issuance.parent_issuance.title }}
+              </Link>
             </div>
 
             <!-- Actions -->
@@ -223,6 +257,11 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                 Sign & Release
               </AppButton>
 
+              <AppButton v-if="isAdmin && !issuance.is_supplement && issuance.status === 'released' && !issuance.archived_at"
+                as="link" :href="route('issuances.supplements.create', issuance.id)" variant="secondary">
+                <PlusIcon class="h-4 w-4" /> Add Related Document
+              </AppButton>
+
               <!-- Download PDF -->
               <AppButton v-if="issuance.status === 'released'"
                 as="a" :href="route('issuances.pdf', issuance.id)" target="_blank" variant="secondary">
@@ -232,6 +271,15 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               <!-- View scan -->
               <AppButton v-if="issuance.has_attachment" variant="secondary" @click="showScanModal = true">
                 <EyeIcon class="h-4 w-4" /> View Scan
+              </AppButton>
+              <AppButton v-if="isAdmin && !issuance.archived_at" variant="secondary" @click="archiveRecord">
+                <ArchiveBoxIcon class="h-4 w-4" /> Archive
+              </AppButton>
+              <AppButton v-if="isAdmin && issuance.archived_at" variant="secondary" @click="unarchiveRecord">
+                <ArrowUturnLeftIcon class="h-4 w-4" /> Restore
+              </AppButton>
+              <AppButton v-if="isAdmin && issuance.status === 'draft'" variant="danger" @click="deleteDraft">
+                <TrashIcon class="h-4 w-4" /> Delete
               </AppButton>
             </div>
           </div>
@@ -252,8 +300,10 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                 <p class="text-xs text-slate-500">Caraga Region Campus</p>
               </div>
               <div class="text-center mb-4">
-                <p class="text-sm font-bold uppercase tracking-widest text-slate-800">{{ issuance.type_label }}</p>
-                <p class="text-xs text-slate-500 mt-0.5">No. {{ issuance.control_number.split('-').slice(-1)[0] }}, S. {{ issuance.control_number.split('-')[1] }}</p>
+                <p class="text-sm font-bold uppercase tracking-widest text-slate-800">{{ issuance.is_supplement ? issuance.document_kind_label : issuance.type_label }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  {{ issuance.is_supplement ? issuance.display_number : `No. ${issuance.control_number.split('-').slice(-1)[0]}, S. ${issuance.control_number.split('-')[1]}` }}
+                </p>
               </div>
               <div class="text-sm text-slate-700 leading-relaxed prose prose-sm max-w-none" v-html="DOMPurify.sanitize(issuance.content ?? '')"></div>
             </div>
@@ -284,6 +334,28 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               </div>
             </div>
           </AppCard>
+
+          <AppCard v-if="!issuance.is_supplement" title="Related Documents">
+            <div v-if="supplements?.length" class="divide-y divide-slate-100">
+              <Link v-for="item in supplements" :key="item.id" :href="route('issuances.show', item.id)"
+                class="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 hover:text-indigo-700">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <AppBadge :color="item.kind === 'corrigendum' || item.kind === 'erratum' ? 'red' : 'blue'">{{ item.kind_label }}</AppBadge>
+                    <span class="text-xs font-semibold text-slate-700">{{ item.reference_number }}</span>
+                    <AppBadge v-if="item.archived_at" color="slate">Archived</AppBadge>
+                    <AppBadge v-else :color="statusColor(item.status)" class="capitalize">{{ item.status }}</AppBadge>
+                  </div>
+                  <p class="mt-1 truncate text-sm text-slate-700">{{ item.title }}</p>
+                  <p v-if="isAdmin && item.status === 'released'" class="mt-1 text-xs text-slate-400">
+                    {{ item.acknowledged_count }}/{{ item.recipients_count }} acknowledged
+                  </p>
+                </div>
+                <span class="shrink-0 text-xs font-medium text-indigo-600">View →</span>
+              </Link>
+            </div>
+            <EmptyState v-else title="No related documents" subtitle="No addendum, erratum, corrigendum, or appendix has been added." />
+          </AppCard>
         </div>
 
         <!-- ── Right panel ────────────────────────────────────────────────── -->
@@ -296,6 +368,11 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               {{ qrCopied ? '✓ Copied!' : 'Copy verification link' }}
             </AppButton>
             <p class="text-[10px] text-slate-400 text-center mt-2">Scan to verify authenticity</p>
+          </AppCard>
+
+          <AppCard v-if="issuance.archived_at" title="Archive Record">
+            <p class="text-xs text-slate-500">Archived {{ fmtDt(issuance.archived_at) }}</p>
+            <p v-if="issuance.archive_reason" class="mt-2 text-sm text-slate-700">{{ issuance.archive_reason }}</p>
           </AppCard>
 
           <!-- Hash -->
@@ -368,7 +445,10 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
           <!-- Release panel (draft) -->
           <AppCard v-if="isAdmin && issuance.status === 'draft' && showReleasePanel" title="Release Settings">
             <div class="space-y-3">
-              <div>
+              <div v-if="issuance.is_supplement" class="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                Recipients will be inherited from {{ issuance.parent_issuance?.control_number }}. Each recipient will receive and acknowledge this document separately.
+              </div>
+              <div v-else>
                 <label class="block text-xs font-medium text-slate-600 mb-1.5">Recipients</label>
                 <div class="space-y-1.5">
                   <label v-for="opt in [
@@ -384,7 +464,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               </div>
 
               <!-- Division picker (only shown when By Division is selected) -->
-              <div v-if="recipientType === 'division'" class="space-y-2">
+              <div v-if="!issuance.is_supplement && recipientType === 'division'" class="space-y-2">
                 <AppInput v-model="divisionSearch" type="text" placeholder="Search divisions…" />
                 <div class="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
                   <label v-for="d in filteredDivisions" :key="d.id"

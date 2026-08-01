@@ -50,6 +50,10 @@ class IssuanceService
 
         return hash('sha256', implode('|', [
             $issuance->control_number,
+            $issuance->parent_issuance_id,
+            $issuance->document_kind,
+            $issuance->supplement_no,
+            $issuance->reference_number,
             $payload,
             $issuance->title,
         ]));
@@ -209,7 +213,7 @@ class IssuanceService
             'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
         ]);
 
-        $mpdf->SetTitle($issuance->type_label . ' — ' . $issuance->control_number);
+        $mpdf->SetTitle(($issuance->isSupplement() ? $issuance->display_number : $issuance->type_label) . ' — ' . $issuance->title);
         $mpdf->SetHTMLHeader('<div style="margin:0;padding:0;"><img src="' . $headerImg . '" style="width:100%;display:block;" /></div>');
         $mpdf->SetHTMLFooter('<div style="margin:0;padding:0;"><img src="' . $footerImg . '" style="width:100%;display:block;" /></div>');
         $mpdf->WriteHTML($html);
@@ -248,7 +252,7 @@ class IssuanceService
         try {
             $pdf = new \setasign\Fpdi\Tcpdf\Fpdi('P', 'mm', 'A4', true, 'UTF-8', false);
             $pdf->SetCreator('Atlas');
-            $pdf->SetTitle($issuance->type_label . ' — ' . $issuance->control_number);
+            $pdf->SetTitle(($issuance->isSupplement() ? $issuance->display_number : $issuance->type_label) . ' — ' . $issuance->title);
             $pdf->SetPrintHeader(false);
             $pdf->SetPrintFooter(false);
             $pdf->SetAutoPageBreak(false);
