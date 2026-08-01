@@ -1896,6 +1896,36 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     Route::put('/employees/{user}/profile', [\App\Http\Controllers\HR\EmployeeProfileController::class, 'update'])
         ->name('employees.profile.update');
 
+    // ── Service Records ──────────────────────────────────────────────────────
+    Route::get('/service-records', [\App\Http\Controllers\HR\ServiceRecordController::class, 'index'])
+        ->name('service-records.index');
+    Route::get('/service-records/my', [\App\Http\Controllers\HR\ServiceRecordController::class, 'my'])
+        ->name('service-records.my');
+    Route::get('/service-records/evidence/{evidence}', [\App\Http\Controllers\HR\ServiceRecordController::class, 'evidence'])
+        ->name('service-records.evidence.show');
+    Route::delete('/service-records/evidence/{evidence}', [\App\Http\Controllers\HR\ServiceRecordController::class, 'destroyEvidence'])
+        ->name('service-records.evidence.destroy');
+    Route::post('/service-records/entries/{entry}/evidence', [\App\Http\Controllers\HR\ServiceRecordController::class, 'storeEvidence'])
+        ->name('service-records.evidence.store');
+    Route::post('/service-records/entries/{entry}/verify', [\App\Http\Controllers\HR\ServiceRecordController::class, 'verify'])
+        ->name('service-records.verify');
+    Route::post('/service-records/entries/{entry}/supersede', [\App\Http\Controllers\HR\ServiceRecordController::class, 'supersede'])
+        ->name('service-records.supersede');
+    Route::delete('/service-records/actions/{action}', [\App\Http\Controllers\HR\ServiceRecordController::class, 'destroyAction'])
+        ->name('service-records.actions.destroy');
+    Route::get('/service-records/{user}/export.csv', [\App\Http\Controllers\HR\ServiceRecordController::class, 'export'])
+        ->name('service-records.export');
+    Route::get('/service-records/{user}', [\App\Http\Controllers\HR\ServiceRecordController::class, 'show'])
+        ->name('service-records.show');
+    Route::post('/service-records/{user}/entries', [\App\Http\Controllers\HR\ServiceRecordController::class, 'store'])
+        ->name('service-records.store');
+    Route::put('/service-records/{user}/entries/{entry}', [\App\Http\Controllers\HR\ServiceRecordController::class, 'update'])
+        ->name('service-records.update');
+    Route::post('/service-records/{user}/import-pds', [\App\Http\Controllers\HR\ServiceRecordController::class, 'importPds'])
+        ->name('service-records.import-pds');
+    Route::post('/service-records/{user}/actions', [\App\Http\Controllers\HR\ServiceRecordController::class, 'storeAction'])
+        ->name('service-records.actions.store');
+
     // ── Leave Applications ────────────────────────────────────────────────────
     Route::get('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'index'])
         ->name('leave.index');

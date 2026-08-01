@@ -36,6 +36,12 @@ class PermissionsSeeder extends Seeder
             ['module' => 'HR',       'name' => 'hr.gatepass.view', 'description' => 'View gate passes'],
             ['module' => 'HR',       'name' => 'hr.gatepass.create', 'description' => 'Create gate passes'],
             ['module' => 'HR',       'name' => 'hr.gatepass.approve', 'description' => 'Approve gate passes'],
+            ['module' => 'HR Service Records', 'name' => 'hr.service-records.view', 'description' => 'View employee service records'],
+            ['module' => 'HR Service Records', 'name' => 'hr.service-records.view-own', 'description' => 'View own verified service record'],
+            ['module' => 'HR Service Records', 'name' => 'hr.service-records.manage', 'description' => 'Create and update service record entries'],
+            ['module' => 'HR Service Records', 'name' => 'hr.service-records.verify', 'description' => 'Verify service record entries and evidence'],
+            ['module' => 'HR Service Records', 'name' => 'hr.service-records.certify', 'description' => 'Certify and issue official service records'],
+            ['module' => 'HR Service Records', 'name' => 'hr.service-records.export', 'description' => 'Export service record reports'],
 
             // ── WFH ───────────────────────────────────────────────────────────
             ['module' => 'WFH',      'name' => 'wfh.view',         'description' => 'Access WFH dashboard'],

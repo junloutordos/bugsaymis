@@ -54,7 +54,7 @@ class RolePermissionSeeder extends Seeder
             'InformationOfficer', 'Dorm Manager',
         ];
         foreach ($employeeRoles as $roleName) {
-            $assign($roleName, ['saln.create', 'saln.submit', 'computer_labs.book']);
+            $assign($roleName, ['saln.create', 'saln.submit', 'computer_labs.book', 'hr.service-records.view-own']);
         }
 
         // HR gets full filing & reporting access
@@ -101,6 +101,9 @@ class RolePermissionSeeder extends Seeder
             'hr.leave.credits.view', 'hr.leave.credits.manage',
             'hr.leave.credits.service', 'hr.leave.credits.reports',
             'hr.employee.view', 'hr.employee.manage',
+            'hr.service-records.view', 'hr.service-records.view-own',
+            'hr.service-records.manage', 'hr.service-records.verify',
+            'hr.service-records.certify', 'hr.service-records.export',
             'chat.access',
         ]);
 
