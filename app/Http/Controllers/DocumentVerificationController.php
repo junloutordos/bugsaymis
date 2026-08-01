@@ -318,7 +318,7 @@ class DocumentVerificationController extends Controller
 
         abort_if(! $certificate || $certificate->visit?->status !== 'issued', 404);
 
-        $pdfPath = 'coa/' . $certificate->control_number . '.pdf';
+        $pdfPath = $this->coaSvc->pdfPath($certificate);
         if (! Storage::disk('s3')->exists($pdfPath)) {
             $pdfPath = $this->coaSvc->generatePdf($certificate);
         }

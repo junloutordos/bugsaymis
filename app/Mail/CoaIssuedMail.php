@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Administration\CoaCertificate;
+use App\Services\CertificateOfAppearanceService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -29,7 +30,8 @@ class CoaIssuedMail extends Mailable
 
         // Attach the generated PDF (generated in ProcessCoaIssue before emails are sent)
         try {
-            $pdf = Storage::disk('s3')->get('coa/' . $this->certificate->control_number . '.pdf');
+            $path = app(CertificateOfAppearanceService::class)->pdfPath($this->certificate);
+            $pdf = Storage::disk('s3')->get($path);
             $mail->attachData($pdf, $this->certificate->control_number . '.pdf', ['mime' => 'application/pdf']);
         } catch (\Throwable) {
             // PDF unavailable — email still goes out with the verify link

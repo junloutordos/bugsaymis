@@ -129,6 +129,7 @@ class CoaController extends Controller
                 $cert->update(['control_number' => $this->coaSvc->nextControlNumber()]);
                 $cert->refresh()->setRelation('visit', $visit);
                 $cert->update(['content_hash' => $this->coaSvc->computeHash($cert)]);
+                $signaturePath = $this->coaSvc->snapshotSignature($request->user(), $cert);
 
                 $signed = $this->performSign(
                     $request,
@@ -137,6 +138,7 @@ class CoaController extends Controller
                     'issuance',
                     "Certificate of Appearance {$cert->control_number} — {$cert->visitor_name}",
                     $this->coaSvc->computeHash($cert),
+                    ['signature_path' => $signaturePath],
                 );
 
                 if (! $signed) {
@@ -156,6 +158,11 @@ class CoaController extends Controller
         abort_if($certificate->visit->status !== 'issued', 422, 'Certificate has not been issued yet.');
 
         try {
+            $path = $this->coaSvc->pdfPath($certificate);
+            if (! Storage::disk('s3')->exists($path)) {
+                $this->coaSvc->generatePdf($certificate);
+            }
+
             \Illuminate\Support\Facades\Mail::to($certificate->email)
                 ->send(new \App\Mail\CoaIssuedMail($certificate));
             $certificate->update(['email_status' => 'sent', 'emailed_at' => now()]);
@@ -174,7 +181,7 @@ class CoaController extends Controller
     {
         abort_if($certificate->visit->status !== 'issued', 404);
 
-        $path = 'coa/' . $certificate->control_number . '.pdf';
+        $path = $this->coaSvc->pdfPath($certificate);
         if (! Storage::disk('s3')->exists($path)) {
             $path = $this->coaSvc->generatePdf($certificate);
         }
