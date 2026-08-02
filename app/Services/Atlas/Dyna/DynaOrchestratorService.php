@@ -54,6 +54,7 @@ class DynaOrchestratorService
 
             if (empty($toolUseBlocks)) {
                 $finalText = collect($assistantContent)->pluck('text')->filter()->implode('');
+                $finalText = $this->stripThinkingTags($finalText);
 
                 DynaMessage::create([
                     'dyna_conversation_id' => $conversation->id,
@@ -100,6 +101,16 @@ class DynaOrchestratorService
         ]);
 
         return $fallback;
+    }
+
+    /**
+     * Amazon Nova inlines its chain-of-thought directly in the text output as
+     * <thinking>...</thinking>, rather than a separate content block the way gpt-oss's
+     * reasoningContent does — strip it so users only see the actual answer.
+     */
+    private function stripThinkingTags(string $text): string
+    {
+        return trim(preg_replace('/<thinking>.*?<\/thinking>/is', '', $text));
     }
 
     private function historyAsBedrockMessages(DynaConversation $conversation): array

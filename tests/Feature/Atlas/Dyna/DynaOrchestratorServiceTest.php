@@ -62,4 +62,31 @@ class DynaOrchestratorServiceTest extends TestCase
         $this->assertEquals('get_headcount', $assistantMessage->tool_calls[0]['name']);
         $this->assertEquals(['total_headcount' => 42], $assistantMessage->tool_calls[0]['result']);
     }
+
+    public function test_reply_strips_thinking_tags_amazon_nova_inlines_into_its_text_output(): void
+    {
+        $user = User::factory()->create();
+        $conversation = DynaConversation::create(['user_id' => $user->id]);
+        $registry = new DynaToolRegistry([]);
+
+        $bedrock = Mockery::mock(BedrockRuntimeClient::class);
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->andReturn(new Result([
+                'output' => ['message' => ['role' => 'assistant', 'content' => [
+                    ['text' => "<thinking> The user says hello, I should greet them back. </thinking>\nHello! How can I help?"],
+                ]]],
+                'stopReason' => 'end_turn',
+            ]));
+
+        $clientFactory = Mockery::mock(DynaBedrockClientFactory::class);
+        $clientFactory->shouldReceive('make')->andReturn($bedrock);
+
+        $orchestrator = new DynaOrchestratorService($registry, $clientFactory);
+
+        $answer = $orchestrator->reply($user, $conversation, 'Hello');
+
+        $this->assertEquals('Hello! How can I help?', $answer);
+        $this->assertEquals('Hello! How can I help?', $conversation->fresh()->messages->last()->content);
+    }
 }
