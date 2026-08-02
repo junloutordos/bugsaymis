@@ -29,6 +29,9 @@ use App\Services\Atlas\Dyna\Tools\GetFinanceStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetOperationsStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetAttentionItemsTool;
 use App\Services\Atlas\Dyna\Tools\GetDivisionScorecardTool;
+use App\Services\Atlas\Dyna\Tools\GetFacultyLoadDistributionTool;
+use App\Services\Atlas\Dyna\Tools\GetClassRecordComplianceTool;
+use App\Services\Atlas\Dyna\Tools\GetTeacherAttendanceStatsTool;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
@@ -64,7 +67,10 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(GetOperationsStatsTool::class),
                 $app->make(GetAttentionItemsTool::class),
                 $app->make(GetDivisionScorecardTool::class),
-                // Tasks 3-8 append their tools to this same array.
+                $app->make(GetFacultyLoadDistributionTool::class),
+                $app->make(GetClassRecordComplianceTool::class),
+                $app->make(GetTeacherAttendanceStatsTool::class),
+                // Tasks 4-8 append their tools to this same array.
             ]);
         });
     }

@@ -606,9 +606,32 @@ git commit -m "feat(dyna): add 9 Executive Dashboard adapter tools"
   only (no additional module permission — pure aggregates, per the spec's access-control
   decision).
 
-All three are division-scoped via `whereHas('user', ...)` / `whereHas('teacher', ...)` on
+All three are division-scoped via `whereHas('faculty', ...)` / `whereHas('teacher', ...)` on
 `users.division_id`, following the exact pattern `GetLeaveTrendsTool` already established in
 Phase 1 — reuse that pattern, don't invent a new one.
+
+**Real relation names found during execution:** `FacultyLoad`'s relation to the faculty member
+is `faculty()`, not `user()` (confirmed via `app/Models/FacultyLoading/FacultyLoad.php:50`) —
+despite the FK column itself being named `user_id`. `ClassRecord::teacher()` and
+`TeacherTapLog::teacher()` are both correctly named `teacher()` as assumed. Use `faculty()` for
+the `FacultyLoad` scoping call, not `user()`.
+
+**Real required-fixture chain found during execution (needed to construct valid test rows,
+none of it obvious from `$fillable` alone):**
+- `faculty_loads` requires `school_year_id` and `academic_term_id` (both FKs, no default) —
+  confirmed via `database/migrations/*_create_faculty_loads_table.php`.
+- `school_years` requires `start_date` and `end_date` in addition to `name`/`is_current` — the
+  `SchoolYear::where('is_current', true)->first()` convention from `CLAUDE.md` doesn't cover
+  what's required to *create* one.
+- `academic_terms` requires `school_year_id` (FK) and `name`.
+- `class_records` requires `grading_option_id` (FK to `grading_options`) and `school_year`
+  (string) — `school_year_id` is a separate, later-added column and IS nullable, unlike
+  `school_year` itself.
+- `teacher_tap_logs` requires `classroom_id` (FK to `classrooms`).
+- `classrooms` requires `school_year_id` — nullable in the original create-table migration,
+  made `nullable(false)` by a later migration
+  (`database/migrations/2026_06_09_000012_add_school_year_id_to_classrooms.php`), which also
+  changed `code`'s uniqueness from global to per-`school_year_id`.
 
 - [ ] **Step 1: Write the three failing tests**
 
@@ -618,7 +641,9 @@ Phase 1 — reuse that pattern, don't invent a new one.
 namespace Tests\Feature\Atlas\Dyna;
 
 use App\Models\Division;
+use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\FacultyLoad;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetFacultyLoadDistributionTool;
@@ -637,9 +662,16 @@ class GetFacultyLoadDistributionToolTest extends TestCase
         $facultyA2 = User::factory()->create(['division_id' => $divisionA->id]);
         $facultyB1 = User::factory()->create(['division_id' => $divisionB->id]);
 
-        FacultyLoad::create(['user_id' => $facultyA1->id, 'load_status' => 'overload', 'total_units' => 20]);
-        FacultyLoad::create(['user_id' => $facultyA2->id, 'load_status' => 'full_load', 'total_units' => 18]);
-        FacultyLoad::create(['user_id' => $facultyB1->id, 'load_status' => 'underload', 'total_units' => 10]);
+        // faculty_loads.school_year_id and .academic_term_id are required FKs (no default) —
+        // confirmed via database/migrations/*_create_faculty_loads_table.php. school_years
+        // also requires start_date/end_date (no default) — confirmed via
+        // database/migrations/*_create_school_years_table.php.
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        $term = AcademicTerm::create(['school_year_id' => $schoolYear->id, 'name' => '1st Semester']);
+
+        FacultyLoad::create(['user_id' => $facultyA1->id, 'school_year_id' => $schoolYear->id, 'academic_term_id' => $term->id, 'load_status' => 'overload', 'total_units' => 20]);
+        FacultyLoad::create(['user_id' => $facultyA2->id, 'school_year_id' => $schoolYear->id, 'academic_term_id' => $term->id, 'load_status' => 'full_load', 'total_units' => 18]);
+        FacultyLoad::create(['user_id' => $facultyB1->id, 'school_year_id' => $schoolYear->id, 'academic_term_id' => $term->id, 'load_status' => 'underload', 'total_units' => 10]);
 
         $chief = User::factory()->create(['division_id' => $divisionA->id]);
         $divisionA->update(['division_chief_id' => $chief->id]);
@@ -658,6 +690,7 @@ class GetFacultyLoadDistributionToolTest extends TestCase
 namespace Tests\Feature\Atlas\Dyna;
 
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetClassRecordComplianceTool;
@@ -671,8 +704,12 @@ class GetClassRecordComplianceToolTest extends TestCase
     public function test_administrator_sees_campus_wide_status_breakdown(): void
     {
         $teacher = User::factory()->create();
-        ClassRecord::create(['teacher_id' => $teacher->id, 'status' => 'checked', 'subject_name' => 'Math', 'year_level_section' => 'G7-A']);
-        ClassRecord::create(['teacher_id' => $teacher->id, 'status' => 'draft', 'subject_name' => 'Science', 'year_level_section' => 'G7-A']);
+        // class_records.grading_option_id and .school_year are required (no default) —
+        // confirmed via database/migrations/*_create_class_records_table.php. school_year_id
+        // (a later-added FK) is nullable, unlike school_year itself.
+        $gradingOption = GradingOption::create(['name' => 'Standard']);
+        ClassRecord::create(['teacher_id' => $teacher->id, 'grading_option_id' => $gradingOption->id, 'school_year' => '2026-2027', 'status' => 'checked', 'subject_name' => 'Math', 'year_level_section' => 'G7-A']);
+        ClassRecord::create(['teacher_id' => $teacher->id, 'grading_option_id' => $gradingOption->id, 'school_year' => '2026-2027', 'status' => 'draft', 'subject_name' => 'Science', 'year_level_section' => 'G7-A']);
 
         $administrator = User::factory()->create();
         $administrator->roles()->attach(Role::firstOrCreate(['name' => 'Administrator']));
@@ -689,6 +726,8 @@ class GetClassRecordComplianceToolTest extends TestCase
 
 namespace Tests\Feature\Atlas\Dyna;
 
+use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\TeacherTapLog;
 use App\Models\Role;
 use App\Models\User;
@@ -703,9 +742,15 @@ class GetTeacherAttendanceStatsToolTest extends TestCase
     public function test_administrator_sees_campus_wide_tap_status_breakdown(): void
     {
         $teacher = User::factory()->create();
-        TeacherTapLog::create(['user_id' => $teacher->id, 'status' => 'on_time', 'tapped_at' => now(), 'is_late' => false]);
-        TeacherTapLog::create(['user_id' => $teacher->id, 'status' => 'late', 'tapped_at' => now(), 'is_late' => true, 'late_minutes' => 12]);
-        TeacherTapLog::create(['user_id' => $teacher->id, 'status' => 'no_match', 'tapped_at' => now(), 'is_late' => false]);
+        // teacher_tap_logs.classroom_id is a required FK (no default) — confirmed via
+        // database/migrations/*_create_teacher_tap_logs_table.php. classrooms.school_year_id
+        // is also required (made non-nullable by a later migration) — confirmed via
+        // database/migrations/*_add_school_year_id_to_classrooms.php.
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        $classroom = Classroom::create(['name' => 'Science Hall 101', 'code' => 'SH-101-'.uniqid(), 'school_year_id' => $schoolYear->id]);
+        TeacherTapLog::create(['user_id' => $teacher->id, 'classroom_id' => $classroom->id, 'status' => 'on_time', 'tapped_at' => now(), 'is_late' => false]);
+        TeacherTapLog::create(['user_id' => $teacher->id, 'classroom_id' => $classroom->id, 'status' => 'late', 'tapped_at' => now()->addMinute(), 'is_late' => true, 'late_minutes' => 12]);
+        TeacherTapLog::create(['user_id' => $teacher->id, 'classroom_id' => $classroom->id, 'status' => 'no_match', 'tapped_at' => now()->addMinutes(2), 'is_late' => false]);
 
         $administrator = User::factory()->create();
         $administrator->roles()->attach(Role::firstOrCreate(['name' => 'Administrator']));
@@ -752,7 +797,7 @@ class GetFacultyLoadDistributionTool implements DynaTool
         $query = FacultyLoad::query();
 
         if (! $user->hasAnyRole(['Administrator', 'OCD'])) {
-            $query->whereHas('user', fn ($q) => $q->where('division_id', $user->division_id));
+            $query->whereHas('faculty', fn ($q) => $q->where('division_id', $user->division_id));
         }
 
         return $query->selectRaw('load_status, count(*) as total')
