@@ -2181,6 +2181,17 @@ git commit -m "feat(dyna): add POST /api/dyna/login/google"
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test --filter=Dyna"`
 Expected: PASS — every test from this plan plus all of Phase 1's, no interaction failures.
 
+**Real environment issue found during execution:** with ~39 Dyna tests now (up from Phase 1's
+~17), the default 128M PHP CLI `memory_limit` in this dev container is too low to run the full
+`--filter=Dyna` sweep in one process — it fails with `Allowed memory size of 134217728 bytes
+exhausted`, unrelated to any test logic (every test file already passed individually while
+building this plan). `php artisan test`'s wrapper does not forward a parent `-d memory_limit=`
+flag to the PHPUnit subprocess it spawns, so bumping it on the `artisan test` invocation itself
+doesn't help. Workaround: invoke PHPUnit directly with the flag on that binary:
+`docker compose exec php bash -c "cd /var/www/html/bugsaymis && php -d memory_limit=1024M vendor/bin/phpunit --filter=Dyna"`
+— confirmed all 39 tests pass this way (`OK, but there were issues!` — the "issues" are
+pre-existing PHPUnit deprecation warnings elsewhere in the suite, not failures).
+
 - [ ] **Step 2: PHP syntax-check every modified/created file**
 
 Run the project's `lint` skill (`php -l` sweep) over every file touched in this plan.
