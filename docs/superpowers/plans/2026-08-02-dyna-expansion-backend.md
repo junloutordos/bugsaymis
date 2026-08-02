@@ -935,8 +935,8 @@ git commit -m "feat(dyna): add faculty load, class record, and teacher attendanc
 
 namespace Tests\Feature\Atlas\Dyna;
 
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentEnrollment;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetEnrollmentStatusBreakdownTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -948,26 +948,21 @@ class GetEnrollmentStatusBreakdownToolTest extends TestCase
 
     public function test_returns_enrollment_status_counts(): void
     {
-        StudentEnrollment::create(['student_id' => 1, 'status' => 'enrolled', 'grade_level' => 'Grade 7']);
-        StudentEnrollment::create(['student_id' => 2, 'status' => 'enrolled', 'grade_level' => 'Grade 7']);
-        StudentEnrollment::create(['student_id' => 3, 'status' => 'transferred_out', 'grade_level' => 'Grade 8']);
+        // student_enrollments requires school_year_id, section_id, grade_level (tinyint,
+        // not a label string), and enrollment_date — confirmed via
+        // database/migrations/*_create_student_enrollments_table.php. Unique on
+        // [student_id, school_year_id], so distinct student_id per row below.
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
 
-        $user = $this->userWithPermission('atlas.dyna.access');
+        StudentEnrollment::create(['student_id' => 1, 'school_year_id' => $schoolYear->id, 'section_id' => 1, 'grade_level' => 7, 'status' => 'enrolled', 'enrollment_date' => now()]);
+        StudentEnrollment::create(['student_id' => 2, 'school_year_id' => $schoolYear->id, 'section_id' => 1, 'grade_level' => 7, 'status' => 'enrolled', 'enrollment_date' => now()]);
+        StudentEnrollment::create(['student_id' => 3, 'school_year_id' => $schoolYear->id, 'section_id' => 2, 'grade_level' => 8, 'status' => 'transferred_out', 'enrollment_date' => now()]);
+
+        $user = User::factory()->create();
 
         $result = (new GetEnrollmentStatusBreakdownTool())->execute($user, []);
 
         $this->assertEquals(['enrolled' => 2, 'transferred_out' => 1], $result);
-    }
-
-    private function userWithPermission(string $name): User
-    {
-        $role = \App\Models\Role::create(['name' => 'Dyna Test '.uniqid()]);
-        $permission = \App\Models\Permission::firstOrCreate(['name' => $name], ['module' => 'Atlas', 'description' => $name]);
-        $role->permissions()->attach($permission);
-        $user = User::factory()->create();
-        $user->roles()->attach($role);
-
-        return $user;
     }
 }
 ```
@@ -989,9 +984,11 @@ class GetGateAttendanceTrendToolTest extends TestCase
 
     public function test_returns_scan_counts_by_day_within_the_given_range(): void
     {
-        StudentAttendanceLog::create(['student_id' => 1, 'type' => 'in', 'scan_time' => '2026-07-27 07:00:00']);
-        StudentAttendanceLog::create(['student_id' => 2, 'type' => 'in', 'scan_time' => '2026-07-27 07:05:00']);
-        StudentAttendanceLog::create(['student_id' => 1, 'type' => 'in', 'scan_time' => '2026-07-28 07:00:00']);
+        // raw_barcode is required (no default) — confirmed via
+        // database/migrations/*_create_student_attendance_logs_table.php.
+        StudentAttendanceLog::create(['student_id' => 1, 'raw_barcode' => 'BC1', 'type' => 'in', 'scan_time' => '2026-07-27 07:00:00']);
+        StudentAttendanceLog::create(['student_id' => 2, 'raw_barcode' => 'BC2', 'type' => 'in', 'scan_time' => '2026-07-27 07:05:00']);
+        StudentAttendanceLog::create(['student_id' => 1, 'raw_barcode' => 'BC1', 'type' => 'in', 'scan_time' => '2026-07-28 07:00:00']);
 
         $user = User::factory()->create();
 
@@ -1056,9 +1053,13 @@ class GetCompetitionsStatsToolTest extends TestCase
 
     public function test_returns_competition_counts_by_level(): void
     {
-        Competition::create(['title' => 'Math Olympiad', 'level' => 'regional', 'date_from' => '2026-07-01']);
-        Competition::create(['title' => 'Science Fair', 'level' => 'regional', 'date_from' => '2026-07-15']);
-        Competition::create(['title' => 'Robotics Cup', 'level' => 'national', 'date_from' => '2026-06-01']);
+        // created_by is a required FK (no default) — confirmed via
+        // database/migrations/*_create_competitions_table.php.
+        $creator = User::factory()->create();
+
+        Competition::create(['title' => 'Math Olympiad', 'level' => 'regional', 'date_from' => '2026-07-01', 'created_by' => $creator->id]);
+        Competition::create(['title' => 'Science Fair', 'level' => 'regional', 'date_from' => '2026-07-15', 'created_by' => $creator->id]);
+        Competition::create(['title' => 'Robotics Cup', 'level' => 'national', 'date_from' => '2026-06-01', 'created_by' => $creator->id]);
 
         $user = User::factory()->create();
 
