@@ -1175,12 +1175,37 @@ git commit -m "feat(dyna-app): wire up ChatView, ConversationListView, and app e
 
 **Interfaces:** none (build/release tooling, not application code).
 
+**What was actually found during execution — this task cannot be fully completed by an
+agent:**
+- `security find-identity -v -p codesigning` confirms the org's Apple Developer Program team
+  IS already present locally: `Apple Distribution: Philippine Science High School - Caraga
+  Region Campus (U376ZTY96N)` and `Apple Development: Junlou Tordos (S779ZPQ8NJ)` — Team ID
+  `U376ZTY96N`, matching "reuse AtlasGo's account" from the design spec.
+- No `Developer ID Application` certificate exists yet, though — confirmed by actually running
+  `xcodebuild archive` (succeeded, auto-signed with the Development cert) followed by
+  `xcodebuild -exportArchive` with `method: developer-id` (failed:
+  `No signing certificate "Developer ID Application" found`).
+- Creating that certificate requires an Apple ID interactively signed into Xcode (Xcode →
+  Settings → Accounts → Manage Certificates → "+" → Developer ID Application) with
+  Admin/App Manager role on the team, or the manual developer.apple.com CSR flow. Both require
+  entering real Apple ID credentials — out of scope for an agent to do on the user's behalf.
+- Notarization has the same shape of blocker: `xcrun notarytool store-credentials` needs the
+  user's Apple ID + an app-specific password (generated at appleid.apple.com), entered
+  interactively, once.
+- **What was completed:** `DEVELOPMENT_TEAM: U376ZTY96N` wired into `project.yml`,
+  `exportOptions.plist` written with the real team ID and `method: developer-id`, and the
+  build script below — all ready to run the moment the certificate and notarization profile
+  exist. The remaining action item for the user: create the Developer ID Application
+  certificate, run `notarytool store-credentials "DynaNotarization" --apple-id <id> --team-id
+  U376ZTY96N --password <app-specific-password>` once, then run
+  `./scripts/build-dyna-dmg.sh`.
+
 - [ ] **Step 1: Configure signing**
 
-In Xcode → Dyna target → Signing & Capabilities: set the Team to the existing Apple Developer
-account already used for AtlasGo, Signing Certificate to "Developer ID Application" (not
-"Apple Development" — Developer ID is required for outside-the-App-Store distribution),
-and confirm the bundle ID `ph.edu.pshs.crc.atlas.dyna` doesn't collide with AtlasGo's existing
+Team ID (`U376ZTY96N`) and `CODE_SIGN_STYLE: Automatic` are already set in `project.yml`
+(regenerate with `xcodegen generate` after any project.yml change). What's left, and cannot be
+scripted: creating the `Developer ID Application` certificate itself (see note above) and
+confirming the bundle ID `ph.edu.pshs.crc.atlas.dyna` doesn't collide with AtlasGo's existing
 bundle IDs.
 
 - [ ] **Step 2: Write the build/notarize/package script**
@@ -1188,9 +1213,12 @@ bundle IDs.
 ```bash
 #!/usr/bin/env bash
 # Builds, signs, notarizes, and packages Dyna.app into a distributable .dmg.
-# Requires: an Xcode-configured Developer ID signing identity, and a notarization
-# profile stored via `xcrun notarytool store-credentials` (one-time setup, same
-# Apple ID/team already used for AtlasGo's notarization).
+#
+# One-time prerequisites (see the note above for why these can't be automated):
+#   1. A "Developer ID Application" certificate for team U376ZTY96N (PSHS-CRC).
+#   2. A notarization credentials profile, stored once via:
+#      xcrun notarytool store-credentials "DynaNotarization" \
+#        --apple-id <your-apple-id> --team-id U376ZTY96N --password <app-specific-password>
 set -euo pipefail
 
 APP_NAME="Dyna"
@@ -1199,7 +1227,9 @@ PROJECT="Dyna.xcodeproj"
 ARCHIVE_PATH="build/${APP_NAME}.xcarchive"
 EXPORT_PATH="build/export"
 DMG_PATH="build/${APP_NAME}.dmg"
-NOTARY_PROFILE="AtlasGoNotarization" # reuse the profile already set up for AtlasGo
+NOTARY_PROFILE="DynaNotarization" # not "AtlasGoNotarization" as originally planned — no way
+                                   # to verify AtlasGo's actual profile name from this repo,
+                                   # so this script uses its own dedicated profile instead
 
 rm -rf build && mkdir -p build
 
@@ -1225,18 +1255,21 @@ echo "Notarized DMG ready at $DMG_PATH"
 Also create a minimal `exportOptions.plist` (`method: developer-id`, `teamID` set to the
 existing team ID) alongside it — required by `xcodebuild -exportArchive`.
 
-- [ ] **Step 3: Run the script and verify**
+- [x] **Step 3: Run the script and verify — blocked, not completed**
 
-Run: `chmod +x scripts/build-dyna-dmg.sh && ./scripts/build-dyna-dmg.sh`
-Expected: a `build/Dyna.dmg` that mounts, contains a signed `Dyna.app`, and passes
+Ran the two steps the script automates directly (`xcodebuild archive`, then
+`xcodebuild -exportArchive` with `method: developer-id`) to confirm exactly what blocks it:
+archive succeeded (auto-signed with the Apple Development cert, since that's all that's
+available), export failed with `No signing certificate "Developer ID Application" found`.
+This is the expected, correct failure mode given no such certificate exists yet — not a bug
+in the script or project config. Once the certificate and notarization profile exist (see the
+note above this task), run: `./scripts/build-dyna-dmg.sh`
+Expected then: a `build/Dyna.dmg` that mounts, contains a signed `Dyna.app`, and passes
 `spctl --assess --type execute build/export/Dyna.app` (Gatekeeper acceptance — confirms
 signing + notarization worked, not just that the build succeeded).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
-```bash
-git add scripts/build-dyna-dmg.sh exportOptions.plist
-git commit -m "chore(dyna-app): add signed/notarized .dmg build script"
-```
-
-(`build/` should be gitignored — it's build output, not source.)
+Committed `scripts/build-dyna-dmg.sh`, `exportOptions.plist`, and the `project.yml` /
+`Dyna.xcodeproj` changes (Team ID). `build/` is gitignored (build output, not source) and was
+cleaned up after the archive/export test above.
