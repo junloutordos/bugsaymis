@@ -20,7 +20,7 @@ abstract class ExecutiveDashboardAdapterTool implements DynaTool
     public function inputSchema(): array
     {
         if (! $this->exposesDivisionFilter()) {
-            return ['type' => 'object', 'properties' => []];
+            return ['type' => 'object', 'properties' => (object) []];
         }
 
         return [

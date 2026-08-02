@@ -16,7 +16,7 @@ class GetLibraryStatsTool implements DynaTool
 
     public function inputSchema(): array
     {
-        return ['type' => 'object', 'properties' => []];
+        return ['type' => 'object', 'properties' => (object) []];
     }
 
     public function execute(User $user, array $input): array
