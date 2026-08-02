@@ -20,6 +20,15 @@ use App\Policies\WFHAttendancePolicy;
 use App\Services\Atlas\Dyna\DynaToolRegistry;
 use App\Services\Atlas\Dyna\Tools\GetHeadcountTool;
 use App\Services\Atlas\Dyna\Tools\GetLeaveTrendsTool;
+use App\Services\Atlas\Dyna\Tools\GetPerformanceStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetRequestsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetSatisfactionStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetAcademicsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetRecruitmentStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetFinanceStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetOperationsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetAttentionItemsTool;
+use App\Services\Atlas\Dyna\Tools\GetDivisionScorecardTool;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
@@ -46,6 +55,16 @@ class AppServiceProvider extends ServiceProvider
             return new DynaToolRegistry([
                 $app->make(GetHeadcountTool::class),
                 $app->make(GetLeaveTrendsTool::class),
+                $app->make(GetPerformanceStatsTool::class),
+                $app->make(GetRequestsStatsTool::class),
+                $app->make(GetSatisfactionStatsTool::class),
+                $app->make(GetAcademicsStatsTool::class),
+                $app->make(GetRecruitmentStatsTool::class),
+                $app->make(GetFinanceStatsTool::class),
+                $app->make(GetOperationsStatsTool::class),
+                $app->make(GetAttentionItemsTool::class),
+                $app->make(GetDivisionScorecardTool::class),
+                // Tasks 3-8 append their tools to this same array.
             ]);
         });
     }

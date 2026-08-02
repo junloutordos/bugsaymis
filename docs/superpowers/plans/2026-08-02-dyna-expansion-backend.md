@@ -308,7 +308,10 @@ class ExecutiveDashboardAdapterToolsTest extends TestCase
             ->execute($chief, []);
 
         // ExecutiveDashboardService::build() sets 'scorecard' => null whenever $divisionId is non-null.
-        $this->assertNull($result);
+        // ExecutiveDashboardService::build() sets 'scorecard' => null whenever $divisionId is
+        // non-null; the tool interface requires an array return, so this becomes a note instead
+        // (real bug found during execution — see the execute() note below).
+        $this->assertArrayHasKey('note', $result);
     }
 
     private function userWithRole(string $roleName): User
@@ -395,7 +398,14 @@ abstract class ExecutiveDashboardAdapterTool implements DynaTool
     {
         $divisionId = $this->resolveDivisionId($user, $input['division_id'] ?? null);
 
-        return $this->dashboard->build($divisionId)[$this->sectionKey()] ?? [];
+        $section = $this->dashboard->build($divisionId)[$this->sectionKey()];
+
+        // Real bug found during execution: only `scorecard` can legitimately be null
+        // (campus-lens only, per ExecutiveDashboardService::build()) — the DynaTool interface
+        // requires an array return, so a plain `?? []` here silently hides *why* it's empty
+        // and also fails the type contract's intent (execute() must return array, not null).
+        // Every other section key is never null, so this fallback is unreachable for them.
+        return $section ?? ['note' => 'Not available for a division-locked view — this section is campus-wide only.'];
     }
 }
 ```
