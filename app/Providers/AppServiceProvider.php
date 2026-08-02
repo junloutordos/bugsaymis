@@ -39,6 +39,7 @@ use App\Services\Atlas\Dyna\Tools\GetCompetitionsStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetDisciplineCaseStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetHomeroomAttendanceSummaryTool;
 use App\Services\Atlas\Dyna\Tools\GetEmployeeInfoTool;
+use App\Services\Atlas\Dyna\Tools\GetStudentInfoTool;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
@@ -84,7 +85,7 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(GetDisciplineCaseStatsTool::class),
                 $app->make(GetHomeroomAttendanceSummaryTool::class),
                 $app->make(GetEmployeeInfoTool::class),
-                // Task 8 appends its tool to this same array.
+                $app->make(GetStudentInfoTool::class),
             ]);
         });
     }
