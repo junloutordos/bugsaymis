@@ -7,12 +7,22 @@
 
 ## Summary
 
-Phase 2 of Dyna: expand the backend tool registry from 2 tools to 20 (comprehensive coverage
+Phase 2 of Dyna: expand the backend tool registry from 2 tools to 22 (comprehensive coverage
 of HR/payroll/IPCR/requests/CSM/academics/recruitment/finance/operations, plus CID-specific
-faculty and student modules), add Google Sign-In to Dyna.app alongside the existing
-email/password flow, and ship an interim app icon using the Atlas mark.
+faculty and student modules, plus individual employee/student lookups), add Google Sign-In to
+Dyna.app alongside the existing email/password flow, and ship an interim app icon using the
+Atlas mark.
 
-## Backend — 18 new tools (20 total)
+**Individual-level data is explicitly allowed (revised from the initial aggregate-only
+design):** Dyna is restricted to school administration (`atlas.dyna.access` holders only, not
+a public or broad-staff surface), so the extra "aggregate only, never individual" caution
+originally applied to discipline/homeroom-attendance data has been removed. The permission
+scoping underneath is unchanged — a tool still only returns what the requesting user could
+already see for that person in the web app (Division Chief still can't reach another
+division's people; discipline/homeroom-attendance still require their specific permissions).
+What changed is only the *shape* the data can take, not *who* can reach it.
+
+## Backend — 20 new tools (22 total)
 
 ### Group A: Executive Dashboard adapters (9 tools)
 
@@ -50,14 +60,21 @@ Grounded in real schema (verified via direct model/migration reads, not assumed)
 | `get_gate_attendance_trend` | `student_attendance_logs` | Multi-day/weekly scan volume, late-arrival rate |
 | `get_library_stats` | `borrowings.status` | Current borrowed count, overdue count, active distinct-borrower count |
 | `get_competitions_stats` | `competitions.level` / `competition_participants` | Competition count by level (campus→international), award trend, by school year |
-| `get_homeroom_attendance_summary` | `homeroom_monthly_report_lines` (per-student) | **Aggregate only**: avg cutting incidents, perfect-attendance count, excused-vs-unexcused ratio |
-| `get_discipline_case_stats` | `discipline_cases.status` / `.threat_level` | **Aggregate only**: case counts by status/threat-level/offense |
+| `get_homeroom_attendance_summary` | `homeroom_monthly_report_lines` (per-student) | Aggregate by default (avg cutting incidents, perfect-attendance count, excused-vs-unexcused ratio); optional `student_identifier` param returns that student's individual record |
+| `get_discipline_case_stats` | `discipline_cases.status` / `.threat_level` | Aggregate by default (case counts by status/threat-level/offense); optional `student_identifier` param returns that student's case detail |
 
-**PII discipline (approved):**
-- `get_homeroom_attendance_summary` and `get_discipline_case_stats` read from genuinely
-  per-student tables. They must only ever return grouped counts/averages — never a
-  `student_id`, name, or case narrative — and must suppress any breakdown cell narrow enough
-  to de-anonymize (minimum group size, e.g. omit/collapse any count below 5).
+### Group C: Individual lookups (2 new tools)
+
+- **`get_employee_info(identifier)`** — name, position, division/office, status, salary
+  grade/step, leave balance, latest DTR/attendance status, current-period IPCR status. Scoped
+  exactly like the web HR module already requires: Division Chief → own division's staff only;
+  OCD/Administrator/HR-tier roles → campus-wide. Salary grade/step is included — whoever can
+  already see an employee's HR profile in the web app already sees it there, so Dyna mirroring
+  that is consistent with the core design principle rather than a new exposure.
+- **`get_student_info(identifier)`** — enrollment status, grade/section, attendance summary
+  (gate + homeroom), library status; discipline history included only when the requester has
+  `discipline.view` (same gate as `get_discipline_case_stats`). Scoped like the web
+  Registrar/Student modules already require.
 
 ### Access control — two tiers (approved)
 
@@ -73,9 +90,14 @@ to use most of the new tools — cutting against "comprehensive." Resolution:
   `get_enrollment_status_breakdown`, `get_gate_attendance_trend`, `get_library_stats`,
   `get_competitions_stats`): gated by `atlas.dyna.access` only. These are pure institutional
   aggregates — no individual PII — so Dyna's own access gate is sufficient.
-- **`get_discipline_case_stats`**: gated by `atlas.dyna.access` **and** `discipline.view`.
-- **`get_homeroom_attendance_summary`**: gated by `atlas.dyna.access` **and**
-  `homeroom-attendance.admin`.
+- **`get_discipline_case_stats`** (aggregate or individual, via optional `student_identifier`):
+  gated by `atlas.dyna.access` **and** `discipline.view`. Individual-mode results are still
+  reachable only by the same people who could already look up that case in the web app.
+- **`get_homeroom_attendance_summary`** (aggregate or individual): gated by
+  `atlas.dyna.access` **and** `homeroom-attendance.admin`.
+- **`get_employee_info`** / **`get_student_info`**: gated by `atlas.dyna.access` plus the same
+  division/role scoping their respective web modules (HR, Registrar) already enforce — see
+  Group C above.
 
 ### `atlas.dyna.access` grant expansion (approved)
 
@@ -117,11 +139,12 @@ pass is a separate future task.
 
 ## Open items for the implementation plan
 
-- Exact minimum-group-size threshold for discipline/homeroom suppression (proposing 5,
-  confirm during implementation).
-- Whether the 9 new Group B tools need their own migration (permission checks are code-level,
-  not new `permissions` rows) or just service-level `hasPermission()` calls mirroring the
-  existing tools' pattern.
-- Task grouping for the implementation plan — 18 new tools is a lot of individual TDD tasks;
+- What identifier `get_employee_info`/`get_student_info` accept — proposing name (fuzzy
+  match, disambiguate on multiple hits) plus exact ID/LRN/employee-number when available, to
+  confirm during implementation.
+- Whether the new tools need their own migration (permission checks are code-level, not new
+  `permissions` rows) or just service-level `hasPermission()` calls mirroring the existing
+  tools' pattern.
+- Task grouping for the implementation plan — 20 new tools is a lot of individual TDD tasks;
   will batch related tools (e.g. all 9 Group A adapters as one task-family) rather than one
   task per tool, to keep the plan reviewable.
