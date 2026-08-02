@@ -8,6 +8,6 @@ class DynaGoogleClientFactory
 {
     public function make(): Client
     {
-        return new Client(['client_id' => config('services.google.mobile_client_id')]);
+        return new Client(['client_id' => config('services.google.dyna_client_id')]);
     }
 }
