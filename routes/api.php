@@ -193,6 +193,7 @@ Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
 
 Route::prefix('dyna')->name('dyna.')->group(function () {
     Route::post('/login', [DynaAuthController::class, 'login'])->name('login')->middleware('throttle:10,1');
+    Route::post('/login/google', [DynaAuthController::class, 'loginWithGoogle'])->name('login.google')->middleware('throttle:10,1');
 
     Route::middleware(['auth:sanctum', 'permission:atlas.dyna.access'])->group(function () {
         Route::post('/chat', [DynaController::class, 'chat'])->name('chat');
