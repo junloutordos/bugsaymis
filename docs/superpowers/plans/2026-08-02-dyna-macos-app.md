@@ -1199,6 +1199,14 @@ agent:**
   certificate, run `notarytool store-credentials "DynaNotarization" --apple-id <id> --team-id
   U376ZTY96N --password <app-specific-password>` once, then run
   `./scripts/build-dyna-dmg.sh`.
+- **Second gotcha, also found by execution (not by inspection):** setting `DEVELOPMENT_TEAM`
+  only on the `Dyna` target and re-running the full test suite as a final sanity check broke
+  it — `DynaTests` was still signed with whatever team Xcode defaults to, and macOS refuses to
+  `dlopen` a test bundle into a host app when their Team IDs differ ("code signature ... not
+  valid for use in process: mapping process and mapped file (non-platform) have different Team
+  IDs"). Fix: put `DEVELOPMENT_TEAM` and `CODE_SIGN_STYLE` in `project.yml`'s top-level
+  `settings.base` (applies to every target) rather than only under the `Dyna` target's
+  settings.
 
 - [ ] **Step 1: Configure signing**
 
