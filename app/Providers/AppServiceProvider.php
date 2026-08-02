@@ -36,6 +36,7 @@ use App\Services\Atlas\Dyna\Tools\GetEnrollmentStatusBreakdownTool;
 use App\Services\Atlas\Dyna\Tools\GetGateAttendanceTrendTool;
 use App\Services\Atlas\Dyna\Tools\GetLibraryStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetCompetitionsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetDisciplineCaseStatsTool;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
@@ -78,7 +79,8 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(GetGateAttendanceTrendTool::class),
                 $app->make(GetLibraryStatsTool::class),
                 $app->make(GetCompetitionsStatsTool::class),
-                // Tasks 5-8 append their tools to this same array.
+                $app->make(GetDisciplineCaseStatsTool::class),
+                // Tasks 6-8 append their tools to this same array.
             ]);
         });
     }

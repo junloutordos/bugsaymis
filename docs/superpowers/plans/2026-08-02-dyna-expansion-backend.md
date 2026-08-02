@@ -1309,8 +1309,13 @@ class GetDisciplineCaseStatsToolTest extends TestCase
 
     public function test_aggregate_mode_returns_counts_by_status(): void
     {
-        DisciplineCase::create(['student_id' => 1, 'status' => 'resolved', 'threat_level' => 'low', 'nature_of_offense' => 'Tardiness', 'incident_date' => '2026-07-01', 'school_year_id' => 1]);
-        DisciplineCase::create(['student_id' => 2, 'status' => 'under_review', 'threat_level' => 'medium', 'nature_of_offense' => 'Bullying', 'incident_date' => '2026-07-05', 'school_year_id' => 1]);
+        // case_no (unique) and filer_id are required (no default) — confirmed via
+        // database/migrations/*_create_discipline_cases_table.php. Everything else used
+        // below is nullable there, but supplied anyway since the tool groups by them.
+        $filer = User::factory()->create();
+
+        DisciplineCase::create(['case_no' => 'DISC-2026-07-001', 'student_id' => 1, 'filer_id' => $filer->id, 'status' => 'resolved', 'threat_level' => 'low', 'nature_of_offense' => 'Tardiness', 'incident_date' => '2026-07-01', 'school_year_id' => 1]);
+        DisciplineCase::create(['case_no' => 'DISC-2026-07-002', 'student_id' => 2, 'filer_id' => $filer->id, 'status' => 'under_review', 'threat_level' => 'medium', 'nature_of_offense' => 'Bullying', 'incident_date' => '2026-07-05', 'school_year_id' => 1]);
 
         $user = $this->userWithPermissions(['atlas.dyna.access', 'discipline.view']);
 
@@ -1329,7 +1334,8 @@ class GetDisciplineCaseStatsToolTest extends TestCase
             'lastname' => $lastname, 'firstname' => 'Test',
         ]);
 
-        DisciplineCase::create(['student_id' => $studentId, 'status' => 'resolved', 'threat_level' => 'low', 'nature_of_offense' => 'Tardiness', 'incident_date' => '2026-07-01', 'school_year_id' => 1]);
+        $filer = User::factory()->create();
+        DisciplineCase::create(['case_no' => 'DISC-2026-07-'.uniqid(), 'student_id' => $studentId, 'filer_id' => $filer->id, 'status' => 'resolved', 'threat_level' => 'low', 'nature_of_offense' => 'Tardiness', 'incident_date' => '2026-07-01', 'school_year_id' => 1]);
 
         $user = $this->userWithPermissions(['atlas.dyna.access', 'discipline.view']);
 
