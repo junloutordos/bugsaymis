@@ -285,6 +285,13 @@ git commit -m "feat(dyna-app): add KeychainStore for Sanctum token persistence"
   `URLSession` (defaults to `.shared`) so tests can substitute a mock protocol — Task 4/6
   depend on this same injected-session pattern.
 
+**Swift 6 note (found during execution):** `DynaAPIClient` must conform to `Sendable` —
+`@MainActor` view models (Task 4's `LoginViewModel`, Task 6's `ChatViewModel`) call its async
+methods, and Swift 6's strict concurrency checking rejects passing a non-`Sendable` class
+across that boundary. It's safe here: both stored properties are `let` and themselves
+`Sendable` (`URLSession`, `URL`). Declare `final class DynaAPIClient: Sendable` from the start
+rather than discovering this error later in Task 4.
+
 - [ ] **Step 1: Write the failing test**
 
 ```swift
@@ -410,7 +417,7 @@ struct LoginResponse: Decodable {
     let user: User
 }
 
-final class DynaAPIClient {
+final class DynaAPIClient: Sendable {
     private let session: URLSession
     private let baseURL: URL
 
@@ -478,10 +485,19 @@ git commit -m "feat(dyna-app): add DynaAPIClient with login()"
 
 **Interfaces:**
 - Consumes: `DynaAPIClient.login()` (Task 3), `KeychainStore.save(token:)` (Task 2).
-- Produces: `LoginViewModel` (`@Observable`) with `email: String`, `password: String`,
+- Produces: `LoginViewModel` (`@MainActor @Observable`) with `email: String`, `password: String`,
   `isLoading: Bool`, `errorMessage: String?`, `isAuthenticated: Bool`, and
   `func signIn() async`. Task 6 (`ChatView`/root scene) reads `isAuthenticated` to decide
   which screen to show.
+
+**Swift 6 note (found during execution):** without `@MainActor` on the class, `LoginView`'s
+`Task { await viewModel.signIn() }` fails to compile — "sending 'self.viewModel' risks causing
+data races," because a SwiftUI view's body is implicitly MainActor-isolated and Swift 6 flags
+sending a non-isolated `@Observable` class across that boundary. Apply `@MainActor` to any
+Dyna view model (this one and Task 6's `ChatViewModel`) that a SwiftUI view drives via `Task {
+await ... }` — it's also just correct: view models exist to back UI state, so they belong on
+the main actor. Test classes that touch a `@MainActor` view model synchronously (as this one
+does — setting `viewModel.email` directly) need `@MainActor` on the test class too.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -489,6 +505,7 @@ git commit -m "feat(dyna-app): add DynaAPIClient with login()"
 import XCTest
 @testable import Dyna
 
+@MainActor
 final class LoginViewModelTests: XCTestCase {
     override func tearDown() {
         KeychainStore.deleteToken()
@@ -511,7 +528,9 @@ final class LoginViewModelTests: XCTestCase {
     }
 
     func test_signIn_sets_a_readable_error_on_invalid_credentials() async {
-        let session = URLSession.mockSession(status: 422, json: """{"message":"nope"}""")
+        let session = URLSession.mockSession(status: 422, json: """
+        {"message":"nope"}
+        """)
         let viewModel = LoginViewModel(client: DynaAPIClient(session: session))
         viewModel.email = "junlou@example.com"
         viewModel.password = "wrong"
@@ -535,6 +554,7 @@ Expected: FAIL — `LoginViewModel` doesn't exist.
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class LoginViewModel {
     var email = ""
@@ -836,6 +856,7 @@ git commit -m "feat(dyna-app): add sendMessage, fetchConversations, fetchMessage
 import XCTest
 @testable import Dyna
 
+@MainActor
 final class ChatViewModelTests: XCTestCase {
     func test_send_appends_the_user_message_then_the_assistant_reply() async throws {
         try KeychainStore.save(token: "abc123")
@@ -858,7 +879,9 @@ final class ChatViewModelTests: XCTestCase {
 
     func test_send_surfaces_a_readable_error_and_keeps_the_user_message_on_failure() async throws {
         try KeychainStore.save(token: "abc123")
-        let session = URLSession.mockSession(status: 500, json: """{"message":"boom"}""")
+        let session = URLSession.mockSession(status: 500, json: """
+        {"message":"boom"}
+        """)
         let viewModel = ChatViewModel(client: DynaAPIClient(session: session))
 
         await viewModel.send("How many active employees do we have?")
@@ -927,6 +950,7 @@ struct Message: Identifiable, Equatable {
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class ChatViewModel {
     var messages: [Message] = []
