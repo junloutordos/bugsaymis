@@ -73,9 +73,16 @@ class DynaOrchestratorService
 
                 $toolCallLog[] = ['name' => $toolUse['name'], 'input' => $toolUse['input'] ?? [], 'result' => $output];
 
+                // Some tools legitimately return a bare list (e.g. get_attention_items with
+                // nothing flagged returns []). array_is_list() is true for both a populated
+                // list AND an empty array, so this also covers the empty case — Nova's
+                // Converse validator requires toolResult.content[].json to be a JSON object,
+                // not an array, so any bare list gets wrapped rather than passed through raw.
+                $json = is_array($output) && array_is_list($output) ? ['items' => $output] : $output;
+
                 $toolResultBlocks[] = ['toolResult' => [
                     'toolUseId' => $toolUse['toolUseId'],
-                    'content' => [['json' => $output]],
+                    'content' => [['json' => $json]],
                 ]];
             }
 
