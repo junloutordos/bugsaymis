@@ -143,10 +143,12 @@ git commit -m "chore(dyna-app): add GoogleSignIn-iOS dependency and OAuth config
 **Interfaces:**
 - Produces: `protocol DynaGoogleSignInService { func signIn() async throws -> String }`
   (returns the ID token string) and `final class LiveDynaGoogleSignInService: DynaGoogleSignInService`
-  wrapping `GIDSignIn.sharedInstance.signIn(withPresentingWindow:)` (the macOS-specific method
-  — not `signIn(withPresenting:)`, which is the iOS/UIViewController-taking variant). Task 4
-  (`LoginViewModel`) depends on the protocol, not the concrete class, so tests can substitute a
-  fake without touching the real SDK.
+  wrapping `GIDSignIn.sharedInstance.signIn(withPresenting:)`. **Corrected during execution:**
+  the label is `withPresenting:` on macOS too, not a separate `withPresentingWindow:` as
+  originally planned from a web search — the compiler caught this immediately (`incorrect
+  argument label`), the label just accepts an `NSWindow` on macOS vs a `UIViewController` on
+  iOS via platform-conditional overloads. Task 4 (`LoginViewModel`) depends on the protocol,
+  not the concrete class, so tests can substitute a fake without touching the real SDK.
 
 This task has no automated test — it's a thin bridge over a UI-driven, credential-requiring SDK
 call that can't be exercised without a real Google account and the real OAuth client from Task
@@ -175,7 +177,7 @@ final class LiveDynaGoogleSignInService: DynaGoogleSignInService {
             throw DynaGoogleSignInError.noPresentableWindow
         }
 
-        let result = try await GIDSignIn.sharedInstance.signIn(withPresentingWindow: window)
+        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: window)
 
         guard let idToken = result.user.idToken?.tokenString else {
             throw DynaGoogleSignInError.noIdToken
