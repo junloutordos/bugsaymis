@@ -43,6 +43,11 @@ abstract class ExecutiveDashboardAdapterTool implements DynaTool
         // ExecutiveDashboardService::build()) — the DynaTool interface requires an array
         // return, so a plain `?? []` here would silently hide *why* it's empty. Every other
         // section key is never null, so this fallback is unreachable for them.
-        return $section ?? ['note' => 'Not available for a division-locked view — this section is campus-wide only.'];
+        $section ??= ['note' => 'Not available for a division-locked view — this section is campus-wide only.'];
+
+        // ExecutiveDashboardService's sections carry raw Collection/Carbon instances — fine
+        // for Inertia's response pipeline, but Bedrock's Converse toolResult validator only
+        // accepts null/numeric/string/bool/array, so anything else must be plain-arrayed first.
+        return json_decode(json_encode($section), true);
     }
 }

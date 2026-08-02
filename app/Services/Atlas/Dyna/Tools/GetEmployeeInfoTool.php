@@ -60,7 +60,7 @@ class GetEmployeeInfoTool implements DynaTool
             'salary_grade' => $employee->salary_grade,
             'salary_step' => $employee->salary_step,
             'latest_dtr_status' => $latestDtr?->attendance_status,
-            'latest_dtr_date' => $latestDtr?->work_date,
+            'latest_dtr_date' => $latestDtr?->work_date?->format('Y-m-d'),
             'current_ipcr_status' => $currentIpcr?->status,
             'current_ipcr_rating' => $currentIpcr?->final_adjectival_rating,
         ];
