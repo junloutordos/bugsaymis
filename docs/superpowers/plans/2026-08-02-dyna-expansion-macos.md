@@ -328,8 +328,13 @@ import XCTest
 @testable import Dyna
 
 private final class FakeGoogleSignInService: DynaGoogleSignInService {
-    var stubbedIdToken: String?
-    var stubbedError: Error?
+    // Test-only mock state, set synchronously before signIn() is awaited — never mutated
+    // concurrently. DynaGoogleSignInService requires Sendable, and Swift 6 flags any mutable
+    // stored property on a Sendable class as unsafe by default; nonisolated(unsafe) opts out
+    // for this deliberately single-context double (found during execution — same pattern as
+    // MockURLProtocol's statics in the Phase 1 plan).
+    nonisolated(unsafe) var stubbedIdToken: String?
+    nonisolated(unsafe) var stubbedError: Error?
 
     func signIn() async throws -> String {
         if let stubbedError { throw stubbedError }
