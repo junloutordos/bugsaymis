@@ -25,16 +25,20 @@ class DynaOrchestratorService
 
     public function reply(User $user, DynaConversation $conversation, string $userMessage): string
     {
+        // Build history BEFORE persisting the current message — historyAsBedrockMessages()
+        // lazy-loads $conversation->messages from the DB, so creating the row first would
+        // make the current message get queried back as "history" and then appended a second
+        // time below, sending it to the model twice on every single turn.
+        $client = $this->clientFactory->make();
+        $messages = $this->historyAsBedrockMessages($conversation);
+        $messages[] = ['role' => 'user', 'content' => [['text' => $userMessage]]];
+
         DynaMessage::create([
             'dyna_conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $userMessage,
             'created_at' => now(),
         ]);
-
-        $client = $this->clientFactory->make();
-        $messages = $this->historyAsBedrockMessages($conversation);
-        $messages[] = ['role' => 'user', 'content' => [['text' => $userMessage]]];
 
         $toolCallLog = [];
 
@@ -48,7 +52,20 @@ class DynaOrchestratorService
             ]);
 
             $assistantContent = $result['output']['message']['content'];
-            $messages[] = ['role' => 'assistant', 'content' => $assistantContent];
+
+            // The AWS SDK decodes Bedrock's JSON with associative arrays, so a zero-arg tool
+            // call's toolUse.input comes back as {} -> [] — the same empty-array-vs-object
+            // ambiguity fixed elsewhere in this class. Re-sending that [] as history on the
+            // next turn gets rejected by Nova's validator ("not a valid document type"), so
+            // it's normalized to an object here — only in the copy stored as history, not in
+            // $assistantContent itself, since execute() below expects a plain array.
+            $messages[] = ['role' => 'assistant', 'content' => array_map(function ($block) {
+                if (isset($block['toolUse']['input']) && is_array($block['toolUse']['input']) && empty($block['toolUse']['input'])) {
+                    $block['toolUse']['input'] = (object) [];
+                }
+
+                return $block;
+            }, $assistantContent)];
 
             $toolUseBlocks = array_values(array_filter($assistantContent, fn ($b) => isset($b['toolUse'])));
 

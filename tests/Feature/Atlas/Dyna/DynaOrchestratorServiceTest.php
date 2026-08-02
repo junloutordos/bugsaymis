@@ -63,6 +63,39 @@ class DynaOrchestratorServiceTest extends TestCase
         $this->assertEquals(['total_headcount' => 42], $assistantMessage->tool_calls[0]['result']);
     }
 
+    public function test_reply_does_not_duplicate_the_current_user_message_in_the_bedrock_history(): void
+    {
+        $user = User::factory()->create();
+        $conversation = DynaConversation::create(['user_id' => $user->id]);
+        $registry = new DynaToolRegistry([]);
+
+        $capturedArgs = null;
+
+        $bedrock = Mockery::mock(BedrockRuntimeClient::class);
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->andReturnUsing(function (array $args) use (&$capturedArgs) {
+                $capturedArgs = $args;
+
+                return new Result([
+                    'output' => ['message' => ['role' => 'assistant', 'content' => [
+                        ['text' => 'Hi there!'],
+                    ]]],
+                    'stopReason' => 'end_turn',
+                ]);
+            });
+
+        $clientFactory = Mockery::mock(DynaBedrockClientFactory::class);
+        $clientFactory->shouldReceive('make')->andReturn($bedrock);
+
+        $orchestrator = new DynaOrchestratorService($registry, $clientFactory);
+
+        $orchestrator->reply($user, $conversation, 'Hello Dyna');
+
+        $userMessages = array_filter($capturedArgs['messages'], fn ($m) => $m['role'] === 'user');
+        $this->assertCount(1, $userMessages, 'The current user message should appear exactly once, not duplicated.');
+    }
+
     public function test_reply_strips_thinking_tags_amazon_nova_inlines_into_its_text_output(): void
     {
         $user = User::factory()->create();
@@ -116,5 +149,60 @@ class DynaOrchestratorServiceTest extends TestCase
         $this->assertStringNotContainsString('<thinking>', $answer);
         $this->assertStringNotContainsString('let me figure out which', $answer);
         $this->assertNotEmpty($answer);
+    }
+
+    public function test_reply_normalizes_an_empty_toolUse_input_before_replaying_it_as_history(): void
+    {
+        $user = User::factory()->create();
+        $conversation = DynaConversation::create(['user_id' => $user->id]);
+
+        $tool = new class implements DynaTool {
+            public function name(): string { return 'get_attention_items'; }
+            public function description(): string { return 'desc'; }
+            public function inputSchema(): array { return ['type' => 'object', 'properties' => (object) []]; }
+            public function execute(User $user, array $input): array { return []; }
+        };
+        $registry = new DynaToolRegistry([$tool]);
+
+        $capturedSecondCallArgs = null;
+
+        $bedrock = Mockery::mock(BedrockRuntimeClient::class);
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->andReturn(new Result([
+                // Simulates how the AWS SDK decodes Bedrock's {} for a zero-arg tool call —
+                // PHP's json_decode(..., true) can't distinguish {} from [], so an empty
+                // "input" comes back as a plain array here, same as our own tool outputs did.
+                'output' => ['message' => ['role' => 'assistant', 'content' => [
+                    ['toolUse' => ['toolUseId' => 'tu_1', 'name' => 'get_attention_items', 'input' => []]],
+                ]]],
+                'stopReason' => 'tool_use',
+            ]))
+            ->ordered();
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->ordered()
+            ->andReturnUsing(function (array $args) use (&$capturedSecondCallArgs) {
+                $capturedSecondCallArgs = $args;
+
+                return new Result([
+                    'output' => ['message' => ['role' => 'assistant', 'content' => [
+                        ['text' => 'Nothing needs your attention right now.'],
+                    ]]],
+                    'stopReason' => 'end_turn',
+                ]);
+            });
+
+        $clientFactory = Mockery::mock(DynaBedrockClientFactory::class);
+        $clientFactory->shouldReceive('make')->andReturn($bedrock);
+
+        $orchestrator = new DynaOrchestratorService($registry, $clientFactory);
+
+        $orchestrator->reply($user, $conversation, 'Anything need my attention?');
+
+        $replayedAssistantContent = $capturedSecondCallArgs['messages'][1]['content'];
+        $replayedInput = $replayedAssistantContent[0]['toolUse']['input'];
+
+        $this->assertEquals('{}', json_encode($replayedInput));
     }
 }
