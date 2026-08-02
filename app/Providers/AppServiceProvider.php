@@ -17,6 +17,29 @@ use App\Policies\Recruitment\JobItemPolicy;
 use App\Policies\Recruitment\PlacementPolicy;
 use App\Policies\WFHAccomplishmentPolicy;
 use App\Policies\WFHAttendancePolicy;
+use App\Services\Atlas\Dyna\DynaToolRegistry;
+use App\Services\Atlas\Dyna\Tools\GetHeadcountTool;
+use App\Services\Atlas\Dyna\Tools\GetLeaveTrendsTool;
+use App\Services\Atlas\Dyna\Tools\GetPerformanceStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetRequestsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetSatisfactionStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetAcademicsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetRecruitmentStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetFinanceStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetOperationsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetAttentionItemsTool;
+use App\Services\Atlas\Dyna\Tools\GetDivisionScorecardTool;
+use App\Services\Atlas\Dyna\Tools\GetFacultyLoadDistributionTool;
+use App\Services\Atlas\Dyna\Tools\GetClassRecordComplianceTool;
+use App\Services\Atlas\Dyna\Tools\GetTeacherAttendanceStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetEnrollmentStatusBreakdownTool;
+use App\Services\Atlas\Dyna\Tools\GetGateAttendanceTrendTool;
+use App\Services\Atlas\Dyna\Tools\GetLibraryStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetCompetitionsStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetDisciplineCaseStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetHomeroomAttendanceSummaryTool;
+use App\Services\Atlas\Dyna\Tools\GetEmployeeInfoTool;
+use App\Services\Atlas\Dyna\Tools\GetStudentInfoTool;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
@@ -36,7 +59,35 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // DynaToolRegistry takes an array of DynaTool instances — the container can't
+        // auto-wire an array constructor param by type-hint alone, so it needs an
+        // explicit binding listing every registered Dyna tool.
+        $this->app->singleton(DynaToolRegistry::class, function ($app) {
+            return new DynaToolRegistry([
+                $app->make(GetHeadcountTool::class),
+                $app->make(GetLeaveTrendsTool::class),
+                $app->make(GetPerformanceStatsTool::class),
+                $app->make(GetRequestsStatsTool::class),
+                $app->make(GetSatisfactionStatsTool::class),
+                $app->make(GetAcademicsStatsTool::class),
+                $app->make(GetRecruitmentStatsTool::class),
+                $app->make(GetFinanceStatsTool::class),
+                $app->make(GetOperationsStatsTool::class),
+                $app->make(GetAttentionItemsTool::class),
+                $app->make(GetDivisionScorecardTool::class),
+                $app->make(GetFacultyLoadDistributionTool::class),
+                $app->make(GetClassRecordComplianceTool::class),
+                $app->make(GetTeacherAttendanceStatsTool::class),
+                $app->make(GetEnrollmentStatusBreakdownTool::class),
+                $app->make(GetGateAttendanceTrendTool::class),
+                $app->make(GetLibraryStatsTool::class),
+                $app->make(GetCompetitionsStatsTool::class),
+                $app->make(GetDisciplineCaseStatsTool::class),
+                $app->make(GetHomeroomAttendanceSummaryTool::class),
+                $app->make(GetEmployeeInfoTool::class),
+                $app->make(GetStudentInfoTool::class),
+            ]);
+        });
     }
 
     /**

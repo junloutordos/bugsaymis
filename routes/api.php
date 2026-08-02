@@ -13,6 +13,8 @@ use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
 use App\Http\Controllers\Api\AtlasSentinelController;
 use App\Http\Controllers\Api\AtlasSentinelRemoteHelpController;
 use App\Http\Controllers\Api\BiometricPunchIngestController;
+use App\Http\Controllers\Api\DynaAuthController;
+use App\Http\Controllers\Api\DynaController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -179,5 +181,23 @@ Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
         Route::post('/backup/{run}/upload-session', [AtlasSentinelController::class, 'backupUploadSession'])->name('backup.upload-session');
         Route::post('/backup/{run}/file-complete', [AtlasSentinelController::class, 'backupFileComplete'])->name('backup.file-complete');
         Route::post('/backup/{run}/complete', [AtlasSentinelController::class, 'backupComplete'])->name('backup.complete');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Dyna AI Assistant — macOS app API
+|--------------------------------------------------------------------------
+| Stateless, Sanctum token auth. Prefix: /api/dyna
+*/
+
+Route::prefix('dyna')->name('dyna.')->group(function () {
+    Route::post('/login', [DynaAuthController::class, 'login'])->name('login')->middleware('throttle:10,1');
+    Route::post('/login/google', [DynaAuthController::class, 'loginWithGoogle'])->name('login.google')->middleware('throttle:10,1');
+
+    Route::middleware(['auth:sanctum', 'permission:atlas.dyna.access'])->group(function () {
+        Route::post('/chat', [DynaController::class, 'chat'])->name('chat');
+        Route::get('/conversations', [DynaController::class, 'conversations'])->name('conversations');
+        Route::get('/conversations/{id}', [DynaController::class, 'show'])->name('conversations.show');
     });
 });
