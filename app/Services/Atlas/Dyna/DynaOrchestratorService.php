@@ -44,7 +44,7 @@ class DynaOrchestratorService
                 'system' => [['text' => self::SYSTEM_PROMPT]],
                 'messages' => $messages,
                 'toolConfig' => $this->tools->toBedrockToolConfig(),
-                'inferenceConfig' => ['maxTokens' => 1024],
+                'inferenceConfig' => ['maxTokens' => 2048],
             ]);
 
             $assistantContent = $result['output']['message']['content'];
@@ -106,11 +106,19 @@ class DynaOrchestratorService
     /**
      * Amazon Nova inlines its chain-of-thought directly in the text output as
      * <thinking>...</thinking>, rather than a separate content block the way gpt-oss's
-     * reasoningContent does — strip it so users only see the actual answer.
+     * reasoningContent does — strip it so users only see the actual answer. A response
+     * truncated by maxTokens can leave an unclosed <thinking> tag with no real answer after
+     * it; that's stripped too (falling back to a friendly message) rather than shown raw.
      */
     private function stripThinkingTags(string $text): string
     {
-        return trim(preg_replace('/<thinking>.*?<\/thinking>/is', '', $text));
+        $text = preg_replace('/<thinking>.*?<\/thinking>/is', '', $text);
+        $text = preg_replace('/<thinking>.*/is', '', $text);
+        $text = trim($text);
+
+        return $text !== ''
+            ? $text
+            : "Dyna's response got cut off — try asking again, or narrow the question.";
     }
 
     private function historyAsBedrockMessages(DynaConversation $conversation): array

@@ -89,4 +89,32 @@ class DynaOrchestratorServiceTest extends TestCase
         $this->assertEquals('Hello! How can I help?', $answer);
         $this->assertEquals('Hello! How can I help?', $conversation->fresh()->messages->last()->content);
     }
+
+    public function test_reply_strips_an_unclosed_thinking_tag_left_by_a_truncated_response(): void
+    {
+        $user = User::factory()->create();
+        $conversation = DynaConversation::create(['user_id' => $user->id]);
+        $registry = new DynaToolRegistry([]);
+
+        $bedrock = Mockery::mock(BedrockRuntimeClient::class);
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->andReturn(new Result([
+                'output' => ['message' => ['role' => 'assistant', 'content' => [
+                    ['text' => '<thinking> The user is asking about headcount, let me figure out which'],
+                ]]],
+                'stopReason' => 'max_tokens',
+            ]));
+
+        $clientFactory = Mockery::mock(DynaBedrockClientFactory::class);
+        $clientFactory->shouldReceive('make')->andReturn($bedrock);
+
+        $orchestrator = new DynaOrchestratorService($registry, $clientFactory);
+
+        $answer = $orchestrator->reply($user, $conversation, 'How many teaching staff?');
+
+        $this->assertStringNotContainsString('<thinking>', $answer);
+        $this->assertStringNotContainsString('let me figure out which', $answer);
+        $this->assertNotEmpty($answer);
+    }
 }
