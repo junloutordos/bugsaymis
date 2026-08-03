@@ -175,7 +175,7 @@ class ClassScheduleController extends Controller
         );
         $section->loadMissing(['flSchoolYear', 'classroom:id,name,code']);
         $adviserName = $this->advisoryScope
-            ->adviserNamesBySection((int) $term->id, [$section->id])
+            ->sectionAdviserNamesBySection((int) $term->id, [$section->id])
             ->get((int) $section->id);
 
         return $this->renderPrintSchedule(
@@ -563,7 +563,7 @@ class ClassScheduleController extends Controller
                 ->orderBy('sectionname')
                 ->get();
 
-            $adviserNames = $this->advisoryScope->adviserNamesBySection(
+            $adviserNames = $this->advisoryScope->sectionAdviserNamesBySection(
                 (int) $term->id,
                 $sections->pluck('id'),
             );
@@ -734,7 +734,7 @@ class ClassScheduleController extends Controller
             ->get(array_merge(['id', 'sectionname', 'levelid'], $lunchOverrideColumns, $recessOverrideColumns, $whiteSpaceOverrideColumns, $wellnessOverrideColumns));
 
         $adviserNames = $termId
-            ? $this->advisoryScope->adviserNamesBySection((int) $termId, $sections->pluck('id'))
+            ? $this->advisoryScope->sectionAdviserNamesBySection((int) $termId, $sections->pluck('id'))
             : collect();
         $sections->each(fn (Section $section) => $section->setAttribute(
             'adviser_name',

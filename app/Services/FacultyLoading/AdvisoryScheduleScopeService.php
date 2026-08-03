@@ -109,6 +109,56 @@ class AdvisoryScheduleScopeService
     }
 
     /**
+     * @return Collection<int, string> Adviser names keyed by section ID —
+     * SECTION-SPECIFIC ONLY, unlike adviserNamesBySection(). Deliberately
+     * does NOT fold in gradeWideCoordinatorAssignments(): that "coordinator
+     * wins" behavior is correct for the WAT print signatory (captioned
+     * "Homeroom Coordinator"), but wrong for the Class Schedule calendar/
+     * print, which labels this plain "Adviser" — the specific HR_ADV/HR_ACAD
+     * designee who actually runs that one section's homeroom period, not
+     * the grade-wide oversight role. Use this method for Class Schedule;
+     * keep using adviserNamesBySection() for WAT.
+     */
+    public function sectionAdviserNamesBySection(int $academicTermId, array|Collection $sectionIds): Collection
+    {
+        $sectionIds = collect($sectionIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($sectionIds->isEmpty()) {
+            return collect();
+        }
+
+        return LoadAssignment::with(['faculty:id,name', 'designation.category'])
+            ->where('academic_term_id', $academicTermId)
+            ->whereNotNull('designation_id')
+            ->whereHas('designation', fn ($query) => $query
+                ->where('is_active', true)
+                ->where(function ($sectionQuery) use ($sectionIds) {
+                    $sectionQuery->whereIn('section_id', $sectionIds)
+                        ->orWhereNull('section_id');
+                })
+                ->whereHas('category', fn ($categoryQuery) => $categoryQuery
+                    ->whereIn('code', ['HR_ADV', 'HR_ACAD'])))
+            ->where(function ($query) use ($sectionIds) {
+                $query->whereIn('section_id', $sectionIds)
+                    ->orWhereHas('designation', fn ($designationQuery) => $designationQuery
+                        ->whereIn('section_id', $sectionIds));
+            })
+            ->orderBy('id')
+            ->get()
+            ->mapWithKeys(function (LoadAssignment $assignment) {
+                $sectionId = $assignment->designation?->section_id ?? $assignment->section_id;
+
+                return $sectionId && $assignment->faculty
+                    ? [(int) $sectionId => $assignment->faculty->name]
+                    : [];
+            });
+    }
+
+    /**
      * Grade-wide COORD-* coordinator assignments applicable to the given
      * sections, keyed by section ID — e.g. a single "COORD-HRG7&8" holder
      * covers every G7 and G8 section with ONE designation, instead of one
