@@ -10,10 +10,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetHomeroomAttendanceSummaryTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetHomeroomAttendanceSummaryToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_aggregate_mode_returns_campus_wide_averages(): void
@@ -32,6 +34,19 @@ class GetHomeroomAttendanceSummaryToolTest extends TestCase
 
         $this->assertEquals(1, $result['perfect_attendance_count']);
         $this->assertEquals(1.0, $result['average_cutting_count']);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        $report = MonthlyReport::create(['section_id' => 1, 'school_year_id' => $schoolYear->id, 'month' => 7, 'year' => 2026]);
+        MonthlyReportLine::create(['homeroom_monthly_report_id' => $report->id, 'student_id' => 1, 'cutting_count' => 2, 'is_perfect_attendance' => false, 'excused_absences' => 1, 'unexcused_absences' => 1]);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'homeroom-attendance.admin']);
+
+        $result = (new GetHomeroomAttendanceSummaryTool())->execute($user, []);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 
     private function userWithPermissions(array $permissionNames): User

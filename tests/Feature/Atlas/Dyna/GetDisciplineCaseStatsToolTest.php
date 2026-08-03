@@ -8,10 +8,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetDisciplineCaseStatsTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetDisciplineCaseStatsToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_aggregate_mode_returns_counts_by_status(): void
@@ -51,6 +53,23 @@ class GetDisciplineCaseStatsToolTest extends TestCase
 
         $this->assertCount(1, $result['cases']);
         $this->assertEquals('Tardiness', $result['cases'][0]['nature_of_offense']);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $lastname = 'DisciplineLeafCheck'.uniqid();
+        $studentId = \DB::table('students')->insertGetId([
+            'lastname' => $lastname, 'firstname' => 'Test',
+        ]);
+
+        $filer = User::factory()->create();
+        DisciplineCase::create(['case_no' => 'DISC-2026-07-'.uniqid(), 'student_id' => $studentId, 'filer_id' => $filer->id, 'status' => 'resolved', 'threat_level' => 'low', 'nature_of_offense' => 'Tardiness', 'incident_date' => '2026-07-01', 'school_year_id' => 1]);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'discipline.view']);
+
+        $result = (new GetDisciplineCaseStatsTool())->execute($user, ['student_identifier' => $lastname]);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 
     private function userWithPermissions(array $permissionNames): User

@@ -8,10 +8,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetEmployeeInfoTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetEmployeeInfoToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_employee_profile_for_a_user_in_the_requesters_division(): void
@@ -56,5 +58,28 @@ class GetEmployeeInfoToolTest extends TestCase
 
         $this->assertArrayHasKey('note', $result);
         $this->assertEmpty($result['employee'] ?? null);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $division = Division::factory()->create();
+        $employee = User::factory()->create([
+            'name' => 'Leaf Check Employee', 'division_id' => $division->id, 'position' => 'Teacher III',
+            'salary_grade' => 15, 'salary_step' => 3, 'status' => 'active',
+        ]);
+
+        $chief = User::factory()->create(['division_id' => $division->id]);
+        $division->update(['division_chief_id' => $chief->id]);
+        $chief->roles()->attach(Role::firstOrCreate(['name' => 'DivisionChief']));
+        $chief->roles()->first()->permissions()->attach(
+            Permission::firstOrCreate(['name' => 'hr.employees.manage'], ['module' => 'HR', 'description' => 'x'])
+        );
+        $chief->roles()->first()->permissions()->attach(
+            Permission::firstOrCreate(['name' => 'atlas.dyna.access'], ['module' => 'Atlas', 'description' => 'x'])
+        );
+
+        $result = (new GetEmployeeInfoTool())->execute($chief, ['identifier' => 'Leaf Check Employee']);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 }

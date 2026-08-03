@@ -10,10 +10,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetFacultyLoadDistributionTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetFacultyLoadDistributionToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_load_status_distribution_scoped_to_division_chiefs_division(): void
@@ -42,5 +44,24 @@ class GetFacultyLoadDistributionToolTest extends TestCase
         $result = (new GetFacultyLoadDistributionTool())->execute($chief, []);
 
         $this->assertEquals(['overload' => 1, 'full_load' => 1], $result);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $division = Division::factory()->create();
+        $faculty = User::factory()->create(['division_id' => $division->id]);
+
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        $term = AcademicTerm::create(['school_year_id' => $schoolYear->id, 'name' => '1st Semester']);
+
+        FacultyLoad::create(['user_id' => $faculty->id, 'school_year_id' => $schoolYear->id, 'academic_term_id' => $term->id, 'load_status' => 'overload', 'total_units' => 20]);
+
+        $chief = User::factory()->create(['division_id' => $division->id]);
+        $division->update(['division_chief_id' => $chief->id]);
+        $chief->roles()->attach(Role::firstOrCreate(['name' => 'DivisionChief']));
+
+        $result = (new GetFacultyLoadDistributionTool())->execute($chief, []);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 }

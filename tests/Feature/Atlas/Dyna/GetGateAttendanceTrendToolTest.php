@@ -6,10 +6,12 @@ use App\Models\StudentAttendance\StudentAttendanceLog;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetGateAttendanceTrendTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetGateAttendanceTrendToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_scan_counts_by_day_within_the_given_range(): void
@@ -27,5 +29,18 @@ class GetGateAttendanceTrendToolTest extends TestCase
         ]);
 
         $this->assertEquals(['2026-07-27' => 2, '2026-07-28' => 1], $result);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        StudentAttendanceLog::create(['student_id' => 1, 'raw_barcode' => 'BC1', 'type' => 'in', 'scan_time' => '2026-07-27 07:00:00']);
+
+        $user = User::factory()->create();
+
+        $result = (new GetGateAttendanceTrendTool())->execute($user, [
+            'from_date' => '2026-07-27', 'to_date' => '2026-07-28',
+        ]);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 }

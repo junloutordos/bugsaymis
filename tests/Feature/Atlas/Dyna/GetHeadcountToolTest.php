@@ -7,10 +7,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetHeadcountTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetHeadcountToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_administrator_sees_campus_wide_headcount(): void
@@ -37,6 +39,17 @@ class GetHeadcountToolTest extends TestCase
         $result = (new GetHeadcountTool())->execute($chief, []);
 
         $this->assertEquals(3, $result['total_headcount']); // 2 in division A + the chief themself
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $division = Division::factory()->create();
+        User::factory()->count(2)->create(['division_id' => $division->id, 'status' => 'active']);
+        $administrator = $this->userWithRole('Administrator');
+
+        $result = (new GetHeadcountTool())->execute($administrator, []);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 
     private function userWithRole(string $roleName, array $attributes = []): User

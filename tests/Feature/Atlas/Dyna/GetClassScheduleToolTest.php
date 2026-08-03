@@ -12,10 +12,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetClassScheduleTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetClassScheduleToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_a_faculty_members_active_schedule_for_the_current_term(): void
@@ -59,6 +61,34 @@ class GetClassScheduleToolTest extends TestCase
         $this->assertEquals('Physics', $result['schedule'][0]['subject']);
         $this->assertEquals('Monday', $result['schedule'][0]['day']);
         $this->assertEquals('Newton', $result['schedule'][0]['section']);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        $term = AcademicTerm::create(['school_year_id' => $schoolYear->id, 'name' => 'Q1', 'is_current' => true]);
+        $subject = Subject::create(['name' => 'Physics', 'code' => 'PHYS1', 'grade_level' => 8, 'school_year_id' => $schoolYear->id]);
+        $section = Section::create(['sectionname' => 'Newton', 'levelid' => 8]);
+        $faculty = User::factory()->create(['name' => 'Maria Santos']);
+
+        ClassSchedule::create([
+            'user_id' => $faculty->id,
+            'subject_id' => $subject->id,
+            'section_id' => $section->id,
+            'classroom_id' => null,
+            'school_year_id' => $schoolYear->id,
+            'academic_term_id' => $term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '08:00:00',
+            'end_time' => '09:00:00',
+            'status' => 'active',
+        ]);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'faculty_loading.view']);
+
+        $result = (new GetClassScheduleTool())->execute($user, ['faculty_identifier' => 'Maria Santos']);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 
     private function userWithPermissions(array $permissionNames): User

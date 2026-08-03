@@ -7,10 +7,12 @@ use App\Models\Registrar\StudentEnrollment;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetEnrollmentStatusBreakdownTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetEnrollmentStatusBreakdownToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_enrollment_status_counts(): void
@@ -30,5 +32,17 @@ class GetEnrollmentStatusBreakdownToolTest extends TestCase
         $result = (new GetEnrollmentStatusBreakdownTool())->execute($user, []);
 
         $this->assertEquals(['enrolled' => 2, 'transferred_out' => 1], $result);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        StudentEnrollment::create(['student_id' => 1, 'school_year_id' => $schoolYear->id, 'section_id' => 1, 'grade_level' => 7, 'status' => 'enrolled', 'enrollment_date' => now()]);
+
+        $user = User::factory()->create();
+
+        $result = (new GetEnrollmentStatusBreakdownTool())->execute($user, []);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 }

@@ -9,10 +9,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetStudentInfoTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetStudentInfoToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_enrollment_and_attendance_summary_without_discipline_access(): void
@@ -36,6 +38,21 @@ class GetStudentInfoToolTest extends TestCase
         $this->assertEquals('enrolled', $result['enrollment_status']);
         $this->assertEquals(9, $result['grade_level']);
         $this->assertArrayNotHasKey('discipline_cases', $result);
+    }
+
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $lastname = 'StudentInfoLeafCheck'.uniqid();
+        $studentId = \DB::table('students')->insertGetId(['lastname' => $lastname, 'firstname' => 'Test']);
+
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        StudentEnrollment::create(['student_id' => $studentId, 'school_year_id' => $schoolYear->id, 'section_id' => 1, 'grade_level' => 9, 'status' => 'enrolled', 'enrollment_date' => now()]);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view']);
+
+        $result = (new GetStudentInfoTool())->execute($user, ['identifier' => $lastname]);
+
+        $this->assertNoNonScalarLeaves($result);
     }
 
     private function userWithPermissions(array $permissionNames): User
