@@ -40,6 +40,9 @@ use App\Services\Atlas\Dyna\Tools\GetDisciplineCaseStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetHomeroomAttendanceSummaryTool;
 use App\Services\Atlas\Dyna\Tools\GetEmployeeInfoTool;
 use App\Services\Atlas\Dyna\Tools\GetStudentInfoTool;
+use App\Services\Atlas\Dyna\Tools\GetClassScheduleTool;
+use App\Services\Atlas\Dyna\Tools\GetEmployeeFullProfileTool;
+use App\Services\Atlas\Dyna\Tools\GetStudentFullProfileTool;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
@@ -86,6 +89,9 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(GetHomeroomAttendanceSummaryTool::class),
                 $app->make(GetEmployeeInfoTool::class),
                 $app->make(GetStudentInfoTool::class),
+                $app->make(GetClassScheduleTool::class),
+                $app->make(GetEmployeeFullProfileTool::class),
+                $app->make(GetStudentFullProfileTool::class),
             ]);
         });
     }

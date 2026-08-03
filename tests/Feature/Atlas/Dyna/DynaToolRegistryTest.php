@@ -43,4 +43,16 @@ class DynaToolRegistryTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $registry->execute('does_not_exist', [], User::factory()->make());
     }
+
+    public function test_registry_includes_the_new_full_profile_and_schedule_tools(): void
+    {
+        $registry = app(DynaToolRegistry::class);
+        $config = $registry->toBedrockToolConfig();
+        $names = collect($config['tools'])->pluck('toolSpec.name')->all();
+
+        $this->assertContains('get_class_schedule', $names);
+        $this->assertContains('get_employee_full_profile', $names);
+        $this->assertContains('get_student_full_profile', $names);
+        $this->assertCount(25, $names);
+    }
 }
