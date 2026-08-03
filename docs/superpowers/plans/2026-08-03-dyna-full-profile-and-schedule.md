@@ -540,7 +540,7 @@ class GetStudentFullProfileToolTest extends TestCase
 
         $user = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view']);
 
-        $result = (new GetStudentFullProfileTool())->execute($user, ['identifier' => $lastname]);
+        $result = app(GetStudentFullProfileTool::class)->execute($user, ['identifier' => $lastname]);
 
         $this->assertCount(1, $result['enrollment_history']);
         $this->assertEquals(8, $result['enrollment_history'][0]['grade_level']);
