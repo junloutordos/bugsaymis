@@ -180,6 +180,13 @@ class GetClassScheduleTool implements DynaTool
 
             $query->forFaculty($faculty->id);
         } elseif (! empty($input['student_identifier'])) {
+            // A student's schedule is never "your own" for a Dyna user (Dyna users are
+            // staff/faculty, not students) — view_own only covers self-lookups in the
+            // faculty branch above, so this always needs the broader view permission.
+            if (! $user->hasPermission('faculty_loading.view')) {
+                throw new \RuntimeException('This account can only view its own schedule.');
+            }
+
             $student = \DB::table('students')
                 ->where('lastname', 'like', '%'.$input['student_identifier'].'%')
                 ->orWhere('firstname', 'like', '%'.$input['student_identifier'].'%')
