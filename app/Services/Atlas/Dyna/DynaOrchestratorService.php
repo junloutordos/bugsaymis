@@ -40,12 +40,16 @@ class DynaOrchestratorService
             'created_at' => now(),
         ]);
 
+        // SYSTEM_PROMPT is a compile-time const, so today's date — needed to resolve
+        // relative-date questions ("today", "this week") into a tool's from_date/to_date —
+        // has to be appended here at request time instead.
+        $systemPrompt = self::SYSTEM_PROMPT."\n\nToday's date is ".now()->toDateString().'.';
         $toolCallLog = [];
 
         for ($turn = 0; $turn < self::MAX_TOOL_TURNS; $turn++) {
             $result = $client->converse([
                 'modelId' => config('services.bedrock.inference_profile_id'),
-                'system' => [['text' => self::SYSTEM_PROMPT]],
+                'system' => [['text' => $systemPrompt]],
                 'messages' => $messages,
                 'toolConfig' => $this->tools->toBedrockToolConfig(),
                 'inferenceConfig' => ['maxTokens' => 2048],

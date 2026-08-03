@@ -205,4 +205,36 @@ class DynaOrchestratorServiceTest extends TestCase
 
         $this->assertEquals('{}', json_encode($replayedInput));
     }
+
+    public function test_reply_includes_todays_date_in_the_system_prompt(): void
+    {
+        $user = User::factory()->create();
+        $conversation = DynaConversation::create(['user_id' => $user->id]);
+        $registry = new DynaToolRegistry([]);
+
+        $capturedArgs = null;
+
+        $bedrock = Mockery::mock(BedrockRuntimeClient::class);
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->andReturnUsing(function (array $args) use (&$capturedArgs) {
+                $capturedArgs = $args;
+
+                return new Result([
+                    'output' => ['message' => ['role' => 'assistant', 'content' => [
+                        ['text' => 'Sure, one moment.'],
+                    ]]],
+                    'stopReason' => 'end_turn',
+                ]);
+            });
+
+        $clientFactory = Mockery::mock(DynaBedrockClientFactory::class);
+        $clientFactory->shouldReceive('make')->andReturn($bedrock);
+
+        $orchestrator = new DynaOrchestratorService($registry, $clientFactory);
+
+        $orchestrator->reply($user, $conversation, 'How many gate scans today?');
+
+        $this->assertStringContainsString(now()->toDateString(), $capturedArgs['system'][0]['text']);
+    }
 }
