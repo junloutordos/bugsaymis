@@ -8,6 +8,7 @@ use App\Http\Controllers\ComputerLabScheduleApprovalController;
 use App\Http\Controllers\HR\EmployeeDocumentController;
 use App\Http\Controllers\ApprovalInboxController;
 use App\Http\Controllers\AtlasGoDownloadController;
+use App\Http\Controllers\DynaDownloadController;
 
 // ECS container health check — no auth, no session
 Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('health');
@@ -18,6 +19,10 @@ Route::get('/developer', fn () => inertia('Developer'))->name('developer');
 
 // AtlasGo mobile app — public direct-download (sideload) while Play Store listing is pending
 Route::get('/downloads/atlasgo', [AtlasGoDownloadController::class, 'download'])->name('atlasgo.download');
+
+// Dyna macOS app — Sparkle auto-update feed + signed release DMG download, both public/no-auth
+Route::get('/downloads/dyna/appcast.xml', [DynaDownloadController::class, 'appcast'])->name('dyna.appcast');
+Route::get('/downloads/dyna/download/{filename}', [DynaDownloadController::class, 'download'])->name('dyna.download');
 
 // Data Privacy Policy — public, no auth (required by app store listings)
 Route::get('/privacy-policy', fn () => inertia('Privacy/Public'))->name('privacy.public');
