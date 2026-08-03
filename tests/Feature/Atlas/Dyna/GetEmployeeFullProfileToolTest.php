@@ -151,9 +151,14 @@ class GetEmployeeFullProfileToolTest extends TestCase
         $this->assertArrayNotHasKey('gate_pass_recent', $withoutGatePass);
     }
 
-    public function test_returns_request_history_and_document_tracking_for_any_hr_permitted_caller(): void
+    public function test_returns_request_history_and_document_tracking_only_to_self_no_cross_employee_permission_exists(): void
     {
+        $role = Role::create(['name' => 'Dyna Test '.uniqid()]);
+        $permission = Permission::firstOrCreate(['name' => 'hr.employees.manage'], ['module' => 'Atlas', 'description' => 'hr.employees.manage']);
+        $role->permissions()->attach($permission);
         $employee = User::factory()->create(['name' => 'Elmer Cruz']);
+        $employee->roles()->attach($role);
+
         $divisionChief = User::factory()->create();
         ITJobRequest::create([
             'itjr_no' => '2026-08-0001',
@@ -173,14 +178,18 @@ class GetEmployeeFullProfileToolTest extends TestCase
             'current_holder_id' => $employee->id,
         ]);
 
-        $user = $this->userWithPermissions(['atlas.dyna.access', 'hr.employees.manage']);
+        $otherHrUser = $this->userWithPermissions(['atlas.dyna.access', 'hr.employees.manage']);
 
-        $result = (new GetEmployeeFullProfileTool())->execute($user, ['identifier' => 'Elmer Cruz']);
+        $selfResult = (new GetEmployeeFullProfileTool())->execute($employee, ['identifier' => 'Elmer Cruz']);
+        $otherResult = (new GetEmployeeFullProfileTool())->execute($otherHrUser, ['identifier' => 'Elmer Cruz']);
 
-        $this->assertCount(1, $result['requests_recent']);
-        $this->assertEquals('Laptop not booting', $result['requests_recent'][0]['title']);
-        $this->assertCount(1, $result['documents_with_employee']);
-        $this->assertEquals('Budget Request', $result['documents_with_employee'][0]['subject']);
+        $this->assertCount(1, $selfResult['requests_recent']);
+        $this->assertEquals('Laptop not booting', $selfResult['requests_recent'][0]['title']);
+        $this->assertCount(1, $selfResult['documents_with_employee']);
+        $this->assertEquals('Budget Request', $selfResult['documents_with_employee'][0]['subject']);
+
+        $this->assertArrayNotHasKey('requests_recent', $otherResult);
+        $this->assertArrayNotHasKey('documents_with_employee', $otherResult);
     }
 
     private function userWithPermissions(array $permissionNames): User

@@ -186,19 +186,24 @@ class GetEmployeeFullProfileTool implements DynaTool
             }
         }
 
-        $profile['requests_recent'] = collect()
-            ->merge(ITJobRequest::where('user_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (ITJobRequest $r) => ['type' => 'IT Job Request', 'title' => $r->title, 'status' => $r->status]))
-            ->merge(FacilityRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (FacilityRequest $r) => ['type' => 'Facility Request', 'title' => $r->activity, 'status' => $r->status]))
-            ->merge(VehicleRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (VehicleRequest $r) => ['type' => 'Vehicle Request', 'title' => $r->purpose, 'status' => $r->status]))
-            ->merge(ServiceRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (ServiceRequest $r) => ['type' => 'Service Request', 'title' => $r->service_type, 'status' => $r->status]))
-            ->values()->toArray();
+        // No dedicated "view all employees' requests/documents" permission exists in the
+        // seeded permission set — restrict to self rather than inventing one, matching the
+        // isSelf-only fallback used elsewhere in this method when no broader grant applies.
+        if ($isSelf) {
+            $profile['requests_recent'] = collect()
+                ->merge(ITJobRequest::where('user_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (ITJobRequest $r) => ['type' => 'IT Job Request', 'title' => $r->title, 'status' => $r->status]))
+                ->merge(FacilityRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (FacilityRequest $r) => ['type' => 'Facility Request', 'title' => $r->activity, 'status' => $r->status]))
+                ->merge(VehicleRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (VehicleRequest $r) => ['type' => 'Vehicle Request', 'title' => $r->purpose, 'status' => $r->status]))
+                ->merge(ServiceRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (ServiceRequest $r) => ['type' => 'Service Request', 'title' => $r->service_type, 'status' => $r->status]))
+                ->values()->toArray();
 
-        $profile['documents_with_employee'] = Document::where('current_holder_id', $employee->id)
-            ->orWhere('created_by', $employee->id)
-            ->latest('id')->limit(10)
-            ->get(['tracking_no', 'subject', 'overall_status', 'created_by', 'current_holder_id'])
-            ->map(fn (Document $d) => ['tracking_no' => $d->tracking_no, 'subject' => $d->subject, 'status' => $d->overall_status, 'role' => $d->created_by === $employee->id ? 'filed_by' : 'current_holder'])
-            ->toArray();
+            $profile['documents_with_employee'] = Document::where('current_holder_id', $employee->id)
+                ->orWhere('created_by', $employee->id)
+                ->latest('id')->limit(10)
+                ->get(['tracking_no', 'subject', 'overall_status', 'created_by', 'current_holder_id'])
+                ->map(fn (Document $d) => ['tracking_no' => $d->tracking_no, 'subject' => $d->subject, 'status' => $d->overall_status, 'role' => $d->created_by === $employee->id ? 'filed_by' : 'current_holder'])
+                ->toArray();
+        }
 
         if ($user->hasPermission('recruitment.view')) {
             $applicant = Applicant::where('email', $employee->email)->first();

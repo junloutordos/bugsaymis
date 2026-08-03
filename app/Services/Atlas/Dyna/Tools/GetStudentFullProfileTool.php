@@ -66,8 +66,15 @@ class GetStudentFullProfileTool implements DynaTool
         $profile = [
             'enrollment_history' => StudentEnrollment::where('student_id', $student->id)->orderByDesc('school_year_id')->get()
                 ->map(fn (StudentEnrollment $e) => ['school_year_id' => $e->school_year_id, 'grade_level' => $e->grade_level, 'status' => $e->status])->values()->toArray(),
-            'personal_info' => [
-                'name' => trim("{$student->firstname} {$student->middlename} {$student->lastname}"),
+            'personal_info' => ['name' => trim("{$student->firstname} {$student->middlename} {$student->lastname}")],
+        ];
+
+        // Birthdate/address/contact/LRN are direct identifiers for a minor — reuse
+        // students.records.export (already trusted with the same PII via COE/Good
+        // Moral/Clearance PDFs) rather than gating on the base students.enrollment.view
+        // required just to run this tool at all.
+        if ($user->hasPermission('students.records.export')) {
+            $profile['personal_info'] += [
                 'birthday' => $student->birthday,
                 'sex' => $student->sex,
                 'blood_type' => $student->bloodtype,
@@ -75,8 +82,8 @@ class GetStudentFullProfileTool implements DynaTool
                 'lrn' => $student->lrn,
                 'dormer' => $student->dormer,
                 'address' => implode(', ', array_filter([$student->houseno, $student->barangay, $student->municipal, $student->province])),
-            ],
-        ];
+            ];
+        }
 
         $section = (new StudentSectionResolver())->latestForStudent($student->id);
         if ($section) {

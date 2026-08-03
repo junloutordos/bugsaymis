@@ -38,10 +38,10 @@ class GetStudentFullProfileToolTest extends TestCase
         $this->assertArrayNotHasKey('discipline', $result);
     }
 
-    public function test_returns_personal_and_contact_details_unconditionally(): void
+    public function test_returns_only_name_by_default_and_full_pii_when_records_export_permitted(): void
     {
         $lastname = 'PersonalInfoLookup'.uniqid();
-        $studentId = \DB::table('students')->insertGetId([
+        \DB::table('students')->insertGetId([
             'lastname' => $lastname,
             'firstname' => 'Test',
             'birthday' => '2010-03-15',
@@ -53,14 +53,20 @@ class GetStudentFullProfileToolTest extends TestCase
             'lrn' => '123456789012',
         ]);
 
-        $user = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view']);
+        $restrictedUser = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view']);
+        $exportUser = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view', 'students.records.export']);
 
-        $result = app(GetStudentFullProfileTool::class)->execute($user, ['identifier' => $lastname]);
+        $restricted = app(GetStudentFullProfileTool::class)->execute($restrictedUser, ['identifier' => $lastname]);
+        $full = app(GetStudentFullProfileTool::class)->execute($exportUser, ['identifier' => $lastname]);
 
-        $this->assertEquals('2010-03-15', $result['personal_info']['birthday']);
-        $this->assertEquals('Female', $result['personal_info']['sex']);
-        $this->assertEquals('O+', $result['personal_info']['blood_type']);
-        $this->assertEquals('123456789012', $result['personal_info']['lrn']);
+        $this->assertEquals('Test  '.$lastname, $restricted['personal_info']['name']);
+        $this->assertArrayNotHasKey('birthday', $restricted['personal_info']);
+        $this->assertArrayNotHasKey('address', $restricted['personal_info']);
+
+        $this->assertEquals('2010-03-15', $full['personal_info']['birthday']);
+        $this->assertEquals('Female', $full['personal_info']['sex']);
+        $this->assertEquals('O+', $full['personal_info']['blood_type']);
+        $this->assertEquals('123456789012', $full['personal_info']['lrn']);
     }
 
     public function test_returns_health_records_when_permitted_and_omits_when_not(): void
