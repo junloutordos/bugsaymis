@@ -5,15 +5,23 @@ namespace Tests\Feature\Atlas\Dyna;
 use App\Models\Division;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Atlas\Dyna\Tools\GetAcademicsStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetAttentionItemsTool;
 use App\Services\Atlas\Dyna\Tools\GetDivisionScorecardTool;
+use App\Services\Atlas\Dyna\Tools\GetFinanceStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetOperationsStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetPerformanceStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetRecruitmentStatsTool;
+use App\Services\Atlas\Dyna\Tools\GetRequestsStatsTool;
 use App\Services\Atlas\Dyna\Tools\GetSatisfactionStatsTool;
+use App\Services\ExecutiveDashboardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class ExecutiveDashboardAdapterToolsTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_get_performance_stats_returns_only_the_performance_section(): void
@@ -67,6 +75,29 @@ class ExecutiveDashboardAdapterToolsTest extends TestCase
         // ExecutiveDashboardService::build() sets 'scorecard' => null whenever $divisionId is
         // non-null; the tool interface requires an array return, so this becomes a note instead.
         $this->assertArrayHasKey('note', $result);
+    }
+
+    public function test_all_dashboard_adapter_results_contain_no_non_scalar_leaked_date_objects(): void
+    {
+        $administrator = $this->userWithRole('Administrator');
+        $dashboard = app(ExecutiveDashboardService::class);
+
+        $tools = [
+            new GetPerformanceStatsTool($dashboard),
+            new GetRequestsStatsTool($dashboard),
+            new GetSatisfactionStatsTool($dashboard),
+            new GetAcademicsStatsTool($dashboard),
+            new GetRecruitmentStatsTool($dashboard),
+            new GetFinanceStatsTool($dashboard),
+            new GetOperationsStatsTool($dashboard),
+            new GetAttentionItemsTool($dashboard),
+            new GetDivisionScorecardTool($dashboard),
+        ];
+
+        foreach ($tools as $tool) {
+            $result = $tool->execute($administrator, []);
+            $this->assertNoNonScalarLeaves($result, get_class($tool));
+        }
     }
 
     private function userWithRole(string $roleName): User
