@@ -83,13 +83,13 @@ class GetEmployeeFullProfileTool implements DynaTool
                     ->map(fn (LeaveCredit $c) => ['type' => $c->leaveType?->name, 'balance' => $c->balance])->values()->toArray(),
                 'recent_applications' => LeaveApplication::with('leaveType')->where('user_id', $employee->id)
                     ->latest('date_from')->limit(5)->get()
-                    ->map(fn (LeaveApplication $a) => ['type' => $a->leaveType?->name, 'from' => $a->date_from, 'to' => $a->date_to, 'status' => $a->status])->values()->toArray(),
+                    ->map(fn (LeaveApplication $a) => ['type' => $a->leaveType?->name, 'from' => $a->date_from?->format('Y-m-d'), 'to' => $a->date_to?->format('Y-m-d'), 'status' => $a->status])->values()->toArray(),
             ];
         }
 
         if ($user->hasPermission('hr.dtr.view') || $isSelf) {
             $profile['dtr_recent'] = DtrRecord::where('user_id', $employee->id)->orderByDesc('work_date')->limit(10)->get()
-                ->map(fn (DtrRecord $d) => ['date' => $d->work_date, 'status' => $d->attendance_status, 'hours' => $d->hours_worked])->values()->toArray();
+                ->map(fn (DtrRecord $d) => ['date' => $d->work_date?->format('Y-m-d'), 'status' => $d->attendance_status, 'hours' => $d->hours_worked])->values()->toArray();
         }
 
         $pds = Pds::where('user_id', $employee->id)->first();
@@ -141,7 +141,7 @@ class GetEmployeeFullProfileTool implements DynaTool
 
         if ($user->hasPermission('saln.view_all') || $isSelf) {
             $profile['saln'] = SalnRecord::where('user_id', $employee->id)->orderByDesc('year')->limit(3)->get()
-                ->map(fn (SalnRecord $s) => ['year' => $s->year, 'status' => $s->status, 'filed_at' => $s->filed_at])->values()->toArray();
+                ->map(fn (SalnRecord $s) => ['year' => $s->year, 'status' => $s->status, 'filed_at' => $s->filed_at?->toDateTimeString()])->values()->toArray();
         }
 
         if ($user->hasPermission('ipcr.view') || $isSelf) {
@@ -215,7 +215,7 @@ class GetEmployeeFullProfileTool implements DynaTool
 
         if ($user->hasPermission('wfh.view') || $isSelf) {
             $profile['wfh_recent'] = WFHAttendance::where('user_id', $employee->id)->orderByDesc('date')->limit(5)->get()
-                ->map(fn (WFHAttendance $w) => ['date' => $w->date, 'time_in' => $w->time_in, 'time_out' => $w->time_out])->values()->toArray();
+                ->map(fn (WFHAttendance $w) => ['date' => $w->date?->format('Y-m-d'), 'time_in' => $w->time_in?->format('H:i'), 'time_out' => $w->time_out?->format('H:i')])->values()->toArray();
         }
 
         return $profile;

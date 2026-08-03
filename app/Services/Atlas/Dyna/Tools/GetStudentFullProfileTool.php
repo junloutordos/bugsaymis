@@ -110,7 +110,7 @@ class GetStudentFullProfileTool implements DynaTool
         if ($user->hasPermission('homeroom-attendance.admin')) {
             $profile['attendance_homeroom'] = AttendanceRecord::with('attendanceDate')->where('student_id', $student->id)
                 ->latest('id')->limit(10)->get()
-                ->map(fn (AttendanceRecord $r) => ['date' => $r->attendanceDate?->date, 'status' => $r->status])->values()->toArray();
+                ->map(fn (AttendanceRecord $r) => ['date' => $r->attendanceDate?->date?->format('Y-m-d'), 'status' => $r->status])->values()->toArray();
         }
 
         if ($user->hasPermission('students.attendance.view')) {
@@ -162,8 +162,8 @@ class GetStudentFullProfileTool implements DynaTool
                     'room_number' => $intern->room?->room_number,
                     'bed_number' => $intern->bed_number,
                     'status' => $intern->status,
-                    'check_in_date' => $intern->check_in_date,
-                    'check_out_date' => $intern->check_out_date,
+                    'check_in_date' => $intern->check_in_date?->format('Y-m-d'),
+                    'check_out_date' => $intern->check_out_date?->format('Y-m-d'),
                 ];
             }
         }

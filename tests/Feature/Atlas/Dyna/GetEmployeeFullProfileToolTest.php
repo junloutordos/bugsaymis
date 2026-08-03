@@ -4,6 +4,8 @@ namespace Tests\Feature\Atlas\Dyna;
 
 use App\Models\FacultyLoading\FacultyCommitteeAccomplishment;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
+use App\Models\HR\DtrRecord;
+use App\Models\HR\LeaveApplication;
 use App\Models\HR\LeaveCredit;
 use App\Models\HR\LeaveType;
 use App\Models\ITJobRequest;
@@ -17,7 +19,9 @@ use App\Models\PDSVoluntaryWork;
 use App\Models\PDSWorkExperience;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\SALN\SalnRecord;
 use App\Models\User;
+use App\Models\WFHAttendance;
 use App\Services\Atlas\Dyna\Tools\GetEmployeeFullProfileTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -190,6 +194,50 @@ class GetEmployeeFullProfileToolTest extends TestCase
 
         $this->assertArrayNotHasKey('requests_recent', $otherResult);
         $this->assertArrayNotHasKey('documents_with_employee', $otherResult);
+    }
+
+    /**
+     * Regression guard for a real prod bug: several sections extracted a
+     * Carbon-cast date via raw property access inside ->map(), leaking a
+     * Carbon object into the tool's return array. Mocked-Bedrock tests never
+     * catch this — the real AWS SDK's Converse document-type validator does,
+     * rejecting the whole request with `[...][json] is not a valid document
+     * type`. Assert every leaf value is JSON-safe (scalar/null/array) so this
+     * class of bug can't silently reappear.
+     */
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $employee = User::factory()->create(['name' => 'Fiona Cruz']);
+        $leaveType = LeaveType::create(['code' => 'SL', 'name' => 'Sick Leave']);
+        LeaveApplication::create([
+            'user_id' => $employee->id, 'leave_type_id' => $leaveType->id,
+            'date_from' => '2026-08-01', 'date_to' => '2026-08-02', 'days_applied' => 2, 'status' => 'approved',
+        ]);
+        DtrRecord::create(['user_id' => $employee->id, 'work_date' => '2026-08-01', 'attendance_status' => 'Present']);
+        SalnRecord::create(['user_id' => $employee->id, 'year' => 2026, 'as_of_date' => '2026-06-30', 'status' => 'Filed', 'filed_at' => now()]);
+        WFHAttendance::create(['user_id' => $employee->id, 'date' => '2026-08-01', 'time_in' => now(), 'time_out' => now()]);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'hr.employees.manage', 'hr.leave.credits.view', 'hr.dtr.view', 'saln.view_all', 'wfh.view']);
+
+        $result = (new GetEmployeeFullProfileTool())->execute($user, ['identifier' => 'Fiona Cruz']);
+
+        $this->assertNoNonScalarLeaves($result);
+    }
+
+    private function assertNoNonScalarLeaves(mixed $value, string $path = 'result'): void
+    {
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $this->assertNoNonScalarLeaves($item, "{$path}.{$key}");
+            }
+
+            return;
+        }
+
+        $this->assertTrue(
+            is_scalar($value) || is_null($value),
+            "Expected a JSON-safe scalar at {$path}, got ".(is_object($value) ? get_class($value) : gettype($value))
+        );
     }
 
     private function userWithPermissions(array $permissionNames): User

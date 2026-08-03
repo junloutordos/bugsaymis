@@ -7,6 +7,8 @@ use App\Models\AMS\ActivityStudentAttendance;
 use App\Models\Consultation;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\GuidanceConsultation;
+use App\Models\HomeroomAttendance\AttendanceDate;
+use App\Models\HomeroomAttendance\AttendanceRecord;
 use App\Models\Permission;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\ResidenceHall\RhIntern;
@@ -148,6 +150,50 @@ class GetStudentFullProfileToolTest extends TestCase
         $this->assertEquals('Science Fair 2026', $result['ams_participation'][0]['activity_title']);
         $this->assertEquals('active', $result['residence_hall']['status']);
         $this->assertEquals('BRH', $result['residence_hall']['residence_hall']);
+    }
+
+    /**
+     * Regression guard for a real prod bug: attendance_homeroom and
+     * residence_hall extracted Carbon-cast dates via raw property access,
+     * leaking Carbon objects into the tool's return array. Mocked-Bedrock
+     * tests never catch this — only the real AWS SDK's Converse document-type
+     * validator does, rejecting the whole request. Assert every leaf value is
+     * JSON-safe so this class of bug can't silently reappear.
+     */
+    public function test_result_contains_no_non_scalar_leaked_date_objects(): void
+    {
+        $lastname = 'JsonSafeLookup'.uniqid();
+        $studentId = \DB::table('students')->insertGetId(['lastname' => $lastname, 'firstname' => 'Test']);
+
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        $taker = User::factory()->create();
+        $attendanceDate = AttendanceDate::create(['section_id' => 1, 'school_year_id' => $schoolYear->id, 'date' => '2026-08-01', 'taken_by' => $taker->id]);
+        AttendanceRecord::create(['homeroom_attendance_date_id' => $attendanceDate->id, 'student_id' => $studentId, 'status' => 'present']);
+
+        $room = RhRoom::create(['residence_hall' => 'BRH', 'room_number' => '102']);
+        RhIntern::create(['student_id' => $studentId, 'school_year_id' => $schoolYear->id, 'rh_room_id' => $room->id, 'status' => 'active', 'check_in_date' => '2026-06-01']);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view', 'homeroom-attendance.admin', 'rh.interns.view']);
+
+        $result = app(GetStudentFullProfileTool::class)->execute($user, ['identifier' => $lastname]);
+
+        $this->assertNoNonScalarLeaves($result);
+    }
+
+    private function assertNoNonScalarLeaves(mixed $value, string $path = 'result'): void
+    {
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $this->assertNoNonScalarLeaves($item, "{$path}.{$key}");
+            }
+
+            return;
+        }
+
+        $this->assertTrue(
+            is_scalar($value) || is_null($value),
+            "Expected a JSON-safe scalar at {$path}, got ".(is_object($value) ? get_class($value) : gettype($value))
+        );
     }
 
     private function userWithPermissions(array $permissionNames): User
