@@ -122,15 +122,21 @@ Route::middleware(['web', 'auth', 'verified'])
             ->get('/schedules/print-batch', [ClassScheduleController::class, 'printBatchSchedules'])
             ->name('schedules.print-batch');
 
-        Route::middleware('permission:faculty_loading.manage')
+        // Read-only: faculty (view_own) may view the whole adjusted-day schedule,
+        // same as CID/managers. Mutating actions stay manage-only below.
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.view_own')
             ->prefix('schedules/day-adjustments')->name('schedules.day-adjustments.')->group(function () {
                 Route::get('/', [ClassScheduleDayAdjustmentController::class, 'index'])->name('index');
+                Route::get('/{adjustment}/print', [ClassScheduleDayAdjustmentController::class, 'print'])->name('print');
+            });
+
+        Route::middleware('permission:faculty_loading.manage')
+            ->prefix('schedules/day-adjustments')->name('schedules.day-adjustments.')->group(function () {
                 Route::get('/suggest', [ClassScheduleDayAdjustmentController::class, 'suggest'])->name('suggest');
                 Route::post('/', [ClassScheduleDayAdjustmentController::class, 'store'])->name('store');
                 Route::put('/{adjustment}', [ClassScheduleDayAdjustmentController::class, 'update'])->name('update');
                 Route::post('/{adjustment}/publish', [ClassScheduleDayAdjustmentController::class, 'publish'])->name('publish');
                 Route::post('/{adjustment}/cancel', [ClassScheduleDayAdjustmentController::class, 'cancel'])->name('cancel');
-                Route::get('/{adjustment}/print', [ClassScheduleDayAdjustmentController::class, 'print'])->name('print');
             });
 
         Route::middleware('permission:faculty_loading.manage')

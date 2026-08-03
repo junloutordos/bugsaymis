@@ -120,7 +120,7 @@ function durationClass(start, end) {
 }
 function entryTitle(entry) {
   if (entry.entry_type === 'non_teaching') return entry.title || 'Non-teaching'
-  return entry.subject?.code ?? entry.subject?.name ?? 'TBA'
+  return entry.subject?.name ?? entry.subject?.code ?? 'TBA'
 }
 function bandClass(type) {
   if (type === 'OFFICIAL_ACTIVITY') return 'official-activity'
@@ -196,7 +196,7 @@ html, body { margin: 0; padding: 0; background: #d1d5db; }
 .signatories { display: grid; grid-template-columns: 1fr 1fr; gap: 35mm; margin: 3mm 20mm 0; }
 .signatories > div { display: flex; min-height: 14mm; flex-direction: column; justify-content: flex-end; text-align: center; font-size: 6.5pt; }
 .signatories span { align-self: flex-start; color: #475569; }
-.signatories strong { border-bottom: .2mm solid #334155; padding-bottom: .6mm; font-size: 8pt; text-transform: uppercase; }
+.signatories strong { border-bottom: .2mm solid #334155; padding-bottom: .6mm; font-size: 8pt; }
 .signatories small { padding-top: .5mm; color: #475569; }
 .draft-watermark { position: absolute; z-index: 20; top: 77mm; left: 55mm; transform: rotate(-28deg); font-size: 38pt; font-weight: 800; letter-spacing: .12em; color: rgba(220, 38, 38, .13); pointer-events: none; }
 @page { size: A4 landscape; margin: 0; }

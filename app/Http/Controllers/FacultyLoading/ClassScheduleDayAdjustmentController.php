@@ -31,7 +31,7 @@ class ClassScheduleDayAdjustmentController extends Controller
 
     public function index(Request $request): Response
     {
-        $this->authorize('faculty_loading.manage');
+        abort_unless($request->user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.view_own']), 403);
 
         $termId = $request->integer('term_id') ?: AcademicTerm::where('is_current', true)->value('id');
         $term = $termId ? AcademicTerm::with('schoolYear')->findOrFail($termId) : null;
@@ -77,6 +77,7 @@ class ClassScheduleDayAdjustmentController extends Controller
             ] : null,
             'terms' => $terms,
             'adjustments' => $adjustments,
+            'canManage' => $request->user()->hasPermission('faculty_loading.manage'),
         ]);
     }
 
@@ -180,7 +181,7 @@ class ClassScheduleDayAdjustmentController extends Controller
 
     public function print(Request $request, ClassScheduleDayAdjustment $adjustment): Response
     {
-        $this->authorize('faculty_loading.manage');
+        abort_unless($request->user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.view_own']), 403);
         abort_if($adjustment->status === 'cancelled', 404);
 
         $adjustment->loadMissing([

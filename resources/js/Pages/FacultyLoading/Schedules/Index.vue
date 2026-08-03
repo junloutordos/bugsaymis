@@ -51,6 +51,11 @@
               <PaperAirplaneIcon class="h-4 w-4" /> Submit to OCD
             </AppButton>
           </template>
+          <!-- My Faculty Schedule is pinned to self-mode (isManage is always false here),
+               so this is the only entry point faculty have into the adjusted-day schedule. -->
+          <AppButton v-if="isMyPage" variant="secondary" as="link" :href="route('faculty-loading.schedules.day-adjustments.index')">
+            <CalendarDaysIcon class="h-4 w-4" /> Adjusted Day Schedules
+          </AppButton>
           <!-- Unit heads (AUH) plot/adjust classes for their own faculty. -->
           <AppButton v-if="isUnit && !isMyPage" :disabled="scheduleLocked" @click="openForm()">
             <PlusIcon class="h-4 w-4" /> Assign Schedule

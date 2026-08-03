@@ -10,7 +10,7 @@
           <AppButton variant="secondary" as="link" :href="route('faculty-loading.schedules.index', { term_id: term?.id })">
             <ArrowLeftIcon class="h-4 w-4" /> Regular Schedule
           </AppButton>
-          <AppButton :disabled="!term" @click="openCreate">
+          <AppButton v-if="canManage" :disabled="!term" @click="openCreate">
             <PlusIcon class="h-4 w-4" /> New Adjustment
           </AppButton>
         </template>
@@ -76,16 +76,16 @@
                 </td>
                 <td class="w-px whitespace-nowrap px-4 py-3">
                   <div v-if="item.status !== 'cancelled'" class="flex items-center justify-end gap-1">
-                    <AppIconButton v-if="item.status === 'draft'" label="Edit adjustment" @click="openEdit(item)">
+                    <AppIconButton v-if="canManage && item.status === 'draft'" label="Edit adjustment" @click="openEdit(item)">
                       <PencilSquareIcon class="h-4 w-4" />
                     </AppIconButton>
                     <AppIconButton :label="item.status === 'draft' ? 'Preview adjusted schedule' : 'Print adjusted schedule'" variant="primary" @click="choosePrint(item)">
                       <PrinterIcon class="h-4 w-4" />
                     </AppIconButton>
-                    <AppIconButton v-if="item.status === 'draft'" label="Publish adjustment" variant="success" @click="publish(item)">
+                    <AppIconButton v-if="canManage && item.status === 'draft'" label="Publish adjustment" variant="success" @click="publish(item)">
                       <CheckCircleIcon class="h-4 w-4" />
                     </AppIconButton>
-                    <AppIconButton label="Cancel adjustment" variant="danger" @click="cancelAdjustment(item)">
+                    <AppIconButton v-if="canManage" label="Cancel adjustment" variant="danger" @click="cancelAdjustment(item)">
                       <XCircleIcon class="h-4 w-4" />
                     </AppIconButton>
                   </div>
@@ -204,6 +204,7 @@ const props = defineProps({
   term: { type: Object, default: null },
   terms: { type: Array, default: () => [] },
   adjustments: { type: Array, default: () => [] },
+  canManage: { type: Boolean, default: false },
 })
 
 const selectedTermId = ref(props.term?.id ?? null)
