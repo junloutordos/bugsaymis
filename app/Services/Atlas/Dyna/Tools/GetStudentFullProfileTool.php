@@ -2,11 +2,15 @@
 
 namespace App\Services\Atlas\Dyna\Tools;
 
+use App\Models\AMS\ActivityStudentAttendance;
 use App\Models\CID\CompetitionParticipant;
+use App\Models\Consultation;
 use App\Models\Discipline\DisciplineCase;
+use App\Models\GuidanceConsultation;
 use App\Models\HomeroomAttendance\AttendanceRecord;
 use App\Models\Registrar\StudentAcademicStanding;
 use App\Models\Registrar\StudentEnrollment;
+use App\Models\ResidenceHall\RhIntern;
 use App\Models\StudentAttendance\StudentAttendanceLog;
 use App\Models\User;
 use App\Services\Registrar\StudentTranscriptService;
@@ -20,11 +24,14 @@ class GetStudentFullProfileTool implements DynaTool
 
     public function description(): string
     {
-        return 'Returns a comprehensive profile for one student: academic record/GWA, homeroom and gate '
+        return 'Returns a comprehensive profile for one student: personal/contact details (birthday, sex, '
+             . 'blood type, contact number, address, LRN), academic record/GWA, homeroom and gate '
              . 'attendance, discipline cases, library activity, competitions, full enrollment history, '
-             . 'current section, and guardian contact — each section only included if the requesting user '
-             . 'has access to it. Use for open-ended "tell me about student X" questions; use '
-             . 'get_student_info instead for a quick single-fact lookup.';
+             . 'current section, guardian contact, clinic/health consultation records, guidance/counseling '
+             . 'referral records, activity (AMS) participation, and residence hall/dormer assignment — each '
+             . 'section only included if the requesting user has access to it. Use for open-ended "tell me '
+             . 'about student X" questions (including birthdate, contact number, address, or other personal '
+             . 'details); use get_student_info instead for a quick single-fact lookup.';
     }
 
     public function inputSchema(): array
@@ -59,6 +66,16 @@ class GetStudentFullProfileTool implements DynaTool
         $profile = [
             'enrollment_history' => StudentEnrollment::where('student_id', $student->id)->orderByDesc('school_year_id')->get()
                 ->map(fn (StudentEnrollment $e) => ['school_year_id' => $e->school_year_id, 'grade_level' => $e->grade_level, 'status' => $e->status])->values()->toArray(),
+            'personal_info' => [
+                'name' => trim("{$student->firstname} {$student->middlename} {$student->lastname}"),
+                'birthday' => $student->birthday,
+                'sex' => $student->sex,
+                'blood_type' => $student->bloodtype,
+                'contact_no' => $student->contactno1,
+                'lrn' => $student->lrn,
+                'dormer' => $student->dormer,
+                'address' => implode(', ', array_filter([$student->houseno, $student->barangay, $student->municipal, $student->province])),
+            ],
         ];
 
         $section = (new StudentSectionResolver())->latestForStudent($student->id);
@@ -107,6 +124,41 @@ class GetStudentFullProfileTool implements DynaTool
         if ($user->hasPermission('cid.competitions.manage')) {
             $profile['competitions'] = CompetitionParticipant::with('competition')->where('student_id', $student->id)
                 ->get()->map(fn (CompetitionParticipant $c) => ['competition' => $c->competition?->name, 'role' => $c->role, 'award' => $c->award])->values()->toArray();
+        }
+
+        if ($user->hasPermission('health.manage')) {
+            $profile['health_records'] = Consultation::where('student_id', $student->id)
+                ->latest('id')->limit(10)
+                ->get(['reason', 'status', 'scheduled_at', 'date_attended', 'notes'])->toArray();
+        }
+
+        if ($user->hasPermission('guidance.view')) {
+            // requestor_id is a legacy ambiguous FK (can point to students or users) — matches
+            // the same students-table-first resolution GuidanceConsultationController uses.
+            $profile['guidance_records'] = GuidanceConsultation::where('requestor_id', $student->id)
+                ->latest('id')->limit(10)
+                ->get(['concern', 'status', 'consultation_type', 'date_time_preferred', 'intervention'])->toArray();
+        }
+
+        if ($user->hasAnyPermission(['activities.manage', 'activities.view_all', 'activities.monitor', 'activities.evaluation_committee'])) {
+            $profile['ams_participation'] = ActivityStudentAttendance::with('activity')->where('participant_id', $student->id)
+                ->latest('id')->limit(10)->get()
+                ->map(fn (ActivityStudentAttendance $a) => ['activity_title' => $a->activity?->title, 'attended' => $a->attended, 'hours_attended' => $a->hours_attended])
+                ->values()->toArray();
+        }
+
+        if ($user->hasAnyPermission(['rh.interns.view', 'rh.interns.manage'])) {
+            $intern = RhIntern::with('room')->where('student_id', $student->id)->latest('id')->first();
+            if ($intern) {
+                $profile['residence_hall'] = [
+                    'residence_hall' => $intern->room?->residence_hall,
+                    'room_number' => $intern->room?->room_number,
+                    'bed_number' => $intern->bed_number,
+                    'status' => $intern->status,
+                    'check_in_date' => $intern->check_in_date,
+                    'check_out_date' => $intern->check_out_date,
+                ];
+            }
         }
 
         return $profile;

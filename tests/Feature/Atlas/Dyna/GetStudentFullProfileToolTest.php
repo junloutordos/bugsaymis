@@ -2,9 +2,15 @@
 
 namespace Tests\Feature\Atlas\Dyna;
 
+use App\Models\AMS\Activity;
+use App\Models\AMS\ActivityStudentAttendance;
+use App\Models\Consultation;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\GuidanceConsultation;
 use App\Models\Permission;
 use App\Models\Registrar\StudentEnrollment;
+use App\Models\ResidenceHall\RhIntern;
+use App\Models\ResidenceHall\RhRoom;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetStudentFullProfileTool;
@@ -30,6 +36,112 @@ class GetStudentFullProfileToolTest extends TestCase
         $this->assertCount(1, $result['enrollment_history']);
         $this->assertEquals(8, $result['enrollment_history'][0]['grade_level']);
         $this->assertArrayNotHasKey('discipline', $result);
+    }
+
+    public function test_returns_personal_and_contact_details_unconditionally(): void
+    {
+        $lastname = 'PersonalInfoLookup'.uniqid();
+        $studentId = \DB::table('students')->insertGetId([
+            'lastname' => $lastname,
+            'firstname' => 'Test',
+            'birthday' => '2010-03-15',
+            'sex' => 'Female',
+            'bloodtype' => 'O+',
+            'contactno1' => '09171234567',
+            'houseno' => '123',
+            'barangay' => 'Ampayon',
+            'lrn' => '123456789012',
+        ]);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view']);
+
+        $result = app(GetStudentFullProfileTool::class)->execute($user, ['identifier' => $lastname]);
+
+        $this->assertEquals('2010-03-15', $result['personal_info']['birthday']);
+        $this->assertEquals('Female', $result['personal_info']['sex']);
+        $this->assertEquals('O+', $result['personal_info']['blood_type']);
+        $this->assertEquals('123456789012', $result['personal_info']['lrn']);
+    }
+
+    public function test_returns_health_records_when_permitted_and_omits_when_not(): void
+    {
+        $lastname = 'HealthLookup'.uniqid();
+        $studentId = \DB::table('students')->insertGetId(['lastname' => $lastname, 'firstname' => 'Test']);
+        Consultation::create([
+            'student_id' => $studentId,
+            'reason' => 'Fever',
+            'status' => 'Completed',
+        ]);
+
+        $permittedUser = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view', 'health.manage']);
+        $restrictedUser = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view']);
+
+        $withHealth = app(GetStudentFullProfileTool::class)->execute($permittedUser, ['identifier' => $lastname]);
+        $withoutHealth = app(GetStudentFullProfileTool::class)->execute($restrictedUser, ['identifier' => $lastname]);
+
+        $this->assertCount(1, $withHealth['health_records']);
+        $this->assertEquals('Fever', $withHealth['health_records'][0]['reason']);
+        $this->assertArrayNotHasKey('health_records', $withoutHealth);
+    }
+
+    public function test_returns_guidance_records_when_permitted_and_omits_when_not(): void
+    {
+        $lastname = 'GuidanceLookup'.uniqid();
+        $studentId = \DB::table('students')->insertGetId(['lastname' => $lastname, 'firstname' => 'Test']);
+        GuidanceConsultation::create([
+            'requestor_id' => $studentId,
+            'concern' => 'Academic difficulty',
+            'status' => 'pending',
+        ]);
+
+        $permittedUser = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view', 'guidance.view']);
+        $restrictedUser = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view']);
+
+        $withGuidance = app(GetStudentFullProfileTool::class)->execute($permittedUser, ['identifier' => $lastname]);
+        $withoutGuidance = app(GetStudentFullProfileTool::class)->execute($restrictedUser, ['identifier' => $lastname]);
+
+        $this->assertCount(1, $withGuidance['guidance_records']);
+        $this->assertEquals('Academic difficulty', $withGuidance['guidance_records'][0]['concern']);
+        $this->assertArrayNotHasKey('guidance_records', $withoutGuidance);
+    }
+
+    public function test_returns_ams_participation_and_residence_hall_when_permitted(): void
+    {
+        $lastname = 'AmsRhLookup'.uniqid();
+        $studentId = \DB::table('students')->insertGetId(['lastname' => $lastname, 'firstname' => 'Test']);
+
+        $activity = Activity::create([
+            'user_id' => User::factory()->create()->id,
+            'title' => 'Science Fair 2026',
+            'activity_type' => Activity::TYPE_IN_HOUSE,
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-01',
+        ]);
+        ActivityStudentAttendance::create([
+            'activity_id' => $activity->id,
+            'participant_id' => $studentId,
+            'attended' => true,
+            'hours_attended' => 3.5,
+        ]);
+
+        $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
+        $room = RhRoom::create(['residence_hall' => 'BRH', 'room_number' => '101']);
+        RhIntern::create([
+            'student_id' => $studentId,
+            'school_year_id' => $schoolYear->id,
+            'rh_room_id' => $room->id,
+            'bed_number' => 1,
+            'status' => 'active',
+        ]);
+
+        $user = $this->userWithPermissions(['atlas.dyna.access', 'students.enrollment.view', 'activities.view_all', 'rh.interns.view']);
+
+        $result = app(GetStudentFullProfileTool::class)->execute($user, ['identifier' => $lastname]);
+
+        $this->assertCount(1, $result['ams_participation']);
+        $this->assertEquals('Science Fair 2026', $result['ams_participation'][0]['activity_title']);
+        $this->assertEquals('active', $result['residence_hall']['status']);
+        $this->assertEquals('BRH', $result['residence_hall']['residence_hall']);
     }
 
     private function userWithPermissions(array $permissionNames): User

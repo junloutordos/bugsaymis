@@ -3,16 +3,21 @@
 namespace App\Services\Atlas\Dyna\Tools;
 
 use App\Models\Applicant;
+use App\Models\Document;
 use App\Models\EmployeeIPCR;
+use App\Models\FacilityRequest;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\HR\DtrRecord;
 use App\Models\HR\LeaveApplication;
 use App\Models\HR\LeaveCredit;
+use App\Models\ITJobRequest;
 use App\Models\Payroll\PayrollRecord;
 use App\Models\Pds;
 use App\Models\SALN\SalnRecord;
+use App\Models\ServiceRequest;
 use App\Models\User;
+use App\Models\VehicleRequest;
 use App\Models\WFHAttendance;
 
 class GetEmployeeFullProfileTool implements DynaTool
@@ -22,10 +27,15 @@ class GetEmployeeFullProfileTool implements DynaTool
     public function description(): string
     {
         return 'Returns a comprehensive profile for one employee: leave credits/history, DTR summary, '
-             . 'PDS, SALN filing status, IPCR history, faculty loading (if applicable), payroll summary, '
-             . 'committee memberships, recruitment history, and WFH summary — each section only included '
-             . 'if the requesting user has access to it. Use for open-ended "tell me about employee X" '
-             . 'questions; use get_employee_info instead for a quick single-fact lookup.';
+             . 'PDS (including personal/contact details, address, government ID numbers, work experience, '
+             . 'civil service eligibility, voluntary work, and family background), SALN filing status, IPCR '
+             . 'history, faculty loading (if applicable), payroll summary, committee memberships and '
+             . 'accomplishment ratings, gate pass history, recent IT/facility/vehicle/service request '
+             . 'filings, documents currently routed to or filed by this employee, recruitment history, and '
+             . 'WFH summary — each section only included if the requesting user has access to it. Use for '
+             . 'open-ended "tell me about employee X" questions (including birthdate, contact number, '
+             . 'address, or other personal details); use get_employee_info instead for a quick single-fact '
+             . 'lookup.';
     }
 
     public function inputSchema(): array
@@ -88,6 +98,45 @@ class GetEmployeeFullProfileTool implements DynaTool
                 'education' => $pds->education()->get(['level', 'school_name', 'year_graduated'])->toArray(),
                 'trainings_count' => $pds->trainings()->count(),
             ];
+
+            $personalInfo = $pds->personalInfo;
+            if ($personalInfo) {
+                $profile['personal_info'] = [
+                    'date_of_birth' => $personalInfo->date_of_birth,
+                    'civil_status' => $personalInfo->civil_status,
+                    'blood_type' => $personalInfo->blood_type,
+                    'mobile_no' => $personalInfo->mobile_no,
+                    'telephone_no' => $personalInfo->telephone_no,
+                    'email_address' => $personalInfo->email_address,
+                    'tin_no' => $personalInfo->tin_no,
+                    'philhealth_no' => $personalInfo->philhealth_no,
+                    'pagibig_id_no' => $personalInfo->pagibig_id_no,
+                    'umid_id_no' => $personalInfo->umid_id_no,
+                    'residential_address' => implode(', ', array_filter([
+                        $personalInfo->residential_house, $personalInfo->residential_street,
+                        $personalInfo->residential_barangay, $personalInfo->residential_city,
+                        $personalInfo->residential_province,
+                    ])),
+                    'permanent_address' => implode(', ', array_filter([
+                        $personalInfo->permanent_house, $personalInfo->permanent_street,
+                        $personalInfo->permanent_barangay, $personalInfo->permanent_city,
+                        $personalInfo->permanent_province,
+                    ])),
+                ];
+            }
+
+            $profile['work_experience'] = $pds->workExperience()->get(['position', 'agency', 'from_date', 'to_date', 'appointment_status'])->toArray();
+            $profile['eligibility'] = $pds->eligibility()->get(['eligibility', 'rating', 'exam_date', 'license_number'])->toArray();
+            $profile['voluntary_work'] = $pds->voluntaryWork()->get(['organization', 'from_date', 'to_date', 'hours', 'nature_of_work'])->toArray();
+
+            $familyBackground = $pds->familyBackground;
+            if ($familyBackground) {
+                $profile['family_background'] = $familyBackground->only([
+                    'spouse_surname', 'spouse_first_name', 'spouse_middle_name', 'spouse_occupation',
+                    'father_surname', 'father_first_name', 'father_middle_name',
+                    'mother_maiden_surname', 'mother_maiden_first_name', 'mother_maiden_middle_name',
+                ]);
+            }
         }
 
         if ($user->hasPermission('saln.view_all') || $isSelf) {
@@ -114,9 +163,42 @@ class GetEmployeeFullProfileTool implements DynaTool
         }
 
         if ($user->hasPermission('faculty_loading.view') || $isSelf) {
-            $profile['committees'] = FacultyCommitteeAssignment::where('user_id', $employee->id)->where('status', 'active')
-                ->get(['committee_name', 'role'])->toArray();
+            $assignments = FacultyCommitteeAssignment::with('accomplishments')->where('user_id', $employee->id)->where('status', 'active')->get();
+            $profile['committees'] = $assignments->map(fn (FacultyCommitteeAssignment $a) => ['committee_name' => $a->committee_name, 'role' => $a->role])->toArray();
+
+            $accomplishments = $assignments->flatMap->accomplishments;
+            if ($accomplishments->isNotEmpty()) {
+                $profile['committee_accomplishments'] = $accomplishments
+                    ->map(fn ($a) => ['accomplishment' => $a->accomplishment, 'sup_quality' => $a->sup_quality, 'sup_efficiency' => $a->sup_efficiency, 'sup_timeliness' => $a->sup_timeliness, 'sup_average' => $a->sup_average])
+                    ->values()->toArray();
+            }
         }
+
+        if ($user->hasPermission('hr.dtr.view') || $isSelf) {
+            if ($employee->badge_id) {
+                $profile['gate_pass_recent'] = \DB::table('gatepass')
+                    ->whereRaw('CAST(badgeNumber AS CHAR) = ?', [(string) $employee->badge_id])
+                    ->orderByDesc('id')->limit(5)
+                    ->get(['gatepass_type', 'gatepass_date', 'destination', 'purpose', 'status'])
+                    ->map(fn ($row) => (array) $row)->toArray();
+            } else {
+                $profile['gate_pass_recent'] = [];
+            }
+        }
+
+        $profile['requests_recent'] = collect()
+            ->merge(ITJobRequest::where('user_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (ITJobRequest $r) => ['type' => 'IT Job Request', 'title' => $r->title, 'status' => $r->status]))
+            ->merge(FacilityRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (FacilityRequest $r) => ['type' => 'Facility Request', 'title' => $r->activity, 'status' => $r->status]))
+            ->merge(VehicleRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (VehicleRequest $r) => ['type' => 'Vehicle Request', 'title' => $r->purpose, 'status' => $r->status]))
+            ->merge(ServiceRequest::where('requestor_id', $employee->id)->latest('id')->limit(5)->get()->map(fn (ServiceRequest $r) => ['type' => 'Service Request', 'title' => $r->service_type, 'status' => $r->status]))
+            ->values()->toArray();
+
+        $profile['documents_with_employee'] = Document::where('current_holder_id', $employee->id)
+            ->orWhere('created_by', $employee->id)
+            ->latest('id')->limit(10)
+            ->get(['tracking_no', 'subject', 'overall_status', 'created_by', 'current_holder_id'])
+            ->map(fn (Document $d) => ['tracking_no' => $d->tracking_no, 'subject' => $d->subject, 'status' => $d->overall_status, 'role' => $d->created_by === $employee->id ? 'filed_by' : 'current_holder'])
+            ->toArray();
 
         if ($user->hasPermission('recruitment.view')) {
             $applicant = Applicant::where('email', $employee->email)->first();
