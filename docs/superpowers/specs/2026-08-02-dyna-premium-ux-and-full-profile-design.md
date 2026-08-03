@@ -85,6 +85,14 @@ gotchas during implementation, same as the Phase 2 expansion earlier today.
   (homeroom + gate, cutting flags), discipline cases (already covered — carried over
   unchanged), library borrowing history, competitions participation, enrollment history
   across school years, section/adviser assignment, guardian contact info (standard SIS data).
+- **Class schedule (added 2026-08-03, not in the original scope):** confirmed via live use
+  that Dyna cannot answer schedule questions at all — no tool touches
+  `FacultyLoading\ClassSchedule` (a real, actively-used model: faculty, subject, classroom,
+  section, school year, term). This is now in scope for **both** domain lists — a student's
+  current schedule, and a faculty member's teaching schedule — as its own tool
+  (`get_class_schedule`, queryable by faculty, section, or day), not folded into the two
+  full-profile tools below, since "what's my Tuesday schedule" is a different query shape
+  than "tell me everything about this person."
 - **Health/Guidance:** explicitly **included**, under the same rule as everything else — see
   Permission Model below. This was a deliberate confirmation, not an oversight; the
   alternative (blanket-excluding Health/Guidance from Dyna regardless of the asker's actual
