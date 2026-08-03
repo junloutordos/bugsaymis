@@ -288,4 +288,38 @@ class DynaOrchestratorServiceTest extends TestCase
         $this->assertEquals(['error' => 'This data could not be retrieved right now.'], $toolResultContent);
         $this->assertEquals("I couldn't retrieve the headcount right now.", $answer);
     }
+
+    public function test_system_prompt_instructs_conversational_tone_and_tool_error_handling(): void
+    {
+        $user = User::factory()->create();
+        $conversation = DynaConversation::create(['user_id' => $user->id]);
+        $registry = new DynaToolRegistry([]);
+
+        $capturedArgs = null;
+
+        $bedrock = Mockery::mock(BedrockRuntimeClient::class);
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->andReturnUsing(function (array $args) use (&$capturedArgs) {
+                $capturedArgs = $args;
+
+                return new Result([
+                    'output' => ['message' => ['role' => 'assistant', 'content' => [
+                        ['text' => 'Sure, one moment.'],
+                    ]]],
+                    'stopReason' => 'end_turn',
+                ]);
+            });
+
+        $clientFactory = Mockery::mock(DynaBedrockClientFactory::class);
+        $clientFactory->shouldReceive('make')->andReturn($bedrock);
+
+        $orchestrator = new DynaOrchestratorService($registry, $clientFactory);
+
+        $orchestrator->reply($user, $conversation, 'Hello');
+
+        $systemText = $capturedArgs['system'][0]['text'];
+        $this->assertStringContainsString('error', $systemText);
+        $this->assertStringContainsString('briefing a colleague', $systemText);
+    }
 }
