@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\Atlas\Dyna\DynaToolRegistry;
 use App\Services\Atlas\Dyna\Tools\DynaTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class DynaToolRegistryTest extends TestCase
@@ -54,5 +55,25 @@ class DynaToolRegistryTest extends TestCase
         $this->assertContains('get_employee_full_profile', $names);
         $this->assertContains('get_student_full_profile', $names);
         $this->assertCount(25, $names);
+    }
+
+    public function test_registry_catches_a_tool_exception_logs_it_and_returns_a_structured_error(): void
+    {
+        Log::spy();
+
+        $tool = new class implements DynaTool {
+            public function name(): string { return 'broken_tool'; }
+            public function description(): string { return 'desc'; }
+            public function inputSchema(): array { return ['type' => 'object', 'properties' => []]; }
+            public function execute(User $user, array $input): array { throw new \RuntimeException('DB timeout'); }
+        };
+        $registry = new DynaToolRegistry([$tool]);
+
+        $result = $registry->execute('broken_tool', [], User::factory()->make());
+
+        $this->assertEquals(['error' => 'This data could not be retrieved right now.'], $result);
+        Log::shouldHaveReceived('error')->once()->withArgs(
+            fn ($message, $context) => $message === 'Dyna tool execution failed' && $context['tool'] === 'broken_tool'
+        );
     }
 }

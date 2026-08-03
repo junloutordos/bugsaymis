@@ -237,4 +237,55 @@ class DynaOrchestratorServiceTest extends TestCase
 
         $this->assertStringContainsString(now()->toDateString(), $capturedArgs['system'][0]['text']);
     }
+
+    public function test_reply_surfaces_a_caught_tool_error_to_the_model_as_a_tool_result(): void
+    {
+        $user = User::factory()->create();
+        $conversation = DynaConversation::create(['user_id' => $user->id]);
+
+        $tool = new class implements DynaTool {
+            public function name(): string { return 'get_headcount'; }
+            public function description(): string { return 'desc'; }
+            public function inputSchema(): array { return ['type' => 'object', 'properties' => []]; }
+            public function execute(User $user, array $input): array { throw new \RuntimeException('DB timeout'); }
+        };
+        $registry = new DynaToolRegistry([$tool]);
+
+        $capturedSecondCallArgs = null;
+
+        $bedrock = Mockery::mock(BedrockRuntimeClient::class);
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->andReturn(new Result([
+                'output' => ['message' => ['role' => 'assistant', 'content' => [
+                    ['toolUse' => ['toolUseId' => 'tu_1', 'name' => 'get_headcount', 'input' => []]],
+                ]]],
+                'stopReason' => 'tool_use',
+            ]))
+            ->ordered();
+        $bedrock->shouldReceive('converse')
+            ->once()
+            ->ordered()
+            ->andReturnUsing(function (array $args) use (&$capturedSecondCallArgs) {
+                $capturedSecondCallArgs = $args;
+
+                return new Result([
+                    'output' => ['message' => ['role' => 'assistant', 'content' => [
+                        ['text' => "I couldn't retrieve the headcount right now."],
+                    ]]],
+                    'stopReason' => 'end_turn',
+                ]);
+            });
+
+        $clientFactory = Mockery::mock(DynaBedrockClientFactory::class);
+        $clientFactory->shouldReceive('make')->andReturn($bedrock);
+
+        $orchestrator = new DynaOrchestratorService($registry, $clientFactory);
+
+        $answer = $orchestrator->reply($user, $conversation, 'How many active employees do we have?');
+
+        $toolResultContent = $capturedSecondCallArgs['messages'][2]['content'][0]['toolResult']['content'][0]['json'];
+        $this->assertEquals(['error' => 'This data could not be retrieved right now.'], $toolResultContent);
+        $this->assertEquals("I couldn't retrieve the headcount right now.", $answer);
+    }
 }
