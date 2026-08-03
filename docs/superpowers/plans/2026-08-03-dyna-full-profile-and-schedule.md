@@ -25,9 +25,9 @@
 - Test: `tests/Feature/Atlas/Dyna/GetClassScheduleToolTest.php`
 
 **Interfaces:**
-- Produces: `GetClassScheduleTool implements DynaTool` — `name()` returns `'get_class_schedule'`. `inputSchema()`: optional `faculty_identifier` (string), optional `section_id` (integer), optional `day` (string, one of Mon/Tue/Wed/Thu/Fri/Sat). `execute(User $user, array $input): array`.
+- Produces: `GetClassScheduleTool implements DynaTool` — `name()` returns `'get_class_schedule'`. `inputSchema()`: optional `faculty_identifier` (string), optional `section_id` (integer), optional `day` (string, one of Monday/Tuesday/Wednesday/Thursday/Friday/Saturday — the real enum values, confirmed via migration; not abbreviations). `execute(User $user, array $input): array`.
 
-Real schema, already confirmed by reading `app/Models/FacultyLoading/ClassSchedule.php` and its migration directly: columns `user_id` (faculty), `subject_id`, `section_id`, `classroom_id`, `school_year_id`, `academic_term_id`, `day_of_week` (enum Mon–Sat), `start_time`, `end_time`, `status` (enum active/tentative/cancelled — filter to `active`). Relations: `faculty()` -> `User`, `subject()` -> `Subject`, `classroom()` -> `Classroom`, `section()` -> `Section`. Scopes: `scopeActive($query)`, `scopeForFaculty($query, int $userId)`.
+Real schema, already confirmed by reading `app/Models/FacultyLoading/ClassSchedule.php` and its migration directly: columns `user_id` (faculty), `subject_id`, `section_id`, `classroom_id`, `school_year_id`, `academic_term_id`, `day_of_week` (enum: full day names Monday–Saturday, confirmed via migration — not abbreviations), `start_time`, `end_time`, `status` (enum active/tentative/cancelled — filter to `active`). Relations: `faculty()` -> `User`, `subject()` -> `Subject`, `classroom()` -> `Classroom`, `section()` -> `App\Models\FacultyLoading\Section`. Scopes: `scopeActive($query)`, `scopeForFaculty($query, int $userId)`. **`section_id` has a real FK constraint to `sections.id`** (a fork-reported claim that it was "no FK constraint" was wrong — verified directly via a failing test) — tests need a real `Section::create(['sectionname' => ..., 'levelid' => ...])` row, not a bare integer. `Section` has a `name` accessor mapping to the legacy `sectionname` column, already usable as `$section->name`.
 
 Student's current section comes from `App\Services\StudentSectionResolver::latestForStudent(int $studentId): ?object` (already confirmed by reading the file — returns an object with `->sectionid`, or `null`). Do not query `student_enrollments` directly for this.
 
@@ -41,6 +41,7 @@ namespace Tests\Feature\Atlas\Dyna;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\Permission;
 use App\Models\Role;
@@ -57,17 +58,18 @@ class GetClassScheduleToolTest extends TestCase
     {
         $schoolYear = SchoolYear::create(['name' => '2026-2027', 'start_date' => '2026-06-01', 'end_date' => '2027-03-31', 'is_current' => true]);
         $term = AcademicTerm::create(['school_year_id' => $schoolYear->id, 'name' => 'Q1', 'is_current' => true]);
-        $subject = Subject::create(['name' => 'Physics', 'code' => 'PHYS1']);
+        $subject = Subject::create(['name' => 'Physics', 'code' => 'PHYS1', 'grade_level' => 8, 'school_year_id' => $schoolYear->id]);
+        $section = Section::create(['sectionname' => 'Newton', 'levelid' => 8]);
         $faculty = User::factory()->create(['name' => 'Maria Santos']);
 
         ClassSchedule::create([
             'user_id' => $faculty->id,
             'subject_id' => $subject->id,
-            'section_id' => 5,
+            'section_id' => $section->id,
             'classroom_id' => null,
             'school_year_id' => $schoolYear->id,
             'academic_term_id' => $term->id,
-            'day_of_week' => 'Mon',
+            'day_of_week' => 'Monday',
             'start_time' => '08:00:00',
             'end_time' => '09:00:00',
             'status' => 'active',
@@ -75,11 +77,11 @@ class GetClassScheduleToolTest extends TestCase
         ClassSchedule::create([
             'user_id' => $faculty->id,
             'subject_id' => $subject->id,
-            'section_id' => 5,
+            'section_id' => $section->id,
             'classroom_id' => null,
             'school_year_id' => $schoolYear->id,
             'academic_term_id' => $term->id,
-            'day_of_week' => 'Tue',
+            'day_of_week' => 'Tuesday',
             'start_time' => '10:00:00',
             'end_time' => '11:00:00',
             'status' => 'cancelled',
@@ -91,7 +93,8 @@ class GetClassScheduleToolTest extends TestCase
 
         $this->assertCount(1, $result['schedule']);
         $this->assertEquals('Physics', $result['schedule'][0]['subject']);
-        $this->assertEquals('Mon', $result['schedule'][0]['day']);
+        $this->assertEquals('Monday', $result['schedule'][0]['day']);
+        $this->assertEquals('Newton', $result['schedule'][0]['section']);
     }
 
     private function userWithPermissions(array $permissionNames): User
@@ -144,7 +147,7 @@ class GetClassScheduleTool implements DynaTool
             'properties' => [
                 'faculty_identifier' => ['type' => 'string', 'description' => 'Faculty member name or email — returns their teaching schedule.'],
                 'student_identifier' => ['type' => 'string', 'description' => 'Student name or system ID — returns their current section\'s schedule.'],
-                'day' => ['type' => 'string', 'description' => 'Optional: filter to one day (Mon, Tue, Wed, Thu, Fri, or Sat).'],
+                'day' => ['type' => 'string', 'description' => 'Optional: filter to one day (Monday, Tuesday, Wednesday, Thursday, Friday, or Saturday).'],
             ],
         ];
     }
