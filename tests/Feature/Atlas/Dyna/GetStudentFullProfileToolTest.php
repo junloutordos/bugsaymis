@@ -17,10 +17,12 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Atlas\Dyna\Tools\GetStudentFullProfileTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetStudentFullProfileToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_enrollment_history_and_omits_discipline_without_access(): void
@@ -178,22 +180,6 @@ class GetStudentFullProfileToolTest extends TestCase
         $result = app(GetStudentFullProfileTool::class)->execute($user, ['identifier' => $lastname]);
 
         $this->assertNoNonScalarLeaves($result);
-    }
-
-    private function assertNoNonScalarLeaves(mixed $value, string $path = 'result'): void
-    {
-        if (is_array($value)) {
-            foreach ($value as $key => $item) {
-                $this->assertNoNonScalarLeaves($item, "{$path}.{$key}");
-            }
-
-            return;
-        }
-
-        $this->assertTrue(
-            is_scalar($value) || is_null($value),
-            "Expected a JSON-safe scalar at {$path}, got ".(is_object($value) ? get_class($value) : gettype($value))
-        );
     }
 
     private function userWithPermissions(array $permissionNames): User

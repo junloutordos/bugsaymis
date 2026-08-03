@@ -24,10 +24,12 @@ use App\Models\User;
 use App\Models\WFHAttendance;
 use App\Services\Atlas\Dyna\Tools\GetEmployeeFullProfileTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Atlas\Dyna\Concerns\AssertsJsonSafeToolResult;
 use Tests\TestCase;
 
 class GetEmployeeFullProfileToolTest extends TestCase
 {
+    use AssertsJsonSafeToolResult;
     use RefreshDatabase;
 
     public function test_returns_leave_section_when_permitted_and_omits_it_when_not(): void
@@ -222,22 +224,6 @@ class GetEmployeeFullProfileToolTest extends TestCase
         $result = (new GetEmployeeFullProfileTool())->execute($user, ['identifier' => 'Fiona Cruz']);
 
         $this->assertNoNonScalarLeaves($result);
-    }
-
-    private function assertNoNonScalarLeaves(mixed $value, string $path = 'result'): void
-    {
-        if (is_array($value)) {
-            foreach ($value as $key => $item) {
-                $this->assertNoNonScalarLeaves($item, "{$path}.{$key}");
-            }
-
-            return;
-        }
-
-        $this->assertTrue(
-            is_scalar($value) || is_null($value),
-            "Expected a JSON-safe scalar at {$path}, got ".(is_object($value) ? get_class($value) : gettype($value))
-        );
     }
 
     private function userWithPermissions(array $permissionNames): User
