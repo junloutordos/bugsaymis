@@ -14,8 +14,9 @@ use Tests\TestCase;
 
 /**
  * The DTR "Verified as to the prescribed office hours" signatory:
- * COS Teachers must be verified by their Academic Unit Head, not the
- * CID Chief / division chief.
+ * Teaching staff (Plantilla or COS) must be verified by their Academic
+ * Unit Head, not the CID Chief / division chief. The CID Chief /
+ * division chief is only a fallback when no AUH is resolvable.
  */
 class DtrSupervisorSignatoryTest extends TestCase
 {
@@ -105,13 +106,48 @@ class DtrSupervisorSignatoryTest extends TestCase
                 ->where('supervisor.name', 'Dr. CID Chief'));
     }
 
-    public function test_non_cos_employee_still_verified_by_division_chief(): void
+    public function test_non_teaching_employee_still_verified_by_division_chief(): void
+    {
+        $staff = User::factory()->create([
+            'name' => 'Maria NonTeaching',
+            'emp_category' => 'Plantilla Non-Teaching',
+            'division_id' => $this->cid->id,
+            'academic_unit_id' => $this->unit->id, // even with a unit, non-teaching keeps old behavior
+        ]);
+
+        $this->actingAs($this->viewer())
+            ->get(route('hr.dtr.print', ['user' => $staff->id, 'month' => '2098-08']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('supervisor.name', 'Dr. CID Chief'));
+    }
+
+    public function test_plantilla_teacher_is_verified_by_their_academic_unit_head(): void
     {
         $teacher = User::factory()->create([
-            'name' => 'Maria Permanent',
-            'emp_category' => 'Permanent',
+            'name' => 'Ana Plantilla Teacher',
+            'emp_category' => 'Plantilla Teaching',
             'division_id' => $this->cid->id,
-            'academic_unit_id' => $this->unit->id, // even with a unit, non-COS keeps old behavior
+            'academic_unit_id' => $this->unit->id,
+        ]);
+
+        $this->actingAs($this->viewer())
+            ->get(route('hr.dtr.print', ['user' => $teacher->id, 'month' => '2098-08']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('HR/DTR/PrintCsc')
+                ->where('supervisor.name', 'Ms. Math Unit Head')
+                ->where('supervisor.position', 'Academic Unit Head'));
+    }
+
+    public function test_plantilla_teacher_without_resolvable_unit_falls_back_to_division_chief(): void
+    {
+        $teacher = User::factory()->create([
+            'name' => 'Jose Plantilla Teacher',
+            'emp_category' => 'Plantilla Teaching',
+            'division_id' => $this->cid->id,
+            'academic_unit_id' => null,
+            'office_id' => null,
         ]);
 
         $this->actingAs($this->viewer())
