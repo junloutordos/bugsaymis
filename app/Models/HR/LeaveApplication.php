@@ -33,12 +33,17 @@ class LeaveApplication extends Model
         'hr_officer_action',
         'hr_officer_at',
         'hr_officer_remarks',
-        // Stage 2 — Division Chief (recommends)
+        // Stage 2 — Academic Unit Head (recommends, CID teaching faculty only)
+        'auh_id',
+        'auh_action',
+        'auh_at',
+        'auh_remarks',
+        // Stage 3 — Division Chief (recommends)
         'division_chief_id',
         'division_chief_action',
         'division_chief_at',
         'division_chief_remarks',
-        // Stage 3 — Campus Director (final approval)
+        // Stage 4 — Campus Director (final approval)
         'approved_by',
         'approval_action',
         'approved_at',
@@ -57,6 +62,7 @@ class LeaveApplication extends Model
         'is_without_pay'    => 'boolean',
         'filed_at'          => 'datetime',
         'hr_officer_at'     => 'datetime',
+        'auh_at'            => 'datetime',
         'division_chief_at' => 'datetime',
         'approved_at'       => 'datetime',
     ];
@@ -77,13 +83,19 @@ class LeaveApplication extends Model
         return $this->belongsTo(User::class, 'hr_officer_id');
     }
 
-    /** Stage 2: Division Chief who recommended */
+    /** Stage 2: Academic Unit Head who recommended (CID teaching faculty only) */
+    public function academicUnitHead(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'auh_id');
+    }
+
+    /** Stage 3: Division Chief who recommended */
     public function divisionChief(): BelongsTo
     {
         return $this->belongsTo(User::class, 'division_chief_id');
     }
 
-    /** Stage 3: Campus Director who gave final approval */
+    /** Stage 4: Campus Director who gave final approval */
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');

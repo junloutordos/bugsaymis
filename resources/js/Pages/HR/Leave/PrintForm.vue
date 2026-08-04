@@ -212,7 +212,7 @@
           <div class="sig-space"></div>
           <div class="mt-6 officer-name">{{ certifyingOfficer?.name?.toUpperCase() ?? '' }}</div>
           <div v-if="sigs['hr_officer']" class="dig-badge-sm">✓ Digitally Signed</div>
-          <div class="sig-lbl">(Authorized Officer)</div>
+          <div class="sig-lbl">({{ certifyingOfficer?.position || 'Authorized Officer' }})</div>
         </td>
 
         <!-- 7B: Recommendation -->
@@ -224,13 +224,30 @@
             <span class="cb">{{ recForDisapproval ? '☑' : '☐' }}</span> For disapproval due to :
           </div>
           <div class="rec-remarks" v-if="recForDisapproval">{{ application.division_chief_remarks || application.approval_remarks }}</div>
-          <div class="disapprove-line mt-6"></div>
-          <div class="disapprove-line mt-6"></div>
-          <div class="disapprove-line mt-6"></div>
-          <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:36px;display:block;margin:4px auto 2px;" alt="division chief signature" />
-          <div class="mt-12 officer-name">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
-          <div v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</div>
-          <div class="sig-lbl">(Authorized Officer)</div>
+
+          <!-- CID teaching faculty: Academic Unit Head recommends first, then Division Chief -->
+          <template v-if="academicUnitHead">
+            <div class="disapprove-line mt-6"></div>
+            <img v-if="sigs['academic_unit_head']?.uri" :src="sigs['academic_unit_head'].uri" style="max-height:28px;display:block;margin:2px auto 1px;" alt="academic unit head signature" />
+            <div class="officer-name mt-2" style="font-size:7.5pt;">{{ academicUnitHead?.name?.toUpperCase() ?? '' }}</div>
+            <div v-if="sigs['academic_unit_head']" class="dig-badge-sm">✓ Digitally Signed</div>
+            <div class="sig-lbl">({{ academicUnitHead?.position || 'Academic Unit Head' }})</div>
+
+            <div class="disapprove-line mt-6"></div>
+            <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:28px;display:block;margin:2px auto 1px;" alt="division chief signature" />
+            <div class="officer-name mt-2" style="font-size:7.5pt;">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
+            <div v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</div>
+            <div class="sig-lbl">(Authorized Officer)</div>
+          </template>
+          <template v-else>
+            <div class="disapprove-line mt-6"></div>
+            <div class="disapprove-line mt-6"></div>
+            <div class="disapprove-line mt-6"></div>
+            <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:36px;display:block;margin:4px auto 2px;" alt="division chief signature" />
+            <div class="mt-12 officer-name">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
+            <div v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</div>
+            <div class="sig-lbl">(Authorized Officer)</div>
+          </template>
         </td>
       </tr>
 
@@ -291,6 +308,7 @@ const props = defineProps({
   application:        Object,
   credits:            Object,  // { VL: {earned,used,balance}, SL: {...}, ... }
   certifyingOfficer:  Object,  // 7.A — certifies leave credits
+  academicUnitHead:   { type: Object, default: null }, // 7.B — CID teaching faculty only, recommends before Division Chief
   authorizedOfficer:  Object,  // 7.B — Division Chief where user belongs
   authorizedOfficial: Object,  // bottom — Campus Director / Head of Agency
   monthlySalary:      { type: String, default: null },

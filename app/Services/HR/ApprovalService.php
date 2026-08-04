@@ -7,36 +7,40 @@ use App\Models\HR\LeaveApplication;
 use App\Models\User;
 use App\Services\HR\DTRService;
 use App\Services\NotificationService;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use App\Services\SnapshotService;
 use Illuminate\Support\Facades\DB;
 
 /**
  * ApprovalService (Leave)
  *
- * Handles the 3-stage leave approval workflow and writes
- * immutable ApprovalSnapshot records via SnapshotService.
+ * Handles the leave approval workflow and writes immutable
+ * ApprovalSnapshot records via SnapshotService.
  *
- * Stage 1 — hr_officer      : certified | rejected  (pending      → hr_verified)
- * Stage 2 — division_chief  : forwarded | rejected  (hr_verified  → forwarded)
- * Stage 3 — campus_director : approved  | rejected  (forwarded    → approved)
+ * Stage 1 — hr_officer        : certified   | rejected  (pending       → hr_verified)
+ * Stage 2 — academic_unit_head: recommended | rejected  (hr_verified   → auh_verified)
+ *   (CID teaching faculty only — skipped for everyone else)
+ * Stage 3 — division_chief    : forwarded   | rejected  (hr_verified/auh_verified → forwarded)
+ * Stage 4 — campus_director   : approved    | rejected  (forwarded     → approved)
  */
 class ApprovalService
 {
     public function __construct(
-        private LeaveCreditService $credits,
-        private SnapshotService    $snapshots,
-        private DTRService         $dtr,
+        private LeaveCreditService    $credits,
+        private SnapshotService       $snapshots,
+        private DTRService            $dtr,
+        private IPCRWorkflowService   $ipcrWorkflow,
     ) {}
 
     /**
-     * Process a leave approval action for any of the 3 stages.
+     * Process a leave approval action for any of the workflow stages.
      *
      * Writes the approval snapshot inside the same DB transaction so the
      * snapshot is always in sync with the FK columns on leave_applications.
      *
      * @param  LeaveApplication  $application
-     * @param  string            $stage    hr_officer | division_chief | campus_director
-     * @param  string            $action   certified | forwarded | approved | rejected
+     * @param  string            $stage    hr_officer | academic_unit_head | division_chief | campus_director
+     * @param  string            $action   certified | recommended | forwarded | approved | rejected
      * @param  string            $remarks
      * @param  User              $approver
      */
@@ -48,14 +52,19 @@ class ApprovalService
         User             $approver,
     ): void {
         DB::transaction(function () use ($application, $stage, $action, $remarks, $approver) {
+            $requiresAuh = $application->user
+                ? $this->ipcrWorkflow->requiresLeaveAuhRecommendation($application->user)
+                : false;
+
             // Enforce the serial workflow — a stage can only be processed while
             // the application is sitting at the status that stage is meant to act on.
             // Without this, the "Review Stage" selector lets any authorized approver
             // skip stages (e.g. jump straight to Campus Director on a still-pending app).
             $expectedStatus = [
-                'hr_officer'       => 'pending',
-                'division_chief'   => 'hr_verified',
-                'campus_director'  => 'forwarded',
+                'hr_officer'         => 'pending',
+                'academic_unit_head' => 'hr_verified',
+                'division_chief'     => $requiresAuh ? 'auh_verified' : 'hr_verified',
+                'campus_director'    => 'forwarded',
             ][$stage] ?? null;
 
             abort_unless(
@@ -63,6 +72,10 @@ class ApprovalService
                 409,
                 "This application is not currently awaiting the {$stage} stage (current status: {$application->status})."
             );
+
+            if ($stage === 'academic_unit_head') {
+                abort_unless($requiresAuh, 409, 'This application does not require Academic Unit Head recommendation.');
+            }
 
             switch ($stage) {
 
@@ -95,6 +108,28 @@ class ApprovalService
                     );
                     break;
 
+                case 'academic_unit_head':
+                    abort_unless(in_array($action, ['recommended', 'rejected']), 422);
+                    $application->update([
+                        'auh_id'      => $approver->id,
+                        'auh_action'  => $action,
+                        'auh_at'      => now(),
+                        'auh_remarks' => $remarks,
+                        'status'      => $action === 'recommended' ? 'auh_verified' : 'rejected',
+                    ]);
+                    $this->snapshots->recordApproval(
+                        approvable: $application,
+                        step:       ApprovalStep::LEAVE_ACADEMIC_UNIT_HEAD,
+                        sequence:   2,
+                        action:     $action,
+                        approver:   $approver,
+                        remarks:    $remarks,
+                    );
+                    if ($action === 'rejected') {
+                        $this->credits->restoreLeaveCredits($application->id, $approver->id);
+                    }
+                    break;
+
                 case 'division_chief':
                     abort_unless(in_array($action, ['forwarded', 'rejected']), 422);
                     $application->update([
@@ -107,7 +142,7 @@ class ApprovalService
                     $this->snapshots->recordApproval(
                         approvable: $application,
                         step:       ApprovalStep::LEAVE_DIVISION_CHIEF,
-                        sequence:   2,
+                        sequence:   3,
                         action:     $action,
                         approver:   $approver,
                         remarks:    $remarks,
@@ -129,7 +164,7 @@ class ApprovalService
                     $this->snapshots->recordApproval(
                         approvable: $application,
                         step:       ApprovalStep::LEAVE_CAMPUS_DIRECTOR,
-                        sequence:   3,
+                        sequence:   4,
                         action:     $action,
                         approver:   $approver,
                         remarks:    $remarks,

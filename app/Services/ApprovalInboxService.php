@@ -19,6 +19,7 @@ use App\Models\ServiceRequest;
 use App\Models\User;
 use App\Models\VehicleRequest;
 use App\Models\WorkRequest;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -56,6 +57,9 @@ class ApprovalInboxService
         $isCidChief = $user->hasRole('CID Chief');
         $isAdmin = $user->hasRole('Administrator');
         $isAcidaa = $this->holdsAcidaaDesignation($user);
+        // ACIDAA holders can also be the leave recommender for an AUH's own
+        // leave application (see IPCRWorkflowService::leaveRecommenderFor()).
+        $isAuh = $user->hasRole('AUH') || $isAcidaa;
 
         // Administrator sees all pending items across every module (union of all roles)
         if ($isAdmin) {
@@ -66,6 +70,7 @@ class ApprovalInboxService
             $isHROfficer = true;
             $isCidChief = true;
             $isAcidaa = true;
+            $isAuh = true;
         }
 
         // Pre-compute division IDs for DC queries (used in multiple places)
@@ -75,6 +80,35 @@ class ApprovalInboxService
         } elseif ($isAdmin) {
             // Admin sees all divisions
             $divisionIds = Division::pluck('id')->toArray();
+        }
+
+        // ── Academic Unit Head (and ACIDAA) ──────────────────────────────────
+        // CID teaching faculty's leave must be recommended before it reaches
+        // the Division Chief (CID Chief). Recommender is normally the AUH,
+        // but an AUH's own leave is recommended by ACIDAA instead — see
+        // IPCRWorkflowService::leaveRecommenderFor(). No divisionIds scoping —
+        // each application is matched against the applicant's *specific*
+        // resolved recommender, not just "anyone holding the AUH role".
+        if ($isAuh) {
+            $ipcrWorkflowForAuh = app(IPCRWorkflowService::class);
+            $laAuhItems = LeaveApplication::with(['user:id,name,emp_category,division_id,academic_unit_id,office_id', 'leaveType:id,name,code', 'hrOfficer:id,name'])
+                ->where('status', 'hr_verified')
+                ->latest()->get()
+                ->filter(function ($r) use ($ipcrWorkflowForAuh, $user, $isAdmin) {
+                    if (! $r->user || ! $ipcrWorkflowForAuh->requiresLeaveAuhRecommendation($r->user)) {
+                        return false;
+                    }
+                    if ($isAdmin) {
+                        return true;
+                    }
+
+                    $recommender = $ipcrWorkflowForAuh->leaveRecommenderFor($r->user);
+
+                    return $recommender && (int) $recommender->id === (int) $user->id;
+                })
+                ->map(fn ($r) => $this->normaliseLeaveApplication($r))
+                ->values()->all();
+            $this->addTab($tabs, 'leave_applications', 'Leave Applications', $laAuhItems);
         }
 
         // ── Division Chief (and Administrator) ───────────────────────────────
@@ -175,13 +209,25 @@ class ApprovalInboxService
                 ->values()->all();
             $this->addTab($tabs, 'gate_passes', 'Gate Passes', $gpRows);
 
-            // Leave Applications
-            $laQuery = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code', 'hrOfficer:id,name'])
-                ->where('status', 'hr_verified');
+            // Leave Applications — 'auh_verified' apps already cleared the AUH
+            // recommendation stage; 'hr_verified' apps skip straight here unless
+            // the applicant still needs an AUH recommendation first.
+            $laQuery = LeaveApplication::with(['user:id,name,emp_category,division_id,academic_unit_id,office_id', 'leaveType:id,name,code', 'hrOfficer:id,name', 'academicUnitHead:id,name'])
+                ->whereIn('status', ['hr_verified', 'auh_verified']);
             if (! $isAdmin) {
                 $laQuery->whereHas('user', fn ($q) => $q->whereIn('division_id', $divisionIds));
             }
+            $ipcrWorkflow = app(IPCRWorkflowService::class);
             $laItems = $laQuery->latest()->get()
+                ->filter(function ($r) use ($ipcrWorkflow) {
+                    if ($r->status === 'auh_verified') {
+                        return true;
+                    }
+
+                    // status === 'hr_verified': only visible to the DC once
+                    // AUH recommendation isn't required for this applicant.
+                    return ! $r->user || ! $ipcrWorkflow->requiresLeaveAuhRecommendation($r->user);
+                })
                 ->map(fn ($r) => $this->normaliseLeaveApplication($r))
                 ->values()->all();
             $this->addTab($tabs, 'leave_applications', 'Leave Applications', $laItems);
@@ -263,7 +309,7 @@ class ApprovalInboxService
                 ->map(fn ($r) => $this->normaliseGatePass($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'gate_passes', 'Gate Passes', $gpOCD);
 
-            $laOCD = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code', 'hrOfficer:id,name', 'divisionChief:id,name'])
+            $laOCD = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code', 'hrOfficer:id,name', 'academicUnitHead:id,name', 'divisionChief:id,name'])
                 ->where('status', 'forwarded')->latest()->get()
                 ->map(fn ($r) => $this->normaliseLeaveApplication($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'leave_applications', 'Leave Applications', $laOCD);
@@ -302,7 +348,7 @@ class ApprovalInboxService
 
         // ── HR Officer ────────────────────────────────────────────────────────
         if ($isHROfficer) {
-            $laHR = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code'])
+            $laHR = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code', 'academicUnitHead:id,name'])
                 ->where('status', 'pending')->latest()->get()
                 ->map(fn ($r) => $this->normaliseLeaveApplication($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'leave_applications', 'Leave Applications', $laHR);
@@ -782,6 +828,9 @@ class ApprovalInboxService
                         ['label' => 'HR Officer',         'value' => $r->hrOfficer?->name ?? '—'],
                         ['label' => 'HR Action',          'value' => $r->hr_officer_action ?? '—'],
                         ['label' => 'HR Remarks',         'value' => $r->hr_officer_remarks ?? '—', 'full' => true],
+                        ['label' => 'Academic Unit Head', 'value' => $r->academicUnitHead?->name ?? '—'],
+                        ['label' => 'AUH Action',         'value' => $r->auh_action ?? '—'],
+                        ['label' => 'AUH Remarks',        'value' => $r->auh_remarks ?? '—', 'full' => true],
                         ['label' => 'Division Chief',     'value' => $r->divisionChief?->name ?? '—'],
                         ['label' => 'DC Action',          'value' => $r->division_chief_action ?? '—'],
                         ['label' => 'DC Remarks',         'value' => $r->division_chief_remarks ?? '—', 'full' => true],

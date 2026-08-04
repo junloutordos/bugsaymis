@@ -12,9 +12,10 @@ namespace App\Enums;
 class ApprovalStep
 {
     // ── HR Leave ───────────────────────────────────────────────────────────────
-    const LEAVE_HR_OFFICER      = 'hr_officer';       // seq 1 — certifies credits
-    const LEAVE_DIVISION_CHIEF  = 'division_chief';   // seq 2 — recommends
-    const LEAVE_CAMPUS_DIRECTOR = 'campus_director';  // seq 3 — final approval
+    const LEAVE_HR_OFFICER        = 'hr_officer';          // seq 1 — certifies credits
+    const LEAVE_ACADEMIC_UNIT_HEAD = 'academic_unit_head';  // seq 2 — recommends (CID teaching faculty only)
+    const LEAVE_DIVISION_CHIEF    = 'division_chief';      // seq 3 — recommends
+    const LEAVE_CAMPUS_DIRECTOR   = 'campus_director';     // seq 4 — final approval
 
     // ── Payroll ────────────────────────────────────────────────────────────────
     const PAYROLL_PREPARED = 'prepared_by';  // seq 1
@@ -83,9 +84,10 @@ class ApprovalStep
     const DISCIPLINE_RESOLVED = 'discipline_resolved';  // seq 4 — resolution + sanction
 
     // ── Signatory role labels (for signatory_snapshots.role_label) ────────────
-    const SIG_CERTIFYING_OFFICER  = 'Certifying Officer';
-    const SIG_AUTHORIZED_OFFICER  = 'Authorized Officer';
-    const SIG_AUTHORIZED_OFFICIAL = 'Authorized Official';
+    const SIG_CERTIFYING_OFFICER   = 'Certifying Officer';
+    const SIG_ACADEMIC_UNIT_HEAD   = 'Academic Unit Head';
+    const SIG_AUTHORIZED_OFFICER   = 'Authorized Officer';
+    const SIG_AUTHORIZED_OFFICIAL  = 'Authorized Official';
     const SIG_PREPARED_BY         = 'Prepared By';
     const SIG_APPROVED_BY         = 'Approved By';
     const SIG_NOTED_BY            = 'Noted By';

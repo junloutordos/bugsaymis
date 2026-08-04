@@ -186,6 +186,56 @@ class IPCRWorkflowService
         return $headId ? User::find($headId) : null;
     }
 
+    /**
+     * The "recommend before Division Chief" resolver for CID teaching
+     * faculty leave applications. Mirrors immediateSupervisorFor()'s
+     * AUH/ACIDAA chain (without the DivisionChief-self branch, which
+     * doesn't apply to leave — non-teaching DCs never reach this gate):
+     *   AUH (heads a unit)  → ACIDAA — an AUH cannot recommend their own leave
+     *   ACIDAA holder       → CID Chief
+     *   Regular unit faculty→ their Academic Unit Head
+     */
+    public function leaveRecommenderFor(User $employee): ?User
+    {
+        if ($this->holdsAcidaaDesignation($employee)) {
+            return $this->firstNotSelf($employee, $this->cidChief());
+        }
+
+        if ($this->currentAcademicUnits()->where('head_user_id', $employee->id)->isNotEmpty()) {
+            return $this->firstNotSelf($employee, $this->acidaaHolder(), $this->cidChief());
+        }
+
+        return $this->firstNotSelf($employee, $this->academicUnitHeadFor($employee));
+    }
+
+    /**
+     * Whether a leave application from this employee must first be
+     * recommended (via leaveRecommenderFor()) before the Division Chief
+     * (CID Chief) — teaching faculty (Plantilla or COS) in the CID
+     * division, with a resolvable recommender other than themselves and
+     * other than the Division Chief (who already acts at the next stage —
+     * recommending twice as the same person would be redundant).
+     */
+    public function requiresLeaveAuhRecommendation(User $applicant): bool
+    {
+        if (! in_array($applicant->emp_category, ['Plantilla Teaching', 'COS Teaching'], true)) {
+            return false;
+        }
+
+        if ((int) $applicant->division_id !== (int) $this->cidDivisionId()) {
+            return false;
+        }
+
+        $recommender = $this->leaveRecommenderFor($applicant);
+        if (! $recommender || (int) $recommender->id === (int) $applicant->id) {
+            return false;
+        }
+
+        $divisionChiefId = Division::where('id', $applicant->division_id)->value('division_chief_id');
+
+        return (int) $recommender->id !== (int) $divisionChiefId;
+    }
+
     private function currentSchoolYearId(): ?int
     {
         if (! array_key_exists('currentSyId', $this->memo)) {

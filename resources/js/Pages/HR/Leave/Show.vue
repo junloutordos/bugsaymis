@@ -98,10 +98,29 @@
             </div>
           </div>
 
-          <!-- Stage 2: Division Chief -->
+          <!-- Stage 2: Academic Unit Head (CID teaching faculty only) -->
+          <div v-if="requiresAuh" class="flex items-start gap-3">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                 :class="application.auh_id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">3</div>
+            <div>
+              <p class="text-sm font-medium text-slate-700">Academic Unit Head — Recommendation</p>
+              <template v-if="application.auh_id">
+                <p class="text-xs text-slate-600">
+                  <span :class="actionClass(application.auh_action)" class="font-semibold capitalize">
+                    {{ application.auh_action }}
+                  </span>
+                  by {{ application.academic_unit_head?.name }} &bull; {{ fmtDate(application.auh_at) }}
+                </p>
+                <p v-if="application.auh_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.auh_remarks }}"</p>
+              </template>
+              <p v-else class="text-xs text-slate-400">Awaiting Academic Unit Head recommendation</p>
+            </div>
+          </div>
+
+          <!-- Stage 3: Division Chief -->
           <div class="flex items-start gap-3">
             <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                 :class="application.division_chief_id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">3</div>
+                 :class="application.division_chief_id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">{{ requiresAuh ? 4 : 3 }}</div>
             <div>
               <p class="text-sm font-medium text-slate-700">Division Chief — Recommendation</p>
               <template v-if="application.division_chief_id">
@@ -117,10 +136,10 @@
             </div>
           </div>
 
-          <!-- Stage 3: Campus Director -->
+          <!-- Stage 4: Campus Director -->
           <div class="flex items-start gap-3">
             <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                 :class="application.approved_by ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">4</div>
+                 :class="application.approved_by ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">{{ requiresAuh ? 5 : 4 }}</div>
             <div>
               <p class="text-sm font-medium text-slate-700">Campus Director — Final Approval</p>
               <template v-if="application.approved_by">
@@ -147,8 +166,8 @@
           Cancel Application
         </AppButton>
 
-        <!-- Approve/Reject (Division Chief or HR) -->
-        <AppButton v-if="canApprove && ['pending','hr_verified','forwarded'].includes(application.status)"
+        <!-- Approve/Reject (Division Chief, AUH, or HR) -->
+        <AppButton v-if="canApprove && ['pending','hr_verified','auh_verified','forwarded'].includes(application.status)"
                    @click="approveModal = true">
           Review Application
         </AppButton>
@@ -223,18 +242,21 @@ import { PrinterIcon, PaperClipIcon } from '@heroicons/vue/24/outline'
 import { confirmAction } from '@/Composables/useConfirm'
 
 const props = defineProps({
-  application:  Object,
-  hasPin:       Boolean,
-  signatureUri: String,
+  application:       Object,
+  hasPin:            Boolean,
+  signatureUri:      String,
+  requiresAuh:       Boolean,
+  isAuhRecommender:  Boolean,
 })
 
 const page = usePage()
 const me = page.props.auth?.user
 
-const canApprove = me?.permissions?.includes('hr.leave.approve') && props.application.user_id !== me?.id
+const canApprove = (me?.permissions?.includes('hr.leave.approve') || props.isAuhRecommender)
+  && props.application.user_id !== me?.id
 const canCancel  = computed(() =>
   props.application.user_id === me?.id &&
-  ['pending', 'hr_verified', 'forwarded'].includes(props.application.status)
+  ['pending', 'hr_verified', 'auh_verified', 'forwarded'].includes(props.application.status)
 )
 
 // Approve modal
@@ -242,23 +264,26 @@ const approveModal = ref(false)
 
 function defaultStage() {
   const s = props.application.status
-  if (s === 'pending')     return 'hr_officer'
-  if (s === 'hr_verified') return 'division_chief'
-  if (s === 'forwarded')   return 'campus_director'
+  if (s === 'pending')      return 'hr_officer'
+  if (s === 'hr_verified')  return props.requiresAuh ? 'academic_unit_head' : 'division_chief'
+  if (s === 'auh_verified') return 'division_chief'
+  if (s === 'forwarded')    return 'campus_director'
   return 'hr_officer'
 }
 
 function stageLabel(stage) {
   return {
-    hr_officer:       'HR Officer — Certification of Leave Credits',
-    division_chief:   'Division Chief — Recommendation',
-    campus_director:  'Campus Director — Final Approval',
+    hr_officer:          'HR Officer — Certification of Leave Credits',
+    academic_unit_head:  'Academic Unit Head — Recommendation',
+    division_chief:      'Division Chief — Recommendation',
+    campus_director:     'Campus Director — Final Approval',
   }[stage] ?? stage
 }
 
 function defaultAction(stage) {
-  if (stage === 'hr_officer')    return 'certified'
-  if (stage === 'division_chief') return 'forwarded'
+  if (stage === 'hr_officer')          return 'certified'
+  if (stage === 'academic_unit_head')  return 'recommended'
+  if (stage === 'division_chief')      return 'forwarded'
   return 'approved'
 }
 
@@ -273,13 +298,19 @@ const approveForm = useForm({
 const showPinModal   = ref(false)
 const pinModalLoading = ref(false)
 
-const SIGNING_ACTIONS = ['certified', 'forwarded', 'approved']
+const SIGNING_ACTIONS = ['certified', 'recommended', 'forwarded', 'approved']
 
 const actionOptions = computed(() => {
   if (approveForm.stage === 'hr_officer') {
     return [
       { value: 'certified', label: 'Certify Credits' },
       { value: 'rejected',  label: 'Reject' },
+    ]
+  }
+  if (approveForm.stage === 'academic_unit_head') {
+    return [
+      { value: 'recommended', label: 'Recommend to Division Chief' },
+      { value: 'rejected',    label: 'Reject' },
     ]
   }
   if (approveForm.stage === 'division_chief') {
@@ -345,24 +376,26 @@ function leaveDetailLabel(v) { return leaveDetailMap[v] ?? v }
 
 function statusColor(s) {
   const map = {
-    pending:     'amber',
-    hr_verified: 'purple',
-    forwarded:   'blue',
-    approved:    'green',
-    rejected:    'red',
-    cancelled:   'slate',
+    pending:      'amber',
+    hr_verified:  'purple',
+    auh_verified: 'indigo',
+    forwarded:    'blue',
+    approved:     'green',
+    rejected:     'red',
+    cancelled:    'slate',
   }
   return map[s] ?? 'slate'
 }
 
 function statusLabel(s) {
   const map = {
-    pending:     'Pending',
-    hr_verified: 'For Division Chief',
-    forwarded:   'For Campus Director',
-    approved:    'Approved',
-    rejected:    'Rejected',
-    cancelled:   'Cancelled',
+    pending:      'Pending',
+    hr_verified:  props.requiresAuh ? 'For Academic Unit Head' : 'For Division Chief',
+    auh_verified: 'For Division Chief',
+    forwarded:    'For Campus Director',
+    approved:     'Approved',
+    rejected:     'Rejected',
+    cancelled:    'Cancelled',
   }
   return map[s] ?? s
 }

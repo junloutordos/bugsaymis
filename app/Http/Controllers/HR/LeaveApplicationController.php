@@ -162,44 +162,79 @@ class LeaveApplicationController extends Controller
         $this->authorize('hr.leave.view');
 
         $authUser = Auth::user();
+        $ipcrWorkflow = app(\App\Services\PerformanceManagement\IPCRWorkflowService::class);
+        $requiresAuh = $leaveApplication->user
+            ? $ipcrWorkflow->requiresLeaveAuhRecommendation($leaveApplication->user)
+            : false;
 
         return Inertia::render('HR/Leave/Show', [
             'application' => $leaveApplication->load([
                 'user', 'leaveType',
-                'hrOfficer',       // Stage 1
-                'divisionChief',   // Stage 2
-                'approvedBy',      // Stage 3
+                'hrOfficer',        // Stage 1
+                'academicUnitHead', // Stage 2 (CID teaching faculty only)
+                'divisionChief',    // Stage 3
+                'approvedBy',       // Stage 4
             ]),
             'hasPin'       => ! empty($authUser->signature_pin),
             'signatureUri' => $this->sigService->getSignatureDataUri($authUser),
+            'requiresAuh'  => $requiresAuh,
+            // Lets the "Review Application" button show for the specific
+            // resolved recommender even when they hold no RBAC permission
+            // for it (e.g. an ACIDAA holder reviewing an AUH's own leave).
+            'isAuhRecommender' => $requiresAuh
+                && ($recommender = $ipcrWorkflow->leaveRecommenderFor($leaveApplication->user))
+                && (int) $recommender->id === (int) $authUser->id,
         ]);
     }
 
     /**
-     * 3-stage approval workflow:
-     *   Stage 1 — hr_officer   : HR Officer certifies leave credits  (pending      → hr_verified)
-     *   Stage 2 — division_chief: Division Chief recommends           (hr_verified  → forwarded)
-     *   Stage 3 — campus_director: Campus Director final approval     (forwarded    → approved/rejected)
+     * Leave approval workflow (4 stages for CID teaching faculty, 3 for everyone else):
+     *   Stage 1 — hr_officer        : HR Officer certifies leave credits    (pending       → hr_verified)
+     *   Stage 2 — academic_unit_head: AUH (or ACIDAA for an AUH's own leave)
+     *                                 recommends — CID teaching faculty only (hr_verified   → auh_verified)
+     *   Stage 3 — division_chief    : Division Chief recommends              (hr_verified/auh_verified → forwarded)
+     *   Stage 4 — campus_director   : Campus Director final approval         (forwarded     → approved/rejected)
      */
     public function approve(Request $request, LeaveApplication $leaveApplication)
     {
-        $this->authorize('hr.leave.approve');
-
         $data = $request->validate([
-            'stage'   => 'required|in:hr_officer,division_chief,campus_director',
+            'stage'   => 'required|in:hr_officer,academic_unit_head,division_chief,campus_director',
             'action'  => 'required|string',
             'remarks' => 'nullable|string|max:500',
         ]);
 
+        // The academic_unit_head stage is authorized purely by identity (must
+        // be the applicant's specific resolved recommender, checked below) —
+        // an ACIDAA holder reviewing an AUH's own leave has no dedicated RBAC
+        // role/permission, mirroring how ApprovalInboxController already
+        // treats ACIDAA designation membership as sufficient on its own.
+        if ($data['stage'] !== 'academic_unit_head') {
+            $this->authorize('hr.leave.approve');
+        }
+
         $approver = Auth::user();
 
         // Nobody may act on their own leave application at any stage — even if
-        // they separately hold HR Officer/Division Chief/Campus Director permission.
+        // they separately hold HR Officer/AUH/Division Chief/Campus Director permission.
         abort_if(
             $leaveApplication->user_id === $approver->id,
             403,
             'You cannot act on your own leave application.'
         );
+
+        // Academic Unit Head (or ACIDAA, for an AUH's own leave) may only act
+        // on the specific applicant they are the resolved recommender for.
+        if ($data['stage'] === 'academic_unit_head' && ! $approver->isSuperAdmin()) {
+            $ipcrWorkflow = app(\App\Services\PerformanceManagement\IPCRWorkflowService::class);
+            $recommender = $leaveApplication->user
+                ? $ipcrWorkflow->leaveRecommenderFor($leaveApplication->user)
+                : null;
+            abort_unless(
+                $recommender && (int) $recommender->id === (int) $approver->id,
+                403,
+                'You are not the Academic Unit Head recommender for this employee.'
+            );
+        }
 
         // Division Chiefs may only act on leave from their own division
         if ($data['stage'] === 'division_chief' && ! $approver->isSuperAdmin()) {
@@ -220,7 +255,7 @@ class LeaveApplicationController extends Controller
             approver:    $approver,
         );
 
-        if (in_array($data['action'], ['certified', 'forwarded', 'approved'], true)) {
+        if (in_array($data['action'], ['certified', 'recommended', 'forwarded', 'approved'], true)) {
             $this->performSign($request, LeaveApplication::class, $leaveApplication->id,
                 $data['stage'],
                 "Leave Application #{$leaveApplication->id}",
@@ -237,7 +272,7 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        if (! in_array($leaveApplication->status, ['pending', 'hr_verified', 'forwarded', 'approved'])) {
+        if (! in_array($leaveApplication->status, ['pending', 'hr_verified', 'auh_verified', 'forwarded', 'approved'])) {
             return back()->with('error', 'This application cannot be cancelled.');
         }
 
@@ -390,7 +425,7 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        $application = $leaveApplication->load(['user.division.divisionchief', 'leaveType', 'hrOfficer', 'divisionChief', 'approvedBy']);
+        $application = $leaveApplication->load(['user.division.divisionchief', 'leaveType', 'hrOfficer', 'academicUnitHead', 'divisionChief', 'approvedBy']);
 
         // Resolve monthly salary from salary schedule (salary_grade + salary_step on the user)
         $monthlySalary = null;
@@ -444,8 +479,33 @@ class LeaveApplicationController extends Controller
 
         // ── Resolve signatories (snapshot-first, live fallback) ──────────────
 
-        // Fallback: live certifying officer (HR Officer who certified)
-        $liveCertifying = $application->hr_officer_id ? $application->hrOfficer : null;
+        // Certification of Leave Credits is always attributed to the
+        // officially designated Human Resource Designate, regardless of
+        // which HR-permission holder performed the digital certification
+        // in the system — there is no User account for this title, so it's
+        // a fixed display value rather than a snapshot/live-resolved one.
+        $certifyingOfficer = [
+            'name'           => 'Flora Mae O. Tormento',
+            'position'       => 'Human Resource Designate',
+            'division'       => null,
+            'office'         => null,
+            'signature_path' => null,
+            'captured_at'    => null,
+        ];
+
+        // Fallback: live Academic Unit Head recommender (CID teaching faculty
+        // only — AUH for regular faculty, ACIDAA for an AUH's own leave).
+        $requiresAuh = $application->user
+            ? app(\App\Services\PerformanceManagement\IPCRWorkflowService::class)
+                ->requiresLeaveAuhRecommendation($application->user)
+            : false;
+        $liveAuh = null;
+        if ($requiresAuh) {
+            $liveAuh = $application->auh_id
+                ? $application->academicUnitHead
+                : app(\App\Services\PerformanceManagement\IPCRWorkflowService::class)
+                    ->leaveRecommenderFor($application->user);
+        }
 
         // Fallback: live authorized officer (Division Chief of the applicant's division)
         // Division Chiefs have no DC above them — leave this signatory blank.
@@ -471,22 +531,25 @@ class LeaveApplicationController extends Controller
         }
 
         // Capture signatories into snapshots (idempotent — safe to call every print)
-        $this->snapshots->captureSignatories($application, [
-            ['role_label' => ApprovalStep::SIG_CERTIFYING_OFFICER,  'user' => $liveCertifying],
+        $signatoriesToCapture = [
             ['role_label' => ApprovalStep::SIG_AUTHORIZED_OFFICER,  'user' => $liveAuthorized],
             ['role_label' => ApprovalStep::SIG_AUTHORIZED_OFFICIAL, 'user' => $liveOfficial],
-        ]);
+        ];
+        if ($requiresAuh) {
+            $signatoriesToCapture[] = ['role_label' => ApprovalStep::SIG_ACADEMIC_UNIT_HEAD, 'user' => $liveAuh];
+        }
+        $this->snapshots->captureSignatories($application, $signatoriesToCapture);
 
         // Resolve final display data from snapshots (with live fallback)
-        $certifyingOfficer  = $this->snapshots->resolveSignatory(
-            $application, ApprovalStep::SIG_CERTIFYING_OFFICER, $liveCertifying
-        );
         $authorizedOfficer  = $this->snapshots->resolveSignatory(
             $application, ApprovalStep::SIG_AUTHORIZED_OFFICER, $liveAuthorized
         );
         $authorizedOfficial = $this->snapshots->resolveSignatory(
             $application, ApprovalStep::SIG_AUTHORIZED_OFFICIAL, $liveOfficial
         );
+        $academicUnitHead   = $requiresAuh
+            ? $this->snapshots->resolveSignatory($application, ApprovalStep::SIG_ACADEMIC_UNIT_HEAD, $liveAuh)
+            : null;
 
         $sigs = $this->loadSigsForPrint(LeaveApplication::class, $leaveApplication->id);
 
@@ -497,6 +560,7 @@ class LeaveApplicationController extends Controller
             'application'        => $application,
             'credits'            => $creditsMap,
             'certifyingOfficer'  => $certifyingOfficer,
+            'academicUnitHead'   => $academicUnitHead,
             'authorizedOfficer'  => $authorizedOfficer,
             'authorizedOfficial' => $authorizedOfficial,
             'monthlySalary'      => $monthlySalary,

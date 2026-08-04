@@ -448,6 +448,9 @@ class RolePermissionSeeder extends Seeder
         $assign('CID Chief', ['cid.dashboard']);
         $assign('AUH', ['cid.dashboard']);
 
+        // ── Leave — AUH recommends CID teaching faculty's leave before the DC ──
+        $assign('AUH', ['hr.leave.view', 'hr.leave.approve']);
+
         // ── Alternative Learning Program ─────────────────────────────────────
         $assign('CID Chief', ['alp.view', 'alp.manage', 'alp.advise', 'alp.coordinate', 'alp.approve', 'alp.reports', 'alp.audit']);
         $assign('Faculty', ['alp.view', 'alp.advise']);
