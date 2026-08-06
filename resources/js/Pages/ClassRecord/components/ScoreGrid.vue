@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
@@ -10,7 +10,8 @@ import {
 import ManageStudentsModal from './ManageStudentsModal.vue'
 import AppButton from '@/Components/AppButton.vue'
 import { confirmAction } from '@/Composables/useConfirm.js'
-import { LockClosedIcon, UsersIcon } from '@heroicons/vue/24/outline'
+import { sessionExpired } from '@/Composables/useSession.js'
+import { LockClosedIcon, UsersIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecordId:   { type: Number,  required: true },
@@ -106,8 +107,46 @@ const allAssessments = computed(() =>
 const scores  = ref({})   // { `${studentId}_${assessmentId}`: number|null }
 const loading = ref(true)
 const saveStatus = ref('idle')  // 'idle' | 'saving' | 'saved' | 'error'
+const saveError  = ref(null)    // persistent human-readable message, or null
 let   saveTimer  = null
+let   retryTimer = null
+let   inFlight   = false
+const retryCount = ref(0)
 const dirtyKeys  = ref(new Set())
+
+// ── Unsaved-draft persistence (localStorage) ──────────────────────────────────
+// A safety net for the window between a keystroke and the debounced save
+// actually landing: if the tab is closed, the network drops, or the session
+// expires before that happens, the pending edits would otherwise vanish
+// silently. Every dirty score is mirrored here and only cleared once the
+// server has actually confirmed it.
+
+function draftStorageKey() {
+  return `crScoreDraft:${props.classRecordId}:${props.quarterNumber}`
+}
+
+function loadDraftFromStorage() {
+  try {
+    const raw = localStorage.getItem(draftStorageKey())
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function persistDraftToStorage() {
+  try {
+    if (!dirtyKeys.value.size) {
+      localStorage.removeItem(draftStorageKey())
+      return
+    }
+    const draft = {}
+    for (const key of dirtyKeys.value) draft[key] = scores.value[key] ?? null
+    localStorage.setItem(draftStorageKey(), JSON.stringify(draft))
+  } catch {
+    // best-effort only — localStorage may be unavailable/full
+  }
+}
 
 async function loadScores() {
   if (!props.quarterData) return
@@ -120,6 +159,22 @@ async function loadScores() {
     scores.value = {}
     for (const [key, val] of Object.entries(data)) {
       scores.value[key] = val !== null ? Number(val) : null
+    }
+
+    // Restore any unsaved draft left behind by a lost connection, an expired
+    // session, or a tab close that happened before the debounced save fired.
+    const draft = loadDraftFromStorage()
+    const draftKeys = draft ? Object.keys(draft) : []
+    if (draftKeys.length) {
+      for (const key of draftKeys) {
+        scores.value[key] = draft[key]
+        dirtyKeys.value.add(key)
+      }
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'info', showConfirmButton: false, timer: 3500,
+        title: `Restored ${draftKeys.length} unsaved score(s) — re-saving now…`,
+      })
+      flushSave()
     }
   } catch (err) {
     console.error('Failed to load scores', err)
@@ -145,6 +200,7 @@ function setScore(studentId, assessmentId, val) {
   const parsed = val === '' || val === null || val === undefined ? null : Number(val)
   scores.value[key] = parsed
   dirtyKeys.value.add(key)
+  persistDraftToStorage()
   scheduleSave()
 }
 
@@ -152,20 +208,27 @@ function setScore(studentId, assessmentId, val) {
 
 function scheduleSave() {
   clearTimeout(saveTimer)
+  clearTimeout(retryTimer)
   saveStatus.value = 'idle'
+  saveError.value  = null
+  retryCount.value = 0
   saveTimer = setTimeout(flushSave, 1500)
 }
 
 async function flushSave() {
-  if (!dirtyKeys.value.size || props.isLocked) return
+  clearTimeout(saveTimer)
+  if (inFlight || !dirtyKeys.value.size || props.isLocked) return
 
+  inFlight = true
   saveStatus.value = 'saving'
   const keysToSave = [...dirtyKeys.value]
-  dirtyKeys.value  = new Set()
+  // Snapshot exactly what's being sent, so a key edited again while this
+  // request is in flight doesn't get incorrectly marked as saved.
+  const sentValues = Object.fromEntries(keysToSave.map(key => [key, scores.value[key]]))
 
   const payload = keysToSave.map(key => {
     const [studentId, assessmentId] = key.split('_').map(Number)
-    return { student_id: studentId, assessment_id: assessmentId, score: scores.value[key] }
+    return { student_id: studentId, assessment_id: assessmentId, score: sentValues[key] }
   })
 
   try {
@@ -173,14 +236,63 @@ async function flushSave() {
       route('class-records.scores.upsert', { classRecord: props.classRecordId, q: props.quarterNumber }),
       { scores: payload }
     )
+    for (const key of keysToSave) {
+      if (scores.value[key] === sentValues[key]) dirtyKeys.value.delete(key)
+    }
+    persistDraftToStorage()
+    retryCount.value = 0
+    saveError.value  = null
     saveStatus.value = 'saved'
     setTimeout(() => { if (saveStatus.value === 'saved') saveStatus.value = 'idle' }, 3000)
   } catch (err) {
-    saveStatus.value = 'error'
-    dirtyKeys.value  = new Set([...dirtyKeys.value, ...keysToSave])
     console.error('Auto-save failed', err)
+    persistDraftToStorage() // dirty keys were never removed on failure — still tracked
+
+    if (err.response?.status === 419 || err.response?.status === 401) {
+      saveStatus.value = 'error'
+      saveError.value  = 'Your session expired before these changes could be saved. Reload to log back in — your unsaved scores will be restored and re-saved automatically.'
+      sessionExpired.value = true
+      return
+    }
+
+    saveStatus.value = 'error'
+    retryCount.value += 1
+    if (retryCount.value <= 3) {
+      saveError.value = `Save failed — retrying (attempt ${retryCount.value} of 3)…`
+      clearTimeout(retryTimer)
+      retryTimer = setTimeout(flushSave, retryCount.value * 5000)
+    } else {
+      saveError.value = `${keysToSave.length} score(s) could not be saved after several attempts.`
+    }
+  } finally {
+    inFlight = false
   }
 }
+
+function retryNow() {
+  retryCount.value = 0
+  clearTimeout(retryTimer)
+  flushSave()
+}
+
+// ── Flush on navigation away / tab close ──────────────────────────────────────
+// The Scores sub-tab is torn down via v-if the instant the teacher switches
+// quarters or sub-tabs — any edit still sitting in the 1.5s debounce window
+// would otherwise be silently dropped instead of sent.
+
+onBeforeUnmount(() => {
+  clearTimeout(saveTimer)
+  clearTimeout(retryTimer)
+  if (dirtyKeys.value.size) flushSave()
+})
+
+function handleBeforeUnload(e) {
+  if (!dirtyKeys.value.size) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
 
 // ── Computed grades ───────────────────────────────────────────────────────────
 
@@ -314,6 +426,10 @@ async function lockQuarter() {
   locking.value = true
   try {
     await flushSave()
+    if (dirtyKeys.value.size) {
+      Swal.fire('Error', 'Some scores could not be saved yet — fix the connection issue above and try locking again once "Saved ✓" shows.', 'error')
+      return
+    }
     await axios.post(
       route('class-records.quarters.lock', { classRecord: props.classRecordId, q: props.quarterNumber })
     )
@@ -354,13 +470,22 @@ const showRunning = computed(() => props.quarterNumber > 1)
         <!-- Save indicator -->
         <span v-if="saveStatus === 'saving'" class="text-xs text-slate-400">Saving…</span>
         <span v-if="saveStatus === 'saved'"  class="text-xs text-emerald-600 font-medium">Saved ✓</span>
-        <span v-if="saveStatus === 'error'"  class="text-xs text-red-500">Save failed — will retry</span>
       </div>
       <div class="flex items-center gap-2">
         <AppButton variant="secondary" size="sm" @click="showStudentsModal = true">
           <UsersIcon class="h-3.5 w-3.5" /> Manage Students
         </AppButton>
       </div>
+    </div>
+
+    <!-- Persistent save-failure banner — does not auto-dismiss, unlike the toolbar status text -->
+    <div v-if="saveError"
+      class="flex items-center gap-2 bg-red-50 border border-red-100 text-red-700 rounded-lg px-4 py-2.5 text-sm">
+      <ExclamationTriangleIcon class="h-4 w-4 shrink-0" />
+      <span class="flex-1">{{ saveError }}</span>
+      <button v-if="retryCount > 3" type="button" @click="retryNow" class="underline font-medium shrink-0">
+        Retry now
+      </button>
     </div>
 
     <!-- At-risk summary chips -->
