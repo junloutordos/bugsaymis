@@ -186,10 +186,10 @@
 
       <!-- Assignment list -->
       <div v-else class="space-y-1.5">
-        <button v-for="la in myLoad" :key="la.load_assignment_id"
-                type="button"
-                @click="pickLoad(la)"
-                class="w-full text-left rounded-xl px-4 py-3 border transition"
+        <div v-for="la in myLoad" :key="la.load_assignment_id"
+                role="button" tabindex="0"
+                @click="pickLoad(la)" @keydown.enter="pickLoad(la)"
+                class="w-full text-left rounded-xl px-4 py-3 border transition cursor-pointer"
                 :class="[
                   isSelected(la)
                     ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
@@ -222,7 +222,21 @@
             Existing: {{ la.existing_records.map(r => r.category_label || '(no category)').join(', ') }} —
             selecting this will create <span class="font-medium">another</span> category for this subject.
           </p>
-        </button>
+          <div v-if="la.joinable_records?.length && !la.already_created"
+               class="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+            <p class="text-[11px] text-slate-500">
+              A shared record already exists for this section — join it as the
+              <span class="font-medium">{{ la.subject_name }}</span> teacher.
+            </p>
+            <AppButton v-for="record in la.joinable_records" :key="record.id"
+              size="sm" variant="secondary"
+              :loading="joiningId === record.id"
+              :disabled="joiningId !== null"
+              @click.stop="joinRecord(la, record)">
+              Join {{ record.subject_name }} record
+            </AppButton>
+          </div>
+        </div>
       </div>
 
       <p v-if="createErrors.assignment" class="text-xs text-red-500 mt-2">{{ createErrors.assignment[0] }}</p>
@@ -662,6 +676,21 @@ function openCreate() {
   createErrors.value    = {}
   showModal.value       = true
   fetchMyLoad()
+}
+
+// Join an existing PEHM-style shared class record instead of creating a new one.
+const joiningId = ref(null)
+
+async function joinRecord(la, record) {
+  joiningId.value = record.id
+  try {
+    await axios.post(route('class-records.join', record.id), { subject_id: la.subject_id })
+    await fetchMyLoad()
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to join.', 'error')
+  } finally {
+    joiningId.value = null
+  }
 }
 
 function isSelected(assignment) {

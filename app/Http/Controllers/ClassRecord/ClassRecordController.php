@@ -236,6 +236,46 @@ class ClassRecordController extends Controller
         ]);
     }
 
+    // ── GET /class-records/{classRecord}/co-teacher-candidates ────────────────
+    // Admin-only lookup used by the "Add Co-teacher" control on the Show page:
+    // which sibling subjects (same subject_group + grade_level) still have no
+    // teacher on this record, and which teachers are actually assigned (via
+    // LoadAssignment) to teach that subject on this section this school year.
+
+    public function coTeacherCandidates(ClassRecord $classRecord): JsonResponse
+    {
+        abort_unless($this->isAdmin(), 403);
+
+        $primarySubject = Subject::find($classRecord->subject_id);
+        $currentSY = SchoolYear::where('is_current', true)->first(['id']);
+
+        if (! $primarySubject?->subject_group || ! $currentSY) {
+            return response()->json(['subjects' => [], 'teachers_by_subject' => (object) []]);
+        }
+
+        $coveredSubjectIds = $classRecord->coTeachers()->pluck('subject_id');
+
+        $siblings = Subject::where('subject_group', $primarySubject->subject_group)
+            ->where('grade_level', $primarySubject->grade_level)
+            ->where('id', '!=', $classRecord->subject_id)
+            ->whereNotIn('id', $coveredSubjectIds)
+            ->get(['id', 'name']);
+
+        $teachersBySubject = LoadAssignment::whereIn('subject_id', $siblings->pluck('id'))
+            ->where('section_id', $classRecord->section_id)
+            ->where('school_year_id', $currentSY->id)
+            ->where('assignment_type', 'teaching')
+            ->with('faculty:id,name')
+            ->get()
+            ->groupBy('subject_id')
+            ->map(fn ($rows) => $rows->pluck('faculty')->filter()->unique('id')->values());
+
+        return response()->json([
+            'subjects' => $siblings,
+            'teachers_by_subject' => $teachersBySubject,
+        ]);
+    }
+
     /**
      * Once a record has co-teachers, its subject_name becomes a synthesized
      * "group — subject / subject / subject" label (e.g. "PEHM — PE / Health

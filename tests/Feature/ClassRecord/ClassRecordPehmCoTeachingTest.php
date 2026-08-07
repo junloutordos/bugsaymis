@@ -11,9 +11,14 @@ use App\Models\ClassRecord\ClassRecordStudent;
 use App\Models\ClassRecord\ClassRecordTeacher;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\FacultyLoad;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -30,6 +35,7 @@ class ClassRecordPehmCoTeachingTest extends TestCase
     use RefreshDatabase;
 
     private SchoolYear $sy;
+    private AcademicTerm $term;
     private GradingOption $option;
     private Section $section;
 
@@ -40,6 +46,10 @@ class ClassRecordPehmCoTeachingTest extends TestCase
         $this->sy = SchoolYear::create([
             'name' => '2025-2026', 'start_date' => '2025-08-01', 'end_date' => '2026-06-30',
             'is_current' => true, 'status' => 'active',
+        ]);
+        $this->term = AcademicTerm::create([
+            'school_year_id' => $this->sy->id, 'name' => '1st Semester', 'term_type' => '1st_semester',
+            'start_date' => '2025-08-01', 'end_date' => '2025-12-31', 'is_current' => true,
         ]);
         $this->option = GradingOption::create(['name' => 'PEHM Grading', 'is_active' => true]);
         $this->section = Section::create([
@@ -82,6 +92,34 @@ class ClassRecordPehmCoTeachingTest extends TestCase
         return ClassRecordTeacher::create([
             'class_record_id' => $record->id, 'subject_id' => $subject->id,
             'user_id' => $user->id, 'is_primary' => $primary,
+        ]);
+    }
+
+    private function admin(): User
+    {
+        $permission = Permission::firstOrCreate(
+            ['name' => 'class-records.admin'],
+            ['module' => 'Class Records', 'description' => 'Admin'],
+        );
+        $role = Role::create(['name' => 'ClassRecordAdmin_'.uniqid()]);
+        $role->permissions()->attach($permission->id);
+        $user = User::factory()->create();
+        $user->roles()->attach($role->id);
+
+        return $user->fresh();
+    }
+
+    private function assignTeachingLoad(User $user, Subject $subject, Section $section): LoadAssignment
+    {
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $user->id, 'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+        ]);
+
+        return LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $user->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'load_units' => 3,
         ]);
     }
 
@@ -494,6 +532,66 @@ class ClassRecordPehmCoTeachingTest extends TestCase
 
         $this->assertEquals(1, ClassRecordTeacher::where('class_record_id', $record->id)
             ->where('subject_id', $peSubject->id)->count());
+    }
+
+    // ── Co-teacher candidates (admin "Add Co-teacher" lookup) ─────────────────
+
+    public function test_admin_can_list_co_teacher_candidates(): void
+    {
+        $peTeacher = User::factory()->create();
+        $healthTeacher = User::factory()->create();
+        $musicTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1');
+        $healthSubject = $this->makeSubject('Health 1', 'HEA1');
+        $musicSubject = $this->makeSubject('Music 1', 'MUS1');
+
+        $record = $this->makeRecord($peTeacher, $peSubject);
+        $this->attachCoTeacher($record, $peSubject, $peTeacher, true);
+        // Health is already covered by a co-teacher — must be excluded from candidates.
+        $this->attachCoTeacher($record, $healthSubject, $healthTeacher);
+
+        $this->assignTeachingLoad($musicTeacher, $musicSubject, $this->section);
+
+        $response = $this->actingAs($this->admin())
+            ->getJson(route('class-records.co-teacher-candidates', ['classRecord' => $record->id]))
+            ->assertOk();
+
+        $subjects = $response->json('subjects');
+        $this->assertCount(1, $subjects);
+        $this->assertSame($musicSubject->id, $subjects[0]['id']);
+
+        $teachers = $response->json("teachers_by_subject.{$musicSubject->id}");
+        $this->assertCount(1, $teachers);
+        $this->assertSame($musicTeacher->id, $teachers[0]['id']);
+    }
+
+    public function test_non_admin_cannot_list_co_teacher_candidates(): void
+    {
+        $peTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1');
+        $record = $this->makeRecord($peTeacher, $peSubject);
+
+        $this->actingAs($peTeacher)
+            ->getJson(route('class-records.co-teacher-candidates', ['classRecord' => $record->id]))
+            ->assertStatus(403);
+    }
+
+    public function test_candidates_endpoint_returns_empty_for_non_shared_subject(): void
+    {
+        $teacher = User::factory()->create();
+        $subject = Subject::create([
+            'school_year_id' => $this->sy->id, 'code' => 'MATH8', 'name' => 'Mathematics 8',
+            'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
+            'grade_level' => 8, 'subject_group' => null, 'sessions_per_week' => 5,
+            'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $record = $this->makeRecord($teacher, $subject);
+
+        $response = $this->actingAs($this->admin())
+            ->getJson(route('class-records.co-teacher-candidates', ['classRecord' => $record->id]))
+            ->assertOk();
+
+        $this->assertSame([], $response->json('subjects'));
     }
 
     // ── Monitor scope ──────────────────────────────────────────────────────────

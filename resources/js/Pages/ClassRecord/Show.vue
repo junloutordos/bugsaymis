@@ -776,6 +776,50 @@ async function copyFromRecord() {
   }
 }
 
+// ── Add co-teacher (admin) ─────────────────────────────────────────────────────
+
+const showAddCoTeacherModal        = ref(false)
+const loadingCoTeacherCandidates   = ref(false)
+const coTeacherCandidates          = ref({ subjects: [], teachers_by_subject: {} })
+const selectedCoTeacherSubjectId   = ref(null)
+const selectedCoTeacherUserId      = ref(null)
+const addingCoTeacher              = ref(false)
+
+watch(selectedCoTeacherSubjectId, () => { selectedCoTeacherUserId.value = null })
+
+async function openAddCoTeacherModal() {
+  selectedCoTeacherSubjectId.value = null
+  selectedCoTeacherUserId.value    = null
+  showAddCoTeacherModal.value      = true
+  loadingCoTeacherCandidates.value = true
+  try {
+    const { data } = await axios.get(route('class-records.co-teacher-candidates', props.classRecord.id))
+    coTeacherCandidates.value = data
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to load eligible subjects.', 'error')
+    coTeacherCandidates.value = { subjects: [], teachers_by_subject: {} }
+  } finally {
+    loadingCoTeacherCandidates.value = false
+  }
+}
+
+async function submitAddCoTeacher() {
+  if (!selectedCoTeacherSubjectId.value || !selectedCoTeacherUserId.value) return
+  addingCoTeacher.value = true
+  try {
+    await axios.post(route('class-records.join', props.classRecord.id), {
+      subject_id: selectedCoTeacherSubjectId.value,
+      teacher_id: selectedCoTeacherUserId.value,
+    })
+    showAddCoTeacherModal.value = false
+    router.reload({ only: ['classRecord'] })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to add co-teacher.', 'error')
+  } finally {
+    addingCoTeacher.value = false
+  }
+}
+
 // ── Apply this setup to other sections (push direction) ───────────────────────
 
 const showApplyToSectionsModal = ref(false)
@@ -1128,13 +1172,16 @@ async function saveQuarterOption() {
       </AppPageHeader>
 
       <!-- Co-teacher roster: only shown for a shared (e.g. PEHM) record -->
-      <div v-if="classRecord.co_teachers?.length" class="flex flex-wrap items-center gap-2 text-sm">
-        <span class="text-slate-500 font-medium">Shared with:</span>
+      <div v-if="classRecord.co_teachers?.length || isAdmin" class="flex flex-wrap items-center gap-2 text-sm">
+        <span v-if="classRecord.co_teachers?.length" class="text-slate-500 font-medium">Shared with:</span>
         <span v-for="ct in classRecord.co_teachers" :key="ct.id"
           class="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-medium">
           {{ ct.subject?.name ?? 'Subject' }} — {{ ct.user?.name ?? '—' }}
           <span v-if="ct.is_primary" class="text-indigo-400">(primary)</span>
         </span>
+        <AppButton v-if="isAdmin" size="sm" variant="secondary" @click="openAddCoTeacherModal">
+          <PlusIcon class="h-3.5 w-3.5" /> Add Co-teacher
+        </AppButton>
       </div>
 
       <!-- Read-only banner: past school year, or a CID Chief / AUH monitor view -->
@@ -1671,6 +1718,55 @@ async function saveQuarterOption() {
       <AppButton variant="secondary" @click="showApplyToSectionsModal = false">Cancel</AppButton>
       <AppButton :loading="applyingToSections" :disabled="!applyToSectionIds.length || applyingToSections" @click="applyToSections">
         {{ applyingToSections ? 'Applying…' : `Apply to ${applyToSectionIds.length || ''} Section(s)` }}
+      </AppButton>
+    </template>
+  </AppModal>
+
+  <!-- Add co-teacher modal -->
+  <AppModal :show="showAddCoTeacherModal" title="Add Co-teacher"
+    subtitle="Attach a teacher for another PEHM-group subject on this shared class record."
+    size="md" @close="showAddCoTeacherModal = false">
+    <div class="space-y-3">
+      <div v-if="loadingCoTeacherCandidates" class="flex items-center gap-2 text-sm text-slate-400 py-4">
+        <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+        </svg>
+        Loading eligible subjects…
+      </div>
+      <p v-else-if="!coTeacherCandidates.subjects.length" class="text-sm text-slate-400">
+        This subject doesn't support shared class records, or every slot is already covered.
+      </p>
+      <template v-else>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Subject</label>
+          <select v-model="selectedCoTeacherSubjectId"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option :value="null" disabled>Select subject…</option>
+            <option v-for="s in coTeacherCandidates.subjects" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Teacher</label>
+          <select v-model="selectedCoTeacherUserId"
+            :disabled="!selectedCoTeacherSubjectId"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option :value="null" disabled>Select teacher…</option>
+            <option v-for="t in coTeacherCandidates.teachers_by_subject[selectedCoTeacherSubjectId] ?? []" :key="t.id" :value="t.id">
+              {{ t.name }}
+            </option>
+          </select>
+          <p v-if="selectedCoTeacherSubjectId && !(coTeacherCandidates.teachers_by_subject[selectedCoTeacherSubjectId] ?? []).length"
+             class="text-xs text-warning-600 mt-1">
+            No teacher is assigned to teach this subject for this section in Faculty Loading yet.
+          </p>
+        </div>
+      </template>
+    </div>
+    <template #footer>
+      <AppButton variant="secondary" @click="showAddCoTeacherModal = false">Cancel</AppButton>
+      <AppButton :loading="addingCoTeacher" :disabled="!selectedCoTeacherSubjectId || !selectedCoTeacherUserId || addingCoTeacher" @click="submitAddCoTeacher">
+        {{ addingCoTeacher ? 'Adding…' : 'Add Co-teacher' }}
       </AppButton>
     </template>
   </AppModal>

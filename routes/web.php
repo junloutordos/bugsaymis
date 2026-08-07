@@ -2429,6 +2429,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::post('/class-records',                       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'store'])->name('class-records.store');
     Route::post('/class-records/bulk',                  [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'bulkStore'])->name('class-records.bulk-store');
     Route::post('/class-records/{classRecord}/join',    [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'join'])->name('class-records.join');
+    Route::get('/class-records/{classRecord}/co-teacher-candidates', [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'coTeacherCandidates'])->name('class-records.co-teacher-candidates');
     Route::get('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'show'])->name('class-records.show');
     Route::put('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'update'])->name('class-records.update');
     Route::delete('/class-records/{classRecord}',       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'destroy'])->name('class-records.destroy');
