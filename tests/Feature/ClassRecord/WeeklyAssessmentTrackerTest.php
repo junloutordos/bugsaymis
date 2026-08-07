@@ -697,6 +697,40 @@ class WeeklyAssessmentTrackerTest extends TestCase
         $this->assertSame(['graded' => 1, 'major' => 1], $counts);
     }
 
+    /**
+     * Production regression (Grade 11 "Venus", 2026-08-11): Biology 3 Level 2's
+     * Science Core period is stored as one 07:30-09:10 row, while Physics 3
+     * Level 2's identical period is stored as two consecutive 07:30-08:20 +
+     * 08:20-09:10 rows. Both are the same cross-section Science Core block and
+     * must pool as one WAT unit — the split-row storage must not make Physics 3
+     * count as its own separate slot.
+     */
+    public function test_same_time_science_core_subjects_count_as_one_even_when_one_is_stored_as_split_rows(): void
+    {
+        $teacher = User::factory()->create();
+        $homeroom = $this->makeSection(['levelid' => 11, 'sectionname' => 'Venus']);
+        $biology = $this->makeSection(['levelid' => 11, 'sectionname' => 'SCI-BIO3L2-G11']);
+        $physics = $this->makeSection(['levelid' => 11, 'sectionname' => 'SCI-PHY3L2-G11']);
+        $biologySubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
+        $physicsSubject = $this->makeSubject(['grade_level' => 11, 'subject_type' => 'science_core']);
+
+        $this->makeSchedule($biology, $biologySubject, $teacher, '07:30:00', '09:10:00', 'Tuesday');
+        $this->makeSchedule($physics, $physicsSubject, $teacher, '07:30:00', '08:20:00', 'Tuesday');
+        $this->makeSchedule($physics, $physicsSubject, $teacher, '08:20:00', '09:10:00', 'Tuesday');
+
+        $this->makeClassRecordWithAssessment($biology, $biologySubject, $teacher, '2025-09-02');
+        $this->makeClassRecordWithAssessment($physics, $physicsSubject, $teacher, '2025-09-02');
+
+        $counts = WatRuleService::gradeCountsOnDate(
+            $homeroom->id,
+            11,
+            $this->sy->id,
+            '2025-09-02'
+        );
+
+        $this->assertSame(['graded' => 1, 'major' => 0], $counts);
+    }
+
     public function test_shared_block_grouping_requires_same_type_and_exact_unambiguous_time(): void
     {
         $teacher = User::factory()->create();

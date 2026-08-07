@@ -509,11 +509,62 @@ class WatRuleService
                 }
             }
 
+            // Science Core has no fixed campus-wide window catalog the way
+            // Electives do (its real placement is dynamic, driven by
+            // room/faculty availability — see SchedulingConstants' "VESTIGIAL"
+            // Science Core notes), so a class whose period happens to be
+            // stored as consecutive rows (e.g. two 50-min rows instead of one
+            // merged 100-min row) still needs to resolve to the same block as
+            // a sibling Science Core class covering the identical span with a
+            // single row. Falls back to merging THIS row's own back-to-back
+            // schedule rows into one continuous span whenever nothing above
+            // resolved a block — safe for every subject type since only
+            // elective/science_core rows are ever unioned into a shared block
+            // (see consolidatedCounts()).
+            if ($watBlock === null) {
+                $watBlock = self::mergedContiguousSpan($selectedSchedules);
+            }
+
             return [self::scheduleSlotKey($row) => [
                 'display_slot' => $displaySlot,
                 'wat_block' => $watBlock,
             ]];
         });
+    }
+
+    /**
+     * Collapse a set of schedule rows into one "start|end" span when they
+     * chain together with no gap (one row's end equals the next row's
+     * start) — e.g. 07:30-08:20 + 08:20-09:10 becomes "07:30|09:10". Returns
+     * null when the rows don't form a single continuous span (a genuine gap,
+     * or a real double-booking), matching the existing conservative fallback
+     * used elsewhere in this file.
+     */
+    private static function mergedContiguousSpan(Collection $schedules): ?string
+    {
+        if ($schedules->isEmpty()) {
+            return null;
+        }
+
+        $intervals = $schedules
+            ->map(fn ($schedule) => [
+                substr((string) $schedule->start_time, 0, 5),
+                substr((string) $schedule->end_time, 0, 5),
+            ])
+            ->unique(fn ($interval) => implode('|', $interval))
+            ->sortBy(fn ($interval) => $interval[0])
+            ->values();
+
+        [$start, $end] = $intervals->first();
+
+        foreach ($intervals->slice(1) as [$nextStart, $nextEnd]) {
+            if ($nextStart !== $end) {
+                return null;
+            }
+            $end = $nextEnd;
+        }
+
+        return $start.'|'.$end;
     }
 
     // ── Schedule-day check (warn-only) ────────────────────────────────────────
