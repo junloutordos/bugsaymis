@@ -212,7 +212,7 @@ const form = useForm({
   sectionname: '',
   levelid: 7,
   section_code: '',
-  capacity: 30,
+  capacity: 35,
   classroom_id: null,
   recess_start: '',
   recess_end: '',
@@ -244,7 +244,7 @@ function openForm(s = null) {
     form.reset()
     form.id = null
     form.levelid = 7
-    form.capacity = 30
+    form.capacity = 35
     form.classroom_id = null
     form.recess_start = ''
     form.recess_end = ''
