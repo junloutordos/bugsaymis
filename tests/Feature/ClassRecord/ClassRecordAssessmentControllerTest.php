@@ -193,6 +193,68 @@ class ClassRecordAssessmentControllerTest extends TestCase
             ->assertJsonValidationErrors(['assessments']);
     }
 
+    public function test_two_different_assessments_can_share_the_same_activity_date(): void
+    {
+        $admin = $this->admin();
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), [
+                'assessments' => [
+                    [
+                        'grading_category_id' => $this->category->id,
+                        'assessment_number' => 1,
+                        'title' => 'Quiz 1',
+                        'is_graded' => true,
+                        'activity_date' => '2026-09-07',
+                        'activity_dates' => ['2026-09-07'],
+                        'max_score' => 20,
+                    ],
+                    [
+                        'grading_category_id' => $this->category->id,
+                        'assessment_number' => 2,
+                        'title' => 'Quiz 2',
+                        'is_graded' => true,
+                        'activity_date' => '2026-09-07',
+                        'activity_dates' => ['2026-09-07'],
+                        'max_score' => 20,
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_assessments', ['title' => 'Quiz 1', 'activity_date' => '2026-09-07']);
+        $this->assertDatabaseHas('class_record_assessments', ['title' => 'Quiz 2', 'activity_date' => '2026-09-07']);
+    }
+
+    public function test_assessment_with_the_same_date_listed_twice_is_rejected_with_a_clear_message(): void
+    {
+        $admin = $this->admin();
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', [
+                'classRecord' => $quarter->class_record_id, 'q' => 1,
+            ]), [
+                'assessments' => [[
+                    'grading_category_id' => $this->category->id,
+                    'assessment_number' => 1,
+                    'title' => 'Quiz 1',
+                    'is_graded' => true,
+                    'activity_date' => '2026-09-07',
+                    'activity_dates' => ['2026-09-07', '2026-09-07'],
+                    'max_score' => 20,
+                ]],
+            ])
+            ->assertStatus(422);
+
+        $response->assertJson([
+            'message' => '"Quiz 1" lists the same date more than once — remove the duplicate before saving.',
+        ]);
+    }
+
     public function test_changing_a_scored_assessment_to_non_graded_requires_confirmation_and_removes_scores(): void
     {
         $admin = $this->admin();

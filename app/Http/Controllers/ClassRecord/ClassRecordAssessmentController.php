@@ -199,7 +199,7 @@ class ClassRecordAssessmentController extends Controller
             'assessments.*.is_graded' => 'sometimes|boolean',
             'assessments.*.activity_date' => 'required|date',
             'assessments.*.activity_dates' => 'sometimes|array|min:1',
-            'assessments.*.activity_dates.*' => 'required|date|distinct',
+            'assessments.*.activity_dates.*' => 'required|date',
             'assessments.*.max_score' => 'nullable|numeric|min:0',
             'assessments.*.sort_order' => 'sometimes|integer|min:0',
             'confirm_non_graded_score_removal' => 'sometimes|boolean',
@@ -219,6 +219,20 @@ class ClassRecordAssessmentController extends Controller
                 422,
                 'One or more assessments reference a category that is not part of this quarter\'s grading option.',
             );
+
+            // Laravel's `distinct` rule on a nested wildcard (activity_dates.*)
+            // checks uniqueness across EVERY assessment's dates in the whole
+            // payload, not just this one's own list — which incorrectly
+            // rejects the normal case of two different assessments sharing a
+            // date. Check for a genuine internal repeat within this single
+            // assessment's own dates instead, scoped and named so the error
+            // is actually actionable.
+            $dates = $item['activity_dates'] ?? [$item['activity_date']];
+            if (count($dates) !== count(array_unique($dates))) {
+                return response()->json([
+                    'message' => "\"{$item['title']}\" lists the same date more than once — remove the duplicate before saving.",
+                ], 422);
+            }
         }
 
         // On a shared (e.g. PEHM) record, a leaf tagged with a subject_id may
