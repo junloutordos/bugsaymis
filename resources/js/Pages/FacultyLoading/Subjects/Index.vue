@@ -59,7 +59,7 @@ const form  = useForm({
   id: null, school_year_id: props.currentSchoolYearId,
   code: '', name: '', description: '', specialization_tags: '',
   credit_units: 3, load_units: 3,
-  lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', grade_level: 7,
+  lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', grade_level: 7, subject_group: '',
   semester: 'both', sessions_per_week: 5, minutes_per_session: 60, is_active: true, has_ilp: false,
   requires_computer_lab: false,
 })
@@ -71,6 +71,7 @@ function openForm(s = null) {
       specialization_tags: s.specialization_tags ?? '',
       credit_units: s.credit_units, load_units: s.load_units, lecture_hours: s.lecture_hours,
       lab_hours: s.lab_hours ?? 0, subject_type: s.subject_type, grade_level: s.grade_level,
+      subject_group: s.subject_group ?? '',
       semester: s.semester, sessions_per_week: s.sessions_per_week,
       minutes_per_session: s.minutes_per_session, is_active: s.is_active, has_ilp: s.has_ilp,
       requires_computer_lab: s.requires_computer_lab })
@@ -79,6 +80,7 @@ function openForm(s = null) {
     form.id = null
     form.school_year_id = props.currentSchoolYearId
     form.grade_level = 7; form.subject_type = 'lecture'
+    form.subject_group = ''
     form.credit_units = 3; form.load_units = 3; form.lecture_hours = 3
     form.sessions_per_week = 5; form.minutes_per_session = 60; form.is_active = true
     form.has_ilp = false
@@ -201,7 +203,10 @@ function doCopy() {
           <td class="px-4 py-3 text-slate-800">{{ s.name }}</td>
           <td class="px-4 py-3 text-center text-slate-600">{{ s.grade_level === 0 ? '—' : s.grade_level }}</td>
           <td class="px-4 py-3 text-center">
-            <AppBadge :color="typeBadge(s.subject_type)">{{ s.subject_type }}</AppBadge>
+            <div class="flex flex-col items-center gap-1">
+              <AppBadge :color="typeBadge(s.subject_type)">{{ s.subject_type }}</AppBadge>
+              <AppBadge v-if="s.subject_group" color="purple">{{ s.subject_group }}</AppBadge>
+            </div>
           </td>
           <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ s.load_units }}</td>
           <td class="px-4 py-3 text-center text-slate-500">{{ s.lecture_hours }} / {{ s.lab_hours ?? 0 }}</td>
@@ -236,6 +241,7 @@ function doCopy() {
             </div>
             <div class="flex items-center gap-2">
               <AppBadge :color="typeBadge(s.subject_type)">{{ s.subject_type }}</AppBadge>
+              <AppBadge v-if="s.subject_group" color="purple">{{ s.subject_group }}</AppBadge>
               <span class="text-xs text-slate-500">Grade {{ s.grade_level === 0 ? '—' : s.grade_level }}</span>
               <span class="text-xs text-slate-500">{{ s.load_units }} units</span>
             </div>
@@ -279,6 +285,10 @@ function doCopy() {
           <div class="col-span-2">
             <AppInput v-model="form.specialization_tags" label="Specialization Tags" placeholder="e.g. mathematics, algebra, calculus" />
             <p class="text-xs text-slate-400 mt-0.5">Comma-separated keywords used for auto-assignment matching.</p>
+          </div>
+          <div class="col-span-2">
+            <AppInput v-model="form.subject_group" label="Subject Group (optional)" placeholder="e.g. PEHM" />
+            <p class="text-xs text-slate-400 mt-0.5">Subjects sharing the same group + grade level can share one class record (e.g. PEHM for PE/Health/Music).</p>
           </div>
           <AppSelect v-model="form.subject_type" label="Subject Type" required :show-blank="false">
             <option value="lecture">Lecture</option>
