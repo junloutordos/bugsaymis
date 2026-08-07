@@ -1489,6 +1489,10 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/saveratings', [DivisionChiefIPCRController::class, 'saveRatings'])->name('division-chief-employee-ipcr.saveratings');
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])->name('division-chief-employee-ipcr.savecomments');
 
+        // Coaching & Mentoring Journal — gated by IPCRWorkflowService::assertCanManage (immediate supervisor / OCD)
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/coaching-sessions', [\App\Http\Controllers\IPCRCoachingSessionController::class, 'store'])->name('ipcr-coaching-sessions.store');
+        Route::delete('/division-chief-employee-ipcr/{employeeIPCR}/coaching-sessions/{coachingSession}', [\App\Http\Controllers\IPCRCoachingSessionController::class, 'destroy'])->name('ipcr-coaching-sessions.destroy');
+
         // Ministerial / endorsement actions — Division Chiefs only
         Route::middleware('permission:ipcr.approve')->group(function () {
             Route::post('/division-chief-employee-ipcr/{employeeIPCR}/submit-to-pmt', [DivisionChiefIPCRController::class, 'submitToPMT'])->name('division-chief-employee-ipcr.submitToPMT');
@@ -1523,6 +1527,12 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
             Route::post('/hr/ipcrs/{employeeIPCR}/submit-to-pmt', [HRIPCRController::class, 'submitToPMT'])->name('hr-ipcr.submitToPMT');
             Route::post('/hr/ipcrs/batch-submit-to-pmt', [HRIPCRController::class, 'batchSubmitToPMT'])->name('hr-ipcr.batchSubmitToPMT');
         });
+    });
+
+    // ── Admin IPCR Monitoring — read-only view across every stage ──────────
+    Route::middleware('role:Administrator')->group(function () {
+        Route::get('/admin/ipcrs', [\App\Http\Controllers\AdminIPCRController::class, 'index'])->name('admin-ipcr.index');
+        Route::get('/admin/ipcrs/{id}', [\App\Http\Controllers\AdminIPCRController::class, 'show'])->name('admin-ipcr.show');
     });
 
     Route::middleware('role:Faculty')->group(function () {

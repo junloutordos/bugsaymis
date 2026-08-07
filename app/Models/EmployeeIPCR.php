@@ -62,6 +62,11 @@ class EmployeeIPCR extends Model
         return $this->belongsTo(IPCRRatingPeriod::class, 'rating_period_id');
     }
 
+    public function coachingSessions()
+    {
+        return $this->hasMany(IPCRCoachingSession::class, 'employee_ipcr_id')->orderBy('meeting_date', 'desc');
+    }
+
     public function isFinalized(): bool
     {
         return $this->status === self::STATUS_DIRECTOR_SIGNED;

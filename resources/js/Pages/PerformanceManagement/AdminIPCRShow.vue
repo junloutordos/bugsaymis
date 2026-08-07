@@ -179,12 +179,12 @@ const printIPCR = () => window.print()
 </script>
 
 <template>
-  <Head :title="`HR Review — ${ipcr.title}`" />
-  <AdminLayout :title="`HR IPCR Review: ${ipcr.title}`">
+  <Head :title="`Admin View — ${ipcr.title}`" />
+  <AdminLayout :title="`IPCR Monitoring: ${ipcr.title}`">
     <div>
       <!-- Back -->
-      <AppButton variant="ghost" size="sm" class="mb-4" @click="router.visit(route('hr-ipcr.index'))">
-        <ArrowLeftIcon class="w-4 h-4" /> Back to HR IPCR List
+      <AppButton variant="ghost" size="sm" class="mb-4" @click="router.visit(route('admin-ipcr.index'))">
+        <ArrowLeftIcon class="w-4 h-4" /> Back to IPCR Monitoring
       </AppButton>
 
       <!-- Header card -->
@@ -192,7 +192,7 @@ const printIPCR = () => window.print()
         <div class="flex items-start justify-between flex-wrap gap-3 p-5">
           <div>
             <h2 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h2>
-            <p class="text-slate-500 text-sm mt-0.5">Rating Period: {{ ipcr.rating_period }}</p>
+            <p class="text-slate-500 text-sm mt-0.5">{{ employee?.name }} &middot; Rating Period: {{ ipcr.rating_period }}</p>
           </div>
           <div class="flex items-center gap-3">
             <AppBadge :color="statusBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>

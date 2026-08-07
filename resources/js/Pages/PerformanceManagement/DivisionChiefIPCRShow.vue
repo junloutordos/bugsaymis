@@ -7,7 +7,9 @@ import AppBadge from "@/Components/AppBadge.vue";
 import AppModal from "@/Components/AppModal.vue";
 import AppInput from "@/Components/AppInput.vue";
 import AppTextarea from "@/Components/AppTextarea.vue";
-import { ArrowLeftIcon, DocumentTextIcon } from "@heroicons/vue/24/outline";
+import AppSelect from "@/Components/AppSelect.vue";
+import Checkbox from "@/Components/Checkbox.vue";
+import { ArrowLeftIcon, DocumentTextIcon, TrashIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import Swal from "sweetalert2";
 import { useSubmit } from "@/Composables/useSubmit";
@@ -332,9 +334,9 @@ const openModal = (plan) => {
   form.value = {
     accomplishment: plan.pivot?.accomplishment || "",
     mov_link: plan.pivot?.mov_link || "",
-    quality: plan.pivot?.sup_quality ?? plan.pivot?.self_quality ?? null,
-    efficiency: plan.pivot?.sup_efficiency ?? plan.pivot?.self_efficiency ?? null,
-    timeliness: plan.pivot?.sup_timeliness ?? plan.pivot?.self_timeliness ?? null,
+    quality: plan.pivot?.sup_quality ?? null,
+    efficiency: plan.pivot?.sup_efficiency ?? null,
+    timeliness: plan.pivot?.sup_timeliness ?? null,
   };
   isModalOpen.value = true;
 };
@@ -439,6 +441,59 @@ const approveTargets = () => {
       });
     });
 };
+
+// ---------- Coaching & Mentoring Journal ----------
+const coachingSessions = computed(() => props.ipcr.coaching_sessions ?? []);
+
+const emptyCoachingForm = () => ({
+  activity_type:   "coaching",
+  mechanism:       "one_on_one",
+  meeting_date:    new Date().toISOString().slice(0, 10),
+  channel_memo:    false,
+  channel_others:  "",
+  remarks:         "",
+  noted_by_name:   props.ocdUser?.name ?? "",
+  noted_at:        "",
+});
+
+const showCoachingModal = ref(false);
+const coachingForm = ref(emptyCoachingForm());
+
+const openCoachingModal = () => {
+  coachingForm.value = emptyCoachingForm();
+  showCoachingModal.value = true;
+};
+
+const saveCoachingSession = () => {
+  if (!coachingForm.value.remarks.trim()) {
+    Swal.fire({ icon: "warning", title: "Remarks required", text: "Please describe what was discussed during the session." });
+    return;
+  }
+  submit.post(route("ipcr-coaching-sessions.store", props.ipcr.id), coachingForm.value, {
+    onSuccess: () => {
+      showCoachingModal.value = false;
+      Swal.fire({ icon: "success", title: "Logged!", text: "Coaching/mentoring session saved.", timer: 1500, showConfirmButton: false });
+    },
+    onError: (err) => Swal.fire({
+      icon: "error",
+      title: "Could not save",
+      text: Object.values(err ?? {}).flat().join("\n") || "Failed to save. Please check your input.",
+    }),
+  });
+};
+
+const deleteCoachingSession = (session) => {
+  Swal.fire({ title: "Remove this session?", icon: "warning", showCancelButton: true, confirmButtonColor: "#dc2626", confirmButtonText: "Yes, remove it!" })
+    .then(result => {
+      if (result.isConfirmed) {
+        submit.delete(route("ipcr-coaching-sessions.destroy", [props.ipcr.id, session.id]));
+      }
+    });
+};
+
+const activityTypeLabel = (v) => v === "monitoring" ? "Monitoring" : "Coaching";
+const mechanismLabel    = (v) => v === "group" ? "Group" : "One-on-One";
+const formatSessionDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) : "—";
 </script>
 
 <template>
@@ -509,6 +564,9 @@ const approveTargets = () => {
           </AppButton>
           <AppButton v-if="isAtRatedStage" variant="secondary" @click="printIPCR">
             Print / View PDF
+          </AppButton>
+          <AppButton v-if="isAtRatedStage && canManageIpcr" variant="secondary" @click="openCoachingModal">
+            Log Coaching / Mentoring Session
           </AppButton>
         </div>
       </AppCard>
@@ -890,6 +948,65 @@ const approveTargets = () => {
           </table>
         </div>
 
+        <!-- Coaching & Mentoring Journal — carries over with the packet once submitted -->
+        <div v-if="isAtRatedStage && coachingSessions.length" class="p-5 border-t border-slate-100 space-y-6 coaching-print-section">
+          <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">Performance Monitoring and Coaching Journal</h2>
+
+          <div v-for="session in coachingSessions" :key="session.id" class="border border-slate-200 rounded-lg overflow-hidden coaching-session-card">
+            <table class="min-w-full border text-sm border-collapse">
+              <tbody>
+                <tr><td colspan="4" class="border border-slate-200 px-3 py-2 font-semibold text-slate-800">Performance Monitoring and Coaching Journal</td></tr>
+                <tr><td colspan="4" class="border border-slate-200 px-3 py-2">Rating Period: {{ ipcr.period?.label ?? ipcr.rating_period }}</td></tr>
+                <tr><td colspan="4" class="border border-slate-200 px-3 py-2">Name of Campus: Philippine Science High School &ndash; Caraga Region Campus</td></tr>
+                <tr><td colspan="4" class="border border-slate-200 px-3 py-2">Name of Division/Unit: {{ employee.division?.name ?? '—' }}</td></tr>
+                <tr><td colspan="4" class="border border-slate-200 px-3 py-2">Name of Personnel: {{ employee.name }}, {{ employee.position }}</td></tr>
+                <tr><td colspan="4" class="border border-slate-200 px-3 py-2">Immediate Supervisor: {{ supervisor.name }}</td></tr>
+                <tr>
+                  <td class="border border-slate-200 px-3 py-2 font-medium w-32">Activity</td>
+                  <td class="border border-slate-200 px-3 py-2">{{ activityTypeLabel(session.activity_type) }}</td>
+                  <td class="border border-slate-200 px-3 py-2 font-medium w-32">Mechanism</td>
+                  <td class="border border-slate-200 px-3 py-2">{{ mechanismLabel(session.mechanism) }}</td>
+                </tr>
+                <tr>
+                  <td class="border border-slate-200 px-3 py-2 font-medium">Date of Meeting</td>
+                  <td class="border border-slate-200 px-3 py-2">{{ formatSessionDate(session.meeting_date) }}</td>
+                  <td class="border border-slate-200 px-3 py-2 font-medium">Channel</td>
+                  <td class="border border-slate-200 px-3 py-2">
+                    <span v-if="session.channel_memo">Memo</span>
+                    <span v-if="session.channel_memo && session.channel_others">; </span>
+                    <span v-if="session.channel_others">{{ session.channel_others }}</span>
+                    <span v-if="!session.channel_memo && !session.channel_others">—</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="border border-slate-200 px-3 py-2 font-medium align-top">Remarks</td>
+                  <td colspan="3" class="border border-slate-200 px-3 py-2 whitespace-pre-wrap">{{ session.remarks }}</td>
+                </tr>
+                <tr>
+                  <td class="border border-slate-200 px-3 py-3 text-center" colspan="2">
+                    <br/>
+                    <b class="uppercase">{{ session.conducted_by_name }}</b><br/>
+                    <small class="text-slate-500">Conducted by &mdash; {{ formatSessionDate(session.conducted_at) }}</small>
+                  </td>
+                  <td class="border border-slate-200 px-3 py-3 text-center" colspan="2">
+                    <br/>
+                    <b class="uppercase">{{ session.noted_by_name || '—' }}</b><br/>
+                    <small class="text-slate-500">Noted by &mdash; {{ formatSessionDate(session.noted_at) }}</small>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="canManageIpcr" class="px-3 py-2 no-print text-right">
+              <button type="button" class="text-xs text-danger-600 hover:underline inline-flex items-center gap-1" @click="deleteCoachingSession(session)">
+                <TrashIcon class="w-3.5 h-3.5" /> Remove
+              </button>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="isAtRatedStage && canManageIpcr" class="p-5 border-t border-slate-100 no-print text-sm text-slate-400 italic">
+          No coaching/mentoring sessions logged yet for this rating period.
+        </div>
+
       </div>
 
       <!-- Rate Accomplishment Modal -->
@@ -913,6 +1030,42 @@ const approveTargets = () => {
       </AppModal>
 
     </div>
+
+    <!-- Coaching & Mentoring Session Modal -->
+    <AppModal :show="showCoachingModal" title="Log Coaching / Mentoring Session" @close="showCoachingModal = false">
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <AppSelect v-model="coachingForm.activity_type" label="Activity" :show-blank="false">
+            <option value="coaching">Coaching</option>
+            <option value="monitoring">Monitoring</option>
+          </AppSelect>
+          <AppSelect v-model="coachingForm.mechanism" label="Mechanism" :show-blank="false">
+            <option value="one_on_one">One-on-One</option>
+            <option value="group">Group</option>
+          </AppSelect>
+        </div>
+        <AppInput v-model="coachingForm.meeting_date" label="Date of Meeting" type="date" required />
+        <div class="flex items-center gap-2">
+          <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+            <Checkbox v-model:checked="coachingForm.channel_memo" />
+            Via Memo
+          </label>
+        </div>
+        <AppInput v-model="coachingForm.channel_others" label="Other Channel (optional)" type="text" placeholder="e.g. Face-to-face at office" />
+        <AppTextarea v-model="coachingForm.remarks" label="Remarks — what was discussed" :rows="4" required
+          placeholder="Summarize the coaching/monitoring session, concerns raised, and commitments made..." />
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model="coachingForm.noted_by_name" label="Noted by (optional)" type="text" placeholder="Head of Office" />
+          <AppInput v-model="coachingForm.noted_at" label="Noted Date (optional)" type="date" />
+        </div>
+      </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="showCoachingModal = false">Cancel</AppButton>
+        <AppButton :loading="isSubmitting" :disabled="isSubmitting" @click="saveCoachingSession">
+          {{ isSubmitting ? 'Saving…' : 'Save Session' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- Return to Employee (from PMT) Modal -->
     <AppModal
@@ -999,5 +1152,8 @@ const approveTargets = () => {
   #ipcr-printable table { border-collapse: collapse; width: 100%; }
   #ipcr-printable th,
   #ipcr-printable td { border: 1px solid #000 !important; padding: 3px 6px; }
+
+  .coaching-print-section { page-break-before: always; }
+  .coaching-session-card { page-break-inside: avoid; margin-bottom: 12px; }
 }
 </style>

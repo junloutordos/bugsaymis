@@ -112,7 +112,7 @@ const submitToHRPeriod = ref(props.ratingPeriods[0]?.label ?? "")
 const ratedForHRCount  = computed(() =>
   props.ipcrs.filter(i =>
     i.status === 'Rated & For PMT Review' &&
-    (!submitToHRPeriod.value || i.rating_period === submitToHRPeriod.value)
+    (!submitToHRPeriod.value || (i.period?.label ?? i.rating_period) === submitToHRPeriod.value)
   ).length
 )
 
@@ -142,7 +142,7 @@ const ratedStatusList = ['Rated & For PMT Review', 'Submitted to PMT', 'PMT Retu
 const ratedIPCRs = computed(() =>
   props.ipcrs.filter(i =>
     ratedStatusList.includes(i.status) &&
-    (!reportPeriod.value || i.rating_period === reportPeriod.value)
+    (!reportPeriod.value || (i.period?.label ?? i.rating_period) === reportPeriod.value)
   )
 )
 

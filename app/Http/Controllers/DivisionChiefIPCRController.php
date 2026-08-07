@@ -194,6 +194,7 @@ class DivisionChiefIPCRController extends Controller
             'plans.offices',
             'plans.committees',
             'plans.specialAssignments',
+            'coachingSessions',
         ])->findOrFail($id);
 
         $user = auth()->user();

@@ -728,6 +728,13 @@ export const menuItems = [
         icon: ClipboardDocumentListIcon,
         permissions: ["ipcr.admin"],
       },
+      {
+        label: "IPCR Monitoring (All Stages)",
+        routeName: "admin-ipcr.index",
+        href: route("admin-ipcr.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator"],
+      },
     ],
   },
   {
