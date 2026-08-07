@@ -53,8 +53,13 @@ class DivisionChiefIPCRController extends Controller
         // (AUH → teachers, ACIDAA → AUHs, CID Chief → ACIDAA)
         $supervisedUserIds = $this->workflow->supervisedUserIds($user);
 
-        // Gate access
+        // Gate access — Administrator has no division/unit of their own to be
+        // scoped by, so route them to the unscoped cross-stage monitor instead
+        // of hard-blocking a page this controller can't meaningfully render for them.
         if (!$user->hasAnyRole(['OCD', 'DivisionChief']) && !$isNonDCRater && $supervisedUserIds->isEmpty()) {
+            if ($user->isSuperAdmin()) {
+                return redirect()->route('admin-ipcr.index');
+            }
             abort(403, "You are not authorized to view this.");
         }
 
@@ -146,6 +151,9 @@ class DivisionChiefIPCRController extends Controller
                     ->get(['id', 'name', 'position', 'division_id']);
             } else {
                 if ($dcIpcrs->isEmpty() && $supervisedIpcrs->isEmpty()) {
+                    if ($user->isSuperAdmin()) {
+                        return redirect()->route('admin-ipcr.index');
+                    }
                     abort(403, "You are not assigned to a division.");
                 }
                 $ipcrs             = $dcIpcrs->merge($supervisedIpcrs)->unique('id')->values();

@@ -29,6 +29,9 @@ class MyUnitIPCRController extends Controller
         $offices = Office::where('unit_head', $user->id)->get();
 
         if ($offices->isEmpty()) {
+            if ($user->isSuperAdmin()) {
+                return redirect()->route('admin-ipcr.index');
+            }
             abort(403, 'You are not assigned as a Unit Head of any office.');
         }
 
@@ -73,6 +76,9 @@ class MyUnitIPCRController extends Controller
         $officeIds = Office::where('unit_head', $user->id)->pluck('id');
 
         if ($officeIds->isEmpty()) {
+            if ($user->isSuperAdmin()) {
+                return redirect()->route('admin-ipcr.show', $id);
+            }
             abort(403, 'You are not assigned as a Unit Head of any office.');
         }
 
@@ -87,6 +93,9 @@ class MyUnitIPCRController extends Controller
 
         // Guard: employee must belong to one of the unit head's offices
         if (!$officeIds->contains($ipcr->user->office_id)) {
+            if ($user->isSuperAdmin()) {
+                return redirect()->route('admin-ipcr.show', $id);
+            }
             abort(403, 'This employee is not in your unit.');
         }
 
