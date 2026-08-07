@@ -193,6 +193,75 @@ class ClassRecordPehmCoTeachingTest extends TestCase
         ]);
     }
 
+    public function test_co_teacher_can_save_own_assessment_when_payload_also_includes_already_plotted_sibling_subject_assessment(): void
+    {
+        $peTeacher = User::factory()->create();
+        $musicTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1');
+        $musicSubject = $this->makeSubject('Music 1', 'MUS1');
+
+        $record = $this->makeRecord($peTeacher, $peSubject);
+        $this->attachCoTeacher($record, $peSubject, $peTeacher, true);
+        $this->attachCoTeacher($record, $musicSubject, $musicTeacher);
+
+        $quarter = $this->makeQuarter($record);
+        $peLeaf = GradingCategory::create([
+            'grading_option_id' => $this->option->id, 'subject_id' => $peSubject->id,
+            'name' => 'PE Summative', 'code' => 'PES', 'weight' => 0.5, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+        $musicLeaf = GradingCategory::create([
+            'grading_option_id' => $this->option->id, 'subject_id' => $musicSubject->id,
+            'name' => 'Music Summative', 'code' => 'MUS', 'weight' => 0.5, 'max_assessments' => 5, 'sort_order' => 2,
+        ]);
+
+        // PE teacher already plotted their own assessment first — the normal
+        // real-world sequence: the record creator plots their subject, then a
+        // co-teacher joins and tries to plot theirs.
+        $peAssessment = ClassRecordAssessment::create([
+            'class_record_quarter_id' => $quarter->id, 'grading_category_id' => $peLeaf->id,
+            'assessment_number' => 1, 'title' => 'PE Quiz 1', 'assessment_type' => 'formative',
+            'is_graded' => true, 'is_major' => false, 'activity_date' => now()->addMonth()->toDateString(),
+            'max_score' => 20, 'sort_order' => 1,
+        ]);
+
+        // The Setup tab always resubmits every leaf's rows on save — the music
+        // teacher's payload includes their own new row AND the PE teacher's
+        // already-saved row, unchanged.
+        $this->actingAs($musicTeacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'assessments' => [
+                    [
+                        'id' => $peAssessment->id,
+                        'grading_category_id' => $peLeaf->id,
+                        'assessment_number' => 1,
+                        'title' => 'PE Quiz 1',
+                        'activity_date' => $peAssessment->activity_date->toDateString(),
+                        'max_score' => 20,
+                    ],
+                    [
+                        'grading_category_id' => $musicLeaf->id,
+                        'assessment_number' => 1,
+                        'title' => 'Music Quiz 1',
+                        'activity_date' => now()->addMonth()->toDateString(),
+                        'max_score' => 20,
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $quarter->id,
+            'grading_category_id' => $musicLeaf->id,
+            'title' => 'Music Quiz 1',
+        ]);
+        // The PE teacher's already-plotted row must survive untouched, not be
+        // deleted as "missing from the incoming payload".
+        $this->assertDatabaseHas('class_record_assessments', [
+            'id' => $peAssessment->id,
+            'title' => 'PE Quiz 1',
+        ]);
+    }
+
     public function test_apply_setup_on_shared_record_copies_only_the_co_teachers_subject_and_preserves_other_subjects(): void
     {
         $peTeacher = User::factory()->create();

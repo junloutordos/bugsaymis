@@ -205,37 +205,47 @@ class ClassRecordAssessmentController extends Controller
             'confirm_non_graded_score_removal' => 'sometimes|boolean',
         ]);
 
-        $categories = GradingCategory::whereIn(
-            'id',
-            collect($validated['assessments'])->pluck('grading_category_id')->unique()
-        )->get()->keyBy('id');
-
         // Assessments may only attach to LEAF categories of the grading option
         // in force for THIS quarter (per-quarter override, else record default).
         $optionId = $quarter->grading_option_id ?? $classRecord->grading_option_id;
         $option = GradingOption::with('categories')->find($optionId);
         $leafIds = $option ? $option->leafCategories()->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
+        $categories = GradingCategory::whereIn('id', $leafIds)->get()->keyBy('id');
         $isAdminUser = $this->isAdmin();
+
         foreach ($validated['assessments'] as $item) {
             abort_unless(
                 in_array((int) $item['grading_category_id'], $leafIds, true),
                 422,
                 'One or more assessments reference a category that is not part of this quarter\'s grading option.',
             );
+        }
 
-            // On a shared (e.g. PEHM) record, a leaf tagged with a subject_id
-            // may only be written to by that subject's teacher — this is what
-            // keeps the PE teacher from editing Music's assessments and vice
-            // versa. Leaves with no subject_id (the normal case) stay scoped
-            // to any of the record's teachers, same as canEdit(null) above.
-            $category = $categories[$item['grading_category_id']];
-            if (! $isAdminUser) {
-                abort_unless(
-                    $classRecord->canEdit(Auth::user(), $category->subject_id),
-                    403,
-                    "You do not have edit access to \"{$category->name}\" on this class record.",
-                );
-            }
+        // On a shared (e.g. PEHM) record, a leaf tagged with a subject_id may
+        // only be written to by that subject's teacher — this keeps the PE
+        // teacher from editing Music's assessments and vice versa. Leaves
+        // with no subject_id (the normal case) stay scoped to any of the
+        // record's teachers, same as canEdit(null) above.
+        //
+        // The Setup tab always resubmits every leaf's rows on every save —
+        // a co-teacher's payload therefore includes their own edits AND every
+        // sibling subject's already-saved rows, unchanged. Aborting the whole
+        // request the moment one of those foreign rows shows up would mean no
+        // co-teacher could ever save once a sibling subject has anything
+        // plotted (the normal case). So instead: silently drop rows outside
+        // the requester's own subject(s) from the write-set — they're a
+        // no-op either way — rather than rejecting the batch.
+        $isCoTeacherScoped = ! $isAdminUser && $classRecord->coTeachers()->exists();
+        $editableCategoryIds = $isCoTeacherScoped
+            ? $categories->filter(fn ($category) => $classRecord->canEdit(Auth::user(), $category->subject_id))->keys()->all()
+            : $leafIds;
+
+        $assessmentsInput = collect($validated['assessments']);
+        if ($isCoTeacherScoped) {
+            $assessmentsInput = $assessmentsInput
+                ->filter(fn ($item) => in_array((int) $item['grading_category_id'], $editableCategoryIds, true))
+                ->values();
+            abort_if($assessmentsInput->isEmpty(), 403, 'You do not have edit access to any of the categories in this save.');
         }
 
         // Existing rows are matched by their stable primary key, not by
@@ -250,7 +260,7 @@ class ClassRecordAssessmentController extends Controller
 
         // Type and is_major are always derived server-side — never trusted from
         // the client (the grading category already identifies the type)
-        $items = collect($validated['assessments'])->map(function ($item) use ($categories, $existingById) {
+        $items = $assessmentsInput->map(function ($item) use ($categories, $existingById) {
             $category = $categories[$item['grading_category_id']];
 
             $item['is_graded'] = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
@@ -448,8 +458,15 @@ class ClassRecordAssessmentController extends Controller
         // ── Removed rows: any existing assessment for this quarter whose id is
         //    absent from the incoming payload was deleted by the user. Block
         //    the whole save if any of those already have scores entered.
+        //    On a co-teacher-scoped save, only the requester's OWN categories
+        //    are ever candidates for deletion — a sibling subject's rows were
+        //    filtered out of $items above (unchanged, not "removed"), and
+        //    must never be diffed away here regardless of the payload.
         $incomingIds = $items->pluck('id')->filter()->map(fn ($id) => (int) $id)->unique();
-        $toDeleteIds = $existingById->keys()->diff($incomingIds)->values();
+        $deletionCandidates = $isCoTeacherScoped
+            ? $existingById->filter(fn ($assessment) => in_array((int) $assessment->grading_category_id, $editableCategoryIds, true))
+            : $existingById;
+        $toDeleteIds = $deletionCandidates->keys()->diff($incomingIds)->values();
 
         if ($toDeleteIds->isNotEmpty()) {
             // Once plotted (dated), an assessment is considered announced to
