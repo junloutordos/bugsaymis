@@ -2530,6 +2530,10 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::put('/modules/{module}/items/reorder', [\App\Http\Controllers\Learn\ModuleItemController::class, 'reorder'])->name('items.reorder');
     Route::patch('/items/{item}/publish', [\App\Http\Controllers\Learn\ModuleItemController::class, 'togglePublish'])->name('items.publish');
     Route::delete('/items/{item}', [\App\Http\Controllers\Learn\ModuleItemController::class, 'destroy'])->name('items.destroy');
+
+    Route::post('/{course}/announcements', [\App\Http\Controllers\Learn\CourseAnnouncementController::class, 'store'])->name('announcements.store');
+    Route::put('/announcements/{announcement}', [\App\Http\Controllers\Learn\CourseAnnouncementController::class, 'update'])->name('announcements.update');
+    Route::delete('/announcements/{announcement}', [\App\Http\Controllers\Learn\CourseAnnouncementController::class, 'destroy'])->name('announcements.destroy');
 });
 
 /*
