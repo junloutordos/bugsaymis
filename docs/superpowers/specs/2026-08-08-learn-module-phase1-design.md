@@ -67,7 +67,8 @@ Phases 2–4 each get their own design → plan → implementation cycle once Ph
   `faculty_loading.sections` — `sections.id` is an int PK, not bigint, same convention
   `load_assignments.section_id` already uses), `school_year_id` (FK
   `faculty_loading.school_years`), `academic_term_id` (FK `faculty_loading.academic_terms`,
-  nullable for non-term subjects)
+  **not nullable** — `load_assignments.academic_term_id` itself is a required FK, so every
+  teaching assignment, and therefore every course resolved from one, always has a term)
 - Unique on `(subject_id, section_id, school_year_id, academic_term_id)`
 - `status`: `draft` (default) → `published`. No `archived` value — see lifecycle below.
 - `syllabus_body` (nullable rich text, Tiptap JSON/HTML — same editor convention as Issuances)
