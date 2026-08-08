@@ -2505,6 +2505,23 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| Learn Module (LMS) — Phase 1: Course Shell + Content
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Learn\CourseController::class, 'index'])->name('index');
+
+    // Must be registered before the {course} wildcard.
+    Route::get('/file/{fileId}', [\App\Http\Controllers\Learn\FileController::class, 'show'])
+        ->name('files.show')->where('fileId', '[a-zA-Z0-9_.=-]+');
+
+    Route::get('/{course}', [\App\Http\Controllers\Learn\CourseController::class, 'show'])->name('show');
+    Route::put('/{course}/syllabus', [\App\Http\Controllers\Learn\CourseController::class, 'updateSyllabus'])->name('syllabus.update');
+    Route::patch('/{course}/status', [\App\Http\Controllers\Learn\CourseController::class, 'updateStatus'])->name('status.update');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Document Verification — public, no auth required
 |--------------------------------------------------------------------------
 */
