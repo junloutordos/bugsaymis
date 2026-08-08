@@ -3,9 +3,12 @@
 namespace App\Models\Learn;
 
 use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\Registrar\StudentEnrollment;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -54,5 +57,64 @@ class Course extends Model
     public function announcements(): HasMany
     {
         return $this->hasMany(CourseAnnouncement::class, 'learn_course_id')->orderByDesc('posted_at');
+    }
+
+    public function isCurrentSchoolYear(): bool
+    {
+        return $this->schoolYear?->is_current === true;
+    }
+
+    public function isReadOnly(): bool
+    {
+        return ! $this->isCurrentSchoolYear();
+    }
+
+    /** @return array<int> */
+    public function instructorIds(): array
+    {
+        return LoadAssignment::teaching()
+            ->where('subject_id', $this->subject_id)
+            ->where('section_id', $this->section_id)
+            ->where('school_year_id', $this->school_year_id)
+            ->where('academic_term_id', $this->academic_term_id)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function canEdit(User $user): bool
+    {
+        if ($this->isReadOnly()) {
+            return false;
+        }
+        if ($user->hasPermission('learn.course.view.all')) {
+            return true;
+        }
+
+        return in_array((int) $user->id, $this->instructorIds(), true);
+    }
+
+    public function canView(User $user): bool
+    {
+        if ($user->hasPermission('learn.course.view.all')) {
+            return true;
+        }
+
+        return in_array((int) $user->id, $this->instructorIds(), true);
+    }
+
+    public function isVisibleToStudent(int $studentId): bool
+    {
+        if ($this->status !== 'published') {
+            return false;
+        }
+
+        return StudentEnrollment::where('student_id', $studentId)
+            ->where('school_year_id', $this->school_year_id)
+            ->where('section_id', $this->section_id)
+            ->where('status', 'enrolled')
+            ->exists();
     }
 }
