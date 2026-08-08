@@ -20,7 +20,7 @@ on.
 
 | Phase | Scope | Depends on |
 |---|---|---|
-| **1 (this spec)** | Course shell: auto-created courses, Modules, Pages, Files, syllabus, course announcements, publish/draft | Faculty Loading, `section_students` |
+| **1 (this spec)** | Course shell: auto-created courses, Modules, Pages, Files, syllabus, course announcements, publish/draft | Faculty Loading, `student_enrollments` |
 | 2 | Assignments + submissions + rubric grading + optional push to Class Record | Phase 1 |
 | 3 | Quizzes/assessment engine (question bank, auto-grading, timed attempts) | Phase 1 |
 | 4 | Discussions/forums | Phase 1 |
@@ -46,9 +46,15 @@ Phases 2–4 each get their own design → plan → implementation cycle once Ph
    grades/schedule views.
 5. **Enrollment is fully derived, never manual.** A course = one row per
    `(subject_id, section_id, school_year_id, academic_term_id)` sourced from Faculty Loading's
-   teaching `LoadAssignment`s. Roster = live from `section_students` (the existing single
-   source of truth for section membership — see `project_section_students_mirror` convention).
-   No "enroll student in course" step, no separate roster table to drift out of sync.
+   teaching `LoadAssignment`s. Roster = live from `student_enrollments` (Registrar module,
+   `status = enrolled`), the canonical current-SY enrollment source — **not** the legacy
+   `section_students` mirror table. This corrects an assumption from initial brainstorming:
+   `section_students` was previously documented as the section-read source of truth, but the
+   Homeroom Attendance module (`RosterService::studentsForSection()`) and
+   `StudentSectionResolver` have since established `student_enrollments` as canonical, since
+   `section_students` is not school-year-aware and shows a stale section for students not yet
+   mirrored into the new SY. Learn follows the newer, correct convention. No "enroll student in
+   course" step, no separate roster table to drift out of sync.
 6. **Content model is polymorphic Modules → Module Items**, matching the
    `respondable_type/id` convention CSM Feedback already uses in this codebase. Item types in
    Phase 1: `LearnPage`, `LearnFile`. Phases 2–4 add `LearnAssignment`, `LearnQuiz`,
@@ -57,30 +63,37 @@ Phases 2–4 each get their own design → plan → implementation cycle once Ph
 ## Data model
 
 ### `learn_courses`
-- `subject_id` (FK `faculty_loading.subjects`), `section_id` (FK `faculty_loading.sections`),
-  `school_year_id` (FK `faculty_loading.school_years`), `academic_term_id` (FK
-  `faculty_loading.academic_terms`, nullable for non-term subjects)
+- `subject_id` (FK `faculty_loading.subjects`), `section_id` (unsigned int FK
+  `faculty_loading.sections` — `sections.id` is an int PK, not bigint, same convention
+  `load_assignments.section_id` already uses), `school_year_id` (FK
+  `faculty_loading.school_years`), `academic_term_id` (FK `faculty_loading.academic_terms`,
+  nullable for non-term subjects)
 - Unique on `(subject_id, section_id, school_year_id, academic_term_id)`
-- `status`: `draft` (default) → `published` → `archived`
+- `status`: `draft` (default) → `published`. No `archived` value — see lifecycle below.
 - `syllabus_body` (nullable rich text, Tiptap JSON/HTML — same editor convention as Issuances)
 - No `class_record_id` FK — Phase 2's "push grade" action looks up the matching Class Record
   row by the same tuple at push time rather than storing a hard FK. This keeps a Learn course
   functional even in the (rare) window before a Class Record exists for that offering.
 
-### `learn_course_instructors`
-- Pivot: `learn_course_id`, `user_id`
-- Populated from teaching-type `LoadAssignment`s for the course's tuple — reuses the same
-  source data Class Record already resolves for co-teaching (e.g. PEHM), so Learn does not
-  reimplement co-teacher resolution logic.
+### Instructors — computed, not a synced pivot
+No `learn_course_instructors` table. This codebase has no Eloquent Observer pattern anywhere,
+and there is no generic "a LoadAssignment changed" hook to sync a pivot off of — building one
+would be new infrastructure for this module alone. Instead, a course's instructors are
+resolved live, the same way `ClassRecord::teacherIdsFor()` and `RosterService` compute their
+answers on read rather than maintaining a synced copy: query teaching `LoadAssignment`s for
+the course's exact tuple and pluck distinct `user_id`s. Zero drift risk, since there's nothing
+to fall out of sync.
 
-### Course lifecycle sync
-- A scheduled sync (hooking the same trigger point as `SyncLoadingPlan`) upserts
-  `learn_courses` + `learn_course_instructors` whenever a teaching `LoadAssignment` exists for
-  a tuple with no matching course yet, and refreshes the instructor pivot when assignments
-  change.
-- When `SchoolYear.is_current` flips false, courses for that school year move to `archived`
-  automatically (matches Class Record's existing SY-lock behavior). Archived courses are
-  read-only for everyone, including instructors.
+### Course lifecycle — lazy creation, computed lock (not a scheduled job)
+- No sync job or observer creates course rows ahead of time. A course row is
+  find-or-created on first access: when a faculty member with a teaching `LoadAssignment`
+  opens "My Courses," the controller resolves their distinct teaching tuples for the
+  current/future school year and `firstOrCreate()`s a `learn_courses` row per tuple (default
+  `draft`). This mirrors the "compute live" convention above — there's no window where a
+  background sync could be stale or fail to run.
+- Read-only lock is **computed**, not a stored `archived` status: a course is read-only when
+  `course.schoolYear.is_current === false`, exactly `ClassRecord::isCurrentSchoolYear()`'s
+  existing pattern. No scheduled transition job, nothing to drift.
 
 ### `learn_modules`
 - `learn_course_id`, `title`, `position` (int, ordering), `published_at` (nullable)
@@ -117,8 +130,8 @@ Phases 2–4 each get their own design → plan → implementation cycle once Ph
   tuple, they can edit that course — mirroring `ClassRecord::canEdit()`'s existing co-teacher
   logic rather than reinventing an authorization model.
 - Students are never permission-gated here. Visibility is computed: published course AND the
-  student appears in `section_students` for that section — same computation style as their
-  existing grades/schedule views in the Student Portal.
+  student has an active `student_enrollments` row for that section/school year — same
+  computation style as their existing grades/schedule views in the Student Portal.
 
 ## Publishing workflow
 
@@ -128,22 +141,22 @@ Phases 2–4 each get their own design → plan → implementation cycle once Ph
 - Modules and module items each carry their own `published_at`, independent of the course's
   status — a teacher can build out a full module in draft and reveal it to students later
   without touching course-level status or other modules.
-- Archived (past school year) courses are read-only for all users, instructors included —
-  consistent with Class Record's SY lock.
+- Courses from a past school year (`schoolYear.is_current === false`) are read-only for all
+  users, instructors included — computed the same way, not a stored status transition.
 
 ## Student Portal integration
 
 - New "My Courses" area inside the existing `/student-portal` (Firebase auth, `students`
   table session — not the main app's Google OAuth).
-- Lists courses where `status = published` and the student is present in `section_students`
-  for that course's section.
+- Lists courses where `status = published` and the student has an active `student_enrollments`
+  row (`status = enrolled`) for that course's `section_id` in the course's `school_year_id`.
 - Read-only content view for Phase 1: modules, pages, files, syllabus, course announcements.
   No submission UI yet (that's Phase 2).
 
 ## Testing
 
-- Course auto-creation/update from `LoadAssignment` sync, including multi-instructor
-  (co-teaching) pivot correctness.
+- Course lazy find-or-create from a teaching `LoadAssignment`, including multi-instructor
+  (co-teaching) resolution correctness computed live from `LoadAssignment`.
 - Instructor-derived edit access: holder of a teaching `LoadAssignment` for the tuple can
   edit; non-instructor faculty cannot.
 - Publish gating: draft course invisible to students; unpublished module item invisible even
