@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
+import DOMPurify from 'dompurify'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import RichTextEditor from '@/Components/RichTextEditor.vue'
 import {
@@ -9,6 +10,19 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ course: Object })
+
+// Rich text (syllabus, page body) is stored as raw HTML — an instructor could
+// bypass the RichTextEditor UI and POST a malicious payload directly to the
+// API, so it must be sanitized at render time, not trusted as authored.
+function sanitizeHtml(html) {
+  return DOMPurify.sanitize(html || '')
+}
+
+// video_url is free-text input — reject anything but http(s) before it's
+// ever used as a clickable href (blocks javascript:/data: scheme XSS).
+function safeVideoUrl(url) {
+  return url && /^https?:\/\//i.test(url) ? url : null
+}
 
 // ── Syllabus ──────────────────────────────────────────────────────────────
 const syllabus = ref(props.course.syllabus_body || '')
@@ -135,7 +149,7 @@ function deleteAnnouncement(id) {
       <section>
         <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Syllabus</h2>
         <RichTextEditor v-if="course.can_edit" v-model="syllabus" />
-        <div v-else class="prose prose-sm max-w-none" v-html="course.syllabus_body || '<p class=\'text-slate-400\'>No syllabus yet.</p>'" />
+        <div v-else class="prose prose-sm max-w-none" v-html="sanitizeHtml(course.syllabus_body) || '<p class=\'text-slate-400\'>No syllabus yet.</p>'" />
         <button v-if="course.can_edit" @click="saveSyllabus" class="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
           Save syllabus
         </button>
@@ -165,9 +179,9 @@ function deleteAnnouncement(id) {
               <PaperClipIcon v-else class="h-5 w-5 text-slate-400 shrink-0" />
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-slate-700">{{ item.title }}</p>
-                <div v-if="item.type === 'page' && item.body" class="prose prose-sm max-w-none mt-1" v-html="item.body" />
-                <a v-if="item.type === 'page' && item.video_url" :href="item.video_url" target="_blank" class="text-xs text-indigo-600 underline">Watch video</a>
-                <a v-if="item.type === 'file'" :href="item.file_url" target="_blank" class="text-xs text-indigo-600 underline">Download file</a>
+                <div v-if="item.type === 'page' && item.body" class="prose prose-sm max-w-none mt-1" v-html="sanitizeHtml(item.body)" />
+                <a v-if="item.type === 'page' && safeVideoUrl(item.video_url)" :href="safeVideoUrl(item.video_url)" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Watch video</a>
+                <a v-if="item.type === 'file'" :href="item.file_url" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Download file</a>
               </div>
               <div v-if="course.can_edit" class="flex items-center gap-1 shrink-0">
                 <button @click="moveItem(module, itemIndex, -1)" class="p-1 text-slate-400 hover:text-slate-700"><ArrowUpIcon class="h-3.5 w-3.5" /></button>
