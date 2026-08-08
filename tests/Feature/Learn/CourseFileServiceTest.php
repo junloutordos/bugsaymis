@@ -31,6 +31,24 @@ class CourseFileServiceTest extends TestCase
         $this->assertSame('%PDF-1.4 fake pdf bytes', Storage::disk('s3')->get($file->s3_key));
     }
 
+    public function test_upload_rejects_mime_types_outside_the_document_allowlist(): void
+    {
+        $service = app(CourseFileService::class);
+
+        // text/html and image/svg+xml can execute script when served inline
+        // on the same origin — stored XSS via a "course file" upload.
+        foreach (['text/html', 'image/svg+xml', 'application/javascript'] as $mime) {
+            $dataUri = "data:{$mime};base64," . base64_encode('<script>alert(1)</script>');
+
+            try {
+                $service->upload(1, 'evil', $dataUri);
+                $this->fail("Expected upload of {$mime} to be rejected.");
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $this->assertArrayHasKey('file', $e->errors());
+            }
+        }
+    }
+
     public function test_encode_and_decode_file_id_round_trip(): void
     {
         $service = app(CourseFileService::class);

@@ -30,7 +30,16 @@ class CourseFileService
 
         $mime = $this->mimeFromMeta($meta) ?? 'application/octet-stream';
         $extension = $this->extensionFromMime($mime);
-        $s3Key = "Learn/{$courseId}/" . uniqid() . ($extension ? ".{$extension}" : '');
+
+        // Reject anything outside the document/image allowlist — an
+        // unrestricted MIME (e.g. text/html, image/svg+xml) stored and
+        // later served with Content-Disposition: inline on this app's
+        // origin would be a stored-XSS vector.
+        if ($extension === null) {
+            throw ValidationException::withMessages(['file' => 'Unsupported file type.']);
+        }
+
+        $s3Key = "Learn/{$courseId}/" . uniqid() . ".{$extension}";
 
         Storage::disk('s3')->put($s3Key, $binary);
 
@@ -73,6 +82,7 @@ class CourseFileService
 
         return response(Storage::disk('s3')->get($file->s3_key), 200)
             ->header('Content-Type', $file->mime_type)
+            ->header('X-Content-Type-Options', 'nosniff')
             ->header('Content-Disposition', 'inline; filename="' . addslashes($file->title) . '"');
     }
 
