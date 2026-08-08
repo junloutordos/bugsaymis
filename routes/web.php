@@ -2611,6 +2611,12 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
         Route::get('/lost-found',               [\App\Http\Controllers\StudentPortal\LostFoundController::class, 'show'])->name('lost-found');
         Route::post('/lost-found',              [\App\Http\Controllers\StudentPortal\LostFoundController::class, 'store'])->name('lost-found.store');
         Route::get('/lost-found/photo/{item}',  [\App\Http\Controllers\StudentPortal\LostFoundController::class, 'photo'])->name('lost-found.photo')->whereNumber('item');
+
+        // Must be registered before the {course} wildcard.
+        Route::get('/learn/file/{fileId}', [\App\Http\Controllers\StudentPortal\LearnController::class, 'file'])
+            ->name('learn.file')->where('fileId', '[a-zA-Z0-9_.=-]+');
+        Route::get('/learn', [\App\Http\Controllers\StudentPortal\LearnController::class, 'index'])->name('learn.index');
+        Route::get('/learn/{course}', [\App\Http\Controllers\StudentPortal\LearnController::class, 'show'])->name('learn.show');
     });
 });
 
