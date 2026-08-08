@@ -2518,6 +2518,18 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::get('/{course}', [\App\Http\Controllers\Learn\CourseController::class, 'show'])->name('show');
     Route::put('/{course}/syllabus', [\App\Http\Controllers\Learn\CourseController::class, 'updateSyllabus'])->name('syllabus.update');
     Route::patch('/{course}/status', [\App\Http\Controllers\Learn\CourseController::class, 'updateStatus'])->name('status.update');
+
+    Route::post('/{course}/modules', [\App\Http\Controllers\Learn\ModuleController::class, 'store'])->name('modules.store');
+    Route::put('/{course}/modules/reorder', [\App\Http\Controllers\Learn\ModuleController::class, 'reorder'])->name('modules.reorder');
+    Route::put('/modules/{module}', [\App\Http\Controllers\Learn\ModuleController::class, 'update'])->name('modules.update');
+    Route::patch('/modules/{module}/publish', [\App\Http\Controllers\Learn\ModuleController::class, 'togglePublish'])->name('modules.publish');
+    Route::delete('/modules/{module}', [\App\Http\Controllers\Learn\ModuleController::class, 'destroy'])->name('modules.destroy');
+
+    Route::post('/modules/{module}/items/page', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storePage'])->name('items.store-page');
+    Route::post('/modules/{module}/items/file', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeFile'])->name('items.store-file');
+    Route::put('/modules/{module}/items/reorder', [\App\Http\Controllers\Learn\ModuleItemController::class, 'reorder'])->name('items.reorder');
+    Route::patch('/items/{item}/publish', [\App\Http\Controllers\Learn\ModuleItemController::class, 'togglePublish'])->name('items.publish');
+    Route::delete('/items/{item}', [\App\Http\Controllers\Learn\ModuleItemController::class, 'destroy'])->name('items.destroy');
 });
 
 /*
