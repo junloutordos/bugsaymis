@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Learn\Quiz;
+use App\Models\Learn\QuizAttempt;
 use App\Models\Student;
 use App\Services\Learn\QuizAttemptService;
 
@@ -22,6 +23,17 @@ class QuizAttemptController extends Controller
         abort_unless($course->isVisibleToStudent($student->id), 403);
 
         $attempt = $this->attemptService->start($quiz, $student->id);
+
+        return redirect()->route('student-portal.learn.quiz-attempts.show', $attempt);
+    }
+
+    /** POST /student-portal/learn/quiz-attempts/{attempt}/submit */
+    public function submit(QuizAttempt $attempt)
+    {
+        $student = $this->currentStudent();
+        abort_unless($attempt->student_id === $student->id, 403);
+
+        $this->attemptService->submit($attempt);
 
         return redirect()->route('student-portal.learn.quiz-attempts.show', $attempt);
     }

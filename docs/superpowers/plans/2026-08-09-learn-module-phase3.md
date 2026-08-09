@@ -2322,7 +2322,7 @@ class QuizAttemptFinalizeTest extends TestCase
         $quiz = Quiz::create(['title' => 'Quiz']);
         $q = $quiz->questions()->create(['question_type' => 'essay', 'prompt' => 'Q', 'points' => 10, 'position' => 0]);
 
-        $this->assertFalse($quiz->is_locked);
+        $this->assertFalse($quiz->fresh()->is_locked);
 
         $attempt = $this->makeAttempt($quiz, [$q->id]);
         $this->service->submit($attempt);
