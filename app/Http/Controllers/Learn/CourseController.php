@@ -7,6 +7,7 @@ use App\Models\Learn\Assignment;
 use App\Models\Learn\Course;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
+use App\Models\Learn\RubricTemplate;
 use App\Services\Learn\CourseFileService;
 use App\Services\Learn\CourseResolver;
 use Illuminate\Http\Request;
@@ -56,6 +57,16 @@ class CourseController extends Controller
 
         return Inertia::render('Learn/Show', [
             'course' => $this->serializeCourse($course, $user),
+            'rubric_templates' => RubricTemplate::where('user_id', $user->id)
+                ->with('criteria')
+                ->get()
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'criteria' => $t->criteria->map(fn ($c) => [
+                        'description' => $c->description, 'max_points' => (float) $c->max_points,
+                    ])->values(),
+                ])->values(),
         ]);
     }
 
