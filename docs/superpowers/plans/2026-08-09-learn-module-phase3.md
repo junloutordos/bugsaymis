@@ -1642,7 +1642,7 @@ class CourseQuizSerializationTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->where('course.modules.0.items.0.type', 'quiz')
             ->where('course.modules.0.items.0.quiz.time_limit_minutes', 15)
-            ->where('course.modules.0.items.0.quiz.max_score', 5.0)
+            ->where('course.modules.0.items.0.quiz.max_score', 5)
             ->where('course.modules.0.items.0.quiz.questions.0.options.0.is_correct', true)
         );
     }
@@ -1707,7 +1707,8 @@ class LearnQuizSerializationTest extends TestCase
             'id' => $studentId, 'pisaysystemID' => "PS{$studentId}", 'firstname' => 'Test', 'lastname' => 'Student',
         ]);
         StudentEnrollment::create([
-            'student_id' => $studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id, 'status' => 'enrolled',
+            'student_id' => $studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id,
+            'grade_level' => 8, 'status' => 'enrolled', 'enrollment_date' => now()->toDateString(),
         ]);
         QuizAttempt::create([
             'learn_quiz_id' => $quiz->id, 'student_id' => $studentId, 'attempt_number' => 1,
@@ -1722,7 +1723,7 @@ class LearnQuizSerializationTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->where('course.modules.0.items.0.type', 'quiz')
             ->where('course.modules.0.items.0.quiz.attempts_used', 1)
-            ->where('course.modules.0.items.0.quiz.best_score', 5.0)
+            ->where('course.modules.0.items.0.quiz.best_score', 5)
             ->where('course.modules.0.items.0.quiz.can_start_new_attempt', true)
             ->missing('course.modules.0.items.0.quiz.questions')
         );
@@ -1980,7 +1981,8 @@ class QuizAttemptStartTest extends TestCase
             'id' => $this->studentId, 'pisaysystemID' => "PS{$this->studentId}", 'firstname' => 'Test', 'lastname' => 'Student',
         ]);
         StudentEnrollment::create([
-            'student_id' => $this->studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id, 'status' => 'enrolled',
+            'student_id' => $this->studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id,
+            'grade_level' => 8, 'status' => 'enrolled', 'enrollment_date' => now()->toDateString(),
         ]);
         session(['student_pisaysystemID' => "PS{$this->studentId}"]);
     }
@@ -2623,7 +2625,8 @@ class QuizAttemptAnswerTest extends TestCase
             'id' => $this->studentId, 'pisaysystemID' => "PS{$this->studentId}", 'firstname' => 'Test', 'lastname' => 'Student',
         ]);
         StudentEnrollment::create([
-            'student_id' => $this->studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id, 'status' => 'enrolled',
+            'student_id' => $this->studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id,
+            'grade_level' => 8, 'status' => 'enrolled', 'enrollment_date' => now()->toDateString(),
         ]);
         session(['student_pisaysystemID' => "PS{$this->studentId}"]);
 
@@ -2860,7 +2863,8 @@ class QuizAttemptShowTest extends TestCase
             'id' => $this->studentId, 'pisaysystemID' => "PS{$this->studentId}", 'firstname' => 'Test', 'lastname' => 'Student',
         ]);
         StudentEnrollment::create([
-            'student_id' => $this->studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id, 'status' => 'enrolled',
+            'student_id' => $this->studentId, 'school_year_id' => $sy->id, 'section_id' => $section->id,
+            'grade_level' => 8, 'status' => 'enrolled', 'enrollment_date' => now()->toDateString(),
         ]);
         session(['student_pisaysystemID' => "PS{$this->studentId}"]);
 

@@ -7,6 +7,7 @@ use App\Models\Learn\Assignment;
 use App\Models\Learn\Course;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
+use App\Models\Learn\Quiz;
 use App\Models\Learn\RubricTemplate;
 use App\Services\Learn\CourseFileService;
 use App\Services\Learn\CourseResolver;
@@ -54,6 +55,7 @@ class CourseController extends Controller
 
         $course->load(['subject', 'section', 'schoolYear', 'modules.items.itemable', 'announcements.postedBy']);
         $this->loadAssignmentRubrics($course);
+        $this->loadQuizQuestions($course);
 
         return Inertia::render('Learn/Show', [
             'course' => $this->serializeCourse($course, $user),
@@ -133,6 +135,17 @@ class CourseController extends Controller
         }
     }
 
+    private function loadQuizQuestions(Course $course): void
+    {
+        foreach ($course->modules as $module) {
+            foreach ($module->items as $item) {
+                if ($item->itemable instanceof Quiz) {
+                    $item->itemable->load('questions.options', 'questions.acceptedAnswers');
+                }
+            }
+        }
+    }
+
     private function serializeItem($item): array
     {
         $itemable = $item->itemable;
@@ -141,6 +154,7 @@ class CourseController extends Controller
             $itemable instanceof LearnPage => 'page',
             $itemable instanceof LearnFile => 'file',
             $itemable instanceof Assignment => 'assignment',
+            $itemable instanceof Quiz => 'quiz',
             default => 'unknown',
         };
 
@@ -162,6 +176,30 @@ class CourseController extends Controller
                 'due_at' => $itemable->due_at?->toIso8601String(),
                 'max_score' => $itemable->maxScore(),
                 'has_rubric' => $itemable->rubric !== null,
+            ] : null,
+            'quiz' => $itemable instanceof Quiz ? [
+                'id' => $itemable->id,
+                'instructions' => $itemable->instructions,
+                'time_limit_minutes' => $itemable->time_limit_minutes,
+                'max_attempts' => $itemable->max_attempts,
+                'questions_to_draw' => $itemable->questions_to_draw,
+                'shuffle_questions' => $itemable->shuffle_questions,
+                'shuffle_options' => $itemable->shuffle_options,
+                'due_at' => $itemable->due_at?->toIso8601String(),
+                'is_locked' => $itemable->is_locked,
+                'max_score' => $itemable->maxScore(),
+                'question_count' => $itemable->questions->count(),
+                'questions' => $itemable->questions->map(fn ($q) => [
+                    'id' => $q->id,
+                    'question_type' => $q->question_type,
+                    'prompt' => $q->prompt,
+                    'points' => (float) $q->points,
+                    'difficulty' => $q->difficulty,
+                    'options' => $q->options->map(fn ($o) => [
+                        'id' => $o->id, 'option_text' => $o->option_text, 'is_correct' => $o->is_correct,
+                    ])->values(),
+                    'accepted_answers' => $q->acceptedAnswers->pluck('answer_text')->values(),
+                ])->values(),
             ] : null,
         ];
     }

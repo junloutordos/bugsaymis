@@ -7,6 +7,8 @@ use App\Models\Learn\Assignment;
 use App\Models\Learn\Course;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
+use App\Models\Learn\Quiz;
+use App\Models\Learn\QuizAttempt;
 use App\Models\Learn\Submission;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
@@ -65,6 +67,7 @@ class LearnController extends Controller
             'announcements.postedBy',
         ]);
         $this->loadAssignmentRubrics($course);
+        $this->loadQuizQuestionCounts($course);
 
         return Inertia::render('StudentPortal/Learn/Show', [
             'course' => [
@@ -161,6 +164,17 @@ class LearnController extends Controller
         }
     }
 
+    private function loadQuizQuestionCounts(Course $course): void
+    {
+        foreach ($course->modules as $module) {
+            foreach ($module->items as $item) {
+                if ($item->itemable instanceof Quiz) {
+                    $item->itemable->load('questions');
+                }
+            }
+        }
+    }
+
     private function serializeItem($item, int $studentId): array
     {
         $itemable = $item->itemable;
@@ -169,6 +183,7 @@ class LearnController extends Controller
             $itemable instanceof LearnPage => 'page',
             $itemable instanceof LearnFile => 'file',
             $itemable instanceof Assignment => 'assignment',
+            $itemable instanceof Quiz => 'quiz',
             default => 'unknown',
         };
 
@@ -200,6 +215,30 @@ class LearnController extends Controller
             ];
         }
 
+        $quizData = null;
+        if ($itemable instanceof Quiz) {
+            $attempts = QuizAttempt::where('learn_quiz_id', $itemable->id)
+                ->where('student_id', $studentId)
+                ->orderByDesc('attempt_number')
+                ->get();
+            $bestScore = $attempts->whereNotNull('score')->max('score');
+            $inProgress = $attempts->first(fn ($a) => $a->submitted_at === null);
+
+            $quizData = [
+                'id' => $itemable->id,
+                'instructions' => $itemable->instructions,
+                'time_limit_minutes' => $itemable->time_limit_minutes,
+                'max_attempts' => $itemable->max_attempts,
+                'due_at' => $itemable->due_at?->toIso8601String(),
+                'max_score' => $itemable->maxScore(),
+                'question_count' => $itemable->questions_to_draw ?? $itemable->questions->count(),
+                'attempts_used' => $attempts->count(),
+                'best_score' => $bestScore !== null ? (float) $bestScore : null,
+                'can_start_new_attempt' => $itemable->max_attempts === null || $attempts->count() < $itemable->max_attempts,
+                'in_progress_attempt_id' => $inProgress?->id,
+            ];
+        }
+
         return [
             'id' => $item->id,
             'type' => $type,
@@ -210,6 +249,7 @@ class LearnController extends Controller
                 ? route('student-portal.learn.file', ['fileId' => $this->files->encodeFileId($itemable->s3_key)])
                 : null,
             'assignment' => $assignmentData,
+            'quiz' => $quizData,
         ];
     }
 
