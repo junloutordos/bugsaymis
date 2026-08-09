@@ -1,5 +1,6 @@
 <script setup>
-import { Head } from '@inertiajs/vue3'
+import { ref } from 'vue'
+import { Head, useForm } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
 import StudentPortalLayout from '@/Layouts/StudentPortalLayout.vue'
 import { DocumentIcon, PaperClipIcon } from '@heroicons/vue/24/outline'
@@ -17,6 +18,37 @@ function sanitizeHtml(html) {
 // ever used as a clickable href (blocks javascript:/data: scheme XSS).
 function safeVideoUrl(url) {
   return url && /^https?:\/\//i.test(url) ? url : null
+}
+
+// ── Assignment submission ────────────────────────────────────────────────
+const submissionForms = ref({})
+function submissionForm(item) {
+  if (! submissionForms.value[item.id]) {
+    submissionForms.value[item.id] = useForm({ text_body: '', link_url: '', title: '', file_base64: '' })
+  }
+  return submissionForms.value[item.id]
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+async function pickFile(item, event) {
+  const file = event.target.files[0]
+  if (! file) return
+  const form = submissionForm(item)
+  form.file_base64 = await readFileAsBase64(file)
+  form.title = file.name
+}
+
+function submitAssignment(item) {
+  const form = submissionForm(item)
+  form.post(route('student-portal.learn.assignments.submit', item.assignment.id), { preserveScroll: true })
 }
 </script>
 
@@ -47,6 +79,39 @@ function safeVideoUrl(url) {
                 <div v-if="item.type === 'page' && item.body" class="prose prose-sm max-w-none mt-1" v-html="sanitizeHtml(item.body)" />
                 <a v-if="item.type === 'page' && safeVideoUrl(item.video_url)" :href="safeVideoUrl(item.video_url)" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Watch video</a>
                 <a v-if="item.type === 'file'" :href="item.file_url" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Download file</a>
+
+                <div v-if="item.type === 'assignment'" class="mt-1 space-y-2">
+                  <div v-if="item.assignment.instructions" class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.assignment.instructions)" />
+                  <p class="text-xs text-slate-500">
+                    {{ item.assignment.submission_type }} submission
+                    <span v-if="item.assignment.due_at"> — due {{ new Date(item.assignment.due_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
+                    <span v-if="item.assignment.max_score !== null"> — {{ item.assignment.max_score }} pts</span>
+                  </p>
+
+                  <div v-if="item.assignment.submission && item.assignment.submission.is_graded" class="border border-emerald-200 bg-emerald-50 rounded-lg p-3">
+                    <p class="text-sm font-medium text-emerald-800">Score: {{ item.assignment.submission.score }} / {{ item.assignment.max_score }}</p>
+                    <p v-if="item.assignment.submission.feedback_comment" class="text-sm text-emerald-700 mt-1">{{ item.assignment.submission.feedback_comment }}</p>
+                  </div>
+
+                  <div v-else-if="item.assignment.submission" class="border border-slate-200 rounded-lg p-3">
+                    <p class="text-xs text-slate-500">
+                      Submitted {{ new Date(item.assignment.submission.submitted_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+                      <span v-if="item.assignment.submission.is_late" class="text-amber-600">— Late</span>
+                    </p>
+                    <p v-if="item.assignment.submission_type === 'text'" class="text-sm text-slate-700 mt-1 whitespace-pre-line">{{ item.assignment.submission.text_body }}</p>
+                    <a v-else-if="item.assignment.submission_type === 'link'" :href="item.assignment.submission.link_url" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">{{ item.assignment.submission.link_url }}</a>
+                    <a v-else-if="item.assignment.submission_type === 'file'" :href="item.assignment.submission.file_url" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">View my submission</a>
+                  </div>
+
+                  <div v-if="!item.assignment.submission || !item.assignment.submission.is_graded" class="border-t border-slate-100 pt-2 space-y-2">
+                    <textarea v-if="item.assignment.submission_type === 'text'" v-model="submissionForm(item).text_body" placeholder="Type your submission" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="3" />
+                    <input v-else-if="item.assignment.submission_type === 'link'" v-model="submissionForm(item).link_url" placeholder="https://..." class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
+                    <input v-else-if="item.assignment.submission_type === 'file'" type="file" @change="e => pickFile(item, e)" class="text-sm" />
+                    <button @click="submitAssignment(item)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                      {{ item.assignment.submission ? 'Resubmit' : 'Submit' }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             <p v-if="module.items.length === 0" class="text-xs text-slate-400">No content yet.</p>
