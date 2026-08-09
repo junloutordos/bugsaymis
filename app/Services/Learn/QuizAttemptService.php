@@ -82,6 +82,18 @@ class QuizAttemptService
         return $answer->fresh();
     }
 
+    /** Reproducible per-attempt shuffle — same attempt+question always yields the same order. */
+    public function shuffledOptionsFor(QuizAttempt $attempt, QuizQuestion $question): \Illuminate\Support\Collection
+    {
+        $options = $question->options;
+
+        if (! $attempt->quiz->shuffle_options) {
+            return $options;
+        }
+
+        return $options->sortBy(fn ($option) => crc32("{$attempt->id}-{$question->id}-{$option->id}"))->values();
+    }
+
     public function submit(QuizAttempt $attempt): QuizAttempt
     {
         return $this->finalize($attempt, autoSubmitted: false);

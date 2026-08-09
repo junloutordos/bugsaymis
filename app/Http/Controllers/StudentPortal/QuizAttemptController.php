@@ -10,6 +10,8 @@ use App\Models\Student;
 use App\Services\Learn\QuizAttemptService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class QuizAttemptController extends Controller
 {
@@ -63,6 +65,64 @@ class QuizAttemptController extends Controller
         $this->attemptService->submit($attempt);
 
         return redirect()->route('student-portal.learn.quiz-attempts.show', $attempt);
+    }
+
+    /** GET /student-portal/learn/quiz-attempts/{attempt} */
+    public function show(QuizAttempt $attempt): Response
+    {
+        $student = $this->currentStudent();
+        abort_unless($attempt->student_id === $student->id, 403);
+
+        $attempt = $this->attemptService->finalizeIfExpired($attempt);
+        $quiz = $attempt->quiz;
+
+        $questions = $quiz->questions()->whereIn('id', $attempt->question_order)->get()->keyBy('id');
+        $answers = $attempt->answers()->with('selectedOptions')->get()->keyBy('learn_quiz_question_id');
+
+        $orderedQuestions = collect($attempt->question_order)
+            ->map(function ($id) use ($questions, $answers, $attempt) {
+                $question = $questions->get($id);
+                if (! $question) {
+                    return null;
+                }
+                $answer = $answers->get($id);
+                $hasOptions = in_array($question->question_type, ['multiple_choice', 'true_false', 'multiple_select'], true);
+
+                return [
+                    'id' => $question->id,
+                    'question_type' => $question->question_type,
+                    'prompt' => $question->prompt,
+                    'points' => (float) $question->points,
+                    'options' => $hasOptions
+                        ? $this->attemptService->shuffledOptionsFor($attempt, $question)
+                            ->map(fn ($o) => ['id' => $o->id, 'option_text' => $o->option_text])->values()
+                        : null,
+                    'your_answer' => $answer ? [
+                        'answer_text' => $answer->answer_text,
+                        'selected_option_ids' => $answer->selectedOptions->pluck('learn_quiz_question_option_id')->values(),
+                        'is_correct' => $attempt->isSubmitted() ? $answer->is_correct : null,
+                        'points_earned' => $attempt->isSubmitted() && $answer->points_earned !== null
+                            ? (float) $answer->points_earned : null,
+                    ] : null,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        return Inertia::render('StudentPortal/Learn/QuizAttempt', [
+            'attempt' => [
+                'id' => $attempt->id,
+                'quiz_title' => $quiz->title,
+                'time_limit_minutes' => $quiz->time_limit_minutes,
+                'started_at' => $attempt->started_at->toIso8601String(),
+                'submitted_at' => $attempt->submitted_at?->toIso8601String(),
+                'auto_submitted' => $attempt->auto_submitted,
+                'score' => $attempt->score !== null ? (float) $attempt->score : null,
+                'max_score' => $quiz->maxScore(),
+                'is_submitted' => $attempt->isSubmitted(),
+                'questions' => $orderedQuestions,
+            ],
+        ]);
     }
 
     private function currentStudent(): Student
