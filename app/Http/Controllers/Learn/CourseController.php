@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Learn;
 use App\Http\Controllers\Controller;
 use App\Models\Learn\Assignment;
 use App\Models\Learn\Course;
+use App\Models\Learn\Discussion;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
 use App\Models\Learn\Quiz;
@@ -57,6 +58,7 @@ class CourseController extends Controller
         $course->load(['subject', 'section', 'schoolYear', 'modules.items.itemable', 'announcements.postedBy']);
         $this->loadAssignmentRubrics($course);
         $this->loadQuizQuestions($course);
+        $this->loadDiscussionPostCounts($course);
 
         return Inertia::render('Learn/Show', [
             'course' => $this->serializeCourse($course, $user),
@@ -161,6 +163,17 @@ class CourseController extends Controller
         }
     }
 
+    private function loadDiscussionPostCounts(Course $course): void
+    {
+        foreach ($course->modules as $module) {
+            foreach ($module->items as $item) {
+                if ($item->itemable instanceof Discussion) {
+                    $item->itemable->load('posts');
+                }
+            }
+        }
+    }
+
     private function serializeItem($item): array
     {
         $itemable = $item->itemable;
@@ -170,6 +183,7 @@ class CourseController extends Controller
             $itemable instanceof LearnFile => 'file',
             $itemable instanceof Assignment => 'assignment',
             $itemable instanceof Quiz => 'quiz',
+            $itemable instanceof Discussion => 'discussion',
             default => 'unknown',
         };
 
@@ -215,6 +229,12 @@ class CourseController extends Controller
                     ])->values(),
                     'accepted_answers' => $q->acceptedAnswers->pluck('answer_text')->values(),
                 ])->values(),
+            ] : null,
+            'discussion' => $itemable instanceof Discussion ? [
+                'id' => $itemable->id,
+                'prompt' => $itemable->prompt,
+                'max_score' => $itemable->maxScore(),
+                'post_count' => $itemable->posts->count(),
             ] : null,
         ];
     }

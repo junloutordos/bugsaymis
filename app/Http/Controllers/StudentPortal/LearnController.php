@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StudentPortal;
 use App\Http\Controllers\Controller;
 use App\Models\Learn\Assignment;
 use App\Models\Learn\Course;
+use App\Models\Learn\Discussion;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
 use App\Models\Learn\Quiz;
@@ -68,6 +69,7 @@ class LearnController extends Controller
         ]);
         $this->loadAssignmentRubrics($course);
         $this->loadQuizQuestionCounts($course);
+        $this->loadDiscussionPostCounts($course);
 
         return Inertia::render('StudentPortal/Learn/Show', [
             'course' => [
@@ -175,6 +177,17 @@ class LearnController extends Controller
         }
     }
 
+    private function loadDiscussionPostCounts(Course $course): void
+    {
+        foreach ($course->modules as $module) {
+            foreach ($module->items as $item) {
+                if ($item->itemable instanceof Discussion) {
+                    $item->itemable->load('posts');
+                }
+            }
+        }
+    }
+
     private function serializeItem($item, int $studentId): array
     {
         $itemable = $item->itemable;
@@ -184,6 +197,7 @@ class LearnController extends Controller
             $itemable instanceof LearnFile => 'file',
             $itemable instanceof Assignment => 'assignment',
             $itemable instanceof Quiz => 'quiz',
+            $itemable instanceof Discussion => 'discussion',
             default => 'unknown',
         };
 
@@ -250,6 +264,12 @@ class LearnController extends Controller
                 : null,
             'assignment' => $assignmentData,
             'quiz' => $quizData,
+            'discussion' => $itemable instanceof Discussion ? [
+                'id' => $itemable->id,
+                'prompt' => $itemable->prompt,
+                'max_score' => $itemable->maxScore(),
+                'post_count' => $itemable->posts->count(),
+            ] : null,
         ];
     }
 
