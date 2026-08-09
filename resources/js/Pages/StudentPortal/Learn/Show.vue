@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
 import StudentPortalLayout from '@/Layouts/StudentPortalLayout.vue'
-import { DocumentIcon, PaperClipIcon, AcademicCapIcon } from '@heroicons/vue/24/outline'
+import { DocumentIcon, PaperClipIcon, AcademicCapIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 
 defineProps({ course: Object })
 
@@ -88,6 +88,7 @@ function continueAttempt(attemptId) {
             <div v-for="item in module.items" :key="item.id" class="flex items-start gap-2 border border-slate-100 rounded-lg p-3">
               <DocumentIcon v-if="item.type === 'page'" class="h-5 w-5 text-slate-400 shrink-0" />
               <AcademicCapIcon v-else-if="item.type === 'quiz'" class="h-5 w-5 text-slate-400 shrink-0" />
+              <ChatBubbleLeftRightIcon v-else-if="item.type === 'discussion'" class="h-5 w-5 text-slate-400 shrink-0" />
               <PaperClipIcon v-else class="h-5 w-5 text-slate-400 shrink-0" />
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-slate-700">{{ item.title }}</p>
@@ -147,6 +148,15 @@ function continueAttempt(attemptId) {
                     Start quiz
                   </button>
                   <p v-else class="text-xs text-slate-400">No attempts remaining.</p>
+                </div>
+
+                <div v-if="item.type === 'discussion'" class="mt-1 space-y-1">
+                  <div class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.discussion.prompt)" />
+                  <p class="text-xs text-slate-500">
+                    {{ item.discussion.post_count }} post{{ item.discussion.post_count === 1 ? '' : 's' }}
+                    <span v-if="item.discussion.max_score !== null"> — {{ item.discussion.max_score }} pts</span>
+                  </p>
+                  <Link :href="route('student-portal.learn.discussions.show', item.discussion.id)" class="text-xs text-indigo-600 underline">View discussion</Link>
                 </div>
               </div>
             </div>
