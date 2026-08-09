@@ -2528,6 +2528,11 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::post('/modules/{module}/items/page', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storePage'])->name('items.store-page');
     Route::post('/modules/{module}/items/file', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeFile'])->name('items.store-file');
     Route::post('/modules/{module}/items/assignment', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeAssignment'])->name('items.store-assignment');
+
+    Route::get('/assignments/{assignment}/submissions', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'index'])->name('assignments.submissions');
+    Route::put('/submissions/{submission}/grade', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'grade'])->name('submissions.grade');
+    Route::post('/submissions/{submission}/reopen', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'reopen'])->name('submissions.reopen');
+    Route::get('/submissions/{submission}/file', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'file'])->name('submissions.file');
     Route::put('/modules/{module}/items/reorder', [\App\Http\Controllers\Learn\ModuleItemController::class, 'reorder'])->name('items.reorder');
     Route::patch('/items/{item}/publish', [\App\Http\Controllers\Learn\ModuleItemController::class, 'togglePublish'])->name('items.publish');
     Route::delete('/items/{item}', [\App\Http\Controllers\Learn\ModuleItemController::class, 'destroy'])->name('items.destroy');
