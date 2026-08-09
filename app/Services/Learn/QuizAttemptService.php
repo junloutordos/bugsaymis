@@ -65,6 +65,23 @@ class QuizAttemptService
         return $questionIds;
     }
 
+    public function saveAnswer(QuizAttempt $attempt, QuizQuestion $question, array $data): QuizAttemptAnswer
+    {
+        $answer = QuizAttemptAnswer::updateOrCreate(
+            ['learn_quiz_attempt_id' => $attempt->id, 'learn_quiz_question_id' => $question->id],
+            ['answer_text' => $data['answer_text'] ?? null]
+        );
+
+        if (in_array($question->question_type, ['multiple_choice', 'true_false', 'multiple_select'], true)) {
+            $answer->selectedOptions()->delete();
+            foreach (($data['selected_option_ids'] ?? []) as $optionId) {
+                $answer->selectedOptions()->create(['learn_quiz_question_option_id' => $optionId]);
+            }
+        }
+
+        return $answer->fresh();
+    }
+
     public function submit(QuizAttempt $attempt): QuizAttempt
     {
         return $this->finalize($attempt, autoSubmitted: false);

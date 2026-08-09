@@ -5,8 +5,10 @@ namespace App\Http\Controllers\StudentPortal;
 use App\Http\Controllers\Controller;
 use App\Models\Learn\Quiz;
 use App\Models\Learn\QuizAttempt;
+use App\Models\Learn\QuizQuestion;
 use App\Models\Student;
 use App\Services\Learn\QuizAttemptService;
+use Illuminate\Http\Request;
 
 class QuizAttemptController extends Controller
 {
@@ -25,6 +27,27 @@ class QuizAttemptController extends Controller
         $attempt = $this->attemptService->start($quiz, $student->id);
 
         return redirect()->route('student-portal.learn.quiz-attempts.show', $attempt);
+    }
+
+    /** PUT /student-portal/learn/quiz-attempts/{attempt}/answers/{question} */
+    public function answer(Request $request, QuizAttempt $attempt, QuizQuestion $question)
+    {
+        $student = $this->currentStudent();
+        abort_unless($attempt->student_id === $student->id, 403);
+        abort_unless(in_array($question->id, $attempt->question_order, true), 404);
+
+        $attempt = $this->attemptService->finalizeIfExpired($attempt);
+        abort_if($attempt->isSubmitted(), 403, 'This attempt has already been submitted.');
+
+        $validated = $request->validate([
+            'answer_text' => 'nullable|string',
+            'selected_option_ids' => 'nullable|array',
+            'selected_option_ids.*' => 'integer|exists:learn_quiz_question_options,id',
+        ]);
+
+        $this->attemptService->saveAnswer($attempt, $question, $validated);
+
+        return back()->with('success', 'Answer saved.');
     }
 
     /** POST /student-portal/learn/quiz-attempts/{attempt}/submit */
