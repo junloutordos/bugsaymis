@@ -4464,11 +4464,12 @@ git commit -m "feat(learn): widen Class Record push to quizzes via HasClassRecor
 - Create: `resources/js/Components/MathContent.vue`
 
 **Interfaces:**
-- Produces: `<MathContent :html="sanitizeHtml(text)" />` — a drop-in replacement for a raw
+- Produces: `<MathContent :html="text" />` — a drop-in replacement for a raw
   `<div v-html="sanitizeHtml(text)" />` wherever a quiz prompt is displayed. Consumed by Tasks
   18–21's Vue pages (authoring preview, student attempt view, grading view, item analysis).
-  Always sanitize with the existing `sanitizeHtml()`/DOMPurify helper (Phase 1) *before* passing
-  to `MathContent` — this component renders math inside already-trusted HTML, it does not sanitize.
+  **Sanitizes internally** (DOMPurify, same as Phase 1's `sanitizeHtml()` helper) — callers pass
+  raw or already-sanitized HTML either way, so one caller forgetting to pre-sanitize can never
+  produce a stored-XSS gap.
 
 This task has no backend test — it's a frontend-only dependency addition verified by a successful
 build, consistent with how DOMPurify was added in Phase 1.
@@ -4485,11 +4486,15 @@ errors.
 
 ```vue
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import DOMPurify from 'dompurify'
 import renderMathInElement from 'katex/contrib/auto-render'
 import 'katex/dist/katex.min.css'
 
+// Sanitizes internally so every caller is safe by default, even one that forgets to
+// pre-sanitize — callers may still pass raw or already-sanitized HTML either way.
 const props = defineProps({ html: { type: String, default: '' } })
+const sanitized = computed(() => DOMPurify.sanitize(props.html || ''))
 const el = ref(null)
 
 function render() {
@@ -4504,11 +4509,11 @@ function render() {
 }
 
 onMounted(render)
-watch(() => props.html, () => render())
+watch(sanitized, () => render())
 </script>
 
 <template>
-  <div ref="el" v-html="html" />
+  <div ref="el" v-html="sanitized" />
 </template>
 ```
 

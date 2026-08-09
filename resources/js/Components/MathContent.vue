@@ -1,9 +1,13 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import DOMPurify from 'dompurify'
 import renderMathInElement from 'katex/contrib/auto-render'
 import 'katex/dist/katex.min.css'
 
+// Sanitizes internally so every caller is safe by default, even one that forgets to
+// pre-sanitize — callers may still pass raw or already-sanitized HTML either way.
 const props = defineProps({ html: { type: String, default: '' } })
+const sanitized = computed(() => DOMPurify.sanitize(props.html || ''))
 const el = ref(null)
 
 function render() {
@@ -18,9 +22,9 @@ function render() {
 }
 
 onMounted(render)
-watch(() => props.html, () => render())
+watch(sanitized, () => render())
 </script>
 
 <template>
-  <div ref="el" v-html="html" />
+  <div ref="el" v-html="sanitized" />
 </template>
