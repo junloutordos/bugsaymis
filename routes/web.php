@@ -2634,6 +2634,11 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
         Route::get('/learn/{course}', [\App\Http\Controllers\StudentPortal\LearnController::class, 'show'])->name('learn.show');
         Route::post('/learn/assignments/{assignment}/submit', [\App\Http\Controllers\StudentPortal\LearnController::class, 'submit'])->name('learn.assignments.submit');
         Route::get('/learn/submissions/{submission}/file', [\App\Http\Controllers\StudentPortal\LearnController::class, 'submissionFile'])->name('learn.submissions.file');
+
+        Route::post('/learn/quizzes/{quiz}/attempts', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'start'])->name('learn.quiz-attempts.start');
+        Route::put('/learn/quiz-attempts/{attempt}/answers/{question}', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'answer'])->name('learn.quiz-attempts.answer');
+        Route::post('/learn/quiz-attempts/{attempt}/submit', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'submit'])->name('learn.quiz-attempts.submit');
+        Route::get('/learn/quiz-attempts/{attempt}', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'show'])->name('learn.quiz-attempts.show');
     });
 });
 
