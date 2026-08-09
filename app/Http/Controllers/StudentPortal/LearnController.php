@@ -11,6 +11,7 @@ use App\Models\Learn\Submission;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
 use App\Services\Learn\CourseFileService;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -100,6 +101,53 @@ class LearnController extends Controller
         abort_unless($course->isVisibleToStudent($student->id), 403);
 
         return $this->files->streamResponse($file);
+    }
+
+    /** POST /student-portal/learn/assignments/{assignment}/submit */
+    public function submit(Request $request, Assignment $assignment)
+    {
+        $student = $this->currentStudent();
+        $course = $assignment->course();
+        abort_if(! $course, 404);
+        abort_unless($course->isVisibleToStudent($student->id), 403);
+
+        $existing = Submission::where('learn_assignment_id', $assignment->id)
+            ->where('student_id', $student->id)
+            ->first();
+        abort_if($existing?->isGraded(), 403, 'This submission has already been graded and is locked.');
+
+        $rules = match ($assignment->submission_type) {
+            'text' => ['text_body' => 'required|string'],
+            'link' => ['link_url' => 'required|url'],
+            'file' => ['title' => 'required|string|max:255', 'file_base64' => 'required|string'],
+        };
+        $validated = $request->validate($rules);
+
+        $data = ['submitted_at' => now()];
+        match ($assignment->submission_type) {
+            'text' => $data['text_body'] = $validated['text_body'],
+            'link' => $data['link_url'] = $validated['link_url'],
+            'file' => $data['learn_file_id'] = $this->files->upload(
+                $course->id, $validated['title'], $validated['file_base64']
+            )->id,
+        };
+
+        Submission::updateOrCreate(
+            ['learn_assignment_id' => $assignment->id, 'student_id' => $student->id],
+            $data
+        );
+
+        return back()->with('success', 'Submission saved.');
+    }
+
+    /** GET /student-portal/learn/submissions/{submission}/file */
+    public function submissionFile(Submission $submission)
+    {
+        $student = $this->currentStudent();
+        abort_unless($submission->student_id === $student->id, 403);
+        abort_if(! $submission->file, 404);
+
+        return $this->files->streamResponse($submission->file);
     }
 
     private function loadAssignmentRubrics(Course $course): void

@@ -2623,6 +2623,8 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
             ->name('learn.file')->where('fileId', '[a-zA-Z0-9_.=-]+');
         Route::get('/learn', [\App\Http\Controllers\StudentPortal\LearnController::class, 'index'])->name('learn.index');
         Route::get('/learn/{course}', [\App\Http\Controllers\StudentPortal\LearnController::class, 'show'])->name('learn.show');
+        Route::post('/learn/assignments/{assignment}/submit', [\App\Http\Controllers\StudentPortal\LearnController::class, 'submit'])->name('learn.assignments.submit');
+        Route::get('/learn/submissions/{submission}/file', [\App\Http\Controllers\StudentPortal\LearnController::class, 'submissionFile'])->name('learn.submissions.file');
     });
 });
 
