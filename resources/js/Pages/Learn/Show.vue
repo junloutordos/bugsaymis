@@ -7,7 +7,7 @@ import RichTextEditor from '@/Components/RichTextEditor.vue'
 import MathContent from '@/Components/MathContent.vue'
 import {
   PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon,
-  ArrowUpIcon, ArrowDownIcon, DocumentIcon, PaperClipIcon, AcademicCapIcon,
+  ArrowUpIcon, ArrowDownIcon, DocumentIcon, PaperClipIcon, AcademicCapIcon, ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ course: Object, rubric_templates: Array, quiz_question_bank: Array })
@@ -282,6 +282,20 @@ function postAnnouncement() {
 function deleteAnnouncement(id) {
   router.delete(route('learn.announcements.destroy', id), { preserveScroll: true })
 }
+
+const discussionForms = ref({})
+function discussionForm(moduleId) {
+  if (! discussionForms.value[moduleId]) {
+    discussionForms.value[moduleId] = useForm({ title: '', prompt: '', points_possible: '' })
+  }
+  return discussionForms.value[moduleId]
+}
+function addDiscussion(moduleId) {
+  discussionForm(moduleId).post(route('learn.items.store-discussion', moduleId), {
+    preserveScroll: true,
+    onSuccess: () => { discussionForms.value[moduleId] = null },
+  })
+}
 </script>
 
 <template>
@@ -341,6 +355,7 @@ function deleteAnnouncement(id) {
             <div v-for="(item, itemIndex) in module.items" :key="item.id" class="flex items-start gap-2 border border-slate-100 rounded-lg p-3">
               <DocumentIcon v-if="item.type === 'page'" class="h-5 w-5 text-slate-400 shrink-0" />
               <AcademicCapIcon v-else-if="item.type === 'quiz'" class="h-5 w-5 text-slate-400 shrink-0" />
+              <ChatBubbleLeftRightIcon v-else-if="item.type === 'discussion'" class="h-5 w-5 text-slate-400 shrink-0" />
               <PaperClipIcon v-else class="h-5 w-5 text-slate-400 shrink-0" />
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-slate-700">{{ item.title }}</p>
@@ -412,6 +427,17 @@ function deleteAnnouncement(id) {
 
                       <button @click="submitNewQuestion(item.quiz.id)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium">Add question</button>
                     </div>
+                  </div>
+                </div>
+                <div v-if="item.type === 'discussion'" class="mt-1 space-y-1">
+                  <div class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.discussion.prompt)" />
+                  <p class="text-xs text-slate-500">
+                    {{ item.discussion.post_count }} post{{ item.discussion.post_count === 1 ? '' : 's' }}
+                    <span v-if="item.discussion.max_score !== null"> — {{ item.discussion.max_score }} pts</span>
+                  </p>
+                  <div class="flex gap-2">
+                    <Link :href="route('learn.discussions.show', item.discussion.id)" class="text-xs text-indigo-600 underline">View discussion</Link>
+                    <Link v-if="item.discussion.max_score !== null" :href="route('learn.discussions.grades', item.discussion.id)" class="text-xs text-indigo-600 underline">Grades</Link>
                   </div>
                 </div>
               </div>
@@ -575,6 +601,14 @@ function deleteAnnouncement(id) {
                 </div>
 
                 <button @click="addQuiz(module.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add quiz</button>
+              </div>
+
+              <div v-if="course.can_edit" class="border-t border-slate-100 pt-3 space-y-2">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">New discussion</p>
+                <input v-model="discussionForm(module.id).title" placeholder="Discussion title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
+                <textarea v-model="discussionForm(module.id).prompt" placeholder="Discussion prompt" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
+                <input v-model="discussionForm(module.id).points_possible" type="number" min="0" placeholder="Points possible (optional — leave blank for ungraded)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
+                <button @click="addDiscussion(module.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add discussion</button>
               </div>
             </div>
           </div>
