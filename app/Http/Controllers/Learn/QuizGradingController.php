@@ -26,7 +26,7 @@ class QuizGradingController extends Controller
         abort_unless($quiz->canEdit($user), 403);
 
         $attempts = QuizAttempt::where('learn_quiz_id', $quiz->id)
-            ->with('answers.question')
+            ->with('answers.question.options', 'answers.selectedOptions')
             ->orderBy('student_id')
             ->orderBy('attempt_number')
             ->get();
@@ -68,9 +68,24 @@ class QuizGradingController extends Controller
             ],
             'attempts' => $attempts->map(function (QuizAttempt $attempt) use ($students) {
                 $student = $students->get($attempt->student_id);
-                $pendingEssays = $attempt->answers
-                    ->filter(fn ($a) => $a->question->question_type === 'essay' && $a->points_earned === null)
-                    ->count();
+
+                $answers = $attempt->answers->map(fn ($answer) => [
+                    'id' => $answer->id,
+                    'question_type' => $answer->question->question_type,
+                    'prompt' => $answer->question->prompt,
+                    'points_possible' => (float) $answer->question->points,
+                    'answer_text' => $answer->answer_text,
+                    'selected_option_ids' => $answer->selectedOptions->pluck('learn_quiz_question_option_id')->values(),
+                    'options' => in_array($answer->question->question_type, ['multiple_choice', 'true_false', 'multiple_select'], true)
+                        ? $answer->question->options->map(fn ($o) => [
+                            'id' => $o->id, 'option_text' => $o->option_text, 'is_correct' => $o->is_correct,
+                        ])->values()
+                        : null,
+                    'is_correct' => $answer->is_correct,
+                    'points_earned' => $answer->points_earned !== null ? (float) $answer->points_earned : null,
+                ])->values();
+
+                $pendingEssays = $answers->filter(fn ($a) => $a['question_type'] === 'essay' && $a['points_earned'] === null)->count();
 
                 return [
                     'id' => $attempt->id,
@@ -80,6 +95,7 @@ class QuizGradingController extends Controller
                     'submitted_at' => $attempt->submitted_at?->toIso8601String(),
                     'score' => $attempt->score !== null ? (float) $attempt->score : null,
                     'pending_essays' => $pendingEssays,
+                    'answers' => $answers,
                 ];
             })->values(),
         ]);
