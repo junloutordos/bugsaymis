@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Learn;
 
 use App\Http\Controllers\Controller;
+use App\Models\Learn\Assignment;
 use App\Models\Learn\Module;
 use App\Models\Learn\ModuleItem;
 use App\Models\Learn\Page;
@@ -49,6 +50,49 @@ class ModuleItemController extends Controller
         $this->attachItem($module, $file);
 
         return back()->with('success', 'File added.');
+    }
+
+    /** POST /learn/modules/{module}/items/assignment */
+    public function storeAssignment(Request $request, Module $module)
+    {
+        $user = Auth::user();
+        abort_unless($module->course->canEdit($user), 403);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'instructions' => 'nullable|string',
+            'submission_type' => 'required|in:text,file,link',
+            'points_possible' => 'nullable|numeric|min:0',
+            'due_at' => 'nullable|date',
+            'rubric_criteria' => 'nullable|array',
+            'rubric_criteria.*.description' => 'required_with:rubric_criteria|string|max:255',
+            'rubric_criteria.*.max_points' => 'required_with:rubric_criteria|numeric|min:0',
+        ]);
+
+        $hasRubric = ! empty($validated['rubric_criteria']);
+
+        $assignment = Assignment::create([
+            'title' => $validated['title'],
+            'instructions' => $validated['instructions'] ?? null,
+            'submission_type' => $validated['submission_type'],
+            'points_possible' => $hasRubric ? null : ($validated['points_possible'] ?? null),
+            'due_at' => $validated['due_at'] ?? null,
+        ]);
+
+        if ($hasRubric) {
+            $rubric = $assignment->rubric()->create([]);
+            foreach ($validated['rubric_criteria'] as $position => $criterion) {
+                $rubric->criteria()->create([
+                    'description' => $criterion['description'],
+                    'max_points' => $criterion['max_points'],
+                    'position' => $position,
+                ]);
+            }
+        }
+
+        $this->attachItem($module, $assignment);
+
+        return back()->with('success', 'Assignment added.');
     }
 
     /** PATCH /learn/items/{item}/publish */

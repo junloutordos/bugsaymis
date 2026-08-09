@@ -2527,6 +2527,7 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
 
     Route::post('/modules/{module}/items/page', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storePage'])->name('items.store-page');
     Route::post('/modules/{module}/items/file', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeFile'])->name('items.store-file');
+    Route::post('/modules/{module}/items/assignment', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeAssignment'])->name('items.store-assignment');
     Route::put('/modules/{module}/items/reorder', [\App\Http\Controllers\Learn\ModuleItemController::class, 'reorder'])->name('items.reorder');
     Route::patch('/items/{item}/publish', [\App\Http\Controllers\Learn\ModuleItemController::class, 'togglePublish'])->name('items.publish');
     Route::delete('/items/{item}', [\App\Http\Controllers\Learn\ModuleItemController::class, 'destroy'])->name('items.destroy');
