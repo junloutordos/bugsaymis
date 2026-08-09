@@ -7,15 +7,20 @@ use App\Models\Learn\Assignment;
 use App\Models\Learn\Module;
 use App\Models\Learn\ModuleItem;
 use App\Models\Learn\Page;
+use App\Models\Learn\Quiz;
 use App\Models\Learn\RubricTemplate;
 use App\Services\Learn\CourseFileService;
+use App\Services\Learn\QuizQuestionFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class ModuleItemController extends Controller
 {
-    public function __construct(private CourseFileService $files)
-    {
+    public function __construct(
+        private CourseFileService $files,
+        private QuizQuestionFactory $questionFactory,
+    ) {
     }
 
     /** POST /learn/modules/{module}/items/page */
@@ -110,6 +115,64 @@ class ModuleItemController extends Controller
         $this->attachItem($module, $assignment);
 
         return back()->with('success', 'Assignment added.');
+    }
+
+    /** POST /learn/modules/{module}/items/quiz */
+    public function storeQuiz(Request $request, Module $module)
+    {
+        $user = Auth::user();
+        abort_unless($module->course->canEdit($user), 403);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'instructions' => 'nullable|string',
+            'time_limit_minutes' => 'nullable|integer|min:1',
+            'max_attempts' => 'nullable|integer|min:1',
+            'questions_to_draw' => 'nullable|integer|min:1',
+            'shuffle_questions' => 'nullable|boolean',
+            'shuffle_options' => 'nullable|boolean',
+            'due_at' => 'nullable|date',
+            'questions' => 'nullable|array',
+            'questions.*.question_type' => 'required_with:questions|in:multiple_choice,true_false,multiple_select,short_answer,essay',
+            'questions.*.prompt' => 'required_with:questions|string',
+            'questions.*.points' => 'required_with:questions|numeric|min:0',
+            'questions.*.difficulty' => 'nullable|in:easy,medium,hard',
+            'questions.*.options' => 'nullable|array',
+            'questions.*.options.*.option_text' => 'required_with:questions.*.options|string|max:255',
+            'questions.*.options.*.is_correct' => 'nullable|boolean',
+            'questions.*.accepted_answers' => 'nullable|array',
+            'questions.*.accepted_answers.*' => 'required_with:questions.*.accepted_answers|string|max:255',
+        ]);
+
+        $questions = $validated['questions'] ?? [];
+
+        if (! empty($validated['questions_to_draw']) && count($questions) > 1) {
+            $distinctPoints = collect($questions)->pluck('points')->unique();
+            if ($distinctPoints->count() > 1) {
+                throw ValidationException::withMessages([
+                    'questions_to_draw' => 'When drawing a random subset of questions, every question must be worth the same points.',
+                ]);
+            }
+        }
+
+        $quiz = Quiz::create([
+            'title' => $validated['title'],
+            'instructions' => $validated['instructions'] ?? null,
+            'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
+            'max_attempts' => $validated['max_attempts'] ?? null,
+            'questions_to_draw' => $validated['questions_to_draw'] ?? null,
+            'shuffle_questions' => $validated['shuffle_questions'] ?? false,
+            'shuffle_options' => $validated['shuffle_options'] ?? false,
+            'due_at' => $validated['due_at'] ?? null,
+        ]);
+
+        foreach ($questions as $position => $questionData) {
+            $this->questionFactory->create($quiz, $questionData, $position);
+        }
+
+        $this->attachItem($module, $quiz);
+
+        return back()->with('success', 'Quiz added.');
     }
 
     /** PATCH /learn/items/{item}/publish */
