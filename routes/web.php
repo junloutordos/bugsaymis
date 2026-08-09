@@ -2654,6 +2654,9 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
         Route::post('/learn/quiz-attempts/{attempt}/submit', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'submit'])->name('learn.quiz-attempts.submit');
         Route::get('/learn/quiz-attempts/{attempt}', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'show'])->name('learn.quiz-attempts.show');
         Route::get('/learn/discussions/{discussion}', [\App\Http\Controllers\StudentPortal\DiscussionController::class, 'show'])->name('learn.discussions.show');
+        Route::post('/learn/discussions/{discussion}/posts', [\App\Http\Controllers\StudentPortal\DiscussionPostController::class, 'store'])->name('learn.discussion-posts.store');
+        Route::put('/learn/discussion-posts/{post}', [\App\Http\Controllers\StudentPortal\DiscussionPostController::class, 'update'])->name('learn.discussion-posts.update');
+        Route::delete('/learn/discussion-posts/{post}', [\App\Http\Controllers\StudentPortal\DiscussionPostController::class, 'destroy'])->name('learn.discussion-posts.destroy');
     });
 });
 
