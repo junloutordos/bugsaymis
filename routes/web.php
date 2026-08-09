@@ -2536,6 +2536,8 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::delete('/discussion-posts/{post}', [\App\Http\Controllers\Learn\DiscussionPostController::class, 'destroy'])->name('discussion-posts.destroy');
     Route::get('/discussions/{discussion}/grades', [\App\Http\Controllers\Learn\DiscussionGradingController::class, 'index'])->name('discussions.grades');
     Route::put('/discussions/{discussion}/grades/{student}', [\App\Http\Controllers\Learn\DiscussionGradingController::class, 'grade'])->name('discussions.grade');
+    Route::put('/discussions/{discussion}/link', [\App\Http\Controllers\Learn\DiscussionClassRecordPushController::class, 'link'])->name('discussions.link');
+    Route::post('/discussions/{discussion}/push', [\App\Http\Controllers\Learn\DiscussionClassRecordPushController::class, 'push'])->name('discussions.push');
     Route::post('/quizzes/{quiz}/questions', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'store'])->name('quiz-questions.store');
     Route::put('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'update'])->name('quiz-questions.update');
     Route::delete('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'destroy'])->name('quiz-questions.destroy');

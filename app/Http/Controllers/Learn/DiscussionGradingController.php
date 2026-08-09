@@ -7,6 +7,7 @@ use App\Models\Learn\Discussion;
 use App\Models\Learn\DiscussionGrade;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
+use App\Services\Learn\ClassRecordPushService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,10 @@ use Inertia\Response;
 
 class DiscussionGradingController extends Controller
 {
+    public function __construct(private ClassRecordPushService $pushService)
+    {
+    }
+
     /** GET /learn/discussions/{discussion}/grades */
     public function index(Discussion $discussion): Response
     {
@@ -46,11 +51,35 @@ class DiscussionGradingController extends Controller
             ];
         })->sortBy('name')->values();
 
+        $discussion->load(['classRecordAssessment.gradingCategory', 'classRecordAssessment.quarter.classRecord']);
+        $classRecordOptions = $this->pushService->candidateClassRecords($discussion);
+
         return Inertia::render('Learn/DiscussionGrading', [
             'discussion' => [
                 'id' => $discussion->id,
                 'title' => $discussion->title,
                 'max_score' => $discussion->maxScore(),
+                'class_record_link' => $discussion->classRecordAssessment ? [
+                    'assessment_id' => $discussion->classRecordAssessment->id,
+                    'assessment_title' => $discussion->classRecordAssessment->title,
+                    'class_record_name' => $discussion->classRecordAssessment->quarter->classRecord->display_name,
+                    'quarter' => $discussion->classRecordAssessment->quarter->quarter,
+                    'category_name' => $discussion->classRecordAssessment->gradingCategory->name,
+                    'max_score' => (float) $discussion->classRecordAssessment->max_score,
+                    'pushed_at' => $discussion->pushed_at?->toIso8601String(),
+                ] : null,
+                'class_record_options' => $classRecordOptions->map(fn ($cr) => [
+                    'id' => $cr->id,
+                    'display_name' => $cr->display_name,
+                    'quarters' => $cr->quarters->map(fn ($q) => [
+                        'id' => $q->id,
+                        'quarter' => $q->quarter,
+                        'assessments' => $q->assessments->map(fn ($a) => [
+                            'id' => $a->id, 'title' => $a->title, 'max_score' => (float) $a->max_score,
+                            'category_name' => $a->gradingCategory->name,
+                        ])->values(),
+                    ])->values(),
+                ])->values(),
             ],
             'roster' => $roster,
         ]);
