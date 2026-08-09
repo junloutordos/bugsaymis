@@ -2,6 +2,7 @@
 
 namespace App\Models\Learn;
 
+use App\Contracts\Learn\HasClassRecordLink;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-class Assignment extends Model
+class Assignment extends Model implements HasClassRecordLink
 {
     protected $table = 'learn_assignments';
 
@@ -65,5 +66,17 @@ class Assignment extends Model
     public function canEdit(User $user): bool
     {
         return $this->course()?->canEdit($user) ?? false;
+    }
+
+    /**
+     * @return array<int, float> student_id => score, for every graded submission.
+     */
+    public function gradedStudentScores(): array
+    {
+        return Submission::where('learn_assignment_id', $this->id)
+            ->whereNotNull('graded_at')
+            ->pluck('score', 'student_id')
+            ->map(fn ($score) => (float) $score)
+            ->all();
     }
 }

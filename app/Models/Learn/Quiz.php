@@ -2,6 +2,7 @@
 
 namespace App\Models\Learn;
 
+use App\Contracts\Learn\HasClassRecordLink;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-class Quiz extends Model
+class Quiz extends Model implements HasClassRecordLink
 {
     protected $table = 'learn_quizzes';
 
