@@ -7,6 +7,7 @@ use App\Models\Learn\Assignment;
 use App\Models\Learn\Module;
 use App\Models\Learn\ModuleItem;
 use App\Models\Learn\Page;
+use App\Models\Learn\RubricTemplate;
 use App\Services\Learn\CourseFileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -67,6 +68,8 @@ class ModuleItemController extends Controller
             'rubric_criteria' => 'nullable|array',
             'rubric_criteria.*.description' => 'required_with:rubric_criteria|string|max:255',
             'rubric_criteria.*.max_points' => 'required_with:rubric_criteria|numeric|min:0',
+            'save_as_template' => 'nullable|boolean',
+            'template_name' => 'required_if:save_as_template,true|nullable|string|max:255',
         ]);
 
         $hasRubric = ! empty($validated['rubric_criteria']);
@@ -83,6 +86,20 @@ class ModuleItemController extends Controller
             $rubric = $assignment->rubric()->create([]);
             foreach ($validated['rubric_criteria'] as $position => $criterion) {
                 $rubric->criteria()->create([
+                    'description' => $criterion['description'],
+                    'max_points' => $criterion['max_points'],
+                    'position' => $position,
+                ]);
+            }
+        }
+
+        if ($hasRubric && ($validated['save_as_template'] ?? false)) {
+            $template = RubricTemplate::create([
+                'user_id' => $user->id,
+                'name' => $validated['template_name'],
+            ]);
+            foreach ($validated['rubric_criteria'] as $position => $criterion) {
+                $template->criteria()->create([
                     'description' => $criterion['description'],
                     'max_points' => $criterion['max_points'],
                     'position' => $position,

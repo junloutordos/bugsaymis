@@ -483,10 +483,11 @@ class StoreAssignmentSavesRubricTemplateTest extends TestCase
         $this->assertCount(2, $template->criteria);
 
         $assignment = Assignment::where('title', 'Lab')->firstOrFail();
-        $this->assertEmpty(array_intersect(
-            $assignment->rubric->criteria->pluck('id')->all(),
-            $template->criteria->pluck('id')->all()
-        ));
+        $this->assertCount(2, $assignment->rubric->criteria);
+        // Two independent tables — the assignment's own rubric criteria row is never the
+        // template's criterion row (different model classes/tables entirely).
+        $this->assertInstanceOf(\App\Models\Learn\RubricCriterion::class, $assignment->rubric->criteria->first());
+        $this->assertInstanceOf(\App\Models\Learn\RubricTemplateCriterion::class, $template->criteria->first());
     }
 
     public function test_omitting_save_as_template_creates_no_template(): void
