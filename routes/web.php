@@ -2653,6 +2653,7 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
         Route::put('/learn/quiz-attempts/{attempt}/answers/{question}', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'answer'])->name('learn.quiz-attempts.answer');
         Route::post('/learn/quiz-attempts/{attempt}/submit', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'submit'])->name('learn.quiz-attempts.submit');
         Route::get('/learn/quiz-attempts/{attempt}', [\App\Http\Controllers\StudentPortal\QuizAttemptController::class, 'show'])->name('learn.quiz-attempts.show');
+        Route::get('/learn/discussions/{discussion}', [\App\Http\Controllers\StudentPortal\DiscussionController::class, 'show'])->name('learn.discussions.show');
     });
 });
 
