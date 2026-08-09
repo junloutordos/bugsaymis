@@ -2529,6 +2529,9 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::post('/modules/{module}/items/file', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeFile'])->name('items.store-file');
     Route::post('/modules/{module}/items/assignment', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeAssignment'])->name('items.store-assignment');
     Route::post('/modules/{module}/items/quiz', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeQuiz'])->name('items.store-quiz');
+    Route::post('/quizzes/{quiz}/questions', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'store'])->name('quiz-questions.store');
+    Route::put('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'update'])->name('quiz-questions.update');
+    Route::delete('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'destroy'])->name('quiz-questions.destroy');
 
     Route::get('/assignments/{assignment}/submissions', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'index'])->name('assignments.submissions');
     Route::put('/submissions/{submission}/grade', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'grade'])->name('submissions.grade');
