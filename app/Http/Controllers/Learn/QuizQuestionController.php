@@ -28,6 +28,8 @@ class QuizQuestionController extends Controller
             'options.*.is_correct' => 'nullable|boolean',
             'accepted_answers' => 'nullable|array',
             'accepted_answers.*' => 'required_with:accepted_answers|string|max:255',
+            'save_to_bank' => 'nullable|boolean',
+            'bank_name' => 'required_if:save_to_bank,true|nullable|string|max:255',
         ];
     }
 
@@ -58,7 +60,7 @@ class QuizQuestionController extends Controller
         $this->assertPointsMatchDrawConstraint($quiz, (float) $validated['points']);
 
         $position = ((int) $quiz->questions()->max('position')) + 1;
-        $this->questionFactory->create($quiz, $validated, $position);
+        $this->questionFactory->create($quiz, $validated, $position, $user);
 
         return back()->with('success', 'Question added.');
     }

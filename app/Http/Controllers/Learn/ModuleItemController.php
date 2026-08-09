@@ -142,6 +142,8 @@ class ModuleItemController extends Controller
             'questions.*.options.*.is_correct' => 'nullable|boolean',
             'questions.*.accepted_answers' => 'nullable|array',
             'questions.*.accepted_answers.*' => 'required_with:questions.*.accepted_answers|string|max:255',
+            'questions.*.save_to_bank' => 'nullable|boolean',
+            'questions.*.bank_name' => 'required_if:questions.*.save_to_bank,true|nullable|string|max:255',
         ]);
 
         $questions = $validated['questions'] ?? [];
@@ -167,7 +169,7 @@ class ModuleItemController extends Controller
         ]);
 
         foreach ($questions as $position => $questionData) {
-            $this->questionFactory->create($quiz, $questionData, $position);
+            $this->questionFactory->create($quiz, $questionData, $position, $user);
         }
 
         $this->attachItem($module, $quiz);

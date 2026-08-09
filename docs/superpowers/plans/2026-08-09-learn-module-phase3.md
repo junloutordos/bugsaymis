@@ -3824,7 +3824,7 @@ class QuizQuestionBankSaveTest extends TestCase
         $this->assertSame('Original', $bankItem->fresh()->prompt);
 
         $bankItem->update(['name' => 'Renamed']);
-        $this->assertSame('Original', $question->fresh()->prompt);
+        $this->assertSame('Changed', $question->fresh()->prompt);
     }
 }
 ```

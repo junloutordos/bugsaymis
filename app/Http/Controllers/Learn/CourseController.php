@@ -8,6 +8,7 @@ use App\Models\Learn\Course;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
 use App\Models\Learn\Quiz;
+use App\Models\Learn\QuizQuestionBankItem;
 use App\Models\Learn\RubricTemplate;
 use App\Services\Learn\CourseFileService;
 use App\Services\Learn\CourseResolver;
@@ -67,6 +68,20 @@ class CourseController extends Controller
                     'name' => $t->name,
                     'criteria' => $t->criteria->map(fn ($c) => [
                         'description' => $c->description, 'max_points' => (float) $c->max_points,
+                    ])->values(),
+                ])->values(),
+            'quiz_question_bank' => QuizQuestionBankItem::where('user_id', $user->id)
+                ->with('options')
+                ->get()
+                ->map(fn ($item) => [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'question_type' => $item->question_type,
+                    'prompt' => $item->prompt,
+                    'points' => (float) $item->points,
+                    'difficulty' => $item->difficulty,
+                    'options' => $item->options->map(fn ($o) => [
+                        'option_text' => $o->option_text, 'is_correct' => $o->is_correct,
                     ])->values(),
                 ])->values(),
         ]);
