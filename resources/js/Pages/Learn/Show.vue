@@ -9,7 +9,7 @@ import {
   ArrowUpIcon, ArrowDownIcon, DocumentIcon, PaperClipIcon,
 } from '@heroicons/vue/24/outline'
 
-const props = defineProps({ course: Object })
+const props = defineProps({ course: Object, rubric_templates: Array })
 
 // Rich text (syllabus, page body) is stored as raw HTML — an instructor could
 // bypass the RichTextEditor UI and POST a malicious payload directly to the
@@ -101,6 +101,7 @@ function assignmentForm(moduleId) {
     assignmentForms.value[moduleId] = useForm({
       title: '', instructions: '', submission_type: 'text',
       points_possible: '', due_at: '', rubric_criteria: [],
+      save_as_template: false, template_name: '',
     })
   }
   return assignmentForms.value[moduleId]
@@ -116,6 +117,30 @@ function addAssignment(moduleId) {
     preserveScroll: true,
     onSuccess: () => { assignmentForms.value[moduleId] = null },
   })
+}
+
+function applyTemplate(moduleId, templateId) {
+  const template = props.rubric_templates.find(t => t.id === Number(templateId))
+  if (! template) return
+  assignmentForm(moduleId).rubric_criteria = template.criteria.map(c => ({
+    description: c.description, max_points: c.max_points,
+  }))
+}
+
+const renameTemplateDrafts = ref({})
+function startRenameTemplate(template) {
+  renameTemplateDrafts.value[template.id] = template.name
+}
+function saveTemplateRename(template) {
+  router.put(route('learn.rubric-templates.update', template.id), {
+    name: renameTemplateDrafts.value[template.id],
+  }, {
+    preserveScroll: true,
+    onSuccess: () => { delete renameTemplateDrafts.value[template.id] },
+  })
+}
+function deleteTemplate(template) {
+  router.delete(route('learn.rubric-templates.destroy', template.id), { preserveScroll: true })
 }
 
 function toggleItemPublish(itemId) {
@@ -265,7 +290,32 @@ function deleteAnnouncement(id) {
                     <button @click="removeRubricCriterion(module.id, i)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-4 w-4" /></button>
                   </div>
                 </div>
+
+                <div v-if="rubric_templates.length" class="flex gap-2 items-center">
+                  <select @change="e => applyTemplate(module.id, e.target.value)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1">
+                    <option value="" disabled selected>Start from a saved template</option>
+                    <option v-for="t in rubric_templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                  </select>
+                </div>
+
                 <button @click="addRubricCriterion(module.id)" class="text-xs text-indigo-600 underline">+ Add rubric criterion</button>
+
+                <div v-if="assignmentForm(module.id).rubric_criteria.length > 0" class="flex items-center gap-2">
+                  <input type="checkbox" v-model="assignmentForm(module.id).save_as_template" :id="`save-template-${module.id}`" />
+                  <label :for="`save-template-${module.id}`" class="text-xs text-slate-600">Save these criteria as a template</label>
+                </div>
+                <input v-if="assignmentForm(module.id).save_as_template" v-model="assignmentForm(module.id).template_name" placeholder="Template name" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
+
+                <div v-if="rubric_templates.length" class="border-t border-slate-100 pt-2 space-y-1">
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">My templates</p>
+                  <div v-for="t in rubric_templates" :key="t.id" class="flex items-center gap-2">
+                    <input v-if="renameTemplateDrafts[t.id] !== undefined" v-model="renameTemplateDrafts[t.id]" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs flex-1" />
+                    <span v-else class="text-xs text-slate-600 flex-1">{{ t.name }}</span>
+                    <button v-if="renameTemplateDrafts[t.id] !== undefined" @click="saveTemplateRename(t)" class="text-xs text-indigo-600 underline">Save</button>
+                    <button v-else @click="startRenameTemplate(t)" class="text-xs text-slate-500 underline">Rename</button>
+                    <button @click="deleteTemplate(t)" class="text-xs text-red-500 underline">Delete</button>
+                  </div>
+                </div>
 
                 <button @click="addAssignment(module.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add assignment</button>
               </div>
