@@ -395,7 +395,7 @@ class DiscussionPost extends Model
 
     public function isDeleted(): bool
     {
-        return $this->is_deleted;
+        return (bool) $this->is_deleted;
     }
 }
 ```
