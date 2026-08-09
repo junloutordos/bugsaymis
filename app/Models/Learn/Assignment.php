@@ -2,8 +2,10 @@
 
 namespace App\Models\Learn;
 
+use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
@@ -12,11 +14,15 @@ class Assignment extends Model
 {
     protected $table = 'learn_assignments';
 
-    protected $fillable = ['title', 'instructions', 'submission_type', 'points_possible', 'due_at'];
+    protected $fillable = [
+        'title', 'instructions', 'submission_type', 'points_possible', 'due_at',
+        'class_record_assessment_id', 'pushed_at',
+    ];
 
     protected $casts = [
         'points_possible' => 'decimal:2',
         'due_at' => 'datetime',
+        'pushed_at' => 'datetime',
     ];
 
     public function moduleItem(): MorphOne
@@ -32,6 +38,11 @@ class Assignment extends Model
     public function submissions(): HasMany
     {
         return $this->hasMany(Submission::class, 'learn_assignment_id');
+    }
+
+    public function classRecordAssessment(): BelongsTo
+    {
+        return $this->belongsTo(ClassRecordAssessment::class, 'class_record_assessment_id');
     }
 
     /** Rubric total (when a rubric exists) takes precedence over points_possible; never both. */
