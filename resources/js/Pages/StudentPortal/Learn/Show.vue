@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
 import StudentPortalLayout from '@/Layouts/StudentPortalLayout.vue'
-import { DocumentIcon, PaperClipIcon } from '@heroicons/vue/24/outline'
+import { DocumentIcon, PaperClipIcon, AcademicCapIcon } from '@heroicons/vue/24/outline'
 
 defineProps({ course: Object })
 
@@ -57,6 +57,13 @@ function submitAssignment(item) {
   const form = submissionForm(item)
   form.post(route('student-portal.learn.assignments.submit', item.assignment.id), { preserveScroll: true })
 }
+
+function startAttempt(quizId) {
+  router.post(route('student-portal.learn.quiz-attempts.start', quizId))
+}
+function continueAttempt(attemptId) {
+  router.visit(route('student-portal.learn.quiz-attempts.show', attemptId))
+}
 </script>
 
 <template>
@@ -80,6 +87,7 @@ function submitAssignment(item) {
           <div class="p-4 space-y-3">
             <div v-for="item in module.items" :key="item.id" class="flex items-start gap-2 border border-slate-100 rounded-lg p-3">
               <DocumentIcon v-if="item.type === 'page'" class="h-5 w-5 text-slate-400 shrink-0" />
+              <AcademicCapIcon v-else-if="item.type === 'quiz'" class="h-5 w-5 text-slate-400 shrink-0" />
               <PaperClipIcon v-else class="h-5 w-5 text-slate-400 shrink-0" />
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-slate-700">{{ item.title }}</p>
@@ -118,6 +126,27 @@ function submitAssignment(item) {
                       {{ item.assignment.submission ? 'Resubmit' : 'Submit' }}
                     </button>
                   </div>
+                </div>
+
+                <div v-if="item.type === 'quiz'" class="mt-1 space-y-2">
+                  <div v-if="item.quiz.instructions" class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.quiz.instructions)" />
+                  <p class="text-xs text-slate-500">
+                    {{ item.quiz.question_count }} question{{ item.quiz.question_count === 1 ? '' : 's' }}
+                    <span v-if="item.quiz.time_limit_minutes"> — {{ item.quiz.time_limit_minutes }} min</span>
+                    <span v-if="item.quiz.due_at"> — due {{ new Date(item.quiz.due_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
+                    <span v-if="item.quiz.max_score !== null"> — {{ item.quiz.max_score }} pts</span>
+                  </p>
+                  <p class="text-xs text-slate-500">
+                    Attempts used: {{ item.quiz.attempts_used }}<span v-if="item.quiz.max_attempts"> / {{ item.quiz.max_attempts }}</span>
+                    <span v-if="item.quiz.best_score !== null"> — Best score: {{ item.quiz.best_score }} / {{ item.quiz.max_score }}</span>
+                  </p>
+                  <button v-if="item.quiz.in_progress_attempt_id" @click="continueAttempt(item.quiz.in_progress_attempt_id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    Continue attempt
+                  </button>
+                  <button v-else-if="item.quiz.can_start_new_attempt" @click="startAttempt(item.quiz.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    Start quiz
+                  </button>
+                  <p v-else class="text-xs text-slate-400">No attempts remaining.</p>
                 </div>
               </div>
             </div>
