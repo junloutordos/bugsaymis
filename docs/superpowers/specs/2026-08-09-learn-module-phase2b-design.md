@@ -23,6 +23,26 @@ Record assessment.
 | 3 | Quizzes/assessment engine | Phase 1 |
 | 4 | Discussions/forums | Phase 1 |
 
+## WAT compliance (verified invariant, not an open question)
+
+The Weekly Assessment Tracker (WAT) enforces, at the moment a `ClassRecordAssessment` gets a
+`plotted_at`/`activity_date`: per-section daily and weekly caps on graded and major assessments
+(`WatRuleService::DAILY_GRADED_MAX`/`DAILY_MAJOR_MAX`/`WEEKLY_GRADED_MAX`/`WEEKLY_MAJOR_MAX`,
+pooled across every subject the section has, not just one), a Friday-noon-of-the-preceding-week
+plotting deadline (no same-week plotting), and a schedule-day rule (only plottable on days the
+subject actually meets). All of this is enforced today in
+`ClassRecordAssessmentController`/`AssessmentPlottingService`, unchanged by this phase.
+
+Phase 2b cannot bypass any of it, by construction: per Decision 1 below, Learn never creates or
+dates a `ClassRecordAssessment` — the instructor does that themselves, through Class Record's
+existing WAT-enforced flow, exactly as they would without Learn in the picture at all. Linking
+only *selects* an assessment that already passed WAT validation at creation time; pushing only
+ever writes `ClassRecordScore` rows and never touches `plotted_at`/`activity_date`. There is no
+code path in this phase that creates, dates, or reschedules an assessment, so there is nothing
+for WAT's caps, deadline, or schedule-day rule to be bypassed *by*. This is deliberate, not
+incidental — it's the direct consequence of Decision 1, called out explicitly here because it
+was raised as a concern during review.
+
 ## Key decisions (resolved during brainstorming, not open questions)
 
 1. **Learn never creates Class Record assessments.** The instructor creates the target
@@ -114,6 +134,10 @@ code, already correctly PEHM-subject-scoped) — Learn adds no new authorization
   student with no matching `ClassRecordStudent` on the target quarter without failing the rest
   of the push; ungraded submissions are never pushed; 422 when pushing before linking; 403 when
   either side's permission is missing at push time.
+- WAT invariant: assert the target `ClassRecordAssessment`'s `plotted_at` and `activity_date`
+  are byte-for-byte unchanged after both linking and pushing — proving neither action can move,
+  create, or reschedule a plotted assessment regardless of WAT's caps/deadline/schedule-day
+  rules.
 
 ## Out of scope for Phase 2b
 
