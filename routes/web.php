@@ -2536,6 +2536,8 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
 
     Route::put('/assignments/{assignment}/link', [\App\Http\Controllers\Learn\ClassRecordPushController::class, 'link'])->name('assignments.link');
     Route::post('/assignments/{assignment}/push', [\App\Http\Controllers\Learn\ClassRecordPushController::class, 'push'])->name('assignments.push');
+    Route::put('/rubric-templates/{template}', [\App\Http\Controllers\Learn\RubricTemplateController::class, 'update'])->name('rubric-templates.update');
+    Route::delete('/rubric-templates/{template}', [\App\Http\Controllers\Learn\RubricTemplateController::class, 'destroy'])->name('rubric-templates.destroy');
     Route::put('/modules/{module}/items/reorder', [\App\Http\Controllers\Learn\ModuleItemController::class, 'reorder'])->name('items.reorder');
     Route::patch('/items/{item}/publish', [\App\Http\Controllers\Learn\ModuleItemController::class, 'togglePublish'])->name('items.publish');
     Route::delete('/items/{item}', [\App\Http\Controllers\Learn\ModuleItemController::class, 'destroy'])->name('items.destroy');
