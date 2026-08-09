@@ -2533,6 +2533,9 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::put('/submissions/{submission}/grade', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'grade'])->name('submissions.grade');
     Route::post('/submissions/{submission}/reopen', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'reopen'])->name('submissions.reopen');
     Route::get('/submissions/{submission}/file', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'file'])->name('submissions.file');
+
+    Route::put('/assignments/{assignment}/link', [\App\Http\Controllers\Learn\ClassRecordPushController::class, 'link'])->name('assignments.link');
+    Route::post('/assignments/{assignment}/push', [\App\Http\Controllers\Learn\ClassRecordPushController::class, 'push'])->name('assignments.push');
     Route::put('/modules/{module}/items/reorder', [\App\Http\Controllers\Learn\ModuleItemController::class, 'reorder'])->name('items.reorder');
     Route::patch('/items/{item}/publish', [\App\Http\Controllers\Learn\ModuleItemController::class, 'togglePublish'])->name('items.publish');
     Route::delete('/items/{item}', [\App\Http\Controllers\Learn\ModuleItemController::class, 'destroy'])->name('items.destroy');
