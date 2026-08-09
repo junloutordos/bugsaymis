@@ -19,8 +19,6 @@ class LearnSubmissionControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private static int $studentCounter = 0;
-
     private Course $course;
     private int $studentId;
     private string $studentPisaysystemID;
@@ -53,10 +51,14 @@ class LearnSubmissionControllerTest extends TestCase
         ]);
 
         // students is ENGINE=MyISAM and ignores transactions — RefreshDatabase's
-        // per-test rollback never applies to it, so a fixed ID collides across
-        // this file's test methods within one process run.
-        self::$studentCounter++;
-        $this->studentPisaysystemID = 'PS' . str_pad((string) self::$studentCounter, 9, '0', STR_PAD_LEFT);
+        // per-test rollback never applies to it, so rows persist for the rest of
+        // this process's test run. A small per-class counter (e.g. starting at 1)
+        // is NOT safe here: PHP static properties are independent per class, so
+        // two different test classes each starting their own counter at 1
+        // generate the *same* pisaysystemID values, and firstOrFail() then
+        // silently picks up the other class's stale row. Use a wide random range
+        // instead so collisions across the whole suite are negligible.
+        $this->studentPisaysystemID = 'PS' . str_pad((string) mt_rand(1, 999999999), 9, '0', STR_PAD_LEFT);
         $this->studentId = DB::table('students')->insertGetId([
             'pisaysystemID' => $this->studentPisaysystemID, 'lastname' => 'Cruz', 'firstname' => 'Juan', 'sex' => 'M',
         ]);
@@ -174,8 +176,7 @@ class LearnSubmissionControllerTest extends TestCase
         ]);
         $submission = Submission::where('learn_assignment_id', $assignment->id)->firstOrFail();
 
-        self::$studentCounter++;
-        $otherPisaysystemID = 'PS' . str_pad((string) self::$studentCounter, 9, '0', STR_PAD_LEFT);
+        $otherPisaysystemID = 'PS' . str_pad((string) mt_rand(1, 999999999), 9, '0', STR_PAD_LEFT);
         DB::table('students')->insert([
             'pisaysystemID' => $otherPisaysystemID, 'lastname' => 'Reyes', 'firstname' => 'Ana', 'sex' => 'F',
         ]);

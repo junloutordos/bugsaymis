@@ -16,8 +16,6 @@ class LearnControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private static int $studentCounter = 0;
-
     private SchoolYear $sy;
     private Section $section;
     private Course $course;
@@ -31,11 +29,13 @@ class LearnControllerTest extends TestCase
         // students is ENGINE=MyISAM (see 2026_06_03_000000_create_students_table.php)
         // and MyISAM ignores transactions, so RefreshDatabase's per-test rollback
         // never applies to it — rows inserted here persist for the rest of this
-        // process's test run. A fixed ID would collide across this file's test
-        // methods and firstOrFail() could pick up a stale row from an earlier
-        // test instead of this one, so each test needs a unique ID.
-        self::$studentCounter++;
-        $this->studentPisaysystemID = 'PS' . str_pad((string) self::$studentCounter, 9, '0', STR_PAD_LEFT);
+        // process's test run. A small per-class counter is NOT safe here: PHP
+        // static properties are independent per class, so another test class
+        // starting its own counter at 1 generates the *same* pisaysystemID
+        // values, and firstOrFail() then silently picks up that other class's
+        // stale row instead of this test's own. Use a wide random range instead
+        // so collisions across the whole suite are negligible.
+        $this->studentPisaysystemID = 'PS' . str_pad((string) mt_rand(1, 999999999), 9, '0', STR_PAD_LEFT);
 
         $this->sy = SchoolYear::create([
             'name' => '2025-2026', 'start_date' => '2025-08-01', 'end_date' => '2026-06-30',
@@ -103,8 +103,7 @@ class LearnControllerTest extends TestCase
 
     public function test_show_403s_when_student_is_not_enrolled_in_the_section(): void
     {
-        self::$studentCounter++;
-        $otherPisaysystemID = 'PS' . str_pad((string) self::$studentCounter, 9, '0', STR_PAD_LEFT);
+        $otherPisaysystemID = 'PS' . str_pad((string) mt_rand(1, 999999999), 9, '0', STR_PAD_LEFT);
         DB::table('students')->insert([
             'pisaysystemID' => $otherPisaysystemID, 'lastname' => 'Reyes', 'firstname' => 'Ana', 'sex' => 'F',
         ]);
