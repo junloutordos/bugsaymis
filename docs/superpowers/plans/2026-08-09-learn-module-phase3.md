@@ -2740,9 +2740,13 @@ Add the imports:
 use App\Models\Learn\QuizAttempt;
 use App\Models\Learn\QuizQuestion;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 ```
 
-Add this method:
+Add this method. Note the scoped `Rule::exists(...)->where(...)` on `selected_option_ids.*` — a
+plain `exists:learn_quiz_question_options,id` only checks the option row exists *somewhere*, not
+that it belongs to *this* question, which would let a student submit an option ID borrowed from
+an unrelated question:
 
 ```php
     /** PUT /student-portal/learn/quiz-attempts/{attempt}/answers/{question} */
@@ -2758,7 +2762,10 @@ Add this method:
         $validated = $request->validate([
             'answer_text' => 'nullable|string',
             'selected_option_ids' => 'nullable|array',
-            'selected_option_ids.*' => 'integer|exists:learn_quiz_question_options,id',
+            'selected_option_ids.*' => [
+                'integer',
+                Rule::exists('learn_quiz_question_options', 'id')->where('learn_quiz_question_id', $question->id),
+            ],
         ]);
 
         $this->attemptService->saveAnswer($attempt, $question, $validated);

@@ -9,6 +9,7 @@ use App\Models\Learn\QuizQuestion;
 use App\Models\Student;
 use App\Services\Learn\QuizAttemptService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class QuizAttemptController extends Controller
 {
@@ -42,7 +43,10 @@ class QuizAttemptController extends Controller
         $validated = $request->validate([
             'answer_text' => 'nullable|string',
             'selected_option_ids' => 'nullable|array',
-            'selected_option_ids.*' => 'integer|exists:learn_quiz_question_options,id',
+            'selected_option_ids.*' => [
+                'integer',
+                Rule::exists('learn_quiz_question_options', 'id')->where('learn_quiz_question_id', $question->id),
+            ],
         ]);
 
         $this->attemptService->saveAnswer($attempt, $question, $validated);
