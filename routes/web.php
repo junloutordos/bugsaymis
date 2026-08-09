@@ -2531,6 +2531,9 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::post('/modules/{module}/items/quiz', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeQuiz'])->name('items.store-quiz');
     Route::post('/modules/{module}/items/discussion', [\App\Http\Controllers\Learn\ModuleItemController::class, 'storeDiscussion'])->name('items.store-discussion');
     Route::get('/discussions/{discussion}', [\App\Http\Controllers\Learn\DiscussionController::class, 'show'])->name('discussions.show');
+    Route::post('/discussions/{discussion}/posts', [\App\Http\Controllers\Learn\DiscussionPostController::class, 'store'])->name('discussion-posts.store');
+    Route::put('/discussion-posts/{post}', [\App\Http\Controllers\Learn\DiscussionPostController::class, 'update'])->name('discussion-posts.update');
+    Route::delete('/discussion-posts/{post}', [\App\Http\Controllers\Learn\DiscussionPostController::class, 'destroy'])->name('discussion-posts.destroy');
     Route::post('/quizzes/{quiz}/questions', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'store'])->name('quiz-questions.store');
     Route::put('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'update'])->name('quiz-questions.update');
     Route::delete('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'destroy'])->name('quiz-questions.destroy');
