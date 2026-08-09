@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Learn\Assignment;
 use App\Models\Learn\RubricScore;
 use App\Models\Learn\Submission;
+use App\Services\Learn\ClassRecordPushService;
 use App\Services\Learn\CourseFileService;
 use App\Services\Learn\SubmissionRosterService;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class AssignmentGradingController extends Controller
     public function __construct(
         private SubmissionRosterService $roster,
         private CourseFileService $files,
+        private ClassRecordPushService $pushService,
     ) {
     }
 
@@ -28,6 +30,8 @@ class AssignmentGradingController extends Controller
         abort_unless($assignment->canEdit($user), 403);
 
         $assignment->load('rubric.criteria');
+        $assignment->load(['classRecordAssessment.gradingCategory', 'classRecordAssessment.quarter.classRecord']);
+        $classRecordOptions = $this->pushService->candidateClassRecords($assignment);
 
         $submissions = Submission::where('learn_assignment_id', $assignment->id)
             ->with('rubricScores')
@@ -66,6 +70,29 @@ class AssignmentGradingController extends Controller
                         'id' => $c->id, 'description' => $c->description, 'max_points' => (float) $c->max_points,
                     ])->values(),
                 ] : null,
+                'class_record_link' => $assignment->classRecordAssessment ? [
+                    'assessment_id' => $assignment->classRecordAssessment->id,
+                    'assessment_title' => $assignment->classRecordAssessment->title,
+                    'class_record_name' => $assignment->classRecordAssessment->quarter->classRecord->display_name,
+                    'quarter' => $assignment->classRecordAssessment->quarter->quarter,
+                    'category_name' => $assignment->classRecordAssessment->gradingCategory->name,
+                    'max_score' => (float) $assignment->classRecordAssessment->max_score,
+                    'pushed_at' => $assignment->pushed_at?->toIso8601String(),
+                ] : null,
+                'class_record_options' => $classRecordOptions->map(fn ($cr) => [
+                    'id' => $cr->id,
+                    'display_name' => $cr->display_name,
+                    'quarters' => $cr->quarters->map(fn ($q) => [
+                        'id' => $q->id,
+                        'quarter' => $q->quarter,
+                        'assessments' => $q->assessments->map(fn ($a) => [
+                            'id' => $a->id,
+                            'title' => $a->title,
+                            'max_score' => (float) $a->max_score,
+                            'category_name' => $a->gradingCategory->name,
+                        ])->values(),
+                    ])->values(),
+                ])->values(),
             ],
             'roster' => $roster->values(),
         ]);
