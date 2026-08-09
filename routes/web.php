@@ -2532,6 +2532,9 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::post('/quizzes/{quiz}/questions', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'store'])->name('quiz-questions.store');
     Route::put('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'update'])->name('quiz-questions.update');
     Route::delete('/quiz-questions/{question}', [\App\Http\Controllers\Learn\QuizQuestionController::class, 'destroy'])->name('quiz-questions.destroy');
+    Route::get('/quizzes/{quiz}/attempts', [\App\Http\Controllers\Learn\QuizGradingController::class, 'index'])->name('quizzes.attempts');
+    Route::put('/quiz-attempt-answers/{answer}/grade', [\App\Http\Controllers\Learn\QuizGradingController::class, 'gradeEssay'])->name('quiz-attempt-answers.grade');
+    Route::post('/quiz-attempts/{attempt}/reopen', [\App\Http\Controllers\Learn\QuizGradingController::class, 'reopen'])->name('quiz-attempts.reopen');
 
     Route::get('/assignments/{assignment}/submissions', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'index'])->name('assignments.submissions');
     Route::put('/submissions/{submission}/grade', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'grade'])->name('submissions.grade');
