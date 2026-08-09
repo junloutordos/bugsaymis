@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Learn\Quiz;
 use App\Models\Learn\QuizAttempt;
 use App\Models\Learn\QuizAttemptAnswer;
+use App\Services\Learn\ClassRecordPushService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,10 @@ use Inertia\Response;
 
 class QuizGradingController extends Controller
 {
+    public function __construct(private ClassRecordPushService $pushService)
+    {
+    }
+
     /** GET /learn/quizzes/{quiz}/attempts */
     public function index(Quiz $quiz): Response
     {
@@ -31,11 +36,35 @@ class QuizGradingController extends Controller
             ->get(['id', 'firstname', 'lastname'])
             ->keyBy('id');
 
+        $quiz->load(['classRecordAssessment.gradingCategory', 'classRecordAssessment.quarter.classRecord']);
+        $classRecordOptions = $this->pushService->candidateClassRecords($quiz);
+
         return Inertia::render('Learn/QuizGrading', [
             'quiz' => [
                 'id' => $quiz->id,
                 'title' => $quiz->title,
                 'max_score' => $quiz->maxScore(),
+                'class_record_link' => $quiz->classRecordAssessment ? [
+                    'assessment_id' => $quiz->classRecordAssessment->id,
+                    'assessment_title' => $quiz->classRecordAssessment->title,
+                    'class_record_name' => $quiz->classRecordAssessment->quarter->classRecord->display_name,
+                    'quarter' => $quiz->classRecordAssessment->quarter->quarter,
+                    'category_name' => $quiz->classRecordAssessment->gradingCategory->name,
+                    'max_score' => (float) $quiz->classRecordAssessment->max_score,
+                    'pushed_at' => $quiz->pushed_at?->toIso8601String(),
+                ] : null,
+                'class_record_options' => $classRecordOptions->map(fn ($cr) => [
+                    'id' => $cr->id,
+                    'display_name' => $cr->display_name,
+                    'quarters' => $cr->quarters->map(fn ($q) => [
+                        'id' => $q->id,
+                        'quarter' => $q->quarter,
+                        'assessments' => $q->assessments->map(fn ($a) => [
+                            'id' => $a->id, 'title' => $a->title, 'max_score' => (float) $a->max_score,
+                            'category_name' => $a->gradingCategory->name,
+                        ])->values(),
+                    ])->values(),
+                ])->values(),
             ],
             'attempts' => $attempts->map(function (QuizAttempt $attempt) use ($students) {
                 $student = $students->get($attempt->student_id);

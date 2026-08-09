@@ -2,30 +2,29 @@
 
 namespace App\Services\Learn;
 
+use App\Contracts\Learn\HasClassRecordLink;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\ClassRecord\ClassRecordScore;
 use App\Models\ClassRecord\ClassRecordStudent;
-use App\Models\Learn\Assignment;
-use App\Models\Learn\Submission;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Links a Learn assignment to a pre-existing Class Record assessment and
- * pushes graded scores into it. Never creates, dates, or reschedules a
- * ClassRecordAssessment — the instructor does that themselves through Class
- * Record's own existing WAT-enforced flow. This service only ever selects
- * an already-plotted assessment and writes ClassRecordScore rows.
+ * Links a Learn gradable item (Assignment or Quiz) to a pre-existing Class Record assessment
+ * and pushes graded scores into it. Never creates, dates, or reschedules a
+ * ClassRecordAssessment — the instructor does that themselves through Class Record's own
+ * existing WAT-enforced flow. This service only ever selects an already-plotted assessment
+ * and writes ClassRecordScore rows.
  */
 class ClassRecordPushService
 {
     /** @return Collection<int, ClassRecord> */
-    public function candidateClassRecords(Assignment $assignment): Collection
+    public function candidateClassRecords(HasClassRecordLink $item): Collection
     {
-        $course = $assignment->course();
+        $course = $item->course();
         if (! $course) {
             return collect();
         }
@@ -41,9 +40,9 @@ class ClassRecordPushService
             ->get();
     }
 
-    public function link(Assignment $assignment, int $assessmentId, User $user): void
+    public function link(HasClassRecordLink $item, int $assessmentId, User $user): void
     {
-        abort_unless($assignment->canEdit($user), 403);
+        abort_unless($item->canEdit($user), 403);
 
         $assessment = ClassRecordAssessment::with(['gradingCategory', 'quarter.classRecord'])->findOrFail($assessmentId);
 
@@ -52,50 +51,50 @@ class ClassRecordPushService
             403
         );
 
-        $maxScore = $assignment->maxScore();
+        $maxScore = $item->maxScore();
         if ($maxScore === null || (float) $assessment->max_score !== $maxScore) {
             throw ValidationException::withMessages([
-                'class_record_assessment_id' => "The assessment's max score ({$assessment->max_score}) must exactly match this assignment's max score ({$maxScore}) before linking.",
+                'class_record_assessment_id' => "The assessment's max score ({$assessment->max_score}) must exactly match this item's max score ({$maxScore}) before linking.",
             ]);
         }
 
-        $assignment->update(['class_record_assessment_id' => $assessment->id]);
+        $item->update(['class_record_assessment_id' => $assessment->id]);
     }
 
     /** @return array{pushed: int, skipped: array<int, string>} */
-    public function push(Assignment $assignment, User $user): array
+    public function push(HasClassRecordLink $item, User $user): array
     {
-        abort_if(! $assignment->class_record_assessment_id, 422, 'Link a Class Record assessment first.');
+        abort_if(! $item->class_record_assessment_id, 422, 'Link a Class Record assessment first.');
 
-        $assessment = $assignment->classRecordAssessment()->with(['gradingCategory', 'quarter.classRecord'])->firstOrFail();
+        $assessment = $item->classRecordAssessment()->with(['gradingCategory', 'quarter.classRecord'])->firstOrFail();
 
-        abort_unless($assignment->canEdit($user), 403);
+        abort_unless($item->canEdit($user), 403);
         abort_unless($assessment->gradingCategory->canEditOn($assessment->quarter->classRecord, $user), 403);
 
-        $submissions = Submission::where('learn_assignment_id', $assignment->id)->whereNotNull('graded_at')->get();
+        $scores = $item->gradedStudentScores();
 
         $pushed = 0;
         $skipped = [];
 
-        foreach ($submissions as $submission) {
+        foreach ($scores as $studentId => $score) {
             $classRecordStudent = ClassRecordStudent::where('class_record_quarter_id', $assessment->class_record_quarter_id)
-                ->where('student_id', $submission->student_id)
+                ->where('student_id', $studentId)
                 ->first();
 
             if (! $classRecordStudent) {
-                $student = DB::table('students')->where('id', $submission->student_id)->first(['lastname', 'firstname']);
-                $skipped[] = $student ? trim("{$student->lastname}, {$student->firstname}") : "Student #{$submission->student_id}";
+                $student = DB::table('students')->where('id', $studentId)->first(['lastname', 'firstname']);
+                $skipped[] = $student ? trim("{$student->lastname}, {$student->firstname}") : "Student #{$studentId}";
                 continue;
             }
 
             ClassRecordScore::updateOrCreate(
                 ['class_record_student_id' => $classRecordStudent->id, 'class_record_assessment_id' => $assessment->id],
-                ['score' => $submission->score]
+                ['score' => $score]
             );
             $pushed++;
         }
 
-        $assignment->update(['pushed_at' => now()]);
+        $item->update(['pushed_at' => now()]);
 
         return ['pushed' => $pushed, 'skipped' => $skipped];
     }

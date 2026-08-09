@@ -2537,6 +2537,8 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::post('/quiz-attempts/{attempt}/reopen', [\App\Http\Controllers\Learn\QuizGradingController::class, 'reopen'])->name('quiz-attempts.reopen');
     Route::put('/quiz-question-bank/{item}', [\App\Http\Controllers\Learn\QuizQuestionBankController::class, 'update'])->name('quiz-question-bank.update');
     Route::delete('/quiz-question-bank/{item}', [\App\Http\Controllers\Learn\QuizQuestionBankController::class, 'destroy'])->name('quiz-question-bank.destroy');
+    Route::put('/quizzes/{quiz}/link', [\App\Http\Controllers\Learn\QuizClassRecordPushController::class, 'link'])->name('quizzes.link');
+    Route::post('/quizzes/{quiz}/push', [\App\Http\Controllers\Learn\QuizClassRecordPushController::class, 'push'])->name('quizzes.push');
 
     Route::get('/assignments/{assignment}/submissions', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'index'])->name('assignments.submissions');
     Route::put('/submissions/{submission}/grade', [\App\Http\Controllers\Learn\AssignmentGradingController::class, 'grade'])->name('submissions.grade');

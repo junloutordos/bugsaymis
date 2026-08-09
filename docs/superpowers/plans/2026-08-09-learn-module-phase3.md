@@ -4179,7 +4179,7 @@ class QuizClassRecordPushTest extends TestCase
         ]);
         ClassRecordStudent::create([
             'class_record_quarter_id' => $quarter->id, 'student_id' => $studentId,
-            'lastname' => 'Student', 'firstname' => 'Test', 'sort_order' => 1,
+            'family_name' => 'Student', 'given_name' => 'Test', 'sex' => 'M', 'sequence_number' => 1,
         ]);
 
         QuizAttempt::create([
