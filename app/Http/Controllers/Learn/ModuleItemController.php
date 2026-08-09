@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Learn;
 
 use App\Http\Controllers\Controller;
 use App\Models\Learn\Assignment;
+use App\Models\Learn\Discussion;
 use App\Models\Learn\Module;
 use App\Models\Learn\ModuleItem;
 use App\Models\Learn\Page;
@@ -175,6 +176,24 @@ class ModuleItemController extends Controller
         $this->attachItem($module, $quiz);
 
         return back()->with('success', 'Quiz added.');
+    }
+
+    /** POST /learn/modules/{module}/items/discussion */
+    public function storeDiscussion(Request $request, Module $module)
+    {
+        $user = Auth::user();
+        abort_unless($module->course->canEdit($user), 403);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'prompt' => 'required|string',
+            'points_possible' => 'nullable|numeric|min:0',
+        ]);
+
+        $discussion = Discussion::create($validated);
+        $this->attachItem($module, $discussion);
+
+        return back()->with('success', 'Discussion added.');
     }
 
     /** PATCH /learn/items/{item}/publish */
