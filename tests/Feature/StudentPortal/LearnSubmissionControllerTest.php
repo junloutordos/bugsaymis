@@ -105,6 +105,19 @@ class LearnSubmissionControllerTest extends TestCase
         ]);
     }
 
+    public function test_link_submission_rejects_non_http_schemes(): void
+    {
+        $assignment = $this->makeAssignment('link');
+
+        // A javascript: link would render as a clickable href in the grading
+        // instructor's view (and the student's own view) — stored XSS if accepted.
+        $this->post(route('student-portal.learn.assignments.submit', $assignment), [
+            'link_url' => 'javascript:alert(document.cookie)',
+        ])->assertSessionHasErrors('link_url');
+
+        $this->assertDatabaseMissing('learn_submissions', ['learn_assignment_id' => $assignment->id]);
+    }
+
     public function test_student_can_submit_a_file_assignment(): void
     {
         $assignment = $this->makeAssignment('file');

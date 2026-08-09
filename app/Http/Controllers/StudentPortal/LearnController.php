@@ -118,7 +118,7 @@ class LearnController extends Controller
 
         $rules = match ($assignment->submission_type) {
             'text' => ['text_body' => 'required|string'],
-            'link' => ['link_url' => 'required|url'],
+            'link' => ['link_url' => 'required|url:http,https'],
             'file' => ['title' => 'required|string|max:255', 'file_base64' => 'required|string'],
         };
         $validated = $request->validate($rules);

@@ -20,6 +20,13 @@ function safeVideoUrl(url) {
   return url && /^https?:\/\//i.test(url) ? url : null
 }
 
+// link_url is submitted content (this student's own, but still not trusted
+// as safe) — reject anything but http(s) before it's ever used as a
+// clickable href.
+function safeLinkUrl(url) {
+  return url && /^https?:\/\//i.test(url) ? url : null
+}
+
 // ── Assignment submission ────────────────────────────────────────────────
 const submissionForms = ref({})
 function submissionForm(item) {
@@ -99,7 +106,7 @@ function submitAssignment(item) {
                       <span v-if="item.assignment.submission.is_late" class="text-amber-600">— Late</span>
                     </p>
                     <p v-if="item.assignment.submission_type === 'text'" class="text-sm text-slate-700 mt-1 whitespace-pre-line">{{ item.assignment.submission.text_body }}</p>
-                    <a v-else-if="item.assignment.submission_type === 'link'" :href="item.assignment.submission.link_url" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">{{ item.assignment.submission.link_url }}</a>
+                    <a v-else-if="item.assignment.submission_type === 'link' && safeLinkUrl(item.assignment.submission.link_url)" :href="safeLinkUrl(item.assignment.submission.link_url)" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">{{ item.assignment.submission.link_url }}</a>
                     <a v-else-if="item.assignment.submission_type === 'file'" :href="item.assignment.submission.file_url" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">View my submission</a>
                   </div>
 

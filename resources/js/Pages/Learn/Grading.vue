@@ -8,6 +8,13 @@ const props = defineProps({ assignment: Object, roster: Array })
 const expandedStudentId = ref(null)
 const gradeForms = ref({})
 
+// link_url is student-submitted content — reject anything but http(s) before
+// it's ever used as a clickable href (blocks javascript:/data: scheme XSS
+// against the grading instructor's authenticated session).
+function safeLinkUrl(url) {
+  return url && /^https?:\/\//i.test(url) ? url : null
+}
+
 function statusLabel(status) {
   return { not_submitted: 'Not submitted', submitted: 'Submitted', late: 'Late', graded: 'Graded' }[status]
 }
@@ -79,7 +86,8 @@ function reopen(row) {
 
         <div v-if="expandedStudentId === row.student_id" class="border-t border-slate-100 p-4 space-y-3">
           <div v-if="assignment.submission_type === 'text'" class="prose prose-sm max-w-none whitespace-pre-line">{{ row.text_body }}</div>
-          <a v-else-if="assignment.submission_type === 'link'" :href="row.link_url" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">{{ row.link_url }}</a>
+          <a v-else-if="assignment.submission_type === 'link' && safeLinkUrl(row.link_url)" :href="safeLinkUrl(row.link_url)" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">{{ row.link_url }}</a>
+          <p v-else-if="assignment.submission_type === 'link'" class="text-sm text-red-600">Submitted link uses an unsupported/unsafe scheme.</p>
           <a v-else-if="assignment.submission_type === 'file'" :href="row.file_url" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 underline">Download submission</a>
 
           <div v-if="!row.is_graded">
