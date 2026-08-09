@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\Learn\Assignment;
 use App\Models\Learn\Course;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
+use App\Models\Learn\Submission;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
 use App\Services\Learn\CourseFileService;
@@ -61,6 +63,7 @@ class LearnController extends Controller
             'modules.items.itemable',
             'announcements.postedBy',
         ]);
+        $this->loadAssignmentRubrics($course);
 
         return Inertia::render('StudentPortal/Learn/Show', [
             'course' => [
@@ -71,7 +74,7 @@ class LearnController extends Controller
                 'modules' => $course->modules->map(fn ($m) => [
                     'id' => $m->id,
                     'title' => $m->title,
-                    'items' => $m->items->map(fn ($i) => $this->serializeItem($i))->values(),
+                    'items' => $m->items->map(fn ($i) => $this->serializeItem($i, $student->id))->values(),
                 ])->values(),
                 'announcements' => $course->announcements->map(fn ($a) => [
                     'title' => $a->title,
@@ -99,19 +102,66 @@ class LearnController extends Controller
         return $this->files->streamResponse($file);
     }
 
-    private function serializeItem($item): array
+    private function loadAssignmentRubrics(Course $course): void
+    {
+        foreach ($course->modules as $module) {
+            foreach ($module->items as $item) {
+                if ($item->itemable instanceof Assignment) {
+                    $item->itemable->load('rubric.criteria');
+                }
+            }
+        }
+    }
+
+    private function serializeItem($item, int $studentId): array
     {
         $itemable = $item->itemable;
 
+        $type = match (true) {
+            $itemable instanceof LearnPage => 'page',
+            $itemable instanceof LearnFile => 'file',
+            $itemable instanceof Assignment => 'assignment',
+            default => 'unknown',
+        };
+
+        $assignmentData = null;
+        if ($itemable instanceof Assignment) {
+            $submission = Submission::where('learn_assignment_id', $itemable->id)
+                ->where('student_id', $studentId)
+                ->first();
+
+            $assignmentData = [
+                'id' => $itemable->id,
+                'instructions' => $itemable->instructions,
+                'submission_type' => $itemable->submission_type,
+                'due_at' => $itemable->due_at?->toIso8601String(),
+                'max_score' => $itemable->maxScore(),
+                'submission' => $submission ? [
+                    'id' => $submission->id,
+                    'text_body' => $submission->text_body,
+                    'link_url' => $submission->link_url,
+                    'file_url' => $submission->learn_file_id
+                        ? route('student-portal.learn.submissions.file', $submission->id)
+                        : null,
+                    'submitted_at' => $submission->submitted_at->toIso8601String(),
+                    'score' => $submission->score !== null ? (float) $submission->score : null,
+                    'feedback_comment' => $submission->feedback_comment,
+                    'is_graded' => $submission->isGraded(),
+                    'is_late' => $submission->isLate(),
+                ] : null,
+            ];
+        }
+
         return [
             'id' => $item->id,
-            'type' => $itemable instanceof LearnPage ? 'page' : 'file',
+            'type' => $type,
             'title' => $itemable?->title,
             'body' => $itemable instanceof LearnPage ? $itemable->body : null,
             'video_url' => $itemable instanceof LearnPage ? $itemable->video_url : null,
             'file_url' => $itemable instanceof LearnFile
                 ? route('student-portal.learn.file', ['fileId' => $this->files->encodeFileId($itemable->s3_key)])
                 : null,
+            'assignment' => $assignmentData,
         ];
     }
 

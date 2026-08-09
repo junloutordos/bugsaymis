@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Learn;
 
 use App\Http\Controllers\Controller;
+use App\Models\Learn\Assignment;
 use App\Models\Learn\Course;
 use App\Models\Learn\File as LearnFile;
 use App\Models\Learn\Page as LearnPage;
@@ -51,6 +52,7 @@ class CourseController extends Controller
         abort_unless($course->canView($user), 403);
 
         $course->load(['subject', 'section', 'schoolYear', 'modules.items.itemable', 'announcements.postedBy']);
+        $this->loadAssignmentRubrics($course);
 
         return Inertia::render('Learn/Show', [
             'course' => $this->serializeCourse($course, $user),
@@ -109,13 +111,31 @@ class CourseController extends Controller
         ];
     }
 
+    private function loadAssignmentRubrics(Course $course): void
+    {
+        foreach ($course->modules as $module) {
+            foreach ($module->items as $item) {
+                if ($item->itemable instanceof Assignment) {
+                    $item->itemable->load('rubric.criteria');
+                }
+            }
+        }
+    }
+
     private function serializeItem($item): array
     {
         $itemable = $item->itemable;
 
+        $type = match (true) {
+            $itemable instanceof LearnPage => 'page',
+            $itemable instanceof LearnFile => 'file',
+            $itemable instanceof Assignment => 'assignment',
+            default => 'unknown',
+        };
+
         return [
             'id' => $item->id,
-            'type' => $itemable instanceof LearnPage ? 'page' : 'file',
+            'type' => $type,
             'position' => $item->position,
             'is_published' => $item->isPublished(),
             'title' => $itemable?->title,
@@ -124,6 +144,14 @@ class CourseController extends Controller
             'file_url' => $itemable instanceof LearnFile
                 ? route('learn.files.show', ['fileId' => $this->files->encodeFileId($itemable->s3_key)])
                 : null,
+            'assignment' => $itemable instanceof Assignment ? [
+                'id' => $itemable->id,
+                'instructions' => $itemable->instructions,
+                'submission_type' => $itemable->submission_type,
+                'due_at' => $itemable->due_at?->toIso8601String(),
+                'max_score' => $itemable->maxScore(),
+                'has_rubric' => $itemable->rubric !== null,
+            ] : null,
         ];
     }
 }
