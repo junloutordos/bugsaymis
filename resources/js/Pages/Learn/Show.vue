@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import RichTextEditor from '@/Components/RichTextEditor.vue'
@@ -95,6 +95,29 @@ async function addFile(moduleId, event) {
   event.target.value = ''
 }
 
+const assignmentForms = ref({})
+function assignmentForm(moduleId) {
+  if (! assignmentForms.value[moduleId]) {
+    assignmentForms.value[moduleId] = useForm({
+      title: '', instructions: '', submission_type: 'text',
+      points_possible: '', due_at: '', rubric_criteria: [],
+    })
+  }
+  return assignmentForms.value[moduleId]
+}
+function addRubricCriterion(moduleId) {
+  assignmentForm(moduleId).rubric_criteria.push({ description: '', max_points: 10 })
+}
+function removeRubricCriterion(moduleId, index) {
+  assignmentForm(moduleId).rubric_criteria.splice(index, 1)
+}
+function addAssignment(moduleId) {
+  assignmentForm(moduleId).post(route('learn.items.store-assignment', moduleId), {
+    preserveScroll: true,
+    onSuccess: () => { assignmentForms.value[moduleId] = null },
+  })
+}
+
 function toggleItemPublish(itemId) {
   router.patch(route('learn.items.publish', itemId), {}, { preserveScroll: true })
 }
@@ -182,6 +205,15 @@ function deleteAnnouncement(id) {
                 <div v-if="item.type === 'page' && item.body" class="prose prose-sm max-w-none mt-1" v-html="sanitizeHtml(item.body)" />
                 <a v-if="item.type === 'page' && safeVideoUrl(item.video_url)" :href="safeVideoUrl(item.video_url)" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Watch video</a>
                 <a v-if="item.type === 'file'" :href="item.file_url" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Download file</a>
+                <div v-if="item.type === 'assignment'" class="mt-1 space-y-1">
+                  <div v-if="item.assignment.instructions" class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.assignment.instructions)" />
+                  <p class="text-xs text-slate-500">
+                    {{ item.assignment.submission_type }} submission
+                    <span v-if="item.assignment.due_at"> — due {{ new Date(item.assignment.due_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
+                    <span v-if="item.assignment.max_score !== null"> — {{ item.assignment.max_score }} pts{{ item.assignment.has_rubric ? ' (rubric)' : '' }}</span>
+                  </p>
+                  <Link :href="route('learn.assignments.submissions', item.assignment.id)" class="text-xs text-indigo-600 underline">View submissions</Link>
+                </div>
               </div>
               <div v-if="course.can_edit" class="flex items-center gap-1 shrink-0">
                 <button @click="moveItem(module, itemIndex, -1)" class="p-1 text-slate-400 hover:text-slate-700"><ArrowUpIcon class="h-3.5 w-3.5" /></button>
@@ -208,6 +240,34 @@ function deleteAnnouncement(id) {
                   Upload file
                   <input type="file" class="hidden" @change="e => addFile(module.id, e)" />
                 </label>
+              </div>
+
+              <div class="border-t border-slate-100 pt-3 space-y-2">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">New assignment</p>
+                <input v-model="assignmentForm(module.id).title" placeholder="Assignment title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
+                <textarea v-model="assignmentForm(module.id).instructions" placeholder="Instructions (optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
+                <div class="flex gap-2">
+                  <select v-model="assignmentForm(module.id).submission_type" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                    <option value="text">Text entry</option>
+                    <option value="file">File upload</option>
+                    <option value="link">Link</option>
+                  </select>
+                  <input v-model="assignmentForm(module.id).due_at" type="datetime-local" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+                </div>
+
+                <div v-if="assignmentForm(module.id).rubric_criteria.length === 0">
+                  <input v-model="assignmentForm(module.id).points_possible" type="number" min="0" placeholder="Points possible" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
+                </div>
+                <div v-else class="space-y-1">
+                  <div v-for="(criterion, i) in assignmentForm(module.id).rubric_criteria" :key="i" class="flex gap-2 items-center">
+                    <input v-model="criterion.description" placeholder="Criterion" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
+                    <input v-model="criterion.max_points" type="number" min="0" placeholder="Points" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-24" />
+                    <button @click="removeRubricCriterion(module.id, i)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-4 w-4" /></button>
+                  </div>
+                </div>
+                <button @click="addRubricCriterion(module.id)" class="text-xs text-indigo-600 underline">+ Add rubric criterion</button>
+
+                <button @click="addAssignment(module.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add assignment</button>
               </div>
             </div>
           </div>
