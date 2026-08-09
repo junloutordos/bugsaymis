@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
@@ -58,6 +58,30 @@ function submitGrade(row) {
 function reopen(row) {
   router.post(route('learn.submissions.reopen', row.submission_id), {}, { preserveScroll: true })
 }
+
+const selectedClassRecordId = ref('')
+const selectedQuarterId = ref('')
+const selectedAssessmentId = ref('')
+
+const availableQuarters = computed(() => {
+  const cr = props.assignment.class_record_options.find(c => c.id === Number(selectedClassRecordId.value))
+  return cr ? cr.quarters : []
+})
+const availableAssessments = computed(() => {
+  const q = availableQuarters.value.find(q => q.id === Number(selectedQuarterId.value))
+  return q ? q.assessments : []
+})
+
+function linkAssessment() {
+  if (! selectedAssessmentId.value) return
+  router.put(route('learn.assignments.link', props.assignment.id), {
+    class_record_assessment_id: selectedAssessmentId.value,
+  }, { preserveScroll: true })
+}
+
+function pushToClassRecord() {
+  router.post(route('learn.assignments.push', props.assignment.id), {}, { preserveScroll: true })
+}
 </script>
 
 <template>
@@ -67,6 +91,45 @@ function reopen(row) {
       <div>
         <h1 class="text-lg font-semibold text-slate-800">{{ assignment.title }}</h1>
         <p class="text-sm text-slate-500">{{ assignment.submission_type }} submission — {{ assignment.max_score }} pts</p>
+      </div>
+
+      <div class="border border-slate-200 rounded-lg p-4 space-y-2">
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Class Record</p>
+
+        <div v-if="assignment.class_record_link">
+          <p class="text-sm text-slate-700">
+            Linked to <strong>{{ assignment.class_record_link.class_record_name }}</strong> —
+            Q{{ assignment.class_record_link.quarter }} — {{ assignment.class_record_link.category_name }} —
+            "{{ assignment.class_record_link.assessment_title }}"
+          </p>
+          <p class="text-xs text-slate-500 mt-1">
+            {{ assignment.class_record_link.pushed_at ? `Last pushed ${new Date(assignment.class_record_link.pushed_at).toLocaleString('en-PH')}` : 'Not pushed yet' }}
+          </p>
+          <button @click="pushToClassRecord" class="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            Push graded scores
+          </button>
+        </div>
+
+        <div v-else class="space-y-2">
+          <p class="text-xs text-slate-500">Not linked yet. Pick the Class Record assessment to push scores into.</p>
+          <div class="flex gap-2">
+            <select v-model="selectedClassRecordId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1">
+              <option value="" disabled>Class Record</option>
+              <option v-for="cr in assignment.class_record_options" :key="cr.id" :value="cr.id">{{ cr.display_name }}</option>
+            </select>
+            <select v-model="selectedQuarterId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="" disabled>Quarter</option>
+              <option v-for="q in availableQuarters" :key="q.id" :value="q.id">Q{{ q.quarter }}</option>
+            </select>
+            <select v-model="selectedAssessmentId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1">
+              <option value="" disabled>Assessment</option>
+              <option v-for="a in availableAssessments" :key="a.id" :value="a.id">{{ a.category_name }} — {{ a.title }} ({{ a.max_score }} pts)</option>
+            </select>
+          </div>
+          <button @click="linkAssessment" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">
+            Link
+          </button>
+        </div>
       </div>
 
       <div v-for="row in roster" :key="row.student_id" class="border border-slate-200 rounded-lg">
