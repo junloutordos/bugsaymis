@@ -35,6 +35,9 @@ class IctEquipmentDevice extends Model implements AuthenticatableContract
         'risk_tier',
         'last_full_inventory_at',
         'last_diagnostics_at',
+        'containment_exempt',
+        'containment_status',
+        'containment_incident_id',
     ];
 
     protected $casts = [
@@ -44,6 +47,7 @@ class IctEquipmentDevice extends Model implements AuthenticatableContract
         'last_update_attempted_at' => 'datetime',
         'last_full_inventory_at' => 'datetime',
         'last_diagnostics_at' => 'datetime',
+        'containment_exempt' => 'boolean',
     ];
 
     public function equipment()
@@ -89,5 +93,10 @@ class IctEquipmentDevice extends Model implements AuthenticatableContract
     public function manualRemediationRequests()
     {
         return $this->hasMany(IctEquipmentManualRemediationRequest::class, 'device_id');
+    }
+
+    public function containmentIncident()
+    {
+        return $this->belongsTo(IctEquipmentContainmentIncident::class, 'containment_incident_id');
     }
 }
