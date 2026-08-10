@@ -1391,6 +1391,15 @@ export const menuItems = [
   },
 
   {
+    label: "Learn",
+    routeName: "learn.index",
+    href: route("learn.index"),
+    icon: AcademicCapIcon,
+    roles: ["Administrator", "Faculty", "CID Chief"],
+    orRoles: ["AUH"],
+  },
+
+  {
     label: "Homeroom Attendance",
     icon: UserGroupIcon,
     roles: ["Administrator", "Faculty", "CID Chief", "Registrar"],

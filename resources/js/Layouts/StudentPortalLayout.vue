@@ -49,6 +49,10 @@ function logout() {
                         class="text-sm text-slate-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors hidden sm:inline"
                     >Grades</a>
                     <a
+                        :href="route('student-portal.learn.index')"
+                        class="text-sm text-slate-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors hidden sm:inline"
+                    >Learn</a>
+                    <a
                         :href="route('student-portal.clearance')"
                         class="text-sm text-slate-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
                     >Clearance</a>
