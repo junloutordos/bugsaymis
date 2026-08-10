@@ -76,6 +76,84 @@ class AtlasSentinelContainmentTest extends TestCase
         $this->assertFalse($response->json('containment.auto_contain_enabled'));
     }
 
+    public function test_manager_can_confirm_an_incident(): void
+    {
+        $manager = $this->userWithPermission('it.equipment.manage');
+        $equipment = ICTEquipment::create([
+            'category' => 'CPU/System Unit',
+            'serial_no' => 'CONFIRM-PC-'.uniqid(),
+            'status' => 'Good Working',
+            'description' => 'Test device for confirm',
+        ]);
+        $device = IctEquipmentDevice::create(['equipment_id' => $equipment->id, 'hostname' => 'CONFIRM-PC']);
+        $service = app(\App\Services\AtlasSentinelContainmentService::class);
+        $incident = $service->recordIncident($device, 'network_anomaly', []);
+
+        $this->actingAs($manager)
+            ->postJson("/ict-equipments/{$equipment->id}/security-incidents/{$incident->id}/confirm")
+            ->assertOk();
+
+        $this->assertNotNull($incident->fresh()->confirmed_at);
+    }
+
+    public function test_manager_can_toggle_containment_exempt(): void
+    {
+        $manager = $this->userWithPermission('it.equipment.manage');
+        $equipment = ICTEquipment::create([
+            'category' => 'CPU/System Unit',
+            'serial_no' => 'EXEMPT-PC-'.uniqid(),
+            'status' => 'Good Working',
+            'description' => 'Test device for exempt toggle',
+        ]);
+        $device = IctEquipmentDevice::create(['equipment_id' => $equipment->id, 'hostname' => 'EXEMPT-PC', 'containment_exempt' => false]);
+
+        $this->actingAs($manager)
+            ->patchJson("/ict-equipments/{$equipment->id}/security-exempt", ['exempt' => true])
+            ->assertOk();
+
+        $this->assertTrue($device->fresh()->containment_exempt);
+    }
+
+    public function test_remediate_endpoint_accepts_network_containment_action(): void
+    {
+        $manager = $this->userWithPermission('it.equipment.manage');
+        $equipment = ICTEquipment::create([
+            'category' => 'CPU/System Unit',
+            'serial_no' => 'REMEDIATE-PC-'.uniqid(),
+            'status' => 'Good Working',
+            'description' => 'Test device for manual isolate',
+        ]);
+        $device = IctEquipmentDevice::create(['equipment_id' => $equipment->id, 'hostname' => 'REMEDIATE-PC']);
+
+        $this->actingAs($manager)
+            ->postJson("/ict-equipments/{$equipment->id}/remediate", ['action' => 'network_containment'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('ict_equipment_manual_remediation_requests', [
+            'device_id' => $device->id,
+            'action' => 'network_containment',
+        ]);
+    }
+
+    public function test_security_panel_endpoint_returns_status_and_incidents(): void
+    {
+        $manager = $this->userWithPermission('it.equipment.view');
+        $equipment = ICTEquipment::create([
+            'category' => 'CPU/System Unit',
+            'serial_no' => 'PANEL-PC-'.uniqid(),
+            'status' => 'Good Working',
+            'description' => 'Test device for security panel',
+        ]);
+        $device = IctEquipmentDevice::create(['equipment_id' => $equipment->id, 'hostname' => 'PANEL-PC']);
+        app(\App\Services\AtlasSentinelContainmentService::class)->recordIncident($device, 'av_signal', ['threat_name' => 'Trojan:Test']);
+
+        $response = $this->actingAs($manager)->getJson("/ict-equipments/{$equipment->id}/security");
+
+        $response->assertOk()->assertJsonStructure(['status', 'incident_id', 'exempt', 'incidents']);
+        $this->assertSame('contained', $response->json('status'));
+        $this->assertCount(1, $response->json('incidents'));
+    }
+
     private function userWithPermission(string $permissionName): User
     {
         $permission = \App\Models\Permission::firstOrCreate(

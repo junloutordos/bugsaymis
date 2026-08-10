@@ -1010,6 +1010,18 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware('permission:it.equipment.manage')
         ->name('ict-equipments.remediate');
 
+    Route::get('/ict-equipments/{ictEquipment}/security', [ICTEquipmentController::class, 'security'])
+        ->middleware('permission:it.equipment.view')
+        ->name('ict-equipments.security');
+
+    Route::post('/ict-equipments/{ictEquipment}/security-incidents/{incident}/confirm', [ICTEquipmentController::class, 'confirmSecurityIncident'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('ict-equipments.security-incidents.confirm');
+
+    Route::patch('/ict-equipments/{ictEquipment}/security-exempt', [ICTEquipmentController::class, 'toggleContainmentExempt'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('ict-equipments.security-exempt');
+
     Route::post('/ict-equipments/{ictEquipment}/merge', [ICTEquipmentController::class, 'merge'])
         ->middleware('permission:it.equipment.manage')
         ->name('ict-equipments.merge');

@@ -470,6 +470,8 @@ class ICTEquipmentController extends Controller
         'dns_flush',
         'windows_maintenance_task',
         'software_uninstall',
+        'network_containment',
+        'network_release',
     ];
 
     /**
@@ -546,5 +548,70 @@ class ICTEquipmentController extends Controller
         return response()->json([
             'message' => 'Fix queued — it will run on the device\'s next check-in (up to 20 minutes).',
         ]);
+    }
+
+    /**
+     * GET /ict-equipments/{ictEquipment}/security
+     *
+     * Data for the Security panel: current containment status/exemption
+     * plus recent incident history for this device.
+     */
+    public function security(ICTEquipment $ictEquipment)
+    {
+        $device = $ictEquipment->agentDevice;
+        if (! $device) {
+            return response()->json(['status' => 'none', 'incident_id' => null, 'exempt' => false, 'incidents' => []]);
+        }
+
+        $incidents = \App\Models\IctEquipmentContainmentIncident::where('device_id', $device->id)
+            ->latest('triggered_at')->limit(20)->get();
+
+        return response()->json([
+            'status' => $device->containment_status,
+            'incident_id' => $device->containment_incident_id,
+            'exempt' => (bool) $device->containment_exempt,
+            'incidents' => $incidents,
+        ]);
+    }
+
+    /**
+     * POST /ict-equipments/{ictEquipment}/security-incidents/{incident}/confirm
+     *
+     * Marks an incident as human-confirmed, which stops the agent's local
+     * auto-release timer (delivered back to the device via the checkin
+     * response's `containment.confirmed` flag) — containment then stays
+     * until an explicit manual release.
+     */
+    public function confirmSecurityIncident(
+        ICTEquipment $ictEquipment,
+        \App\Models\IctEquipmentContainmentIncident $incident,
+        \App\Services\AtlasSentinelContainmentService $service,
+    ) {
+        $service->confirmIncident($incident, request()->user());
+
+        return response()->json(['message' => 'Incident confirmed.']);
+    }
+
+    /**
+     * PATCH /ict-equipments/{ictEquipment}/security-exempt
+     *
+     * Devices exempt from auto-containment only ever alert on a
+     * high-confidence signal and wait for a manual isolate command.
+     */
+    public function toggleContainmentExempt(
+        Request $request,
+        ICTEquipment $ictEquipment,
+        \App\Services\AtlasSentinelContainmentService $service,
+    ) {
+        $validated = $request->validate(['exempt' => ['required', 'boolean']]);
+
+        $device = $ictEquipment->agentDevice;
+        if (! $device) {
+            return response()->json(['message' => 'This equipment has no enrolled agent device.'], 422);
+        }
+
+        $service->toggleExempt($device, $validated['exempt']);
+
+        return response()->json(['message' => 'Containment exemption updated.']);
     }
 }
