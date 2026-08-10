@@ -386,6 +386,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             ->name('recipients.resend')->middleware('permission:issuances.manage');
         Route::post('/{issuance}/recipients/resend-bulk', [\App\Http\Controllers\IssuanceController::class, 'resendBulkEmails'])
             ->name('recipients.resendBulk')->middleware('permission:issuances.manage');
+        Route::post('/{issuance}/recipients', [\App\Http\Controllers\IssuanceController::class, 'addRecipients'])
+            ->name('recipients.add')->middleware('permission:issuances.manage');
     });
 
     // ── Knowledge Management — OED Issuances ─────────────────────────────────

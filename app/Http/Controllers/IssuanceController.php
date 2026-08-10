@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Traits\SignsDocuments;
+use App\Jobs\NotifyAddedIssuanceRecipients;
 use App\Jobs\ProcessIssuanceRelease;
 use App\Jobs\ResendIssuanceEmails;
 use App\Mail\IssuanceReleasedMail;
@@ -607,6 +608,42 @@ class IssuanceController extends Controller
             'Content-Disposition' => 'inline; filename="' . $issuance->attachment_filename . '"',
             'Cache-Control'       => 'private, max-age=300',
         ]);
+    }
+
+    // ── Add recipients (post-release) ───────────────────────────────────────
+
+    /** Add more recipients to an already-released issuance; new recipients are emailed + bell-notified. */
+    public function addRecipients(Request $request, Issuance $issuance)
+    {
+        abort_if(! $issuance->isReleased(), 422, 'Only released issuances can receive additional recipients.');
+        abort_if($issuance->isArchived(), 422, 'Restore this issuance from the archive before adding recipients.');
+
+        $validated = $request->validate([
+            'recipient_type'  => ['required', Rule::in(['all', 'office', 'individual', 'division'])],
+            'office_ids'      => 'nullable|array',
+            'office_ids.*'    => 'exists:offices,id',
+            'user_ids'        => 'nullable|array',
+            'user_ids.*'      => 'exists:users,id',
+            'division_ids'    => 'nullable|array',
+            'division_ids.*'  => 'exists:divisions,id',
+        ]);
+
+        $newRecipientIds = $this->svc->addRecipients($issuance, $validated);
+
+        if (empty($newRecipientIds)) {
+            return back()->with('success', 'No new recipients — everyone selected already has this issuance.');
+        }
+
+        AuditLogger::log([
+            'action'         => 'issuance_recipients_added',
+            'auditable_type' => Issuance::class,
+            'auditable_id'   => $issuance->id,
+            'new_values'     => ['recipient_type' => $validated['recipient_type'], 'added_count' => count($newRecipientIds)],
+        ]);
+
+        NotifyAddedIssuanceRecipients::dispatch($issuance->id, $newRecipientIds);
+
+        return back()->with('success', count($newRecipientIds) . ' new recipient(s) added and notified.');
     }
 
     // ── Resend recipient email ───────────────────────────────────────────────
