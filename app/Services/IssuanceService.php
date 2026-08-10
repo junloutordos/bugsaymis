@@ -116,6 +116,51 @@ class IssuanceService
         }
     }
 
+    /**
+     * Additive recipient fan-out for an already-released issuance. Unlike
+     * buildRecipients() this never deletes existing rows — it resolves the
+     * requested target set the same way, diffs out anyone already a
+     * recipient, and inserts only the new rows. Returns the newly-inserted
+     * issuance_recipients IDs so the caller can notify just those people.
+     */
+    public function addRecipients(Issuance $issuance, array $data): array
+    {
+        $targetUserIds = match ($data['recipient_type']) {
+            'all' => User::employees()->where('status', '<>', 'inactive')->pluck('id'),
+            'office' => User::employees()
+                ->whereIn('office_id', $data['office_ids'] ?? [])
+                ->where('status', '<>', 'inactive')
+                ->pluck('id'),
+            'individual' => User::employees()
+                ->whereIn('id', $data['user_ids'] ?? [])
+                ->pluck('id'),
+            'division' => User::employees()
+                ->whereIn('division_id', $data['division_ids'] ?? [])
+                ->where('status', '<>', 'inactive')
+                ->pluck('id'),
+            default => collect(),
+        };
+
+        $existingUserIds = $issuance->recipients()->pluck('user_id')->all();
+        $newUserIds = $targetUserIds->diff($existingUserIds)->values();
+
+        if ($newUserIds->isEmpty()) {
+            return [];
+        }
+
+        $rows = $newUserIds->map(fn ($uid) => [
+            'issuance_id' => $issuance->id,
+            'user_id'     => $uid,
+            'notified_at' => now(),
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ])->all();
+
+        IssuanceRecipient::insert($rows);
+
+        return $issuance->recipients()->whereIn('user_id', $newUserIds)->pluck('id')->all();
+    }
+
     // ── QR helpers ────────────────────────────────────────────────────────────
 
     public function generateQrSvg(Issuance $issuance, int $size = 120): string
