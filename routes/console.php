@@ -48,6 +48,11 @@ Schedule::command('computer-labs:sync')->everyThirtyMinutes()->withoutOverlappin
 //    no result reported (device went offline/crashed mid-flight) ─────────
 Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinutes()->withoutOverlapping();
 
+// ── Atlas Sentinel: release auto-contained devices whose incident timed out
+//    without IT confirmation — bounds the damage of a false-positive
+//    containment without needing anyone to act ───────────────────────────
+Schedule::command('atlas-sentinel:auto-release-containments')->everyFiveMinutes()->withoutOverlapping();
+
 // ── Class Record: auto-create today's ILA date for every class record whose
 //    subject has a scheduled ILP period today ────────────────────────────
 Schedule::command('class-record:generate-ila-dates')->dailyAt('05:30')->withoutOverlapping();

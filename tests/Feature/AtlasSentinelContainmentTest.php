@@ -154,6 +154,18 @@ class AtlasSentinelContainmentTest extends TestCase
         $this->assertCount(1, $response->json('incidents'));
     }
 
+    public function test_auto_release_command_releases_expired_unconfirmed_incidents(): void
+    {
+        $device = IctEquipmentDevice::create(['hostname' => 'TEST-PC-'.uniqid()]);
+        $service = app(\App\Services\AtlasSentinelContainmentService::class);
+        $incident = $service->recordIncident($device, 'network_anomaly', []);
+        $incident->forceFill(['triggered_at' => now()->subMinutes(45)])->save();
+
+        $this->artisan('atlas-sentinel:auto-release-containments')->assertExitCode(0);
+
+        $this->assertSame('none', $device->fresh()->containment_status);
+    }
+
     private function userWithPermission(string $permissionName): User
     {
         $permission = \App\Models\Permission::firstOrCreate(
