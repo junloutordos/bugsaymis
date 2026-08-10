@@ -42,6 +42,7 @@ import AppTable from "@/Components/AppTable.vue"
 import AppModal from "@/Components/AppModal.vue"
 import EmptyState from "@/Components/EmptyState.vue"
 import PaginationControl from "@/Components/PaginationControl.vue"
+import SecurityPanel from "./SecurityPanel.vue"
 
 // Props from backend
 const props = defineProps({
@@ -1559,6 +1560,9 @@ const showAllChecked    = computed({
                   <div v-if="selectedSpecsEquipment.agent_device.security_status.reboot_required" class="mt-1 text-xs text-amber-600">Reboot required</div>
                 </div>
               </div>
+
+              <!-- Threat Containment -->
+              <SecurityPanel :equipment-id="selectedSpecsEquipment.id" />
 
               <!-- RAM -->
               <div
