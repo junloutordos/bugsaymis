@@ -155,16 +155,12 @@ class ConsultationController extends Controller
 
                     $requestor['sex'] = $student->sex ?? null;
 
-                    // Attach photo path if available
-                    $photoField = null;
-                    foreach (['img', 'image', 'photo', 'student_image'] as $pf) {
-                        if (isset($student->$pf) && $student->$pf) {
-                            $photoField = $student->$pf;
-                            break;
+                    // Attach photo via the canonical proxy route (handles S3 + legacy local files)
+                    if (! empty($student->img)) {
+                        $requestor['photo'] = route('students.photo', ['id' => $student->id]);
+                        if (preg_match('/_(\d+)\.\w+$/', $student->img, $vm)) {
+                            $requestor['photo'] .= '?v='.$vm[1];
                         }
-                    }
-                    if ($photoField) {
-                        $requestor['photo'] = '/storage/students_profile_picture/'.rawurlencode($photoField);
                     }
 
                     $sectionStudent = app(StudentSectionResolver::class)->latestForStudent($student->id);
@@ -756,15 +752,11 @@ class ConsultationController extends Controller
                     $requestor['name'] = $student->name ?? $requestor['name'];
                 }
                 $requestor['sex'] = $student->sex ?? null;
-                $photoField = null;
-                foreach (['img', 'image', 'photo', 'student_image'] as $pf) {
-                    if (isset($student->$pf) && $student->$pf) {
-                        $photoField = $student->$pf;
-                        break;
+                if (! empty($student->img)) {
+                    $requestor['photo'] = route('students.photo', ['id' => $student->id]);
+                    if (preg_match('/_(\d+)\.\w+$/', $student->img, $vm)) {
+                        $requestor['photo'] .= '?v='.$vm[1];
                     }
-                }
-                if ($photoField) {
-                    $requestor['photo'] = '/storage/students_profile_picture/'.rawurlencode($photoField);
                 }
 
                 $sectionStudent = app(StudentSectionResolver::class)->latestForStudent($student->id);
