@@ -28,6 +28,8 @@ const props = defineProps({
   myAcknowledgedAt: String,
   verifyUrl:        String,
   supplements:      Array,
+  offices:          Array,
+  users:            Array,
 })
 
 // ── Release flow (for drafts) ──────────────────────────────────────────────
@@ -77,6 +79,78 @@ function acknowledge() {
   ackForm.post(route('issuances.acknowledge', props.issuance.id), {
     onSuccess: () => { ackDone.value = true },
     preserveScroll: true,
+  })
+}
+
+// ── Add Recipient (post-release) ───────────────────────────────────────────
+const showAddRecipientModal = ref(false)
+const addRecipientType      = ref('individual')
+const addOfficeIds          = ref([])
+const addUserIds             = ref([])
+const addDivisionIds         = ref([])
+const addOfficeSearch        = ref('')
+const addUserSearch          = ref('')
+const addDivisionSearch      = ref('')
+const addingRecipients       = ref(false)
+const addRecipientErrors     = ref({})
+
+const filteredAddOffices = computed(() => {
+  const q = addOfficeSearch.value.toLowerCase()
+  return (props.offices ?? []).filter(o => !q || o.name.toLowerCase().includes(q))
+})
+
+const filteredAddUsers = computed(() => {
+  const q = addUserSearch.value.toLowerCase()
+  const existingUserIds = new Set((props.recipients ?? []).map(r => r.user?.id).filter(Boolean))
+  return (props.users ?? [])
+    .filter(u => !existingUserIds.has(u.id))
+    .filter(u => !q || u.name.toLowerCase().includes(q) || u.position?.toLowerCase().includes(q))
+})
+
+const filteredAddDivisions = computed(() => {
+  const q = addDivisionSearch.value.toLowerCase()
+  return (props.divisions ?? []).filter(d => !q || d.division_name.toLowerCase().includes(q) || d.acronym?.toLowerCase().includes(q))
+})
+
+function toggleAddOffice(id) {
+  const idx = addOfficeIds.value.indexOf(id)
+  if (idx === -1) addOfficeIds.value.push(id)
+  else addOfficeIds.value.splice(idx, 1)
+}
+
+function toggleAddUser(id) {
+  const idx = addUserIds.value.indexOf(id)
+  if (idx === -1) addUserIds.value.push(id)
+  else addUserIds.value.splice(idx, 1)
+}
+
+function toggleAddDivision(id) {
+  const idx = addDivisionIds.value.indexOf(id)
+  if (idx === -1) addDivisionIds.value.push(id)
+  else addDivisionIds.value.splice(idx, 1)
+}
+
+function openAddRecipientModal() {
+  addRecipientType.value = 'individual'
+  addOfficeIds.value = []
+  addUserIds.value = []
+  addDivisionIds.value = []
+  addRecipientErrors.value = {}
+  showAddRecipientModal.value = true
+}
+
+function submitAddRecipients() {
+  addingRecipients.value = true
+  addRecipientErrors.value = {}
+  router.post(route('issuances.recipients.add', props.issuance.id), {
+    recipient_type: addRecipientType.value,
+    office_ids: addOfficeIds.value,
+    user_ids: addUserIds.value,
+    division_ids: addDivisionIds.value,
+  }, {
+    preserveScroll: true,
+    onSuccess: () => { addingRecipients.value = false; showAddRecipientModal.value = false },
+    onError: e => { addRecipientErrors.value = e; addingRecipients.value = false },
   })
 }
 
@@ -389,6 +463,9 @@ function deleteDraft() {
                   <UserGroupIcon class="h-3.5 w-3.5" /> Acknowledgments
                 </h3>
                 <div class="flex items-center gap-1.5">
+                  <AppButton v-if="!issuance.archived_at" size="sm" variant="secondary" @click="openAddRecipientModal">
+                    <PlusIcon class="h-3.5 w-3.5" /> Add Recipient
+                  </AppButton>
                   <AppButton v-if="selectedRecipientIds.length" size="sm" variant="secondary" @click="resendSelected">
                     <ArrowPathIcon class="h-3.5 w-3.5" /> Resend Selected ({{ selectedRecipientIds.length }})
                   </AppButton>
@@ -503,6 +580,87 @@ function deleteDraft() {
       @cancel="showPinModal = false"
       @confirm="onPinVerified"
     />
+
+    <!-- Add Recipient Modal -->
+    <AppModal :show="showAddRecipientModal" title="Add Recipient" size="lg" @close="showAddRecipientModal = false">
+      <div class="space-y-5">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-2">Who should be added?</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button v-for="opt in [
+              { key:'all', label:'All Staff' },
+              { key:'office', label:'By Office' },
+              { key:'division', label:'By Division' },
+              { key:'individual', label:'Individual(s)' },
+            ]" :key="opt.key"
+              type="button"
+              @click="addRecipientType = opt.key"
+              class="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-colors"
+              :class="addRecipientType === opt.key ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'">
+              <p class="text-xs font-semibold" :class="addRecipientType === opt.key ? 'text-indigo-700' : 'text-slate-700'">{{ opt.label }}</p>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="addRecipientType === 'office'" class="space-y-2">
+          <AppInput v-model="addOfficeSearch" type="text" placeholder="Search offices…" />
+          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+            <label v-for="o in filteredAddOffices" :key="o.id"
+              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" :checked="addOfficeIds.includes(o.id)"
+                @change="toggleAddOffice(o.id)" class="rounded border-slate-300 text-indigo-600" />
+              <span class="text-sm text-slate-700">{{ o.name }}</span>
+            </label>
+          </div>
+          <p v-if="addOfficeIds.length" class="text-xs text-indigo-600 font-medium">{{ addOfficeIds.length }} office(s) selected</p>
+        </div>
+
+        <div v-if="addRecipientType === 'division'" class="space-y-2">
+          <AppInput v-model="addDivisionSearch" type="text" placeholder="Search divisions…" />
+          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+            <label v-for="d in filteredAddDivisions" :key="d.id"
+              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" :checked="addDivisionIds.includes(d.id)"
+                @change="toggleAddDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
+              <div>
+                <p class="text-sm text-slate-700">{{ d.division_name }}</p>
+                <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
+              </div>
+            </label>
+          </div>
+          <p v-if="addDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ addDivisionIds.length }} division(s) selected</p>
+        </div>
+
+        <div v-if="addRecipientType === 'individual'" class="space-y-2">
+          <AppInput v-model="addUserSearch" type="text" placeholder="Search by name or position…" />
+          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+            <label v-for="u in filteredAddUsers.slice(0, 50)" :key="u.id"
+              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" :checked="addUserIds.includes(u.id)"
+                @change="toggleAddUser(u.id)" class="rounded border-slate-300 text-indigo-600" />
+              <div>
+                <p class="text-sm font-medium text-slate-700">{{ u.name }}</p>
+                <p v-if="u.position" class="text-xs text-slate-400">{{ u.position }}</p>
+              </div>
+            </label>
+          </div>
+          <p class="text-[10px] text-slate-400">Already-tagged recipients are hidden from this list.</p>
+          <p v-if="addUserIds.length" class="text-xs text-indigo-600 font-medium">{{ addUserIds.length }} person(s) selected</p>
+        </div>
+
+        <p v-if="addRecipientErrors.recipient_type || addRecipientErrors.user_ids || addRecipientErrors.office_ids || addRecipientErrors.division_ids"
+          class="text-xs text-red-600">
+          {{ addRecipientErrors.recipient_type || addRecipientErrors.user_ids || addRecipientErrors.office_ids || addRecipientErrors.division_ids }}
+        </p>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="showAddRecipientModal = false">Cancel</AppButton>
+        <AppButton :disabled="addingRecipients" :loading="addingRecipients" @click="submitAddRecipients">
+          {{ addingRecipients ? 'Adding…' : 'Add & Notify' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- Scan preview modal -->
     <AppModal :show="showScanModal" :title="issuance.attachment_filename" size="4xl" body-class="p-2" @close="showScanModal = false">

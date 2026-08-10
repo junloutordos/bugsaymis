@@ -415,6 +415,9 @@ class IssuanceController extends Controller
 
         return Inertia::render('Issuances/Show', [
             'divisions'  => $isAdmin ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']) : [],
+            'offices'    => $isAdmin ? Office::orderBy('name')->get(['id', 'name']) : [],
+            'users'      => $isAdmin ? User::employees()->where('status', '<>', 'inactive')
+                ->orderBy('name')->get(['id', 'name', 'office_id', 'position']) : [],
             'issuance'   => [
                 'id'               => $issuance->id,
                 'type'             => $issuance->type,
