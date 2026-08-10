@@ -157,6 +157,7 @@ Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
         Route::get('/alerts', [AtlasSentinelController::class, 'alerts'])->name('alerts');
         Route::post('/alerts/{alert}/escalate', [AtlasSentinelController::class, 'escalate'])->name('alerts.escalate');
         Route::get('/device-summary', [AtlasSentinelController::class, 'deviceSummary'])->name('device-summary');
+        Route::post('/security-incident', [AtlasSentinelController::class, 'reportSecurityIncident'])->name('security-incident');
         Route::post('/biometric-punches', [BiometricPunchIngestController::class, 'store'])->name('biometric-punches.store');
         Route::post('/report-problem', [AtlasSentinelController::class, 'reportProblem'])
             ->name('report-problem')

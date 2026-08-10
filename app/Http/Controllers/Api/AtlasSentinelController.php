@@ -29,6 +29,7 @@ use App\Services\AtlasSentinelRemediationDispatcher;
 use App\Services\AtlasSentinelRemoteHelpService;
 use App\Services\AtlasSentinelScoringService;
 use App\Services\AtlasSentinelSecurityEvaluator;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -407,6 +408,48 @@ class AtlasSentinelController extends Controller
         }
 
         return response()->json($response);
+    }
+
+    /**
+     * POST /api/ict-agent/security-incident
+     *
+     * Immediate, out-of-band report fired by the agent the instant it
+     * auto-contains a device — not the 20-min checkin cadence, since a
+     * SYN-flood/malware incident needs IT visibility in near-real-time.
+     * The containment decision itself already happened locally on the
+     * agent by the time this lands; this just records it and notifies.
+     */
+    public function reportSecurityIncident(Request $request, \App\Services\AtlasSentinelContainmentService $containmentService): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'in:network_anomaly,av_signal'],
+            'detail' => ['nullable', 'array'],
+            'triggered_at' => ['required', 'date'],
+        ]);
+
+        /** @var IctEquipmentDevice $device */
+        $device = $request->user();
+
+        $incident = $containmentService->recordIncident($device, $validated['reason'], $validated['detail'] ?? []);
+
+        $recipients = User::with('roles.permissions')
+            ->where('status', '<>', 'inactive')
+            ->get()
+            ->filter(fn (User $user) => $user->hasPermission('it.equipment.manage'));
+
+        $label = $device->equipment?->description ?? $device->hostname ?? "Device #{$device->id}";
+
+        foreach ($recipients as $recipient) {
+            NotificationService::notifyUser(
+                user: $recipient,
+                requestType: 'Atlas Sentinel Security',
+                referenceNo: $label,
+                newStatus: "Automatically isolated ({$incident->reason})",
+                url: route('atlas-sentinel.health-dashboard'),
+            );
+        }
+
+        return response()->json(['status' => 'ok', 'incident_id' => $incident->id]);
     }
 
     /**

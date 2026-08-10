@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\ICTEquipment;
 use App\Models\IctEquipmentDevice;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class AtlasSentinelContainmentTest extends TestCase
@@ -27,5 +30,49 @@ class AtlasSentinelContainmentTest extends TestCase
         $this->assertFalse((bool) $device->containment_exempt);
         $this->assertSame('none', $device->containment_status);
         $this->assertNull($device->containment_incident_id);
+    }
+
+    public function test_agent_can_report_security_incident_and_it_creates_incident_and_notifies(): void
+    {
+        $equipment = ICTEquipment::create([
+            'category' => 'CPU/System Unit',
+            'serial_no' => 'SEC-INCIDENT-PC-'.uniqid(),
+            'status' => 'Good Working',
+            'description' => 'Test device for security incident reporting',
+        ]);
+        $device = IctEquipmentDevice::create(['equipment_id' => $equipment->id, 'hostname' => 'SEC-INCIDENT-PC']);
+        Sanctum::actingAs($device, ['*']);
+
+        $manager = $this->userWithPermission('it.equipment.manage');
+
+        $response = $this->postJson('/api/ict-agent/security-incident', [
+            'reason' => 'network_anomaly',
+            'detail' => ['half_open_count' => 240, 'process_name' => 'svchost.exe'],
+            'triggered_at' => now()->toIso8601String(),
+        ]);
+
+        $response->assertOk()->assertJsonStructure(['status', 'incident_id']);
+        $this->assertDatabaseHas('ict_equipment_containment_incidents', [
+            'device_id' => $device->id,
+            'reason' => 'network_anomaly',
+        ]);
+        $this->assertSame('contained', $device->fresh()->containment_status);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $manager->id,
+        ]);
+    }
+
+    private function userWithPermission(string $permissionName): User
+    {
+        $permission = \App\Models\Permission::firstOrCreate(
+            ['name' => $permissionName],
+            ['module' => 'ICT Equipment', 'description' => $permissionName],
+        );
+        $role = \App\Models\Role::create(['name' => 'ContainmentTester_'.uniqid()]);
+        $role->permissions()->attach($permission->id);
+        $user = User::factory()->create();
+        $user->roles()->attach($role->id);
+
+        return $user;
     }
 }
