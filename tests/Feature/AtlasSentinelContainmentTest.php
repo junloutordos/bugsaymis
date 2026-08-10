@@ -62,6 +62,20 @@ class AtlasSentinelContainmentTest extends TestCase
         ]);
     }
 
+    public function test_checkin_response_includes_containment_config(): void
+    {
+        $device = IctEquipmentDevice::create(['hostname' => 'TEST-PC-'.uniqid()]);
+        Sanctum::actingAs($device, ['*']);
+
+        $response = $this->postJson('/api/ict-agent/checkin', []);
+
+        $response->assertOk()->assertJsonStructure([
+            'containment' => ['exempt', 'auto_contain_enabled', 'thresholds', 'server_host', 'confirmed'],
+        ]);
+        $this->assertFalse($response->json('containment.exempt'));
+        $this->assertFalse($response->json('containment.auto_contain_enabled'));
+    }
+
     private function userWithPermission(string $permissionName): User
     {
         $permission = \App\Models\Permission::firstOrCreate(

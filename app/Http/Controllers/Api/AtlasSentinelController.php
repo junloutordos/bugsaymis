@@ -407,6 +407,22 @@ class AtlasSentinelController extends Controller
             ];
         }
 
+        $containmentSettings = \App\Models\AtlasSentinelContainmentSetting::current();
+        $confirmed = false;
+        if ($device->containment_status === 'contained' && $device->containmentIncident) {
+            $confirmed = (bool) $device->containmentIncident->confirmed_at;
+        }
+        $response['containment'] = [
+            'exempt' => (bool) $device->containment_exempt,
+            'auto_contain_enabled' => (bool) $containmentSettings->auto_contain_enabled,
+            'thresholds' => [
+                'max_half_open_connections' => $containmentSettings->max_half_open_connections,
+                'max_distinct_ips_per_minute' => $containmentSettings->max_distinct_ips_per_minute,
+            ],
+            'server_host' => parse_url(config('app.url'), PHP_URL_HOST),
+            'confirmed' => $confirmed,
+        ];
+
         return response()->json($response);
     }
 
