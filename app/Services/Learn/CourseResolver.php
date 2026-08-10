@@ -48,6 +48,7 @@ class CourseResolver
     private function resolveFromAssignments(Builder $query): Collection
     {
         $tuples = $query
+            ->whereNotNull('section_id')
             ->get(['subject_id', 'section_id', 'school_year_id', 'academic_term_id'])
             ->unique(fn ($a) => "{$a->subject_id}-{$a->section_id}-{$a->school_year_id}-{$a->academic_term_id}");
 

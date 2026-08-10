@@ -167,4 +167,31 @@ class CourseResolverTest extends TestCase
 
         $this->assertCount(2, $courses);
     }
+
+    /**
+     * A "teaching" LoadAssignment can exist with no section yet (TBA/unplaced —
+     * see the auto-placement and reassign-TBA Faculty Loading tooling). Learn
+     * courses require a section, so these rows must be skipped, not crash on
+     * learn_courses.section_id NOT NULL.
+     */
+    public function test_resolver_skips_teaching_assignments_with_no_section_assigned_yet(): void
+    {
+        $teacher = User::factory()->create();
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $teacher->id, 'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+        ]);
+        LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $teacher->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+            'assignment_type' => 'teaching',
+            'subject_id' => $this->subject->id,
+            'section_id' => null,
+            'load_units' => 3,
+        ]);
+
+        $courses = app(CourseResolver::class)->coursesForFaculty($teacher);
+
+        $this->assertCount(0, $courses);
+        $this->assertDatabaseCount('learn_courses', 0);
+    }
 }
