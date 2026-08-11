@@ -1955,6 +1955,18 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     Route::post('/service-records/{user}/actions', [\App\Http\Controllers\HR\ServiceRecordController::class, 'storeAction'])
         ->name('service-records.actions.store');
 
+    // ── Substitutions ──────────────────────────────────────────────────────────
+    Route::get('/substitutions', [\App\Http\Controllers\HR\SubstitutionController::class, 'index'])
+        ->name('substitutions.index');
+    Route::post('/substitutions', [\App\Http\Controllers\HR\SubstitutionController::class, 'store'])
+        ->name('substitutions.store');
+    Route::post('/substitutions/{substitution}/approve', [\App\Http\Controllers\HR\SubstitutionController::class, 'approve'])
+        ->name('substitutions.approve');
+    Route::post('/substitutions/{substitution}/reject', [\App\Http\Controllers\HR\SubstitutionController::class, 'reject'])
+        ->name('substitutions.reject');
+    Route::post('/substitutions/{substitution}/revoke', [\App\Http\Controllers\HR\SubstitutionController::class, 'revoke'])
+        ->name('substitutions.revoke');
+
     // ── Leave Applications ────────────────────────────────────────────────────
     Route::get('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'index'])
         ->name('leave.index');
