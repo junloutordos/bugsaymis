@@ -2553,6 +2553,8 @@ Route::middleware(['auth'])->prefix('learn')->name('learn.')->group(function () 
     Route::get('/{course}', [\App\Http\Controllers\Learn\CourseController::class, 'show'])->name('show');
     Route::put('/{course}/syllabus', [\App\Http\Controllers\Learn\CourseController::class, 'updateSyllabus'])->name('syllabus.update');
     Route::patch('/{course}/status', [\App\Http\Controllers\Learn\CourseController::class, 'updateStatus'])->name('status.update');
+    Route::put('/{course}/cover', [\App\Http\Controllers\Learn\CourseController::class, 'updateCover'])->name('cover.update');
+    Route::get('/{course}/cover', [\App\Http\Controllers\Learn\CourseController::class, 'cover'])->name('cover.show');
 
     Route::post('/{course}/modules', [\App\Http\Controllers\Learn\ModuleController::class, 'store'])->name('modules.store');
     Route::put('/{course}/modules/reorder', [\App\Http\Controllers\Learn\ModuleController::class, 'reorder'])->name('modules.reorder');

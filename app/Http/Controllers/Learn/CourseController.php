@@ -11,6 +11,7 @@ use App\Models\Learn\Page as LearnPage;
 use App\Models\Learn\Quiz;
 use App\Models\Learn\QuizQuestionBankItem;
 use App\Models\Learn\RubricTemplate;
+use App\Services\Learn\CourseCoverService;
 use App\Services\Learn\CourseFileService;
 use App\Services\Learn\CourseResolver;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class CourseController extends Controller
     public function __construct(
         private CourseResolver $resolver,
         private CourseFileService $files,
+        private CourseCoverService $covers,
     ) {
     }
 
@@ -111,6 +113,35 @@ class CourseController extends Controller
         $course->update($validated);
 
         return back()->with('success', $validated['status'] === 'published' ? 'Course published.' : 'Course moved back to draft.');
+    }
+
+    /** PUT /learn/{course}/cover */
+    public function updateCover(Request $request, Course $course)
+    {
+        $user = Auth::user();
+        abort_unless($course->canEdit($user), 403);
+
+        $validated = $request->validate([
+            'preset' => 'nullable|string',
+            'photo_base64' => 'nullable|string',
+        ]);
+        abort_if(empty($validated['preset']) && empty($validated['photo_base64']), 422, 'Provide a preset or a photo.');
+
+        if (! empty($validated['photo_base64'])) {
+            $this->covers->upload($course, $validated['photo_base64']);
+        } else {
+            $this->covers->setPreset($course, $validated['preset']);
+        }
+
+        return back()->with('success', 'Cover updated.');
+    }
+
+    /** GET /learn/{course}/cover */
+    public function cover(Course $course)
+    {
+        abort_unless($course->canView(Auth::user()), 403);
+
+        return $this->covers->streamResponse($course);
     }
 
     private function serializeCourse(Course $course, $user): array

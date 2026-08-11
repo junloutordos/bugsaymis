@@ -162,4 +162,58 @@ class CourseControllerTest extends TestCase
         $progress = $course->fresh()->load('modules.items')->setupProgress();
         $this->assertSame(100, $progress['percent']);
     }
+
+    public function test_instructor_can_set_a_cover_preset_but_stranger_cannot(): void
+    {
+        $teacher = User::factory()->create();
+        $stranger = User::factory()->create();
+        $this->assignTeaching($teacher);
+        $course = Course::create([
+            'subject_id' => $this->subject->id, 'section_id' => $this->section->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+        ]);
+
+        $this->actingAs($teacher)
+            ->put(route('learn.cover.update', $course), ['preset' => 'sky-wave'])
+            ->assertRedirect();
+        $this->assertSame('sky-wave', $course->fresh()->cover_preset);
+
+        $this->actingAs($stranger)
+            ->put(route('learn.cover.update', $course), ['preset' => 'ocean-deep'])
+            ->assertForbidden();
+    }
+
+    public function test_instructor_can_upload_a_cover_photo(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('s3');
+        $teacher = User::factory()->create();
+        $this->assignTeaching($teacher);
+        $course = Course::create([
+            'subject_id' => $this->subject->id, 'section_id' => $this->section->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+        ]);
+        $dataUri = 'data:image/png;base64,' . base64_encode('fake png bytes');
+
+        $this->actingAs($teacher)
+            ->put(route('learn.cover.update', $course), ['photo_base64' => $dataUri])
+            ->assertRedirect();
+
+        $this->assertNotNull($course->fresh()->cover_photo_s3_key);
+    }
+
+    public function test_cover_proxy_streams_the_photo_for_a_viewer_but_403s_a_stranger(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('s3');
+        $teacher = User::factory()->create();
+        $stranger = User::factory()->create();
+        $this->assignTeaching($teacher);
+        $course = Course::create([
+            'subject_id' => $this->subject->id, 'section_id' => $this->section->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+        ]);
+        app(\App\Services\Learn\CourseCoverService::class)->upload($course, 'data:image/png;base64,' . base64_encode('bytes'));
+
+        $this->actingAs($teacher)->get(route('learn.cover.show', $course))->assertOk();
+        $this->actingAs($stranger)->get(route('learn.cover.show', $course))->assertForbidden();
+    }
 }
