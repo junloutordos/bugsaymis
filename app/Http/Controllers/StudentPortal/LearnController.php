@@ -53,6 +53,8 @@ class LearnController extends Controller
                 'id' => $c->id,
                 'subject_name' => $c->subject->name,
                 'section_name' => $c->section->sectionname,
+                'cover_preset' => $c->cover_preset,
+                'cover_photo_url' => $c->cover_photo_s3_key ? route('student-portal.learn.cover', $c->id) : null,
             ])->values(),
         ]);
     }
@@ -79,6 +81,8 @@ class LearnController extends Controller
                 'id' => $course->id,
                 'subject_name' => $course->subject->name,
                 'section_name' => $course->section->sectionname,
+                'cover_preset' => $course->cover_preset,
+                'cover_photo_url' => $course->cover_photo_s3_key ? route('student-portal.learn.cover', $course->id) : null,
                 'syllabus_body' => $course->syllabus_body,
                 'modules' => $course->modules->map(fn ($m) => [
                     'id' => $m->id,

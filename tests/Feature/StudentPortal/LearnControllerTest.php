@@ -147,4 +147,20 @@ class LearnControllerTest extends TestCase
         session(['student_pisaysystemID' => $otherPisaysystemID]);
         $this->get(route('student-portal.learn.cover', $this->course))->assertForbidden();
     }
+
+    public function test_index_and_show_payloads_include_cover_fields(): void
+    {
+        $this->course->update(['cover_preset' => 'navy-radial']);
+        $this->loginAsStudent();
+
+        $this->get(route('student-portal.learn.index'))->assertInertia(fn ($page) => $page
+            ->where('courses.0.cover_preset', 'navy-radial')
+            ->where('courses.0.cover_photo_url', null)
+        );
+
+        $this->get(route('student-portal.learn.show', $this->course))->assertInertia(fn ($page) => $page
+            ->where('course.cover_preset', 'navy-radial')
+            ->where('course.cover_photo_url', null)
+        );
+    }
 }
