@@ -76,4 +76,39 @@ class NotifyAddedIssuanceRecipientsJobTest extends TestCase
         $this->assertSame('sent', $targeted->fresh()->email_status);
         $this->assertSame('pending', $untouched->fresh()->email_status);
     }
+
+    public function test_it_emails_a_student_recipient_and_does_not_send_bell_notification(): void
+    {
+        Mail::fake();
+
+        $issuance = $this->releasedIssuance();
+        $studentId = (int) \Illuminate\Support\Facades\DB::table('students')->insertGetId([
+            'lastname' => 'Doe', 'firstname' => 'Jane',
+            'student_email' => 'jane.doe@crc.pshs.edu.ph',
+        ]);
+        $recipient = IssuanceRecipient::create(['issuance_id' => $issuance->id, 'student_id' => $studentId]);
+
+        (new NotifyAddedIssuanceRecipients($issuance->id, [$recipient->id]))->handle();
+
+        Mail::assertSent(IssuanceReleasedMail::class, fn ($mail) => $mail->issuance->is($issuance) && $mail->recipientName === 'Doe, Jane');
+        $this->assertSame('sent', $recipient->fresh()->email_status);
+        // students have no `users` row — no bell/push notification is possible or attempted
+        $this->assertDatabaseMissing('notifications', ['notifiable_id' => $studentId, 'notifiable_type' => 'App\\Models\\Student']);
+    }
+
+    public function test_it_marks_a_student_with_no_email_as_skipped(): void
+    {
+        Mail::fake();
+
+        $issuance = $this->releasedIssuance();
+        $studentId = (int) \Illuminate\Support\Facades\DB::table('students')->insertGetId([
+            'lastname' => 'NoEmail', 'firstname' => 'Test',
+        ]);
+        $recipient = IssuanceRecipient::create(['issuance_id' => $issuance->id, 'student_id' => $studentId]);
+
+        (new NotifyAddedIssuanceRecipients($issuance->id, [$recipient->id]))->handle();
+
+        $this->assertSame('skipped', $recipient->fresh()->email_status);
+        Mail::assertNotSent(IssuanceReleasedMail::class);
+    }
 }

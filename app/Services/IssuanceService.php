@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\IssuanceReleasedMail;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Issuance;
 use App\Models\IssuanceRecipient;
@@ -10,6 +11,7 @@ use App\Models\Office;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
 use Mpdf\Config\ConfigVariables;
@@ -224,6 +226,46 @@ class IssuanceService
         if (! empty($data['student_ids'])) $types[] = 'individual_student';
 
         return count($types) === 1 ? $types[0] : 'mixed';
+    }
+
+    /**
+     * Resolves the recipient's email/name (staff vs student), sends
+     * IssuanceReleasedMail, and persists email_status/emailed_at/email_error.
+     * Returns 'sent' | 'skipped' | 'failed'.
+     */
+    public function deliverRecipientEmail(IssuanceRecipient $recipient, Issuance $issuance): string
+    {
+        if ($recipient->student_id) {
+            $email = $recipient->student?->student_email;
+            $name  = $recipient->student?->full_name;
+        } else {
+            $email = $recipient->user?->email;
+            $name  = $recipient->user?->name;
+        }
+
+        if (empty($email)) {
+            $recipient->update([
+                'email_status' => 'skipped',
+                'email_error'  => 'No email on file for this recipient.',
+            ]);
+            return 'skipped';
+        }
+
+        try {
+            Mail::to($email)->send(new IssuanceReleasedMail($issuance, $name));
+            $recipient->update(['email_status' => 'sent', 'emailed_at' => now(), 'email_error' => null]);
+            return 'sent';
+        } catch (\Throwable $e) {
+            $recipient->update(['email_status' => 'failed', 'email_error' => $e->getMessage()]);
+            logger()->warning('Issuance recipient email failed', [
+                'issuance_id'  => $issuance->id,
+                'recipient_id' => $recipient->id,
+                'kind'         => $recipient->student_id ? 'student' : 'staff',
+                'email'        => $email,
+                'error'        => $e->getMessage(),
+            ]);
+            return 'failed';
+        }
     }
 
     // ── QR helpers ────────────────────────────────────────────────────────────

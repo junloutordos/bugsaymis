@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Mail\IssuanceReleasedMail;
 use App\Models\Issuance;
 use App\Services\IssuanceService;
 use App\Services\NotificationService;
@@ -11,7 +10,6 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Support\Facades\Mail;
 
 class ProcessIssuanceRelease implements ShouldQueue
 {
@@ -76,51 +74,35 @@ class ProcessIssuanceRelease implements ShouldQueue
         }
 
         // 3. Notify all recipients (email + bell + push)
-        $recipients = $issuance->recipients()->with('user')->get();
+        $recipients = $issuance->recipients()->with(['user', 'student'])->get();
         $sent       = 0;
         $skipped    = 0;
         $failed     = 0;
 
         foreach ($recipients as $recipient) {
-            $u = $recipient->user;
-            if (! $u || empty($u->email)) {
-                $skipped++;
-                $recipient->update([
-                    'email_status' => 'skipped',
-                    'email_error'  => 'No email on file for this recipient.',
-                ]);
-                continue;
-            }
+            $status = $svc->deliverRecipientEmail($recipient, $issuance);
+            match ($status) {
+                'sent'    => $sent++,
+                'skipped' => $skipped++,
+                'failed'  => $failed++,
+            };
 
-            try {
-                Mail::to($u->email)->send(new IssuanceReleasedMail($issuance, $u->name));
-                $sent++;
-                $recipient->update(['email_status' => 'sent', 'emailed_at' => now(), 'email_error' => null]);
-            } catch (\Throwable $e) {
-                $failed++;
-                $recipient->update(['email_status' => 'failed', 'email_error' => $e->getMessage()]);
-                logger()->warning('ProcessIssuanceRelease: email failed', [
-                    'issuance_id' => $issuance->id,
-                    'user_id'     => $u->id,
-                    'email'       => $u->email,
-                    'error'       => $e->getMessage(),
-                ]);
-            }
-
-            try {
-                NotificationService::notifyUser(
-                    $u,
-                    'Issuance',
-                    $issuance->display_number,
-                    ($issuance->isSupplement() ? $issuance->document_kind_label : $issuance->type_label) . ": {$issuance->title}",
-                    route('issuances.show', $issuance->id),
-                );
-            } catch (\Throwable $e) {
-                logger()->warning('ProcessIssuanceRelease: bell/push failed', [
-                    'issuance_id' => $issuance->id,
-                    'user_id'     => $u->id,
-                    'error'       => $e->getMessage(),
-                ]);
+            if ($status === 'sent' && ! $recipient->student_id) {
+                try {
+                    NotificationService::notifyUser(
+                        $recipient->user,
+                        'Issuance',
+                        $issuance->display_number,
+                        ($issuance->isSupplement() ? $issuance->document_kind_label : $issuance->type_label) . ": {$issuance->title}",
+                        route('issuances.show', $issuance->id),
+                    );
+                } catch (\Throwable $e) {
+                    logger()->warning('ProcessIssuanceRelease: bell/push failed', [
+                        'issuance_id' => $issuance->id,
+                        'recipient_id'=> $recipient->id,
+                        'error'       => $e->getMessage(),
+                    ]);
+                }
             }
         }
 
