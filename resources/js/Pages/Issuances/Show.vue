@@ -9,8 +9,8 @@ import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppModal from '@/Components/AppModal.vue'
-import AppInput from '@/Components/AppInput.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import RecipientPicker from '@/Components/RecipientPicker.vue'
 import {
   ChevronLeftIcon, DocumentArrowDownIcon,
   CheckCircleIcon, UserGroupIcon, ClockIcon, ShieldCheckIcon,
@@ -30,27 +30,20 @@ const props = defineProps({
   supplements:      Array,
   offices:          Array,
   users:            Array,
+  sections:         Array,
+  gradeLevels:      Array,
+  students:         Array,
 })
 
 // ── Release flow (for drafts) ──────────────────────────────────────────────
-const showReleasePanel    = ref(false)
-const showPinModal        = ref(false)
-const recipientType       = ref(props.issuance.recipient_type ?? 'all')
-const selectedDivisionIds = ref([])
-const divisionSearch      = ref('')
-const submitting          = ref(false)
-const releaseErrors       = ref({})
-
-const filteredDivisions = computed(() => {
-  const q = divisionSearch.value.toLowerCase()
-  return (props.divisions ?? []).filter(d => !q || d.division_name.toLowerCase().includes(q) || d.acronym?.toLowerCase().includes(q))
+const showReleasePanel = ref(false)
+const showPinModal     = ref(false)
+const submitting       = ref(false)
+const releaseErrors    = ref({})
+const releaseTargeting = ref({
+  all_staff: false, office_ids: [], division_ids: [], user_ids: [],
+  all_students: false, section_ids: [], grade_levels: [], student_ids: [],
 })
-
-function toggleDivision(id) {
-  const idx = selectedDivisionIds.value.indexOf(id)
-  if (idx === -1) selectedDivisionIds.value.push(id)
-  else selectedDivisionIds.value.splice(idx, 1)
-}
 
 function openRelease() {
   showReleasePanel.value = true
@@ -61,8 +54,7 @@ function onPinVerified(pin) {
   submitting.value   = true
   releaseErrors.value = {}
   router.post(route('issuances.release', props.issuance.id), {
-    recipient_type: recipientType.value,
-    division_ids:   selectedDivisionIds.value,
+    ...releaseTargeting.value,
     pin,
   }, {
     onSuccess: () => { submitting.value = false; showReleasePanel.value = false },
@@ -84,57 +76,18 @@ function acknowledge() {
 
 // ── Add Recipient (post-release) ───────────────────────────────────────────
 const showAddRecipientModal = ref(false)
-const addRecipientType      = ref('individual')
-const addOfficeIds          = ref([])
-const addUserIds             = ref([])
-const addDivisionIds         = ref([])
-const addOfficeSearch        = ref('')
-const addUserSearch          = ref('')
-const addDivisionSearch      = ref('')
-const addingRecipients       = ref(false)
-const addRecipientErrors     = ref({})
-
-const filteredAddOffices = computed(() => {
-  const q = addOfficeSearch.value.toLowerCase()
-  return (props.offices ?? []).filter(o => !q || o.name.toLowerCase().includes(q))
+const addTargeting = ref({
+  all_staff: false, office_ids: [], division_ids: [], user_ids: [],
+  all_students: false, section_ids: [], grade_levels: [], student_ids: [],
 })
-
-const filteredAddUsers = computed(() => {
-  const q = addUserSearch.value.toLowerCase()
-  const existingUserIds = new Set((props.recipients ?? []).map(r => r.user?.id).filter(Boolean))
-  return (props.users ?? [])
-    .filter(u => !existingUserIds.has(u.id))
-    .filter(u => !q || u.name.toLowerCase().includes(q) || u.position?.toLowerCase().includes(q))
-})
-
-const filteredAddDivisions = computed(() => {
-  const q = addDivisionSearch.value.toLowerCase()
-  return (props.divisions ?? []).filter(d => !q || d.division_name.toLowerCase().includes(q) || d.acronym?.toLowerCase().includes(q))
-})
-
-function toggleAddOffice(id) {
-  const idx = addOfficeIds.value.indexOf(id)
-  if (idx === -1) addOfficeIds.value.push(id)
-  else addOfficeIds.value.splice(idx, 1)
-}
-
-function toggleAddUser(id) {
-  const idx = addUserIds.value.indexOf(id)
-  if (idx === -1) addUserIds.value.push(id)
-  else addUserIds.value.splice(idx, 1)
-}
-
-function toggleAddDivision(id) {
-  const idx = addDivisionIds.value.indexOf(id)
-  if (idx === -1) addDivisionIds.value.push(id)
-  else addDivisionIds.value.splice(idx, 1)
-}
+const addingRecipients   = ref(false)
+const addRecipientErrors = ref({})
 
 function openAddRecipientModal() {
-  addRecipientType.value = 'individual'
-  addOfficeIds.value = []
-  addUserIds.value = []
-  addDivisionIds.value = []
+  addTargeting.value = {
+    all_staff: false, office_ids: [], division_ids: [], user_ids: [],
+    all_students: false, section_ids: [], grade_levels: [], student_ids: [],
+  }
   addRecipientErrors.value = {}
   showAddRecipientModal.value = true
 }
@@ -142,12 +95,7 @@ function openAddRecipientModal() {
 function submitAddRecipients() {
   addingRecipients.value = true
   addRecipientErrors.value = {}
-  router.post(route('issuances.recipients.add', props.issuance.id), {
-    recipient_type: addRecipientType.value,
-    office_ids: addOfficeIds.value,
-    user_ids: addUserIds.value,
-    division_ids: addDivisionIds.value,
-  }, {
+  router.post(route('issuances.recipients.add', props.issuance.id), addTargeting.value, {
     preserveScroll: true,
     onSuccess: () => { addingRecipients.value = false; showAddRecipientModal.value = false },
     onError: e => { addRecipientErrors.value = e; addingRecipients.value = false },
@@ -525,37 +473,11 @@ function deleteDraft() {
               <div v-if="issuance.is_supplement" class="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
                 Recipients will be inherited from {{ issuance.parent_issuance?.control_number }}. Each recipient will receive and acknowledge this document separately.
               </div>
-              <div v-else>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Recipients</label>
-                <div class="space-y-1.5">
-                  <label v-for="opt in [
-                    { key:'all', label:'All Staff' },
-                    { key:'office', label:'By Office (configure on create)' },
-                    { key:'division', label:'By Division' },
-                    { key:'individual', label:'Individual (configure on create)' },
-                  ]" :key="opt.key" class="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" v-model="recipientType" :value="opt.key" class="text-indigo-600" />
-                    <span class="text-sm text-slate-700">{{ opt.label }}</span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- Division picker (only shown when By Division is selected) -->
-              <div v-if="!issuance.is_supplement && recipientType === 'division'" class="space-y-2">
-                <AppInput v-model="divisionSearch" type="text" placeholder="Search divisions…" />
-                <div class="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-                  <label v-for="d in filteredDivisions" :key="d.id"
-                    class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-                    <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
-                      @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
-                    <div>
-                      <p class="text-sm text-slate-700">{{ d.division_name }}</p>
-                      <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
-                    </div>
-                  </label>
-                </div>
-                <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
-              </div>
+              <RecipientPicker v-else
+                v-model="releaseTargeting"
+                :offices="offices" :divisions="divisions" :users="users"
+                :sections="sections" :grade-levels="gradeLevels" :students="students"
+              />
 
               <p class="text-xs text-warning-700 bg-warning-50 rounded-lg px-3 py-2">
                 ⚠ This will sign and release the issuance permanently.
@@ -584,73 +506,14 @@ function deleteDraft() {
     <!-- Add Recipient Modal -->
     <AppModal :show="showAddRecipientModal" title="Add Recipient" size="lg" @close="showAddRecipientModal = false">
       <div class="space-y-5">
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-2">Who should be added?</label>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button v-for="opt in [
-              { key:'all', label:'All Staff' },
-              { key:'office', label:'By Office' },
-              { key:'division', label:'By Division' },
-              { key:'individual', label:'Individual(s)' },
-            ]" :key="opt.key"
-              type="button"
-              @click="addRecipientType = opt.key"
-              class="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-colors"
-              :class="addRecipientType === opt.key ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'">
-              <p class="text-xs font-semibold" :class="addRecipientType === opt.key ? 'text-indigo-700' : 'text-slate-700'">{{ opt.label }}</p>
-            </button>
-          </div>
-        </div>
+        <RecipientPicker
+          v-model="addTargeting"
+          :offices="offices" :divisions="divisions" :users="users"
+          :sections="sections" :grade-levels="gradeLevels" :students="students"
+        />
 
-        <div v-if="addRecipientType === 'office'" class="space-y-2">
-          <AppInput v-model="addOfficeSearch" type="text" placeholder="Search offices…" />
-          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-            <label v-for="o in filteredAddOffices" :key="o.id"
-              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-              <input type="checkbox" :checked="addOfficeIds.includes(o.id)"
-                @change="toggleAddOffice(o.id)" class="rounded border-slate-300 text-indigo-600" />
-              <span class="text-sm text-slate-700">{{ o.name }}</span>
-            </label>
-          </div>
-          <p v-if="addOfficeIds.length" class="text-xs text-indigo-600 font-medium">{{ addOfficeIds.length }} office(s) selected</p>
-        </div>
-
-        <div v-if="addRecipientType === 'division'" class="space-y-2">
-          <AppInput v-model="addDivisionSearch" type="text" placeholder="Search divisions…" />
-          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-            <label v-for="d in filteredAddDivisions" :key="d.id"
-              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-              <input type="checkbox" :checked="addDivisionIds.includes(d.id)"
-                @change="toggleAddDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
-              <div>
-                <p class="text-sm text-slate-700">{{ d.division_name }}</p>
-                <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
-              </div>
-            </label>
-          </div>
-          <p v-if="addDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ addDivisionIds.length }} division(s) selected</p>
-        </div>
-
-        <div v-if="addRecipientType === 'individual'" class="space-y-2">
-          <AppInput v-model="addUserSearch" type="text" placeholder="Search by name or position…" />
-          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-            <label v-for="u in filteredAddUsers.slice(0, 50)" :key="u.id"
-              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-              <input type="checkbox" :checked="addUserIds.includes(u.id)"
-                @change="toggleAddUser(u.id)" class="rounded border-slate-300 text-indigo-600" />
-              <div>
-                <p class="text-sm font-medium text-slate-700">{{ u.name }}</p>
-                <p v-if="u.position" class="text-xs text-slate-400">{{ u.position }}</p>
-              </div>
-            </label>
-          </div>
-          <p class="text-[10px] text-slate-400">Already-tagged recipients are hidden from this list.</p>
-          <p v-if="addUserIds.length" class="text-xs text-indigo-600 font-medium">{{ addUserIds.length }} person(s) selected</p>
-        </div>
-
-        <p v-if="addRecipientErrors.recipient_type || addRecipientErrors.user_ids || addRecipientErrors.office_ids || addRecipientErrors.division_ids"
-          class="text-xs text-red-600">
-          {{ addRecipientErrors.recipient_type || addRecipientErrors.user_ids || addRecipientErrors.office_ids || addRecipientErrors.division_ids }}
+        <p v-if="Object.keys(addRecipientErrors).length" class="text-xs text-red-600">
+          {{ Object.values(addRecipientErrors)[0] }}
         </p>
       </div>
 
