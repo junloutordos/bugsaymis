@@ -18,6 +18,7 @@ use App\Models\VehicleRequest;
 use App\Models\WorkRequest;
 use App\Services\ApprovalInboxService;
 use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
+use App\Services\HR\ActingAsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -334,6 +335,23 @@ class HandleInertiaRequests extends Middleware
                 }
             },
             'atlasGoVersion' => config('atlasgo.mobile_version'),
+            'actingAs' => function () use ($request) {
+                try {
+                    $substitution = app(ActingAsService::class)->currentSubstitution($request);
+                    if (! $substitution) {
+                        return null;
+                    }
+
+                    return [
+                        'substitution_id' => $substitution->id,
+                        'original_user_name' => $substitution->originalUser->name,
+                        'substitute_user_name' => $substitution->substitute->name,
+                        'end_date' => $substitution->end_date->toDateString(),
+                    ];
+                } catch (\Throwable $e) {
+                    return null;
+                }
+            },
         ]);
     }
 
