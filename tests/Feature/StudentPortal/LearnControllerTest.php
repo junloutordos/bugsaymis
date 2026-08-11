@@ -131,4 +131,20 @@ class LearnControllerTest extends TestCase
             ->where('course.modules.0.items.0.title', 'Intro')
         );
     }
+
+    public function test_cover_proxy_streams_for_an_enrolled_student_but_403s_an_unenrolled_one(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('s3');
+        app(\App\Services\Learn\CourseCoverService::class)->upload($this->course, 'data:image/png;base64,' . base64_encode('bytes'));
+
+        $this->loginAsStudent();
+        $this->get(route('student-portal.learn.cover', $this->course))->assertOk();
+
+        $otherPisaysystemID = 'PS' . str_pad((string) mt_rand(1, 999999999), 9, '0', STR_PAD_LEFT);
+        DB::table('students')->insert([
+            'pisaysystemID' => $otherPisaysystemID, 'lastname' => 'Reyes', 'firstname' => 'Ana', 'sex' => 'F',
+        ]);
+        session(['student_pisaysystemID' => $otherPisaysystemID]);
+        $this->get(route('student-portal.learn.cover', $this->course))->assertForbidden();
+    }
 }

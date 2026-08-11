@@ -2685,6 +2685,7 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
         // Must be registered before the {course} wildcard.
         Route::get('/learn/file/{fileId}', [\App\Http\Controllers\StudentPortal\LearnController::class, 'file'])
             ->name('learn.file')->where('fileId', '[a-zA-Z0-9_.=-]+');
+        Route::get('/learn/{course}/cover', [\App\Http\Controllers\StudentPortal\LearnController::class, 'cover'])->name('learn.cover');
         Route::get('/learn', [\App\Http\Controllers\StudentPortal\LearnController::class, 'index'])->name('learn.index');
         Route::get('/learn/{course}', [\App\Http\Controllers\StudentPortal\LearnController::class, 'show'])->name('learn.show');
         Route::post('/learn/assignments/{assignment}/submit', [\App\Http\Controllers\StudentPortal\LearnController::class, 'submit'])->name('learn.assignments.submit');

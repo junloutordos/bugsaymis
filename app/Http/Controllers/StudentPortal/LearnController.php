@@ -13,6 +13,7 @@ use App\Models\Learn\QuizAttempt;
 use App\Models\Learn\Submission;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
+use App\Services\Learn\CourseCoverService;
 use App\Services\Learn\CourseFileService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,8 +21,10 @@ use Inertia\Response;
 
 class LearnController extends Controller
 {
-    public function __construct(private CourseFileService $files)
-    {
+    public function __construct(
+        private CourseFileService $files,
+        private CourseCoverService $covers,
+    ) {
     }
 
     /** GET /student-portal/learn */
@@ -90,6 +93,15 @@ class LearnController extends Controller
                 ])->values(),
             ],
         ]);
+    }
+
+    /** GET /student-portal/learn/{course}/cover */
+    public function cover(Course $course)
+    {
+        $student = $this->currentStudent();
+        abort_unless($course->isVisibleToStudent($student->id), 403);
+
+        return $this->covers->streamResponse($course);
     }
 
     /** GET /student-portal/learn/file/{fileId} */
