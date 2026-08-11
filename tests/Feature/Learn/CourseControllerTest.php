@@ -137,4 +137,29 @@ class CourseControllerTest extends TestCase
             ->put(route('learn.syllabus.update', $course), ['syllabus_body' => '<p>Too late</p>'])
             ->assertForbidden();
     }
+
+    public function test_setup_progress_reports_each_step_and_overall_percent(): void
+    {
+        $course = Course::create([
+            'subject_id' => $this->subject->id, 'section_id' => $this->section->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+        ]);
+
+        $progress = $course->setupProgress();
+        $this->assertSame(0, $progress['percent']);
+        $this->assertFalse(collect($progress['steps'])->firstWhere('key', 'syllabus')['complete']);
+
+        $course->update(['syllabus_body' => '<p>Welcome</p>', 'status' => 'published']);
+        $module = $course->modules()->create(['title' => 'Week 1', 'position' => 1]);
+
+        $progress = $course->fresh()->setupProgress();
+        $this->assertSame(75, $progress['percent']); // syllabus + modules + published, no module content yet
+        $this->assertTrue(collect($progress['steps'])->firstWhere('key', 'modules')['complete']);
+        $this->assertFalse(collect($progress['steps'])->firstWhere('key', 'content')['complete']);
+
+        $module->items()->create(['itemable_type' => \App\Models\Learn\Page::class, 'itemable_id' => 1, 'position' => 1]);
+
+        $progress = $course->fresh()->load('modules.items')->setupProgress();
+        $this->assertSame(100, $progress['percent']);
+    }
 }

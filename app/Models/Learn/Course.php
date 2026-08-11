@@ -19,7 +19,7 @@ class Course extends Model
 
     protected $fillable = [
         'subject_id', 'section_id', 'school_year_id', 'academic_term_id',
-        'status', 'syllabus_body',
+        'status', 'syllabus_body', 'cover_photo_s3_key', 'cover_preset',
     ];
 
     protected $casts = [
@@ -67,6 +67,22 @@ class Course extends Model
     public function isReadOnly(): bool
     {
         return ! $this->isCurrentSchoolYear();
+    }
+
+    /** @return array{steps: array<int, array{key: string, label: string, complete: bool}>, percent: int} */
+    public function setupProgress(): array
+    {
+        $steps = [
+            ['key' => 'syllabus', 'label' => 'Write a syllabus', 'complete' => filled($this->syllabus_body)],
+            ['key' => 'modules', 'label' => 'Add a module', 'complete' => $this->modules->isNotEmpty()],
+            ['key' => 'content', 'label' => 'Add content to a module', 'complete' => $this->modules->contains(fn ($m) => $m->items->isNotEmpty())],
+            ['key' => 'published', 'label' => 'Publish the course', 'complete' => $this->status === 'published'],
+        ];
+
+        return [
+            'steps' => $steps,
+            'percent' => (int) round(collect($steps)->where('complete', true)->count() / count($steps) * 100),
+        ];
     }
 
     /** @return array<int> */
