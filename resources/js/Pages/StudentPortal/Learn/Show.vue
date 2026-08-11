@@ -1,11 +1,13 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
 import StudentPortalLayout from '@/Layouts/StudentPortalLayout.vue'
+import CourseCover from '@/Components/CourseCover.vue'
 import { DocumentIcon, PaperClipIcon, AcademicCapIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 
-defineProps({ course: Object })
+const props = defineProps({ course: Object })
+const subjectInitials = computed(() => (props.course.subject_name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase())
 
 // Rich text (syllabus, page body) is stored as raw HTML — an instructor could
 // bypass the RichTextEditor UI and POST a malicious payload directly to the
@@ -70,9 +72,12 @@ function continueAttempt(attemptId) {
   <Head :title="course.subject_name" />
   <StudentPortalLayout>
     <div class="max-w-3xl mx-auto py-6 px-4 space-y-8">
-      <div>
-        <h1 class="text-lg font-semibold text-slate-800">{{ course.subject_name }}</h1>
-        <p class="text-sm text-slate-500">{{ course.section_name }}</p>
+      <div class="overflow-hidden rounded-2xl shadow-sm ring-1 ring-slate-200/70">
+        <CourseCover :photo-url="course.cover_photo_url" :preset="course.cover_preset" :initials="subjectInitials" class="h-28 w-full" />
+        <div class="bg-white px-4 py-4 sm:px-6">
+          <h1 class="font-heading text-lg font-semibold text-slate-900">{{ course.subject_name }}</h1>
+          <p class="text-sm text-slate-500">{{ course.section_name }}</p>
+        </div>
       </div>
 
       <section v-if="course.syllabus_body">
