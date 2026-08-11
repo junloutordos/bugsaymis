@@ -37,7 +37,7 @@ class CourseController extends Controller
             ? $this->resolver->allCoursesForCurrentSchoolYear()
             : $this->resolver->coursesForFaculty($user);
 
-        $courses->load(['subject', 'section', 'schoolYear']);
+        $courses->load(['subject', 'section', 'schoolYear', 'modules.items']);
 
         return Inertia::render('Learn/Index', [
             'courses' => $courses->map(fn (Course $c) => [
@@ -47,6 +47,9 @@ class CourseController extends Controller
                 'grade_level' => $c->section->levelid,
                 'status' => $c->status,
                 'is_read_only' => $c->isReadOnly(),
+                'cover_preset' => $c->cover_preset,
+                'cover_photo_url' => $c->cover_photo_s3_key ? route('learn.cover.show', $c->id) : null,
+                'setup_percent' => $c->setupProgress()['percent'],
             ])->values(),
         ]);
     }
@@ -154,6 +157,9 @@ class CourseController extends Controller
             'status' => $course->status,
             'syllabus_body' => $course->syllabus_body,
             'is_read_only' => $course->isReadOnly(),
+            'cover_preset' => $course->cover_preset,
+            'cover_photo_url' => $course->cover_photo_s3_key ? route('learn.cover.show', $course->id) : null,
+            'setup_progress' => $course->setupProgress(),
             'can_edit' => $course->canEdit($user),
             'modules' => $course->modules->map(fn ($m) => [
                 'id' => $m->id,

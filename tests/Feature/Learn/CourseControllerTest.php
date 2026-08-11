@@ -216,4 +216,40 @@ class CourseControllerTest extends TestCase
         $this->actingAs($teacher)->get(route('learn.cover.show', $course))->assertOk();
         $this->actingAs($stranger)->get(route('learn.cover.show', $course))->assertForbidden();
     }
+
+    public function test_index_payload_includes_cover_and_setup_percent(): void
+    {
+        $teacher = User::factory()->create();
+        $this->assignTeaching($teacher);
+
+        $response = $this->actingAs($teacher)->get(route('learn.index'));
+
+        $response->assertInertia(fn ($page) => $page
+            ->component('Learn/Index')
+            ->where('courses.0.cover_preset', null)
+            ->where('courses.0.cover_photo_url', null)
+            ->where('courses.0.setup_percent', 0)
+        );
+    }
+
+    public function test_show_payload_includes_cover_and_setup_progress(): void
+    {
+        $teacher = User::factory()->create();
+        $this->assignTeaching($teacher);
+        $course = Course::create([
+            'subject_id' => $this->subject->id, 'section_id' => $this->section->id,
+            'school_year_id' => $this->sy->id, 'academic_term_id' => $this->term->id,
+            'cover_preset' => 'sky-wave',
+        ]);
+
+        $response = $this->actingAs($teacher)->get(route('learn.show', $course));
+
+        $response->assertInertia(fn ($page) => $page
+            ->component('Learn/Show')
+            ->where('course.cover_preset', 'sky-wave')
+            ->where('course.cover_photo_url', null)
+            ->has('course.setup_progress.steps', 4)
+            ->where('course.setup_progress.percent', 0)
+        );
+    }
 }
