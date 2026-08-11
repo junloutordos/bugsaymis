@@ -20,6 +20,7 @@ use App\Mail\WorkRequestFADApprovalMail;
 use App\Mail\WorkRequestDCApprovalMail;
 use App\Mail\WorkRequestCompletedMail;
 use App\Models\Division;
+use App\Models\WorkRequestTrackingLog;
 use App\Enums\ApprovalStep;
 use App\Services\SnapshotService;
 use App\Services\DigitalSignatureService;
@@ -56,6 +57,7 @@ class WorkRequestController extends Controller
             'actedBy',
             'preRepairInspection.inspector:id,name',
             'preRepairInspection.notedBy:id,name',
+            'trackingLogs.user:id,name',
         ])->orderByDesc('created_at');
 
         $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief'])
@@ -142,6 +144,13 @@ class WorkRequestController extends Controller
 
         $wr = WorkRequest::create($data);
 
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $wr->id,
+            'status' => 'Submitted',
+            'remarks' => 'Work request submitted by requestor.',
+            'updated_by' => $userId,
+        ]);
+
         // Send the first approval request to the requester's Division Chief.
         try {
             $dc = $dcId ? User::find($dcId) : null;
@@ -181,6 +190,13 @@ class WorkRequestController extends Controller
         $workRequest->status = 'Pending GSU Approval';
         $workRequest->save();
 
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Division Chief Approved',
+            'remarks' => 'Approved via email link.',
+            'updated_by' => $chief,
+        ]);
+
         // Notify all GSU Head users to assign staff
         try {
             $gsuHeadRole2 = \App\Models\Role::where('name', 'GSU Head')->first();
@@ -211,6 +227,13 @@ class WorkRequestController extends Controller
         $workRequest->status = 'Pending GSU Approval';
         $workRequest->save();
         if ($workRequest->requester) { NotificationService::notifyUser($workRequest->requester, 'Work Request', "#{$workRequest->id}", 'Approved by Division Chief', route('work-requests.index')); }
+
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Division Chief Approved',
+            'remarks' => 'Approved by Division Chief.',
+            'updated_by' => $user->id,
+        ]);
 
         $this->snapshots->recordApproval(
             approvable: $workRequest,
@@ -257,6 +280,13 @@ class WorkRequestController extends Controller
         $workRequest->decline_reason = $data['reason'] ?? null;
         $workRequest->declined_at = now();
         $workRequest->save();
+
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Declined',
+            'remarks' => $data['reason'] ?? 'Declined by Division Chief.',
+            'updated_by' => $user->id,
+        ]);
 
         $this->snapshots->recordApproval(
             approvable: $workRequest,
@@ -324,6 +354,13 @@ class WorkRequestController extends Controller
         $workRequest->acted_by_id = $gsu;
         $workRequest->save();
 
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'GSU Approved',
+            'remarks' => 'Approved via email link.',
+            'updated_by' => $gsu,
+        ]);
+
         if ($approver = User::find($gsu)) {
             $this->snapshots->recordApproval(
                 approvable: $workRequest,
@@ -389,6 +426,13 @@ class WorkRequestController extends Controller
         $workRequest->acted_by_id = $gsu;
         $workRequest->save();
 
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Declined',
+            'remarks' => $workRequest->decline_reason,
+            'updated_by' => $gsu,
+        ]);
+
         logger()->info('WorkRequest declined by GSU Head', ['work_request_id' => $workRequest->id, 'gsu_id' => $gsu, 'reason' => $workRequest->decline_reason]);
 
         // Notify requester that GSU Head declined
@@ -427,6 +471,13 @@ class WorkRequestController extends Controller
         $workRequest->status = 'GSU Approved';
         $workRequest->acted_by_id = $user->id;
         $workRequest->save();
+
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'GSU Approved',
+            'remarks' => 'Approved by GSU Head.',
+            'updated_by' => $user->id,
+        ]);
 
         $this->snapshots->recordApproval(
             approvable: $workRequest,
@@ -472,6 +523,13 @@ class WorkRequestController extends Controller
         $workRequest->acted_by_id = $user->id;
         $workRequest->save();
 
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Declined',
+            'remarks' => $data['reason'],
+            'updated_by' => $user->id,
+        ]);
+
         $this->snapshots->recordApproval(
             approvable: $workRequest,
             step:       ApprovalStep::REQ_GSU,
@@ -512,6 +570,13 @@ class WorkRequestController extends Controller
 
         $workRequest->status = 'FAD Approved';
         $workRequest->save();
+
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'FAD Approved',
+            'remarks' => 'Approved via email link.',
+            'updated_by' => $chief,
+        ]);
 
         if ($approver = User::find($chief)) {
             $this->snapshots->recordApproval(
@@ -573,6 +638,13 @@ class WorkRequestController extends Controller
         $workRequest->decline_reason = $request->input('reason');
         $workRequest->declined_at = now();
         $workRequest->save();
+
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Declined',
+            'remarks' => $workRequest->decline_reason,
+            'updated_by' => $chief,
+        ]);
 
         logger()->info('WorkRequest declined by FAD Chief', ['work_request_id' => $workRequest->id, 'fad_id' => $chief, 'reason' => $workRequest->decline_reason]);
 
@@ -639,6 +711,13 @@ class WorkRequestController extends Controller
         $workRequest->declined_at = now();
         $workRequest->save();
 
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Declined',
+            'remarks' => $workRequest->decline_reason,
+            'updated_by' => $chief,
+        ]);
+
         // Notify requester via email (declined by Division Chief)
         try {
             $requesterEmail = $workRequest->requester?->email ?? null;
@@ -683,6 +762,13 @@ class WorkRequestController extends Controller
             $workRequest->update(['status' => 'FAD Approved']);
             if ($workRequest->requester) { NotificationService::notifyUser($workRequest->requester, 'Work Request', "#{$workRequest->id}", 'Approved by FAD', route('work-requests.index')); }
 
+            WorkRequestTrackingLog::create([
+                'work_request_id' => $workRequest->id,
+                'status' => 'FAD Approved',
+                'remarks' => 'Approved by FAD Chief.',
+                'updated_by' => $user->id,
+            ]);
+
             $this->performSign($request, WorkRequest::class, $workRequest->id,
                 'fad_approval',
                 "Work Request #{$workRequest->id} — {$workRequest->issue}",
@@ -699,6 +785,14 @@ class WorkRequestController extends Controller
             }
         } else {
             $workRequest->update(['status' => 'Declined', 'decline_reason' => 'Declined by FAD Chief.', 'declined_at' => now()]);
+
+            WorkRequestTrackingLog::create([
+                'work_request_id' => $workRequest->id,
+                'status' => 'Declined',
+                'remarks' => 'Declined by FAD Chief.',
+                'updated_by' => $user->id,
+            ]);
+
             try {
                 $requesterEmail = $workRequest->requester?->email ?? null;
                 if ($requesterEmail) {
@@ -754,6 +848,13 @@ class WorkRequestController extends Controller
                     Mail::to($assigned->email)->queue(new WorkRequestAssignedMail($workRequest));
                 }
 
+                WorkRequestTrackingLog::create([
+                    'work_request_id' => $workRequest->id,
+                    'status' => 'Assigned',
+                    'remarks' => $assigned ? "Assigned to {$assigned->name}." : 'Personnel assigned.',
+                    'updated_by' => Auth::id(),
+                ]);
+
                 if ($workRequest->requires_pre_repair_inspection && ! $workRequest->preRepairInspection) {
                     \App\Models\WorkRequestPreRepairInspection::create([
                         'work_request_id' => $workRequest->id,
@@ -796,6 +897,38 @@ class WorkRequestController extends Controller
     }
 
     /**
+     * Post an interim progress update (GSU Head / Administrator) without marking
+     * the work request completed — lets the requestor see progress while work
+     * is still ongoing. Does not touch status, action_taken, or date_completed.
+     */
+    public function updateNote(Request $request, WorkRequest $workRequest)
+    {
+        // Authorization enforced by route middleware (permission:facilities.manage)
+        $data = $request->validate([
+            'remarks' => 'required|string|max:2000',
+        ]);
+
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Update',
+            'remarks' => $data['remarks'],
+            'updated_by' => Auth::id(),
+        ]);
+
+        // Notify the requester of the progress update
+        try {
+            $requesterEmail = $workRequest->requester?->email ?? null;
+            if ($requesterEmail) {
+                Mail::to($requesterEmail)->queue(new WorkRequestStatusMail($workRequest, 'Update', $data['remarks'], Auth::user()->name));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send work request progress update email', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Progress update added.');
+    }
+
+    /**
      * Mark a work request as completed with details provided by GSU Head or Administrator.
      */
     public function complete(Request $request, WorkRequest $workRequest)
@@ -823,6 +956,13 @@ class WorkRequestController extends Controller
         $workRequest->date_completed = $data['date_completed'];
         $workRequest->status = 'Completed';
         $workRequest->save();
+
+        WorkRequestTrackingLog::create([
+            'work_request_id' => $workRequest->id,
+            'status' => 'Completed',
+            'remarks' => $data['action_taken'],
+            'updated_by' => $workRequest->acted_by_id,
+        ]);
 
         // Notify the requester
         try {

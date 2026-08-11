@@ -68,4 +68,10 @@ class WorkRequest extends Model
     {
         return $this->hasOne(WorkRequestPreRepairInspection::class);
     }
+
+    /** Progress-tracking history (status transitions + interim GSU Head updates). */
+    public function trackingLogs()
+    {
+        return $this->hasMany(WorkRequestTrackingLog::class)->orderBy('created_at');
+    }
 }

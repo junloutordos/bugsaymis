@@ -25,8 +25,16 @@ class WorkRequestStatusMail extends Mailable
 
     public function build()
     {
-        $isApproved = str_contains(strtolower($this->status), 'approved');
-        $subject = $isApproved ? 'Your Work Request is Approved' : 'Your Work Request is Declined';
+        $statusLower = strtolower($this->status);
+        if (str_contains($statusLower, 'approved')) {
+            $subject = 'Your Work Request is Approved';
+        } elseif (str_contains($statusLower, 'declined')) {
+            $subject = 'Your Work Request is Declined';
+        } else {
+            // Neutral/informational statuses (e.g. progress updates) — don't
+            // imply an approval decision that didn't happen.
+            $subject = "Work Request Update — #{$this->workRequest->id}";
+        }
 
         return $this->subject($subject)
                     ->view('emails.work_request_status')

@@ -592,6 +592,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/work-requests/{workRequest}/complete', [WorkRequestController::class, 'complete'])
         ->name('work-requests.complete')
         ->middleware('permission:facilities.manage');
+    // Interim progress update — GSU Head / Admin can post updates to the
+    // requestor without marking the work request completed.
+    Route::post('/work-requests/{workRequest}/update-note', [WorkRequestController::class, 'updateNote'])
+        ->name('work-requests.update-note')
+        ->middleware('permission:facilities.manage');
     Route::post('/work-requests/{workRequest}/pre-repair-inspection', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'save'])
         ->name('work-requests.pre-repair-inspection.save')
         ->middleware('permission:facilities.view');

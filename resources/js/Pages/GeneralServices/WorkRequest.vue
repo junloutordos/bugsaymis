@@ -105,6 +105,14 @@
                 <CheckCircleIcon class="w-4 h-4" />
               </AppIconButton>
 
+              <AppIconButton
+                v-if="canAddUpdate(wr)"
+                label="Add Update"
+                @click.prevent="openUpdateNoteModal(wr)"
+              >
+                <ChatBubbleLeftRightIcon class="w-4 h-4" />
+              </AppIconButton>
+
               <AppButton
                 v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))"
                 as="a"
@@ -148,6 +156,7 @@
               <AppButton v-if="hasRole('Administrator')" size="sm" variant="danger" @click.prevent="destroy(wr)">Delete</AppButton>
               <AppButton v-if="canOpenInspection(wr)" size="sm" variant="warning" @click.prevent="openInspectionModal(wr)">Inspection</AppButton>
               <AppButton v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Pending GSU Approval' && hasRole('GSU Head')))" size="sm" variant="success" @click.prevent="openCompleteModal(wr)">Mark Completed</AppButton>
+              <AppButton v-if="canAddUpdate(wr)" size="sm" @click.prevent="openUpdateNoteModal(wr)">Add Update</AppButton>
               <AppButton v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" as="a" :href="`/work-requests/${wr.id}/print`" target="_blank" size="sm" variant="secondary">Print</AppButton>
               <AppButton v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" size="sm" variant="success" @click.prevent="openCsmModal(wr)">Confirm &amp; Rate</AppButton>
             </div>
@@ -185,8 +194,59 @@
           <div><span class="text-xs font-medium text-slate-500 uppercase">Status</span><p class="mt-0.5"><AppBadge :color="statusClass(detailsWorkRequest?.status)">{{ detailsWorkRequest?.status ?? '—' }}</AppBadge></p></div>
           <div><span class="text-xs font-medium text-slate-500 uppercase">Inspection</span><p class="mt-0.5"><AppBadge :color="inspectionStatusClass(detailsWorkRequest)">{{ inspectionStatus(detailsWorkRequest) }}</AppBadge></p></div>
         </div>
+
+        <!-- Progress Tracking -->
+        <div v-if="detailsWorkRequest?.tracking_logs?.length" class="mt-5 border-t border-slate-100 pt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Progress Tracking</h3>
+            <AppButton
+              v-if="canAddUpdate(detailsWorkRequest)"
+              size="sm"
+              variant="secondary"
+              @click.prevent="openUpdateNoteModal(detailsWorkRequest)"
+            >Add Update</AppButton>
+          </div>
+
+          <!-- Timeline -->
+          <div class="relative max-h-64 overflow-y-auto pl-6 border-l border-slate-200">
+            <div
+              v-for="log in [...detailsWorkRequest.tracking_logs].reverse()"
+              :key="log.id"
+              class="relative mb-5"
+            >
+              <!-- Timeline Dot -->
+              <span class="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-indigo-500 ring-4 ring-white"></span>
+
+              <!-- Log Card -->
+              <div class="bg-slate-50 rounded-lg border border-slate-100 p-3 shadow-sm">
+                <div class="flex justify-between items-start gap-2">
+                  <p class="text-sm font-semibold text-indigo-600">{{ log.status }}</p>
+                  <span class="text-xs text-slate-400 whitespace-nowrap">{{ formatDateTime(log.created_at) }}</span>
+                </div>
+                <p class="mt-1 text-sm text-slate-600 whitespace-pre-line">{{ log.remarks ?? 'No remarks provided.' }}</p>
+                <p v-if="log.user?.name" class="mt-1 text-xs text-slate-400">by {{ log.user.name }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="canAddUpdate(detailsWorkRequest)" class="mt-5 border-t border-slate-100 pt-4 flex justify-end">
+          <AppButton size="sm" variant="secondary" @click.prevent="openUpdateNoteModal(detailsWorkRequest)">Add Update</AppButton>
+        </div>
+
         <template #footer>
           <AppButton variant="secondary" @click="closeDetailsModal">Close</AppButton>
+        </template>
+      </AppModal>
+
+      <!-- Add Update Modal -->
+      <AppModal :show="showUpdateNoteModal" title="Add Progress Update" size="md" @close="closeUpdateNoteModal">
+        <p class="text-sm text-slate-600 mb-3">
+          Post a progress update for work request <span class="font-medium">#{{ updateNoteTarget?.id }}</span> — visible to the requestor.
+        </p>
+        <AppTextarea v-model="updateNoteForm.remarks" label="Update / Remarks" :rows="4" placeholder="e.g. Materials procured, work scheduled to start Monday…" />
+        <template #footer>
+          <AppButton variant="secondary" :disabled="updateNoteForm.processing" @click="closeUpdateNoteModal">Cancel</AppButton>
+          <AppButton :loading="updateNoteForm.processing" :disabled="!updateNoteForm.remarks.trim()" @click="submitUpdateNote">Post Update</AppButton>
         </template>
       </AppModal>
 
@@ -439,7 +499,7 @@
 <script setup>
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
-import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, PrinterIcon, ClipboardDocumentCheckIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, PrinterIcon, ClipboardDocumentCheckIcon, EyeIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import CsmForm from '@/Components/CsmForm.vue'
@@ -598,6 +658,44 @@ const completeForm = useForm({
   date_completed: '',
 })
 
+// ── Interim progress update (GSU Head / Admin) ────────────────────────────
+const showUpdateNoteModal = ref(false)
+const updateNoteTarget = ref(null)
+const updateNoteForm = useForm({ remarks: '' })
+
+const canAddUpdate = (wr) =>
+  !!wr && hasAnyRole('Administrator', 'GSU Head') && ! ['Completed', 'Declined'].includes(wr.status)
+
+const openUpdateNoteModal = (wr) => {
+  updateNoteTarget.value = wr
+  updateNoteForm.reset()
+  showUpdateNoteModal.value = true
+}
+
+const closeUpdateNoteModal = () => {
+  showUpdateNoteModal.value = false
+  updateNoteTarget.value = null
+  updateNoteForm.reset()
+}
+
+const submitUpdateNote = () => {
+  if (!updateNoteTarget.value) return
+  updateNoteForm.post(`/work-requests/${updateNoteTarget.value.id}/update-note`, {
+    onSuccess: () => {
+      closeUpdateNoteModal()
+      Swal.fire({ icon: 'success', title: 'Update posted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
+    },
+    onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to post update', text: Object.values(errors).flat().join('\n') || 'Failed to post update' }) },
+  })
+}
+
+const formatDateTime = (d) => {
+  if (!d) return '—'
+  const dt = new Date(d)
+  if (isNaN(dt.getTime())) return '—'
+  return dt.toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 const showInspectionModal = ref(false)
 const inspectionWorkRequest = ref(null)
 const inspectionForm = useForm({
@@ -668,10 +766,34 @@ const openModal = (wr = null) => {
 
 const openCompleteModal = (wr) => {
   if (wr?.requires_pre_repair_inspection && wr?.pre_repair_inspection?.status !== 'noted') {
+    const inspectionStatusValue = wr?.pre_repair_inspection?.status
+    if (!inspectionStatusValue) {
+      // No inspection has been created/submitted at all yet.
+      Swal.fire({
+        icon: 'warning',
+        title: 'Pre-Repair Inspection Required',
+        text: 'A Pre-Repair Inspection Report has not been submitted for this work request yet. Please complete and submit it before marking this work request completed.',
+      })
+      return
+    }
+
+    // An inspection already exists (draft/submitted/returned) but hasn't been
+    // noted yet — that's the actual missing step, so say so explicitly and
+    // offer a one-click path to open it (GSU Head/Admin can note it directly).
+    const label = inspectionStatusValue === 'submitted'
+      ? 'submitted, but not yet noted'
+      : inspectionStatusValue
     Swal.fire({
       icon: 'warning',
-      title: 'Pre-Repair Inspection Required',
-      text: 'A noted Pre-Repair Inspection Report is required before this work request can be marked completed.',
+      title: 'Pre-Repair Inspection Not Yet Noted',
+      html: `The Pre-Repair Inspection Report for this work request is <strong>${label}</strong>. It must be <strong>noted</strong> before this work request can be marked completed.`,
+      showCancelButton: true,
+      confirmButtonText: 'Open Inspection',
+      cancelButtonText: 'Close',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        openInspectionModal(wr)
+      }
     })
     return
   }
