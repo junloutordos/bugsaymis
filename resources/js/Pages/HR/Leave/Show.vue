@@ -190,8 +190,9 @@
           Review Application
         </AppButton>
 
-        <!-- Print CS Form 6 -->
-        <AppButton as="a" variant="secondary" :href="route('hr.leave.print', application.id)" target="_blank">
+        <!-- Print CS Form 6 — only available once Campus Director has given final approval -->
+        <AppButton v-if="application.status === 'approved'"
+                   as="a" variant="secondary" :href="route('hr.leave.print', application.id)" target="_blank">
           <PrinterIcon class="h-4 w-4" />
           Print CS Form 6
         </AppButton>

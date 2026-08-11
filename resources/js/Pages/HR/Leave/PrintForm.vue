@@ -145,11 +145,14 @@
           <div class="lbl-sm">6.D COMMUTATION</div>
           <div class="cb-row mt-1"><span class="cb">☐</span> Not Requested</div>
           <div class="cb-row"><span class="cb">☐</span> Requested</div>
-          <div class="sig-space"></div>
-          <img v-if="sigs['submission']?.uri" :src="sigs['submission'].uri" style="max-height:36px;display:block;margin:0 auto 2px;" alt="applicant signature" />
-          <div class="sig-line-el"></div>
-          <div v-if="sigs['submission']" class="dig-badge-sm">✓ Digitally Signed · {{ fmtDatetime(sigs['submission'].signed_at) }}</div>
-          <div class="sig-lbl">Signature of Applicant</div>
+          <div class="sig-block mt-2">
+            <img v-if="sigs['submission']?.uri" :src="sigs['submission'].uri" style="max-height:28px;display:block;margin:0 auto 2px;" alt="applicant signature" />
+            <div class="sig-line-el"></div>
+            <div class="sig-row">
+              <span class="sig-lbl">Signature of Applicant</span>
+              <span v-if="sigs['submission']" class="dig-badge-sm">✓ Digitally Signed · {{ fmtDatetime(sigs['submission'].signed_at) }}</span>
+            </div>
+          </div>
         </td>
       </tr>
     </table>
@@ -194,7 +197,7 @@
                 <td>{{ isChecked('VL') ? application.days_applied : 0 }}</td>
                 <td>{{ isChecked('SL') ? application.days_applied : 0 }}</td>
                 <td>{{ isChecked('CTO') ? application.days_applied : 0 }}</td>
-                <td></td>
+                <td>{{ isChecked('SC') ? application.days_applied : 0 }}</td>
                 <td>{{ isChecked('WL') ? application.days_applied : 0 }}</td>
               </tr>
               <tr>
@@ -202,17 +205,19 @@
                 <td>{{ credits['VL']?.balance ?? '' }}</td>
                 <td>{{ credits['SL']?.balance ?? '' }}</td>
                 <td>{{ credits['CTO']?.balance ?? '' }}</td>
-                <td></td>
-                <td></td>
+                <td>{{ scBalanceAfter }}</td>
+                <td>{{ wlBalanceAfter }}</td>
               </tr>
             </tbody>
           </table>
-          <div class="sig-space"></div>
-          <img v-if="sigs['hr_officer']?.uri" :src="sigs['hr_officer'].uri" style="max-height:36px;display:block;margin:0 auto 2px;" alt="hr officer signature" />
-          <div class="sig-space"></div>
-          <div class="mt-6 officer-name">{{ certifyingOfficer?.name?.toUpperCase() ?? '' }}</div>
-          <div v-if="sigs['hr_officer']" class="dig-badge-sm">✓ Digitally Signed</div>
-          <div class="sig-lbl">({{ certifyingOfficer?.position || 'Authorized Officer' }})</div>
+          <div class="sig-block mt-2">
+            <img v-if="sigs['hr_officer']?.uri" :src="sigs['hr_officer'].uri" style="max-height:28px;display:block;margin:0 auto 2px;" alt="hr officer signature" />
+            <div class="officer-name">{{ certifyingOfficer?.name?.toUpperCase() ?? '' }}</div>
+            <div class="sig-row">
+              <span class="sig-lbl">({{ certifyingOfficer?.position || 'Authorized Officer' }})</span>
+              <span v-if="sigs['hr_officer']" class="dig-badge-sm">✓ Digitally Signed</span>
+            </div>
+          </div>
         </td>
 
         <!-- 7B: Recommendation -->
@@ -227,26 +232,36 @@
 
           <!-- CID teaching faculty: Academic Unit Head recommends first, then Division Chief -->
           <template v-if="academicUnitHead">
-            <div class="disapprove-line mt-6"></div>
-            <img v-if="sigs['academic_unit_head']?.uri" :src="sigs['academic_unit_head'].uri" style="max-height:28px;display:block;margin:2px auto 1px;" alt="academic unit head signature" />
-            <div class="officer-name mt-2" style="font-size:7.5pt;">{{ academicUnitHead?.name?.toUpperCase() ?? '' }}</div>
-            <div v-if="sigs['academic_unit_head']" class="dig-badge-sm">✓ Digitally Signed</div>
-            <div class="sig-lbl">({{ academicUnitHead?.position || 'Academic Unit Head' }})</div>
+            <div class="disapprove-line mt-3"></div>
+            <div class="sig-block">
+              <img v-if="sigs['academic_unit_head']?.uri" :src="sigs['academic_unit_head'].uri" style="max-height:24px;display:block;margin:1px auto 1px;" alt="academic unit head signature" />
+              <div class="officer-name" style="font-size:7.5pt;">{{ academicUnitHead?.name?.toUpperCase() ?? '' }}</div>
+              <div class="sig-row">
+                <span class="sig-lbl">({{ academicUnitHead?.position || 'Academic Unit Head' }})</span>
+                <span v-if="sigs['academic_unit_head']" class="dig-badge-sm">✓ Digitally Signed</span>
+              </div>
+            </div>
 
-            <div class="disapprove-line mt-6"></div>
-            <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:28px;display:block;margin:2px auto 1px;" alt="division chief signature" />
-            <div class="officer-name mt-2" style="font-size:7.5pt;">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
-            <div v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</div>
-            <div class="sig-lbl">(Authorized Officer)</div>
+            <div class="disapprove-line mt-3"></div>
+            <div class="sig-block">
+              <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:24px;display:block;margin:1px auto 1px;" alt="division chief signature" />
+              <div class="officer-name" style="font-size:7.5pt;">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
+              <div class="sig-row">
+                <span class="sig-lbl">(Authorized Officer)</span>
+                <span v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</span>
+              </div>
+            </div>
           </template>
           <template v-else>
             <div class="disapprove-line mt-6"></div>
-            <div class="disapprove-line mt-6"></div>
-            <div class="disapprove-line mt-6"></div>
-            <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:36px;display:block;margin:4px auto 2px;" alt="division chief signature" />
-            <div class="mt-12 officer-name">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
-            <div v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</div>
-            <div class="sig-lbl">(Authorized Officer)</div>
+            <div class="sig-block">
+              <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:28px;display:block;margin:4px auto 2px;" alt="division chief signature" />
+              <div class="officer-name">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
+              <div class="sig-row">
+                <span class="sig-lbl">(Authorized Officer)</span>
+                <span v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</span>
+              </div>
+            </div>
           </template>
         </td>
       </tr>
@@ -267,31 +282,32 @@
         </td>
         <td class="body-cell" style="padding:4px 6px; vertical-align:top;">
           <div class="lbl-sm">7.D DISAPPROVED DUE TO:</div>
-          <div class="disapprove-line"></div>
-          <div class="disapprove-line"></div>
-          <div class="disapprove-line"></div>
+          <div class="disapprove-line mt-3"></div>
+          <div class="disapprove-line mt-3"></div>
         </td>
       </tr>
 
       <!-- Authorized Official — full width inside the table -->
       <tr>
         <td class="body-cell" colspan="2" style="padding:6px 4px; text-align:center; border-top:1px solid #000;">
-          <img v-if="sigs['campus_director']?.uri" :src="sigs['campus_director'].uri" style="max-height:36px;display:block;margin:0 auto 2px;" alt="campus director signature" />
+          <img v-if="sigs['campus_director']?.uri" :src="sigs['campus_director'].uri" style="max-height:28px;display:block;margin:0 auto 2px;" alt="campus director signature" />
           <div class="officer-name">{{ authorizedOfficial?.name?.toUpperCase() ?? '' }}</div>
-          <div v-if="sigs['campus_director']" class="dig-badge-sm">✓ Digitally Signed</div>
-          <div class="sig-lbl">(Authorized Official)</div>
+          <div class="sig-row" style="justify-content:center;">
+            <span class="sig-lbl">(Authorized Official)</span>
+            <span v-if="sigs['campus_director']" class="dig-badge-sm">✓ Digitally Signed</span>
+          </div>
         </td>
       </tr>
     </table>
 
         <!-- QR Verify Section -->
-        <div v-if="qrSvg" style="margin-top:16px; padding-top:10px; border-top:1px solid #ccc; display:flex; align-items:center; gap:12px;">
-          <img :src="`data:image/svg+xml;base64,${qrSvg}`" style="width:72px; height:72px; flex-shrink:0;" alt="QR Code" />
-          <div style="font-size:9px; color:#555; line-height:1.5;">
-            <div style="font-weight:bold; font-size:10px; margin-bottom:2px;">Verify Digital Signatures</div>
+        <div v-if="qrSvg" style="margin-top:8px; padding-top:6px; border-top:1px solid #ccc; display:flex; align-items:center; gap:10px;">
+          <img :src="`data:image/svg+xml;base64,${qrSvg}`" style="width:48px; height:48px; flex-shrink:0;" alt="QR Code" />
+          <div style="font-size:7px; color:#555; line-height:1.3;">
+            <div style="font-weight:bold; font-size:8px; margin-bottom:1px;">Verify Digital Signatures</div>
             <div>Scan the QR code or visit:</div>
-            <div style="font-size:8px; color:#888; word-break:break-all; max-width:200px;">{{ verifyUrl }}</div>
-            <div style="margin-top:3px; color:#999; font-size:8px;">PSHS-CRC Management Information System</div>
+            <div style="font-size:6.5px; color:#888; word-break:break-all; max-width:220px;">{{ verifyUrl }}</div>
+            <div style="margin-top:2px; color:#999; font-size:6.5px;">PSHS-CRC Management Information System</div>
           </div>
         </div>
         </td></tr>
@@ -412,6 +428,19 @@ const inclusiveDates = computed(() => {
 const recForApproval    = computed(() => ['approved', 'forwarded'].includes(props.application.status))
 const recForDisapproval = computed(() => props.application.status === 'rejected')
 
+// Balance after deducting this application's days, for leave types that are
+// deductible and were actually availed of. Blank when the type wasn't
+// applied for, matching how VL/SL/CTO columns already behave.
+function balanceAfter(code) {
+  const bal = props.credits[code]?.balance
+  if (bal === undefined || bal === null) return ''
+  if (!isChecked(code)) return bal
+  return Math.max(0, Number(bal) - Number(props.application.days_applied ?? 0))
+}
+
+const wlBalanceAfter = computed(() => balanceAfter('WL'))
+const scBalanceAfter = computed(() => balanceAfter('SC'))
+
 const withPayDays    = computed(() =>
   props.application.status === 'approved' && !props.application.is_without_pay
     ? props.application.days_applied : '_______'
@@ -443,7 +472,7 @@ onMounted(() => setTimeout(() => window.print(), 500))
 html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
 
 #leave-print-root {
-  font-size: 8.5pt;
+  font-size: 8pt;
   color: #000;
 }
 
@@ -458,7 +487,7 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvet
 }
 
 #leave-pt-body {
-  padding: 10px 0.75in;
+  padding: 6px 0.75in;
   vertical-align: top;
 }
 
@@ -509,15 +538,15 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvet
 /* ── Checkboxes ───────────────────────────────────────────────────── */
 .cb-row {
   display: flex; align-items: flex-start; gap: 3px;
-  margin-bottom: 1.5px; font-size: 7.5pt; line-height: 1.3;
+  margin-bottom: 1px; font-size: 7pt; line-height: 1.15;
 }
-.cb { font-size: 8.5pt; flex-shrink: 0; }
+.cb { font-size: 8pt; flex-shrink: 0; }
 .bold { font-weight: bold; }
 .underline { text-decoration: underline; }
 
 /* ── Leave detail groups (6B) ─────────────────────────────────────── */
-.detail-group { margin-bottom: 4px; }
-.detail-head  { font-size: 7pt; font-style: italic; margin-bottom: 1px; }
+.detail-group { margin-bottom: 2px; }
+.detail-head  { font-size: 6.5pt; font-style: italic; margin-bottom: 1px; }
 
 /* ── 6C ───────────────────────────────────────────────────────────── */
 .lbl-sm   { font-size: 7.5pt; font-weight: bold; }
@@ -525,13 +554,20 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvet
 .mt-1  { margin-top: 4px; }
 .mt-2  { margin-top: 8px; }
 .mt-3  { margin-top: 12px; }
-.mt-6  { margin-top: 22px; }
-.mt-12 { margin-top: 44px; }
-.sig-space    { height: 28px; }
+.mt-6  { margin-top: 10px; }
+.mt-12 { margin-top: 14px; }
+.sig-space    { height: 10px; }
 .sig-line-el  { border-bottom: 1px solid #000; width: 100%; display: block; margin-top: 2px; }
-.sig-lbl { font-size: 7pt; text-align: center; margin-top: 1px; }
-.dig-badge-sm { font-size:7pt; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:2px; padding:1px 4px; margin:2px auto; display:inline-block; }
+.sig-lbl { font-size: 7pt; }
+.dig-badge-sm { font-size:6.5pt; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:2px; padding:1px 4px; display:inline-block; white-space:nowrap; }
 .rec-remarks { font-size: 7pt; color: #555; font-style: italic; margin: 2px 0; }
+
+/* ── Signature blocks — badge sits beside the label, not stacked below ──── */
+.sig-block { margin-top: 6px; }
+.sig-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; margin-top: 1px; flex-wrap: nowrap;
+}
 
 /* ── 7A credits table ─────────────────────────────────────────────── */
 .credits-tbl {
@@ -562,7 +598,7 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvet
   border-bottom: 1px solid #000;
   width: 100%;
   display: block;
-  margin-top: 18px;
+  margin-top: 10px;
 }
 
 /* ── Print overrides ──────────────────────────────────────────────── */

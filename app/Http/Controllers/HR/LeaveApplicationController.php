@@ -485,19 +485,31 @@ class LeaveApplicationController extends Controller
 
         // ── Resolve signatories (snapshot-first, live fallback) ──────────────
 
-        // Certification of Leave Credits is always attributed to the
-        // officially designated Human Resource Designate, regardless of
-        // which HR-permission holder performed the digital certification
-        // in the system — there is no User account for this title, so it's
-        // a fixed display value rather than a snapshot/live-resolved one.
-        $certifyingOfficer = [
-            'name'           => 'Flora Mae O. Tormento',
-            'position'       => 'Human Resource Designate',
-            'division'       => null,
-            'office'         => null,
-            'signature_path' => null,
-            'captured_at'    => null,
-        ];
+        // Certification of Leave Credits (7.A) must show whoever actually
+        // performed the HR certification (hr_officer_id / the hr_officer
+        // digital signature record) — HR staff other than the designated
+        // Human Resource Designate, or a shared "Human Resource Unit"
+        // account, may perform this step. Falls back to the official
+        // Human Resource Designate title only when no signer is resolved
+        // (should not occur once printing is gated on 'approved' status).
+        $hrSigner = $application->hr_officer_id ? $application->hrOfficer : null;
+        $certifyingOfficer = $hrSigner
+            ? [
+                'name'           => $hrSigner->name,
+                'position'       => $hrSigner->position ?? 'Human Resource Designate',
+                'division'       => null,
+                'office'         => null,
+                'signature_path' => null,
+                'captured_at'    => $application->hr_officer_at,
+            ]
+            : [
+                'name'           => 'Flora Mae O. Tormento',
+                'position'       => 'Human Resource Designate',
+                'division'       => null,
+                'office'         => null,
+                'signature_path' => null,
+                'captured_at'    => null,
+            ];
 
         // Fallback: live Academic Unit Head recommender (CID teaching faculty
         // only — AUH for regular faculty, CID Chief for an AUH's own leave).
