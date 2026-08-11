@@ -23,6 +23,24 @@
         {{ $page.props.flash.error }}
       </div>
 
+      <!-- Assign Substitute -->
+      <div v-if="application.status === 'approved'" class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign Substitute</h3>
+        <select v-model="substituteForm.substitute_user_id" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+          <option value="" disabled>Select a substitute…</option>
+          <option v-for="u in eligibleSubstitutes" :key="u.id" :value="u.id">{{ u.name }}</option>
+        </select>
+        <textarea v-model="substituteForm.notes" placeholder="Handoff notes (optional)" rows="2" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+        <button
+          @click="submitSubstitute"
+          :disabled="!substituteForm.substitute_user_id || substituteForm.processing"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+        >
+          Nominate Substitute
+        </button>
+        <p v-if="substituteForm.errors.substitution" class="text-xs text-danger-500">{{ substituteForm.errors.substitution }}</p>
+      </div>
+
       <!-- Details Card -->
       <AppCard title="Application Details">
         <div class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
@@ -247,7 +265,21 @@ const props = defineProps({
   signatureUri:      String,
   requiresAuh:       Boolean,
   isAuhRecommender:  Boolean,
+  eligibleSubstitutes: { type: Array, default: () => [] },
 })
+
+const substituteForm = useForm({
+  substitute_user_id: '',
+  leave_application_id: props.application.id,
+  notes: '',
+})
+
+function submitSubstitute() {
+  substituteForm.post(route('hr.substitutions.store'), {
+    preserveScroll: true,
+    onSuccess: () => { substituteForm.reset('notes') },
+  })
+}
 
 const page = usePage()
 const me = page.props.auth?.user

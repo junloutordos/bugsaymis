@@ -25,7 +25,23 @@ const props = defineProps({
   travel: Object,
   lookups: Object,
   currentUser: Object,
+  eligibleSubstitutes: { type: Array, default: () => [] },
 })
+
+const TRAVEL_APPROVED_STATUSES = ['ocd_approved', 'transport_arranged', 'cash_advance_processing', 'dv_created', 'released', 'completed']
+
+const substituteForm = useForm({
+  substitute_user_id: '',
+  travel_request_id: props.travel.id,
+  notes: '',
+})
+
+function submitSubstitute() {
+  substituteForm.post(route('hr.substitutions.store'), {
+    preserveScroll: true,
+    onSuccess: () => { substituteForm.reset('notes') },
+  })
+}
 
 const statusBadgeColor = (status) => {
   if (['liquidated', 'completed', 'released'].includes(status)) return 'green'
@@ -253,6 +269,24 @@ const deleteAttachment = (attachment) => router.delete(route('travel.attachments
           <div class="md:col-span-3">
             <AppTextarea v-model="detailsForm.purpose" label="Purpose" :disabled="!canEdit" :rows="3" />
           </div>
+        </div>
+      </AppCard>
+
+      <AppCard v-if="TRAVEL_APPROVED_STATUSES.includes(travel.status)" title="Assign Substitute">
+        <div class="space-y-3">
+          <select v-model="substituteForm.substitute_user_id" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+            <option value="" disabled>Select a substitute…</option>
+            <option v-for="u in eligibleSubstitutes" :key="u.id" :value="u.id">{{ u.name }}</option>
+          </select>
+          <textarea v-model="substituteForm.notes" placeholder="Handoff notes (optional)" rows="2" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+          <button
+            @click="submitSubstitute"
+            :disabled="!substituteForm.substitute_user_id || substituteForm.processing"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          >
+            Nominate Substitute
+          </button>
+          <p v-if="substituteForm.errors.substitution" class="text-xs text-danger-500">{{ substituteForm.errors.substitution }}</p>
         </div>
       </AppCard>
 
