@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
+use App\Services\HR\ActingAsService;
 
 class SubstitutionService
 {
@@ -124,6 +125,44 @@ class SubstitutionService
         if (! $resolved || (int) $resolved->id !== (int) $approver->id) {
             throw ValidationException::withMessages(['substitution' => ['You are not the resolved approver for this nomination.']]);
         }
+    }
+
+    public function revoke(Substitution $substitution, ?User $revoker, string $reason): Substitution
+    {
+        if ($substitution->status !== 'approved') {
+            throw ValidationException::withMessages(['substitution' => ['Only an approved substitution can be revoked.']]);
+        }
+
+        if ($revoker !== null && ! $revoker->isSuperAdmin()) {
+            $isOriginalUser = (int) $revoker->id === (int) $substitution->original_user_id;
+            $resolvedApprover = $this->resolveApprover($substitution->originalUser);
+            $isResolvedApprover = $resolvedApprover && (int) $resolvedApprover->id === (int) $revoker->id;
+
+            if (! $isOriginalUser && ! $isResolvedApprover) {
+                throw ValidationException::withMessages(['substitution' => ['You are not authorized to revoke this substitution.']]);
+            }
+        }
+
+        $substitution->update([
+            'status' => 'revoked',
+            'revoked_by' => $revoker?->id,
+            'revoked_at' => now(),
+            'revocation_reason' => $reason,
+        ]);
+
+        app(ActingAsService::class)->forceEndForSubstitution($substitution, 'revoked');
+
+        return $substitution->fresh();
+    }
+
+    /** System-triggered revocation when the underlying Leave/Travel is cancelled. */
+    public function revokeForCancelledAbsence(Model $absentable): void
+    {
+        Substitution::where('absentable_type', get_class($absentable))
+            ->where('absentable_id', $absentable->id)
+            ->where('status', 'approved')
+            ->get()
+            ->each(fn (Substitution $s) => $this->revoke($s, null, 'The underlying leave/travel request was cancelled.'));
     }
 
     /** @return array{0: ?string, 1: ?string} [start_date, end_date] as Y-m-d strings */

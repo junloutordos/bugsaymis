@@ -282,6 +282,8 @@ class LeaveApplicationController extends Controller
                 $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
             }
 
+            app(\App\Services\HR\SubstitutionService::class)->revokeForCancelledAbsence($leaveApplication);
+
             $leaveApplication->update(['status' => 'cancelled']);
         });
 
