@@ -172,7 +172,7 @@
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Date <span class="text-danger-500">*</span></label>
-          <input v-model="form.gatepass_date" type="date"
+          <input v-model="form.gatepass_date" type="date" :min="todayDate"
                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -346,6 +346,11 @@ const isSelf      = computed(() => ['Staff', 'Faculty'].includes(currentUser.val
 const isDivisionChief = computed(() => currentUser.value.role?.name === 'DivisionChief')
 const isAdmin     = computed(() => (currentUser.value.role?.name ?? '').toLowerCase() === 'administrator')
 const canRecordActualTime = computed(() => currentUser.value.permissions?.includes('hr.gatepass.approve') ?? false)
+
+// Gate passes can only be filed/edited for today or a future date — never
+// the past. Used as the native date-input's `min` so the browser's own
+// picker won't offer earlier dates (server also enforces this).
+const todayDate = computed(() => new Date().toLocaleDateString('en-CA')) // en-CA => YYYY-MM-DD
 
 // ── Status badge color mapping ────────────────────────────────────────────────
 function statusColor(status) {

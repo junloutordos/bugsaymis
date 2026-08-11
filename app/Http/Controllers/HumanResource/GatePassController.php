@@ -146,7 +146,9 @@ class GatePassController extends Controller
             'gatepass_type' => 'nullable|string|max:100',
             'gatepass_timeout' => 'nullable|string|max:50',
             'gatepass_timein' => 'nullable|string|max:50',
-            'gatepass_date' => 'nullable|string|max:50',
+            // Gate passes may only be filed for today or a future date — never
+            // a past date (backdating is not allowed).
+            'gatepass_date' => 'nullable|date|after_or_equal:today',
             'gatepass_datefiled' => 'nullable|string|max:50',
             'destination' => 'nullable|string|max:255',
             'purpose' => 'nullable|string|max:1000',
@@ -154,6 +156,8 @@ class GatePassController extends Controller
             'actual_timeout' => 'nullable|string|max:100',
             'actual_timein' => 'nullable|string|max:100',
             'time_consumed' => 'nullable|string|max:50',
+        ], [
+            'gatepass_date.after_or_equal' => 'Gate pass date cannot be in the past. Please select today or a future date.',
         ]);
 
         if ($validator->fails()) {
@@ -305,7 +309,9 @@ class GatePassController extends Controller
             'gatepass_type' => 'nullable|string|max:100',
             'gatepass_timeout' => 'nullable|string|max:50',
             'gatepass_timein' => 'nullable|string|max:50',
-            'gatepass_date' => 'nullable|string|max:50',
+            // Gate passes may only be edited to today or a future date — never
+            // backdated, even while still Pending.
+            'gatepass_date' => 'nullable|date|after_or_equal:today',
             'gatepass_datefiled' => 'nullable|string|max:50',
             'destination' => 'nullable|string|max:255',
             'purpose' => 'nullable|string|max:1000',
@@ -316,6 +322,8 @@ class GatePassController extends Controller
             'actual_timein' => 'nullable|string|max:100',
             'time_consumed' => 'nullable|string|max:50',
             'status' => 'nullable|string|max:50',
+        ], [
+            'gatepass_date.after_or_equal' => 'Gate pass date cannot be in the past. Please select today or a future date.',
         ]);
 
         if ($validator->fails()) {
