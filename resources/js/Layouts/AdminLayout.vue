@@ -13,6 +13,7 @@ import SidebarLink from "@/Components/SidebarLink.vue";
 import SidebarSearch from '@/Components/Layout/SidebarSearch.vue';
 import ProfileEditModal from '@/Components/ProfileEditModal.vue';
 import AdminTopbar from '@/Components/Layout/AdminTopbar.vue';
+import ActingAsBanner from '@/Components/Layout/ActingAsBanner.vue';
 import ReportDateRangeModal from '@/Components/Layout/ReportDateRangeModal.vue';
 import SessionExpiredOverlay from '@/Components/Layout/SessionExpiredOverlay.vue';
 import VersionHistoryModal from '@/Components/Layout/VersionHistoryModal.vue';
@@ -511,7 +512,9 @@ watch(() => page.url, async () => {
 <template>
   <Head :title="title" />
 
-  <div class="min-h-screen flex bg-slate-50">
+  <div class="min-h-screen flex flex-col bg-slate-50">
+    <ActingAsBanner />
+    <div class="min-h-screen flex flex-1">
     <!-- Mobile backdrop -->
     <div
       v-if="mobileOpen"
@@ -765,6 +768,7 @@ watch(() => page.url, async () => {
     @submit="generateAttendanceReport"
   />
 
+</div>
 </div>
 
   <SessionExpiredOverlay :show="sessionExpired" />
