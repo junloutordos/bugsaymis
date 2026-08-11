@@ -138,7 +138,7 @@ function resendEmail(recipient) {
   Swal.fire({
     icon: 'question',
     title: 'Resend issuance email?',
-    text: `${props.issuance.display_number} will be re-sent to ${recipient.user?.name ?? 'this recipient'}.`,
+    text: `${props.issuance.display_number} will be re-sent to ${recipient.user?.name ?? recipient.student?.full_name ?? 'this recipient'}.`,
     showCancelButton: true,
     confirmButtonText: 'Resend',
   }).then((res) => {
@@ -194,8 +194,9 @@ function fmtDt(d) {
   return new Date(d).toLocaleString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-const ackCount    = computed(() => (props.recipients ?? []).filter(r => r.acknowledged_at).length)
-const totalCount  = computed(() => (props.recipients ?? []).length)
+const staffRecipients = computed(() => (props.recipients ?? []).filter(r => !r.student))
+const ackCount    = computed(() => staffRecipients.value.filter(r => r.acknowledged_at).length)
+const totalCount  = computed(() => staffRecipients.value.length)
 const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value / totalCount.value) * 100) : 0)
 
 function archiveRecord() {
@@ -446,8 +447,9 @@ function deleteDraft() {
                   <input type="checkbox" :checked="selectedRecipientIds.includes(r.id)" @change="toggleSelect(r.id)"
                     class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0" />
                   <div class="min-w-0 flex-1">
-                    <p class="text-xs font-medium text-slate-700 truncate">{{ r.user?.name ?? r.office?.name ?? '—' }}</p>
+                    <p class="text-xs font-medium text-slate-700 truncate">{{ r.user?.name ?? r.student?.full_name ?? r.office?.name ?? '—' }}</p>
                     <p v-if="r.user?.position" class="text-[10px] text-slate-400 truncate">{{ r.user.position }}</p>
+                    <p v-else-if="r.student" class="text-[10px] text-slate-400 truncate">Student</p>
                     <p v-if="r.email_status === 'failed' && r.email_error" class="text-[10px] text-red-500 truncate" :title="r.email_error">{{ r.email_error }}</p>
                   </div>
                 </div>
@@ -460,8 +462,8 @@ function deleteDraft() {
                     class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Resend email">
                     <ArrowPathIcon class="h-3.5 w-3.5" />
                   </button>
-                  <span v-if="r.acknowledged_at" class="text-success-500 text-xs" title="Acknowledged">✓</span>
-                  <ClockIcon v-else class="h-3.5 w-3.5 text-slate-300" />
+                  <span v-if="!r.student && r.acknowledged_at" class="text-success-500 text-xs" title="Acknowledged">✓</span>
+                  <ClockIcon v-else-if="!r.student" class="h-3.5 w-3.5 text-slate-300" />
                 </div>
               </div>
             </div>
