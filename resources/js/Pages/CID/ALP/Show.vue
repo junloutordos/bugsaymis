@@ -153,6 +153,7 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
 
       <AppTabs v-model="activeTab" :tabs="tabs">
       <template v-if="activeTab === 'overview'">
+        <div class="space-y-5">
         <div class="grid gap-5 lg:grid-cols-3">
           <AppCard title="Program profile" class="lg:col-span-2">
             <form class="mt-4 space-y-4" @submit.prevent="saveProgram">
@@ -195,9 +196,11 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
             </AppButton>
           </div>
         </AppCard>
+        </div>
       </template>
 
       <template v-else-if="activeTab === 'members'">
+        <div class="space-y-5">
         <AppCard v-if="abilities.manage && ['draft', 'returned'].includes(cycle.status)" title="Add enrolled scholars" subtitle="Search the current school-year enrollment by name or PSHS ID.">
           <div class="flex gap-2">
             <AppInput v-model="search" placeholder="Search name or PSHS ID" class="min-w-0 flex-1" @keyup.enter="findStudents" />
@@ -256,6 +259,7 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
           </div>
           <EmptyState v-else title="No officers assigned" />
         </AppCard>
+        </div>
       </template>
 
       <template v-else-if="activeTab === 'forms'">
@@ -273,6 +277,7 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
       </template>
 
       <template v-else-if="activeTab === 'activities'">
+        <div class="space-y-5">
         <AppCard v-if="abilities.manage" title="New activity plan">
           <form class="grid gap-3 md:grid-cols-2" @submit.prevent="saveActivity">
             <AppInput v-model="activityForm.title" label="Activity title" required class="md:col-span-2" />
@@ -297,9 +302,11 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
           </AppCard>
         </div>
         <AppCard v-else><EmptyState title="No activities planned" /></AppCard>
+        </div>
       </template>
 
       <template v-else-if="activeTab === 'attendance'">
+        <div class="space-y-5">
         <AppCard v-if="abilities.manage" title="Create session">
           <form class="grid gap-3 md:grid-cols-3" @submit.prevent="saveSession"><AppInput v-model="sessionForm.session_date" label="Session date" required type="date" /><AppInput v-model="sessionForm.topic" label="Topic" /><AppInput v-model="sessionForm.venue" label="Venue" /><AppButton type="submit" :loading="sessionForm.processing" class="md:col-start-3 md:justify-self-end">Create roster</AppButton></form>
         </AppCard>
@@ -316,9 +323,11 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
             <template #empty><EmptyState title="No attendance data" /></template>
           </AppTable>
         </AppCard>
+        </div>
       </template>
 
       <template v-else-if="activeTab === 'finance'">
+        <div class="space-y-5">
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><AppCard v-for="item in financeStats" :key="item[0]"><p class="text-xs font-medium text-slate-500">{{ item[0] }}</p><p class="mt-1 font-heading text-xl font-semibold text-slate-900">{{ money(item[1]) }}</p></AppCard></div>
         <AppCard v-if="abilities.manage" title="Record transaction">
           <form class="grid gap-3 md:grid-cols-3" @submit.prevent="saveFinance"><AppInput v-model="financeForm.transaction_date" label="Transaction date" required type="date" /><AppSelect v-model="financeForm.entry_type" label="Entry type" :show-blank="false"><option value="opening_balance">Opening balance</option><option value="income">Income</option><option value="expense">Expense</option><option value="turnover">Turnover</option></AppSelect><AppInput v-model="financeForm.amount" label="Amount" required type="number" step="0.01" min="0" /><AppInput v-model="financeForm.description" label="Description" required class="md:col-span-2" /><div><label class="mb-1 block text-xs font-medium text-slate-600">Receipt</label><input type="file" accept="application/pdf,image/jpeg,image/png" class="block w-full rounded-lg border border-slate-200 bg-white text-sm text-slate-600 file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200" @change="setReceipt" /></div><AppButton type="submit" :loading="financeForm.processing" class="md:col-start-3 md:justify-self-end">Post entry</AppButton></form>
@@ -330,14 +339,17 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
             <template #empty><EmptyState title="No financial entries" /></template>
           </AppTable>
         </AppCard>
+        </div>
       </template>
 
       <template v-else-if="activeTab === 'reports'">
+        <div class="space-y-5">
         <AppCard v-if="abilities.manage" title="Prepare report">
           <div class="grid gap-3 md:grid-cols-2"><AppSelect v-model="reportForm.report_type" label="Report type" :show-blank="false"><option value="accomplishment">Accomplishment</option><option value="attendance_summary">Attendance summary</option><option value="financial">Financial</option><option value="coordinator">Coordinator</option><option value="adviser_evaluation">Adviser evaluation</option></AppSelect><AppInput v-model="reportForm.period" label="Period" /><AppTextarea v-model="reportForm.data.narrative" label="Narrative / summary" :rows="6" class="md:col-span-2" /></div><div class="mt-3 flex gap-2"><AppButton variant="secondary" :loading="reportForm.processing" @click="saveReport('draft')">Save draft</AppButton><AppButton :loading="reportForm.processing" @click="saveReport('submitted')">Submit report</AppButton></div>
         </AppCard>
         <div v-if="cycle.reports.length" class="grid gap-4 lg:grid-cols-2"><AppCard v-for="report in cycle.reports" :key="report.id"><div class="flex justify-between gap-3"><div><h2 class="font-heading text-sm font-semibold text-slate-800">{{ label(report.report_type) }}</h2><p class="text-sm text-slate-500">{{ report.period }}</p></div><AppBadge :color="statusColor(report.status)">{{ label(report.status) }}</AppBadge></div><div class="mt-4 flex gap-2"><AppButton as="a" :href="route('alp.reports.pdf', [cycle.id, report.id])" target="_blank" size="sm" variant="secondary">PDF</AppButton><AppButton v-if="(abilities.coordinate || abilities.approve) && report.status === 'submitted'" size="sm" variant="success" @click="postAction(route('alp.reports.approve', [cycle.id, report.id]), { pin: transitionForm.pin })">Approve</AppButton></div></AppCard></div>
         <AppCard v-else><EmptyState title="No reports prepared" /></AppCard>
+        </div>
       </template>
 
       <template v-else>
