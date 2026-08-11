@@ -281,7 +281,7 @@ function deleteDraft() {
 <template>
   <Head :title="`${issuance.display_number} — Issuance`" />
   <AdminLayout :title="issuance.display_number">
-    <div class="max-w-4xl space-y-5">
+    <div class="max-w-7xl mx-auto space-y-6">
 
       <!-- Back -->
       <Link :href="route('issuances.index')"
@@ -295,27 +295,25 @@ function deleteDraft() {
         <div class="h-1.5 bg-indigo-600"></div>
 
         <div class="p-6">
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-            <div class="flex-1">
-              <div class="flex flex-wrap items-center gap-2 mb-2">
-                <span class="font-mono font-bold text-slate-800 text-base">{{ issuance.display_number }}</span>
-                <AppBadge :color="typeColor(issuance.type)">{{ issuance.is_supplement ? issuance.document_kind_label : issuance.type_label }}</AppBadge>
-                <AppBadge :color="statusColor(issuance.status)" class="capitalize">{{ issuance.status }}</AppBadge>
-                <AppBadge v-if="issuance.archived_at" color="slate">Archived</AppBadge>
-              </div>
-              <h1 class="text-xl font-semibold text-slate-800">{{ issuance.title }}</h1>
-              <p class="text-xs text-slate-500 mt-1">
-                Issued by <strong>{{ issuance.creator?.name }}</strong>
-                <span v-if="issuance.released_at"> · Released {{ fmtDt(issuance.released_at) }}</span>
-              </p>
-              <Link v-if="issuance.parent_issuance" :href="route('issuances.show', issuance.parent_issuance.id)"
-                class="mt-2 inline-block text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                Related to {{ issuance.parent_issuance.control_number }} — {{ issuance.parent_issuance.title }}
-              </Link>
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <span class="font-mono font-bold text-slate-800 text-base">{{ issuance.display_number }}</span>
+              <AppBadge :color="typeColor(issuance.type)">{{ issuance.is_supplement ? issuance.document_kind_label : issuance.type_label }}</AppBadge>
+              <AppBadge :color="statusColor(issuance.status)" class="capitalize">{{ issuance.status }}</AppBadge>
+              <AppBadge v-if="issuance.archived_at" color="slate">Archived</AppBadge>
             </div>
+            <h1 class="text-xl font-semibold text-slate-800">{{ issuance.title }}</h1>
+            <p class="text-xs text-slate-500 mt-1">
+              Issued by <strong>{{ issuance.creator?.name }}</strong>
+              <span v-if="issuance.released_at"> · Released {{ fmtDt(issuance.released_at) }}</span>
+            </p>
+            <Link v-if="issuance.parent_issuance" :href="route('issuances.show', issuance.parent_issuance.id)"
+              class="mt-2 inline-block text-xs font-medium text-indigo-600 hover:text-indigo-800">
+              Related to {{ issuance.parent_issuance.control_number }} — {{ issuance.parent_issuance.title }}
+            </Link>
 
             <!-- Actions -->
-            <div class="flex flex-wrap gap-2 shrink-0">
+            <div class="mt-5 pt-5 border-t border-slate-100 flex flex-wrap items-center gap-2">
               <!-- Acknowledge (staff) -->
               <AppButton v-if="!isAdmin && issuance.status === 'released' && !ackDone"
                 @click="acknowledge" :disabled="ackForm.processing">
@@ -360,15 +358,15 @@ function deleteDraft() {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
         <!-- ── Document Body ──────────────────────────────────────────────── -->
-        <div class="lg:col-span-2 space-y-5">
+        <div class="lg:col-span-3 space-y-6">
 
           <!-- Content -->
           <AppCard v-if="issuance.content" title="Content">
             <!-- Official letterhead preview -->
-            <div class="border border-slate-200 rounded-lg p-5">
+            <div class="border border-slate-200 rounded-lg bg-slate-50/50 p-6">
               <div class="text-center border-b border-slate-200 pb-3 mb-4">
                 <p class="text-xs font-bold text-slate-700 tracking-wide">PHILIPPINE SCIENCE HIGH SCHOOL</p>
                 <p class="text-xs text-slate-500">Caraga Region Campus</p>
@@ -433,36 +431,38 @@ function deleteDraft() {
         </div>
 
         <!-- ── Right panel ────────────────────────────────────────────────── -->
-        <div class="space-y-4">
+        <div class="lg:col-span-2 space-y-5 lg:sticky lg:top-6 lg:self-start">
 
-          <!-- QR + Verification -->
-          <AppCard v-if="issuance.status === 'released'" title="Verification QR">
-            <div class="flex justify-center mb-3" v-html="issuance.qr_svg"></div>
-            <AppButton variant="secondary" size="sm" block @click="copyVerifyUrl">
-              {{ qrCopied ? '✓ Copied!' : 'Copy verification link' }}
-            </AppButton>
-            <p class="text-[10px] text-slate-400 text-center mt-2">Scan to verify authenticity</p>
-          </AppCard>
+          <div class="space-y-3">
+            <!-- QR + Verification -->
+            <AppCard v-if="issuance.status === 'released'" title="Verification QR">
+              <div class="flex justify-center mb-3" v-html="issuance.qr_svg"></div>
+              <AppButton variant="secondary" size="sm" block @click="copyVerifyUrl">
+                {{ qrCopied ? '✓ Copied!' : 'Copy verification link' }}
+              </AppButton>
+              <p class="text-[10px] text-slate-400 text-center mt-2">Scan to verify authenticity</p>
+            </AppCard>
 
-          <AppCard v-if="issuance.archived_at" title="Archive Record">
-            <p class="text-xs text-slate-500">Archived {{ fmtDt(issuance.archived_at) }}</p>
-            <p v-if="issuance.archive_reason" class="mt-2 text-sm text-slate-700">{{ issuance.archive_reason }}</p>
-          </AppCard>
+            <AppCard v-if="issuance.archived_at" title="Archive Record">
+              <p class="text-xs text-slate-500">Archived {{ fmtDt(issuance.archived_at) }}</p>
+              <p v-if="issuance.archive_reason" class="mt-2 text-sm text-slate-700">{{ issuance.archive_reason }}</p>
+            </AppCard>
 
-          <!-- Hash -->
-          <AppCard v-if="issuance.content_hash" title="Content Hash">
-            <p class="font-mono text-[10px] text-slate-500 break-all bg-slate-50 rounded p-2">{{ issuance.content_hash }}</p>
-            <p class="text-[10px] text-slate-400 mt-1">SHA-256 tamper detection</p>
-          </AppCard>
+            <!-- Hash -->
+            <AppCard v-if="issuance.content_hash" title="Content Hash">
+              <p class="font-mono text-[10px] text-slate-500 break-all bg-slate-50 rounded p-2">{{ issuance.content_hash }}</p>
+              <p class="text-[10px] text-slate-400 mt-1">SHA-256 tamper detection</p>
+            </AppCard>
+          </div>
 
           <!-- Acknowledgment progress (admin) -->
           <AppCard v-if="isAdmin && issuance.status === 'released'">
             <template #header>
-              <div class="flex items-center justify-between gap-2">
+              <div class="w-full space-y-2.5">
                 <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <UserGroupIcon class="h-3.5 w-3.5" /> Acknowledgments
                 </h3>
-                <div class="flex items-center gap-1.5">
+                <div class="flex flex-wrap items-center gap-1.5">
                   <AppButton v-if="!issuance.archived_at" size="sm" variant="secondary" @click="openAddRecipientModal">
                     <PlusIcon class="h-3.5 w-3.5" /> Add Recipient
                   </AppButton>
