@@ -1,10 +1,23 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import DOMPurify from 'dompurify'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import RichTextEditor from '@/Components/RichTextEditor.vue'
 import MathContent from '@/Components/MathContent.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTabs from '@/Components/AppTabs.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import CourseCover from '@/Components/CourseCover.vue'
+import SetupProgressBar from '@/Components/SetupProgressBar.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { COURSE_COVER_PRESETS } from '@/Constants/courseCoverPresets'
 import {
   PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon,
   ArrowUpIcon, ArrowDownIcon, DocumentIcon, PaperClipIcon, AcademicCapIcon, ChatBubbleLeftRightIcon,
@@ -35,6 +48,27 @@ function saveSyllabus() {
 function toggleCourseStatus() {
   const next = props.course.status === 'published' ? 'draft' : 'published'
   router.patch(route('learn.status.update', props.course.id), { status: next }, { preserveScroll: true })
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────
+const tabs = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'modules', label: 'Modules' },
+  { key: 'announcements', label: 'Announcements' },
+]
+const activeTab = ref('overview')
+const subjectInitials = computed(() => (props.course.subject_name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase())
+
+// ── Cover photo ──────────────────────────────────────────────────────────
+function selectCoverPreset(presetKey) {
+  router.put(route('learn.cover.update', props.course.id), { preset: presetKey }, { preserveScroll: true })
+}
+async function uploadCoverPhoto(event) {
+  const file = event.target.files[0]
+  if (! file) return
+  const base64 = await readFileAsBase64(file)
+  router.put(route('learn.cover.update', props.course.id), { photo_base64: base64 }, { preserveScroll: true })
+  event.target.value = ''
 }
 
 // ── Modules ──────────────────────────────────────────────────────────────
@@ -301,348 +335,384 @@ function addDiscussion(moduleId) {
 <template>
   <Head :title="`Learn — ${course.subject_name}`" />
   <AdminLayout :title="course.subject_name">
-    <div class="max-w-4xl mx-auto py-6 px-4 space-y-8">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-lg font-semibold text-slate-800">{{ course.subject_name }}</h1>
-          <p class="text-sm text-slate-500">Grade {{ course.grade_level }} — {{ course.section_name }}</p>
-        </div>
-        <div v-if="course.can_edit" class="flex items-center gap-3">
-          <Link :href="route('learn.course-trend', course.id)" class="text-xs text-indigo-600 underline">Quiz trend</Link>
-          <button
+    <div class="max-w-5xl mx-auto py-6 px-4 space-y-5">
+      <AppPageHeader
+        hero
+        :title="course.subject_name"
+        :subtitle="`Grade ${course.grade_level} — ${course.section_name}`"
+      >
+        <template #cover>
+          <CourseCover :photo-url="course.cover_photo_url" :preset="course.cover_preset" :initials="subjectInitials" class="h-full w-full" />
+        </template>
+        <template #actions>
+          <AppBadge :color="course.status === 'published' ? 'green' : 'slate'">
+            {{ course.status === 'published' ? 'Published' : 'Draft' }}
+          </AppBadge>
+          <Link v-if="course.can_edit" :href="route('learn.course-trend', course.id)" class="text-xs font-medium text-indigo-600 hover:underline">
+            Quiz trend
+          </Link>
+          <AppButton
+            v-if="course.can_edit"
+            :variant="course.status === 'published' ? 'secondary' : 'primary'"
             @click="toggleCourseStatus"
-            class="rounded-lg px-4 py-2 text-sm font-medium"
-            :class="course.status === 'published' ? 'bg-slate-100 text-slate-700' : 'bg-indigo-600 hover:bg-indigo-700 text-white'"
           >
             {{ course.status === 'published' ? 'Unpublish' : 'Publish course' }}
-          </button>
-        </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
+      <div v-if="course.is_read_only" class="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800">
+        This course is from a past school year and is read-only.
       </div>
 
-      <p v-if="course.is_read_only" class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-        This course is from a past school year and is read-only.
-      </p>
+      <AppTabs v-model="activeTab" :tabs="tabs">
+        <template v-if="activeTab === 'overview'">
+          <div class="space-y-5">
+            <AppCard title="Course setup">
+              <SetupProgressBar :steps="course.setup_progress.steps" :percent="course.setup_progress.percent" />
+            </AppCard>
 
-      <!-- Syllabus -->
-      <section>
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Syllabus</h2>
-        <RichTextEditor v-if="course.can_edit" v-model="syllabus" />
-        <div v-else class="prose prose-sm max-w-none" v-html="sanitizeHtml(course.syllabus_body) || '<p class=\'text-slate-400\'>No syllabus yet.</p>'" />
-        <button v-if="course.can_edit" @click="saveSyllabus" class="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          Save syllabus
-        </button>
-      </section>
+            <AppCard v-if="course.can_edit" title="Course cover" subtitle="Shown on your class card and at the top of this page.">
+              <div class="flex flex-wrap gap-3">
+                <button
+                  v-for="preset in COURSE_COVER_PRESETS"
+                  :key="preset.key"
+                  type="button"
+                  :class="['h-16 w-24 rounded-lg ring-2 transition', preset.class, course.cover_preset === preset.key && !course.cover_photo_url ? 'ring-indigo-600' : 'ring-transparent hover:ring-slate-300']"
+                  :aria-label="preset.label"
+                  @click="selectCoverPreset(preset.key)"
+                />
+                <label class="flex h-16 w-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-center text-xs font-medium text-slate-500 hover:border-indigo-400 hover:text-indigo-600">
+                  Upload photo
+                  <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="uploadCoverPhoto" />
+                </label>
+              </div>
+            </AppCard>
 
-      <!-- Modules -->
-      <section>
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Modules</h2>
-
-        <div v-for="(module, index) in course.modules" :key="module.id" class="border border-slate-200 rounded-lg mb-3">
-          <div class="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-t-lg">
-            <span class="text-sm font-medium text-slate-800">{{ module.title }}</span>
-            <div v-if="course.can_edit" class="flex items-center gap-1">
-              <button @click="moveModule(index, -1)" class="p-1 text-slate-400 hover:text-slate-700"><ArrowUpIcon class="h-4 w-4" /></button>
-              <button @click="moveModule(index, 1)" class="p-1 text-slate-400 hover:text-slate-700"><ArrowDownIcon class="h-4 w-4" /></button>
-              <button @click="toggleModulePublish(module.id)" class="p-1 text-slate-400 hover:text-slate-700">
-                <EyeIcon v-if="!module.is_published" class="h-4 w-4" />
-                <EyeSlashIcon v-else class="h-4 w-4" />
-              </button>
-              <button @click="deleteModule(module.id)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-4 w-4" /></button>
-            </div>
+            <AppCard title="Syllabus">
+              <RichTextEditor v-if="course.can_edit" v-model="syllabus" />
+              <div v-else class="prose prose-sm max-w-none" v-html="sanitizeHtml(course.syllabus_body) || '<p class=\'text-slate-400\'>No syllabus yet.</p>'" />
+              <AppButton v-if="course.can_edit" class="mt-3" @click="saveSyllabus">Save syllabus</AppButton>
+            </AppCard>
           </div>
+        </template>
 
-          <div class="p-4 space-y-3">
-            <div v-for="(item, itemIndex) in module.items" :key="item.id" class="flex items-start gap-2 border border-slate-100 rounded-lg p-3">
-              <DocumentIcon v-if="item.type === 'page'" class="h-5 w-5 text-slate-400 shrink-0" />
-              <AcademicCapIcon v-else-if="item.type === 'quiz'" class="h-5 w-5 text-slate-400 shrink-0" />
-              <ChatBubbleLeftRightIcon v-else-if="item.type === 'discussion'" class="h-5 w-5 text-slate-400 shrink-0" />
-              <PaperClipIcon v-else class="h-5 w-5 text-slate-400 shrink-0" />
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-slate-700">{{ item.title }}</p>
-                <div v-if="item.type === 'page' && item.body" class="prose prose-sm max-w-none mt-1" v-html="sanitizeHtml(item.body)" />
-                <a v-if="item.type === 'page' && safeVideoUrl(item.video_url)" :href="safeVideoUrl(item.video_url)" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Watch video</a>
-                <a v-if="item.type === 'file'" :href="item.file_url" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Download file</a>
-                <div v-if="item.type === 'assignment'" class="mt-1 space-y-1">
-                  <div v-if="item.assignment.instructions" class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.assignment.instructions)" />
-                  <p class="text-xs text-slate-500">
-                    {{ item.assignment.submission_type }} submission
-                    <span v-if="item.assignment.due_at"> — due {{ new Date(item.assignment.due_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
-                    <span v-if="item.assignment.max_score !== null"> — {{ item.assignment.max_score }} pts{{ item.assignment.has_rubric ? ' (rubric)' : '' }}</span>
-                  </p>
-                  <Link :href="route('learn.assignments.submissions', item.assignment.id)" class="text-xs text-indigo-600 underline">View submissions</Link>
+        <template v-else-if="activeTab === 'modules'">
+          <div class="space-y-5">
+            <AppCard v-for="(module, index) in course.modules" :key="module.id" :padded="false">
+              <template #header>
+                <div class="flex flex-1 items-center justify-between gap-3">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span class="truncate text-sm font-semibold text-slate-800">{{ module.title }}</span>
+                    <AppBadge :color="module.is_published ? 'green' : 'slate'">{{ module.is_published ? 'Published' : 'Draft' }}</AppBadge>
+                  </div>
+                  <div v-if="course.can_edit" class="flex shrink-0 items-center gap-1">
+                    <AppIconButton label="Move up" @click="moveModule(index, -1)"><ArrowUpIcon class="h-4 w-4" /></AppIconButton>
+                    <AppIconButton label="Move down" @click="moveModule(index, 1)"><ArrowDownIcon class="h-4 w-4" /></AppIconButton>
+                    <AppIconButton :label="module.is_published ? 'Unpublish module' : 'Publish module'" @click="toggleModulePublish(module.id)">
+                      <EyeIcon v-if="!module.is_published" class="h-4 w-4" />
+                      <EyeSlashIcon v-else class="h-4 w-4" />
+                    </AppIconButton>
+                    <AppIconButton label="Delete module" variant="danger" @click="deleteModule(module.id)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                  </div>
                 </div>
-                <div v-if="item.type === 'quiz'" class="mt-1 space-y-1">
-                  <p class="text-xs text-slate-500">
-                    {{ item.quiz.question_count }} question{{ item.quiz.question_count === 1 ? '' : 's' }}
-                    <span v-if="item.quiz.time_limit_minutes"> — {{ item.quiz.time_limit_minutes }} min</span>
-                    <span v-if="item.quiz.due_at"> — due {{ new Date(item.quiz.due_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
-                    <span v-if="item.quiz.max_score !== null"> — {{ item.quiz.max_score }} pts</span>
-                  </p>
+              </template>
+
+              <div class="space-y-3 p-5">
+                <div v-for="(item, itemIndex) in module.items" :key="item.id" class="flex items-start gap-2 rounded-lg border border-slate-100 p-3">
+                  <DocumentIcon v-if="item.type === 'page'" class="h-5 w-5 shrink-0 text-slate-400" />
+                  <AcademicCapIcon v-else-if="item.type === 'quiz'" class="h-5 w-5 shrink-0 text-slate-400" />
+                  <ChatBubbleLeftRightIcon v-else-if="item.type === 'discussion'" class="h-5 w-5 shrink-0 text-slate-400" />
+                  <PaperClipIcon v-else class="h-5 w-5 shrink-0 text-slate-400" />
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <p class="text-sm font-medium text-slate-700">{{ item.title }}</p>
+                      <AppBadge :color="item.is_published ? 'green' : 'slate'">{{ item.is_published ? 'Published' : 'Draft' }}</AppBadge>
+                    </div>
+                    <div v-if="item.type === 'page' && item.body" class="prose prose-sm mt-1 max-w-none" v-html="sanitizeHtml(item.body)" />
+                    <a v-if="item.type === 'page' && safeVideoUrl(item.video_url)" :href="safeVideoUrl(item.video_url)" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Watch video</a>
+                    <a v-if="item.type === 'file'" :href="item.file_url" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 underline">Download file</a>
+                    <div v-if="item.type === 'assignment'" class="mt-1 space-y-1">
+                      <div v-if="item.assignment.instructions" class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.assignment.instructions)" />
+                      <p class="text-xs text-slate-500">
+                        {{ item.assignment.submission_type }} submission
+                        <span v-if="item.assignment.due_at"> — due {{ new Date(item.assignment.due_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
+                        <span v-if="item.assignment.max_score !== null"> — {{ item.assignment.max_score }} pts{{ item.assignment.has_rubric ? ' (rubric)' : '' }}</span>
+                      </p>
+                      <Link :href="route('learn.assignments.submissions', item.assignment.id)" class="text-xs text-indigo-600 underline">View submissions</Link>
+                    </div>
+                    <div v-if="item.type === 'quiz'" class="mt-1 space-y-1">
+                      <p class="text-xs text-slate-500">
+                        {{ item.quiz.question_count }} question{{ item.quiz.question_count === 1 ? '' : 's' }}
+                        <span v-if="item.quiz.time_limit_minutes"> — {{ item.quiz.time_limit_minutes }} min</span>
+                        <span v-if="item.quiz.due_at"> — due {{ new Date(item.quiz.due_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
+                        <span v-if="item.quiz.max_score !== null"> — {{ item.quiz.max_score }} pts</span>
+                      </p>
+                      <div class="flex gap-2">
+                        <Link :href="route('learn.quizzes.attempts', item.quiz.id)" class="text-xs text-indigo-600 underline">View attempts</Link>
+                        <Link :href="route('learn.quizzes.analytics', item.quiz.id)" class="text-xs text-indigo-600 underline">Analytics</Link>
+                      </div>
+
+                      <div v-if="course.can_edit" class="space-y-2 border-t border-slate-100 pt-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Questions</p>
+                        <p v-if="item.quiz.is_locked" class="text-xs text-warning-600">Locked — students have submitted attempts. Existing questions cannot be changed, but new ones can still be added.</p>
+
+                        <div v-for="q in item.quiz.questions" :key="q.id" class="flex items-start gap-2 rounded-lg border border-slate-100 p-2">
+                          <div class="min-w-0 flex-1">
+                            <MathContent :html="sanitizeHtml(q.prompt)" class="prose prose-sm max-w-none" />
+                            <p class="text-xs text-slate-400">{{ q.question_type }} — {{ q.points }} pts</p>
+                          </div>
+                          <AppIconButton v-if="!item.quiz.is_locked" label="Delete question" variant="danger" size="sm" @click="deleteQuizQuestion(q.id)"><TrashIcon class="h-3.5 w-3.5" /></AppIconButton>
+                        </div>
+
+                        <AppCard class="space-y-2">
+                          <p class="text-xs text-slate-500">Add another question</p>
+                          <div class="flex gap-2">
+                            <AppSelect v-model="newQuestionForm(item.quiz.id).question_type" :show-blank="false" class="max-w-[200px]">
+                              <option value="multiple_choice">Multiple choice</option>
+                              <option value="true_false">True / False</option>
+                              <option value="multiple_select">Multiple select</option>
+                              <option value="short_answer">Short answer</option>
+                              <option value="essay">Essay</option>
+                            </AppSelect>
+                            <AppInput v-model="newQuestionForm(item.quiz.id).points" type="number" min="0" placeholder="Points" class="w-24" />
+                          </div>
+                          <AppTextarea v-model="newQuestionForm(item.quiz.id).prompt" placeholder="Question prompt (supports $LaTeX$)" :rows="2" />
+
+                          <div v-if="['multiple_choice', 'true_false', 'multiple_select'].includes(newQuestionForm(item.quiz.id).question_type)" class="space-y-1">
+                            <div v-for="(o, oIndex) in newQuestionForm(item.quiz.id).options" :key="oIndex" class="flex items-center gap-2">
+                              <AppInput v-model="o.option_text" placeholder="Option text" class="flex-1" />
+                              <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="o.is_correct" /> Correct</label>
+                              <AppIconButton label="Remove option" variant="danger" size="sm" @click="removeNewQuestionOption(item.quiz.id, oIndex)"><TrashIcon class="h-3.5 w-3.5" /></AppIconButton>
+                            </div>
+                            <button type="button" class="text-xs text-indigo-600 underline" @click="addNewQuestionOption(item.quiz.id)">+ Add option</button>
+                          </div>
+                          <div v-else-if="newQuestionForm(item.quiz.id).question_type === 'short_answer'" class="space-y-1">
+                            <div v-for="(a, aIndex) in newQuestionForm(item.quiz.id).accepted_answers" :key="aIndex" class="flex items-center gap-2">
+                              <AppInput v-model="newQuestionForm(item.quiz.id).accepted_answers[aIndex]" placeholder="Accepted answer" class="flex-1" />
+                              <AppIconButton label="Remove accepted answer" variant="danger" size="sm" @click="removeNewAcceptedAnswer(item.quiz.id, aIndex)"><TrashIcon class="h-3.5 w-3.5" /></AppIconButton>
+                            </div>
+                            <button type="button" class="text-xs text-indigo-600 underline" @click="addNewAcceptedAnswer(item.quiz.id)">+ Add accepted answer</button>
+                          </div>
+
+                          <AppButton variant="secondary" size="sm" @click="submitNewQuestion(item.quiz.id)">Add question</AppButton>
+                        </AppCard>
+                      </div>
+                    </div>
+                    <div v-if="item.type === 'discussion'" class="mt-1 space-y-1">
+                      <div class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.discussion.prompt)" />
+                      <p class="text-xs text-slate-500">
+                        {{ item.discussion.post_count }} post{{ item.discussion.post_count === 1 ? '' : 's' }}
+                        <span v-if="item.discussion.max_score !== null"> — {{ item.discussion.max_score }} pts</span>
+                      </p>
+                      <div class="flex gap-2">
+                        <Link :href="route('learn.discussions.show', item.discussion.id)" class="text-xs text-indigo-600 underline">View discussion</Link>
+                        <Link v-if="item.discussion.max_score !== null" :href="route('learn.discussions.grades', item.discussion.id)" class="text-xs text-indigo-600 underline">Grades</Link>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="course.can_edit" class="flex shrink-0 items-center gap-1">
+                    <AppIconButton label="Move up" size="sm" @click="moveItem(module, itemIndex, -1)"><ArrowUpIcon class="h-3.5 w-3.5" /></AppIconButton>
+                    <AppIconButton label="Move down" size="sm" @click="moveItem(module, itemIndex, 1)"><ArrowDownIcon class="h-3.5 w-3.5" /></AppIconButton>
+                    <AppIconButton :label="item.is_published ? 'Unpublish item' : 'Publish item'" size="sm" @click="toggleItemPublish(item.id)">
+                      <EyeIcon v-if="!item.is_published" class="h-3.5 w-3.5" />
+                      <EyeSlashIcon v-else class="h-3.5 w-3.5" />
+                    </AppIconButton>
+                    <AppIconButton label="Delete item" variant="danger" size="sm" @click="deleteItem(item.id)"><TrashIcon class="h-3.5 w-3.5" /></AppIconButton>
+                  </div>
+                </div>
+
+                <div v-if="course.can_edit" class="space-y-3 border-t border-slate-100 pt-3">
                   <div class="flex gap-2">
-                    <Link :href="route('learn.quizzes.attempts', item.quiz.id)" class="text-xs text-indigo-600 underline">View attempts</Link>
-                    <Link :href="route('learn.quizzes.analytics', item.quiz.id)" class="text-xs text-indigo-600 underline">Analytics</Link>
+                    <AppInput v-model="pageForm(module.id).title" placeholder="Page title" class="flex-1" />
+                    <AppButton variant="secondary" @click="addPage(module.id)">Add page</AppButton>
+                  </div>
+                  <AppTextarea v-model="pageForm(module.id).body" placeholder="Page body (optional)" :rows="2" />
+                  <AppInput v-model="pageForm(module.id).video_url" placeholder="Video URL (YouTube/Drive, optional)" />
+
+                  <div class="flex items-center gap-2">
+                    <AppInput v-model="fileTitles[module.id]" placeholder="File title" class="flex-1" />
+                    <label class="cursor-pointer rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200">
+                      Upload file
+                      <input type="file" class="hidden" @change="e => addFile(module.id, e)" />
+                    </label>
                   </div>
 
-                  <div v-if="course.can_edit" class="border-t border-slate-100 pt-2 space-y-2">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Questions</p>
-                    <p v-if="item.quiz.is_locked" class="text-xs text-amber-600">Locked — students have submitted attempts. Existing questions cannot be changed, but new ones can still be added.</p>
-
-                    <div v-for="q in item.quiz.questions" :key="q.id" class="flex items-start gap-2 border border-slate-100 rounded-lg p-2">
-                      <div class="min-w-0 flex-1">
-                        <MathContent :html="sanitizeHtml(q.prompt)" class="prose prose-sm max-w-none" />
-                        <p class="text-xs text-slate-400">{{ q.question_type }} — {{ q.points }} pts</p>
-                      </div>
-                      <button v-if="!item.quiz.is_locked" @click="deleteQuizQuestion(q.id)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-3.5 w-3.5" /></button>
+                  <div class="space-y-2 border-t border-slate-100 pt-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">New assignment</p>
+                    <AppInput v-model="assignmentForm(module.id).title" placeholder="Assignment title" />
+                    <AppTextarea v-model="assignmentForm(module.id).instructions" placeholder="Instructions (optional)" :rows="2" />
+                    <div class="flex gap-2">
+                      <AppSelect v-model="assignmentForm(module.id).submission_type" :show-blank="false" class="max-w-[200px]">
+                        <option value="text">Text entry</option>
+                        <option value="file">File upload</option>
+                        <option value="link">Link</option>
+                      </AppSelect>
+                      <AppInput v-model="assignmentForm(module.id).due_at" type="datetime-local" />
                     </div>
 
-                    <div class="border border-slate-100 rounded-lg p-3 space-y-2">
-                      <p class="text-xs text-slate-500">Add another question</p>
+                    <div v-if="assignmentForm(module.id).rubric_criteria.length === 0">
+                      <AppInput v-model="assignmentForm(module.id).points_possible" type="number" min="0" placeholder="Points possible" />
+                    </div>
+                    <div v-else class="space-y-1">
+                      <div v-for="(criterion, i) in assignmentForm(module.id).rubric_criteria" :key="i" class="flex items-center gap-2">
+                        <AppInput v-model="criterion.description" placeholder="Criterion" class="flex-1" />
+                        <AppInput v-model="criterion.max_points" type="number" min="0" placeholder="Points" class="w-24" />
+                        <AppIconButton label="Remove criterion" variant="danger" @click="removeRubricCriterion(module.id, i)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                      </div>
+                    </div>
+
+                    <AppSelect v-if="rubric_templates.length" :show-blank="false" placeholder="Start from a saved template" @update:model-value="value => applyTemplate(module.id, value)">
+                      <option value="" disabled selected>Start from a saved template</option>
+                      <option v-for="t in rubric_templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                    </AppSelect>
+
+                    <button type="button" class="text-xs text-indigo-600 underline" @click="addRubricCriterion(module.id)">+ Add rubric criterion</button>
+
+                    <div v-if="assignmentForm(module.id).rubric_criteria.length > 0" class="flex items-center gap-2">
+                      <input type="checkbox" v-model="assignmentForm(module.id).save_as_template" :id="`save-template-${module.id}`" />
+                      <label :for="`save-template-${module.id}`" class="text-xs text-slate-600">Save these criteria as a template</label>
+                    </div>
+                    <AppInput v-if="assignmentForm(module.id).save_as_template" v-model="assignmentForm(module.id).template_name" placeholder="Template name" />
+
+                    <div v-if="rubric_templates.length" class="space-y-1 border-t border-slate-100 pt-2">
+                      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">My templates</p>
+                      <div v-for="t in rubric_templates" :key="t.id" class="flex items-center gap-2">
+                        <AppInput v-if="renameTemplateDrafts[t.id] !== undefined" v-model="renameTemplateDrafts[t.id]" class="flex-1" />
+                        <span v-else class="flex-1 text-xs text-slate-600">{{ t.name }}</span>
+                        <button v-if="renameTemplateDrafts[t.id] !== undefined" type="button" class="text-xs text-indigo-600 underline" @click="saveTemplateRename(t)">Save</button>
+                        <button v-else type="button" class="text-xs text-slate-500 underline" @click="startRenameTemplate(t)">Rename</button>
+                        <button type="button" class="text-xs text-red-500 underline" @click="deleteTemplate(t)">Delete</button>
+                      </div>
+                    </div>
+
+                    <AppButton @click="addAssignment(module.id)">Add assignment</AppButton>
+                  </div>
+
+                  <div class="space-y-2 border-t border-slate-100 pt-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">New quiz</p>
+                    <AppInput v-model="quizForm(module.id).title" placeholder="Quiz title" />
+                    <AppTextarea v-model="quizForm(module.id).instructions" placeholder="Instructions (optional)" :rows="2" />
+                    <div class="grid grid-cols-2 gap-2">
+                      <AppInput v-model="quizForm(module.id).time_limit_minutes" type="number" min="1" placeholder="Time limit (minutes, optional)" />
+                      <AppInput v-model="quizForm(module.id).max_attempts" type="number" min="1" placeholder="Max attempts (optional)" />
+                      <AppInput v-model="quizForm(module.id).questions_to_draw" type="number" min="1" placeholder="Draw N random questions (optional)" />
+                      <AppInput v-model="quizForm(module.id).due_at" type="datetime-local" />
+                    </div>
+                    <div class="flex gap-4">
+                      <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="quizForm(module.id).shuffle_questions" /> Shuffle questions</label>
+                      <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="quizForm(module.id).shuffle_options" /> Shuffle options</label>
+                    </div>
+
+                    <AppCard v-for="(q, qIndex) in quizForm(module.id).questions" :key="qIndex" class="space-y-2">
                       <div class="flex gap-2">
-                        <select v-model="newQuestionForm(item.quiz.id).question_type" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                        <AppSelect v-model="q.question_type" :show-blank="false" class="max-w-[180px]">
                           <option value="multiple_choice">Multiple choice</option>
                           <option value="true_false">True / False</option>
                           <option value="multiple_select">Multiple select</option>
                           <option value="short_answer">Short answer</option>
                           <option value="essay">Essay</option>
-                        </select>
-                        <input v-model="newQuestionForm(item.quiz.id).points" type="number" min="0" placeholder="Points" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-24" />
+                        </AppSelect>
+                        <AppInput v-model="q.points" type="number" min="0" placeholder="Points" class="w-24" />
+                        <AppSelect v-model="q.difficulty" placeholder="Difficulty (optional)" class="max-w-[160px]">
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </AppSelect>
+                        <AppIconButton label="Remove question" variant="danger" @click="removeQuizQuestion(module.id, qIndex)"><TrashIcon class="h-4 w-4" /></AppIconButton>
                       </div>
-                      <textarea v-model="newQuestionForm(item.quiz.id).prompt" placeholder="Question prompt (supports $LaTeX$)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
+                      <AppTextarea v-model="q.prompt" placeholder="Question prompt (supports $LaTeX$)" :rows="2" />
+                      <MathContent v-if="q.prompt" :html="sanitizeHtml(q.prompt)" class="prose prose-sm max-w-none border-l-2 border-slate-200 pl-2" />
 
-                      <div v-if="['multiple_choice', 'true_false', 'multiple_select'].includes(newQuestionForm(item.quiz.id).question_type)" class="space-y-1">
-                        <div v-for="(o, oIndex) in newQuestionForm(item.quiz.id).options" :key="oIndex" class="flex gap-2 items-center">
-                          <input v-model="o.option_text" placeholder="Option text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
+                      <AppSelect v-if="quiz_question_bank.length" :show-blank="false" placeholder="Start from a saved question" @update:model-value="value => applyQuizBankItem(module.id, qIndex, value)">
+                        <option value="" disabled selected>Start from a saved question</option>
+                        <option v-for="b in quiz_question_bank" :key="b.id" :value="b.id">{{ b.name }}</option>
+                      </AppSelect>
+
+                      <div v-if="['multiple_choice', 'true_false', 'multiple_select'].includes(q.question_type)" class="space-y-1">
+                        <div v-for="(o, oIndex) in q.options" :key="oIndex" class="flex items-center gap-2">
+                          <AppInput v-model="o.option_text" placeholder="Option text" class="flex-1" />
                           <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="o.is_correct" /> Correct</label>
-                          <button @click="removeNewQuestionOption(item.quiz.id, oIndex)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-3.5 w-3.5" /></button>
+                          <AppIconButton label="Remove option" variant="danger" size="sm" @click="removeQuizQuestionOption(module.id, qIndex, oIndex)"><TrashIcon class="h-3.5 w-3.5" /></AppIconButton>
                         </div>
-                        <button @click="addNewQuestionOption(item.quiz.id)" class="text-xs text-indigo-600 underline">+ Add option</button>
-                      </div>
-                      <div v-else-if="newQuestionForm(item.quiz.id).question_type === 'short_answer'" class="space-y-1">
-                        <div v-for="(a, aIndex) in newQuestionForm(item.quiz.id).accepted_answers" :key="aIndex" class="flex gap-2 items-center">
-                          <input v-model="newQuestionForm(item.quiz.id).accepted_answers[aIndex]" placeholder="Accepted answer" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
-                          <button @click="removeNewAcceptedAnswer(item.quiz.id, aIndex)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-3.5 w-3.5" /></button>
-                        </div>
-                        <button @click="addNewAcceptedAnswer(item.quiz.id)" class="text-xs text-indigo-600 underline">+ Add accepted answer</button>
+                        <button type="button" class="text-xs text-indigo-600 underline" @click="addQuizQuestionOption(module.id, qIndex)">+ Add option</button>
                       </div>
 
-                      <button @click="submitNewQuestion(item.quiz.id)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium">Add question</button>
+                      <div v-else-if="q.question_type === 'short_answer'" class="space-y-1">
+                        <div v-for="(a, aIndex) in q.accepted_answers" :key="aIndex" class="flex items-center gap-2">
+                          <AppInput v-model="q.accepted_answers[aIndex]" placeholder="Accepted answer" class="flex-1" />
+                          <AppIconButton label="Remove accepted answer" variant="danger" size="sm" @click="removeAcceptedAnswer(module.id, qIndex, aIndex)"><TrashIcon class="h-3.5 w-3.5" /></AppIconButton>
+                        </div>
+                        <button type="button" class="text-xs text-indigo-600 underline" @click="addAcceptedAnswer(module.id, qIndex)">+ Add accepted answer</button>
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <input type="checkbox" v-model="q.save_to_bank" :id="`save-qbank-${module.id}-${qIndex}`" />
+                        <label :for="`save-qbank-${module.id}-${qIndex}`" class="text-xs text-slate-600">Save this question to my bank</label>
+                      </div>
+                      <AppInput v-if="q.save_to_bank" v-model="q.bank_name" placeholder="Bank name" />
+                    </AppCard>
+                    <button type="button" class="text-xs text-indigo-600 underline" @click="addQuizQuestion(module.id)">+ Add question</button>
+
+                    <div v-if="quiz_question_bank.length" class="space-y-1 border-t border-slate-100 pt-2">
+                      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">My question bank</p>
+                      <div v-for="b in quiz_question_bank" :key="b.id" class="flex items-center gap-2">
+                        <AppInput v-if="renameBankItemDrafts[b.id] !== undefined" v-model="renameBankItemDrafts[b.id]" class="flex-1" />
+                        <span v-else class="flex-1 text-xs text-slate-600">{{ b.name }}</span>
+                        <button v-if="renameBankItemDrafts[b.id] !== undefined" type="button" class="text-xs text-indigo-600 underline" @click="saveBankItemRename(b)">Save</button>
+                        <button v-else type="button" class="text-xs text-slate-500 underline" @click="startRenameBankItem(b)">Rename</button>
+                        <button type="button" class="text-xs text-red-500 underline" @click="deleteBankItem(b)">Delete</button>
+                      </div>
                     </div>
+
+                    <AppButton @click="addQuiz(module.id)">Add quiz</AppButton>
                   </div>
-                </div>
-                <div v-if="item.type === 'discussion'" class="mt-1 space-y-1">
-                  <div class="prose prose-sm max-w-none" v-html="sanitizeHtml(item.discussion.prompt)" />
-                  <p class="text-xs text-slate-500">
-                    {{ item.discussion.post_count }} post{{ item.discussion.post_count === 1 ? '' : 's' }}
-                    <span v-if="item.discussion.max_score !== null"> — {{ item.discussion.max_score }} pts</span>
-                  </p>
-                  <div class="flex gap-2">
-                    <Link :href="route('learn.discussions.show', item.discussion.id)" class="text-xs text-indigo-600 underline">View discussion</Link>
-                    <Link v-if="item.discussion.max_score !== null" :href="route('learn.discussions.grades', item.discussion.id)" class="text-xs text-indigo-600 underline">Grades</Link>
+
+                  <div class="space-y-2 border-t border-slate-100 pt-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">New discussion</p>
+                    <AppInput v-model="discussionForm(module.id).title" placeholder="Discussion title" />
+                    <AppTextarea v-model="discussionForm(module.id).prompt" placeholder="Discussion prompt" :rows="2" />
+                    <AppInput v-model="discussionForm(module.id).points_possible" type="number" min="0" placeholder="Points possible (optional — leave blank for ungraded)" />
+                    <AppButton @click="addDiscussion(module.id)">Add discussion</AppButton>
                   </div>
                 </div>
               </div>
-              <div v-if="course.can_edit" class="flex items-center gap-1 shrink-0">
-                <button @click="moveItem(module, itemIndex, -1)" class="p-1 text-slate-400 hover:text-slate-700"><ArrowUpIcon class="h-3.5 w-3.5" /></button>
-                <button @click="moveItem(module, itemIndex, 1)" class="p-1 text-slate-400 hover:text-slate-700"><ArrowDownIcon class="h-3.5 w-3.5" /></button>
-                <button @click="toggleItemPublish(item.id)" class="p-1 text-slate-400 hover:text-slate-700">
-                  <EyeIcon v-if="!item.is_published" class="h-3.5 w-3.5" />
-                  <EyeSlashIcon v-else class="h-3.5 w-3.5" />
-                </button>
-                <button @click="deleteItem(item.id)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-3.5 w-3.5" /></button>
-              </div>
+            </AppCard>
+
+            <div v-if="course.can_edit" class="flex gap-2">
+              <AppInput v-model="newModuleTitle" placeholder="New module title" class="flex-1" />
+              <AppButton @click="addModule"><PlusIcon class="h-4 w-4" /> Add module</AppButton>
             </div>
 
-            <div v-if="course.can_edit" class="border-t border-slate-100 pt-3 space-y-2">
-              <div class="flex gap-2">
-                <input v-model="pageForm(module.id).title" placeholder="Page title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
-                <button @click="addPage(module.id)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium">Add page</button>
-              </div>
-              <textarea v-model="pageForm(module.id).body" placeholder="Page body (optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
-              <input v-model="pageForm(module.id).video_url" placeholder="Video URL (YouTube/Drive, optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-
-              <div class="flex gap-2 items-center">
-                <input v-model="fileTitles[module.id]" placeholder="File title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
-                <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer">
-                  Upload file
-                  <input type="file" class="hidden" @change="e => addFile(module.id, e)" />
-                </label>
-              </div>
-
-              <div class="border-t border-slate-100 pt-3 space-y-2">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">New assignment</p>
-                <input v-model="assignmentForm(module.id).title" placeholder="Assignment title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-                <textarea v-model="assignmentForm(module.id).instructions" placeholder="Instructions (optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
-                <div class="flex gap-2">
-                  <select v-model="assignmentForm(module.id).submission_type" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                    <option value="text">Text entry</option>
-                    <option value="file">File upload</option>
-                    <option value="link">Link</option>
-                  </select>
-                  <input v-model="assignmentForm(module.id).due_at" type="datetime-local" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
-                </div>
-
-                <div v-if="assignmentForm(module.id).rubric_criteria.length === 0">
-                  <input v-model="assignmentForm(module.id).points_possible" type="number" min="0" placeholder="Points possible" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-                </div>
-                <div v-else class="space-y-1">
-                  <div v-for="(criterion, i) in assignmentForm(module.id).rubric_criteria" :key="i" class="flex gap-2 items-center">
-                    <input v-model="criterion.description" placeholder="Criterion" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
-                    <input v-model="criterion.max_points" type="number" min="0" placeholder="Points" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-24" />
-                    <button @click="removeRubricCriterion(module.id, i)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-4 w-4" /></button>
-                  </div>
-                </div>
-
-                <div v-if="rubric_templates.length" class="flex gap-2 items-center">
-                  <select @change="e => applyTemplate(module.id, e.target.value)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1">
-                    <option value="" disabled selected>Start from a saved template</option>
-                    <option v-for="t in rubric_templates" :key="t.id" :value="t.id">{{ t.name }}</option>
-                  </select>
-                </div>
-
-                <button @click="addRubricCriterion(module.id)" class="text-xs text-indigo-600 underline">+ Add rubric criterion</button>
-
-                <div v-if="assignmentForm(module.id).rubric_criteria.length > 0" class="flex items-center gap-2">
-                  <input type="checkbox" v-model="assignmentForm(module.id).save_as_template" :id="`save-template-${module.id}`" />
-                  <label :for="`save-template-${module.id}`" class="text-xs text-slate-600">Save these criteria as a template</label>
-                </div>
-                <input v-if="assignmentForm(module.id).save_as_template" v-model="assignmentForm(module.id).template_name" placeholder="Template name" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-
-                <div v-if="rubric_templates.length" class="border-t border-slate-100 pt-2 space-y-1">
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">My templates</p>
-                  <div v-for="t in rubric_templates" :key="t.id" class="flex items-center gap-2">
-                    <input v-if="renameTemplateDrafts[t.id] !== undefined" v-model="renameTemplateDrafts[t.id]" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs flex-1" />
-                    <span v-else class="text-xs text-slate-600 flex-1">{{ t.name }}</span>
-                    <button v-if="renameTemplateDrafts[t.id] !== undefined" @click="saveTemplateRename(t)" class="text-xs text-indigo-600 underline">Save</button>
-                    <button v-else @click="startRenameTemplate(t)" class="text-xs text-slate-500 underline">Rename</button>
-                    <button @click="deleteTemplate(t)" class="text-xs text-red-500 underline">Delete</button>
-                  </div>
-                </div>
-
-                <button @click="addAssignment(module.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add assignment</button>
-              </div>
-
-              <div v-if="course.can_edit" class="border-t border-slate-100 pt-3 space-y-2">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">New quiz</p>
-                <input v-model="quizForm(module.id).title" placeholder="Quiz title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-                <textarea v-model="quizForm(module.id).instructions" placeholder="Instructions (optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
-                <div class="grid grid-cols-2 gap-2">
-                  <input v-model="quizForm(module.id).time_limit_minutes" type="number" min="1" placeholder="Time limit (minutes, optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
-                  <input v-model="quizForm(module.id).max_attempts" type="number" min="1" placeholder="Max attempts (optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
-                  <input v-model="quizForm(module.id).questions_to_draw" type="number" min="1" placeholder="Draw N random questions (optional)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
-                  <input v-model="quizForm(module.id).due_at" type="datetime-local" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
-                </div>
-                <div class="flex gap-4">
-                  <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="quizForm(module.id).shuffle_questions" /> Shuffle questions</label>
-                  <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="quizForm(module.id).shuffle_options" /> Shuffle options</label>
-                </div>
-
-                <div v-for="(q, qIndex) in quizForm(module.id).questions" :key="qIndex" class="border border-slate-100 rounded-lg p-3 space-y-2">
-                  <div class="flex gap-2">
-                    <select v-model="q.question_type" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                      <option value="multiple_choice">Multiple choice</option>
-                      <option value="true_false">True / False</option>
-                      <option value="multiple_select">Multiple select</option>
-                      <option value="short_answer">Short answer</option>
-                      <option value="essay">Essay</option>
-                    </select>
-                    <input v-model="q.points" type="number" min="0" placeholder="Points" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-24" />
-                    <select v-model="q.difficulty" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                      <option value="">Difficulty (optional)</option>
-                      <option value="easy">Easy</option>
-                      <option value="medium">Medium</option>
-                      <option value="hard">Hard</option>
-                    </select>
-                    <button @click="removeQuizQuestion(module.id, qIndex)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-4 w-4" /></button>
-                  </div>
-                  <textarea v-model="q.prompt" placeholder="Question prompt (supports $LaTeX$)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
-                  <MathContent v-if="q.prompt" :html="sanitizeHtml(q.prompt)" class="prose prose-sm max-w-none border-l-2 border-slate-200 pl-2" />
-
-                  <div v-if="quiz_question_bank.length" class="flex gap-2 items-center">
-                    <select @change="e => applyQuizBankItem(module.id, qIndex, e.target.value)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1">
-                      <option value="" disabled selected>Start from a saved question</option>
-                      <option v-for="b in quiz_question_bank" :key="b.id" :value="b.id">{{ b.name }}</option>
-                    </select>
-                  </div>
-
-                  <div v-if="['multiple_choice', 'true_false', 'multiple_select'].includes(q.question_type)" class="space-y-1">
-                    <div v-for="(o, oIndex) in q.options" :key="oIndex" class="flex gap-2 items-center">
-                      <input v-model="o.option_text" placeholder="Option text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
-                      <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="o.is_correct" /> Correct</label>
-                      <button @click="removeQuizQuestionOption(module.id, qIndex, oIndex)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-3.5 w-3.5" /></button>
-                    </div>
-                    <button @click="addQuizQuestionOption(module.id, qIndex)" class="text-xs text-indigo-600 underline">+ Add option</button>
-                  </div>
-
-                  <div v-else-if="q.question_type === 'short_answer'" class="space-y-1">
-                    <div v-for="(a, aIndex) in q.accepted_answers" :key="aIndex" class="flex gap-2 items-center">
-                      <input v-model="q.accepted_answers[aIndex]" placeholder="Accepted answer" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
-                      <button @click="removeAcceptedAnswer(module.id, qIndex, aIndex)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-3.5 w-3.5" /></button>
-                    </div>
-                    <button @click="addAcceptedAnswer(module.id, qIndex)" class="text-xs text-indigo-600 underline">+ Add accepted answer</button>
-                  </div>
-
-                  <div class="flex items-center gap-2">
-                    <input type="checkbox" v-model="q.save_to_bank" :id="`save-qbank-${module.id}-${qIndex}`" />
-                    <label :for="`save-qbank-${module.id}-${qIndex}`" class="text-xs text-slate-600">Save this question to my bank</label>
-                  </div>
-                  <input v-if="q.save_to_bank" v-model="q.bank_name" placeholder="Bank name" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-                </div>
-                <button @click="addQuizQuestion(module.id)" class="text-xs text-indigo-600 underline">+ Add question</button>
-
-                <div v-if="quiz_question_bank.length" class="border-t border-slate-100 pt-2 space-y-1">
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">My question bank</p>
-                  <div v-for="b in quiz_question_bank" :key="b.id" class="flex items-center gap-2">
-                    <input v-if="renameBankItemDrafts[b.id] !== undefined" v-model="renameBankItemDrafts[b.id]" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs flex-1" />
-                    <span v-else class="text-xs text-slate-600 flex-1">{{ b.name }}</span>
-                    <button v-if="renameBankItemDrafts[b.id] !== undefined" @click="saveBankItemRename(b)" class="text-xs text-indigo-600 underline">Save</button>
-                    <button v-else @click="startRenameBankItem(b)" class="text-xs text-slate-500 underline">Rename</button>
-                    <button @click="deleteBankItem(b)" class="text-xs text-red-500 underline">Delete</button>
-                  </div>
-                </div>
-
-                <button @click="addQuiz(module.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add quiz</button>
-              </div>
-
-              <div v-if="course.can_edit" class="border-t border-slate-100 pt-3 space-y-2">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">New discussion</p>
-                <input v-model="discussionForm(module.id).title" placeholder="Discussion title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-                <textarea v-model="discussionForm(module.id).prompt" placeholder="Discussion prompt" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="2" />
-                <input v-model="discussionForm(module.id).points_possible" type="number" min="0" placeholder="Points possible (optional — leave blank for ungraded)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-                <button @click="addDiscussion(module.id)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add discussion</button>
-              </div>
-            </div>
+            <EmptyState v-if="course.modules.length === 0" title="No modules yet" subtitle="Add your first module to start building this course." />
           </div>
-        </div>
+        </template>
 
-        <div v-if="course.can_edit" class="flex gap-2">
-          <input v-model="newModuleTitle" placeholder="New module title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm flex-1" />
-          <button @click="addModule" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1">
-            <PlusIcon class="h-4 w-4" /> Add module
-          </button>
-        </div>
-      </section>
+        <template v-else>
+          <div class="space-y-5">
+            <AppCard v-for="announcement in course.announcements" :key="announcement.id">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-medium text-slate-800">{{ announcement.title }}</p>
+                  <p class="text-xs text-slate-500">{{ announcement.posted_by }} — {{ new Date(announcement.posted_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</p>
+                </div>
+                <AppIconButton v-if="course.can_edit" label="Delete announcement" variant="danger" @click="deleteAnnouncement(announcement.id)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+              </div>
+              <p class="mt-2 whitespace-pre-line text-sm text-slate-600">{{ announcement.body }}</p>
+            </AppCard>
 
-      <!-- Announcements -->
-      <section>
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Announcements</h2>
+            <EmptyState v-if="course.announcements.length === 0" title="No announcements yet" />
 
-        <div v-for="announcement in course.announcements" :key="announcement.id" class="border border-slate-200 rounded-lg p-4 mb-2">
-          <div class="flex items-start justify-between">
-            <div>
-              <p class="text-sm font-medium text-slate-800">{{ announcement.title }}</p>
-              <p class="text-xs text-slate-500">{{ announcement.posted_by }} — {{ new Date(announcement.posted_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}</p>
-            </div>
-            <button v-if="course.can_edit" @click="deleteAnnouncement(announcement.id)" class="p-1 text-red-400 hover:text-red-600"><TrashIcon class="h-4 w-4" /></button>
+            <AppCard v-if="course.can_edit" title="Post announcement">
+              <div class="space-y-2">
+                <AppInput v-model="announcementForm.title" placeholder="Announcement title" />
+                <AppTextarea v-model="announcementForm.body" placeholder="Announcement body" :rows="3" />
+                <AppButton @click="postAnnouncement">Post announcement</AppButton>
+              </div>
+            </AppCard>
           </div>
-          <p class="text-sm text-slate-600 mt-2 whitespace-pre-line">{{ announcement.body }}</p>
-        </div>
-
-        <div v-if="course.can_edit" class="border border-slate-200 rounded-lg p-4 space-y-2">
-          <input v-model="announcementForm.title" placeholder="Announcement title" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" />
-          <textarea v-model="announcementForm.body" placeholder="Announcement body" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full" rows="3" />
-          <button @click="postAnnouncement" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Post announcement</button>
-        </div>
-      </section>
+        </template>
+      </AppTabs>
     </div>
   </AdminLayout>
 </template>
