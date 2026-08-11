@@ -22,7 +22,10 @@ use Tests\TestCase;
 /**
  * CID teaching faculty's leave must be recommended by their Academic Unit
  * Head before the Division Chief (CID Chief). An AUH's own leave is
- * recommended by ACIDAA instead, since an AUH cannot recommend themselves.
+ * recommended by the CID Chief directly instead, since an AUH cannot
+ * recommend themselves. When the CID Chief (role) is the same person as
+ * the Division Chief of record, that collapses the workflow to 3 stages —
+ * see test_auh_own_leave_skips_recommendation_when_cid_chief_is_division_chief.
  * Everyone else keeps the original 3-stage workflow unchanged.
  */
 class LeaveAuhRecommendationTest extends TestCase
@@ -246,11 +249,19 @@ class LeaveAuhRecommendationTest extends TestCase
         $this->assertSame('forwarded', $application->status);
     }
 
-    public function test_auh_own_leave_is_recommended_by_acidaa(): void
+    public function test_auh_own_leave_skips_recommendation_when_cid_chief_is_division_chief(): void
     {
-        // The AUH applies for their own leave — they cannot recommend
-        // themselves, so ACIDAA (not the AUH's own academic-unit lookup)
-        // must be the resolved recommender.
+        // An ACIDAA designee exists in the system, but must NOT be routed
+        // to for the AUH's own leave — the CID Chief handles it directly.
+        // Give $this->cidChief the "CID Chief" RBAC role so it's also who
+        // IPCRWorkflowService::cidChief() resolves — matching production,
+        // where the CID Chief role holder and the CID division's
+        // division_chief_id are the same person. That equality is what
+        // collapses the recommendation stage away entirely — the CID
+        // Chief forwards straight from hr_verified.
+        $this->cidChief->roles()->attach(Role::firstOrCreate(['name' => 'CID Chief'])->id);
+        $this->makeAcidaaUser();
+
         $auhApplicant = User::factory()->create([
             'name' => 'Ms. Math Unit Head',
             'emp_category' => 'Plantilla Teaching',
@@ -259,19 +270,64 @@ class LeaveAuhRecommendationTest extends TestCase
         // Re-point the unit's head to this exact user (they head their own unit).
         $this->unit->update(['head_user_id' => $auhApplicant->id]);
 
-        $acidaa = $this->makeAcidaaUser();
         $application = $this->application($auhApplicant, ['status' => 'hr_verified']);
 
-        // ACIDAA has no dedicated RBAC role/permission for this — the
-        // identity-match check alone must authorize the action.
-        $this->actingAs($acidaa)
+        $this->actingAs($this->cidChief)
+            ->post(route('hr.leave.approve', $application), [
+                'stage' => 'division_chief', 'action' => 'forwarded', 'remarks' => '',
+            ])->assertRedirect();
+
+        $application->refresh();
+        $this->assertSame('forwarded', $application->status);
+        $this->assertNull($application->auh_id);
+    }
+
+    public function test_auh_own_leave_requires_recommendation_when_cid_chief_role_differs_from_division_chief_record(): void
+    {
+        // Here "CID Chief" (the RBAC role leaveRecommenderFor() resolves
+        // via cidChief()) is a different physical person than
+        // $this->cidChief (the CID division's division_chief_id holder).
+        // Deliberately do NOT attach the "CID Chief" role to $this->cidChief
+        // in this test, so cidChief() resolves unambiguously to the user
+        // created below. The AUH's own leave must still route through a
+        // distinct recommendation stage in that case, performed by the CID
+        // Chief role holder — not collapsed, and not ACIDAA either.
+        $cidChiefRoleHolder = User::factory()->create(['name' => 'Dr. Other CID Chief']);
+        $cidChiefRoleHolder->roles()->attach(Role::firstOrCreate(['name' => 'CID Chief'])->id);
+
+        $auhApplicant = User::factory()->create([
+            'name' => 'Ms. Math Unit Head',
+            'emp_category' => 'Plantilla Teaching',
+            'division_id' => $this->cid->id,
+        ]);
+        $this->unit->update(['head_user_id' => $auhApplicant->id]);
+
+        $application = $this->application($auhApplicant, ['status' => 'hr_verified']);
+
+        // The division_chief_id holder cannot forward yet — no recommendation on file.
+        $this->actingAs($this->cidChief)
+            ->post(route('hr.leave.approve', $application), [
+                'stage' => 'division_chief', 'action' => 'forwarded', 'remarks' => '',
+            ])->assertStatus(409);
+
+        // The CID Chief role holder recommends.
+        $this->actingAs($cidChiefRoleHolder)
             ->post(route('hr.leave.approve', $application), [
                 'stage' => 'academic_unit_head', 'action' => 'recommended', 'remarks' => '',
             ])->assertRedirect();
 
         $application->refresh();
         $this->assertSame('auh_verified', $application->status);
-        $this->assertSame($acidaa->id, $application->auh_id);
+        $this->assertSame($cidChiefRoleHolder->id, $application->auh_id);
+
+        // Now the actual division_chief_id holder forwards.
+        $this->actingAs($this->cidChief)
+            ->post(route('hr.leave.approve', $application), [
+                'stage' => 'division_chief', 'action' => 'forwarded', 'remarks' => '',
+            ])->assertRedirect();
+
+        $application->refresh();
+        $this->assertSame('forwarded', $application->status);
     }
 
     public function test_academic_unit_head_inbox_visibility(): void

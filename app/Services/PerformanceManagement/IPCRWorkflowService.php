@@ -189,9 +189,11 @@ class IPCRWorkflowService
     /**
      * The "recommend before Division Chief" resolver for CID teaching
      * faculty leave applications. Mirrors immediateSupervisorFor()'s
-     * AUH/ACIDAA chain (without the DivisionChief-self branch, which
-     * doesn't apply to leave — non-teaching DCs never reach this gate):
-     *   AUH (heads a unit)  → ACIDAA — an AUH cannot recommend their own leave
+     * AUH chain (without the DivisionChief-self branch, which doesn't
+     * apply to leave — non-teaching DCs never reach this gate), but
+     * unlike immediateSupervisorFor() an AUH's own leave never routes
+     * through ACIDAA — it goes straight to the CID Chief:
+     *   AUH (heads a unit)  → CID Chief — an AUH cannot recommend their own leave
      *   ACIDAA holder       → CID Chief
      *   Regular unit faculty→ their Academic Unit Head
      */
@@ -202,7 +204,7 @@ class IPCRWorkflowService
         }
 
         if ($this->currentAcademicUnits()->where('head_user_id', $employee->id)->isNotEmpty()) {
-            return $this->firstNotSelf($employee, $this->acidaaHolder(), $this->cidChief());
+            return $this->firstNotSelf($employee, $this->cidChief());
         }
 
         return $this->firstNotSelf($employee, $this->academicUnitHeadFor($employee));
