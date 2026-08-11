@@ -8,10 +8,14 @@ use App\Jobs\ProcessIssuanceRelease;
 use App\Jobs\ResendIssuanceEmails;
 use App\Mail\IssuanceReleasedMail;
 use App\Models\Division;
+use App\Models\FacultyLoading\GradeLevel;
+use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\Issuance;
 use App\Models\IssuanceRecipient;
 use App\Models\IssuanceType;
 use App\Models\Office;
+use App\Models\Registrar\StudentEnrollment;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
 use App\Services\IssuanceService;
@@ -99,9 +103,38 @@ class IssuanceController extends Controller
 
     // ── Create ────────────────────────────────────────────────────────────────
 
+    /** @return array{sections: \Illuminate\Support\Collection, gradeLevels: \Illuminate\Support\Collection, students: \Illuminate\Support\Collection} */
+    private function recipientTargetingOptions(): array
+    {
+        $currentSY = SchoolYear::where('is_current', true)->first();
+
+        $sections = $currentSY
+            ? Section::where('school_year_id', $currentSY->id)->where('is_active', true)
+                ->orderBy('levelid')->orderBy('sectionname')->get(['id', 'sectionname', 'levelid'])
+            : collect();
+
+        $gradeLevels = GradeLevel::orderBy('sort_order')->get(['grade', 'label']);
+
+        $students = $currentSY
+            ? StudentEnrollment::active()->forSchoolYear($currentSY->id)
+                ->with('student:id,lastname,firstname,middlename')
+                ->get()
+                ->map(fn ($e) => [
+                    'id'          => $e->student_id,
+                    'full_name'   => $e->student?->full_name,
+                    'grade_level' => $e->grade_level,
+                    'section_id'  => $e->section_id,
+                ])
+                ->filter(fn ($s) => $s['full_name'])
+                ->values()
+            : collect();
+
+        return compact('sections', 'gradeLevels', 'students');
+    }
+
     public function create()
     {
-        return Inertia::render('Issuances/Create', [
+        return Inertia::render('Issuances/Create', array_merge([
             'typeLabels' => Issuance::typeLabels(),
             'offices'    => Office::orderBy('name')->get(['id', 'name']),
             'divisions'  => Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']),
@@ -109,7 +142,7 @@ class IssuanceController extends Controller
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'position']),
             'hasPin'     => ! empty(auth()->user()->signature_pin),
             'signatureUri' => $this->sigService->getSignatureDataUri(auth()->user()),
-        ]);
+        ], $this->recipientTargetingOptions()));
     }
 
     public function createSupplement(Request $request, Issuance $issuance)
@@ -417,11 +450,12 @@ class IssuanceController extends Controller
             ]);
 
         $recipients = $issuance->recipients()
-            ->with(['user:id,name,position,office_id', 'office:id,name'])
+            ->with(['user:id,name,position,office_id', 'office:id,name', 'student:id,lastname,firstname,middlename'])
             ->get()
             ->map(fn($r) => [
                 'id'              => $r->id,
                 'user'            => $r->user?->only('id', 'name', 'position'),
+                'student'         => $r->student ? ['id' => $r->student->id, 'full_name' => $r->student->full_name] : null,
                 'office'          => $r->office?->only('id', 'name'),
                 'acknowledged_at' => $r->acknowledged_at?->toISOString(),
                 'notified_at'     => $r->notified_at?->toISOString(),
@@ -438,11 +472,16 @@ class IssuanceController extends Controller
         $myRecipient = $isAdmin ? null
             : $issuance->recipients()->where('user_id', $user->id)->first();
 
+        $targetingOptions = $isAdmin ? $this->recipientTargetingOptions() : ['sections' => [], 'gradeLevels' => [], 'students' => []];
+
         return Inertia::render('Issuances/Show', [
             'divisions'  => $isAdmin ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']) : [],
             'offices'    => $isAdmin ? Office::orderBy('name')->get(['id', 'name']) : [],
             'users'      => $isAdmin ? User::employees()->where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'position']) : [],
+            'sections'    => $targetingOptions['sections'],
+            'gradeLevels' => $targetingOptions['gradeLevels'],
+            'students'    => $targetingOptions['students'],
             'issuance'   => [
                 'id'               => $issuance->id,
                 'type'             => $issuance->type,
