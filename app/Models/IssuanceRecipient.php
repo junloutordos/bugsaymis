@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class IssuanceRecipient extends Model
 {
     protected $fillable = [
-        'issuance_id', 'user_id', 'office_id', 'notified_at', 'acknowledged_at',
+        'issuance_id', 'user_id', 'student_id', 'office_id', 'notified_at', 'acknowledged_at',
         'email_status', 'emailed_at', 'email_error',
     ];
 
@@ -25,6 +25,11 @@ class IssuanceRecipient extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
     }
 
     public function office()
