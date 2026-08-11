@@ -366,7 +366,7 @@ function deleteDraft() {
           <!-- Content -->
           <AppCard v-if="issuance.content" title="Content">
             <!-- Official letterhead preview -->
-            <div class="border border-slate-200 rounded-lg p-5">
+            <div class="border border-slate-200 rounded-lg bg-slate-50/50 p-6">
               <div class="text-center border-b border-slate-200 pb-3 mb-4">
                 <p class="text-xs font-bold text-slate-700 tracking-wide">PHILIPPINE SCIENCE HIGH SCHOOL</p>
                 <p class="text-xs text-slate-500">Caraga Region Campus</p>
@@ -433,25 +433,27 @@ function deleteDraft() {
         <!-- ── Right panel ────────────────────────────────────────────────── -->
         <div class="lg:col-span-2 space-y-5 lg:sticky lg:top-6 lg:self-start">
 
-          <!-- QR + Verification -->
-          <AppCard v-if="issuance.status === 'released'" title="Verification QR">
-            <div class="flex justify-center mb-3" v-html="issuance.qr_svg"></div>
-            <AppButton variant="secondary" size="sm" block @click="copyVerifyUrl">
-              {{ qrCopied ? '✓ Copied!' : 'Copy verification link' }}
-            </AppButton>
-            <p class="text-[10px] text-slate-400 text-center mt-2">Scan to verify authenticity</p>
-          </AppCard>
+          <div class="space-y-3">
+            <!-- QR + Verification -->
+            <AppCard v-if="issuance.status === 'released'" title="Verification QR">
+              <div class="flex justify-center mb-3" v-html="issuance.qr_svg"></div>
+              <AppButton variant="secondary" size="sm" block @click="copyVerifyUrl">
+                {{ qrCopied ? '✓ Copied!' : 'Copy verification link' }}
+              </AppButton>
+              <p class="text-[10px] text-slate-400 text-center mt-2">Scan to verify authenticity</p>
+            </AppCard>
 
-          <AppCard v-if="issuance.archived_at" title="Archive Record">
-            <p class="text-xs text-slate-500">Archived {{ fmtDt(issuance.archived_at) }}</p>
-            <p v-if="issuance.archive_reason" class="mt-2 text-sm text-slate-700">{{ issuance.archive_reason }}</p>
-          </AppCard>
+            <AppCard v-if="issuance.archived_at" title="Archive Record">
+              <p class="text-xs text-slate-500">Archived {{ fmtDt(issuance.archived_at) }}</p>
+              <p v-if="issuance.archive_reason" class="mt-2 text-sm text-slate-700">{{ issuance.archive_reason }}</p>
+            </AppCard>
 
-          <!-- Hash -->
-          <AppCard v-if="issuance.content_hash" title="Content Hash">
-            <p class="font-mono text-[10px] text-slate-500 break-all bg-slate-50 rounded p-2">{{ issuance.content_hash }}</p>
-            <p class="text-[10px] text-slate-400 mt-1">SHA-256 tamper detection</p>
-          </AppCard>
+            <!-- Hash -->
+            <AppCard v-if="issuance.content_hash" title="Content Hash">
+              <p class="font-mono text-[10px] text-slate-500 break-all bg-slate-50 rounded p-2">{{ issuance.content_hash }}</p>
+              <p class="text-[10px] text-slate-400 mt-1">SHA-256 tamper detection</p>
+            </AppCard>
+          </div>
 
           <!-- Acknowledgment progress (admin) -->
           <AppCard v-if="isAdmin && issuance.status === 'released'">
