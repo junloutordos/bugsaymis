@@ -63,6 +63,7 @@ import {
   MegaphoneIcon,
   PresentationChartLineIcon,
   FlagIcon,
+  ArrowsRightLeftIcon,
 } from "@heroicons/vue/24/outline";
 import LighthouseIcon from '@/Components/Icons/LighthouseIcon.vue';
 
@@ -439,6 +440,13 @@ export const menuItems = [
         routeName: "hr.leave.index",
         href: route('hr.leave.index'),
         icon: ClipboardDocumentListIcon,
+        permissions: ["hr.leave.file", "hr.leave.view"],
+      },
+      {
+        label: "Substitutions",
+        routeName: "hr.substitutions.index",
+        href: route('hr.substitutions.index'),
+        icon: ArrowsRightLeftIcon,
         permissions: ["hr.leave.file", "hr.leave.view"],
       },
       {
