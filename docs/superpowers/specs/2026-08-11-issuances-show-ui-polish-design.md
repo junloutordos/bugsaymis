@@ -37,11 +37,12 @@ Header restructured from one packed row to two:
 At the new sidebar width (~480px vs ~260px), 2 buttons fit per row before wrapping — no more overflow at any viewport.
 
 ### 4. Premium visual polish (applies across all cards on this page, local markup only)
-- Card body padding `p-5` → `p-6`; card header padding `px-5 py-4` → `px-6 py-5` — done via local Tailwind classes in `Show.vue`'s markup, not by editing the shared `AppCard.vue` component.
 - Card stack spacing `space-y-5` → `space-y-6`.
 - Letterhead/content preview block: slightly more internal padding + subtle `bg-slate-50/50` behind it so it reads as a distinct "document" rather than a plain bordered box.
 - Sidebar "metadata" cards (Verification QR, Content Hash, Archive Record) grouped with tighter spacing between each other, with clearer separation before the heavier Acknowledgments card.
 - No new colors. Stays indigo-dominant; status colors (green/amber/red) remain reserved for actual status values only, per existing project color-palette convention.
+
+**Dropped during planning:** an earlier draft of this section also called for bumping card body padding (`p-5`→`p-6`) and card header padding (`px-5 py-4`→`px-6 py-5`). The header padding is hardcoded inside `AppCard.vue`'s own template with no override slot, so it can't be changed "locally" without editing the shared component — which this spec puts out of scope (it's used across many other modules). Dropped rather than widen the blast radius; confirmed with the user.
 
 ## Testing
 
