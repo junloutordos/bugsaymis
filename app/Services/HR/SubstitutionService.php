@@ -1,0 +1,215 @@
+<?php
+
+namespace App\Services\HR;
+
+use App\Models\Division;
+use App\Models\HR\LeaveApplication;
+use App\Models\HR\Substitution;
+use App\Models\TravelRequest;
+use App\Models\User;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
+use App\Services\HR\ActingAsService;
+
+class SubstitutionService
+{
+    public function __construct(private IPCRWorkflowService $ipcrWorkflow) {}
+
+    /**
+     * Create a pending-approval substitution grant tied to an approved
+     * Leave/Travel absence.
+     */
+    public function nominate(User $originalUser, User $substituteUser, Model $absentable, ?string $notes = null): Substitution
+    {
+        [$start, $end] = $this->absentableDateRange($absentable);
+        $errors = [];
+
+        if (! $this->absentableIsApproved($absentable)) {
+            $errors[] = 'The underlying leave/travel request is not approved.';
+        }
+
+        if ($originalUser->isSuperAdmin()) {
+            $errors[] = 'Administrators cannot be substituted through this module.';
+        }
+
+        if ($originalUser->is($substituteUser)) {
+            $errors[] = 'You cannot nominate yourself as your own substitute.';
+        }
+
+        if ($start && $end && $this->hasOverlappingApprovedLeave($substituteUser, $start, $end)) {
+            $errors[] = 'The selected substitute has their own approved leave overlapping this period.';
+        }
+
+        if ($start && $end && $this->hasOverlappingGrant($originalUser, $start, $end)) {
+            $errors[] = 'There is already an active or pending substitution for this period.';
+        }
+
+        if ($errors) {
+            throw ValidationException::withMessages(['substitution' => $errors]);
+        }
+
+        return Substitution::create([
+            'original_user_id' => $originalUser->id,
+            'substitute_user_id' => $substituteUser->id,
+            'absentable_type' => get_class($absentable),
+            'absentable_id' => $absentable->id,
+            'start_date' => $start,
+            'end_date' => $end,
+            'status' => 'pending_approval',
+            'nominated_by' => $originalUser->id,
+            'notes' => $notes,
+        ]);
+    }
+
+    /**
+     * Resolve who must approve a substitution nomination for this employee —
+     * reuses the same Division Chief/AUH recommender resolution as the leave
+     * approval workflow, falling back to the employee's Division Chief when
+     * that resolves to nobody or to the employee themselves.
+     */
+    public function resolveApprover(User $originalUser): ?User
+    {
+        $recommender = $this->ipcrWorkflow->leaveRecommenderFor($originalUser);
+        if ($recommender && (int) $recommender->id !== (int) $originalUser->id) {
+            return $recommender;
+        }
+
+        $divisionChiefId = Division::where('id', $originalUser->division_id)->value('division_chief_id');
+        if ($divisionChiefId && (int) $divisionChiefId !== (int) $originalUser->id) {
+            return User::find($divisionChiefId);
+        }
+
+        return null;
+    }
+
+    public function approve(Substitution $substitution, User $approver, ?string $remarks = null): Substitution
+    {
+        $this->guardPendingAndAuthorizedApprover($substitution, $approver);
+
+        $substitution->update([
+            'status' => 'approved',
+            'approved_by' => $approver->id,
+            'approved_at' => now(),
+            'notes' => trim(($substitution->notes ?? '') . ($remarks ? "\nApprover remarks: {$remarks}" : '')),
+        ]);
+
+        return $substitution->fresh();
+    }
+
+    public function reject(Substitution $substitution, User $approver, string $reason): Substitution
+    {
+        $this->guardPendingAndAuthorizedApprover($substitution, $approver);
+
+        $substitution->update([
+            'status' => 'rejected',
+            'approved_by' => $approver->id,
+            'approved_at' => now(),
+            'rejection_reason' => $reason,
+        ]);
+
+        return $substitution->fresh();
+    }
+
+    private function guardPendingAndAuthorizedApprover(Substitution $substitution, User $approver): void
+    {
+        if ($substitution->status !== 'pending_approval') {
+            throw ValidationException::withMessages(['substitution' => ['This nomination has already been decided.']]);
+        }
+
+        if ($approver->isSuperAdmin()) {
+            return;
+        }
+
+        $resolved = $this->resolveApprover($substitution->originalUser);
+        if (! $resolved || (int) $resolved->id !== (int) $approver->id) {
+            throw ValidationException::withMessages(['substitution' => ['You are not the resolved approver for this nomination.']]);
+        }
+    }
+
+    public function revoke(Substitution $substitution, ?User $revoker, string $reason): Substitution
+    {
+        if ($substitution->status !== 'approved') {
+            throw ValidationException::withMessages(['substitution' => ['Only an approved substitution can be revoked.']]);
+        }
+
+        if ($revoker !== null && ! $revoker->isSuperAdmin()) {
+            $isOriginalUser = (int) $revoker->id === (int) $substitution->original_user_id;
+            $resolvedApprover = $this->resolveApprover($substitution->originalUser);
+            $isResolvedApprover = $resolvedApprover && (int) $resolvedApprover->id === (int) $revoker->id;
+
+            if (! $isOriginalUser && ! $isResolvedApprover) {
+                throw ValidationException::withMessages(['substitution' => ['You are not authorized to revoke this substitution.']]);
+            }
+        }
+
+        $substitution->update([
+            'status' => 'revoked',
+            'revoked_by' => $revoker?->id,
+            'revoked_at' => now(),
+            'revocation_reason' => $reason,
+        ]);
+
+        app(ActingAsService::class)->forceEndForSubstitution($substitution, 'revoked');
+
+        return $substitution->fresh();
+    }
+
+    /** System-triggered revocation when the underlying Leave/Travel is cancelled. */
+    public function revokeForCancelledAbsence(Model $absentable): void
+    {
+        Substitution::where('absentable_type', get_class($absentable))
+            ->where('absentable_id', $absentable->id)
+            ->where('status', 'approved')
+            ->get()
+            ->each(fn (Substitution $s) => $this->revoke($s, null, 'The underlying leave/travel request was cancelled.'));
+    }
+
+    /** @return array{0: ?string, 1: ?string} [start_date, end_date] as Y-m-d strings */
+    private function absentableDateRange(Model $absentable): array
+    {
+        if ($absentable instanceof LeaveApplication) {
+            return [$absentable->date_from?->toDateString(), $absentable->date_to?->toDateString()];
+        }
+
+        if ($absentable instanceof TravelRequest) {
+            return [$absentable->start_date?->toDateString(), $absentable->end_date?->toDateString()];
+        }
+
+        return [null, null];
+    }
+
+    private function absentableIsApproved(Model $absentable): bool
+    {
+        if ($absentable instanceof LeaveApplication) {
+            return $absentable->status === 'approved';
+        }
+
+        if ($absentable instanceof TravelRequest) {
+            return in_array($absentable->status, [
+                'ocd_approved', 'transport_arranged', 'cash_advance_processing',
+                'dv_created', 'released', 'completed',
+            ], true);
+        }
+
+        return false;
+    }
+
+    private function hasOverlappingApprovedLeave(User $user, string $start, string $end): bool
+    {
+        return LeaveApplication::where('user_id', $user->id)
+            ->where('status', 'approved')
+            ->where('date_from', '<=', $end)
+            ->where('date_to', '>=', $start)
+            ->exists();
+    }
+
+    private function hasOverlappingGrant(User $originalUser, string $start, string $end): bool
+    {
+        return Substitution::where('original_user_id', $originalUser->id)
+            ->approvedOrPending()
+            ->where('start_date', '<=', $end)
+            ->where('end_date', '>=', $start)
+            ->exists();
+    }
+}

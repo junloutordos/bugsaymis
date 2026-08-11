@@ -121,6 +121,10 @@ class TravelController extends Controller
                 'divisionChiefs' => User::havingRole('DivisionChief')->where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
             ],
             'currentUser' => $this->formatUser($request->user()),
+            'eligibleSubstitutes' => User::employees()
+                ->where('id', '!=', $travel->traveler_id)
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 

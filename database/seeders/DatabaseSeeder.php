@@ -88,5 +88,8 @@ class DatabaseSeeder extends Seeder
 
         // ── Quiz (live interactive quiz/poll module) ────────────────────────────
         $this->call(QuizPermissionSeeder::class);
+
+        // ── Substitution Module ─────────────────────────────────────────────────
+        $this->call(SubstitutionPermissionSeeder::class);
     }
 }

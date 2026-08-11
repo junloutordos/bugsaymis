@@ -184,6 +184,10 @@ class LeaveApplicationController extends Controller
             'isAuhRecommender' => $requiresAuh
                 && ($recommender = $ipcrWorkflow->leaveRecommenderFor($leaveApplication->user))
                 && (int) $recommender->id === (int) $authUser->id,
+            'eligibleSubstitutes' => \App\Models\User::employees()
+                ->where('id', '!=', $leaveApplication->user_id)
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 
@@ -281,6 +285,8 @@ class LeaveApplicationController extends Controller
             if ($leaveApplication->status === 'approved') {
                 $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
             }
+
+            app(\App\Services\HR\SubstitutionService::class)->revokeForCancelledAbsence($leaveApplication);
 
             $leaveApplication->update(['status' => 'cancelled']);
         });
