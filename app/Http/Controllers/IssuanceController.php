@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class IssuanceController extends Controller
@@ -381,8 +382,11 @@ class IssuanceController extends Controller
     private function assertSigningPin(Request $request, array $data): void
     {
         if (! empty($request->user()->signature_pin)) {
-            abort_if(empty($data['pin']) || ! $this->sigService->verifyPin($request->user(), $data['pin']), 422,
-                'The digital signature PIN is incorrect.');
+            if (empty($data['pin']) || ! $this->sigService->verifyPin($request->user(), $data['pin'])) {
+                throw ValidationException::withMessages([
+                    'pin' => 'The digital signature PIN is incorrect.',
+                ]);
+            }
         }
     }
 
@@ -391,7 +395,12 @@ class IssuanceController extends Controller
         $hasAny = ($data['all_staff'] ?? false) || ($data['all_students'] ?? false)
             || ! empty($data['office_ids']) || ! empty($data['division_ids']) || ! empty($data['user_ids'])
             || ! empty($data['section_ids']) || ! empty($data['grade_levels']) || ! empty($data['student_ids']);
-        abort_if(! $hasAny, 422, 'Select at least one recipient.');
+
+        if (! $hasAny) {
+            throw ValidationException::withMessages([
+                'recipients' => 'Select at least one recipient.',
+            ]);
+        }
     }
 
     private function recipientTargetingRules(): array

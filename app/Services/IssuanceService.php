@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Mpdf\Mpdf;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
@@ -161,7 +162,11 @@ class IssuanceService
         $students = collect();
         if ($wantsStudents) {
             $currentSY = SchoolYear::where('is_current', true)->first();
-            abort_if(! $currentSY, 422, 'No current school year is set — cannot resolve student recipients.');
+            if (! $currentSY) {
+                throw ValidationException::withMessages([
+                    'recipients' => 'No current school year is set — cannot resolve student recipients.',
+                ]);
+            }
 
             if ($data['all_students'] ?? false) {
                 $students = $students->concat(StudentEnrollment::active()->forSchoolYear($currentSY->id)->pluck('student_id'));

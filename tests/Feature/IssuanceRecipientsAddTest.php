@@ -174,6 +174,6 @@ class IssuanceRecipientsAddTest extends TestCase
         $issuance = $this->releasedIssuance();
 
         $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [])
-            ->assertStatus(422);
+            ->assertSessionHasErrors('recipients');
     }
 }

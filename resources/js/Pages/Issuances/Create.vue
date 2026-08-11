@@ -69,11 +69,20 @@ const targetingSummaryParts = computed(() => {
   return parts.length ? parts.join(', ') : 'None selected'
 })
 
+const hasAnyRecipientSelected = computed(() => {
+  const t = targeting.value
+  return t.all_staff || t.all_students
+    || t.office_ids.length || t.division_ids.length || t.user_ids.length
+    || t.section_ids.length || t.grade_levels.length || t.student_ids.length
+})
+
 // ── Release (sign + publish) ───────────────────────────────────────────────
 const showPinModal   = ref(false)
 const saving         = ref(false)
 const savingDraft    = ref(false)
 const errors         = ref({})
+
+const errorMessages = computed(() => Object.values(errors.value ?? {}).flat().filter(Boolean))
 
 function canAdvance() {
   if (step.value === 1) return type.value && title.value.trim()
@@ -89,6 +98,7 @@ function canAdvance() {
 }
 
 function saveDraft() {
+  errors.value = {}
   savingDraft.value = true
   router.post(route('issuances.store'), buildPayload(), {
     onSuccess: () => { savingDraft.value = false },
@@ -109,13 +119,15 @@ function buildPayload(pin = null) {
 }
 
 function openPinModal() {
-  if (!canAdvance()) return
+  if (!canAdvance() || !hasAnyRecipientSelected.value) return
+  errors.value = {}
   showPinModal.value = true
 }
 
 function onPinConfirm(pin) {
   showPinModal.value = false
   saving.value = true
+  errors.value = {}
   // Store + release in one request (controller handles both when should_release=true)
   router.post(route('issuances.store'), { ...buildPayload(pin), should_release: true }, {
     onError:  e  => { errors.value = e; saving.value = false },
@@ -260,6 +272,10 @@ watch(type, (t) => {
       <!-- ── Step 3: Recipients + Release ────────────────────────────────── -->
       <AppCard v-if="step === 3" title="Recipients & Release">
         <div class="space-y-5">
+          <div v-if="errorMessages.length" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 space-y-1">
+            <p v-for="(msg, i) in errorMessages" :key="i">{{ msg }}</p>
+          </div>
+
           <RecipientPicker
             v-model="targeting"
             :offices="offices" :divisions="divisions" :users="users"
@@ -272,6 +288,9 @@ watch(type, (t) => {
             <p><span class="text-slate-500">Title:</span> <strong>{{ title }}</strong></p>
             <p><span class="text-slate-500">Content:</span> {{ contentMode === 'editor' ? content.length + ' characters typed' : scanFilename }}</p>
             <p><span class="text-slate-500">Recipients:</span> <strong>{{ targetingSummaryParts }}</strong></p>
+            <p v-if="!hasAnyRecipientSelected" class="text-xs text-red-600 mt-2">
+              ⚠ Select at least one recipient before releasing or saving as draft.
+            </p>
             <p class="text-xs text-warning-700 mt-2">
               ⚠ Releasing is permanent. The issuance will be signed with your digital signature and sent to all recipients.
             </p>
@@ -280,11 +299,11 @@ watch(type, (t) => {
           <div class="flex items-center justify-between pt-2">
             <div class="flex gap-2">
               <AppButton variant="secondary" @click="step = 2">← Back</AppButton>
-              <AppButton variant="secondary" :disabled="savingDraft" :loading="savingDraft" @click="saveDraft">
+              <AppButton variant="secondary" :disabled="savingDraft || !hasAnyRecipientSelected" :loading="savingDraft" @click="saveDraft">
                 {{ savingDraft ? 'Saving…' : 'Save as Draft' }}
               </AppButton>
             </div>
-            <AppButton @click="openPinModal">
+            <AppButton @click="openPinModal" :disabled="!hasAnyRecipientSelected">
               Sign & Release
             </AppButton>
           </div>

@@ -229,7 +229,7 @@ class IssuanceServiceAddRecipientsTest extends TestCase
     {
         $issuance = $this->releasedIssuance();
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
 
         (new IssuanceService())->addRecipients($issuance, ['all_students' => true]);
     }

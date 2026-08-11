@@ -49,6 +49,15 @@ function openRelease() {
   showReleasePanel.value = true
 }
 
+const hasAnyReleaseRecipientSelected = computed(() => {
+  const t = releaseTargeting.value
+  return t.all_staff || t.all_students
+    || t.office_ids.length || t.division_ids.length || t.user_ids.length
+    || t.section_ids.length || t.grade_levels.length || t.student_ids.length
+})
+
+const releaseErrorMessages = computed(() => Object.values(releaseErrors.value ?? {}).flat().filter(Boolean))
+
 function onPinVerified(pin) {
   showPinModal.value = false
   submitting.value   = true
@@ -83,6 +92,15 @@ const addTargeting = ref({
 const addingRecipients   = ref(false)
 const addRecipientErrors = ref({})
 
+const hasAnyAddRecipientSelected = computed(() => {
+  const t = addTargeting.value
+  return t.all_staff || t.all_students
+    || t.office_ids.length || t.division_ids.length || t.user_ids.length
+    || t.section_ids.length || t.grade_levels.length || t.student_ids.length
+})
+
+const addRecipientErrorMessages = computed(() => Object.values(addRecipientErrors.value ?? {}).flat().filter(Boolean))
+
 function openAddRecipientModal() {
   addTargeting.value = {
     all_staff: false, office_ids: [], division_ids: [], user_ids: [],
@@ -93,6 +111,7 @@ function openAddRecipientModal() {
 }
 
 function submitAddRecipients() {
+  if (!hasAnyAddRecipientSelected.value) return
   addingRecipients.value = true
   addRecipientErrors.value = {}
   router.post(route('issuances.recipients.add', props.issuance.id), addTargeting.value, {
@@ -472,6 +491,10 @@ function deleteDraft() {
           <!-- Release panel (draft) -->
           <AppCard v-if="isAdmin && issuance.status === 'draft' && showReleasePanel" title="Release Settings">
             <div class="space-y-3">
+              <div v-if="releaseErrorMessages.length" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 space-y-1">
+                <p v-for="(msg, i) in releaseErrorMessages" :key="i">{{ msg }}</p>
+              </div>
+
               <div v-if="issuance.is_supplement" class="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
                 Recipients will be inherited from {{ issuance.parent_issuance?.control_number }}. Each recipient will receive and acknowledge this document separately.
               </div>
@@ -481,11 +504,14 @@ function deleteDraft() {
                 :sections="sections" :grade-levels="gradeLevels" :students="students"
               />
 
+              <p v-if="!issuance.is_supplement && !hasAnyReleaseRecipientSelected" class="text-xs text-red-600">
+                ⚠ Select at least one recipient before releasing.
+              </p>
               <p class="text-xs text-warning-700 bg-warning-50 rounded-lg px-3 py-2">
                 ⚠ This will sign and release the issuance permanently.
               </p>
 
-              <AppButton block @click="showPinModal = true">
+              <AppButton block @click="showPinModal = true" :disabled="!issuance.is_supplement && !hasAnyReleaseRecipientSelected">
                 Sign & Release Now
               </AppButton>
             </div>
@@ -508,20 +534,24 @@ function deleteDraft() {
     <!-- Add Recipient Modal -->
     <AppModal :show="showAddRecipientModal" title="Add Recipient" size="lg" @close="showAddRecipientModal = false">
       <div class="space-y-5">
+        <div v-if="addRecipientErrorMessages.length" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 space-y-1">
+          <p v-for="(msg, i) in addRecipientErrorMessages" :key="i">{{ msg }}</p>
+        </div>
+
         <RecipientPicker
           v-model="addTargeting"
           :offices="offices" :divisions="divisions" :users="users"
           :sections="sections" :grade-levels="gradeLevels" :students="students"
         />
 
-        <p v-if="Object.keys(addRecipientErrors).length" class="text-xs text-red-600">
-          {{ Object.values(addRecipientErrors)[0] }}
+        <p v-if="!hasAnyAddRecipientSelected" class="text-xs text-red-600">
+          ⚠ Select at least one recipient to add.
         </p>
       </div>
 
       <template #footer>
         <AppButton variant="secondary" @click="showAddRecipientModal = false">Cancel</AppButton>
-        <AppButton :disabled="addingRecipients" :loading="addingRecipients" @click="submitAddRecipients">
+        <AppButton :disabled="addingRecipients || !hasAnyAddRecipientSelected" :loading="addingRecipients" @click="submitAddRecipients">
           {{ addingRecipients ? 'Adding…' : 'Add & Notify' }}
         </AppButton>
       </template>
