@@ -82,6 +82,50 @@ class SubstitutionService
         return null;
     }
 
+    public function approve(Substitution $substitution, User $approver, ?string $remarks = null): Substitution
+    {
+        $this->guardPendingAndAuthorizedApprover($substitution, $approver);
+
+        $substitution->update([
+            'status' => 'approved',
+            'approved_by' => $approver->id,
+            'approved_at' => now(),
+            'notes' => trim(($substitution->notes ?? '') . ($remarks ? "\nApprover remarks: {$remarks}" : '')),
+        ]);
+
+        return $substitution->fresh();
+    }
+
+    public function reject(Substitution $substitution, User $approver, string $reason): Substitution
+    {
+        $this->guardPendingAndAuthorizedApprover($substitution, $approver);
+
+        $substitution->update([
+            'status' => 'rejected',
+            'approved_by' => $approver->id,
+            'approved_at' => now(),
+            'rejection_reason' => $reason,
+        ]);
+
+        return $substitution->fresh();
+    }
+
+    private function guardPendingAndAuthorizedApprover(Substitution $substitution, User $approver): void
+    {
+        if ($substitution->status !== 'pending_approval') {
+            throw ValidationException::withMessages(['substitution' => ['This nomination has already been decided.']]);
+        }
+
+        if ($approver->isSuperAdmin()) {
+            return;
+        }
+
+        $resolved = $this->resolveApprover($substitution->originalUser);
+        if (! $resolved || (int) $resolved->id !== (int) $approver->id) {
+            throw ValidationException::withMessages(['substitution' => ['You are not the resolved approver for this nomination.']]);
+        }
+    }
+
     /** @return array{0: ?string, 1: ?string} [start_date, end_date] as Y-m-d strings */
     private function absentableDateRange(Model $absentable): array
     {
