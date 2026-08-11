@@ -1966,6 +1966,10 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('substitutions.reject');
     Route::post('/substitutions/{substitution}/revoke', [\App\Http\Controllers\HR\SubstitutionController::class, 'revoke'])
         ->name('substitutions.revoke');
+    Route::post('/substitutions/{substitution}/act-as', [\App\Http\Controllers\HR\ActingAsController::class, 'start'])
+        ->name('substitutions.act-as.start');
+    Route::post('/substitutions/act-as/exit', [\App\Http\Controllers\HR\ActingAsController::class, 'exit'])
+        ->name('substitutions.act-as.exit');
 
     // ── Leave Applications ────────────────────────────────────────────────────
     Route::get('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'index'])
