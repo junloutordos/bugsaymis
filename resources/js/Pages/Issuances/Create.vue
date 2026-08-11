@@ -7,9 +7,9 @@ import RichTextEditor from '@/Components/RichTextEditor.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppInput from '@/Components/AppInput.vue'
 import AppButton from '@/Components/AppButton.vue'
+import RecipientPicker from '@/Components/RecipientPicker.vue'
 import {
-  DocumentTextIcon, PaperClipIcon, UserGroupIcon,
-  BuildingOfficeIcon, BuildingLibraryIcon, UserIcon, CheckCircleIcon, ChevronLeftIcon,
+  DocumentTextIcon, PaperClipIcon, CheckCircleIcon, ChevronLeftIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -17,6 +17,9 @@ const props = defineProps({
   offices:      Array,
   divisions:    Array,
   users:        Array,
+  sections:     Array,
+  gradeLevels:  Array,
+  students:     Array,
   hasPin:       Boolean,
   signatureUri: String,
 })
@@ -47,47 +50,24 @@ function handleScan(e) {
 }
 
 // ── Step 3: Recipients ─────────────────────────────────────────────────────
-const recipientType = ref('all')
-const selectedOfficeIds    = ref([])
-const selectedUserIds      = ref([])
-const selectedDivisionIds  = ref([])
-
-const officeSearch   = ref('')
-const userSearch     = ref('')
-const divisionSearch = ref('')
-
-const filteredOffices = computed(() => {
-  const q = officeSearch.value.toLowerCase()
-  return (props.offices ?? []).filter(o => !q || o.name.toLowerCase().includes(q))
+const targeting = ref({
+  all_staff: false, office_ids: [], division_ids: [], user_ids: [],
+  all_students: false, section_ids: [], grade_levels: [], student_ids: [],
 })
 
-const filteredUsers = computed(() => {
-  const q = userSearch.value.toLowerCase()
-  return (props.users ?? []).filter(u => !q || u.name.toLowerCase().includes(q) || u.position?.toLowerCase().includes(q))
+const targetingSummaryParts = computed(() => {
+  const t = targeting.value
+  const parts = []
+  if (t.all_staff) parts.push('All Staff')
+  if (t.office_ids.length) parts.push(`${t.office_ids.length} Office(s)`)
+  if (t.division_ids.length) parts.push(`${t.division_ids.length} Division(s)`)
+  if (t.user_ids.length) parts.push(`${t.user_ids.length} Staff Member(s)`)
+  if (t.all_students) parts.push('All Students')
+  if (t.section_ids.length) parts.push(`${t.section_ids.length} Section(s)`)
+  if (t.grade_levels.length) parts.push(`${t.grade_levels.length} Grade Level(s)`)
+  if (t.student_ids.length) parts.push(`${t.student_ids.length} Student(s)`)
+  return parts.length ? parts.join(', ') : 'None selected'
 })
-
-const filteredDivisions = computed(() => {
-  const q = divisionSearch.value.toLowerCase()
-  return (props.divisions ?? []).filter(d => !q || d.division_name.toLowerCase().includes(q) || d.acronym?.toLowerCase().includes(q))
-})
-
-function toggleOffice(id) {
-  const idx = selectedOfficeIds.value.indexOf(id)
-  if (idx === -1) selectedOfficeIds.value.push(id)
-  else selectedOfficeIds.value.splice(idx, 1)
-}
-
-function toggleUser(id) {
-  const idx = selectedUserIds.value.indexOf(id)
-  if (idx === -1) selectedUserIds.value.push(id)
-  else selectedUserIds.value.splice(idx, 1)
-}
-
-function toggleDivision(id) {
-  const idx = selectedDivisionIds.value.indexOf(id)
-  if (idx === -1) selectedDivisionIds.value.push(id)
-  else selectedDivisionIds.value.splice(idx, 1)
-}
 
 // ── Release (sign + publish) ───────────────────────────────────────────────
 const showPinModal   = ref(false)
@@ -123,10 +103,7 @@ function buildPayload(pin = null) {
     scan_base64:  contentMode.value === 'upload'  ? scanBase64.value : null,
     scan_filename:contentMode.value === 'upload'  ? scanFilename.value : null,
     scan_mime:    contentMode.value === 'upload'  ? scanMime.value : null,
-    recipient_type: recipientType.value,
-    office_ids:     selectedOfficeIds.value,
-    user_ids:       selectedUserIds.value,
-    division_ids:   selectedDivisionIds.value,
+    ...targeting.value,
     pin,
   }
 }
@@ -283,82 +260,18 @@ watch(type, (t) => {
       <!-- ── Step 3: Recipients + Release ────────────────────────────────── -->
       <AppCard v-if="step === 3" title="Recipients & Release">
         <div class="space-y-5">
-          <!-- Recipient type -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-2">Who receives this issuance?</label>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <button v-for="opt in [
-                { key:'all', icon: UserGroupIcon, label:'All Staff', sub:'Every active user' },
-                { key:'office', icon: BuildingOfficeIcon, label:'By Office', sub:'Select offices' },
-                { key:'division', icon: BuildingLibraryIcon, label:'By Division', sub:'Select divisions' },
-                { key:'individual', icon: UserIcon, label:'Individual(s)', sub:'Pick specific users' },
-              ]" :key="opt.key"
-                @click="recipientType = opt.key"
-                class="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-colors"
-                :class="recipientType === opt.key ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'">
-                <component :is="opt.icon" class="h-5 w-5" :class="recipientType === opt.key ? 'text-indigo-600' : 'text-slate-400'" />
-                <p class="text-xs font-semibold" :class="recipientType === opt.key ? 'text-indigo-700' : 'text-slate-700'">{{ opt.label }}</p>
-                <p class="text-[10px] text-slate-400">{{ opt.sub }}</p>
-              </button>
-            </div>
-          </div>
-
-          <!-- Office selection -->
-          <div v-if="recipientType === 'office'" class="space-y-2">
-            <AppInput v-model="officeSearch" type="text" placeholder="Search offices…" />
-            <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-              <label v-for="o in filteredOffices" :key="o.id"
-                class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-                <input type="checkbox" :checked="selectedOfficeIds.includes(o.id)"
-                  @change="toggleOffice(o.id)" class="rounded border-slate-300 text-indigo-600" />
-                <span class="text-sm text-slate-700">{{ o.name }}</span>
-              </label>
-            </div>
-            <p v-if="selectedOfficeIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedOfficeIds.length }} office(s) selected</p>
-          </div>
-
-          <!-- Division selection -->
-          <div v-if="recipientType === 'division'" class="space-y-2">
-            <AppInput v-model="divisionSearch" type="text" placeholder="Search divisions…" />
-            <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-              <label v-for="d in filteredDivisions" :key="d.id"
-                class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-                <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
-                  @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
-                <div>
-                  <p class="text-sm text-slate-700">{{ d.division_name }}</p>
-                  <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
-                </div>
-              </label>
-            </div>
-            <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
-          </div>
-
-          <!-- Individual selection -->
-          <div v-if="recipientType === 'individual'" class="space-y-2">
-            <AppInput v-model="userSearch" type="text" placeholder="Search by name or position…" />
-            <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-              <label v-for="u in filteredUsers.slice(0, 50)" :key="u.id"
-                class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
-                <input type="checkbox" :checked="selectedUserIds.includes(u.id)"
-                  @change="toggleUser(u.id)" class="rounded border-slate-300 text-indigo-600" />
-                <div>
-                  <p class="text-sm font-medium text-slate-700">{{ u.name }}</p>
-                  <p v-if="u.position" class="text-xs text-slate-400">{{ u.position }}</p>
-                </div>
-              </label>
-            </div>
-            <p v-if="selectedUserIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedUserIds.length }} person(s) selected</p>
-          </div>
+          <RecipientPicker
+            v-model="targeting"
+            :offices="offices" :divisions="divisions" :users="users"
+            :sections="sections" :grade-levels="gradeLevels" :students="students"
+          />
 
           <!-- Summary -->
           <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm space-y-1">
             <p><span class="text-slate-500">Type:</span> <strong>{{ typeLabels[type] }}</strong></p>
             <p><span class="text-slate-500">Title:</span> <strong>{{ title }}</strong></p>
             <p><span class="text-slate-500">Content:</span> {{ contentMode === 'editor' ? content.length + ' characters typed' : scanFilename }}</p>
-            <p><span class="text-slate-500">Recipients:</span>
-              <strong>{{ { all: 'All Staff', office: selectedOfficeIds.length + ' Office(s)', division: selectedDivisionIds.length + ' Division(s)', individual: selectedUserIds.length + ' Person(s)' }[recipientType] }}</strong>
-            </p>
+            <p><span class="text-slate-500">Recipients:</span> <strong>{{ targetingSummaryParts }}</strong></p>
             <p class="text-xs text-warning-700 mt-2">
               ⚠ Releasing is permanent. The issuance will be signed with your digital signature and sent to all recipients.
             </p>
