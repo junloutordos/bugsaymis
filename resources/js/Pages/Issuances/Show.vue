@@ -281,7 +281,7 @@ function deleteDraft() {
 <template>
   <Head :title="`${issuance.display_number} — Issuance`" />
   <AdminLayout :title="issuance.display_number">
-    <div class="max-w-4xl space-y-5">
+    <div class="max-w-7xl mx-auto space-y-6">
 
       <!-- Back -->
       <Link :href="route('issuances.index')"
@@ -360,10 +360,10 @@ function deleteDraft() {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
         <!-- ── Document Body ──────────────────────────────────────────────── -->
-        <div class="lg:col-span-2 space-y-5">
+        <div class="lg:col-span-3 space-y-6">
 
           <!-- Content -->
           <AppCard v-if="issuance.content" title="Content">
@@ -433,7 +433,7 @@ function deleteDraft() {
         </div>
 
         <!-- ── Right panel ────────────────────────────────────────────────── -->
-        <div class="space-y-4">
+        <div class="lg:col-span-2 space-y-5 lg:sticky lg:top-6 lg:self-start">
 
           <!-- QR + Verification -->
           <AppCard v-if="issuance.status === 'released'" title="Verification QR">
