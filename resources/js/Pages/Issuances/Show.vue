@@ -456,11 +456,11 @@ function deleteDraft() {
           <!-- Acknowledgment progress (admin) -->
           <AppCard v-if="isAdmin && issuance.status === 'released'">
             <template #header>
-              <div class="flex items-center justify-between gap-2">
+              <div class="w-full space-y-2.5">
                 <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <UserGroupIcon class="h-3.5 w-3.5" /> Acknowledgments
                 </h3>
-                <div class="flex items-center gap-1.5">
+                <div class="flex flex-wrap items-center gap-1.5">
                   <AppButton v-if="!issuance.archived_at" size="sm" variant="secondary" @click="openAddRecipientModal">
                     <PlusIcon class="h-3.5 w-3.5" /> Add Recipient
                   </AppButton>
