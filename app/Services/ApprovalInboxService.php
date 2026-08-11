@@ -57,9 +57,7 @@ class ApprovalInboxService
         $isCidChief = $user->hasRole('CID Chief');
         $isAdmin = $user->hasRole('Administrator');
         $isAcidaa = $this->holdsAcidaaDesignation($user);
-        // ACIDAA holders can also be the leave recommender for an AUH's own
-        // leave application (see IPCRWorkflowService::leaveRecommenderFor()).
-        $isAuh = $user->hasRole('AUH') || $isAcidaa;
+        $isAuh = $user->hasRole('AUH');
 
         // Administrator sees all pending items across every module (union of all roles)
         if ($isAdmin) {
@@ -82,13 +80,14 @@ class ApprovalInboxService
             $divisionIds = Division::pluck('id')->toArray();
         }
 
-        // ── Academic Unit Head (and ACIDAA) ──────────────────────────────────
+        // ── Academic Unit Head ────────────────────────────────────────────────
         // CID teaching faculty's leave must be recommended before it reaches
         // the Division Chief (CID Chief). Recommender is normally the AUH,
-        // but an AUH's own leave is recommended by ACIDAA instead — see
-        // IPCRWorkflowService::leaveRecommenderFor(). No divisionIds scoping —
-        // each application is matched against the applicant's *specific*
-        // resolved recommender, not just "anyone holding the AUH role".
+        // but an AUH's own leave is recommended by the CID Chief directly
+        // instead — see IPCRWorkflowService::leaveRecommenderFor(). No
+        // divisionIds scoping — each application is matched against the
+        // applicant's *specific* resolved recommender, not just "anyone
+        // holding the AUH role".
         if ($isAuh) {
             $ipcrWorkflowForAuh = app(IPCRWorkflowService::class);
             $laAuhItems = LeaveApplication::with(['user:id,name,emp_category,division_id,academic_unit_id,office_id', 'leaveType:id,name,code', 'hrOfficer:id,name'])

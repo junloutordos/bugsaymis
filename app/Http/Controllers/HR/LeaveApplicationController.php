@@ -180,7 +180,7 @@ class LeaveApplicationController extends Controller
             'requiresAuh'  => $requiresAuh,
             // Lets the "Review Application" button show for the specific
             // resolved recommender even when they hold no RBAC permission
-            // for it (e.g. an ACIDAA holder reviewing an AUH's own leave).
+            // for it (e.g. ACIDAA recommending their own leave).
             'isAuhRecommender' => $requiresAuh
                 && ($recommender = $ipcrWorkflow->leaveRecommenderFor($leaveApplication->user))
                 && (int) $recommender->id === (int) $authUser->id,
@@ -190,7 +190,7 @@ class LeaveApplicationController extends Controller
     /**
      * Leave approval workflow (4 stages for CID teaching faculty, 3 for everyone else):
      *   Stage 1 — hr_officer        : HR Officer certifies leave credits    (pending       → hr_verified)
-     *   Stage 2 — academic_unit_head: AUH (or ACIDAA for an AUH's own leave)
+     *   Stage 2 — academic_unit_head: AUH (or CID Chief for an AUH's own leave)
      *                                 recommends — CID teaching faculty only (hr_verified   → auh_verified)
      *   Stage 3 — division_chief    : Division Chief recommends              (hr_verified/auh_verified → forwarded)
      *   Stage 4 — campus_director   : Campus Director final approval         (forwarded     → approved/rejected)
@@ -205,7 +205,7 @@ class LeaveApplicationController extends Controller
 
         // The academic_unit_head stage is authorized purely by identity (must
         // be the applicant's specific resolved recommender, checked below) —
-        // an ACIDAA holder reviewing an AUH's own leave has no dedicated RBAC
+        // an ACIDAA holder recommending their own leave has no dedicated RBAC
         // role/permission, mirroring how ApprovalInboxController already
         // treats ACIDAA designation membership as sufficient on its own.
         if ($data['stage'] !== 'academic_unit_head') {
@@ -222,8 +222,8 @@ class LeaveApplicationController extends Controller
             'You cannot act on your own leave application.'
         );
 
-        // Academic Unit Head (or ACIDAA, for an AUH's own leave) may only act
-        // on the specific applicant they are the resolved recommender for.
+        // Academic Unit Head (or CID Chief, for an AUH's own leave) may only
+        // act on the specific applicant they are the resolved recommender for.
         if ($data['stage'] === 'academic_unit_head' && ! $approver->isSuperAdmin()) {
             $ipcrWorkflow = app(\App\Services\PerformanceManagement\IPCRWorkflowService::class);
             $recommender = $leaveApplication->user
@@ -494,7 +494,7 @@ class LeaveApplicationController extends Controller
         ];
 
         // Fallback: live Academic Unit Head recommender (CID teaching faculty
-        // only — AUH for regular faculty, ACIDAA for an AUH's own leave).
+        // only — AUH for regular faculty, CID Chief for an AUH's own leave).
         $requiresAuh = $application->user
             ? app(\App\Services\PerformanceManagement\IPCRWorkflowService::class)
                 ->requiresLeaveAuhRecommendation($application->user)
