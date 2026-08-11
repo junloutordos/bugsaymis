@@ -295,27 +295,25 @@ function deleteDraft() {
         <div class="h-1.5 bg-indigo-600"></div>
 
         <div class="p-6">
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-            <div class="flex-1">
-              <div class="flex flex-wrap items-center gap-2 mb-2">
-                <span class="font-mono font-bold text-slate-800 text-base">{{ issuance.display_number }}</span>
-                <AppBadge :color="typeColor(issuance.type)">{{ issuance.is_supplement ? issuance.document_kind_label : issuance.type_label }}</AppBadge>
-                <AppBadge :color="statusColor(issuance.status)" class="capitalize">{{ issuance.status }}</AppBadge>
-                <AppBadge v-if="issuance.archived_at" color="slate">Archived</AppBadge>
-              </div>
-              <h1 class="text-xl font-semibold text-slate-800">{{ issuance.title }}</h1>
-              <p class="text-xs text-slate-500 mt-1">
-                Issued by <strong>{{ issuance.creator?.name }}</strong>
-                <span v-if="issuance.released_at"> · Released {{ fmtDt(issuance.released_at) }}</span>
-              </p>
-              <Link v-if="issuance.parent_issuance" :href="route('issuances.show', issuance.parent_issuance.id)"
-                class="mt-2 inline-block text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                Related to {{ issuance.parent_issuance.control_number }} — {{ issuance.parent_issuance.title }}
-              </Link>
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <span class="font-mono font-bold text-slate-800 text-base">{{ issuance.display_number }}</span>
+              <AppBadge :color="typeColor(issuance.type)">{{ issuance.is_supplement ? issuance.document_kind_label : issuance.type_label }}</AppBadge>
+              <AppBadge :color="statusColor(issuance.status)" class="capitalize">{{ issuance.status }}</AppBadge>
+              <AppBadge v-if="issuance.archived_at" color="slate">Archived</AppBadge>
             </div>
+            <h1 class="text-xl font-semibold text-slate-800">{{ issuance.title }}</h1>
+            <p class="text-xs text-slate-500 mt-1">
+              Issued by <strong>{{ issuance.creator?.name }}</strong>
+              <span v-if="issuance.released_at"> · Released {{ fmtDt(issuance.released_at) }}</span>
+            </p>
+            <Link v-if="issuance.parent_issuance" :href="route('issuances.show', issuance.parent_issuance.id)"
+              class="mt-2 inline-block text-xs font-medium text-indigo-600 hover:text-indigo-800">
+              Related to {{ issuance.parent_issuance.control_number }} — {{ issuance.parent_issuance.title }}
+            </Link>
 
             <!-- Actions -->
-            <div class="flex flex-wrap gap-2 shrink-0">
+            <div class="mt-5 pt-5 border-t border-slate-100 flex flex-wrap items-center gap-2">
               <!-- Acknowledge (staff) -->
               <AppButton v-if="!isAdmin && issuance.status === 'released' && !ackDone"
                 @click="acknowledge" :disabled="ackForm.processing">
