@@ -43,7 +43,7 @@ class IssuanceRecipientsAddTest extends TestCase
             'year' => 2026,
             'month' => 8,
             'title' => 'Test Memo',
-            'recipient_type' => 'individual',
+            'recipient_type' => 'individual_staff',
             'status' => 'released',
             'released_at' => now(),
             'created_by' => $creator->id,
@@ -58,7 +58,6 @@ class IssuanceRecipientsAddTest extends TestCase
         $newUser = User::factory()->create();
 
         $response = $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [
-            'recipient_type' => 'individual',
             'user_ids' => [$newUser->id],
         ]);
 
@@ -82,14 +81,13 @@ class IssuanceRecipientsAddTest extends TestCase
             'year' => 2026,
             'month' => 8,
             'title' => 'Draft Memo',
-            'recipient_type' => 'individual',
+            'recipient_type' => 'individual_staff',
             'status' => 'draft',
             'created_by' => $creator->id,
         ]);
         $newUser = User::factory()->create();
 
         $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [
-            'recipient_type' => 'individual',
             'user_ids' => [$newUser->id],
         ])->assertStatus(422);
 
@@ -104,7 +102,6 @@ class IssuanceRecipientsAddTest extends TestCase
         $newUser = User::factory()->create();
 
         $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [
-            'recipient_type' => 'individual',
             'user_ids' => [$newUser->id],
         ])->assertStatus(422);
     }
@@ -116,7 +113,6 @@ class IssuanceRecipientsAddTest extends TestCase
         $newUser = User::factory()->create();
 
         $this->actingAs($staff)->post(route('issuances.recipients.add', $issuance->id), [
-            'recipient_type' => 'individual',
             'user_ids' => [$newUser->id],
         ])->assertStatus(403);
     }
@@ -132,7 +128,6 @@ class IssuanceRecipientsAddTest extends TestCase
         IssuanceRecipient::create(['issuance_id' => $issuance->id, 'user_id' => $already->id]);
 
         $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [
-            'recipient_type' => 'office',
             'office_ids' => [$office->id],
         ])->assertRedirect();
 
@@ -149,10 +144,36 @@ class IssuanceRecipientsAddTest extends TestCase
         IssuanceRecipient::create(['issuance_id' => $issuance->id, 'user_id' => $existing->id]);
 
         $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [
-            'recipient_type' => 'individual',
             'user_ids' => [$existing->id],
         ])->assertRedirect()->assertSessionHas('success');
 
         Queue::assertNotPushed(NotifyAddedIssuanceRecipients::class);
+    }
+
+    public function test_admin_can_combine_office_and_individual_in_one_request(): void
+    {
+        Queue::fake();
+        $admin = $this->admin();
+        $issuance = $this->releasedIssuance();
+        $office = Office::create(['name' => 'Combo Office ' . uniqid()]);
+        $officeMember = User::factory()->create(['office_id' => $office->id]);
+        $individual = User::factory()->create();
+
+        $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [
+            'office_ids' => [$office->id],
+            'user_ids' => [$individual->id],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('issuance_recipients', ['issuance_id' => $issuance->id, 'user_id' => $officeMember->id]);
+        $this->assertDatabaseHas('issuance_recipients', ['issuance_id' => $issuance->id, 'user_id' => $individual->id]);
+    }
+
+    public function test_adding_recipients_rejects_an_empty_selection(): void
+    {
+        $admin = $this->admin();
+        $issuance = $this->releasedIssuance();
+
+        $this->actingAs($admin)->post(route('issuances.recipients.add', $issuance->id), [])
+            ->assertStatus(422);
     }
 }

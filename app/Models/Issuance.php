@@ -48,6 +48,11 @@ class Issuance extends Model
         return $this->hasMany(IssuanceRecipient::class);
     }
 
+    public function recipientCriteria()
+    {
+        return $this->hasMany(IssuanceRecipientCriterion::class);
+    }
+
     public function parentIssuance()
     {
         return $this->belongsTo(self::class, 'parent_issuance_id');

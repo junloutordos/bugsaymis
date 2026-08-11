@@ -2,11 +2,16 @@
 
 namespace App\Services;
 
+use App\Mail\IssuanceReleasedMail;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Issuance;
 use App\Models\IssuanceRecipient;
+use App\Models\IssuanceRecipientCriterion;
 use App\Models\Office;
+use App\Models\Registrar\StudentEnrollment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
 use Mpdf\Config\ConfigVariables;
@@ -65,55 +70,24 @@ class IssuanceService
     {
         $issuance->recipients()->delete();
 
-        if ($issuance->recipient_type === 'all') {
-            $users = User::employees()->where('status', '<>', 'inactive')->pluck('id');
-            $rows  = $users->map(fn($uid) => [
-                'issuance_id' => $issuance->id,
-                'user_id'     => $uid,
-                'created_at'  => now(),
-                'updated_at'  => now(),
-            ])->toArray();
-            IssuanceRecipient::insert($rows);
+        ['staff' => $staffIds, 'students' => $studentIds] = $this->resolveTargetIds($data);
 
-        } elseif ($issuance->recipient_type === 'office') {
-            $officeIds = $data['office_ids'] ?? [];
-            $users = User::employees()
-                ->whereIn('office_id', $officeIds)
-                ->where('status', '<>', 'inactive')
-                ->pluck('id');
-            $rows  = $users->map(fn($uid) => [
-                'issuance_id' => $issuance->id,
-                'user_id'     => $uid,
-                'created_at'  => now(),
-                'updated_at'  => now(),
-            ])->toArray();
-            if (! empty($rows)) IssuanceRecipient::insert($rows);
+        $rows = $staffIds->map(fn ($uid) => [
+            'issuance_id' => $issuance->id,
+            'user_id'     => $uid,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ])->concat($studentIds->map(fn ($sid) => [
+            'issuance_id' => $issuance->id,
+            'student_id'  => $sid,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]))->all();
 
-        } elseif ($issuance->recipient_type === 'individual') {
-            $userIds = $data['user_ids'] ?? [];
-            $userIds = User::employees()->whereIn('id', $userIds)->pluck('id');
-            $rows    = $userIds->map(fn($uid) => [
-                'issuance_id' => $issuance->id,
-                'user_id'     => $uid,
-                'created_at'  => now(),
-                'updated_at'  => now(),
-            ])->toArray();
-            if (! empty($rows)) IssuanceRecipient::insert($rows);
+        if (! empty($rows)) IssuanceRecipient::insert($rows);
 
-        } elseif ($issuance->recipient_type === 'division') {
-            $divisionIds = $data['division_ids'] ?? [];
-            $users = User::employees()
-                ->whereIn('division_id', $divisionIds)
-                ->where('status', '<>', 'inactive')
-                ->pluck('id');
-            $rows  = $users->map(fn($uid) => [
-                'issuance_id' => $issuance->id,
-                'user_id'     => $uid,
-                'created_at'  => now(),
-                'updated_at'  => now(),
-            ])->toArray();
-            if (! empty($rows)) IssuanceRecipient::insert($rows);
-        }
+        $this->recordCriteria($issuance, $data);
+        $this->updateRecipientTypeSummary($issuance);
     }
 
     /**
@@ -125,40 +99,173 @@ class IssuanceService
      */
     public function addRecipients(Issuance $issuance, array $data): array
     {
-        $targetUserIds = match ($data['recipient_type']) {
-            'all' => User::employees()->where('status', '<>', 'inactive')->pluck('id'),
-            'office' => User::employees()
-                ->whereIn('office_id', $data['office_ids'] ?? [])
-                ->where('status', '<>', 'inactive')
-                ->pluck('id'),
-            'individual' => User::employees()
-                ->whereIn('id', $data['user_ids'] ?? [])
-                ->pluck('id'),
-            'division' => User::employees()
-                ->whereIn('division_id', $data['division_ids'] ?? [])
-                ->where('status', '<>', 'inactive')
-                ->pluck('id'),
-            default => collect(),
-        };
+        ['staff' => $staffIds, 'students' => $studentIds] = $this->resolveTargetIds($data);
 
-        $existingUserIds = $issuance->recipients()->pluck('user_id')->all();
-        $newUserIds = $targetUserIds->diff($existingUserIds)->values();
+        $existingUserIds    = $issuance->recipients()->whereNotNull('user_id')->pluck('user_id')->all();
+        $existingStudentIds = $issuance->recipients()->whereNotNull('student_id')->pluck('student_id')->all();
 
-        if ($newUserIds->isEmpty()) {
-            return [];
+        $newStaffIds   = $staffIds->diff($existingUserIds)->values();
+        $newStudentIds = $studentIds->diff($existingStudentIds)->values();
+
+        $now = now();
+        $rows = $newStaffIds->map(fn ($uid) => [
+            'issuance_id' => $issuance->id, 'user_id' => $uid,
+            'notified_at' => $now, 'created_at' => $now, 'updated_at' => $now,
+        ])->concat($newStudentIds->map(fn ($sid) => [
+            'issuance_id' => $issuance->id, 'student_id' => $sid,
+            'notified_at' => $now, 'created_at' => $now, 'updated_at' => $now,
+        ]))->all();
+
+        if (! empty($rows)) IssuanceRecipient::insert($rows);
+
+        $this->recordCriteria($issuance, $data);
+        $this->updateRecipientTypeSummary($issuance);
+
+        if (empty($rows)) return [];
+
+        return $issuance->recipients()
+            ->where(function ($q) use ($newStaffIds, $newStudentIds) {
+                $q->whereIn('user_id', $newStaffIds)->orWhereIn('student_id', $newStudentIds);
+            })
+            ->pluck('id')->all();
+    }
+
+    /**
+     * Resolves a flexible multi-criteria targeting payload into deduplicated
+     * staff and student ID sets. Payload keys (all optional):
+     * all_staff, office_ids, division_ids, user_ids, all_students,
+     * section_ids, grade_levels, student_ids.
+     *
+     * @return array{staff: \Illuminate\Support\Collection<int,int>, students: \Illuminate\Support\Collection<int,int>}
+     */
+    private function resolveTargetIds(array $data): array
+    {
+        $staff = collect();
+        if ($data['all_staff'] ?? false) {
+            $staff = $staff->concat(User::employees()->where('status', '<>', 'inactive')->pluck('id'));
+        }
+        if (! empty($data['office_ids'])) {
+            $staff = $staff->concat(User::employees()->whereIn('office_id', $data['office_ids'])->where('status', '<>', 'inactive')->pluck('id'));
+        }
+        if (! empty($data['division_ids'])) {
+            $staff = $staff->concat(User::employees()->whereIn('division_id', $data['division_ids'])->where('status', '<>', 'inactive')->pluck('id'));
+        }
+        if (! empty($data['user_ids'])) {
+            $staff = $staff->concat(User::employees()->whereIn('id', $data['user_ids'])->pluck('id'));
+        }
+        $staff = $staff->unique()->values();
+
+        $wantsStudents = ($data['all_students'] ?? false)
+            || ! empty($data['section_ids']) || ! empty($data['grade_levels']) || ! empty($data['student_ids']);
+
+        $students = collect();
+        if ($wantsStudents) {
+            $currentSY = SchoolYear::where('is_current', true)->first();
+            abort_if(! $currentSY, 422, 'No current school year is set — cannot resolve student recipients.');
+
+            if ($data['all_students'] ?? false) {
+                $students = $students->concat(StudentEnrollment::active()->forSchoolYear($currentSY->id)->pluck('student_id'));
+            }
+            if (! empty($data['section_ids'])) {
+                $students = $students->concat(StudentEnrollment::active()->forSchoolYear($currentSY->id)->whereIn('section_id', $data['section_ids'])->pluck('student_id'));
+            }
+            if (! empty($data['grade_levels'])) {
+                $students = $students->concat(StudentEnrollment::active()->forSchoolYear($currentSY->id)->whereIn('grade_level', $data['grade_levels'])->pluck('student_id'));
+            }
+            if (! empty($data['student_ids'])) {
+                $students = $students->concat(StudentEnrollment::active()->forSchoolYear($currentSY->id)->whereIn('student_id', $data['student_ids'])->pluck('student_id'));
+            }
+            $students = $students->unique()->values();
         }
 
-        $rows = $newUserIds->map(fn ($uid) => [
-            'issuance_id' => $issuance->id,
-            'user_id'     => $uid,
-            'notified_at' => now(),
-            'created_at'  => now(),
-            'updated_at'  => now(),
-        ])->all();
+        return ['staff' => $staff, 'students' => $students];
+    }
 
-        IssuanceRecipient::insert($rows);
+    private function recordCriteria(Issuance $issuance, array $data): void
+    {
+        $now  = now();
+        $rows = [];
+        $add  = function (string $type, $targetId = null) use (&$rows, $issuance, $now) {
+            $rows[] = ['issuance_id' => $issuance->id, 'type' => $type, 'target_id' => $targetId, 'created_at' => $now, 'updated_at' => $now];
+        };
 
-        return $issuance->recipients()->whereIn('user_id', $newUserIds)->pluck('id')->all();
+        if ($data['all_staff'] ?? false) $add('all_staff');
+        foreach ($data['office_ids'] ?? [] as $id) $add('office', $id);
+        foreach ($data['division_ids'] ?? [] as $id) $add('division', $id);
+        foreach ($data['user_ids'] ?? [] as $id) $add('individual_staff', $id);
+        if ($data['all_students'] ?? false) $add('all_students');
+        foreach ($data['section_ids'] ?? [] as $id) $add('section', $id);
+        foreach ($data['grade_levels'] ?? [] as $id) $add('grade_level', $id);
+        foreach ($data['student_ids'] ?? [] as $id) $add('individual_student', $id);
+
+        if ($rows) IssuanceRecipientCriterion::insert($rows);
+    }
+
+    private function updateRecipientTypeSummary(Issuance $issuance): void
+    {
+        $types = $issuance->recipientCriteria()->distinct()->pluck('type')->all();
+        $issuance->recipient_type = count($types) === 1 ? $types[0] : 'mixed';
+        $issuance->save();
+    }
+
+    /**
+     * Pure preview of what updateRecipientTypeSummary() would produce, computed
+     * from a raw request payload before any criteria rows exist (used by
+     * IssuanceController::store() when saving a not-yet-released draft).
+     */
+    public function summarizeSelectedTypes(array $data): string
+    {
+        $types = [];
+        if ($data['all_staff'] ?? false) $types[] = 'all_staff';
+        if (! empty($data['office_ids'])) $types[] = 'office';
+        if (! empty($data['division_ids'])) $types[] = 'division';
+        if (! empty($data['user_ids'])) $types[] = 'individual_staff';
+        if ($data['all_students'] ?? false) $types[] = 'all_students';
+        if (! empty($data['section_ids'])) $types[] = 'section';
+        if (! empty($data['grade_levels'])) $types[] = 'grade_level';
+        if (! empty($data['student_ids'])) $types[] = 'individual_student';
+
+        return count($types) === 1 ? $types[0] : 'mixed';
+    }
+
+    /**
+     * Resolves the recipient's email/name (staff vs student), sends
+     * IssuanceReleasedMail, and persists email_status/emailed_at/email_error.
+     * Returns 'sent' | 'skipped' | 'failed'.
+     */
+    public function deliverRecipientEmail(IssuanceRecipient $recipient, Issuance $issuance): string
+    {
+        if ($recipient->student_id) {
+            $email = $recipient->student?->student_email;
+            $name  = $recipient->student?->full_name;
+        } else {
+            $email = $recipient->user?->email;
+            $name  = $recipient->user?->name;
+        }
+
+        if (empty($email)) {
+            $recipient->update([
+                'email_status' => 'skipped',
+                'email_error'  => 'No email on file for this recipient.',
+            ]);
+            return 'skipped';
+        }
+
+        try {
+            Mail::to($email)->send(new IssuanceReleasedMail($issuance, $name));
+            $recipient->update(['email_status' => 'sent', 'emailed_at' => now(), 'email_error' => null]);
+            return 'sent';
+        } catch (\Throwable $e) {
+            $recipient->update(['email_status' => 'failed', 'email_error' => $e->getMessage()]);
+            logger()->warning('Issuance recipient email failed', [
+                'issuance_id'  => $issuance->id,
+                'recipient_id' => $recipient->id,
+                'kind'         => $recipient->student_id ? 'student' : 'staff',
+                'email'        => $email,
+                'error'        => $e->getMessage(),
+            ]);
+            return 'failed';
+        }
     }
 
     // ── QR helpers ────────────────────────────────────────────────────────────

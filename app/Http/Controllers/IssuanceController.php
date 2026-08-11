@@ -8,10 +8,14 @@ use App\Jobs\ProcessIssuanceRelease;
 use App\Jobs\ResendIssuanceEmails;
 use App\Mail\IssuanceReleasedMail;
 use App\Models\Division;
+use App\Models\FacultyLoading\GradeLevel;
+use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\Issuance;
 use App\Models\IssuanceRecipient;
 use App\Models\IssuanceType;
 use App\Models\Office;
+use App\Models\Registrar\StudentEnrollment;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
 use App\Services\IssuanceService;
@@ -99,9 +103,38 @@ class IssuanceController extends Controller
 
     // ── Create ────────────────────────────────────────────────────────────────
 
+    /** @return array{sections: \Illuminate\Support\Collection, gradeLevels: \Illuminate\Support\Collection, students: \Illuminate\Support\Collection} */
+    private function recipientTargetingOptions(): array
+    {
+        $currentSY = SchoolYear::where('is_current', true)->first();
+
+        $sections = $currentSY
+            ? Section::where('school_year_id', $currentSY->id)->where('is_active', true)
+                ->orderBy('levelid')->orderBy('sectionname')->get(['id', 'sectionname', 'levelid'])
+            : collect();
+
+        $gradeLevels = GradeLevel::orderBy('sort_order')->get(['grade', 'label']);
+
+        $students = $currentSY
+            ? StudentEnrollment::active()->forSchoolYear($currentSY->id)
+                ->with('student:id,lastname,firstname,middlename')
+                ->get()
+                ->map(fn ($e) => [
+                    'id'          => $e->student_id,
+                    'full_name'   => $e->student?->full_name,
+                    'grade_level' => $e->grade_level,
+                    'section_id'  => $e->section_id,
+                ])
+                ->filter(fn ($s) => $s['full_name'])
+                ->values()
+            : collect();
+
+        return compact('sections', 'gradeLevels', 'students');
+    }
+
     public function create()
     {
-        return Inertia::render('Issuances/Create', [
+        return Inertia::render('Issuances/Create', array_merge([
             'typeLabels' => Issuance::typeLabels(),
             'offices'    => Office::orderBy('name')->get(['id', 'name']),
             'divisions'  => Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']),
@@ -109,7 +142,7 @@ class IssuanceController extends Controller
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'position']),
             'hasPin'     => ! empty(auth()->user()->signature_pin),
             'signatureUri' => $this->sigService->getSignatureDataUri(auth()->user()),
-        ]);
+        ], $this->recipientTargetingOptions()));
     }
 
     public function createSupplement(Request $request, Issuance $issuance)
@@ -211,23 +244,19 @@ class IssuanceController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'type'               => ['required', Rule::in(array_keys(IssuanceType::activeLabels()))],
             'title'              => 'required|string|max:500',
             'content'            => 'nullable|string',
             'scan_base64'        => 'nullable|string',
             'scan_filename'      => 'nullable|string|max:255',
             'scan_mime'          => 'nullable|string',
-            'recipient_type'     => 'required|in:all,office,individual,division',
-            'office_ids'         => 'nullable|array',
-            'office_ids.*'       => 'exists:offices,id',
-            'user_ids'           => 'nullable|array',
-            'user_ids.*'         => 'exists:users,id',
-            'division_ids'       => 'nullable|array',
-            'division_ids.*'     => 'exists:divisions,id',
             'should_release'     => 'nullable|boolean',
             'pin'                => 'nullable|string',
-        ]);
+        ], $this->recipientTargetingRules()));
+
+        $this->assertHasRecipientSelection($validated);
+
         if ($validated['should_release'] ?? false) {
             $this->assertSigningPin($request, $validated);
         }
@@ -262,7 +291,7 @@ class IssuanceController extends Controller
                 'attachment_path'    => $attachmentPath,
                 'attachment_filename'=> $attachmentFilename,
                 'attachment_mime'    => $attachmentMime,
-                'recipient_type'     => $validated['recipient_type'],
+                'recipient_type'     => $this->svc->summarizeSelectedTypes($validated),
                 'status'             => 'draft',
                 'created_by'         => $request->user()->id,
             ]);
@@ -284,23 +313,24 @@ class IssuanceController extends Controller
         $this->assertSigningPin($request, $data);
 
         DB::transaction(function () use ($issuance, $data) {
-            $issuance->content_hash   = $this->svc->computeHash($issuance);
-            $issuance->recipient_type = $issuance->isSupplement()
-                ? $issuance->parentIssuance->recipient_type
-                : $data['recipient_type'];
-            $issuance->status         = 'released';
-            $issuance->released_at    = now();
-            $issuance->save();
+            $issuance->content_hash = $this->svc->computeHash($issuance);
+            $issuance->status       = 'released';
+            $issuance->released_at  = now();
+
             if ($issuance->isSupplement()) {
-                $rows = $issuance->parentIssuance->recipients()->get(['user_id', 'office_id'])->map(fn ($recipient) => [
+                $issuance->recipient_type = $issuance->parentIssuance->recipient_type;
+                $issuance->save();
+                $rows = $issuance->parentIssuance->recipients()->get(['user_id', 'office_id', 'student_id'])->map(fn ($recipient) => [
                     'issuance_id' => $issuance->id,
                     'user_id' => $recipient->user_id,
                     'office_id' => $recipient->office_id,
+                    'student_id' => $recipient->student_id,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ])->all();
                 if ($rows) IssuanceRecipient::insert($rows);
             } else {
+                $issuance->save();
                 $this->svc->buildRecipients($issuance, $data);
             }
             $issuance->recipients()->update(['notified_at' => now()]);
@@ -356,6 +386,34 @@ class IssuanceController extends Controller
         }
     }
 
+    private function assertHasRecipientSelection(array $data): void
+    {
+        $hasAny = ($data['all_staff'] ?? false) || ($data['all_students'] ?? false)
+            || ! empty($data['office_ids']) || ! empty($data['division_ids']) || ! empty($data['user_ids'])
+            || ! empty($data['section_ids']) || ! empty($data['grade_levels']) || ! empty($data['student_ids']);
+        abort_if(! $hasAny, 422, 'Select at least one recipient.');
+    }
+
+    private function recipientTargetingRules(): array
+    {
+        return [
+            'all_staff'      => 'nullable|boolean',
+            'office_ids'     => 'nullable|array',
+            'office_ids.*'   => 'exists:offices,id',
+            'division_ids'   => 'nullable|array',
+            'division_ids.*' => 'exists:divisions,id',
+            'user_ids'       => 'nullable|array',
+            'user_ids.*'     => 'exists:users,id',
+            'all_students'   => 'nullable|boolean',
+            'section_ids'    => 'nullable|array',
+            'section_ids.*'  => 'exists:sections,id',
+            'grade_levels'   => 'nullable|array',
+            'grade_levels.*' => 'exists:grade_levels,grade',
+            'student_ids'    => 'nullable|array',
+            'student_ids.*'  => 'exists:students,id',
+        ];
+    }
+
     // ── Show ──────────────────────────────────────────────────────────────────
 
     public function show(Request $request, Issuance $issuance)
@@ -392,11 +450,12 @@ class IssuanceController extends Controller
             ]);
 
         $recipients = $issuance->recipients()
-            ->with(['user:id,name,position,office_id', 'office:id,name'])
+            ->with(['user:id,name,position,office_id', 'office:id,name', 'student:id,lastname,firstname,middlename'])
             ->get()
             ->map(fn($r) => [
                 'id'              => $r->id,
                 'user'            => $r->user?->only('id', 'name', 'position'),
+                'student'         => $r->student ? ['id' => $r->student->id, 'full_name' => $r->student->full_name] : null,
                 'office'          => $r->office?->only('id', 'name'),
                 'acknowledged_at' => $r->acknowledged_at?->toISOString(),
                 'notified_at'     => $r->notified_at?->toISOString(),
@@ -413,11 +472,16 @@ class IssuanceController extends Controller
         $myRecipient = $isAdmin ? null
             : $issuance->recipients()->where('user_id', $user->id)->first();
 
+        $targetingOptions = $isAdmin ? $this->recipientTargetingOptions() : ['sections' => [], 'gradeLevels' => [], 'students' => []];
+
         return Inertia::render('Issuances/Show', [
             'divisions'  => $isAdmin ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']) : [],
             'offices'    => $isAdmin ? Office::orderBy('name')->get(['id', 'name']) : [],
             'users'      => $isAdmin ? User::employees()->where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'position']) : [],
+            'sections'    => $targetingOptions['sections'],
+            'gradeLevels' => $targetingOptions['gradeLevels'],
+            'students'    => $targetingOptions['students'],
             'issuance'   => [
                 'id'               => $issuance->id,
                 'type'             => $issuance->type,
@@ -477,14 +541,13 @@ class IssuanceController extends Controller
                 'The parent issuance must be active and released.');
         }
 
-        $validated = $request->validate([
-            'recipient_type' => [$issuance->isSupplement() ? 'nullable' : 'required', Rule::in(['all', 'office', 'individual', 'division'])],
-            'office_ids'     => 'nullable|array',
-            'user_ids'       => 'nullable|array',
-            'division_ids'   => 'nullable|array',
-            'division_ids.*' => 'exists:divisions,id',
-            'pin'            => 'nullable|string',
-        ]);
+        $validated = $request->validate(array_merge([
+            'pin' => 'nullable|string',
+        ], $this->recipientTargetingRules()));
+
+        if (! $issuance->isSupplement()) {
+            $this->assertHasRecipientSelection($validated);
+        }
 
         $this->doRelease($request, $issuance, $validated);
 
@@ -621,15 +684,8 @@ class IssuanceController extends Controller
         abort_if(! $issuance->isReleased(), 422, 'Only released issuances can receive additional recipients.');
         abort_if($issuance->isArchived(), 422, 'Restore this issuance from the archive before adding recipients.');
 
-        $validated = $request->validate([
-            'recipient_type'  => ['required', Rule::in(['all', 'office', 'individual', 'division'])],
-            'office_ids'      => 'nullable|array',
-            'office_ids.*'    => 'exists:offices,id',
-            'user_ids'        => 'nullable|array',
-            'user_ids.*'      => 'exists:users,id',
-            'division_ids'    => 'nullable|array',
-            'division_ids.*'  => 'exists:divisions,id',
-        ]);
+        $validated = $request->validate($this->recipientTargetingRules());
+        $this->assertHasRecipientSelection($validated);
 
         $newRecipientIds = $this->svc->addRecipients($issuance, $validated);
 
@@ -641,7 +697,7 @@ class IssuanceController extends Controller
             'action'         => 'issuance_recipients_added',
             'auditable_type' => Issuance::class,
             'auditable_id'   => $issuance->id,
-            'new_values'     => ['recipient_type' => $validated['recipient_type'], 'added_count' => count($newRecipientIds)],
+            'new_values'     => ['added_count' => count($newRecipientIds)],
         ]);
 
         NotifyAddedIssuanceRecipients::dispatch($issuance->id, $newRecipientIds);
