@@ -7,6 +7,7 @@ use App\Models\ComputerLabScheduleApproval;
 use App\Models\Division;
 use App\Models\Facility;
 use App\Models\FacilityRequest;
+use App\Models\FacultyLoading\AcademicUnit;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
 use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\LoadAssignment;
@@ -57,7 +58,10 @@ class ApprovalInboxService
         $isCidChief = $user->hasRole('CID Chief');
         $isAdmin = $user->hasRole('Administrator');
         $isAcidaa = $this->holdsAcidaaDesignation($user);
-        $isAuh = $user->hasRole('AUH');
+        // No dedicated "AUH" RBAC role exists — headship is derived from
+        // academic_units.head_user_id (see holdsAcademicUnitHeadship()),
+        // matching how the approval action itself is authorized by identity.
+        $isAuh = $this->holdsAcademicUnitHeadship($user);
 
         // Administrator sees all pending items across every module (union of all roles)
         if ($isAdmin) {
@@ -371,6 +375,23 @@ class ApprovalInboxService
 
         return LoadAssignment::whereIn('designation_id', $designationIds)
             ->where('user_id', $user->id)
+            ->whereHas('schoolYear', fn ($q) => $q->where('is_current', true))
+            ->exists();
+    }
+
+    /**
+     * Whether $user currently heads an active Academic Unit for the current
+     * school year. There is no dedicated "AUH" RBAC role — headship is
+     * derived purely from academic_units.head_user_id, the same source
+     * IPCRWorkflowService::leaveRecommenderFor() uses to resolve each
+     * applicant's specific recommender. This must stay in sync with that
+     * resolution logic so the inbox tab appears for exactly the users who
+     * are actually authorized to act (see LeaveApplicationController::approve()).
+     */
+    private function holdsAcademicUnitHeadship(User $user): bool
+    {
+        return AcademicUnit::active()
+            ->where('head_user_id', $user->id)
             ->whereHas('schoolYear', fn ($q) => $q->where('is_current', true))
             ->exists();
     }
