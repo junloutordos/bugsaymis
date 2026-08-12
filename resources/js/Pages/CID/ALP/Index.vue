@@ -42,8 +42,8 @@ const sync = () => router.post(route('alp.sync'), {}, { preserveScroll: true })
 const statCards = computed(() => [
   { label: 'Programs', value: props.stats.programs || 0, icon: AcademicCapIcon, tone: 'bg-indigo-50 text-indigo-600' },
   { label: 'Accredited', value: props.stats.accredited || 0, icon: CheckBadgeIcon, tone: 'bg-success-50 text-success-600' },
-  { label: 'Active members', value: props.stats.members || 0, icon: UserGroupIcon, tone: 'bg-blue-50 text-blue-600' },
-  { label: 'Unassigned Grades 7–10', value: props.stats.unassignedRequired || 0, icon: UserMinusIcon, tone: 'bg-warning-50 text-warning-600' },
+  { label: 'Active members', value: props.stats.members || 0, icon: UserGroupIcon, tone: 'bg-blue-50 text-blue-600', href: route('alp.members.index') },
+  { label: 'Unassigned Grades 7–10', value: props.stats.unassignedRequired || 0, icon: UserMinusIcon, tone: 'bg-warning-50 text-warning-600', href: route('alp.unassigned.index') },
 ])
 
 const TH = 'px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap'
@@ -77,7 +77,14 @@ const TD = 'px-4 py-3 text-sm text-slate-600'
       </AppPageHeader>
 
       <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="ALP summary">
-        <AppCard v-for="item in statCards" :key="item.label">
+        <AppCard
+          v-for="item in statCards"
+          :key="item.label"
+          :tabindex="item.href ? 0 : undefined"
+          :class="item.href ? 'cursor-pointer transition-shadow hover:shadow-md focus-visible:ring-2 focus-visible:ring-indigo-500' : ''"
+          @click="item.href && router.visit(item.href)"
+          @keydown.enter="item.href && router.visit(item.href)"
+        >
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-xs font-medium text-slate-500">{{ item.label }}</p>
