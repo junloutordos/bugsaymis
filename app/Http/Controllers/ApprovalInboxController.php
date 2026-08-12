@@ -27,6 +27,7 @@ use App\Models\WorkRequest;
 use App\Services\ApprovalInboxService;
 use App\Services\DigitalSignatureService;
 use App\Services\HR\HrDocumentRequestService;
+use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -430,6 +431,14 @@ class ApprovalInboxController extends Controller
                 if ($user->hasPermission('hr.leave.approve') && ! $user->hasRole('DivisionChief')) {
                     break;
                 }
+                // Academic Unit Head (or CID Chief, for an AUH's own leave) may
+                // act on this specific applicant if they are the resolved
+                // recommender — identity-based, no dedicated "AUH" RBAC role
+                // exists. Mirrors LeaveApplicationController::approve()'s
+                // academic_unit_head stage check exactly.
+                if ($this->isAuhRecommenderFor($user, $record)) {
+                    break;
+                }
                 // Division Chiefs may only act on their own division's employees
                 if ($isDC) {
                     $divisionIds = Division::where('division_chief_id', $user->id)->pluck('id');
@@ -605,6 +614,7 @@ class ApprovalInboxController extends Controller
                 $stage = $this->resolveLeaveStage($user, $record);
                 $action = match ($stage) {
                     'hr_officer' => 'certified',
+                    'academic_unit_head' => 'recommended',
                     'division_chief' => 'forwarded',
                     default => 'approved',
                 };
@@ -782,8 +792,39 @@ class ApprovalInboxController extends Controller
         if ($user->hasRole('DivisionChief')) {
             return 'division_chief';
         }
+        // Identity-based: the applicant's specific resolved AUH recommender
+        // (or CID Chief, for an AUH's own leave) acts at the
+        // academic_unit_head stage — checked before falling back to
+        // hr_officer so an AUH with no hr.leave.approve permission still
+        // resolves correctly.
+        if ($this->isAuhRecommenderFor($user, $record)) {
+            return 'academic_unit_head';
+        }
 
         // HR Officer
         return 'hr_officer';
+    }
+
+    /**
+     * Whether $user is the specific resolved Academic Unit Head recommender
+     * (or CID Chief, for an AUH's own leave) for this leave application's
+     * applicant. Same resolution IPCRWorkflowService::leaveRecommenderFor()
+     * and LeaveApplicationController::approve()'s academic_unit_head stage
+     * check already use — no dedicated "AUH" RBAC role exists.
+     */
+    private function isAuhRecommenderFor($user, LeaveApplication $record): bool
+    {
+        if (! $record->user) {
+            return false;
+        }
+
+        $ipcrWorkflow = app(IPCRWorkflowService::class);
+        if (! $ipcrWorkflow->requiresLeaveAuhRecommendation($record->user)) {
+            return false;
+        }
+
+        $recommender = $ipcrWorkflow->leaveRecommenderFor($record->user);
+
+        return $recommender && (int) $recommender->id === (int) $user->id;
     }
 }
