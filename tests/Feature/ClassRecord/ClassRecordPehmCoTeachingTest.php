@@ -12,6 +12,7 @@ use App\Models\ClassRecord\ClassRecordTeacher;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
@@ -366,7 +367,158 @@ class ClassRecordPehmCoTeachingTest extends TestCase
         ]);
     }
 
-    // ── Co-teacher access: scores ──────────────────────────────────────────────
+    // ── Schedule-day check is scoped to each co-teacher's OWN subject ─────────
+    // Regression coverage for the reported bug: a co-teacher's assessment
+    // plotting was being validated against the record CREATOR's subject
+    // schedule instead of their own — so a PE-only Tuesday class looked
+    // "closed" to the Music co-teacher whose actual schedule is Wednesday,
+    // and vice versa.
+
+    private function scheduleFor(User $teacher, Subject $subject, Section $section, string $dayOfWeek): ClassSchedule
+    {
+        return ClassSchedule::create([
+            'user_id' => $teacher->id,
+            'subject_id' => $subject->id,
+            'section_id' => $section->id,
+            'school_year_id' => $this->sy->id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => $dayOfWeek,
+            'start_time' => '08:00:00',
+            'end_time' => '09:00:00',
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_co_teacher_can_plot_on_their_own_subjects_scheduled_day_even_when_it_differs_from_the_record_creators(): void
+    {
+        $peTeacher = User::factory()->create();
+        $musicTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1');
+        $musicSubject = $this->makeSubject('Music 1', 'MUS1');
+
+        // PE (the record's creator/default subject) meets Tuesday; Music (the
+        // co-teacher's subject) meets Wednesday — genuinely different days,
+        // as PEHM subjects normally do.
+        $this->scheduleFor($peTeacher, $peSubject, $this->section, 'Tuesday');
+        $this->scheduleFor($musicTeacher, $musicSubject, $this->section, 'Wednesday');
+
+        $record = $this->makeRecord($peTeacher, $peSubject);
+        $this->attachCoTeacher($record, $peSubject, $peTeacher, true);
+        $this->attachCoTeacher($record, $musicSubject, $musicTeacher);
+
+        $quarter = $this->makeQuarter($record);
+        $musicLeaf = GradingCategory::create([
+            'grading_option_id' => $this->option->id, 'subject_id' => $musicSubject->id,
+            'name' => 'Music Summative', 'code' => 'MUS', 'weight' => 0.5, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+
+        // Next Wednesday — Music's own scheduled day, but NOT PE's (Tuesday).
+        // Before the fix, the record's default (PE) subject_id was used for
+        // the schedule check, which would incorrectly reject this date.
+        $wednesday = now()->addMonth()->next(\Carbon\Carbon::WEDNESDAY)->toDateString();
+
+        $this->actingAs($musicTeacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $musicLeaf->id,
+                    'assessment_number' => 1,
+                    'title' => 'Music Quiz 1',
+                    'activity_date' => $wednesday,
+                    'max_score' => 20,
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'class_record_quarter_id' => $quarter->id,
+            'grading_category_id' => $musicLeaf->id,
+            'title' => 'Music Quiz 1',
+            'activity_date' => $wednesday,
+        ]);
+    }
+
+    public function test_co_teacher_is_still_blocked_on_a_day_their_own_subject_does_not_meet(): void
+    {
+        $peTeacher = User::factory()->create();
+        $musicTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1');
+        $musicSubject = $this->makeSubject('Music 1', 'MUS1');
+
+        // PE meets Tuesday; Music meets Wednesday.
+        $this->scheduleFor($peTeacher, $peSubject, $this->section, 'Tuesday');
+        $this->scheduleFor($musicTeacher, $musicSubject, $this->section, 'Wednesday');
+
+        $record = $this->makeRecord($peTeacher, $peSubject);
+        $this->attachCoTeacher($record, $peSubject, $peTeacher, true);
+        $this->attachCoTeacher($record, $musicSubject, $musicTeacher);
+
+        $quarter = $this->makeQuarter($record);
+        $musicLeaf = GradingCategory::create([
+            'grading_option_id' => $this->option->id, 'subject_id' => $musicSubject->id,
+            'name' => 'Music Summative', 'code' => 'MUS', 'weight' => 0.5, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+
+        // Next Tuesday — PE's day, but Music has no class this day, so the
+        // Music co-teacher must still be blocked (schedule check must not
+        // become a no-op — it should just use the RIGHT subject).
+        $tuesday = now()->addMonth()->next(\Carbon\Carbon::TUESDAY)->toDateString();
+
+        $response = $this->actingAs($musicTeacher)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $musicLeaf->id,
+                    'assessment_number' => 1,
+                    'title' => 'Music Quiz 1',
+                    'activity_date' => $tuesday,
+                    'max_score' => 20,
+                ]],
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseMissing('class_record_assessments', [
+            'class_record_quarter_id' => $quarter->id,
+            'grading_category_id' => $musicLeaf->id,
+        ]);
+    }
+
+    public function test_calendar_plot_endpoint_uses_co_teachers_own_subject_schedule_not_the_record_creators(): void
+    {
+        $peTeacher = User::factory()->create();
+        $musicTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1');
+        $musicSubject = $this->makeSubject('Music 1', 'MUS1');
+
+        $this->scheduleFor($peTeacher, $peSubject, $this->section, 'Tuesday');
+        $this->scheduleFor($musicTeacher, $musicSubject, $this->section, 'Wednesday');
+
+        $record = $this->makeRecord($peTeacher, $peSubject);
+        $this->attachCoTeacher($record, $peSubject, $peTeacher, true);
+        $this->attachCoTeacher($record, $musicSubject, $musicTeacher);
+
+        $this->makeQuarter($record);
+        $musicLeaf = GradingCategory::create([
+            'grading_option_id' => $this->option->id, 'subject_id' => $musicSubject->id,
+            'name' => 'Music Summative', 'code' => 'MUS', 'weight' => 0.5, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+
+        $wednesday = now()->addMonth()->next(\Carbon\Carbon::WEDNESDAY)->toDateString();
+
+        $this->actingAs($musicTeacher)
+            ->postJson(route('class-records.assessments.plot', ['classRecord' => $record->id, 'q' => 1]), [
+                'grading_category_id' => $musicLeaf->id,
+                'title' => 'Music Quiz via Calendar',
+                'activity_date' => $wednesday,
+                'max_score' => 20,
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'grading_category_id' => $musicLeaf->id,
+            'title' => 'Music Quiz via Calendar',
+            'activity_date' => $wednesday,
+        ]);
+    }
+
 
     public function test_co_teacher_cannot_enter_scores_for_a_leaf_they_do_not_own(): void
     {

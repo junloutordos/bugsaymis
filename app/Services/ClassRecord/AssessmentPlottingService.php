@@ -253,6 +253,10 @@ class AssessmentPlottingService
             }
 
             if (! $isAdmin) {
+                // Checked against the CATEGORY'S own subject_id, not the
+                // record's default subject_id — on a shared PEHM record each
+                // co-teacher's subject keeps its own weekly schedule.
+                $scheduleSubjectId = $category->subject_id ?? $record->subject_id;
                 foreach ($dates as $occurrenceDate) {
                     if (WatRuleService::isExamExempt(
                         $assessmentType,
@@ -263,7 +267,7 @@ class AssessmentPlottingService
                         continue;
                     }
                     $meets = WatRuleService::meetsOnDate(
-                        $record->subject_id,
+                        $scheduleSubjectId,
                         $record->section_id,
                         $record->school_year_id,
                         $occurrenceDate,

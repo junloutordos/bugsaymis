@@ -424,22 +424,32 @@ class ClassRecordAssessmentController extends Controller
         // Test/Quarterly Exam entries inside a configured exam window are
         // exempt too — final exams commonly run a special block schedule
         // that doesn't match the regular weekly rotation.
+        //
+        // Checked against the ITEM'S OWN leaf category subject_id, not the
+        // class record's default subject_id — on a shared PEHM record, PE /
+        // Health / Music each keep their own weekly schedule, so a
+        // co-teacher's assessment must be checked against their own
+        // subject's meeting days, not whichever subject created the record.
+        // A leaf with no subject_id (the normal, non-shared case) falls back
+        // to the record's own subject, unchanged from before.
         $warnings = [];
         $meetsByDate = [];
         foreach ($items as $item) {
+            $itemSubjectId = $categories[$item['grading_category_id']]->subject_id ?? $classRecord->subject_id;
             foreach ($item['activity_dates'] as $date) {
                 if (WatRuleService::isExamExempt($item['assessment_type'], $classRecord->school_year_id, $q, $date)) {
                     continue;
                 }
-                if (! array_key_exists($date, $meetsByDate)) {
-                    $meetsByDate[$date] = WatRuleService::meetsOnDate(
-                        $classRecord->subject_id,
+                $meetsKey = $itemSubjectId.'|'.$date;
+                if (! array_key_exists($meetsKey, $meetsByDate)) {
+                    $meetsByDate[$meetsKey] = WatRuleService::meetsOnDate(
+                        $itemSubjectId,
                         $classRecord->section_id,
                         $classRecord->school_year_id,
                         $date
                     );
                 }
-                if ($meetsByDate[$date] !== false) {
+                if ($meetsByDate[$meetsKey] !== false) {
                     continue;
                 }
                 $day = Carbon::parse($date)->format('l, M d');
@@ -1080,14 +1090,16 @@ class ClassRecordAssessmentController extends Controller
         $warnings = [];
         $meetsByDate = [];
         foreach ($sourceAssessments as $item) {
+            $itemSubjectId = $item->gradingCategory?->subject_id ?? $target->subject_id;
             foreach ($item->activityDateStrings() as $date) {
                 if (WatRuleService::isExamExempt($item->assessment_type, $target->school_year_id, $q, $date)) {
                     continue;
                 }
-                if (! array_key_exists($date, $meetsByDate)) {
-                    $meetsByDate[$date] = WatRuleService::meetsOnDate($target->subject_id, $target->section_id, $target->school_year_id, $date);
+                $meetsKey = $itemSubjectId.'|'.$date;
+                if (! array_key_exists($meetsKey, $meetsByDate)) {
+                    $meetsByDate[$meetsKey] = WatRuleService::meetsOnDate($itemSubjectId, $target->section_id, $target->school_year_id, $date);
                 }
-                if ($meetsByDate[$date] === false) {
+                if ($meetsByDate[$meetsKey] === false) {
                     $day = Carbon::parse($date)->format('l, M d');
                     $warning = "{$target->subject_name} has no scheduled class with this section on {$day}.";
                     if (! $this->isAdmin()) {

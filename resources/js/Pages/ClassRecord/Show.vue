@@ -49,6 +49,7 @@ const props = defineProps({
   siblings:           { type: Array, default: () => [] },
   quizzes:            { type: Array, default: () => [] },
   scheduledDays:      { type: Array, default: () => [] },
+  scheduledDaysBySubject: { type: Object, default: () => ({}) },
 })
 
 const page = usePage()
@@ -547,14 +548,42 @@ const dateCounts = computed(() => watCountsFromCalendarDays(calendarDaysWithPend
 // so they can plot make-up/special dates (server warns instead of blocking).
 const WEEKDAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-const disabledWeekdays = computed(() => {
-  if (props.isAdmin || !props.scheduledDays.length) return []
-  return WEEKDAY_ORDER.filter(d => !props.scheduledDays.includes(d))
-})
+/**
+ * Scheduled weekdays for a given subject_id — looks up
+ * scheduledDaysBySubject (populated for every subject on a shared PEHM
+ * record, keyed by subject_id) and falls back to the flat scheduledDays
+ * prop (the record's own default subject) when the subject isn't known or
+ * this is a normal, non-shared record. This is what makes each co-teacher's
+ * OWN subject schedule apply instead of always the record creator's.
+ */
+function scheduledDaysFor(subjectId) {
+  if (subjectId != null) {
+    const days = props.scheduledDaysBySubject?.[String(subjectId)]
+    if (days) return days
+  }
+  return props.scheduledDays
+}
 
-const meetingDaysLabel = computed(() =>
-  WEEKDAY_ORDER.filter(d => props.scheduledDays.includes(d)).map(d => d.slice(0, 3)).join(' · ')
-)
+function disabledWeekdaysFor(subjectId) {
+  const days = scheduledDaysFor(subjectId)
+  if (props.isAdmin || !days.length) return []
+  return WEEKDAY_ORDER.filter(d => !days.includes(d))
+}
+
+// Per-row disabled weekdays — resolves each leaf category's own subject_id
+// (null for a normal record, which resolves to the record's own schedule).
+function disabledWeekdaysForCategory(cat) {
+  return disabledWeekdaysFor(cat?.subject_id)
+}
+
+const disabledWeekdays = computed(() => disabledWeekdaysFor(null))
+
+function meetingDaysLabelFor(subjectId) {
+  const days = scheduledDaysFor(subjectId)
+  return WEEKDAY_ORDER.filter(d => days.includes(d)).map(d => d.slice(0, 3)).join(' · ')
+}
+
+const meetingDaysLabel = computed(() => meetingDaysLabelFor(null))
 
 function onDateChange(row) {
   const date = row._dateInput
@@ -630,6 +659,7 @@ const pendingAssessmentCategories = computed(() => {
       key:      String(cat.id),
       label:    `${cat.code} — ${cat.display_name}`,
       catId:    cat.id,
+      subjectId: cat.subject_id ?? null,
       openRow,
       unsavedDatedRows,
     })
@@ -640,11 +670,17 @@ const pendingAssessmentCategories = computed(() => {
 // Schedule-day + plotting-deadline feasibility for a candidate date, mirrors
 // the same two checks onDateChange() applies per-row (fail-open on schedule
 // when no scheduledDays are known yet; admins bypass both like elsewhere).
-function calendarDateFeasibility(dateStr) {
-  if (!props.isAdmin && props.scheduledDays.length) {
-    const weekday = WEEKDAY_ORDER[(new Date(`${dateStr}T00:00:00`).getDay() + 6) % 7]
-    if (!props.scheduledDays.includes(weekday)) {
-      return { ok: false, reason: `${props.classRecord.subject_name ?? 'This subject'} has no scheduled class with this section on ${weekday}s.` }
+// `subjectId` scopes the schedule check to one co-teacher's own subject —
+// omitted, it falls back to the record's own default subject (unaffected,
+// non-shared records only ever have the one).
+function calendarDateFeasibility(dateStr, subjectId = null) {
+  if (!props.isAdmin) {
+    const days = scheduledDaysFor(subjectId)
+    if (days.length) {
+      const weekday = WEEKDAY_ORDER[(new Date(`${dateStr}T00:00:00`).getDay() + 6) % 7]
+      if (!days.includes(weekday)) {
+        return { ok: false, reason: `${props.classRecord.subject_name ?? 'This subject'} has no scheduled class with this section on ${weekday}s.` }
+      }
     }
   }
   if (!props.isAdmin && new Date() > plottingDeadline(dateStr)) {
@@ -652,6 +688,23 @@ function calendarDateFeasibility(dateStr) {
     return { ok: false, reason: `Plotting deadline passed — must be plotted by 12:00 NN of the Friday before (${deadline}).` }
   }
   return { ok: true, reason: null }
+}
+
+// Grid-level (pre-category-choice) feasibility: a day is only greyed out if
+// it fails for EVERY one of the teacher's own pending categories — on a
+// shared PEHM record, a co-teacher's calendar spans just their own
+// subject(s), but this stays permissive so a mixed set never blocks a day
+// that's genuinely open for at least one of them. The picker itself (once a
+// category is chosen) re-checks strictly against that category's own subject.
+function calendarCellFeasibility(dateStr) {
+  if (!pendingAssessmentCategories.value.length) return { ok: true, reason: null }
+  let lastResult = { ok: true, reason: null }
+  for (const cat of pendingAssessmentCategories.value) {
+    const result = calendarDateFeasibility(dateStr, cat.subjectId)
+    if (result.ok) return result
+    lastResult = result
+  }
+  return lastResult
 }
 
 async function onCalendarSchedule({ catId, title, isGraded, maxScore, date, dates, targetRecordIds }) {
@@ -1430,7 +1483,7 @@ async function saveQuarterOption() {
                         </div>
                         <AppDatePicker v-model="row._dateInput"
                           :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
-                          :disabled-weekdays="disabledWeekdays"
+                          :disabled-weekdays="disabledWeekdaysForCategory(cat)"
                           @change="onDateChange(row)" />
                         <p class="mt-1 text-[10px] text-slate-400">Choose another date to add it to the same assessment.</p>
                         <p v-if="row._dateWarning" class="text-red-500 text-[11px] mt-1">{{ row._dateWarning }}</p>
@@ -1829,7 +1882,7 @@ async function saveQuarterOption() {
     :editable="pendingAssessmentCategories.length > 0"
     :pending-rows="pendingAssessmentCategories"
     :same-subject-records="applyEligibleRecords"
-    :disabled-dates="calendarDateFeasibility"
+    :disabled-dates="calendarCellFeasibility"
     @close="showSectionCalendar = false"
     @schedule="onCalendarSchedule"
     @clear-pending="onCalendarClearPending"

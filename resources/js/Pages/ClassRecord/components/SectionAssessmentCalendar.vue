@@ -106,7 +106,8 @@ const pickerTargetIds = ref([])
 const pickerWarning  = ref(null)
 
 function scheduleFeasibility(date) {
-  const scheduleCheck = props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null }
+  const subjectId = pickerCategory.value?.subjectId ?? null
+  const scheduleCheck = props.disabledDates ? props.disabledDates(date, subjectId) : { ok: true, reason: null }
   if (!scheduleCheck.ok) return scheduleCheck
   // Generic graded/non-major check — the real is_major/is_graded value is
   // only known once the row exists; this is a "is the day even open" gate,
@@ -155,7 +156,7 @@ const pickerFeasibility = computed(() =>
         date,
         ...(pickerIsGraded.value
           ? scheduleFeasibility(date)
-          : (props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null })),
+          : (props.disabledDates ? props.disabledDates(date, pickerCategory.value?.subjectId ?? null) : { ok: true, reason: null })),
       })).find(result => !result.ok)
       ?? { ok: true, reason: null }
     : { ok: true, reason: null }
@@ -164,9 +165,10 @@ const pickerFeasibility = computed(() =>
 function addPickerDate() {
   const date = pickerAdditionalDate.value
   if (!date || pickerDates.value.includes(date)) return
+  const subjectId = pickerCategory.value?.subjectId ?? null
   const feasibility = pickerIsGraded.value
     ? scheduleFeasibility(date)
-    : (props.disabledDates ? props.disabledDates(date) : { ok: true, reason: null })
+    : (props.disabledDates ? props.disabledDates(date, subjectId) : { ok: true, reason: null })
   if (!feasibility.ok) {
     pickerWarning.value = `${date}: ${feasibility.reason}`
     return

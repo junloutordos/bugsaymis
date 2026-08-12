@@ -136,20 +136,34 @@ class ClassRecordPageController extends Controller
 
         $classRecord->setAttribute('can_change_grading_option', $classRecord->canChangeGradingOption($this->isAdmin()));
 
-        // Weekdays this subject meets this section per the class schedule —
-        // drives the Setup datepicker's disabled days. Empty = no schedule
-        // plotted yet, so the picker disables nothing (fail-open, mirrors
-        // WatRuleService::meetsOnDate()).
-        $scheduledDays = [];
-        if ($classRecord->subject_id && $classRecord->section_id) {
-            $scheduledDays = ClassSchedule::where('section_id', $classRecord->section_id)
-                ->where('subject_id', $classRecord->subject_id)
-                ->where('school_year_id', $classRecord->school_year_id)
-                ->distinct()
-                ->pluck('day_of_week')
-                ->values()
-                ->all();
-        }
+        // Weekdays each subject on this record meets this section per the
+        // class schedule — drives the Setup datepicker's disabled days.
+        // Keyed by subject_id so a shared PEHM record's co-teachers are each
+        // checked against THEIR OWN subject's schedule, not the record
+        // creator's — PE, Health, and Music can (and normally do) meet the
+        // section on different days. Empty for a subject = no schedule
+        // plotted yet, so the picker disables nothing for it (fail-open,
+        // mirrors WatRuleService::meetsOnDate()).
+        $scheduleSubjectIds = $classRecord->coTeachers->isNotEmpty()
+            ? $classRecord->coTeachers->pluck('subject_id')->filter()->unique()->values()
+            : collect([$classRecord->subject_id])->filter();
+        $scheduledDaysBySubject = $scheduleSubjectIds->mapWithKeys(function ($subjectId) use ($classRecord) {
+            $days = $classRecord->section_id
+                ? ClassSchedule::where('section_id', $classRecord->section_id)
+                    ->where('subject_id', $subjectId)
+                    ->where('school_year_id', $classRecord->school_year_id)
+                    ->distinct()
+                    ->pluck('day_of_week')
+                    ->values()
+                    ->all()
+                : [];
+
+            return [(string) $subjectId => $days];
+        });
+        // Backward-compatible flat prop for the record's own default subject
+        // (non-shared records — the overwhelming majority — only ever have
+        // one entry anyway).
+        $scheduledDays = $scheduledDaysBySubject->get((string) $classRecord->subject_id, []);
 
         // Other class records by the same teacher for the same subject (for copy-from-section feature).
         // Archived records are excluded — they're soft-deleted and must never resurface as a copy source.
@@ -279,6 +293,7 @@ class ClassRecordPageController extends Controller
             'sameSubjectRecords' => $sameSubjectRecords,
             'siblings' => $siblings,
             'scheduledDays' => $scheduledDays,
+            'scheduledDaysBySubject' => $scheduledDaysBySubject,
             'quizzes' => Quiz::where('source_type', 'class_record')
                 ->where('source_id', $classRecord->id)
                 ->withCount('questions')
