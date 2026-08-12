@@ -497,7 +497,7 @@ class ApprovalInboxController extends Controller
             'service_requests' => ['Pending', 'Approved'],
             'messengerial_requests' => ['Pending Division Chief Approval'],
             'gate_passes' => ['Pending', 'Division Approved'],
-            'leave_applications' => ['pending', 'hr_verified', 'forwarded'],
+            'leave_applications' => ['pending', 'hr_verified', 'auh_verified', 'forwarded'],
             'pms_schedules' => ['pending'],
             'class_schedules' => ['pending_ocd'],
             'computer_lab_schedules' => ['pending_approval'],

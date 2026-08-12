@@ -180,4 +180,102 @@ class ApprovalInboxControllerAuhTest extends TestCase
         $response->assertSessionHasNoErrors();
         $this->assertSame('auh_verified', $application->fresh()->status);
     }
+
+    /**
+     * Regression test for the 409 reported in production: once a CID
+     * teaching faculty's leave application clears the AUH recommendation
+     * stage (status = 'auh_verified'), the Division Chief attempting to
+     * approve it via the Approvals Inbox got "This request has already
+     * been acted upon" (409) — because
+     * ApprovalInboxController::checkPending()'s 'leave_applications'
+     * allow-list only had ['pending', 'hr_verified', 'forwarded'], missing
+     * 'auh_verified' entirely (added by the later AUH-stage feature but
+     * never backfilled into this guard). The underlying
+     * LeaveApplicationController::approve()/ApprovalService::processLeave()
+     * were always correct; checkPending() blocked the request before it
+     * ever reached them.
+     */
+    public function test_division_chief_can_approve_a_leave_application_already_cleared_by_auh_from_the_inbox(): void
+    {
+        $cidChief = User::factory()->create(['emp_category' => 'Plantilla Non-Teaching']);
+        $dcRole = \App\Models\Role::firstOrCreate(['name' => 'DivisionChief']);
+        $leavePermission = \App\Models\Permission::firstOrCreate(
+            ['name' => 'hr.leave.approve'],
+            ['module' => 'HR', 'description' => 'hr.leave.approve'],
+        );
+        $dcRole->permissions()->syncWithoutDetaching([$leavePermission->id]);
+        $cidChief->roles()->attach($dcRole->id);
+        $cidChief->roles()->attach(\App\Models\Role::firstOrCreate(['name' => 'CID Chief'])->id);
+
+        $cidDivision = Division::create([
+            'division_name'     => 'Curriculum Implementation Division',
+            'acronym'           => 'CID',
+            'division_chief_id' => $cidChief->id,
+            'status'            => 'active',
+        ]);
+
+        $schoolYear = SchoolYear::create([
+            'name'       => '2025-2026',
+            'start_date' => '2025-06-01',
+            'end_date'   => '2026-03-31',
+            'is_current' => true,
+            'status'     => 'active',
+        ]);
+
+        $unitHead = User::factory()->create([
+            'division_id'  => $cidDivision->id,
+            'emp_category' => 'Plantilla Teaching',
+        ]);
+
+        $academicUnit = AcademicUnit::create([
+            'school_year_id' => $schoolYear->id,
+            'code'           => 'ENG',
+            'name'           => 'English',
+            'unit_type'      => 'department',
+            'head_user_id'   => $unitHead->id,
+            'sort_order'     => 1,
+            'is_active'      => true,
+        ]);
+
+        $teacher = User::factory()->create([
+            'division_id'      => $cidDivision->id,
+            'emp_category'     => 'Plantilla Teaching',
+            'academic_unit_id' => $academicUnit->id,
+        ]);
+
+        $leaveType = LeaveType::create([
+            'code'                        => 'VL',
+            'name'                        => 'Vacation Leave',
+            'days_per_year'               => 15,
+            'is_creditable'               => true,
+            'is_deductible'               => true,
+            'requires_approval'           => false,
+            'with_pay'                    => true,
+            'applicable_employment_types' => ['permanent'],
+            'is_active'                   => true,
+        ]);
+
+        // Already cleared HR + AUH — sitting at exactly the status the
+        // Division Chief is supposed to act on next.
+        $application = LeaveApplication::create([
+            'user_id'       => $teacher->id,
+            'leave_type_id' => $leaveType->id,
+            'date_from'     => now()->addDays(5)->toDateString(),
+            'date_to'       => now()->addDays(5)->toDateString(),
+            'dates'         => [now()->addDays(5)->toDateString()],
+            'days_applied'  => 1,
+            'status'        => 'auh_verified',
+            'auh_id'        => $unitHead->id,
+            'auh_action'    => 'recommended',
+            'auh_at'        => now(),
+        ]);
+
+        $response = $this->actingAs($cidChief)->post(
+            route('approvals.approve', ['type' => 'leave_applications', 'id' => $application->id])
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHasNoErrors();
+        $this->assertSame('forwarded', $application->fresh()->status);
+    }
 }
