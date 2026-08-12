@@ -454,12 +454,36 @@ class LeaveCreditService
     /**
      * Return (or create) a leave_credits row for the given user/type/year.
      */
+    /**
+     * Get-or-create the leave_credits row for a user/leave-type/year. New
+     * rows normally start at earned=0 — HR posts the actual accrual via the
+     * Initialize/Adjust screens (VL, SL, FL, SPL, etc., which are genuinely
+     * earned incrementally). For a leave type explicitly flagged
+     * 'auto_grant_annual' (a flat-rate universal entitlement — currently
+     * only Wellness Leave, 5 days/year), a brand-new row is seeded with the
+     * full days_per_year instead, so the first-ever leave_credits row for
+     * that employee/year already reflects the entitlement without HR
+     * having to manually initialize every single employee.
+     */
     private function ensureCreditRow(int $userId, int $leaveTypeId, int $year): LeaveCredit
     {
-        return LeaveCredit::firstOrCreate(
+        $leaveType = LeaveType::find($leaveTypeId);
+        $initialEarned = ($leaveType && $leaveType->auto_grant_annual)
+            ? (float) ($leaveType->days_per_year ?? 0)
+            : 0;
+
+        $credit = LeaveCredit::firstOrCreate(
             ['user_id' => $userId, 'leave_type_id' => $leaveTypeId, 'year' => $year],
-            ['earned' => 0, 'carried_over' => 0, 'used' => 0, 'forfeited' => 0, 'monetized' => 0],
+            ['earned' => $initialEarned, 'carried_over' => 0, 'used' => 0, 'forfeited' => 0, 'monetized' => 0],
         );
+
+        // 'balance' is a MySQL generated (STORED) column — firstOrCreate()'s
+        // in-memory model only has the attributes it explicitly set/matched
+        // on, not the DB-computed value, so a freshly-inserted row's
+        // ->balance is null/0 until re-fetched. Callers immediately read
+        // ->balance right after this call, so refresh whenever a new row
+        // was actually created.
+        return $credit->wasRecentlyCreated ? $credit->fresh() : $credit;
     }
 
     /**

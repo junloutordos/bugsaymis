@@ -22,6 +22,7 @@ class LeaveType extends Model
         'name',
         'description',
         'days_per_year',
+        'auto_grant_annual',
         'is_creditable',
         'is_deductible',
         'requires_approval',
@@ -35,6 +36,7 @@ class LeaveType extends Model
 
     protected $casts = [
         'days_per_year'              => 'decimal:2',
+        'auto_grant_annual'          => 'boolean',
         'max_days_per_application'   => 'decimal:2',
         'is_creditable'              => 'boolean',
         'is_deductible'              => 'boolean',

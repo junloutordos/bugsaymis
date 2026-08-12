@@ -9,6 +9,28 @@ use Illuminate\Http\Request;
 trait SignsDocuments
 {
     /**
+     * Pre-flight check for performSign(): whether the signer's PIN (if they
+     * have one set) would actually pass, without creating a DigitalSignature
+     * record. Lets a caller block a state-changing action (e.g. a workflow
+     * stage transition) BEFORE it commits, instead of committing the
+     * transition first and only afterward discovering the signature failed
+     * (which silently leaves an unsigned certification with no way to
+     * cleanly undo the transition).
+     */
+    private function canSign(Request $request): bool
+    {
+        $signer = $request->user();
+
+        if (empty($signer->signature_pin)) {
+            return true;
+        }
+
+        $pin = $request->input('pin');
+
+        return $pin && $this->sigService->verifyPin($signer, $pin);
+    }
+
+    /**
      * Attempt to create a DigitalSignature record for the given signable.
      *
      * - If the signer has a PIN, the request must supply a matching `pin` field.

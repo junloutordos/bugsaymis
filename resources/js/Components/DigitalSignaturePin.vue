@@ -8,6 +8,7 @@ const props = defineProps({
     signatureUri:  { type: String,  default: null },
     loading:       { type: Boolean, default: false },
     confirmLabel:  { type: String,  default: 'Confirm' },
+    serverError:   { type: String,  default: '' },
 })
 
 const emit = defineEmits(['confirm', 'cancel'])
@@ -74,7 +75,7 @@ function cancel() {
                            placeholder="••••••"
                            @keyup.enter="confirm"
                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                    <p v-if="error" class="mt-1 text-xs text-red-600">{{ error }}</p>
+                    <p v-if="error || props.serverError" class="mt-1 text-xs text-red-600">{{ error || props.serverError }}</p>
                 </div>
 
                 <!-- No PIN notice -->

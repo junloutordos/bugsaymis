@@ -178,6 +178,11 @@ class LeaveApplicationController extends Controller
             'hasPin'       => ! empty($authUser->signature_pin),
             'signatureUri' => $this->sigService->getSignatureDataUri($authUser),
             'requiresAuh'  => $requiresAuh,
+            // Which signing stages this application has already committed to
+            // (action recorded, status advanced) but have no matching
+            // DigitalSignature record — lets the page offer a "Re-sign"
+            // affordance instead of leaving the gap invisible until print.
+            'missingSignatureStages' => $this->missingSignatureStages($leaveApplication),
             // Lets the "Review Application" button show for the specific
             // resolved recommender even when they hold no RBAC permission
             // for it (e.g. ACIDAA recommending their own leave).
@@ -189,6 +194,40 @@ class LeaveApplicationController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
+    }
+
+    /**
+     * Stages that have already recorded an action (their *_id/*_action
+     * columns are set) but have no matching DigitalSignature row — e.g. the
+     * signer's PIN failed silently before the fix in approve() that now
+     * blocks the transition on a bad PIN. Lets the page offer "Re-sign"
+     * for already-affected applications instead of leaving the gap
+     * invisible until someone prints the form.
+     */
+    private function missingSignatureStages(LeaveApplication $leaveApplication): array
+    {
+        $stageActedColumns = [
+            'hr_officer'         => 'hr_officer_id',
+            'academic_unit_head' => 'auh_id',
+            'division_chief'     => 'division_chief_id',
+            'campus_director'    => 'approved_by',
+        ];
+
+        $signedStages = \App\Models\DigitalSignature::where('signable_type', LeaveApplication::class)
+            ->where('signable_id', $leaveApplication->id)
+            ->get()
+            ->map(fn ($sig) => $sig->metadata['stage'] ?? null)
+            ->filter()
+            ->all();
+
+        $missing = [];
+        foreach ($stageActedColumns as $stage => $column) {
+            if ($leaveApplication->{$column} && ! in_array($stage, $signedStages, true)) {
+                $missing[] = $stage;
+            }
+        }
+
+        return $missing;
     }
 
     /**
@@ -251,6 +290,18 @@ class LeaveApplicationController extends Controller
             );
         }
 
+        $isSigningAction = in_array($data['action'], ['certified', 'recommended', 'forwarded', 'approved'], true);
+
+        // Verify the signature PIN BEFORE committing the stage transition —
+        // otherwise a wrong/missing PIN silently leaves the application
+        // advanced (e.g. status='hr_verified') with no matching
+        // DigitalSignature record, and nobody finds out until printing.
+        if ($isSigningAction && ! $this->canSign($request)) {
+            return back()->withErrors([
+                'pin' => 'Incorrect signature PIN. This action was not recorded — please try again.',
+            ]);
+        }
+
         $this->approvals->processLeave(
             application: $leaveApplication,
             stage:       $data['stage'],
@@ -259,15 +310,88 @@ class LeaveApplicationController extends Controller
             approver:    $approver,
         );
 
-        if (in_array($data['action'], ['certified', 'recommended', 'forwarded', 'approved'], true)) {
-            $this->performSign($request, LeaveApplication::class, $leaveApplication->id,
+        if ($isSigningAction) {
+            $signed = $this->performSign($request, LeaveApplication::class, $leaveApplication->id,
                 $data['stage'],
                 "Leave Application #{$leaveApplication->id}",
                 LeaveApplication::class . $leaveApplication->id . $data['stage']
             );
+
+            if (! $signed) {
+                // The stage transition already committed (processLeave() ran
+                // in its own transaction) — the PIN passed canSign() above,
+                // so this is an unexpected failure (e.g. signing service
+                // error), not a wrong PIN. Surface it so HR knows to use the
+                // "Re-sign" affordance rather than assuming it worked.
+                logger()->error('Leave approval committed but digital signature failed', [
+                    'leave_application_id' => $leaveApplication->id,
+                    'stage'                => $data['stage'],
+                ]);
+
+                return back()->with('warning', 'Action recorded, but your digital signature could not be saved. Please use "Re-sign" on this application.');
+            }
         }
 
         return back()->with('success', 'Action recorded.');
+    }
+
+    /**
+     * Re-sign a stage that was already acted upon (its *_id/*_action columns
+     * are set, so the workflow already advanced) but has no matching
+     * DigitalSignature record — the historical gap left by the silent-PIN-
+     * failure bug in approve() before it started blocking on a bad PIN.
+     * Does NOT re-run processLeave() — the stage transition already
+     * happened; this only creates the missing signature record.
+     */
+    public function resign(Request $request, LeaveApplication $leaveApplication)
+    {
+        $data = $request->validate([
+            'stage' => 'required|in:hr_officer,academic_unit_head,division_chief,campus_director',
+        ]);
+        $stage = $data['stage'];
+
+        $stageActedColumns = [
+            'hr_officer'         => 'hr_officer_id',
+            'academic_unit_head' => 'auh_id',
+            'division_chief'     => 'division_chief_id',
+            'campus_director'    => 'approved_by',
+        ];
+
+        $actedColumn = $stageActedColumns[$stage];
+        abort_unless($leaveApplication->{$actedColumn}, 404, 'This stage has not been acted upon yet.');
+
+        // Only the original signer for that stage may re-sign it — this is
+        // filling a gap in their own past action, not a new approval.
+        $originalSignerId = $leaveApplication->{$actedColumn};
+        abort_unless(
+            (int) $originalSignerId === (int) Auth::id() || Auth::user()->isSuperAdmin(),
+            403,
+            'Only the original signer for this stage can re-sign it.'
+        );
+
+        abort_if(
+            in_array($stage, $this->missingSignatureStages($leaveApplication), true) === false,
+            409,
+            'This stage already has a signature on file.'
+        );
+
+        if (! $this->canSign($request)) {
+            return back()->withErrors([
+                'pin' => 'Incorrect signature PIN. Signature was not saved — please try again.',
+            ]);
+        }
+
+        $signed = $this->performSign($request, LeaveApplication::class, $leaveApplication->id,
+            $stage,
+            "Leave Application #{$leaveApplication->id}",
+            LeaveApplication::class . $leaveApplication->id . $stage
+        );
+
+        if (! $signed) {
+            return back()->with('warning', 'Signature could not be saved. Please try again.');
+        }
+
+        return back()->with('success', 'Signature saved.');
     }
 
     public function cancel(LeaveApplication $leaveApplication)

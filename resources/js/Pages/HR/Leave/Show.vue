@@ -109,6 +109,9 @@
                     {{ application.hr_officer_action }}
                   </span>
                   by {{ application.hr_officer?.name }} &bull; {{ fmtDate(application.hr_officer_at) }}
+                  <button v-if="missingSignatureStages.includes('hr_officer')" type="button"
+                          class="ml-1.5 text-amber-600 hover:text-amber-700 underline text-xs"
+                          @click="openResign('hr_officer')">Re-sign</button>
                 </p>
                 <p v-if="application.hr_officer_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.hr_officer_remarks }}"</p>
               </template>
@@ -128,6 +131,9 @@
                     {{ application.auh_action }}
                   </span>
                   by {{ application.academic_unit_head?.name }} &bull; {{ fmtDate(application.auh_at) }}
+                  <button v-if="missingSignatureStages.includes('academic_unit_head')" type="button"
+                          class="ml-1.5 text-amber-600 hover:text-amber-700 underline text-xs"
+                          @click="openResign('academic_unit_head')">Re-sign</button>
                 </p>
                 <p v-if="application.auh_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.auh_remarks }}"</p>
               </template>
@@ -147,6 +153,9 @@
                     {{ application.division_chief_action }}
                   </span>
                   by {{ application.division_chief?.name }} &bull; {{ fmtDate(application.division_chief_at) }}
+                  <button v-if="missingSignatureStages.includes('division_chief')" type="button"
+                          class="ml-1.5 text-amber-600 hover:text-amber-700 underline text-xs"
+                          @click="openResign('division_chief')">Re-sign</button>
                 </p>
                 <p v-if="application.division_chief_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.division_chief_remarks }}"</p>
               </template>
@@ -166,6 +175,9 @@
                     {{ application.approval_action }}
                   </span>
                   by {{ application.approved_by?.name }} &bull; {{ fmtDate(application.approved_at) }}
+                  <button v-if="missingSignatureStages.includes('campus_director')" type="button"
+                          class="ml-1.5 text-amber-600 hover:text-amber-700 underline text-xs"
+                          @click="openResign('campus_director')">Re-sign</button>
                 </p>
                 <p v-if="application.approval_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.approval_remarks }}"</p>
               </template>
@@ -238,7 +250,8 @@
         :hasPin="hasPin"
         :signatureUri="signatureUri"
         :loading="pinModalLoading"
-        confirmLabel="Sign & Submit"
+        :serverError="resigningStage ? resignForm.errors.pin : approveForm.errors.pin"
+        :confirmLabel="resigningStage ? 'Sign' : 'Sign & Submit'"
         @confirm="handlePinConfirm"
         @cancel="handlePinCancel"
       />
@@ -267,6 +280,7 @@ const props = defineProps({
   requiresAuh:       Boolean,
   isAuhRecommender:  Boolean,
   eligibleSubstitutes: { type: Array, default: () => [] },
+  missingSignatureStages: { type: Array, default: () => [] },
 })
 
 const substituteForm = useForm({
@@ -371,6 +385,11 @@ function submitApprove() {
 function postApprove() {
   approveForm.post(route('hr.leave.approve', props.application.id), {
     onSuccess: () => {
+      // A wrong/missing PIN redirects back with a 'pin' session error but is
+      // still an Inertia "success" navigation — keep the PIN modal open so
+      // the HR officer sees the message and can retry immediately, instead
+      // of it silently closing as if nothing happened.
+      if (approveForm.errors.pin) return
       approveModal.value = false
       showPinModal.value = false
     },
@@ -378,7 +397,37 @@ function postApprove() {
   })
 }
 
+// Re-sign — fills in a missing DigitalSignature for a stage that already
+// recorded its action (see missingSignatureStages prop), without re-running
+// the approval workflow.
+const resignForm = useForm({ stage: null, pin: null })
+const resigningStage = ref(null)
+
+function openResign(stage) {
+  resigningStage.value = stage
+  resignForm.stage = stage
+  resignForm.pin = null
+  showPinModal.value = true
+}
+
+function postResign() {
+  resignForm.post(route('hr.leave.resign', props.application.id), {
+    onSuccess: () => {
+      if (resignForm.errors.pin) return
+      showPinModal.value = false
+      resigningStage.value = null
+    },
+    onFinish: () => { pinModalLoading.value = false },
+  })
+}
+
 function handlePinConfirm(pin) {
+  if (resigningStage.value) {
+    resignForm.pin = pin
+    pinModalLoading.value = true
+    postResign()
+    return
+  }
   approveForm.pin = pin
   pinModalLoading.value = true
   postApprove()
@@ -386,6 +435,7 @@ function handlePinConfirm(pin) {
 
 function handlePinCancel() {
   showPinModal.value = false
+  resigningStage.value = null
 }
 
 async function cancelApp() {

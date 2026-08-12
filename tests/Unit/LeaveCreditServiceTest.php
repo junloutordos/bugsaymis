@@ -550,4 +550,96 @@ class LeaveCreditServiceTest extends TestCase
 
         $this->assertEmpty(array_filter($balances, fn ($b) => !isset($b['is_service_credit'])));
     }
+
+    // ── auto_grant_annual (Wellness Leave) ────────────────────────────────────
+
+    /**
+     * Regression test for the WL entitlement bug: every leave_credits row
+     * for WL was created with earned=0 (the same as VL/SL, which ARE
+     * genuinely earned incrementally), so every WL deduction ran against a
+     * phantom zero balance and got silently flagged is_without_pay=true.
+     * A leave type flagged auto_grant_annual must seed earned=days_per_year
+     * on its very first credit row, before any deduction happens.
+     */
+    public function test_auto_grant_annual_leave_type_seeds_full_entitlement_on_first_use(): void
+    {
+        $wl = LeaveType::create([
+            'code' => 'WL', 'name' => 'Wellness Leave',
+            'days_per_year' => 5, 'auto_grant_annual' => true,
+            'is_deductible' => true, 'is_creditable' => true, 'is_active' => true, 'sort_order' => 3,
+        ]);
+
+        $user = $this->nonTeachingUser();
+        // No Initialize step run — this is the exact real-world path: HR
+        // never manually granted a WL balance, the first touch is a
+        // deduction on approval.
+        $app = $this->makeApprovedApplication($user, $wl, 2.0);
+
+        $this->service->applyLeaveDeduction($app->id);
+
+        $credit = LeaveCredit::where('user_id', $user->id)
+            ->where('leave_type_id', $wl->id)
+            ->where('year', now()->year)
+            ->first();
+
+        $this->assertEquals(5.0, (float) $credit->earned, 'First-ever WL row must seed the full annual entitlement.');
+        $this->assertEquals(2.0, (float) $credit->used);
+        $this->assertEquals(3.0, (float) $credit->balance);
+
+        $app->refresh();
+        $this->assertEquals(2.0, (float) $app->days_deducted);
+        $this->assertFalse((bool) $app->is_without_pay, 'Must not be flagged AWOL — the entitlement covers this deduction.');
+    }
+
+    public function test_auto_grant_annual_does_not_re_grant_on_an_existing_row(): void
+    {
+        $wl = LeaveType::create([
+            'code' => 'WL', 'name' => 'Wellness Leave',
+            'days_per_year' => 5, 'auto_grant_annual' => true,
+            'is_deductible' => true, 'is_creditable' => true, 'is_active' => true, 'sort_order' => 3,
+        ]);
+
+        $user = $this->nonTeachingUser();
+        $app1 = $this->makeApprovedApplication($user, $wl, 2.0);
+        $this->service->applyLeaveDeduction($app1->id);
+
+        // A second, later application for the same user/year must deduct
+        // from the SAME row, not re-seed another 5 days on top.
+        $app2 = $this->makeApprovedApplication($user, $wl, 2.0);
+        $this->service->applyLeaveDeduction($app2->id);
+
+        $credit = LeaveCredit::where('user_id', $user->id)
+            ->where('leave_type_id', $wl->id)
+            ->where('year', now()->year)
+            ->first();
+
+        $this->assertEquals(5.0, (float) $credit->earned, 'earned must stay at the seeded 5, not double to 10.');
+        $this->assertEquals(4.0, (float) $credit->used);
+        $this->assertEquals(1.0, (float) $credit->balance);
+    }
+
+    /**
+     * Non-regression: VL is NOT flagged auto_grant_annual (the default),
+     * so a brand-new VL row must still start at earned=0 exactly as before
+     * — HR must post the actual accrual. Proves the fix is scoped to
+     * opted-in leave types only.
+     */
+    public function test_leave_type_without_auto_grant_annual_still_starts_at_zero_earned(): void
+    {
+        $this->assertFalse((bool) $this->vl->auto_grant_annual, 'Precondition: VL is not auto-grant.');
+
+        $user = $this->nonTeachingUser();
+        $app  = $this->makeApprovedApplication($user, $this->vl, 2.0);
+
+        $this->service->applyLeaveDeduction($app->id);
+
+        $credit = LeaveCredit::where('user_id', $user->id)
+            ->where('leave_type_id', $this->vl->id)
+            ->where('year', now()->year)
+            ->first();
+
+        $this->assertEquals(0.0, (float) $credit->earned, 'VL must still start at 0 — never auto-granted.');
+        $app->refresh();
+        $this->assertTrue((bool) $app->is_without_pay, 'Uninitialized VL correctly has no balance to deduct from.');
+    }
 }

@@ -96,6 +96,135 @@ class LeaveApprovalWorkflowTest extends TestCase
         $this->assertSame($this->approver->id, $application->approved_by);
     }
 
+    /**
+     * Regression test for the silent-signature-failure bug: previously, a
+     * wrong PIN on a signing action (certified/recommended/forwarded/
+     * approved) still let the stage transition commit — the wrong PIN was
+     * only reflected in a missing DigitalSignature record, discovered later
+     * at print time. approve() now verifies the PIN BEFORE calling
+     * processLeave(), so a bad PIN blocks the transition entirely.
+     */
+    public function test_wrong_signature_pin_blocks_the_stage_transition(): void
+    {
+        $this->approver->update(['signature_pin' => bcrypt('123456')]);
+        $application = $this->makeApplication(['status' => 'forwarded']);
+
+        $response = $this->actingAs($this->approver)
+            ->post(route('hr.leave.approve', $application), [
+                'stage'   => 'campus_director',
+                'action'  => 'approved',
+                'remarks' => '',
+                'pin'     => '999999',
+            ]);
+
+        $response->assertSessionHasErrors('pin');
+
+        $application->refresh();
+        $this->assertSame('forwarded', $application->status, 'Status must not advance on a wrong PIN.');
+        $this->assertNull($application->approved_by);
+
+        $this->assertDatabaseCount('digital_signatures', 0);
+    }
+
+    /**
+     * Correct PIN still signs and advances the stage exactly as before —
+     * proves the new pre-flight check isn't a regression for the happy path.
+     */
+    public function test_correct_signature_pin_signs_and_advances_the_stage(): void
+    {
+        $this->approver->update(['signature_pin' => bcrypt('123456')]);
+        $application = $this->makeApplication(['status' => 'forwarded']);
+
+        $response = $this->actingAs($this->approver)
+            ->post(route('hr.leave.approve', $application), [
+                'stage'   => 'campus_director',
+                'action'  => 'approved',
+                'remarks' => '',
+                'pin'     => '123456',
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasNoErrors();
+
+        $application->refresh();
+        $this->assertSame('approved', $application->status);
+        $this->assertSame($this->approver->id, $application->approved_by);
+
+        $this->assertDatabaseCount('digital_signatures', 1);
+        $this->assertDatabaseHas('digital_signatures', [
+            'signable_type' => LeaveApplication::class,
+            'signable_id'   => $application->id,
+            'signer_id'     => $this->approver->id,
+        ]);
+    }
+
+    /**
+     * Regression test for the "Re-sign" affordance: an application that
+     * already advanced (hr_officer_id set, status moved on) but has no
+     * matching DigitalSignature — the exact gap the historical bug left
+     * behind — can have its missing signature filled in via resign()
+     * without re-running the approval workflow.
+     */
+    public function test_resign_fills_in_a_missing_signature_without_rerunning_the_workflow(): void
+    {
+        $hrOfficer = User::factory()->create();
+        $hrOfficer->roles()->attach($this->rolePermission('hr.leave.approve'));
+        $hrOfficer->update(['signature_pin' => bcrypt('654321')]);
+
+        // Simulate the historical bug: hr_officer_action recorded, status
+        // advanced, but no DigitalSignature row exists for that stage.
+        $application = $this->makeApplication([
+            'status'            => 'hr_verified',
+            'hr_officer_id'     => $hrOfficer->id,
+            'hr_officer_action' => 'certified',
+            'hr_officer_at'     => now(),
+        ]);
+
+        $this->assertDatabaseCount('digital_signatures', 0);
+
+        $response = $this->actingAs($hrOfficer)
+            ->post(route('hr.leave.resign', $application), [
+                'stage' => 'hr_officer',
+                'pin'   => '654321',
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasNoErrors();
+
+        $application->refresh();
+        $this->assertSame('hr_verified', $application->status, 'resign() must not touch the workflow status.');
+
+        $this->assertDatabaseCount('digital_signatures', 1);
+        $this->assertDatabaseHas('digital_signatures', [
+            'signable_type' => LeaveApplication::class,
+            'signable_id'   => $application->id,
+            'signer_id'     => $hrOfficer->id,
+        ]);
+    }
+
+    public function test_resign_rejects_someone_other_than_the_original_signer(): void
+    {
+        $hrOfficer  = User::factory()->create();
+        $someoneElse = User::factory()->create();
+        $someoneElse->roles()->attach($this->rolePermission('hr.leave.approve'));
+
+        $application = $this->makeApplication([
+            'status'            => 'hr_verified',
+            'hr_officer_id'     => $hrOfficer->id,
+            'hr_officer_action' => 'certified',
+            'hr_officer_at'     => now(),
+        ]);
+
+        $this->actingAs($someoneElse)
+            ->post(route('hr.leave.resign', $application), [
+                'stage' => 'hr_officer',
+                'pin'   => null,
+            ])
+            ->assertStatus(403);
+
+        $this->assertDatabaseCount('digital_signatures', 0);
+    }
+
     private function makeApplication(array $overrides = []): LeaveApplication
     {
         $applicant = $overrides['user_id'] ?? null;
