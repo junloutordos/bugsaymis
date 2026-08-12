@@ -114,7 +114,7 @@
               </AppIconButton>
 
               <AppButton
-                v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))"
+                v-if="['Completed', 'Rated'].includes(wr.status) && (hasAnyRole('GSU Head','Administrator'))"
                 as="a"
                 :href="`/work-requests/${wr.id}/print`"
                 target="_blank"
@@ -157,7 +157,7 @@
               <AppButton v-if="canOpenInspection(wr)" size="sm" variant="warning" @click.prevent="openInspectionModal(wr)">Inspection</AppButton>
               <AppButton v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Pending GSU Approval' && hasRole('GSU Head')))" size="sm" variant="success" @click.prevent="openCompleteModal(wr)">Mark Completed</AppButton>
               <AppButton v-if="canAddUpdate(wr)" size="sm" @click.prevent="openUpdateNoteModal(wr)">Add Update</AppButton>
-              <AppButton v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" as="a" :href="`/work-requests/${wr.id}/print`" target="_blank" size="sm" variant="secondary">Print</AppButton>
+              <AppButton v-if="['Completed', 'Rated'].includes(wr.status) && (hasAnyRole('GSU Head','Administrator'))" as="a" :href="`/work-requests/${wr.id}/print`" target="_blank" size="sm" variant="secondary">Print</AppButton>
               <AppButton v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" size="sm" variant="success" @click.prevent="openCsmModal(wr)">Confirm &amp; Rate</AppButton>
             </div>
           </div>

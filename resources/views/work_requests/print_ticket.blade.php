@@ -126,7 +126,7 @@
         <tr>
           <td class="label">Remarks</td>
           <td class="box" colspan="3">
-            @if($workRequest->status === 'Completed')
+            @if(in_array($workRequest->status, ['Completed', 'Rated']))
               Tasks successfully completed and functional/working.
             @elseif($inspection && str_contains(strtolower($inspection->recommendations ?? ''), 'replace'))
               Task may require replacement or further action based on inspection recommendation.
