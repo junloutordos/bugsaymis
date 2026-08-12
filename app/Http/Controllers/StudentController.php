@@ -237,6 +237,11 @@ class StudentController extends Controller
 
     public function destroy($id)
     {
+        $this->authorize('manage-students');
+
+        $hasEnrollments = DB::table('student_enrollments')->where('student_id', $id)->exists();
+        abort_if($hasEnrollments, 422, 'This student has enrollment records and cannot be deleted. Remove their enrollment history first.');
+
         DB::table('students')->where('id', $id)->delete();
         return redirect()->route('students.index')->with('success', 'Student deleted.');
     }
