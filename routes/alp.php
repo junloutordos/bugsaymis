@@ -10,6 +10,7 @@ Route::middleware(['auth', 'permission:alp.view|alp.manage|alp.advise|alp.coordi
     ->group(function () {
         Route::get('/', [AlpController::class, 'index'])->name('index');
         Route::get('/members', [AlpController::class, 'membersIndex'])->name('members.index');
+        Route::get('/unassigned', [AlpController::class, 'unassignedIndex'])->name('unassigned.index');
         Route::post('/sync', [AlpController::class, 'sync'])->name('sync');
         Route::get('/cycles/{cycle}', [AlpController::class, 'show'])->name('cycles.show');
         Route::put('/cycles/{cycle}/program', [AlpController::class, 'updateProgram'])->name('program.update');

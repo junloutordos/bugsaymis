@@ -98,6 +98,18 @@ class AlpController extends Controller
         ]);
     }
 
+    public function unassignedIndex(Request $request)
+    {
+        $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
+        $schoolYearId = $request->integer('school_year_id') ?: $schoolYears->firstWhere('is_current', true)?->id;
+
+        return Inertia::render('CID/ALP/Unassigned', [
+            'students' => $this->roster->unassignedGrades7To10($schoolYearId),
+            'schoolYears' => $schoolYears,
+            'selectedSchoolYearId' => $schoolYearId,
+        ]);
+    }
+
     public function sync(Request $request)
     {
         abort_unless($request->user()->isSuperAdmin() || $request->user()->hasAnyPermission(['alp.manage', 'alp.coordinate']), 403);
