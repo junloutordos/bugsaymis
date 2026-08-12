@@ -98,10 +98,14 @@ class WatRuleService
 
     public static function isMajor(?string $type, GradingCategory $category): bool
     {
-        if (in_array($type, ['long_test_1', 'long_test_2'], true)) {
-            return true;
-        }
-
+        // A long_test_1/long_test_2 type (QE/SE/PE category, assessment #1
+        // or #2) still has to clear the same 10%-per-assessment floor as
+        // every other category — it is NOT automatically major regardless
+        // of weight. A quarterly/summative/periodical exam category split
+        // into enough pieces (or given a low enough weight) that each single
+        // assessment is worth less than 10% of the quarter grade is not a
+        // major assessment, the same as any other category.
+        //
         // round() guards the exact-10% boundary against float division
         // (0.30 / 3 === 0.0999…) — QE at 10% each must count as major
         $perAssessmentShare = round((float) $category->weight / max(1, (int) $category->max_assessments), 6);
