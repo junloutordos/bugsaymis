@@ -439,8 +439,8 @@ async function saveSetup() {
     router.reload({ only: ['classRecord'] })
     loadSectionCalendar()
   } catch (err) {
-    if (err.response?.status === 422) {
-      setupErrors.value = Object.values(err.response.data.errors ?? {}).flat()
+    if (err.response?.status === 422 && err.response?.data?.errors) {
+      setupErrors.value = Object.values(err.response.data.errors).flat()
     } else {
       setupErrors.value = [err.response?.data?.message ?? 'Failed to save setup.']
     }
