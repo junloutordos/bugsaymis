@@ -26,6 +26,8 @@ const props = defineProps({
   overallAvg:     Number,
   sqdAvgs:        Object,
   byModule:       Array,
+  byOffice:       Array,
+  qrSourcedTotal: Number,
   byClientType:   Object,
   bySex:          Object,
   monthlyTrend:   Array,
@@ -58,6 +60,15 @@ function sqdLabel(key) {
 const moduleChart = computed(() => ({
   labels: props.byModule.map(m => m.label),
   datasets: [{ data: props.byModule.map(m => m.count), backgroundColor: props.byModule.map((_, i) => seriesColor(i)) }],
+}))
+
+const officeChart = computed(() => ({
+  labels: props.byOffice.map(o => o.label),
+  datasets: [{
+    label: 'QR Survey Responses',
+    data: props.byOffice.map(o => o.count),
+    backgroundColor: props.byOffice.map((_, i) => seriesColor(i)),
+  }],
 }))
 
 const sqdChart = computed(() => ({
@@ -117,6 +128,7 @@ const cc1Chart = computed(() => {
 
 const donutOpts = { plugins: { legend: { position: 'right' } } }
 const barOpts   = { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 5, ticks: { precision: 1 } }, y: { ticks: { font: { size: 10 } } } } }
+const officeBarOpts = { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 10 } } } } }
 const lineOpts  = { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
 
 const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 10)
@@ -157,7 +169,17 @@ const { values: kpiValues } = useCountUp(() => [props.total, props.thisMonth, pr
           <div class="text-2xl font-bold text-slate-700 tabular-nums">{{ kpiValues[3] ?? byModule.length }}</div>
           <div class="text-xs text-slate-500 font-semibold">Modules Covered</div>
         </div>
+        <div class="bg-purple-50 border border-purple-100 rounded-xl p-4 text-center col-span-2 lg:col-span-1">
+          <ClipboardDocumentCheckIcon class="h-5 w-5 text-purple-500 mx-auto mb-1" />
+          <div class="text-2xl font-bold text-purple-700 tabular-nums">{{ qrSourcedTotal }}</div>
+          <div class="text-xs text-purple-500 font-semibold">Office QR Survey Responses</div>
+        </div>
       </div>
+
+      <!-- By Office (QR-sourced anonymous feedback) -->
+      <AppCard v-if="byOffice.length" title="Responses by Office/Unit (QR Survey)" subtitle="Anonymous walk-in feedback per office" class="dash-section" style="--stagger: 2">
+        <div style="height:220px"><Bar :data="officeChart" :options="officeBarOpts" /></div>
+      </AppCard>
 
       <!-- Charts row 1 -->
       <div class="dash-section grid grid-cols-1 lg:grid-cols-3 gap-4" style="--stagger: 2">

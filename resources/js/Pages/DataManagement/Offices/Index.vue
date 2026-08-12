@@ -10,7 +10,7 @@ import AppFilterBar from "@/Components/AppFilterBar.vue";
 import AppTable from "@/Components/AppTable.vue";
 import AppModal from "@/Components/AppModal.vue";
 import EmptyState from "@/Components/EmptyState.vue";
-import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { PencilSquareIcon, TrashIcon, QrCodeIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({ offices: Array, divisions: Array, users: Array });
 const officesList = ref(props.offices || []);
@@ -103,6 +103,64 @@ const remove = (office) => {
     })
   })
 };
+
+// ── QR Survey modal ─────────────────────────────────────────────────────────
+const showQrModal = ref(false);
+const qrOffice = ref(null);
+
+const openQrModal = (office) => {
+  qrOffice.value = office;
+  showQrModal.value = true;
+};
+
+const closeQrModal = () => {
+  showQrModal.value = false;
+  qrOffice.value = null;
+};
+
+const copySurveyUrl = async () => {
+  try {
+    await navigator.clipboard.writeText(qrOffice.value.survey_url);
+    Swal.fire({ icon: 'success', title: 'Link copied', timer: 1000, showConfirmButton: false });
+  } catch {
+    Swal.fire({ icon: 'error', title: 'Could not copy link' });
+  }
+};
+
+const downloadQrPdf = () => {
+  window.open(route('offices.qr-survey.pdf', qrOffice.value.id), '_blank');
+};
+
+const regenerateToken = () => {
+  Swal.fire({
+    title: 'Regenerate QR code?',
+    text: 'The old QR code (and any printed copies) will stop working. You must reprint and replace them.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, regenerate',
+    cancelButtonText: 'Cancel'
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.post(route('offices.qr-survey.regenerate', qrOffice.value.id), {}, {
+        onSuccess: () => {
+          Swal.fire({ icon: 'success', title: 'QR code regenerated', timer: 1200, showConfirmButton: false })
+            .then(() => { window.location.reload() })
+        },
+        onError: () => Swal.fire({ icon: 'error', title: 'Failed to regenerate' })
+      })
+    })
+  })
+};
+
+const toggleQrSurvey = () => {
+  import('@inertiajs/vue3').then(({ router }) => {
+    router.put(route('offices.qr-survey.toggle', qrOffice.value.id), {}, {
+      onSuccess: () => { window.location.reload() },
+      onError: () => Swal.fire({ icon: 'error', title: 'Failed to update survey status' })
+    })
+  })
+};
 </script>
 
 <template>
@@ -147,6 +205,9 @@ const remove = (office) => {
           <td class="px-4 py-3 text-sm text-slate-700">{{ o.unitHeadUser?.name ?? o.unit_head_user?.name ?? '—' }}</td>
           <td class="px-4 py-3">
             <div class="flex items-center gap-1">
+              <AppIconButton label="QR Survey" @click.prevent="openQrModal(o)">
+                <QrCodeIcon class="w-4 h-4" />
+              </AppIconButton>
               <AppIconButton label="Edit" @click.prevent="openModal(o)">
                 <PencilSquareIcon class="w-4 h-4" />
               </AppIconButton>
@@ -167,6 +228,7 @@ const remove = (office) => {
                 <div class="text-xs text-slate-500">Unit Head: {{ o.unitHeadUser?.name ?? o.unit_head_user?.name ?? '—' }}</div>
               </div>
               <div class="flex flex-col items-end gap-2">
+                <AppButton size="sm" @click.prevent="openQrModal(o)">QR Survey</AppButton>
                 <AppButton size="sm" @click.prevent="openModal(o)">Edit</AppButton>
                 <AppButton size="sm" variant="danger" @click.prevent="remove(o)">Delete</AppButton>
               </div>
@@ -223,6 +285,47 @@ const remove = (office) => {
             </AppButton>
           </div>
         </form>
+      </AppModal>
+      <!-- QR Survey Modal -->
+      <AppModal :show="showQrModal" title="Office QR Survey" @close="closeQrModal">
+        <div v-if="qrOffice" class="space-y-4">
+          <div>
+            <p class="text-xs text-slate-500">Client Satisfaction Survey QR code for</p>
+            <p class="text-sm font-bold text-indigo-700">{{ qrOffice.name }}</p>
+          </div>
+
+          <div class="flex flex-col items-center gap-3 py-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
+            <img :src="route('offices.qr-survey.preview', qrOffice.id)" alt="QR Survey Code"
+              class="w-40 h-40 bg-white rounded-lg border border-slate-200 p-2" />
+            <span class="text-[11px] font-medium text-indigo-600 uppercase tracking-wide">Scan to give feedback</span>
+            <span :class="[
+                'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium',
+                qrOffice.qr_survey_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+              ]">
+              {{ qrOffice.qr_survey_enabled ? 'Survey Active' : 'Survey Disabled' }}
+            </span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Public survey link</label>
+            <div class="flex gap-2">
+              <input :value="qrOffice.survey_url" readonly
+                class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600" />
+              <AppButton size="sm" variant="secondary" @click.prevent="copySurveyUrl">Copy</AppButton>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+            <AppButton size="sm" @click.prevent="downloadQrPdf">Download Printable PDF</AppButton>
+            <AppButton size="sm" variant="secondary" @click.prevent="toggleQrSurvey">
+              {{ qrOffice.qr_survey_enabled ? 'Disable Survey' : 'Enable Survey' }}
+            </AppButton>
+            <AppButton size="sm" variant="danger" @click.prevent="regenerateToken">Regenerate QR</AppButton>
+          </div>
+          <p class="text-[11px] text-slate-400">
+            Regenerating the QR code invalidates any previously printed copies — reprint and replace them after regenerating.
+          </p>
+        </div>
       </AppModal>
     </div>
   </AdminLayout>

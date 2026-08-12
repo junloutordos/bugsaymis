@@ -26,6 +26,7 @@ class CSMFeedbackController extends Controller
         'App\\Models\\VehicleRequest' => 'Vehicle Request',
         'App\\Models\\ServiceRequest' => 'Service Request',
         'App\\Models\\ScienceLab\\LabRequestBundle' => 'Science Laboratory Request',
+        'App\\Models\\Office'         => 'Office QR Survey',
     ];
 
     private function isAdmin(): bool
@@ -86,14 +87,33 @@ class CSMFeedbackController extends Controller
             ? round(array_sum($sqdAvgs) / count(array_filter($sqdAvgs)), 2)
             : 0;
 
-        // By module
+        // By module (module-triggered transactional CSM — excludes Office QR responses)
         $byModule = CsmResponse::selectRaw('respondable_type, COUNT(*) as count')
+            ->where('respondable_type', '<>', \App\Models\Office::class)
             ->groupBy('respondable_type')
             ->get()
             ->map(fn ($r) => [
                 'label' => self::MODULE_LABELS[$r->respondable_type] ?? $r->respondable_type,
                 'count' => (int) $r->count,
             ])->values();
+
+        // By office (anonymous QR-sourced walk-in/general feedback per office/unit)
+        $byOffice = CsmResponse::selectRaw('respondable_id as office_id, COUNT(*) as count')
+            ->where('respondable_type', \App\Models\Office::class)
+            ->groupBy('respondable_id')
+            ->with([])
+            ->get()
+            ->map(function ($r) {
+                $office = \App\Models\Office::find($r->office_id);
+                return [
+                    'label' => $office?->name ?? "Office #{$r->office_id}",
+                    'count' => (int) $r->count,
+                ];
+            })
+            ->sortByDesc('count')
+            ->values();
+
+        $qrSourcedTotal = CsmResponse::where('respondable_type', \App\Models\Office::class)->count();
 
         // By client type
         $byClientType = CsmResponse::selectRaw('client_type, COUNT(*) as count')
@@ -137,6 +157,8 @@ class CSMFeedbackController extends Controller
             'overallAvg'      => $overallAvg,
             'sqdAvgs'         => $sqdAvgs,
             'byModule'        => $byModule,
+            'byOffice'        => $byOffice,
+            'qrSourcedTotal'  => $qrSourcedTotal,
             'byClientType'    => $byClientType,
             'bySex'           => $bySex,
             'monthlyTrend'    => $monthlyTrend,
@@ -212,7 +234,7 @@ class CSMFeedbackController extends Controller
             if ($model) {
                 $related = [
                     'module' => self::MODULE_LABELS[$csmResponse->respondable_type] ?? $csmResponse->respondable_type,
-                    'title'  => $model->title ?? $model->activity ?? $model->service_type ?? $model->purpose ?? "#{$model->id}",
+                    'title'  => $model->title ?? $model->activity ?? $model->service_type ?? $model->purpose ?? $model->name ?? "#{$model->id}",
                     'status' => $model->status ?? null,
                     'id'     => $model->id,
                 ];

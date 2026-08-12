@@ -36,6 +36,14 @@ Route::get('/verify/hr-document/{token}', [\App\Http\Controllers\HR\HrDocumentVe
 // Digital calling card — public, no auth
 Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
 
+// ── Office QR Client Satisfaction Survey — public, no auth, anonymous ────────
+Route::get('/csm/survey/{token}', [\App\Http\Controllers\OfficeQrSurveyController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('csm.survey.show');
+Route::post('/csm/survey/{token}', [\App\Http\Controllers\OfficeQrSurveyController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('csm.survey.store');
+
 // ── GAD Data Dashboard — public, no auth ─────────────────────────────────────
 Route::get('/gad-data', [\App\Http\Controllers\GadDataController::class, 'index'])
     ->name('gad-data');
@@ -94,6 +102,11 @@ Route::middleware(['auth','permission:roles.assign'])->group(function(){
     Route::post('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'store'])->name('offices.store');
     Route::put('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'update'])->name('offices.update');
     Route::delete('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'destroy'])->name('offices.destroy');
+    // Office QR survey — view/print/regenerate/toggle
+    Route::get('/data-management/offices/{office}/qr-survey/pdf', [App\Http\Controllers\OfficeController::class, 'qrSurveyPdf'])->name('offices.qr-survey.pdf');
+    Route::get('/data-management/offices/{office}/qr-survey/preview', [App\Http\Controllers\OfficeController::class, 'qrSurveyPreview'])->name('offices.qr-survey.preview');
+    Route::post('/data-management/offices/{office}/qr-survey/regenerate', [App\Http\Controllers\OfficeController::class, 'regenerateQrSurveyToken'])->name('offices.qr-survey.regenerate');
+    Route::put('/data-management/offices/{office}/qr-survey/toggle', [App\Http\Controllers\OfficeController::class, 'toggleQrSurvey'])->name('offices.qr-survey.toggle');
     // Buildings
     Route::get('/data-management/buildings', [App\Http\Controllers\BuildingController::class, 'index'])->name('buildings.index');
     Route::post('/data-management/buildings', [App\Http\Controllers\BuildingController::class, 'store'])->name('buildings.store');
@@ -1993,6 +2006,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('leave.show');
     Route::post('/leave/{leaveApplication}/approve', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'approve'])
         ->name('leave.approve');
+    Route::post('/leave/{leaveApplication}/resign', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'resign'])
+        ->name('leave.resign');
     Route::post('/leave/{leaveApplication}/cancel', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'cancel'])
         ->name('leave.cancel');
     Route::get('/leave/{leaveApplication}/print', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'printForm'])
