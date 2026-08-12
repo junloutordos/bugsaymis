@@ -53,10 +53,17 @@ class EmployeeSchedule extends Model
 
     /**
      * Scope: schedules active on a given date.
+     *
+     * Only ever resolves an *approved* schedule — a pending submission
+     * (awaiting HR review) or a rejected one must never be used to compute
+     * official time-in/time-out, even if its effective_date is later than
+     * the currently-approved schedule's. See GuardDirectoryService for the
+     * original correct pattern this scope now centralizes.
      */
     public function scopeActiveOnDate($query, string $date)
     {
         return $query
+            ->where('status', 'approved')
             ->where('effective_date', '<=', $date)
             ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date));
     }
