@@ -82,6 +82,16 @@ const sessionForm = useForm({ activity_id: '', session_date: '', start_time: '',
 const saveSession = () => sessionForm.post(route('alp.sessions.store', props.cycle.id), { preserveScroll: true, onSuccess: () => sessionForm.reset() })
 const attendanceDrafts = ref(Object.fromEntries(props.cycle.sessions.map(session => [session.id, Object.fromEntries(session.attendance.map(record => [record.alp_membership_id, { membership_id: record.alp_membership_id, status: record.status, remarks: record.remarks || '' }]))])))
 const saveAttendance = (session) => postAction(route('alp.attendance.save', [props.cycle.id, session.id]), { records: Object.values(attendanceDrafts.value[session.id] || {}) })
+const ATTENDANCE_STATUSES = [
+  { value: 'present', label: 'Present', code: 'P', cls: 'bg-emerald-100 text-emerald-700' },
+  { value: 'absent',  label: 'Absent',  code: 'A', cls: 'bg-red-100 text-red-700' },
+  { value: 'tardy',   label: 'Tardy',   code: 'T', cls: 'bg-amber-100 text-amber-700' },
+  { value: 'cutting', label: 'Cutting', code: 'C', cls: 'bg-orange-100 text-orange-700' },
+  { value: 'excused', label: 'Excused', code: 'E', cls: 'bg-slate-200 text-slate-700' },
+]
+const setAttendanceStatus = (sessionId, memberId, status) => { attendanceDrafts.value[sessionId][memberId].status = status }
+const presentCount = (session) => Object.values(attendanceDrafts.value[session.id] || {}).filter(r => r.status === 'present').length
+const markAllPresent = (session) => { Object.values(attendanceDrafts.value[session.id] || {}).forEach(r => { r.status = 'present' }) }
 
 const financeForm = useForm({ activity_id: '', transaction_date: '', entry_type: 'expense', category: '', description: '', amount: '', source: '', receipt_base64: null })
 const setReceipt = async (event) => { const file = event.target.files?.[0]; if (file) financeForm.receipt_base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }) }
@@ -311,9 +321,45 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
           <form class="grid gap-3 md:grid-cols-3" @submit.prevent="saveSession"><AppInput v-model="sessionForm.session_date" label="Session date" required type="date" /><AppInput v-model="sessionForm.topic" label="Topic" /><AppInput v-model="sessionForm.venue" label="Venue" /><AppButton type="submit" :loading="sessionForm.processing" class="md:col-start-3 md:justify-self-end">Create roster</AppButton></form>
         </AppCard>
         <AppCard v-for="session in cycle.sessions" :key="session.id">
-          <div class="flex justify-between gap-3"><div><h2 class="font-heading text-sm font-semibold text-slate-800">{{ session.topic || 'ALP Session' }}</h2><p class="text-sm text-slate-500">{{ date(session.session_date) }} · {{ session.venue || 'No venue' }}</p></div><AppBadge :color="statusColor(session.status)">{{ label(session.status) }}</AppBadge></div>
-          <div class="mt-4 max-h-80 overflow-auto rounded-xl ring-1 ring-slate-200/70"><div v-for="member in activeMembers" :key="member.id" class="grid grid-cols-1 items-center gap-2 border-b border-slate-100 p-3 text-sm last:border-0 sm:grid-cols-[1fr_150px_1fr]"><span class="font-medium text-slate-700">{{ member.student?.full_name }}</span><AppSelect v-if="attendanceDrafts[session.id]?.[member.id]" v-model="attendanceDrafts[session.id][member.id].status" :show-blank="false"><option value="present">Present</option><option value="absent">Absent</option><option value="tardy">Tardy</option><option value="cutting">Cutting</option><option value="excused">Excused</option></AppSelect><AppInput v-if="attendanceDrafts[session.id]?.[member.id]" v-model="attendanceDrafts[session.id][member.id].remarks" placeholder="Remarks" /></div></div>
-          <div class="mt-4 flex flex-wrap gap-2"><AppButton v-if="abilities.manage" size="sm" @click="saveAttendance(session)">Save attendance</AppButton><AppButton as="a" :href="route('alp.attendance.pdf', [cycle.id, session.id])" target="_blank" size="sm" variant="secondary">Form 33 PDF</AppButton></div>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="font-heading text-sm font-semibold text-slate-800">{{ session.topic || 'ALP Session' }}</h2>
+              <p class="text-sm text-slate-500">{{ date(session.session_date) }} · {{ session.venue || 'No venue' }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <AppBadge :color="statusColor(session.status)">{{ label(session.status) }}</AppBadge>
+              <span class="text-xs text-slate-500">{{ presentCount(session) }} / {{ activeMembers.length }} present</span>
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap gap-2 text-[11px]">
+            <span v-for="s in ATTENDANCE_STATUSES" :key="s.value" class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold" :class="s.cls">
+              {{ s.code }} = {{ s.label }}
+            </span>
+          </div>
+
+          <div class="mt-4 max-h-80 overflow-auto rounded-xl ring-1 ring-slate-200/70">
+            <div v-for="member in activeMembers" :key="member.id" class="grid grid-cols-1 items-center gap-2 border-b border-slate-100 p-3 text-sm last:border-0 sm:grid-cols-[1fr_170px_1fr]">
+              <span class="font-medium text-slate-700">{{ member.student?.full_name }}</span>
+              <div v-if="attendanceDrafts[session.id]?.[member.id]" class="flex gap-1">
+                <button
+                  v-for="s in ATTENDANCE_STATUSES" :key="s.value"
+                  type="button"
+                  :title="s.label"
+                  :class="['min-w-[30px] h-7 px-1.5 rounded-md text-[11px] font-bold transition-colors', attendanceDrafts[session.id][member.id].status === s.value ? s.cls : 'bg-slate-50 text-slate-300 hover:bg-slate-100']"
+                  @click="setAttendanceStatus(session.id, member.id, s.value)"
+                >
+                  {{ s.code }}
+                </button>
+              </div>
+              <AppInput v-if="attendanceDrafts[session.id]?.[member.id]" v-model="attendanceDrafts[session.id][member.id].remarks" placeholder="Remarks" />
+            </div>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <AppButton v-if="abilities.manage" variant="secondary" size="sm" @click="markAllPresent(session)">Mark All Present</AppButton>
+            <AppButton v-if="abilities.manage" size="sm" @click="saveAttendance(session)">Save attendance</AppButton>
+            <AppButton as="a" :href="route('alp.attendance.pdf', [cycle.id, session.id])" target="_blank" size="sm" variant="secondary">Form 33 PDF</AppButton>
+          </div>
         </AppCard>
         <AppCard v-if="cycle.sessions.length === 0"><EmptyState title="No attendance sessions" /></AppCard>
         <AppCard :padded="false" title="Attendance summary">
