@@ -91,7 +91,7 @@ export const menuItems = [
     routeName: "approvals.inbox",
     href: route("approvals.inbox"),
     icon: InboxIcon,
-    roles: ["Administrator", "DivisionChief", "OCD", "GSU Head", "FAD Chief", "HR"],
+    roles: ["Administrator", "DivisionChief", "OCD", "GSU Head", "FAD Chief", "HR", "AUH"],
   },
   {
     label: "Data Management",

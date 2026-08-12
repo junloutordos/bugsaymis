@@ -11,6 +11,7 @@ use App\Models\ClassRecord\ClassRecordAssessmentDeletionRequest;
 use App\Models\ComputerLabScheduleApproval;
 use App\Models\Division;
 use App\Models\FacilityRequest;
+use App\Models\FacultyLoading\AcademicUnit;
 use App\Models\FacultyLoading\ClassScheduleApprovalBatch;
 use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\LoadAssignment;
@@ -159,7 +160,25 @@ class ApprovalInboxController extends Controller
         return $user->hasAnyRole(['Administrator', 'DivisionChief', 'GSU Head', 'OCD', 'FAD Chief'])
             || str_contains($user->position ?? '', 'FAD')
             || $user->hasPermission('hr.leave.approve')
-            || $this->holdsAcidaaDesignation($user);
+            || $this->holdsAcidaaDesignation($user)
+            || $this->holdsAcademicUnitHeadship($user);
+    }
+
+    /**
+     * Whether $user is the current-school-year head of an active Academic
+     * Unit. There is no dedicated "AUH" RBAC role — headship is derived from
+     * academic_units.head_user_id, same source as
+     * ApprovalInboxService::holdsAcademicUnitHeadship() and the shared
+     * Inertia "isAUH" prop (HandleInertiaRequests). Must stay in sync with
+     * both so the inbox route and its sidebar link agree on who is an
+     * approver.
+     */
+    private function holdsAcademicUnitHeadship($user): bool
+    {
+        return AcademicUnit::where('head_user_id', $user->id)
+            ->where('is_active', true)
+            ->whereHas('schoolYear', fn ($q) => $q->where('is_current', true))
+            ->exists();
     }
 
     /**
