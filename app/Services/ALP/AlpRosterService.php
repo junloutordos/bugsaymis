@@ -21,6 +21,7 @@ class AlpRosterService
             )))
             ->with(['student:id,firstname,lastname,middlename', 'enrollment.section:id,sectionname', 'cycle.program:id,name'])
             ->get()
+            ->filter(fn ($membership) => $membership->student !== null)
             ->map(fn ($membership) => [
                 'name' => $membership->student?->full_name,
                 'grade_level' => $membership->enrollment?->grade_level,
@@ -46,6 +47,7 @@ class AlpRosterService
             ->whereNotIn('student_id', $assignedStudentIds)
             ->with(['student:id,firstname,lastname,middlename', 'section:id,sectionname'])
             ->get()
+            ->filter(fn ($enrollment) => $enrollment->student !== null)
             ->map(fn ($enrollment) => [
                 'name' => $enrollment->student?->full_name,
                 'grade_level' => $enrollment->grade_level,
@@ -53,5 +55,31 @@ class AlpRosterService
             ])
             ->sortBy('name')
             ->values();
+    }
+
+    /**
+     * Narrow a roster (as produced by activeMembers()/unassignedGrades7To10())
+     * down to rows matching the given search/grade/section filters — mirrors
+     * the client-side filtering in Members.vue/Unassigned.vue so the PDF
+     * export can respect the same filters the user has applied on screen.
+     */
+    public function filterRows(Collection $rows, ?string $search, ?string $grade, ?string $section, array $searchFields = ['name']): Collection
+    {
+        $q = trim(strtolower((string) $search));
+
+        return $rows->filter(function ($row) use ($q, $grade, $section, $searchFields) {
+            if ($grade !== null && $grade !== '' && (string) ($row['grade_level'] ?? '') !== (string) $grade) {
+                return false;
+            }
+            if ($section !== null && $section !== '' && ($row['section'] ?? null) !== $section) {
+                return false;
+            }
+            if ($q === '') {
+                return true;
+            }
+            $haystack = strtolower(implode(' ', array_map(fn ($field) => (string) ($row[$field] ?? ''), $searchFields)));
+
+            return str_contains($haystack, $q);
+        })->values();
     }
 }

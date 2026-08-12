@@ -19,14 +19,14 @@ class AlpPdfService
         return $this->render(view('alp.document', ['document' => $document, 'cycle' => $document->cycle])->render());
     }
 
-    public function membersList(array $members, string $schoolYearName): string
+    public function membersList(array $members, string $schoolYearName, ?string $filterLabel = null): string
     {
-        return $this->render(view('alp.members-list', compact('members', 'schoolYearName'))->render());
+        return $this->renderWithLetterhead(view('alp.members-list', compact('members', 'schoolYearName', 'filterLabel'))->render());
     }
 
-    public function unassignedList(array $students, string $schoolYearName): string
+    public function unassignedList(array $students, string $schoolYearName, ?string $filterLabel = null): string
     {
-        return $this->render(view('alp.unassigned-list', compact('students', 'schoolYearName'))->render());
+        return $this->renderWithLetterhead(view('alp.unassigned-list', compact('students', 'schoolYearName', 'filterLabel'))->render());
     }
 
     public function package(AlpProgramCycle $cycle): string
@@ -70,6 +70,37 @@ class AlpPdfService
             'margin_left' => 12, 'margin_right' => 12, 'margin_top' => 12, 'margin_bottom' => 12,
             'tempDir' => sys_get_temp_dir(),
         ]);
+        $mpdf->WriteHTML($html);
+
+        return $mpdf->Output('', Destination::STRING_RETURN);
+    }
+
+    /**
+     * Same repeating letterhead used for WFH accomplishment printing and other
+     * list-report PDFs (e.g. ITJobRequestPdfService::exportList) — full-width
+     * header/footer images on every page, with content padded independently.
+     */
+    private function renderWithLetterhead(string $html, bool $landscape = false): string
+    {
+        $headerPath = public_path('images/report_header.jpeg');
+        $footerPath = public_path('images/report_footer.jpeg');
+        $pageWidthMm = $landscape ? 297 : 210;
+
+        $headerInfo = @getimagesize($headerPath);
+        $footerInfo = @getimagesize($footerPath);
+        $headerMm = $headerInfo ? round(($headerInfo[1] / $headerInfo[0]) * $pageWidthMm) + 3 : 36;
+        $footerMm = $footerInfo ? round(($footerInfo[1] / $footerInfo[0]) * $pageWidthMm) + 3 : 36;
+
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4'.($landscape ? '-L' : ''),
+            'margin_left' => 0, 'margin_right' => 0,
+            'margin_top' => $headerMm, 'margin_bottom' => $footerMm,
+            'margin_header' => 0, 'margin_footer' => 0,
+            'tempDir' => sys_get_temp_dir(),
+        ]);
+        $mpdf->SetHTMLHeader('<img src="'.$headerPath.'" style="width:100%; display:block;">');
+        $mpdf->SetHTMLFooter('<img src="'.$footerPath.'" style="width:100%; display:block;">');
         $mpdf->WriteHTML($html);
 
         return $mpdf->Output('', Destination::STRING_RETURN);

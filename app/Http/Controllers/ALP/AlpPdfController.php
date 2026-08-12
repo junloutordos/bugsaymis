@@ -35,8 +35,13 @@ class AlpPdfController extends Controller
         $schoolYear = $schoolYears->firstWhere('id', $schoolYearId);
         abort_unless($schoolYear, 404);
         $members = $this->roster->activeMembers($schoolYearId, $request->user());
+        [$search, $grade, $section] = $this->filterParams($request);
+        $members = $this->roster->filterRows($members, $search, $grade, $section, ['name', 'alp']);
 
-        return $this->response($this->pdf->membersList($members->all(), $schoolYear->name), 'ALP-Active-Members-'.$schoolYear->name.'.pdf');
+        return $this->response(
+            $this->pdf->membersList($members->all(), $schoolYear->name, $this->filterLabel($search, $grade, $section)),
+            'ALP-Active-Members-'.$schoolYear->name.'.pdf'
+        );
     }
 
     public function unassignedList(Request $request)
@@ -46,8 +51,34 @@ class AlpPdfController extends Controller
         $schoolYear = $schoolYears->firstWhere('id', $schoolYearId);
         abort_unless($schoolYear, 404);
         $students = $this->roster->unassignedGrades7To10($schoolYearId);
+        [$search, $grade, $section] = $this->filterParams($request);
+        $students = $this->roster->filterRows($students, $search, $grade, $section, ['name']);
 
-        return $this->response($this->pdf->unassignedList($students->all(), $schoolYear->name), 'ALP-Unassigned-7-10-'.$schoolYear->name.'.pdf');
+        return $this->response(
+            $this->pdf->unassignedList($students->all(), $schoolYear->name, $this->filterLabel($search, $grade, $section)),
+            'ALP-Unassigned-7-10-'.$schoolYear->name.'.pdf'
+        );
+    }
+
+    /** @return array{0: ?string, 1: ?string, 2: ?string} [search, grade, section] */
+    private function filterParams(Request $request): array
+    {
+        return [
+            $request->string('search')->trim()->value() ?: null,
+            $request->string('grade')->trim()->value() ?: null,
+            $request->string('section')->trim()->value() ?: null,
+        ];
+    }
+
+    private function filterLabel(?string $search, ?string $grade, ?string $section): ?string
+    {
+        $parts = array_filter([
+            $grade ? "Grade {$grade}" : null,
+            $section ? "Section {$section}" : null,
+            $search ? '"'.$search.'"' : null,
+        ]);
+
+        return $parts ? implode(', ', $parts) : null;
     }
 
     public function package(Request $request, AlpProgramCycle $cycle)

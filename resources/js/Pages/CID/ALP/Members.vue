@@ -26,6 +26,13 @@ const sectionFilter = ref('')
 const gradeOptions = computed(() => [...new Set(props.members.map(m => m.grade_level).filter(Boolean))].sort((a, b) => a - b))
 const sectionOptions = computed(() => [...new Set(props.members.map(m => m.section).filter(Boolean))].sort())
 
+const pdfHref = computed(() => route('alp.members.pdf', {
+  school_year_id: props.selectedSchoolYearId,
+  search: search.value.trim() || undefined,
+  grade: gradeFilter.value || undefined,
+  section: sectionFilter.value || undefined,
+}))
+
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   return props.members.filter(m => {
@@ -61,7 +68,7 @@ const TD = 'px-4 py-3 text-sm text-slate-600'
           <AppSelect :model-value="selectedSchoolYearId" :show-blank="false" aria-label="School year" class="min-w-40" @update:model-value="selectYear">
             <option v-for="year in schoolYears" :key="year.id" :value="year.id">{{ year.name }}</option>
           </AppSelect>
-          <AppButton as="a" :href="route('alp.members.pdf', { school_year_id: selectedSchoolYearId })" target="_blank" variant="secondary">
+          <AppButton as="a" :href="pdfHref" target="_blank" variant="secondary">
             <DocumentArrowDownIcon class="h-4 w-4" />
             Download PDF
           </AppButton>
