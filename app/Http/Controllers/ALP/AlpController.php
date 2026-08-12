@@ -20,6 +20,7 @@ use App\Services\ALP\AlpAmsIntegrationService;
 use App\Services\ALP\AlpComplianceService;
 use App\Services\ALP\AlpFileService;
 use App\Services\ALP\AlpProgramSyncService;
+use App\Services\ALP\AlpRosterService;
 use App\Services\ALP\AlpWorkflowService;
 use App\Services\NotificationService;
 use App\Services\SnapshotService;
@@ -38,6 +39,7 @@ class AlpController extends Controller
         private AlpWorkflowService $workflow,
         private AlpAmsIntegrationService $ams,
         private AlpFileService $files,
+        private AlpRosterService $roster,
         private SnapshotService $snapshots,
     ) {}
 
@@ -81,6 +83,18 @@ class AlpController extends Controller
                 'unassignedRequired' => max(0, $requiredStudentCount - $assignedRequiredCount),
             ],
             'canSync' => $user->isSuperAdmin() || $user->hasAnyPermission(['alp.manage', 'alp.coordinate']),
+        ]);
+    }
+
+    public function membersIndex(Request $request)
+    {
+        $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
+        $schoolYearId = $request->integer('school_year_id') ?: $schoolYears->firstWhere('is_current', true)?->id;
+
+        return Inertia::render('CID/ALP/Members', [
+            'members' => $this->roster->activeMembers($schoolYearId, $request->user()),
+            'schoolYears' => $schoolYears,
+            'selectedSchoolYearId' => $schoolYearId,
         ]);
     }
 
