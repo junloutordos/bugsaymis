@@ -11,6 +11,8 @@ Route::middleware(['auth', 'permission:alp.view|alp.manage|alp.advise|alp.coordi
         Route::get('/', [AlpController::class, 'index'])->name('index');
         Route::get('/members', [AlpController::class, 'membersIndex'])->name('members.index');
         Route::get('/unassigned', [AlpController::class, 'unassignedIndex'])->name('unassigned.index');
+        Route::get('/members.pdf', [AlpPdfController::class, 'membersList'])->name('members.pdf');
+        Route::get('/unassigned.pdf', [AlpPdfController::class, 'unassignedList'])->name('unassigned.pdf');
         Route::post('/sync', [AlpController::class, 'sync'])->name('sync');
         Route::get('/cycles/{cycle}', [AlpController::class, 'show'])->name('cycles.show');
         Route::put('/cycles/{cycle}/program', [AlpController::class, 'updateProgram'])->name('program.update');

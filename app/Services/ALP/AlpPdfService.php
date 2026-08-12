@@ -19,6 +19,16 @@ class AlpPdfService
         return $this->render(view('alp.document', ['document' => $document, 'cycle' => $document->cycle])->render());
     }
 
+    public function membersList(array $members, string $schoolYearName): string
+    {
+        return $this->render(view('alp.members-list', compact('members', 'schoolYearName'))->render());
+    }
+
+    public function unassignedList(array $students, string $schoolYearName): string
+    {
+        return $this->render(view('alp.unassigned-list', compact('students', 'schoolYearName'))->render());
+    }
+
     public function package(AlpProgramCycle $cycle): string
     {
         $cycle->loadMissing($this->cycleRelations());

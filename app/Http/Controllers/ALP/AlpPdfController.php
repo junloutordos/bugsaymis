@@ -8,15 +8,17 @@ use App\Models\ALP\AlpMembership;
 use App\Models\ALP\AlpProgramCycle;
 use App\Models\ALP\AlpReport;
 use App\Models\ALP\AlpSession;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Services\ALP\AlpAccessService;
 use App\Services\ALP\AlpFileService;
 use App\Services\ALP\AlpPdfService;
+use App\Services\ALP\AlpRosterService;
 use App\Services\ALP\AlpWorkflowService;
 use Illuminate\Http\Request;
 
 class AlpPdfController extends Controller
 {
-    public function __construct(private AlpAccessService $access, private AlpPdfService $pdf, private AlpFileService $files, private AlpWorkflowService $workflow) {}
+    public function __construct(private AlpAccessService $access, private AlpPdfService $pdf, private AlpFileService $files, private AlpWorkflowService $workflow, private AlpRosterService $roster) {}
 
     public function document(Request $request, AlpProgramCycle $cycle, AlpDocument $document)
     {
@@ -24,6 +26,28 @@ class AlpPdfController extends Controller
         abort_unless($document->alp_program_cycle_id === $cycle->id, 404);
 
         return $this->response($this->pdf->document($document), $document->form_code.'-'.$cycle->program->code.'.pdf');
+    }
+
+    public function membersList(Request $request)
+    {
+        $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
+        $schoolYearId = $request->integer('school_year_id') ?: $schoolYears->firstWhere('is_current', true)?->id;
+        $schoolYear = $schoolYears->firstWhere('id', $schoolYearId);
+        abort_unless($schoolYear, 404);
+        $members = $this->roster->activeMembers($schoolYearId, $request->user());
+
+        return $this->response($this->pdf->membersList($members->all(), $schoolYear->name), 'ALP-Active-Members-'.$schoolYear->name.'.pdf');
+    }
+
+    public function unassignedList(Request $request)
+    {
+        $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
+        $schoolYearId = $request->integer('school_year_id') ?: $schoolYears->firstWhere('is_current', true)?->id;
+        $schoolYear = $schoolYears->firstWhere('id', $schoolYearId);
+        abort_unless($schoolYear, 404);
+        $students = $this->roster->unassignedGrades7To10($schoolYearId);
+
+        return $this->response($this->pdf->unassignedList($students->all(), $schoolYear->name), 'ALP-Unassigned-7-10-'.$schoolYear->name.'.pdf');
     }
 
     public function package(Request $request, AlpProgramCycle $cycle)
