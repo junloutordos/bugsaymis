@@ -14,6 +14,7 @@ class ActivityTwsEvaluation extends Model
         'participant_type',
         'participant_id',
         'evaluator_name',
+        'sex',
         'position_function',
         // Section A — Content
         'content_1', 'content_2', 'content_3', 'content_4', 'content_5',

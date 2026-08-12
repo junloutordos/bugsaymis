@@ -66,6 +66,7 @@ const sectionC = [
 
 const form = useForm({
   evaluator_name: '',
+  sex: '',
   // Section A
   obj_1: '', obj_2: '', obj_3: '', obj_4: '',
   // Section B
@@ -137,6 +138,23 @@ function submit() {
                     type="text"
                     label="Name of Evaluator (Optional)"
                     placeholder="Leave blank to stay anonymous" />
+        </div>
+
+        <!-- Sex at Birth (walk-in only — registered participants resolve this from their profile) -->
+        <div v-if="walkin" class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-5">
+          <p class="text-sm font-medium text-slate-700 mb-3">Sex at Birth</p>
+          <div class="flex flex-wrap gap-2">
+            <label v-for="opt in [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]"
+                   :key="opt.value"
+                   class="flex items-center gap-1.5 cursor-pointer text-sm px-3 py-1.5 rounded-full border transition-colors"
+                   :class="form.sex === opt.value
+                     ? 'bg-indigo-600 text-white border-indigo-600'
+                     : 'border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'">
+              <input type="radio" name="sex" :value="opt.value" v-model="form.sex" class="sr-only" />
+              {{ opt.label }}
+            </label>
+          </div>
+          <p v-if="form.errors.sex" class="text-xs text-red-500 mt-1.5">{{ form.errors.sex }}</p>
         </div>
 
         <!-- Section A -->

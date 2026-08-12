@@ -100,6 +100,7 @@ const speakerPartII = [
 
 const form = useForm({
   evaluator_name: '',
+  sex: '',
   position_function: '',
   content_1: '', content_2: '', content_3: '', content_4: '', content_5: '',
   mgmt_length_of_program: '', mgmt_schedule: '', mgmt_secretariat_support: '',
@@ -184,6 +185,23 @@ function submit() {
                     type="text"
                     label="Function / Position (Optional)"
                     placeholder="e.g. Faculty, HR Officer…" />
+
+          <!-- Sex at Birth (walk-in only — registered participants resolve this from their profile) -->
+          <div v-if="walkin">
+            <p class="text-sm font-medium text-slate-700 mb-3">Sex at Birth</p>
+            <div class="flex flex-wrap gap-2">
+              <label v-for="opt in [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]"
+                     :key="opt.value"
+                     class="flex items-center gap-1.5 cursor-pointer text-sm px-3 py-1.5 rounded-full border transition-colors"
+                     :class="form.sex === opt.value
+                       ? 'bg-indigo-600 text-white border-indigo-600'
+                       : 'border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'">
+                <input type="radio" name="sex" :value="opt.value" v-model="form.sex" class="sr-only" />
+                {{ opt.label }}
+              </label>
+            </div>
+            <p v-if="form.errors.sex" class="text-xs text-red-500 mt-1.5">{{ form.errors.sex }}</p>
+          </div>
         </div>
 
         <!-- Section A — Content -->

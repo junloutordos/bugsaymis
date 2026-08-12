@@ -98,7 +98,7 @@ class EvaluationController extends Controller
             return $this->storeWalkinTws($request, $activity, $qrToken);
         }
 
-        $data = $request->validate($this->inHouseRules());
+        $data = $request->validate($this->inHouseRules(walkin: true));
 
         ActivityEvaluation::create(array_merge($data, [
             'activity_id'      => $activity->id,
@@ -113,7 +113,7 @@ class EvaluationController extends Controller
     private function storeWalkinTws(Request $request, Activity $activity, string $qrToken)
     {
         $speakerIds = $activity->speakers()->pluck('id')->all();
-        $data = $request->validate($this->twsRules($speakerIds));
+        $data = $request->validate($this->twsRules($speakerIds, walkin: true));
 
         DB::transaction(function () use ($data, $activity) {
             $speakerRows = $data['speakers'];
@@ -155,13 +155,15 @@ class EvaluationController extends Controller
     }
 
     /** Shared by store() (hash flow) and storeWalkin() (QR flow). */
-    private function inHouseRules(): array
+    private function inHouseRules(bool $walkin = false): array
     {
         $likertFull = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
         $likertBase = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree'];
 
         return [
             'evaluator_name' => 'nullable|string|max:255',
+            // Sex at birth — only captured for walk-ins (no linked User/Student record)
+            'sex' => ($walkin ? 'required' : 'nullable') . '|in:male,female',
             // Section A
             'obj_1'  => 'required|in:' . implode(',', $likertFull),
             'obj_2'  => 'required|in:' . implode(',', $likertFull),
@@ -185,7 +187,7 @@ class EvaluationController extends Controller
     }
 
     /** Shared by storeTws() (hash flow) and storeWalkinTws() (QR flow). */
-    private function twsRules(array $speakerIds): array
+    private function twsRules(array $speakerIds, bool $walkin = false): array
     {
         $agree        = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
         $satisfaction = ['very_satisfied', 'satisfied', 'neutral', 'dissatisfied', 'very_dissatisfied', 'not_applicable'];
@@ -195,6 +197,8 @@ class EvaluationController extends Controller
 
         return [
             'evaluator_name'     => 'nullable|string|max:255',
+            // Sex at birth — only captured for walk-ins (no linked User/Student record)
+            'sex'                => ($walkin ? 'required' : 'nullable') . '|in:male,female',
             'position_function'  => 'nullable|string|max:255',
             'content_1'          => 'required|in:' . implode(',', $agree),
             'content_2'          => 'required|in:' . implode(',', $agree),

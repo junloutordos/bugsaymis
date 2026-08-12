@@ -14,6 +14,7 @@ class ActivityEvaluation extends Model
         'participant_type',
         'participant_id',
         'evaluator_name',
+        'sex',
         // Section A
         'obj_1', 'obj_2', 'obj_3', 'obj_4',
         // Section B
