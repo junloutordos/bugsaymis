@@ -215,15 +215,42 @@ class AlpController extends Controller
         }
 
         DB::transaction(function () use ($cycle, $request, $data, $enrollments) {
+            $newMembershipIds = [];
             foreach ($data['student_ids'] as $studentId) {
                 $existing = AlpMembership::where('school_year_id', $cycle->school_year_id)->where('student_id', $studentId)->first();
                 if ($existing && $existing->alp_program_cycle_id !== $cycle->id) {
                     throw ValidationException::withMessages(['student_ids' => "Student #{$studentId} is already assigned to another ALP."]);
                 }
-                AlpMembership::firstOrCreate(
+                $membership = AlpMembership::firstOrCreate(
                     ['school_year_id' => $cycle->school_year_id, 'student_id' => $studentId],
                     ['alp_program_cycle_id' => $cycle->id, 'student_enrollment_id' => $enrollments[$studentId]->id, 'joined_at' => now()->toDateString(), 'created_by' => $request->user()->id]
                 );
+                if ($membership->wasRecentlyCreated) {
+                    $newMembershipIds[] = $membership->id;
+                }
+            }
+
+            // Backfill a default "present" attendance row for every session
+            // that already existed on this cycle before this member joined —
+            // otherwise their row would be silently missing from every
+            // already-created session's attendance grid (the exact bug this
+            // fixes), since storeSession() only ever seeds the roster active
+            // at the moment a session is created.
+            if ($newMembershipIds) {
+                $sessionIds = $cycle->sessions()->pluck('id');
+                if ($sessionIds->isNotEmpty()) {
+                    $now = now();
+                    $rows = [];
+                    foreach ($sessionIds as $sessionId) {
+                        foreach ($newMembershipIds as $membershipId) {
+                            $rows[] = [
+                                'alp_session_id' => $sessionId, 'alp_membership_id' => $membershipId, 'status' => 'present',
+                                'recorded_by' => $request->user()->id, 'created_at' => $now, 'updated_at' => $now,
+                            ];
+                        }
+                    }
+                    AlpAttendance::insertOrIgnore($rows);
+                }
             }
         });
         $this->workflow->log($cycle, $request->user(), 'members_added', $cycle, ['count' => count($data['student_ids'])]);
@@ -445,12 +472,25 @@ class AlpController extends Controller
             'records' => 'required|array', 'records.*.membership_id' => 'required|integer',
             'records.*.status' => 'required|in:present,absent,tardy,cutting,excused', 'records.*.remarks' => 'nullable|string|max:1000',
         ]);
-        DB::transaction(function () use ($data, $session, $cycle, $request) {
-            foreach ($data['records'] as $record) {
-                abort_unless($cycle->memberships()->whereKey($record['membership_id'])->exists(), 422);
+
+        // Every currently ACTIVE member must get a persisted row for this
+        // session, not just the ones the client happened to send — mirrors
+        // Class Record's AttendanceGrid.vue/upsert() completeness guarantee.
+        // A member added to the cycle after this session was created would
+        // otherwise never get a DB row (and, before this fix, never even
+        // appeared in the UI) since storeSession() only seeds the roster
+        // active at creation time. Any submitted record not in the current
+        // active roster (e.g. a since-removed member) is ignored rather
+        // than written, so a stale client payload can't resurrect it.
+        $activeMembershipIds = $cycle->memberships()->where('status', 'active')->pluck('id');
+        $submitted = collect($data['records'])->keyBy('membership_id');
+
+        DB::transaction(function () use ($activeMembershipIds, $submitted, $session, $request) {
+            foreach ($activeMembershipIds as $membershipId) {
+                $record = $submitted->get($membershipId);
                 AlpAttendance::updateOrCreate(
-                    ['alp_session_id' => $session->id, 'alp_membership_id' => $record['membership_id']],
-                    ['status' => $record['status'], 'remarks' => $record['remarks'] ?? null, 'recorded_by' => $request->user()->id]
+                    ['alp_session_id' => $session->id, 'alp_membership_id' => $membershipId],
+                    ['status' => $record['status'] ?? 'present', 'remarks' => $record['remarks'] ?? null, 'recorded_by' => $request->user()->id]
                 );
             }
             $session->update(['status' => 'closed']);

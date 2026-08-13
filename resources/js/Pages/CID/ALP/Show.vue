@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -8,6 +8,7 @@ import AppButton from '@/Components/AppButton.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppIconButton from '@/Components/AppIconButton.vue'
 import AppInput from '@/Components/AppInput.vue'
+import AppModal from '@/Components/AppModal.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AppTable from '@/Components/AppTable.vue'
@@ -80,7 +81,33 @@ const activityAction = (activity, action) => postAction(route('alp.activities.ac
 
 const sessionForm = useForm({ activity_id: '', session_date: '', start_time: '', end_time: '', topic: '', venue: '' })
 const saveSession = () => sessionForm.post(route('alp.sessions.store', props.cycle.id), { preserveScroll: true, onSuccess: () => sessionForm.reset() })
-const attendanceDrafts = ref(Object.fromEntries(props.cycle.sessions.map(session => [session.id, Object.fromEntries(session.attendance.map(record => [record.alp_membership_id, { membership_id: record.alp_membership_id, status: record.status, remarks: record.remarks || '' }]))])))
+const financeForm = useForm({ activity_id: '', transaction_date: '', entry_type: 'expense', category: '', description: '', amount: '', source: '', receipt_base64: null })
+const setReceipt = async (event) => { const file = event.target.files?.[0]; if (file) financeForm.receipt_base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }) }
+const saveFinance = () => financeForm.post(route('alp.finances.store', props.cycle.id), { preserveScroll: true, onSuccess: () => financeForm.reset() })
+
+const reportForm = useForm({ report_type: 'accomplishment', period: 'Year-end', data: { narrative: '', highlights: [], challenges: [], recommendations: [] }, status: 'draft' })
+const saveReport = (status) => { reportForm.status = status; reportForm.post(route('alp.reports.store', props.cycle.id), { preserveScroll: true }) }
+const activeMembers = computed(() => props.cycle.memberships.filter(item => item.status === 'active'))
+
+// Roster-driven, not record-driven: every ACTIVE member always gets a row for
+// every session, defaulting to 'present' when no AlpAttendance row exists yet
+// (e.g. a member added after the session was created, before the backend
+// backfill runs, or any other gap). Mirrors Class Record's AttendanceGrid.vue
+// effectiveStatus()/isDefaulted() pattern — the roster is the source of
+// truth for what rows exist, not whatever happens to already be in the DB.
+const buildAttendanceDrafts = () => Object.fromEntries(props.cycle.sessions.map(session => {
+  const recordsByMembership = Object.fromEntries(session.attendance.map(record => [record.alp_membership_id, record]))
+  return [session.id, Object.fromEntries(activeMembers.value.map(member => {
+    const record = recordsByMembership[member.id]
+    return [member.id, { membership_id: member.id, status: record?.status ?? 'present', remarks: record?.remarks || '', defaulted: !record }]
+  }))]
+}))
+const attendanceDrafts = ref(buildAttendanceDrafts())
+// props.cycle is replaced wholesale on every Inertia visit (new session,
+// new/removed member, saved attendance) — resync the roster-driven drafts
+// so freshly added members/sessions immediately get a full, editable row
+// instead of only appearing after a manual page reload.
+watch(() => props.cycle, () => { attendanceDrafts.value = buildAttendanceDrafts() })
 const saveAttendance = (session) => postAction(route('alp.attendance.save', [props.cycle.id, session.id]), { records: Object.values(attendanceDrafts.value[session.id] || {}) })
 const ATTENDANCE_STATUSES = [
   { value: 'present', label: 'Present', code: 'P', cls: 'bg-emerald-100 text-emerald-700' },
@@ -89,17 +116,37 @@ const ATTENDANCE_STATUSES = [
   { value: 'cutting', label: 'Cutting', code: 'C', cls: 'bg-orange-100 text-orange-700' },
   { value: 'excused', label: 'Excused', code: 'E', cls: 'bg-slate-200 text-slate-700' },
 ]
-const setAttendanceStatus = (sessionId, memberId, status) => { attendanceDrafts.value[sessionId][memberId].status = status }
+const STATUS_CYCLE = ATTENDANCE_STATUSES.map(s => s.value)
+// Click-to-cycle through Present → Absent → Tardy → Cutting → Excused → Present…
+// matching Class Record's cycleAttendance(). A still-defaulted cell (no saved
+// row yet) starts the cycle at the first exception status, same as Class
+// Record skipping past the implied Present on first click.
+const cycleAttendance = (sessionId, memberId) => {
+  if (!props.abilities.manage) return
+  const cell = attendanceDrafts.value[sessionId][memberId]
+  if (cell.defaulted) {
+    cell.status = STATUS_CYCLE[1]
+  } else {
+    const idx = STATUS_CYCLE.indexOf(cell.status)
+    cell.status = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]
+  }
+  cell.defaulted = false
+}
+const remarkCell = ref(null)
+const remarkDraft = ref('')
+const openRemarks = (session, member) => {
+  remarkCell.value = { session, member }
+  remarkDraft.value = attendanceDrafts.value[session.id][member.id].remarks
+}
+const closeRemarks = () => { remarkCell.value = null; remarkDraft.value = '' }
+const applyRemark = () => {
+  if (!remarkCell.value) return
+  const { session, member } = remarkCell.value
+  attendanceDrafts.value[session.id][member.id].remarks = remarkDraft.value.trim()
+  closeRemarks()
+}
 const presentCount = (session) => Object.values(attendanceDrafts.value[session.id] || {}).filter(r => r.status === 'present').length
-const markAllPresent = (session) => { Object.values(attendanceDrafts.value[session.id] || {}).forEach(r => { r.status = 'present' }) }
-
-const financeForm = useForm({ activity_id: '', transaction_date: '', entry_type: 'expense', category: '', description: '', amount: '', source: '', receipt_base64: null })
-const setReceipt = async (event) => { const file = event.target.files?.[0]; if (file) financeForm.receipt_base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }) }
-const saveFinance = () => financeForm.post(route('alp.finances.store', props.cycle.id), { preserveScroll: true, onSuccess: () => financeForm.reset() })
-
-const reportForm = useForm({ report_type: 'accomplishment', period: 'Year-end', data: { narrative: '', highlights: [], challenges: [], recommendations: [] }, status: 'draft' })
-const saveReport = (status) => { reportForm.status = status; reportForm.post(route('alp.reports.store', props.cycle.id), { preserveScroll: true }) }
-const activeMembers = computed(() => props.cycle.memberships.filter(item => item.status === 'active'))
+const markAllPresent = (session) => { Object.values(attendanceDrafts.value[session.id] || {}).forEach(r => { r.status = 'present'; r.defaulted = false }) }
 const workflowActions = computed(() => {
   const status = props.cycle.status
   const actions = []
@@ -339,20 +386,29 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
           </div>
 
           <div class="mt-4 max-h-80 overflow-auto rounded-xl ring-1 ring-slate-200/70">
-            <div v-for="member in activeMembers" :key="member.id" class="grid grid-cols-1 items-center gap-2 border-b border-slate-100 p-3 text-sm last:border-0 sm:grid-cols-[1fr_170px_1fr]">
+            <div v-for="member in activeMembers" :key="member.id" class="grid grid-cols-1 items-center gap-2 border-b border-slate-100 p-3 text-sm last:border-0 sm:grid-cols-[1fr_170px_auto]">
               <span class="font-medium text-slate-700">{{ member.student?.full_name }}</span>
               <div v-if="attendanceDrafts[session.id]?.[member.id]" class="flex gap-1">
                 <button
                   v-for="s in ATTENDANCE_STATUSES" :key="s.value"
                   type="button"
-                  :title="s.label"
-                  :class="['min-w-[30px] h-7 px-1.5 rounded-md text-[11px] font-bold transition-colors', attendanceDrafts[session.id][member.id].status === s.value ? s.cls : 'bg-slate-50 text-slate-300 hover:bg-slate-100']"
-                  @click="setAttendanceStatus(session.id, member.id, s.value)"
+                  :disabled="!abilities.manage"
+                  :title="attendanceDrafts[session.id][member.id].defaulted ? 'Defaults to Present — click to mark an exception' : s.label"
+                  :class="['min-w-[30px] h-7 px-1.5 rounded-md text-[11px] font-bold transition-colors', abilities.manage ? 'cursor-pointer' : 'cursor-default', attendanceDrafts[session.id][member.id].status === s.value ? [s.cls, attendanceDrafts[session.id][member.id].defaulted ? 'opacity-60' : ''] : 'bg-slate-50 text-slate-300 hover:bg-slate-100']"
+                  @click="cycleAttendance(session.id, member.id)"
                 >
                   {{ s.code }}
                 </button>
               </div>
-              <AppInput v-if="attendanceDrafts[session.id]?.[member.id]" v-model="attendanceDrafts[session.id][member.id].remarks" placeholder="Remarks" />
+              <button
+                v-if="attendanceDrafts[session.id]?.[member.id] && attendanceDrafts[session.id][member.id].status !== 'present'"
+                type="button"
+                class="justify-self-start text-[11px] font-semibold transition-colors sm:justify-self-end"
+                :class="attendanceDrafts[session.id][member.id].remarks ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'"
+                @click="openRemarks(session, member)"
+              >
+                {{ attendanceDrafts[session.id][member.id].remarks ? 'Remark' : '+ Remark' }}
+              </button>
             </div>
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
@@ -408,6 +464,30 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
         </AppCard>
       </template>
       </AppTabs>
+
+      <AppModal
+        :show="!!remarkCell"
+        title="Attendance Remark"
+        :subtitle="remarkCell ? `${remarkCell.member.student?.full_name} · ${date(remarkCell.session.session_date)}` : ''"
+        size="md"
+        @close="closeRemarks"
+      >
+        <label for="alp-attendance-remark" class="block text-sm font-medium text-slate-700">
+          Remarks <span class="font-normal text-slate-400">(optional)</span>
+        </label>
+        <textarea
+          id="alp-attendance-remark"
+          v-model="remarkDraft"
+          rows="4"
+          maxlength="1000"
+          placeholder="Add relevant context for this absence, tardiness, or excuse…"
+          class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <template #footer>
+          <AppButton variant="secondary" @click="closeRemarks">Cancel</AppButton>
+          <AppButton @click="applyRemark">Apply Remark</AppButton>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
