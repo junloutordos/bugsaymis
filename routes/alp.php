@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ALP\AlpAttendanceController;
 use App\Http\Controllers\ALP\AlpController;
 use App\Http\Controllers\ALP\AlpPdfController;
 use Illuminate\Support\Facades\Route;
@@ -32,9 +33,11 @@ Route::middleware(['auth', 'permission:alp.view|alp.manage|alp.advise|alp.coordi
         Route::post('/cycles/{cycle}/activities', [AlpController::class, 'storeActivity'])->name('activities.store');
         Route::put('/cycles/{cycle}/activities/{activity}', [AlpController::class, 'updateActivity'])->name('activities.update');
         Route::post('/cycles/{cycle}/activities/{activity}/action', [AlpController::class, 'activityAction'])->name('activities.action');
-        Route::post('/cycles/{cycle}/sessions', [AlpController::class, 'storeSession'])->name('sessions.store');
-        Route::post('/cycles/{cycle}/sessions/{session}/attendance', [AlpController::class, 'saveAttendance'])->name('attendance.save');
         Route::get('/cycles/{cycle}/sessions/{session}/attendance.pdf', [AlpPdfController::class, 'attendance'])->name('attendance.pdf');
+        Route::get('/cycles/{cycle}/attendance', [AlpAttendanceController::class, 'index'])->name('attendance.index');
+        Route::post('/cycles/{cycle}/attendance/dates', [AlpAttendanceController::class, 'storeDate'])->name('attendance.dates.store');
+        Route::delete('/cycles/{cycle}/attendance/dates/{session}', [AlpAttendanceController::class, 'destroyDate'])->name('attendance.dates.destroy');
+        Route::post('/cycles/{cycle}/attendance/records', [AlpAttendanceController::class, 'upsert'])->name('attendance.upsert');
         Route::post('/cycles/{cycle}/finances', [AlpController::class, 'storeFinance'])->name('finances.store');
         Route::delete('/cycles/{cycle}/finances/{entry}', [AlpController::class, 'destroyFinance'])->name('finances.destroy');
         Route::post('/cycles/{cycle}/reports', [AlpController::class, 'storeReport'])->name('reports.store');

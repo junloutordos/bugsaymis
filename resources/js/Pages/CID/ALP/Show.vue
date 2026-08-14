@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -16,6 +16,7 @@ import AppTabs from '@/Components/AppTabs.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import ControlledFormEditor from './Partials/ControlledFormEditor.vue'
+import AlpAttendanceGrid from './components/AlpAttendanceGrid.vue'
 import { ArrowTopRightOnSquareIcon, CheckCircleIcon, DocumentArrowDownIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -79,8 +80,6 @@ const activityForm = useForm({ title: '', activity_type: 'regular', start_date: 
 const saveActivity = () => activityForm.post(route('alp.activities.store', props.cycle.id), { preserveScroll: true, onSuccess: () => activityForm.reset() })
 const activityAction = (activity, action) => postAction(route('alp.activities.action', [props.cycle.id, activity.id]), { action, remarks: action === 'return' || action === 'complete' ? window.prompt('Remarks / completion highlights:') : null, pin: transitionForm.pin })
 
-const sessionForm = useForm({ activity_id: '', session_date: '', start_time: '', end_time: '', topic: '', venue: '' })
-const saveSession = () => sessionForm.post(route('alp.sessions.store', props.cycle.id), { preserveScroll: true, onSuccess: () => sessionForm.reset() })
 const financeForm = useForm({ activity_id: '', transaction_date: '', entry_type: 'expense', category: '', description: '', amount: '', source: '', receipt_base64: null })
 const setReceipt = async (event) => { const file = event.target.files?.[0]; if (file) financeForm.receipt_base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }) }
 const saveFinance = () => financeForm.post(route('alp.finances.store', props.cycle.id), { preserveScroll: true, onSuccess: () => financeForm.reset() })
@@ -88,65 +87,6 @@ const saveFinance = () => financeForm.post(route('alp.finances.store', props.cyc
 const reportForm = useForm({ report_type: 'accomplishment', period: 'Year-end', data: { narrative: '', highlights: [], challenges: [], recommendations: [] }, status: 'draft' })
 const saveReport = (status) => { reportForm.status = status; reportForm.post(route('alp.reports.store', props.cycle.id), { preserveScroll: true }) }
 const activeMembers = computed(() => props.cycle.memberships.filter(item => item.status === 'active'))
-
-// Roster-driven, not record-driven: every ACTIVE member always gets a row for
-// every session, defaulting to 'present' when no AlpAttendance row exists yet
-// (e.g. a member added after the session was created, before the backend
-// backfill runs, or any other gap). Mirrors Class Record's AttendanceGrid.vue
-// effectiveStatus()/isDefaulted() pattern — the roster is the source of
-// truth for what rows exist, not whatever happens to already be in the DB.
-const buildAttendanceDrafts = () => Object.fromEntries(props.cycle.sessions.map(session => {
-  const recordsByMembership = Object.fromEntries(session.attendance.map(record => [record.alp_membership_id, record]))
-  return [session.id, Object.fromEntries(activeMembers.value.map(member => {
-    const record = recordsByMembership[member.id]
-    return [member.id, { membership_id: member.id, status: record?.status ?? 'present', remarks: record?.remarks || '', defaulted: !record }]
-  }))]
-}))
-const attendanceDrafts = ref(buildAttendanceDrafts())
-// props.cycle is replaced wholesale on every Inertia visit (new session,
-// new/removed member, saved attendance) — resync the roster-driven drafts
-// so freshly added members/sessions immediately get a full, editable row
-// instead of only appearing after a manual page reload.
-watch(() => props.cycle, () => { attendanceDrafts.value = buildAttendanceDrafts() })
-const saveAttendance = (session) => postAction(route('alp.attendance.save', [props.cycle.id, session.id]), { records: Object.values(attendanceDrafts.value[session.id] || {}) })
-const ATTENDANCE_STATUSES = [
-  { value: 'present', label: 'Present', code: 'P', cls: 'bg-emerald-100 text-emerald-700' },
-  { value: 'absent',  label: 'Absent',  code: 'A', cls: 'bg-red-100 text-red-700' },
-  { value: 'tardy',   label: 'Tardy',   code: 'T', cls: 'bg-amber-100 text-amber-700' },
-  { value: 'cutting', label: 'Cutting', code: 'C', cls: 'bg-orange-100 text-orange-700' },
-  { value: 'excused', label: 'Excused', code: 'E', cls: 'bg-slate-200 text-slate-700' },
-]
-const STATUS_CYCLE = ATTENDANCE_STATUSES.map(s => s.value)
-// Click-to-cycle through Present → Absent → Tardy → Cutting → Excused → Present…
-// matching Class Record's cycleAttendance(). A still-defaulted cell (no saved
-// row yet) starts the cycle at the first exception status, same as Class
-// Record skipping past the implied Present on first click.
-const cycleAttendance = (sessionId, memberId) => {
-  if (!props.abilities.manage) return
-  const cell = attendanceDrafts.value[sessionId][memberId]
-  if (cell.defaulted) {
-    cell.status = STATUS_CYCLE[1]
-  } else {
-    const idx = STATUS_CYCLE.indexOf(cell.status)
-    cell.status = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]
-  }
-  cell.defaulted = false
-}
-const remarkCell = ref(null)
-const remarkDraft = ref('')
-const openRemarks = (session, member) => {
-  remarkCell.value = { session, member }
-  remarkDraft.value = attendanceDrafts.value[session.id][member.id].remarks
-}
-const closeRemarks = () => { remarkCell.value = null; remarkDraft.value = '' }
-const applyRemark = () => {
-  if (!remarkCell.value) return
-  const { session, member } = remarkCell.value
-  attendanceDrafts.value[session.id][member.id].remarks = remarkDraft.value.trim()
-  closeRemarks()
-}
-const presentCount = (session) => Object.values(attendanceDrafts.value[session.id] || {}).filter(r => r.status === 'present').length
-const markAllPresent = (session) => { Object.values(attendanceDrafts.value[session.id] || {}).forEach(r => { r.status = 'present'; r.defaulted = false }) }
 const workflowActions = computed(() => {
   const status = props.cycle.status
   const actions = []
@@ -364,60 +304,9 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
 
       <template v-else-if="activeTab === 'attendance'">
         <div class="space-y-5">
-        <AppCard v-if="abilities.manage" title="Create session">
-          <form class="grid gap-3 md:grid-cols-3" @submit.prevent="saveSession"><AppInput v-model="sessionForm.session_date" label="Session date" required type="date" /><AppInput v-model="sessionForm.topic" label="Topic" /><AppInput v-model="sessionForm.venue" label="Venue" /><AppButton type="submit" :loading="sessionForm.processing" class="md:col-start-3 md:justify-self-end">Create roster</AppButton></form>
+        <AppCard>
+          <AlpAttendanceGrid :cycle-id="cycle.id" :can-edit="abilities.manage" />
         </AppCard>
-        <AppCard v-for="session in cycle.sessions" :key="session.id">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 class="font-heading text-sm font-semibold text-slate-800">{{ session.topic || 'ALP Session' }}</h2>
-              <p class="text-sm text-slate-500">{{ date(session.session_date) }} · {{ session.venue || 'No venue' }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <AppBadge :color="statusColor(session.status)">{{ label(session.status) }}</AppBadge>
-              <span class="text-xs text-slate-500">{{ presentCount(session) }} / {{ activeMembers.length }} present</span>
-            </div>
-          </div>
-
-          <div class="mt-3 flex flex-wrap gap-2 text-[11px]">
-            <span v-for="s in ATTENDANCE_STATUSES" :key="s.value" class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold" :class="s.cls">
-              {{ s.code }} = {{ s.label }}
-            </span>
-          </div>
-
-          <div class="mt-4 max-h-80 overflow-auto rounded-xl ring-1 ring-slate-200/70">
-            <div v-for="member in activeMembers" :key="member.id" class="grid grid-cols-1 items-center gap-2 border-b border-slate-100 p-3 text-sm last:border-0 sm:grid-cols-[1fr_170px_auto]">
-              <span class="font-medium text-slate-700">{{ member.student?.full_name }}</span>
-              <div v-if="attendanceDrafts[session.id]?.[member.id]" class="flex gap-1">
-                <button
-                  v-for="s in ATTENDANCE_STATUSES" :key="s.value"
-                  type="button"
-                  :disabled="!abilities.manage"
-                  :title="attendanceDrafts[session.id][member.id].defaulted ? 'Defaults to Present — click to mark an exception' : s.label"
-                  :class="['min-w-[30px] h-7 px-1.5 rounded-md text-[11px] font-bold transition-colors', abilities.manage ? 'cursor-pointer' : 'cursor-default', attendanceDrafts[session.id][member.id].status === s.value ? [s.cls, attendanceDrafts[session.id][member.id].defaulted ? 'opacity-60' : ''] : 'bg-slate-50 text-slate-300 hover:bg-slate-100']"
-                  @click="cycleAttendance(session.id, member.id)"
-                >
-                  {{ s.code }}
-                </button>
-              </div>
-              <button
-                v-if="attendanceDrafts[session.id]?.[member.id] && attendanceDrafts[session.id][member.id].status !== 'present'"
-                type="button"
-                class="justify-self-start text-[11px] font-semibold transition-colors sm:justify-self-end"
-                :class="attendanceDrafts[session.id][member.id].remarks ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'"
-                @click="openRemarks(session, member)"
-              >
-                {{ attendanceDrafts[session.id][member.id].remarks ? 'Remark' : '+ Remark' }}
-              </button>
-            </div>
-          </div>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <AppButton v-if="abilities.manage" variant="secondary" size="sm" @click="markAllPresent(session)">Mark All Present</AppButton>
-            <AppButton v-if="abilities.manage" size="sm" @click="saveAttendance(session)">Save attendance</AppButton>
-            <AppButton as="a" :href="route('alp.attendance.pdf', [cycle.id, session.id])" target="_blank" size="sm" variant="secondary">Form 33 PDF</AppButton>
-          </div>
-        </AppCard>
-        <AppCard v-if="cycle.sessions.length === 0"><EmptyState title="No attendance sessions" /></AppCard>
         <AppCard :padded="false" title="Attendance summary">
           <AppTable :is-empty="attendanceSummary.length === 0" :skeleton-cols="5" :card="false">
             <template #head><tr><th :class="TH">Member</th><th :class="TH">Sessions</th><th :class="TH">Present</th><th :class="TH">Absent</th><th :class="TH">Tardy/Cutting</th></tr></template>

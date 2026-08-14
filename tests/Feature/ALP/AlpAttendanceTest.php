@@ -60,93 +60,162 @@ class AlpAttendanceTest extends TestCase
         return AlpProgramCycle::create(['alp_program_id' => $program->id, 'school_year_id' => $sy->id, 'status' => 'draft']);
     }
 
-    public function test_member_added_after_a_session_exists_still_gets_a_default_present_attendance_row(): void
+    private function addMember(AlpProgramCycle $cycle, SchoolYear $sy, string $lastname, string $firstname, int $gradeLevel): AlpMembership
+    {
+        $studentId = $this->makeStudent($lastname, $firstname);
+        $enrollment = $this->enroll($studentId, $sy, $gradeLevel);
+
+        return AlpMembership::create([
+            'alp_program_cycle_id' => $cycle->id, 'school_year_id' => $sy->id, 'student_id' => $studentId,
+            'student_enrollment_id' => $enrollment->id, 'status' => 'active', 'joined_at' => '2026-07-20',
+        ]);
+    }
+
+    public function test_index_lists_every_active_member_automatically_with_no_roster_creation_step(): void
     {
         $user = $this->alpUser();
         $sy = $this->currentSchoolYear();
         $cycle = $this->makeCycle($sy, 'Reading Recovery Program');
 
-        // A member present before the session is created — the pre-existing
-        // "works" path.
-        $earlyStudent = $this->makeStudent('Cruz', 'Ana');
-        $earlyEnrollment = $this->enroll($earlyStudent, $sy, 8);
-        AlpMembership::create([
-            'alp_program_cycle_id' => $cycle->id, 'school_year_id' => $sy->id, 'student_id' => $earlyStudent,
-            'student_enrollment_id' => $earlyEnrollment->id, 'status' => 'active', 'joined_at' => '2026-07-20',
+        $this->addMember($cycle, $sy, 'Cruz', 'Ana', 8);
+        $this->addMember($cycle, $sy, 'Reyes', 'Ben', 9);
+
+        // No date/session created yet — the member list must still be
+        // fully populated (this is the core requirement: the roster is a
+        // given, never something the user has to "create").
+        $response = $this->actingAs($user)->getJson(route('alp.attendance.index', $cycle));
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'members');
+        $response->assertJson(['dates' => [], 'records' => []]);
+        $response->assertJsonFragment(['name' => 'Cruz, Ana']);
+        $response->assertJsonFragment(['name' => 'Reyes, Ben']);
+    }
+
+    public function test_store_date_creates_a_session_and_backfills_present_for_every_active_member(): void
+    {
+        $user = $this->alpUser();
+        $sy = $this->currentSchoolYear();
+        $cycle = $this->makeCycle($sy, 'Reading Recovery Program');
+        $membershipA = $this->addMember($cycle, $sy, 'Cruz', 'Ana', 8);
+        $membershipB = $this->addMember($cycle, $sy, 'Reyes', 'Ben', 9);
+
+        $response = $this->actingAs($user)->postJson(route('alp.attendance.dates.store', $cycle), [
+            'date' => '2026-08-10',
+        ]);
+        $response->assertOk();
+        $sessionId = $response->json('id');
+
+        $this->assertNotNull(AlpSession::find($sessionId));
+        $this->assertSame('present', AlpAttendance::where('alp_session_id', $sessionId)->where('alp_membership_id', $membershipA->id)->first()->status);
+        $this->assertSame('present', AlpAttendance::where('alp_session_id', $sessionId)->where('alp_membership_id', $membershipB->id)->first()->status);
+
+        $index = $this->actingAs($user)->getJson(route('alp.attendance.index', $cycle));
+        $index->assertJsonCount(1, 'dates');
+        $index->assertJsonPath('dates.0.date', '2026-08-10');
+    }
+
+    public function test_member_added_after_a_date_exists_still_gets_a_default_present_row(): void
+    {
+        $user = $this->alpUser();
+        $sy = $this->currentSchoolYear();
+        $cycle = $this->makeCycle($sy, 'Reading Recovery Program');
+        $this->addMember($cycle, $sy, 'Cruz', 'Ana', 8);
+
+        $dateResponse = $this->actingAs($user)->postJson(route('alp.attendance.dates.store', $cycle), ['date' => '2026-08-10']);
+        $sessionId = $dateResponse->json('id');
+
+        // A member added AFTER the date already exists — the exact scenario
+        // that broke under the old session-card design.
+        $studentId = $this->makeStudent('Reyes', 'Ben');
+        $enrollment = $this->enroll($studentId, $sy, 9);
+        $lateMembership = AlpMembership::create([
+            'alp_program_cycle_id' => $cycle->id, 'school_year_id' => $sy->id, 'student_id' => $studentId,
+            'student_enrollment_id' => $enrollment->id, 'status' => 'active', 'joined_at' => '2026-08-11',
         ]);
 
-        $response = $this->actingAs($user)->post(route('alp.sessions.store', $cycle), [
-            'session_date' => '2026-08-10', 'topic' => 'Reading Circle',
-        ]);
-        $response->assertRedirect();
-        $session = AlpSession::where('alp_program_cycle_id', $cycle->id)->first();
-        $this->assertNotNull($session);
-        $this->assertCount(1, AlpAttendance::where('alp_session_id', $session->id)->get());
-
-        // A member added AFTER the session already exists — this is the bug
-        // scenario: before the fix, this member would have zero AlpAttendance
-        // rows for this session and their row would silently not render.
-        $lateStudent = $this->makeStudent('Reyes', 'Ben');
-        $lateEnrollment = $this->enroll($lateStudent, $sy, 9);
-        $storeResponse = $this->actingAs($user)->post(route('alp.members.store', $cycle), [
-            'student_ids' => [$lateStudent],
+        // AlpController::storeMembers() isn't exercised here directly since
+        // this test constructs the membership manually — call it via the
+        // real endpoint instead to prove the backfill fires end-to-end.
+        $newStudentId = $this->makeStudent('Santos', 'Cara');
+        $this->enroll($newStudentId, $sy, 7);
+        $storeResponse = $this->actingAs($user)->postJson(route('alp.members.store', $cycle), [
+            'student_ids' => [$newStudentId],
         ]);
         $storeResponse->assertRedirect();
 
-        $lateMembership = AlpMembership::where('alp_program_cycle_id', $cycle->id)->where('student_id', $lateStudent)->first();
-        $this->assertNotNull($lateMembership);
+        $newestMembership = AlpMembership::where('alp_program_cycle_id', $cycle->id)->where('student_id', '!=', $lateMembership->student_id)
+            ->orderByDesc('id')->first();
 
-        $backfilled = AlpAttendance::where('alp_session_id', $session->id)->where('alp_membership_id', $lateMembership->id)->first();
-        $this->assertNotNull($backfilled, 'Newly added member must be backfilled with a default attendance row for every pre-existing session.');
+        $backfilled = AlpAttendance::where('alp_session_id', $sessionId)->where('alp_membership_id', $newestMembership->id)->first();
+        $this->assertNotNull($backfilled, 'A member added after a date exists must be backfilled with a default present row for that date.');
         $this->assertSame('present', $backfilled->status);
 
-        // Every active member now has exactly one row for the session.
-        $this->assertCount(2, AlpAttendance::where('alp_session_id', $session->id)->get());
+        $index = $this->actingAs($user)->getJson(route('alp.attendance.index', $cycle));
+        $index->assertJsonCount(3, 'members'); // Cruz, Reyes, Santos
     }
 
-    public function test_save_attendance_upserts_every_active_member_even_when_untouched_by_the_client(): void
+    public function test_upsert_saves_the_whole_grid_in_one_request(): void
     {
         $user = $this->alpUser();
         $sy = $this->currentSchoolYear();
         $cycle = $this->makeCycle($sy, 'Numeracy Bridge Program');
+        $membershipA = $this->addMember($cycle, $sy, 'Cruz', 'Ana', 8);
+        $membershipB = $this->addMember($cycle, $sy, 'Reyes', 'Ben', 9);
 
-        $studentA = $this->makeStudent('Cruz', 'Ana');
-        $enrollmentA = $this->enroll($studentA, $sy, 8);
-        $membershipA = AlpMembership::create([
-            'alp_program_cycle_id' => $cycle->id, 'school_year_id' => $sy->id, 'student_id' => $studentA,
-            'student_enrollment_id' => $enrollmentA->id, 'status' => 'active', 'joined_at' => '2026-07-20',
-        ]);
+        $dateResponse = $this->actingAs($user)->postJson(route('alp.attendance.dates.store', $cycle), ['date' => '2026-08-10']);
+        $sessionId = $dateResponse->json('id');
 
-        $studentB = $this->makeStudent('Reyes', 'Ben');
-        $enrollmentB = $this->enroll($studentB, $sy, 9);
-        $membershipB = AlpMembership::create([
-            'alp_program_cycle_id' => $cycle->id, 'school_year_id' => $sy->id, 'student_id' => $studentB,
-            'student_enrollment_id' => $enrollmentB->id, 'status' => 'active', 'joined_at' => '2026-07-20',
-        ]);
-
-        $this->actingAs($user)->post(route('alp.sessions.store', $cycle), [
-            'session_date' => '2026-08-10', 'topic' => 'Numeracy Session',
-        ]);
-        $session = AlpSession::where('alp_program_cycle_id', $cycle->id)->first();
-
-        // Client only sends membership A's record (marked absent) — mirrors a
-        // frontend that only submits touched cells. Membership B must still
-        // end up with a persisted "present" row, not be silently dropped.
-        $response = $this->actingAs($user)->post(route('alp.attendance.save', [$cycle, $session]), [
+        $response = $this->actingAs($user)->postJson(route('alp.attendance.upsert', $cycle), [
             'records' => [
-                ['membership_id' => $membershipA->id, 'status' => 'absent', 'remarks' => 'Sick'],
+                ['session_id' => $sessionId, 'membership_id' => $membershipA->id, 'status' => 'absent', 'remarks' => 'Sick'],
+                ['session_id' => $sessionId, 'membership_id' => $membershipB->id, 'status' => 'present'],
             ],
         ]);
-        $response->assertRedirect();
+        $response->assertOk();
 
-        $recordA = AlpAttendance::where('alp_session_id', $session->id)->where('alp_membership_id', $membershipA->id)->first();
+        $recordA = AlpAttendance::where('alp_session_id', $sessionId)->where('alp_membership_id', $membershipA->id)->first();
         $this->assertSame('absent', $recordA->status);
         $this->assertSame('Sick', $recordA->remarks);
 
-        $recordB = AlpAttendance::where('alp_session_id', $session->id)->where('alp_membership_id', $membershipB->id)->first();
-        $this->assertNotNull($recordB, 'An active member not included in the save payload must still be persisted with the default status.');
+        $recordB = AlpAttendance::where('alp_session_id', $sessionId)->where('alp_membership_id', $membershipB->id)->first();
         $this->assertSame('present', $recordB->status);
+    }
 
-        $this->assertSame('closed', $session->refresh()->status);
+    public function test_upsert_rejects_a_session_or_membership_from_another_cycle(): void
+    {
+        $user = $this->alpUser();
+        $sy = $this->currentSchoolYear();
+        $cycle = $this->makeCycle($sy, 'Numeracy Bridge Program');
+        $membership = $this->addMember($cycle, $sy, 'Cruz', 'Ana', 8);
+
+        $otherCycle = $this->makeCycle($sy, 'Other Program');
+        $otherDateResponse = $this->actingAs($user)->postJson(route('alp.attendance.dates.store', $otherCycle), ['date' => '2026-08-10']);
+        $otherSessionId = $otherDateResponse->json('id');
+
+        $response = $this->actingAs($user)->postJson(route('alp.attendance.upsert', $cycle), [
+            'records' => [
+                ['session_id' => $otherSessionId, 'membership_id' => $membership->id, 'status' => 'present'],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_destroy_date_removes_the_session_and_its_attendance_rows(): void
+    {
+        $user = $this->alpUser();
+        $sy = $this->currentSchoolYear();
+        $cycle = $this->makeCycle($sy, 'Reading Recovery Program');
+        $this->addMember($cycle, $sy, 'Cruz', 'Ana', 8);
+
+        $dateResponse = $this->actingAs($user)->postJson(route('alp.attendance.dates.store', $cycle), ['date' => '2026-08-10']);
+        $sessionId = $dateResponse->json('id');
+
+        $response = $this->actingAs($user)->deleteJson(route('alp.attendance.dates.destroy', [$cycle, $sessionId]));
+        $response->assertOk();
+
+        $this->assertNull(AlpSession::find($sessionId));
+        $this->assertSame(0, AlpAttendance::where('alp_session_id', $sessionId)->count());
     }
 }

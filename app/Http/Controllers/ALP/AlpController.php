@@ -11,7 +11,6 @@ use App\Models\ALP\AlpMembership;
 use App\Models\ALP\AlpOfficer;
 use App\Models\ALP\AlpProgramCycle;
 use App\Models\ALP\AlpReport;
-use App\Models\ALP\AlpSession;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentAcademicStanding;
 use App\Models\Registrar\StudentEnrollment;
@@ -233,9 +232,9 @@ class AlpController extends Controller
             // Backfill a default "present" attendance row for every session
             // that already existed on this cycle before this member joined —
             // otherwise their row would be silently missing from every
-            // already-created session's attendance grid (the exact bug this
-            // fixes), since storeSession() only ever seeds the roster active
-            // at the moment a session is created.
+            // already-created date's attendance grid, since
+            // AlpAttendanceController::storeDate() only ever seeds the
+            // roster active at the moment a date is added.
             if ($newMembershipIds) {
                 $sessionIds = $cycle->sessions()->pluck('id');
                 if ($sessionIds->isNotEmpty()) {
@@ -444,59 +443,6 @@ class AlpController extends Controller
         }
 
         return back()->with('success', 'ALP activity workflow updated.');
-    }
-
-    public function storeSession(Request $request, AlpProgramCycle $cycle)
-    {
-        $this->access->authorizeManage($request->user(), $cycle);
-        $data = $request->validate([
-            'activity_id' => ['nullable', Rule::exists('alp_activities', 'id')->where('alp_program_cycle_id', $cycle->id)],
-            'session_date' => 'required|date', 'start_time' => 'nullable|date_format:H:i', 'end_time' => 'nullable|date_format:H:i|after_or_equal:start_time',
-            'topic' => 'nullable|string|max:255', 'venue' => 'nullable|string|max:255',
-        ]);
-        $session = $cycle->sessions()->create([...$data, 'alp_activity_id' => $data['activity_id'] ?? null, 'created_by' => $request->user()->id]);
-        $rows = $cycle->memberships()->where('status', 'active')->get()->map(fn ($membership) => [
-            'alp_session_id' => $session->id, 'alp_membership_id' => $membership->id, 'status' => 'present',
-            'recorded_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
-        ])->all();
-        AlpAttendance::insert($rows);
-
-        return back()->with('success', 'Session created with the active member roster.');
-    }
-
-    public function saveAttendance(Request $request, AlpProgramCycle $cycle, AlpSession $session)
-    {
-        $this->access->authorizeManage($request->user(), $cycle);
-        abort_unless($session->alp_program_cycle_id === $cycle->id, 404);
-        $data = $request->validate([
-            'records' => 'required|array', 'records.*.membership_id' => 'required|integer',
-            'records.*.status' => 'required|in:present,absent,tardy,cutting,excused', 'records.*.remarks' => 'nullable|string|max:1000',
-        ]);
-
-        // Every currently ACTIVE member must get a persisted row for this
-        // session, not just the ones the client happened to send — mirrors
-        // Class Record's AttendanceGrid.vue/upsert() completeness guarantee.
-        // A member added to the cycle after this session was created would
-        // otherwise never get a DB row (and, before this fix, never even
-        // appeared in the UI) since storeSession() only seeds the roster
-        // active at creation time. Any submitted record not in the current
-        // active roster (e.g. a since-removed member) is ignored rather
-        // than written, so a stale client payload can't resurrect it.
-        $activeMembershipIds = $cycle->memberships()->where('status', 'active')->pluck('id');
-        $submitted = collect($data['records'])->keyBy('membership_id');
-
-        DB::transaction(function () use ($activeMembershipIds, $submitted, $session, $request) {
-            foreach ($activeMembershipIds as $membershipId) {
-                $record = $submitted->get($membershipId);
-                AlpAttendance::updateOrCreate(
-                    ['alp_session_id' => $session->id, 'alp_membership_id' => $membershipId],
-                    ['status' => $record['status'] ?? 'present', 'remarks' => $record['remarks'] ?? null, 'recorded_by' => $request->user()->id]
-                );
-            }
-            $session->update(['status' => 'closed']);
-        });
-
-        return back()->with('success', 'Attendance saved.');
     }
 
     public function storeFinance(Request $request, AlpProgramCycle $cycle)
