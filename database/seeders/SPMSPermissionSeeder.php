@@ -21,6 +21,18 @@ class SPMSPermissionSeeder extends Seeder
             'description' => 'Configure SPMS weight profiles, fiscal periods, and MOV document types',
             'roles' => ['Administrator', 'HR', 'PMT'],
         ],
+        'spms.dpcr.manage' => [
+            'description' => 'Create and manage own division SPMS DPCR (quarterly accomplishments, submit to reviewer)',
+            'roles' => ['Administrator', 'DivisionChief', 'CID Chief'],
+        ],
+        'spms.dpcr.review' => [
+            'description' => "Review SPMS DPCRs as the Division Chief's immediate supervisor (Campus Director)",
+            'roles' => ['Administrator', 'OCD'],
+        ],
+        'spms.dpcr.approve' => [
+            'description' => 'Approve SPMS DPCRs as Head of Office (Campus Director)',
+            'roles' => ['Administrator', 'OCD'],
+        ],
     ];
 
     public function run(): void
