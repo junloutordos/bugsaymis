@@ -3,23 +3,28 @@
 namespace App\Http\Controllers\SPMS;
 
 use App\Http\Controllers\Controller;
-use App\Services\SPMS\MovChecklistService;
+use App\Models\SPMS\MovChecklistItem;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class MovChecklistController extends Controller
 {
-    public function show(string $fileId): Response
+    public function show(MovChecklistItem $movChecklistItem): Response
     {
-        abort_unless(preg_match('/^[a-zA-Z0-9_.=-]+$/', $fileId), 400);
-        abort_unless(str_starts_with($fileId, 's3.'), 400);
+        $movChecklistItem->loadMissing('target.ipcr');
+        $ipcr = $movChecklistItem->target->ipcr;
 
-        $s3Key = MovChecklistService::decodeFileId($fileId);
+        $user = Auth::user();
+        abort_unless(
+            $ipcr->user_id === $user->id || $user->hasPermission('spms.ipcr.review') || $user->isSuperAdmin(),
+            403
+        );
 
-        abort_unless(Storage::disk('s3')->exists($s3Key), 404);
+        abort_unless($movChecklistItem->s3_key && Storage::disk('s3')->exists($movChecklistItem->s3_key), 404);
 
-        $contents = Storage::disk('s3')->get($s3Key);
-        $extension = strtolower(pathinfo($s3Key, PATHINFO_EXTENSION));
+        $contents = Storage::disk('s3')->get($movChecklistItem->s3_key);
+        $extension = strtolower(pathinfo($movChecklistItem->s3_key, PATHINFO_EXTENSION));
         $mime = match ($extension) {
             'png' => 'image/png',
             'jpg', 'jpeg' => 'image/jpeg',

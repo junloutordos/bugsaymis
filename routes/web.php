@@ -2825,8 +2825,16 @@ Route::middleware('auth')->prefix('error-reports')->name('error-reports.')->grou
 
 // ── SPMS (Performance Management v2) ────────────────────────────────────────
 Route::middleware(['auth', 'permission:spms.ipcr.manage|spms.ipcr.review'])->group(function () {
-    Route::get('/spms/ipcr/mov/{fileId}', [\App\Http\Controllers\SPMS\MovChecklistController::class, 'show'])
+    Route::get('/spms/ipcr/mov/{movChecklistItem}', [\App\Http\Controllers\SPMS\MovChecklistController::class, 'show'])
         ->name('spms.ipcr.mov.show');
+});
+
+Route::middleware(['auth', 'permission:spms.ipcr.manage'])->prefix('spms/ipcr')->name('spms.ipcr.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'index'])->name('index');
+    Route::get('/{ipcr}', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'show'])->name('show');
+    Route::post('/{ipcr}/generate-targets', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'generateTargets'])->name('generate-targets');
+    Route::post('/{ipcr}/submit-target', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'submitTarget'])->name('submit-target');
+    Route::post('/{ipcr}/submit-for-rating', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'submitForRating'])->name('submit-for-rating');
 });
 
 require __DIR__.'/auth.php';

@@ -35,20 +35,6 @@ class MovChecklistService
         );
     }
 
-    public static function encodeFileId(string $s3Key): string
-    {
-        return 's3.'.rtrim(strtr(base64_encode($s3Key), '+/', '-_'), '=');
-    }
-
-    public static function decodeFileId(string $fileId): string
-    {
-        $encoded = substr($fileId, 3); // strip 's3.' prefix
-        $padLength = strlen($encoded) % 4 === 0 ? strlen($encoded) : strlen($encoded) + (4 - strlen($encoded) % 4);
-        $padded = str_pad(strtr($encoded, '-_', '+/'), $padLength, '=');
-
-        return base64_decode($padded);
-    }
-
     private function decode(string $dataUri): array
     {
         if (preg_match('/^data:image\/(\w+);base64,/', $dataUri, $matches)) {
