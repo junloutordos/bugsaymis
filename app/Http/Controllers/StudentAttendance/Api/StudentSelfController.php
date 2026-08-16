@@ -157,7 +157,7 @@ class StudentSelfController extends Controller
             ->classes()
             ->where('section_id', $enrollment->section_id)
             ->where('school_year_id', $schoolYear->id)
-            ->active()
+            ->occupying()
             ->orderByRaw("FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')")
             ->orderBy('start_time')
             ->get();
@@ -168,11 +168,15 @@ class StudentSelfController extends Controller
 
         $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $grouped  = collect($dayOrder)->mapWithKeys(fn ($day) => [$day => []]);
+        $isProvisional = false;
 
         foreach ($schedules as $s) {
             $day = $s->day_of_week;
             if (! isset($grouped[$day])) {
                 $grouped[$day] = [];
+            }
+            if ($s->status !== 'active') {
+                $isProvisional = true;
             }
             $grouped[$day][] = [
                 'id'           => $s->id,
@@ -182,22 +186,24 @@ class StudentSelfController extends Controller
                 'start_time'   => $s->start_time,
                 'end_time'     => $s->end_time,
                 'duration_min' => $s->duration_minutes,
+                'status'       => $s->status,
             ];
         }
 
         $filtered = $grouped->filter(fn ($slots) => count($slots) > 0);
 
         return response()->json([
-            'student'     => $student ? [
+            'student'        => $student ? [
                 'id'   => $student->id,
                 'name' => trim("{$student->lastname}, {$student->firstname}"),
             ] : null,
-            'school_year' => $schoolYear->name,
-            'section'     => $section ? [
+            'school_year'    => $schoolYear->name,
+            'section'        => $section ? [
                 'name'        => $section->sectionname,
                 'grade_level' => $section->levelid,
             ] : null,
-            'schedule'    => $filtered,
+            'schedule'       => $filtered,
+            'is_provisional' => $isProvisional,
         ]);
     }
 

@@ -18,16 +18,14 @@ class StudentLinkRequestMail extends Mailable
 
     public function build(): static
     {
-        $confirmUrl = url("/student-attendance/link/{$this->linkRequest->token}/confirm");
-        $denyUrl    = url("/student-attendance/link/{$this->linkRequest->token}/deny");
+        $reviewUrl = url("/student-attendance/link/{$this->linkRequest->token}");
 
         return $this->subject("AtlasGo: A parent requests to be linked to your account")
                     ->view('emails.student_link_request')
                     ->with([
                         'parentName'   => $this->parentName,
                         'relationship' => ucfirst($this->linkRequest->relationship),
-                        'confirmUrl'   => $confirmUrl,
-                        'denyUrl'      => $denyUrl,
+                        'reviewUrl'    => $reviewUrl,
                         'expiresAt'    => $this->linkRequest->expires_at->format('M d, Y h:i A'),
                     ]);
     }

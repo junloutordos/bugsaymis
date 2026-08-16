@@ -18,8 +18,7 @@
 <p style="font-size:14px;color:#475569;margin:16px 0 8px;"><strong>If you approve</strong>, this person will be able to see your gate scan times and receive notifications when you enter or leave campus.</p>
 
 <div style="text-align:center;margin:24px 0;">
-    <a href="{{ $confirmUrl }}" class="btn btn-green" style="margin-right:10px;">✓ Confirm</a>
-    <a href="{{ $denyUrl }}" class="btn btn-red">✕ Deny</a>
+    <a href="{{ $reviewUrl }}" class="btn btn-primary">Review Request</a>
 </div>
 
 <div class="callout callout-blue">
