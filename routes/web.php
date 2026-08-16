@@ -2823,4 +2823,35 @@ Route::middleware('auth')->prefix('error-reports')->name('error-reports.')->grou
     });
 });
 
+// ── SPMS (Performance Management v2) ────────────────────────────────────────
+Route::middleware(['auth', 'permission:spms.ipcr.manage|spms.ipcr.review'])->group(function () {
+    Route::get('/spms/ipcr/mov/{movChecklistItem}', [\App\Http\Controllers\SPMS\MovChecklistController::class, 'show'])
+        ->name('spms.ipcr.mov.show');
+});
+
+Route::middleware(['auth', 'permission:spms.ipcr.manage'])->prefix('spms/ipcr')->name('spms.ipcr.')->where(['ipcr' => '[0-9]+'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'index'])->name('index');
+    Route::get('/{ipcr}', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'show'])->name('show');
+    Route::post('/{ipcr}/generate-targets', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'generateTargets'])->name('generate-targets');
+    Route::post('/{ipcr}/submit-target', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'submitTarget'])->name('submit-target');
+    Route::post('/{ipcr}/submit-for-rating', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'submitForRating'])->name('submit-for-rating');
+});
+
+Route::middleware(['auth', 'permission:spms.ipcr.review'])->prefix('spms/ipcr/review')->name('spms.ipcr.review.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'index'])->name('index');
+    Route::get('/{ipcr}', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'show'])->name('show');
+    Route::post('/{ipcr}/approve-target', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'approveTarget'])->name('approve-target');
+    Route::post('/{ipcr}/rate', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'rate'])->name('rate');
+    Route::post('/{ipcr}/review-dc', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'reviewAsDivisionChief'])->name('review-dc');
+    Route::post('/{ipcr}/review-pmt-hr', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'reviewAsPmtHr'])->name('review-pmt-hr');
+    Route::post('/{ipcr}/finalize', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'finalize'])->name('finalize');
+    Route::post('/{ipcr}/return', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'returnToSender'])->name('return');
+});
+
+Route::middleware(['auth', 'permission:spms.admin.manage'])->prefix('spms/admin')->name('spms.admin.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\SPMS\AdminConfigController::class, 'index'])->name('index');
+    Route::post('/weight-profiles', [\App\Http\Controllers\SPMS\AdminConfigController::class, 'storeWeightProfile'])->name('weight-profiles.store');
+    Route::post('/fiscal-periods', [\App\Http\Controllers\SPMS\AdminConfigController::class, 'storeFiscalPeriod'])->name('fiscal-periods.store');
+});
+
 require __DIR__.'/auth.php';
