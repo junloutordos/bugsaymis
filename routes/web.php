@@ -2848,4 +2848,10 @@ Route::middleware(['auth', 'permission:spms.ipcr.review'])->prefix('spms/ipcr/re
     Route::post('/{ipcr}/return', [\App\Http\Controllers\SPMS\ReviewerIpcrController::class, 'returnToSender'])->name('return');
 });
 
+Route::middleware(['auth', 'permission:spms.admin.manage'])->prefix('spms/admin')->name('spms.admin.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\SPMS\AdminConfigController::class, 'index'])->name('index');
+    Route::post('/weight-profiles', [\App\Http\Controllers\SPMS\AdminConfigController::class, 'storeWeightProfile'])->name('weight-profiles.store');
+    Route::post('/fiscal-periods', [\App\Http\Controllers\SPMS\AdminConfigController::class, 'storeFiscalPeriod'])->name('fiscal-periods.store');
+});
+
 require __DIR__.'/auth.php';
