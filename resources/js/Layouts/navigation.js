@@ -746,6 +746,34 @@ export const menuItems = [
     ],
   },
   {
+    label: "Performance Management (SPMS)",
+    icon: ChartBarIcon,
+    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "HR", "PMT"],
+    children: [
+      {
+        label: "My IPCR",
+        routeName: "spms.ipcr.index",
+        href: route("spms.ipcr.index"),
+        icon: DocumentTextIcon,
+        permissions: ["spms.ipcr.manage"],
+      },
+      {
+        label: "IPCR Review Queue",
+        routeName: "spms.ipcr.review.index",
+        href: route("spms.ipcr.review.index"),
+        icon: ClipboardDocumentCheckIcon,
+        permissions: ["spms.ipcr.review"],
+      },
+      {
+        label: "SPMS Admin Config",
+        routeName: "spms.admin.index",
+        href: route("spms.admin.index"),
+        icon: Cog6ToothIcon,
+        permissions: ["spms.admin.manage"],
+      },
+    ],
+  },
+  {
     label: "Recruitment",
     icon: UserGroupIcon,
     roles: ["Administrator", "HR", "OCD"],
