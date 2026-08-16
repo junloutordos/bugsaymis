@@ -77,7 +77,7 @@ class ScheduleApiController extends Controller
             ->first(['id', 'sectionname', 'levelid']);
 
         $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        $grouped  = collect($dayOrder)->mapWithKeys(fn ($day) => [$day => []]);
+        $grouped  = array_fill_keys($dayOrder, []);
         $isProvisional = false;
 
         foreach ($schedules as $s) {
@@ -101,7 +101,7 @@ class ScheduleApiController extends Controller
         }
 
         // Remove days with no classes
-        $filtered = $grouped->filter(fn ($slots) => count($slots) > 0);
+        $filtered = array_filter($grouped, fn ($slots) => count($slots) > 0);
 
         return response()->json([
             'student'        => $student ? [
