@@ -41,3 +41,6 @@ storage/app/atlasadmin-503805-81f88bf6205b.json
 
 # Superpowers SDD scratch workspace (per-plan ledgers, briefs, reports)
 /.superpowers/
+
+# Git worktrees (manual fallback location)
+/.worktrees/
