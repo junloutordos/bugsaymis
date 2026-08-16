@@ -9,10 +9,19 @@ use App\Services\GoogleDriveService;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AccomplishmentController extends Controller
 {
+    private const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB, matches prior file-upload cap
+
+    private const ALLOWED_PHOTO_MIMES = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+    ];
+
     public function __construct(private IPCRWorkflowService $workflow)
     {
     }
@@ -131,18 +140,36 @@ class AccomplishmentController extends Controller
         $this->assertLinkedIpcrMutable($accomplishment->ipcr_plan_id);
 
         $request->validate([
-            'photo'      => 'nullable|file|mimes:jpg,jpeg,png,gif|max:5120', // images only, 5 MB max
-            'drive_link' => 'nullable|url|max:500',
+            'photo_base64' => 'nullable|string', // base64 data URI, images only, 5MB max
+            'drive_link'   => 'nullable|url|max:500',
         ]);
 
-        if (! $request->hasFile('photo') && ! $request->filled('drive_link')) {
+        if (! $request->filled('photo_base64') && ! $request->filled('drive_link')) {
             return redirect()->back()->withErrors(['proof' => 'Upload a file or paste a Drive link.']);
         }
 
         // Handle file upload
-        if ($request->hasFile('photo')) {
-            $file          = $request->file('photo');
-            $safeBasename  = preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($file->getClientOriginalName()));
+        if ($request->filled('photo_base64')) {
+            if (! preg_match('/^data:([^;]+);base64,(.+)$/', $request->input('photo_base64'), $m)) {
+                return redirect()->back()->withErrors(['photo' => 'Invalid file format.']);
+            }
+
+            $mime = strtolower(trim($m[1]));
+            if (! isset(self::ALLOWED_PHOTO_MIMES[$mime])) {
+                return redirect()->back()->withErrors(['photo' => 'Photo must be a JPG, PNG, or GIF image.']);
+            }
+
+            $binary = base64_decode($m[2], true);
+            if ($binary === false) {
+                return redirect()->back()->withErrors(['photo' => 'Invalid file data.']);
+            }
+
+            if (strlen($binary) > self::MAX_PHOTO_BYTES) {
+                return redirect()->back()->withErrors(['photo' => 'Photo must be smaller than 5MB.']);
+            }
+
+            $ext           = self::ALLOWED_PHOTO_MIMES[$mime];
+            $safeBasename  = $accomplishment->id . '_' . now()->format('YmdHis') . '.' . $ext;
             $slug          = $accomplishment->id . '_' . now()->format('YmdHis') . '_' . $safeBasename;
             $photoData     = [
                 'accomplishment_id' => $accomplishment->id,
@@ -151,14 +178,16 @@ class AccomplishmentController extends Controller
 
             if (config('services.google_drive.credentials')) {
                 try {
-                    $result = app(GoogleDriveService::class)->upload($file, $slug);
+                    $result = app(GoogleDriveService::class)->uploadRaw($binary, $slug, $mime);
                     $photoData['google_drive_file_id'] = $result['file_id'];
                     $photoData['google_drive_link']    = $result['link'];
                 } catch (\Throwable $e) {
                     return redirect()->back()->withErrors(['photo' => 'Drive upload failed: ' . $e->getMessage()]);
                 }
             } else {
-                $photoData['local_path'] = $file->store('accomplishments', 'public');
+                $path = 'accomplishments/' . uniqid() . '.' . $ext;
+                Storage::disk('s3')->put($path, $binary);
+                $photoData['local_path'] = $path;
             }
 
             AccomplishmentPhoto::create($photoData);

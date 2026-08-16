@@ -11,7 +11,7 @@
           <p class="text-sm text-slate-500">Fill in the details below to submit a nomination.</p>
         </div>
         <div class="p-5">
-          <form @submit.prevent="submit" class="space-y-5" enctype="multipart/form-data">
+          <form @submit.prevent="submit" class="space-y-5">
             <AppSelect v-model="form.reward_type_id" label="Award / Recognition Type" required :error="form.errors.reward_type_id" placeholder="Select award type…">
               <option v-for="t in rewardTypes" :key="t.id" :value="t.id">
                 {{ t.name }} ({{ t.frequency }})
@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
@@ -80,17 +80,27 @@ const form = useForm({
   supporting_documents: [],
 })
 
+const pickedFiles = ref([])
+
 const selectedType = computed(() =>
   props.rewardTypes.find(t => t.id == form.reward_type_id) ?? null
 )
 
 function handleFiles(e) {
-  form.supporting_documents = Array.from(e.target.files)
+  pickedFiles.value = Array.from(e.target.files)
 }
 
-function submit() {
-  form.post(route('rewards.nominations.store'), {
-    forceFormData: true,
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
   })
+}
+
+async function submit() {
+  form.supporting_documents = await Promise.all(pickedFiles.value.map(readFileAsDataUrl))
+  form.post(route('rewards.nominations.store'))
 }
 </script>

@@ -15,7 +15,7 @@ class CertificateService
     public function delete(?string $storagePath): void
     {
         if ($storagePath) {
-            Storage::disk('public')->delete($storagePath);
+            Storage::disk('s3')->delete($storagePath);
         }
     }
 
@@ -58,7 +58,7 @@ class CertificateService
                 'margin_right'  => 0,
                 'margin_top'    => 0,
                 'margin_bottom' => 0,
-                'tempDir'       => storage_path('app/tmp'),
+                'tempDir'       => sys_get_temp_dir(),
                 'fontDir'       => [storage_path('fonts')],
                 'fontdata'      => [
                     'montserrat' => [
@@ -87,8 +87,8 @@ class CertificateService
         $filename = 'Certificate_' . md5($name) . '.pdf';
         $fullPath = "{$dir}/{$filename}";
 
-        Storage::disk('public')->makeDirectory($dir);
-        Storage::disk('public')->put($fullPath, $pdfContent);
+        Storage::disk('s3')->makeDirectory($dir);
+        Storage::disk('s3')->put($fullPath, $pdfContent);
 
         return $fullPath;
     }

@@ -44,17 +44,24 @@ const fileInput = ref(null)
 
 const onFileChange = (e) => { docForm.value.file = e.target.files[0] }
 
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(reader.result)
+  reader.onerror = reject
+  reader.readAsDataURL(file)
+})
+
 const submitDoc = async () => {
   docLoading.value = true
   docErrors.value  = {}
 
-  const fd = new FormData()
-  fd.append('document_type', docForm.value.document_type)
-  fd.append('file', docForm.value.file)
-
   try {
-    await axios.post(route('recruitment.applicants.documents.upload', props.applicant.id), fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    const fileBase64 = await readFileAsDataUrl(docForm.value.file)
+
+    await axios.post(route('recruitment.applicants.documents.upload', props.applicant.id), {
+      document_type: docForm.value.document_type,
+      file_base64:   fileBase64,
+      file_name:     docForm.value.file.name,
     })
     showDocModal.value = false
     docForm.value = { document_type: '', file: null }

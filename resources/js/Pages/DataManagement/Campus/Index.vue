@@ -245,12 +245,10 @@ const handleLogoChange = (event) => {
       return
     }
 
-    // Set the file directly to the form
-    form.logo = file
-
-    // Create preview
+    // Read as base64 data URI — sent as JSON, never multipart/form-data (Cloudflare WAF blocks it)
     const reader = new FileReader()
     reader.onload = (e) => {
+      form.logo = e.target.result
       logoPreview.value = e.target.result
     }
     reader.readAsDataURL(file)
@@ -258,20 +256,10 @@ const handleLogoChange = (event) => {
 }
 
 const submitForm = () => {
-  const formData = new FormData()
-
-  // Add all form fields to FormData
-  Object.keys(form.data()).forEach(key => {
-    if (key === 'logo' && form.logo) {
-      formData.append('logo', form.logo)
-    } else if (key !== 'logo') {
-      formData.append(key, form[key] || '')
-    }
-  })
+  const payload = { ...form.data() }
 
   if (editingId.value) {
-    formData.append('_method', 'PUT')
-    inertiaRouter.post(`/data-management/campuses/${editingId.value}`, formData, {
+    inertiaRouter.put(`/data-management/campuses/${editingId.value}`, payload, {
       onSuccess: () => {
         closeModal()
         Swal.fire({ icon: 'success', title: 'Campus updated', timer: 1200, showConfirmButton: false }).then(() => {
@@ -283,7 +271,7 @@ const submitForm = () => {
       }
     })
   } else {
-    inertiaRouter.post('/data-management/campuses', formData, {
+    inertiaRouter.post('/data-management/campuses', payload, {
       onSuccess: () => {
         closeModal()
         Swal.fire({ icon: 'success', title: 'Campus added', timer: 1200, showConfirmButton: false }).then(() => {

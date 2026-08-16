@@ -107,19 +107,28 @@ function openPhotoModal(acc) {
 
 function closePhotoModal() { showPhotoModal.value = false }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 async function submitPhoto() {
   if (!photoFile.value && !driveLink.value.trim()) {
     photoErrors.value = { proof: "Upload a file or paste a Drive link." }
     return
   }
 
-  const fd = new FormData()
-  if (photoFile.value)      fd.append("photo", photoFile.value)
-  if (driveLink.value.trim()) fd.append("drive_link", driveLink.value.trim())
+  const payload = {}
+  if (photoFile.value)      payload.photo_base64 = await readFileAsDataUrl(photoFile.value)
+  if (driveLink.value.trim()) payload.drive_link  = driveLink.value.trim()
 
   uploading.value = true
   try {
-    await axios.post(route("my-accomplishments.upload-photo", photoAccId.value), fd, {
+    await axios.post(route("my-accomplishments.upload-photo", photoAccId.value), payload, {
       headers: { "X-CSRF-TOKEN": page.props.csrf_token ?? document.querySelector('meta[name="csrf-token"]')?.content },
     })
     closePhotoModal()

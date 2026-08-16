@@ -61,7 +61,7 @@ class SalnPdfController extends Controller
                 'margin_footer'     => 5,
                 'default_font'      => 'Arial',
                 'default_font_size' => 8,
-                'tempDir'           => storage_path('app/tmp'),
+                'tempDir'           => sys_get_temp_dir(),
             ]);
 
             $mpdf->SetTitle(sprintf('SALN %d — %s', $saln->year, $saln->user->name));

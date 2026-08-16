@@ -51,7 +51,7 @@ class ImportICTEquipments extends Command
             $fileName = 'qrcodes/equipment_' . $equipment->id . '.png';
             $qrImage = QrCode::format('png')->size(200)->generate($equipment->id);
 
-            Storage::disk('public')->put($fileName, $qrImage);
+            Storage::disk('s3')->put($fileName, $qrImage);
 
             $equipment->qr_code_path = 'storage/' . $fileName;
             $equipment->save();

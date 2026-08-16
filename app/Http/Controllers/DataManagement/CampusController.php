@@ -6,10 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Campus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CampusController extends Controller
 {
+    private const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2MB, matches prior file-upload cap
+
+    private const ALLOWED_LOGO_MIMES = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+    ];
+
     public function index()
     {
         $campus = Campus::first(); // Get the single campus
@@ -30,13 +39,11 @@ class CampusController extends Controller
             'email' => 'nullable|email|max:255',
             'website' => 'nullable|url|max:255',
             'facebook' => 'nullable|string|max:255',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Validate logo upload
+            'logo' => 'nullable|string', // base64 data URI
         ]);
 
-        // Handle logo upload
-        if ($request->hasFile('logo')) {
-            $logoPath = $request->file('logo')->store('campuses', 'public');
-            $data['logo'] = $logoPath;
+        if ($request->filled('logo')) {
+            $data['logo'] = $this->storeLogo($request->input('logo'));
         }
 
         Campus::create($data);
@@ -56,17 +63,15 @@ class CampusController extends Controller
             'email' => 'nullable|email|max:255',
             'website' => 'nullable|url|max:255',
             'facebook' => 'nullable|string|max:255',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Validate logo upload
+            'logo' => 'nullable|string', // base64 data URI
         ]);
 
-        // Handle logo upload
-        if ($request->hasFile('logo')) {
+        if ($request->filled('logo')) {
             // Delete old logo if exists
-            if ($campus->logo && Storage::disk('public')->exists($campus->logo)) {
-                Storage::disk('public')->delete($campus->logo);
+            if ($campus->logo && Storage::disk('s3')->exists($campus->logo)) {
+                Storage::disk('s3')->delete($campus->logo);
             }
-            $logoPath = $request->file('logo')->store('campuses', 'public');
-            $data['logo'] = $logoPath;
+            $data['logo'] = $this->storeLogo($request->input('logo'));
         }
 
         $campus->update($data);
@@ -78,5 +83,35 @@ class CampusController extends Controller
     {
         $campus->delete();
         return redirect()->route('campuses.index')->with('success', 'Campus deleted.');
+    }
+
+    /**
+     * Decode a base64 logo data URI, enforce the same mime/size limits the
+     * old multipart upload validated, and store it on S3.
+     */
+    private function storeLogo(string $dataUri): string
+    {
+        if (! preg_match('/^data:([^;]+);base64,(.+)$/', $dataUri, $m)) {
+            throw ValidationException::withMessages(['logo' => 'Invalid logo format.']);
+        }
+
+        $mime = strtolower(trim($m[1]));
+        if (! isset(self::ALLOWED_LOGO_MIMES[$mime])) {
+            throw ValidationException::withMessages(['logo' => 'Logo must be a JPEG, PNG, or GIF image.']);
+        }
+
+        $binary = base64_decode($m[2], true);
+        if ($binary === false) {
+            throw ValidationException::withMessages(['logo' => 'Invalid logo data.']);
+        }
+
+        if (strlen($binary) > self::MAX_LOGO_BYTES) {
+            throw ValidationException::withMessages(['logo' => 'Logo must be smaller than 2MB.']);
+        }
+
+        $path = 'campuses/' . uniqid() . '.' . self::ALLOWED_LOGO_MIMES[$mime];
+        Storage::disk('s3')->put($path, $binary);
+
+        return $path;
     }
 }

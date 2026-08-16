@@ -176,7 +176,7 @@ class ICTEquipmentController extends Controller
         $fileName = 'qrcodes/equipment_' . $equipment->id . '.svg';
 
         $qrSvg = QrCode::size(200)->generate($url);
-        Storage::disk('public')->put($fileName, $qrSvg);
+        Storage::disk('s3')->put($fileName, $qrSvg);
 
         $equipment->qr_code_path = $fileName;
         $equipment->save();
@@ -226,7 +226,7 @@ class ICTEquipmentController extends Controller
     // Delete old QR if exists
     if ($ictEquipment->qr_code_path) {
         $oldPath = ltrim(str_replace('storage/', '', $ictEquipment->qr_code_path), '/');
-        Storage::disk('public')->delete($oldPath);
+        Storage::disk('s3')->delete($oldPath);
     }
 
     // Generate new QR
@@ -234,7 +234,7 @@ class ICTEquipmentController extends Controller
     $fileName = 'qrcodes/equipment_' . $ictEquipment->id . '.svg';
 
     $qrSvg = QrCode::size(200)->generate($url);
-    Storage::disk('public')->put($fileName, $qrSvg);
+    Storage::disk('s3')->put($fileName, $qrSvg);
 
     // Save new QR path (no storage/ prefix — storageUrl() handles the base)
     $ictEquipment->update([
@@ -248,7 +248,7 @@ class ICTEquipmentController extends Controller
     {
         if ($ictEquipment->qr_code_path) {
             $path = ltrim(str_replace('storage/', '', $ictEquipment->qr_code_path), '/');
-            Storage::disk('public')->delete($path);
+            Storage::disk('s3')->delete($path);
         }
 
         $ictEquipment->delete();
@@ -289,7 +289,7 @@ class ICTEquipmentController extends Controller
 
             if ($source->qr_code_path) {
                 $path = ltrim(str_replace('storage/', '', $source->qr_code_path), '/');
-                Storage::disk('public')->delete($path);
+                Storage::disk('s3')->delete($path);
             }
 
             $source->delete();

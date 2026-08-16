@@ -34,9 +34,8 @@ const form = useForm({
         </header>
 
         <form
-            @submit.prevent="form.patch(route('profile.update'), { forceFormData: true })"
+            @submit.prevent="form.patch(route('profile.update'))"
             class="space-y-5"
-            enctype="multipart/form-data"
         >
             <div>
                 <label for="name" class="block text-xs font-medium text-slate-600 mb-1">Name</label>

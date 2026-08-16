@@ -15,7 +15,7 @@ class UploadBiometricFileRequest extends FormRequest
     {
         return [
             'files'     => 'required|array|min:1|max:20',
-            'files.*'   => 'required|file|max:20480',   // .dat files are binary; no MIME check
+            'files.*'   => 'required|string',   // base64 data URI; .dat files are binary, no MIME check
             'device_id' => 'nullable|string|max:50',
         ];
     }

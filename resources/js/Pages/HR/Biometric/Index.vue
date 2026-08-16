@@ -48,7 +48,7 @@
             <ArrowUpTrayIcon class="h-4 w-4 text-indigo-500" />
             Upload Biometric File
           </h2>
-          <form @submit.prevent="submitUpload" enctype="multipart/form-data" class="space-y-3">
+          <form @submit.prevent="submitUpload" class="space-y-3">
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Files (.dat or .txt)</label>
               <input
@@ -74,7 +74,7 @@
               type="submit"
               block
               :loading="uploadForm.processing"
-              :disabled="uploadForm.processing || !uploadForm.files.length"
+              :disabled="uploadForm.processing || !pickedFiles.length"
             >
               {{ uploadForm.processing ? 'Importing…' : 'Import Now' }}
             </AppButton>
@@ -299,15 +299,25 @@ function formatLiveTime(iso) {
 // ── Upload ─────────────────────────────────────────────────────────────────
 
 const uploadForm = useForm({ files: [], device_id: '' })
+const pickedFiles = ref([])
 
 function onFilePick (e) {
-  uploadForm.files = Array.from(e.target.files)
+  pickedFiles.value = Array.from(e.target.files)
 }
 
-function submitUpload () {
+function readFileAsDataUrl (file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+async function submitUpload () {
+  uploadForm.files = await Promise.all(pickedFiles.value.map(readFileAsDataUrl))
   uploadForm.post(route('hr.biometric.upload'), {
-    forceFormData: true,
-    onSuccess: () => { uploadForm.reset() },
+    onSuccess: () => { uploadForm.reset(); pickedFiles.value = [] },
   })
 }
 

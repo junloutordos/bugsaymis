@@ -55,7 +55,7 @@ class ITJobRequestPdfService
         $dir      = 'it_job_requests';
         $filename = $dir . '/' . $jobRequest->itjr_no . '.pdf';
 
-        Storage::disk('public')->put($filename, $pdfBytes, [
+        Storage::disk('s3')->put($filename, $pdfBytes, [
             'ContentType' => 'application/pdf',
         ]);
 

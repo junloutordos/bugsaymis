@@ -10,10 +10,21 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class RewardNominationController extends Controller
 {
+    private const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024; // 5MB, matches prior file-upload cap
+
+    private const ALLOWED_DOCUMENT_MIMES = [
+        'application/pdf'                                                          => 'pdf',
+        'application/msword'                                                       => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'  => 'docx',
+        'image/jpeg'                                                               => 'jpg',
+        'image/png'                                                                => 'png',
+    ];
+
     public function index(Request $request)
     {
         $this->authorize('rewards.view');
@@ -80,15 +91,33 @@ class RewardNominationController extends Controller
             'period'               => 'nullable|string|max:50',
             'team_name'            => 'nullable|string|max:255',
             'supporting_documents' => 'nullable|array',
-            'supporting_documents.*' => 'file|mimes:pdf,doc,docx,jpg,png|max:5120',
+            'supporting_documents.*' => 'string', // base64 data URI
         ]);
 
         DB::transaction(function () use ($data, $request) {
             $paths = [];
-            if ($request->hasFile('supporting_documents')) {
-                foreach ($request->file('supporting_documents') as $file) {
-                    $paths[] = $file->store('rewards/documents', 'public');
+            foreach ($data['supporting_documents'] ?? [] as $dataUri) {
+                if (! preg_match('/^data:([^;]+);base64,(.+)$/', $dataUri, $m)) {
+                    throw ValidationException::withMessages(['supporting_documents' => 'Invalid file format.']);
                 }
+
+                $mime = strtolower(trim($m[1]));
+                if (! isset(self::ALLOWED_DOCUMENT_MIMES[$mime])) {
+                    throw ValidationException::withMessages(['supporting_documents' => 'Files must be PDF, Word, JPG, or PNG.']);
+                }
+
+                $binary = base64_decode($m[2], true);
+                if ($binary === false) {
+                    throw ValidationException::withMessages(['supporting_documents' => 'Invalid file data.']);
+                }
+
+                if (strlen($binary) > self::MAX_DOCUMENT_BYTES) {
+                    throw ValidationException::withMessages(['supporting_documents' => 'Each file must be smaller than 5MB.']);
+                }
+
+                $path = 'rewards/documents/' . uniqid() . '.' . self::ALLOWED_DOCUMENT_MIMES[$mime];
+                Storage::disk('s3')->put($path, $binary);
+                $paths[] = $path;
             }
 
             $nomination = RewardNomination::create([

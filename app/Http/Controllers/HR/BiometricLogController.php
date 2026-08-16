@@ -47,13 +47,23 @@ class BiometricLogController extends Controller
         ]);
     }
 
+    private const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB, matches prior per-file cap
+
     public function upload(UploadBiometricFileRequest $request, BiometricImportService $importService, DTRService $dtrService)
     {
         $totals  = ['inserted' => 0, 'resolved' => 0, 'unresolved' => 0, 'duplicates' => 0, 'skipped' => 0];
         $batches = [];
 
-        foreach ($request->file('files') as $file) {
-            $path  = $file->store('hr/biometric_imports', 'local');
+        foreach ($request->input('files') as $dataUri) {
+            $encoded = str_contains($dataUri, ',') ? explode(',', $dataUri, 2)[1] : $dataUri;
+            $binary  = base64_decode($encoded, true);
+
+            abort_if($binary === false, 422, 'One of the uploaded files was invalid.');
+            abort_if(strlen($binary) > self::MAX_FILE_BYTES, 422, 'Each file must be 20MB or smaller.');
+
+            $path = 'hr/biometric_imports/' . (string) Str::uuid() . '.dat';
+            Storage::disk('local')->put($path, $binary);
+
             $batch = (string) Str::uuid();
 
             $result = $importService->parse(Storage::disk('local')->path($path), $batch, $request->device_id);
