@@ -2854,4 +2854,13 @@ Route::middleware(['auth', 'permission:spms.admin.manage'])->prefix('spms/admin'
     Route::post('/fiscal-periods', [\App\Http\Controllers\SPMS\AdminConfigController::class, 'storeFiscalPeriod'])->name('fiscal-periods.store');
 });
 
+Route::middleware(['auth', 'permission:spms.dpcr.manage'])->prefix('spms/dpcr')->name('spms.dpcr.')->where(['dpcr' => '[0-9]+'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'index'])->name('index');
+    Route::get('/{dpcr}', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'show'])->name('show');
+    Route::post('/{dpcr}/generate-targets', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'generateTargets'])->name('generate-targets');
+    Route::post('/{dpcr}/update-targets', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'updateTargets'])->name('update-targets');
+    Route::post('/{dpcr}/submit-to-reviewer', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'submitToReviewer'])->name('submit-to-reviewer');
+    Route::post('/{dpcr}/set-override', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'setOverride'])->name('set-override');
+});
+
 require __DIR__.'/auth.php';
