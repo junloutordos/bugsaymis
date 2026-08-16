@@ -2823,4 +2823,10 @@ Route::middleware('auth')->prefix('error-reports')->name('error-reports.')->grou
     });
 });
 
+// ── SPMS (Performance Management v2) ────────────────────────────────────────
+Route::middleware(['auth', 'permission:spms.ipcr.manage|spms.ipcr.review'])->group(function () {
+    Route::get('/spms/ipcr/mov/{fileId}', [\App\Http\Controllers\SPMS\MovChecklistController::class, 'show'])
+        ->name('spms.ipcr.mov.show');
+});
+
 require __DIR__.'/auth.php';
