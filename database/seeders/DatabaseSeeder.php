@@ -91,5 +91,8 @@ class DatabaseSeeder extends Seeder
 
         // ── Substitution Module ─────────────────────────────────────────────────
         $this->call(SubstitutionPermissionSeeder::class);
+
+        // ── SPMS Module (Performance Management v2) ─────────────────────────────
+        $this->call(SPMSPermissionSeeder::class);
     }
 }
