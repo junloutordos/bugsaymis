@@ -20,6 +20,10 @@
         {{ $page.props.flash.success }}
       </div>
 
+      <div v-if="$page.props.flash?.warning" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        {{ $page.props.flash.warning }}
+      </div>
+
       <AppFilterBar>
         <select v-model="selectedTermId" @change="changeTerm"
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
