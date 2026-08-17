@@ -83,6 +83,7 @@ use App\Http\Controllers\AgencyOutcomeController;
 use App\Http\Controllers\PerformanceIndicatorController;
 use App\Http\Controllers\DostPillarController;
 use App\Http\Controllers\DostStrategyController;
+use App\Http\Controllers\DostSubStrategyController;
 use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
@@ -1194,6 +1195,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('dost-strategies', [DostStrategyController::class, 'store'])->name('dost-strategies.store');
         Route::put('dost-strategies/{dostStrategy}', [DostStrategyController::class, 'update'])->name('dost-strategies.update');
         Route::delete('dost-strategies/{dostStrategy}', [DostStrategyController::class, 'destroy'])->name('dost-strategies.destroy');
+
+        Route::post('dost-sub-strategies', [DostSubStrategyController::class, 'store'])->name('dost-sub-strategies.store');
+        Route::put('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'update'])->name('dost-sub-strategies.update');
+        Route::delete('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'destroy'])->name('dost-sub-strategies.destroy');
     });
 
 // Performance Management — Committees & Special Assignments (open to any authenticated user; controller handles auth)
