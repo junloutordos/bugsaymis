@@ -7,6 +7,7 @@ use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\WeightProfile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,9 +52,15 @@ class AdminConfigController extends Controller
             'end_date' => ['required', 'date', 'after:start_date'],
             'parent_period_id' => ['nullable', 'exists:spms_fiscal_periods,id'],
             'school_year_id' => ['nullable', 'exists:school_years,id'],
+            'is_current' => ['sometimes', 'boolean'],
         ]);
 
-        FiscalPeriod::create($validated);
+        DB::transaction(function () use ($validated) {
+            if (!empty($validated['is_current'])) {
+                FiscalPeriod::where('cadence', $validated['cadence'])->update(['is_current' => false]);
+            }
+            FiscalPeriod::create($validated);
+        });
 
         return back()->with('success', 'Fiscal period saved.');
     }
