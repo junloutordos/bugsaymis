@@ -81,6 +81,10 @@ use App\Models\User;
 use App\Http\Controllers\PMSController;
 use App\Http\Controllers\AgencyOutcomeController;
 use App\Http\Controllers\PerformanceIndicatorController;
+use App\Http\Controllers\DostPillarController;
+use App\Http\Controllers\DostStrategyController;
+use App\Http\Controllers\DostSubStrategyController;
+use App\Http\Controllers\DostStrategicPlanController;
 use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
@@ -1184,6 +1188,20 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('agency-outcomes', [AgencyOutcomeController::class, 'store'])->name('outcome.store');
         Route::put('agency-outcomes/{id}', [AgencyOutcomeController::class, 'update'])->name('outcome.update');
         Route::delete('agency-outcomes/{id}', [AgencyOutcomeController::class, 'destroy'])->name('outcome.destroy');
+
+        Route::get('/dost-strategic-plan', [DostStrategicPlanController::class, 'index'])->name('dost-strategic-plan.index');
+
+        Route::post('dost-pillars', [DostPillarController::class, 'store'])->name('dost-pillars.store');
+        Route::put('dost-pillars/{dostPillar}', [DostPillarController::class, 'update'])->name('dost-pillars.update');
+        Route::delete('dost-pillars/{dostPillar}', [DostPillarController::class, 'destroy'])->name('dost-pillars.destroy');
+
+        Route::post('dost-strategies', [DostStrategyController::class, 'store'])->name('dost-strategies.store');
+        Route::put('dost-strategies/{dostStrategy}', [DostStrategyController::class, 'update'])->name('dost-strategies.update');
+        Route::delete('dost-strategies/{dostStrategy}', [DostStrategyController::class, 'destroy'])->name('dost-strategies.destroy');
+
+        Route::post('dost-sub-strategies', [DostSubStrategyController::class, 'store'])->name('dost-sub-strategies.store');
+        Route::put('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'update'])->name('dost-sub-strategies.update');
+        Route::delete('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'destroy'])->name('dost-sub-strategies.destroy');
     });
 
 // Performance Management — Committees & Special Assignments (open to any authenticated user; controller handles auth)

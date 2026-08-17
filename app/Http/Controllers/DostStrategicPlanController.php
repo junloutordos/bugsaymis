@@ -1,0 +1,20 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\AgencyOutcome;
+use App\Models\DostPillar;
+use Inertia\Inertia;
+
+class DostStrategicPlanController extends Controller
+{
+    public function index()
+    {
+        return Inertia::render('PerformanceManagement/DostStrategicPlan', [
+            'pillars' => DostPillar::with(['strategies.subStrategies', 'strategies.agencyOutcome'])
+                ->orderBy('name')
+                ->get(),
+            'agencyOutcomes' => AgencyOutcome::orderBy('outcome')->get(['id', 'outcome']),
+        ]);
+    }
+}
