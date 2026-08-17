@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\SPMS;
 
+use App\Models\Division;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SPMS\Dpcr;
 use App\Models\SPMS\DpcrTarget;
+use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\PerformanceIndicator;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,5 +86,47 @@ class DivisionChiefDpcrControllerTest extends TestCase
         $this->actingAs($ratee)->post("/spms/dpcr/{$dpcr->id}/submit-to-reviewer")->assertRedirect();
 
         $this->assertSame(Dpcr::STATUS_SUBMITTED_TO_REVIEWER, $dpcr->fresh()->status);
+    }
+
+    public function test_store_creates_dpcr_for_own_division_and_current_semester_period(): void
+    {
+        $ratee = $this->ratee();
+        $division = Division::factory()->create();
+        $ratee->update(['division_id' => $division->id]);
+        FiscalPeriod::factory()->create(['cadence' => 'semester', 'is_current' => true]);
+
+        $this->actingAs($ratee)->post('/spms/dpcr')->assertRedirect();
+
+        $this->assertDatabaseHas('spms_dpcrs', ['division_id' => $division->id, 'ratee_user_id' => $ratee->id]);
+    }
+
+    public function test_store_redirects_to_existing_dpcr_instead_of_duplicating(): void
+    {
+        $ratee = $this->ratee();
+        $division = Division::factory()->create();
+        $ratee->update(['division_id' => $division->id]);
+        $period = FiscalPeriod::factory()->create(['cadence' => 'semester', 'is_current' => true]);
+        $existing = Dpcr::factory()->create(['division_id' => $division->id, 'fiscal_period_id' => $period->id]);
+
+        $this->actingAs($ratee)->post('/spms/dpcr')->assertRedirect(route('spms.dpcr.show', $existing->id));
+
+        $this->assertSame(1, Dpcr::where('division_id', $division->id)->count());
+    }
+
+    public function test_store_errors_when_actor_has_no_division(): void
+    {
+        $ratee = $this->ratee();
+        FiscalPeriod::factory()->create(['cadence' => 'semester', 'is_current' => true]);
+
+        $this->actingAs($ratee)->post('/spms/dpcr')->assertSessionHasErrors('division');
+    }
+
+    public function test_store_errors_when_no_current_semester_period_exists(): void
+    {
+        $ratee = $this->ratee();
+        $division = Division::factory()->create();
+        $ratee->update(['division_id' => $division->id]);
+
+        $this->actingAs($ratee)->post('/spms/dpcr')->assertSessionHasErrors('fiscal_period');
     }
 }

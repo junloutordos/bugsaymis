@@ -2857,6 +2857,7 @@ Route::middleware(['auth', 'permission:spms.admin.manage'])->prefix('spms/admin'
 
 Route::middleware(['auth', 'permission:spms.dpcr.manage'])->prefix('spms/dpcr')->name('spms.dpcr.')->where(['dpcr' => '[0-9]+'])->group(function () {
     Route::get('/', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'store'])->name('store');
     Route::get('/{dpcr}', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'show'])->name('show');
     Route::post('/{dpcr}/generate-targets', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'generateTargets'])->name('generate-targets');
     Route::post('/{dpcr}/update-targets', [\App\Http\Controllers\SPMS\DivisionChiefDpcrController::class, 'updateTargets'])->name('update-targets');

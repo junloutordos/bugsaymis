@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SPMS;
 use App\Http\Controllers\Controller;
 use App\Models\SPMS\Dpcr;
 use App\Models\SPMS\DpcrTarget;
+use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\PerformanceIndicator;
 use App\Services\SPMS\DPCRWorkflowService;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,32 @@ class DivisionChiefDpcrController extends Controller
             ->get();
 
         return Inertia::render('SPMS/DivisionChiefDpcrIndex', ['dpcrs' => $dpcrs]);
+    }
+
+    public function store(): RedirectResponse
+    {
+        $divisionId = Auth::user()->division_id;
+        if (!$divisionId) {
+            return back()->withErrors(['division' => 'Your account has no division assigned. Contact HR.']);
+        }
+
+        $period = FiscalPeriod::current()->ofCadence('semester')->first();
+        if (!$period) {
+            return back()->withErrors(['fiscal_period' => 'No current semester fiscal period is configured. Ask an SPMS Admin to set one up.']);
+        }
+
+        $existing = Dpcr::where('division_id', $divisionId)->where('fiscal_period_id', $period->id)->first();
+        if ($existing) {
+            return redirect()->route('spms.dpcr.show', $existing->id);
+        }
+
+        $dpcr = Dpcr::create([
+            'division_id' => $divisionId,
+            'fiscal_period_id' => $period->id,
+            'ratee_user_id' => Auth::id(),
+        ]);
+
+        return redirect()->route('spms.dpcr.show', $dpcr->id)->with('success', 'DPCR created.');
     }
 
     public function show(Dpcr $dpcr): Response
