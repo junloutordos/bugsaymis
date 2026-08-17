@@ -19,7 +19,6 @@ class RolesSeeder extends Seeder
             ['name' => 'MIS',                'description' => 'Manages IT infrastructure, equipment, and job requests.'],
             ['name' => 'HR',                 'description' => 'Human Resource personnel. Manages attendance, PDS, and employees.'],
             ['name' => 'OCD',                'description' => 'Office/Unit Chief Director. Monitors unit-level operations.'],
-            ['name' => 'Executive Director', 'description' => 'PSHS System Executive Director. Approves OPCR (campus-wide performance commitment) as the final signer.'],
             ['name' => 'DivisionChief',      'description' => 'Division Chief. Approves requests and monitors division performance.'],
 
             // ── Academic ──────────────────────────────────────────────────────
