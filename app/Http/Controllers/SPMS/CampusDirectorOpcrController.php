@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SPMS;
 
 use App\Http\Controllers\Controller;
+use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\Opcr;
 use App\Models\SPMS\OpcrTarget;
 use App\Models\SPMS\PerformanceIndicator;
@@ -25,6 +26,23 @@ class CampusDirectorOpcrController extends Controller
             ->get();
 
         return Inertia::render('SPMS/CampusDirectorOpcrIndex', ['opcrs' => $opcrs]);
+    }
+
+    public function store(): RedirectResponse
+    {
+        $period = FiscalPeriod::current()->ofCadence('annual')->first();
+        if (!$period) {
+            return back()->withErrors(['fiscal_period' => 'No current annual fiscal period is configured. Ask an SPMS Admin to set one up.']);
+        }
+
+        $existing = Opcr::where('fiscal_period_id', $period->id)->first();
+        if ($existing) {
+            return redirect()->route('spms.opcr.show', $existing->id);
+        }
+
+        $opcr = Opcr::create(['fiscal_period_id' => $period->id, 'ratee_user_id' => Auth::id()]);
+
+        return redirect()->route('spms.opcr.show', $opcr->id)->with('success', 'OPCR created.');
     }
 
     public function show(Opcr $opcr): Response

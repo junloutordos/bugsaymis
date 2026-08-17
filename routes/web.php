@@ -2877,6 +2877,7 @@ Route::middleware(['auth', 'permission:spms.dpcr.review|spms.dpcr.approve'])->pr
 
 Route::middleware(['auth', 'permission:spms.opcr.manage'])->prefix('spms/opcr')->name('spms.opcr.')->where(['opcr' => '[0-9]+'])->group(function () {
     Route::get('/', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'store'])->name('store');
     Route::get('/{opcr}', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'show'])->name('show');
     Route::post('/{opcr}/generate-targets', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'generateTargets'])->name('generate-targets');
     Route::post('/{opcr}/update-targets', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'updateTargets'])->name('update-targets');

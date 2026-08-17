@@ -4,6 +4,7 @@ namespace Tests\Feature\SPMS;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\Opcr;
 use App\Models\SPMS\OpcrTarget;
 use App\Models\SPMS\PerformanceIndicator;
@@ -84,5 +85,33 @@ class CampusDirectorOpcrControllerTest extends TestCase
         $this->actingAs($ratee)->post("/spms/opcr/{$opcr->id}/submit-to-ed")->assertRedirect();
 
         $this->assertSame(Opcr::STATUS_SUBMITTED_TO_ED, $opcr->fresh()->status);
+    }
+
+    public function test_store_creates_opcr_for_current_annual_period(): void
+    {
+        $ratee = $this->ratee();
+        FiscalPeriod::factory()->create(['cadence' => 'annual', 'is_current' => true]);
+
+        $this->actingAs($ratee)->post('/spms/opcr')->assertRedirect();
+
+        $this->assertDatabaseHas('spms_opcrs', ['ratee_user_id' => $ratee->id]);
+    }
+
+    public function test_store_redirects_to_existing_opcr_instead_of_duplicating(): void
+    {
+        $ratee = $this->ratee();
+        $period = FiscalPeriod::factory()->create(['cadence' => 'annual', 'is_current' => true]);
+        $existing = Opcr::factory()->create(['fiscal_period_id' => $period->id]);
+
+        $this->actingAs($ratee)->post('/spms/opcr')->assertRedirect(route('spms.opcr.show', $existing->id));
+
+        $this->assertSame(1, Opcr::where('fiscal_period_id', $period->id)->count());
+    }
+
+    public function test_store_errors_when_no_current_annual_period_exists(): void
+    {
+        $ratee = $this->ratee();
+
+        $this->actingAs($ratee)->post('/spms/opcr')->assertSessionHasErrors('fiscal_period');
     }
 }
