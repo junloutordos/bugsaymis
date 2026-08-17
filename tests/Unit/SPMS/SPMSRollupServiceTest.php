@@ -7,6 +7,7 @@ use App\Models\SPMS\Dpcr;
 use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\Ipcr;
 use App\Models\SPMS\IpcrTarget;
+use App\Models\SPMS\Opcr;
 use App\Models\User;
 use App\Services\SPMS\SPMSRollupService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -121,5 +122,80 @@ class SPMSRollupServiceTest extends TestCase
         IpcrTarget::factory()->create(['ipcr_id' => $unratedIpcr->id, 'function_type' => 'core', 'rating_avg' => 5.0]);
 
         $this->assertNull((new SPMSRollupService())->rollupIpcrsToDpcr($dpcr->fresh()));
+    }
+
+    public function test_rollup_dpcrs_to_opcr_returns_null_when_no_approved_dpcrs(): void
+    {
+        $opcr = Opcr::factory()->create();
+
+        $this->assertNull((new SPMSRollupService())->rollupDpcrsToOpcr($opcr));
+    }
+
+    public function test_rollup_dpcrs_to_opcr_weights_by_division_headcount(): void
+    {
+        $annualPeriod = FiscalPeriod::factory()->create(['cadence' => 'annual']);
+        $semester = FiscalPeriod::factory()->create(['cadence' => 'semester', 'parent_period_id' => $annualPeriod->id]);
+        $opcr = Opcr::factory()->create(['fiscal_period_id' => $annualPeriod->id]);
+
+        $bigDivision = Division::factory()->create();
+        User::factory()->count(3)->create(['division_id' => $bigDivision->id]);
+        Dpcr::factory()->create([
+            'division_id' => $bigDivision->id, 'fiscal_period_id' => $semester->id,
+            'status' => Dpcr::STATUS_APPROVED, 'final_rating' => 5.0,
+        ]);
+
+        $smallDivision = Division::factory()->create();
+        User::factory()->count(1)->create(['division_id' => $smallDivision->id]);
+        Dpcr::factory()->create([
+            'division_id' => $smallDivision->id, 'fiscal_period_id' => $semester->id,
+            'status' => Dpcr::STATUS_APPROVED, 'final_rating' => 1.0,
+        ]);
+
+        // (5*3 + 1*1) / (3+1) = 16/4 = 4.0
+        $this->assertEqualsWithDelta(4.0, (new SPMSRollupService())->rollupDpcrsToOpcr($opcr->fresh()), 0.001);
+    }
+
+    public function test_rollup_dpcrs_to_opcr_averages_multiple_approved_dpcrs_per_division_first(): void
+    {
+        $annualPeriod = FiscalPeriod::factory()->create(['cadence' => 'annual']);
+        $semester1 = FiscalPeriod::factory()->create(['cadence' => 'semester', 'parent_period_id' => $annualPeriod->id]);
+        $semester2 = FiscalPeriod::factory()->create(['cadence' => 'semester', 'parent_period_id' => $annualPeriod->id]);
+        $opcr = Opcr::factory()->create(['fiscal_period_id' => $annualPeriod->id]);
+
+        $division = Division::factory()->create();
+        User::factory()->count(2)->create(['division_id' => $division->id]);
+        Dpcr::factory()->create([
+            'division_id' => $division->id, 'fiscal_period_id' => $semester1->id,
+            'status' => Dpcr::STATUS_APPROVED, 'final_rating' => 4.0,
+        ]);
+        Dpcr::factory()->create([
+            'division_id' => $division->id, 'fiscal_period_id' => $semester2->id,
+            'status' => Dpcr::STATUS_APPROVED, 'final_rating' => 2.0,
+        ]);
+
+        // Only division: avg(4.0, 2.0) = 3.0
+        $this->assertEqualsWithDelta(3.0, (new SPMSRollupService())->rollupDpcrsToOpcr($opcr->fresh()), 0.001);
+    }
+
+    public function test_rollup_dpcrs_to_opcr_ignores_unapproved_or_out_of_period_dpcrs(): void
+    {
+        $annualPeriod = FiscalPeriod::factory()->create(['cadence' => 'annual']);
+        $semester = FiscalPeriod::factory()->create(['cadence' => 'semester', 'parent_period_id' => $annualPeriod->id]);
+        $otherSemester = FiscalPeriod::factory()->create(['cadence' => 'semester']); // no parent link
+        $opcr = Opcr::factory()->create(['fiscal_period_id' => $annualPeriod->id]);
+
+        $division = Division::factory()->create();
+        User::factory()->create(['division_id' => $division->id]);
+
+        Dpcr::factory()->create([
+            'division_id' => $division->id, 'fiscal_period_id' => $semester->id,
+            'status' => Dpcr::STATUS_SUBMITTED_TO_APPROVER, 'final_rating' => null,
+        ]);
+        Dpcr::factory()->create([
+            'division_id' => $division->id, 'fiscal_period_id' => $otherSemester->id,
+            'status' => Dpcr::STATUS_APPROVED, 'final_rating' => 5.0,
+        ]);
+
+        $this->assertNull((new SPMSRollupService())->rollupDpcrsToOpcr($opcr->fresh()));
     }
 }

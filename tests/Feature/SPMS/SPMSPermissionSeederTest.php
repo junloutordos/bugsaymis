@@ -17,6 +17,7 @@ class SPMSPermissionSeederTest extends TestCase
         $faculty = Role::create(['name' => 'Faculty']);
         $dc = Role::create(['name' => 'DivisionChief']);
         $ocd = Role::create(['name' => 'OCD']);
+        $ed = Role::create(['name' => 'Executive Director']);
 
         (new SPMSPermissionSeeder())->run();
 
@@ -26,6 +27,8 @@ class SPMSPermissionSeederTest extends TestCase
         $this->assertDatabaseHas('permissions', ['name' => 'spms.dpcr.manage']);
         $this->assertDatabaseHas('permissions', ['name' => 'spms.dpcr.review']);
         $this->assertDatabaseHas('permissions', ['name' => 'spms.dpcr.approve']);
+        $this->assertDatabaseHas('permissions', ['name' => 'spms.opcr.manage']);
+        $this->assertDatabaseHas('permissions', ['name' => 'spms.opcr.approve']);
 
         $manage = Permission::where('name', 'spms.ipcr.manage')->first();
         $this->assertTrue($faculty->fresh()->permissions->contains($manage));
@@ -40,6 +43,12 @@ class SPMSPermissionSeederTest extends TestCase
         $dpcrApprove = Permission::where('name', 'spms.dpcr.approve')->first();
         $this->assertTrue($ocd->fresh()->permissions->contains($dpcrReview));
         $this->assertTrue($ocd->fresh()->permissions->contains($dpcrApprove));
+
+        $opcrManage = Permission::where('name', 'spms.opcr.manage')->first();
+        $this->assertTrue($ocd->fresh()->permissions->contains($opcrManage));
+
+        $opcrApprove = Permission::where('name', 'spms.opcr.approve')->first();
+        $this->assertTrue($ed->fresh()->permissions->contains($opcrApprove));
     }
 
     public function test_is_idempotent(): void
@@ -51,5 +60,6 @@ class SPMSPermissionSeederTest extends TestCase
 
         $this->assertSame(1, Permission::where('name', 'spms.ipcr.manage')->count());
         $this->assertSame(1, Permission::where('name', 'spms.dpcr.manage')->count());
+        $this->assertSame(1, Permission::where('name', 'spms.opcr.manage')->count());
     }
 }

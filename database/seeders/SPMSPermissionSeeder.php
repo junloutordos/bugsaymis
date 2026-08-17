@@ -33,6 +33,14 @@ class SPMSPermissionSeeder extends Seeder
             'description' => 'Approve SPMS DPCRs as Head of Office (Campus Director)',
             'roles' => ['Administrator', 'OCD'],
         ],
+        'spms.opcr.manage' => [
+            'description' => 'Create and manage the campus-wide SPMS OPCR (quarterly accomplishments, submit to Executive Director)',
+            'roles' => ['Administrator', 'OCD'],
+        ],
+        'spms.opcr.approve' => [
+            'description' => 'Approve the campus-wide SPMS OPCR as Executive Director',
+            'roles' => ['Administrator', 'Executive Director'],
+        ],
     ];
 
     public function run(): void
