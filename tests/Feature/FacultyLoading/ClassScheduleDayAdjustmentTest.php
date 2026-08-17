@@ -273,4 +273,135 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertContains('Foundation Day Program', array_column($section['bands'], 'label'));
         $this->assertSame('07:30:00', $this->tuesdayClass->fresh()->start_time);
     }
+
+    public function test_cross_grade_room_overlap_after_compression_is_a_warning_not_a_blocking_error(): void
+    {
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $grade7Section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $grade7Subject = Subject::where('code', 'MATH7')->firstOrFail();
+
+        $grade8Section = Section::create([
+            'levelid' => 8,
+            'sectionname' => 'Beryl',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+        $grade8Subject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'MATH8',
+            'name' => 'Mathematics 2',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'lecture',
+            'grade_level' => 8,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+
+        // Grade 7 Period 1 (10:00-10:50) and Grade 8 Period 3 (10:50-11:40)
+        // share Room 101 back-to-back on Monday — zero real gap, not a real
+        // conflict. Different grade-day structures make G8 bank more
+        // compression savings than G7 by 10:50, which currently inverts
+        // their order after 30-minute compression.
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $grade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade8Subject->id,
+            'section_id' => $grade8Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:50',
+            'end_time' => '11:40',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-10',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ]);
+
+        $response->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 1);
+        $response->assertSessionHas('warning');
+        $this->assertStringContainsString('Grade 7', session('warning'));
+        $this->assertStringContainsString('Grade 8', session('warning'));
+    }
+
+    public function test_same_grade_room_double_booking_still_blocks_save(): void
+    {
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $grade7Section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $grade7Subject = Subject::where('code', 'MATH7')->firstOrFail();
+
+        $otherGrade7Section = Section::create([
+            'levelid' => 7,
+            'sectionname' => 'Citrine',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+
+        // Two different Grade 7 sections genuinely double-booked into Room 101
+        // at overlapping original times (10:00-10:50 vs 10:20-11:10) — a real
+        // conflict the base scheduler should never have allowed, unrelated to
+        // compression. Same grade => identical compression shift for both =>
+        // still overlapping after compression => must still block.
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $grade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $otherGrade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:20',
+            'end_time' => '11:10',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-10',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ])->assertSessionHasErrors('activity_start_time');
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 0);
+    }
 }

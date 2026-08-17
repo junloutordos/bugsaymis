@@ -93,6 +93,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'error' => fn () => $request->session()->get('error'),
                 'success' => fn () => $request->session()->get('success'),
+                'warning' => fn () => $request->session()->get('warning'),
             ],
             // One-shot flag set at login when the user has no digital signature
             // and/or signing PIN — pulled (consumed) on the first Inertia page

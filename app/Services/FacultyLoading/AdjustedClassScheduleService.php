@@ -139,6 +139,8 @@ class AdjustedClassScheduleService
             ];
         }
 
+        $conflictWarnings = [];
+
         if ($activityStart) {
             $lateEntry = collect($grades)
                 ->flatMap(fn (array $grade) => $grade['sections'])
@@ -152,7 +154,7 @@ class AdjustedClassScheduleService
                 ]);
             }
 
-            $this->assertNoGeneratedConflicts($grades);
+            $conflictWarnings = $this->assertNoGeneratedConflicts($grades);
         }
 
         return [
@@ -174,6 +176,7 @@ class AdjustedClassScheduleService
             ] : null,
             'calendar_start' => '07:30',
             'calendar_end' => '17:00',
+            'conflict_warnings' => $conflictWarnings,
             'grades' => $grades,
         ];
     }
@@ -210,13 +213,28 @@ class AdjustedClassScheduleService
         return SchedulingConstants::fromMinutes($minutes + $shift);
     }
 
-    /** Ensure campus-wide compression does not create new faculty or room overlaps. */
-    private function assertNoGeneratedConflicts(array $grades): void
+    /**
+     * Same-grade room/faculty overlaps after compression are genuine
+     * conflicts (both sides shrink by the identical per-grade shift, so
+     * compression cannot have manufactured them) and still block the save.
+     *
+     * Cross-grade overlaps cannot be trusted the same way: different grade
+     * groups bank different amounts of compression savings by the same
+     * wall-clock moment (their break/homeroom placement genuinely differs),
+     * so two originally back-to-back, non-conflicting bookings can appear to
+     * invert order after independent compression. Those are downgraded to a
+     * warning instead of a blocking error.
+     *
+     * @return array<int,string> warning messages for cross-grade overlaps
+     */
+    private function assertNoGeneratedConflicts(array $grades): array
     {
         $entries = collect($grades)
             ->flatMap(fn (array $grade) => $grade['sections'])
             ->flatMap(fn (array $section) => $section['entries'])
             ->values();
+
+        $warnings = [];
 
         foreach (['faculty' => 'faculty', 'classroom' => 'room'] as $relation => $label) {
             $groups = $entries->filter(fn (array $entry) => isset($entry[$relation]['id']))
@@ -224,15 +242,35 @@ class AdjustedClassScheduleService
 
             foreach ($groups as $rows) {
                 $sorted = $rows->sortBy('start_time')->values();
+
                 for ($index = 1; $index < $sorted->count(); $index++) {
-                    if ($sorted[$index]['start_time'] < $sorted[$index - 1]['end_time']) {
+                    $previous = $sorted[$index - 1];
+                    $current = $sorted[$index];
+
+                    if ($current['start_time'] >= $previous['end_time']) {
+                        continue;
+                    }
+
+                    if ($current['grade_level'] === $previous['grade_level']) {
                         throw ValidationException::withMessages([
                             'activity_start_time' => "The compressed timetable creates a {$label} conflict. Review the preview or choose another activity time.",
                         ]);
                     }
+
+                    $name = $current[$relation]['name'] ?? $current[$relation]['code'] ?? "#{$current[$relation]['id']}";
+                    $warnings[] = sprintf(
+                        'Possible %s overlap for %s between Grade %s and Grade %s around %s. Review the preview before publishing.',
+                        $label,
+                        $name,
+                        $previous['grade_level'],
+                        $current['grade_level'],
+                        $current['start_time'],
+                    );
                 }
             }
         }
+
+        return array_values(array_unique($warnings));
     }
 
     /** @return array{start:string,end:string}|null */

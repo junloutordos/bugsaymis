@@ -107,8 +107,9 @@ class ClassScheduleDayAdjustmentController extends Controller
         $this->authorize('faculty_loading.manage');
 
         $data = $this->validatedData($request);
+        $warnings = [];
 
-        DB::transaction(function () use ($data) {
+        DB::transaction(function () use ($data, &$warnings) {
             $adjustment = ClassScheduleDayAdjustment::create([
                 ...$data,
                 'ceremony_start_time' => '07:30',
@@ -120,10 +121,13 @@ class ClassScheduleDayAdjustmentController extends Controller
             ]);
 
             // Validate fit and generated campus conflicts before keeping the draft.
-            $this->adjustedSchedules->generate($adjustment);
+            $warnings = $this->adjustedSchedules->generate($adjustment)['conflict_warnings'] ?? [];
         });
 
-        return back()->with('success', 'Adjusted-day schedule saved as a draft.');
+        return back()->with([
+            'success' => 'Adjusted-day schedule saved as a draft.',
+            'warning' => $warnings ? implode(' ', $warnings) : null,
+        ]);
     }
 
     public function update(Request $request, ClassScheduleDayAdjustment $adjustment): RedirectResponse
@@ -132,17 +136,21 @@ class ClassScheduleDayAdjustmentController extends Controller
         abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be edited.');
 
         $data = $this->validatedData($request, $adjustment);
+        $warnings = [];
 
-        DB::transaction(function () use ($adjustment, $data) {
+        DB::transaction(function () use ($adjustment, $data, &$warnings) {
             $adjustment->update([
                 ...$data,
                 'shift_minutes' => $this->hasFlag($data['adjustment_type']) ? 30 : 0,
                 'class_duration_minutes' => $this->hasShortenedClasses($data['adjustment_type']) ? 30 : null,
             ]);
-            $this->adjustedSchedules->generate($adjustment->fresh());
+            $warnings = $this->adjustedSchedules->generate($adjustment->fresh())['conflict_warnings'] ?? [];
         });
 
-        return back()->with('success', 'Adjusted-day draft updated.');
+        return back()->with([
+            'success' => 'Adjusted-day draft updated.',
+            'warning' => $warnings ? implode(' ', $warnings) : null,
+        ]);
     }
 
     public function publish(ClassScheduleDayAdjustment $adjustment): RedirectResponse
