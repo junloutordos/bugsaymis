@@ -81,6 +81,7 @@ use App\Models\User;
 use App\Http\Controllers\PMSController;
 use App\Http\Controllers\AgencyOutcomeController;
 use App\Http\Controllers\PerformanceIndicatorController;
+use App\Http\Controllers\DostPillarController;
 use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
@@ -1184,6 +1185,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('agency-outcomes', [AgencyOutcomeController::class, 'store'])->name('outcome.store');
         Route::put('agency-outcomes/{id}', [AgencyOutcomeController::class, 'update'])->name('outcome.update');
         Route::delete('agency-outcomes/{id}', [AgencyOutcomeController::class, 'destroy'])->name('outcome.destroy');
+
+        Route::post('dost-pillars', [DostPillarController::class, 'store'])->name('dost-pillars.store');
+        Route::put('dost-pillars/{dostPillar}', [DostPillarController::class, 'update'])->name('dost-pillars.update');
+        Route::delete('dost-pillars/{dostPillar}', [DostPillarController::class, 'destroy'])->name('dost-pillars.destroy');
     });
 
 // Performance Management — Committees & Special Assignments (open to any authenticated user; controller handles auth)
