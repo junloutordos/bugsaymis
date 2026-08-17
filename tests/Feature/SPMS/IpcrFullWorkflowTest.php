@@ -90,4 +90,27 @@ class IpcrFullWorkflowTest extends TestCase
         // Terminal: no further employee action is accepted
         $this->actingAs($employee)->post("/spms/ipcr/{$ipcr->id}/submit-target")->assertStatus(500);
     }
+
+    public function test_self_service_store_then_full_lifecycle(): void
+    {
+        $facultyRole = Role::create(['name' => 'Faculty']);
+        $reviewerRole = Role::create(['name' => 'DivisionChief']);
+        $managePermission = Permission::create(['name' => 'spms.ipcr.manage', 'module' => 'SPMS']);
+        $reviewPermission = Permission::create(['name' => 'spms.ipcr.review', 'module' => 'SPMS']);
+        $facultyRole->permissions()->attach($managePermission->id);
+        $reviewerRole->permissions()->attach($reviewPermission->id);
+
+        $employee = User::factory()->create();
+        $employee->roles()->attach($facultyRole->id);
+
+        FiscalPeriod::factory()->create(['cadence' => 'semester', 'is_current' => true]);
+
+        $this->actingAs($employee)->post('/spms/ipcr')->assertRedirect();
+        $ipcr = Ipcr::where('user_id', $employee->id)->firstOrFail();
+        $this->assertSame(Ipcr::STATUS_DRAFT_TARGET, $ipcr->status);
+
+        // Re-clicking Create opens the same record, no duplicate
+        $this->actingAs($employee)->post('/spms/ipcr')->assertRedirect(route('spms.ipcr.show', $ipcr->id));
+        $this->assertSame(1, Ipcr::where('user_id', $employee->id)->count());
+    }
 }

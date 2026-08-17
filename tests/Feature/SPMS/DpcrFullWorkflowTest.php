@@ -81,4 +81,25 @@ class DpcrFullWorkflowTest extends TestCase
         // Terminal: no further DC action is accepted
         $this->actingAs($divisionChief)->post("/spms/dpcr/{$dpcr->id}/submit-to-reviewer")->assertStatus(500);
     }
+
+    public function test_self_service_store_then_full_lifecycle(): void
+    {
+        $dcRole = Role::create(['name' => 'DivisionChief']);
+        $dcManage = Permission::create(['name' => 'spms.dpcr.manage', 'module' => 'SPMS']);
+        $dcRole->permissions()->attach($dcManage->id);
+
+        $division = Division::factory()->create();
+        $divisionChief = User::factory()->create(['division_id' => $division->id]);
+        $divisionChief->roles()->attach($dcRole->id);
+
+        FiscalPeriod::factory()->create(['cadence' => 'semester', 'is_current' => true]);
+
+        $this->actingAs($divisionChief)->post('/spms/dpcr')->assertRedirect();
+        $dpcr = Dpcr::where('division_id', $division->id)->firstOrFail();
+        $this->assertSame(Dpcr::STATUS_DRAFT, $dpcr->status);
+        $this->assertSame($divisionChief->id, $dpcr->ratee_user_id);
+
+        $this->actingAs($divisionChief)->post('/spms/dpcr')->assertRedirect(route('spms.dpcr.show', $dpcr->id));
+        $this->assertSame(1, Dpcr::where('division_id', $division->id)->count());
+    }
 }

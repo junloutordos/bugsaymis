@@ -73,4 +73,23 @@ class OpcrFullWorkflowTest extends TestCase
         // Terminal: no further Campus Director action is accepted
         $this->actingAs($campusDirector)->post("/spms/opcr/{$opcr->id}/submit-to-ed")->assertStatus(500);
     }
+
+    public function test_self_service_store_then_full_lifecycle(): void
+    {
+        $ocdRole = Role::create(['name' => 'OCD']);
+        $opcrManage = Permission::create(['name' => 'spms.opcr.manage', 'module' => 'SPMS']);
+        $ocdRole->permissions()->attach($opcrManage->id);
+
+        $campusDirector = User::factory()->create();
+        $campusDirector->roles()->attach($ocdRole->id);
+
+        FiscalPeriod::factory()->create(['cadence' => 'annual', 'is_current' => true]);
+
+        $this->actingAs($campusDirector)->post('/spms/opcr')->assertRedirect();
+        $opcr = Opcr::where('ratee_user_id', $campusDirector->id)->firstOrFail();
+        $this->assertSame(Opcr::STATUS_DRAFT, $opcr->status);
+
+        $this->actingAs($campusDirector)->post('/spms/opcr')->assertRedirect(route('spms.opcr.show', $opcr->id));
+        $this->assertSame(1, Opcr::where('ratee_user_id', $campusDirector->id)->count());
+    }
 }
