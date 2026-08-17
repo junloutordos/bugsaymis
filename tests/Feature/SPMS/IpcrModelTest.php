@@ -32,4 +32,12 @@ class IpcrModelTest extends TestCase
 
         $this->assertNull($ipcr->dpcr_id);
     }
+
+    public function test_belongs_to_dpcr_once_assigned(): void
+    {
+        $dpcr = \App\Models\SPMS\Dpcr::factory()->create();
+        $ipcr = Ipcr::factory()->create(['dpcr_id' => $dpcr->id]);
+
+        $this->assertSame($dpcr->id, $ipcr->dpcr->id);
+    }
 }

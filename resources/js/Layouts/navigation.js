@@ -748,7 +748,7 @@ export const menuItems = [
   {
     label: "Performance Management (SPMS)",
     icon: ChartBarIcon,
-    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "HR", "PMT"],
+    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "CID Chief", "OCD", "HR", "PMT"],
     children: [
       {
         label: "My IPCR",
@@ -763,6 +763,20 @@ export const menuItems = [
         href: route("spms.ipcr.review.index"),
         icon: ClipboardDocumentCheckIcon,
         permissions: ["spms.ipcr.review"],
+      },
+      {
+        label: "My DPCR",
+        routeName: "spms.dpcr.index",
+        href: route("spms.dpcr.index"),
+        icon: DocumentTextIcon,
+        permissions: ["spms.dpcr.manage"],
+      },
+      {
+        label: "DPCR Review Queue",
+        routeName: "spms.dpcr.review.index",
+        href: route("spms.dpcr.review.index"),
+        icon: ClipboardDocumentCheckIcon,
+        permissions: ["spms.dpcr.review", "spms.dpcr.approve"],
       },
       {
         label: "SPMS Admin Config",

@@ -55,6 +55,11 @@ class Ipcr extends Model
         return $this->belongsTo(WeightProfile::class, 'weight_profile_id');
     }
 
+    public function dpcr(): BelongsTo
+    {
+        return $this->belongsTo(Dpcr::class, 'dpcr_id');
+    }
+
     public function targets(): HasMany
     {
         return $this->hasMany(IpcrTarget::class, 'ipcr_id');
