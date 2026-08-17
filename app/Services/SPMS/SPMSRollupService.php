@@ -3,7 +3,10 @@
 namespace App\Services\SPMS;
 
 use App\Models\SPMS\Dpcr;
+use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\Ipcr;
+use App\Models\SPMS\Opcr;
+use App\Models\User;
 
 class SPMSRollupService
 {
@@ -36,6 +39,40 @@ class SPMSRollupService
 
             $weightedSum += $coreAverage * $coreWeight;
             $weightTotal += $coreWeight;
+        }
+
+        if ($weightTotal <= 0.0) {
+            return null;
+        }
+
+        return round($weightedSum / $weightTotal, 2);
+    }
+
+    public function rollupDpcrsToOpcr(Opcr $opcr): ?float
+    {
+        $semesterPeriodIds = FiscalPeriod::where('parent_period_id', $opcr->fiscal_period_id)->pluck('id');
+
+        $dpcrs = Dpcr::where('status', Dpcr::STATUS_APPROVED)
+            ->whereIn('fiscal_period_id', $semesterPeriodIds)
+            ->get();
+
+        if ($dpcrs->isEmpty()) {
+            return null;
+        }
+
+        $perDivisionAverage = $dpcrs->groupBy('division_id')->map(
+            fn ($group) => (float) $group->avg('final_rating')
+        );
+
+        $weightedSum = 0.0;
+        $weightTotal = 0.0;
+
+        foreach ($perDivisionAverage as $divisionId => $averageRating) {
+            $headcount = User::where('division_id', $divisionId)->where('status', '<>', 'inactive')->count();
+            $weight = $headcount > 0 ? $headcount : 1;
+
+            $weightedSum += $averageRating * $weight;
+            $weightTotal += $weight;
         }
 
         if ($weightTotal <= 0.0) {
