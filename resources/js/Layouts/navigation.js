@@ -653,6 +653,13 @@ export const menuItems = [
     roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief", "OCD", "PMT", "PMRater"],
     children: [
       {
+        label: "DOST Strategic Plan",
+        routeName: "dost-strategic-plan.index",
+        href: route("dost-strategic-plan.index"),
+        icon: FlagIcon,
+        permissions: ["ipcr.view"],
+      },
+      {
         label: "Agency Org Outcome",
         routeName: "outcome.index",
         href: route("outcome.index"),
