@@ -214,6 +214,7 @@
       :hasPin="hasPin"
       :signatureUri="signatureUri"
       :loading="pinModalLoading"
+      :serverError="pinModalError"
       confirmLabel="Approve"
       @confirm="handlePinConfirm"
       @cancel="handlePinCancel"
@@ -258,6 +259,7 @@ const isSubmitting  = ref(false)
 const showPinModal   = ref(false)
 const pinModalLoading = ref(false)
 const pendingApproveItem = ref(null)
+const pinModalError  = ref('')
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 const visibleTabs = computed(() => localTabs.value.filter(t => t.count > 0))
@@ -358,6 +360,7 @@ function closeModal() {
 // ── Approve ───────────────────────────────────────────────────────────────────
 function confirmApprove(item) {
   pendingApproveItem.value = item
+  pinModalError.value = ''
   showPinModal.value = true
 }
 
@@ -365,6 +368,7 @@ function handlePinConfirm(pin) {
   const item = pendingApproveItem.value
   if (! item) return
 
+  pinModalError.value = ''
   pinModalLoading.value = true
   isSubmitting.value = true
   Swal.fire({ title: 'Processing…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
@@ -390,6 +394,18 @@ function handlePinConfirm(pin) {
         })
       },
       onError: (errors) => {
+        // A wrong/missing signature PIN redirects back with a 'pin' session
+        // error — surface that specific message and keep the PIN modal open
+        // so the user can immediately retry, instead of closing it and
+        // showing a generic "already acted upon" toast that misidentifies
+        // the actual cause (mirrors HR/Leave/Show.vue's postApprove()).
+        if (errors?.pin) {
+          Swal.close()
+          pinModalError.value = errors.pin
+          return
+        }
+        showPinModal.value = false
+        pendingApproveItem.value = null
         Swal.fire({
           icon: 'error',
           title: 'Error',
@@ -407,6 +423,7 @@ function handlePinConfirm(pin) {
 function handlePinCancel() {
   showPinModal.value = false
   pendingApproveItem.value = null
+  pinModalError.value = ''
 }
 
 // ── Decline ───────────────────────────────────────────────────────────────────
@@ -435,7 +452,7 @@ function submitDecline(item) {
         Swal.fire({
           icon: 'error',
           title: 'Error',
-          text: errors?.message ?? 'Could not decline this request. It may have already been acted upon.',
+          text: errors?.message ?? errors?.reason ?? 'Could not decline this request. It may have already been acted upon.',
         })
       },
       onFinish: () => { isSubmitting.value = false },
