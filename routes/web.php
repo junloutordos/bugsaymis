@@ -2873,4 +2873,13 @@ Route::middleware(['auth', 'permission:spms.dpcr.review|spms.dpcr.approve'])->pr
     Route::post('/{dpcr}/return', [\App\Http\Controllers\SPMS\ReviewerDpcrController::class, 'returnToSender'])->name('return');
 });
 
+Route::middleware(['auth', 'permission:spms.opcr.manage'])->prefix('spms/opcr')->name('spms.opcr.')->where(['opcr' => '[0-9]+'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'index'])->name('index');
+    Route::get('/{opcr}', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'show'])->name('show');
+    Route::post('/{opcr}/generate-targets', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'generateTargets'])->name('generate-targets');
+    Route::post('/{opcr}/update-targets', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'updateTargets'])->name('update-targets');
+    Route::post('/{opcr}/submit-to-ed', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'submitToExecutiveDirector'])->name('submit-to-ed');
+    Route::post('/{opcr}/set-override', [\App\Http\Controllers\SPMS\CampusDirectorOpcrController::class, 'setOverride'])->name('set-override');
+});
+
 require __DIR__.'/auth.php';
