@@ -26,7 +26,8 @@ class CertificateService
         Activity $activity,
         string   $name,
         mixed    $hoursAttended,
-        int      $participantId
+        int      $participantId,
+        string   $participantType = 'employee'
     ): string {
         $verifyHash = md5($participantId . '-' . $activity->id);
         $verifyUrl  = url(route('ams.certificates.verify', [
@@ -84,7 +85,7 @@ class CertificateService
         }
 
         $dir      = "ams/certificates/{$activity->id}";
-        $filename = 'Certificate_' . md5($name) . '.pdf';
+        $filename = 'Certificate_'.$participantType.'_'.$participantId.'.pdf';
         $fullPath = "{$dir}/{$filename}";
 
         Storage::disk('s3')->makeDirectory($dir);

@@ -29,9 +29,9 @@ class CertificateController extends Controller
         $this->authorizeManage($activity);
         $activity->load('participants');
 
-        $generated = 0;
-        $skipped   = 0;
-        $failed    = 0;
+        $generated   = 0;
+        $skipped     = 0;
+        $failedNames = [];
 
         $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
@@ -54,7 +54,8 @@ class CertificateController extends Controller
                     activity: $activity,
                     name: $user->name,
                     hoursAttended: $participant->hours_attended,
-                    participantId: $participant->participant_id
+                    participantId: $participant->participant_id,
+                    participantType: 'employee'
                 );
 
                 $participant->update(['certificate_path' => $path]);
@@ -63,7 +64,7 @@ class CertificateController extends Controller
                 }
                 $generated++;
             } catch (\Throwable $e) {
-                $failed++;
+                $failedNames[] = $user->name;
                 \Log::warning("AMS: certificate generation failed for employee {$participant->participant_id}: ".$e->getMessage());
             }
         }
@@ -90,7 +91,8 @@ class CertificateController extends Controller
                     activity: $activity,
                     name: $student->full_name,
                     hoursAttended: $row->hours_attended,
-                    participantId: $row->participant_id
+                    participantId: $row->participant_id,
+                    participantType: 'student'
                 );
 
                 $row->update(['certificate_path' => $path]);
@@ -99,14 +101,15 @@ class CertificateController extends Controller
                 }
                 $generated++;
             } catch (\Throwable $e) {
-                $failed++;
+                $failedNames[] = $student->full_name;
                 \Log::warning("AMS: certificate generation failed for student {$row->participant_id}: ".$e->getMessage());
             }
         }
 
         $message = "Generated {$generated} eligible certificate(s) and emailed those with an available address. {$skipped} skipped (absent, not evaluated, already generated, or missing).";
-        if ($failed) {
-            $message .= " {$failed} failed during generation.";
+        if ($failedNames) {
+            $failedCount = count($failedNames);
+            $message .= " {$failedCount} failed during generation: ".implode(', ', $failedNames).'.';
         }
 
         return back()->with('success', $message);

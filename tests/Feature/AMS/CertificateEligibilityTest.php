@@ -82,6 +82,97 @@ class CertificateEligibilityTest extends TestCase
         $this->assertSame('ams/certificates/eligible.pdf', $participant->fresh()->certificate_path);
     }
 
+    public function test_generation_continues_and_reports_failed_participant_name_when_build_throws(): void
+    {
+        [$owner, $attendee1, $activity, $participant1] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ]);
+        ActivityEvaluation::create([
+            'activity_id' => $activity->id,
+            'participant_type' => 'employee',
+            'participant_id' => $attendee1->id,
+        ]);
+
+        $attendee2 = User::factory()->create(['email' => uniqid().'@example.test']);
+        $participant2 = ActivityParticipant::create([
+            'activity_id' => $activity->id,
+            'participant_id' => $attendee2->id,
+            'participant_type' => 'employee',
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ]);
+        ActivityEvaluation::create([
+            'activity_id' => $activity->id,
+            'participant_type' => 'employee',
+            'participant_id' => $attendee2->id,
+        ]);
+
+        $certificate = $this->mock(CertificateService::class);
+        $certificate->shouldReceive('buildAndSave')
+            ->twice()
+            ->andReturnUsing(function (...$args) use ($attendee1) {
+                if ($args[1] === $attendee1->name) {
+                    throw new \RuntimeException('PDF generation failed: simulated mPDF error');
+                }
+                return 'ams/certificates/ok.pdf';
+            });
+        $certificate->shouldReceive('sendCertificateEmail')->once();
+
+        $response = $this->actingAs($owner)
+            ->post(route('ams.activities.certificates.generate', $activity))
+            ->assertRedirect();
+
+        $this->assertNull($participant1->fresh()->certificate_path);
+        $this->assertSame('ams/certificates/ok.pdf', $participant2->fresh()->certificate_path);
+
+        $success = $response->getSession()->get('success');
+        $this->assertStringContainsString('1 failed during generation', $success);
+        $this->assertStringContainsString($attendee1->name, $success);
+    }
+
+    public function test_generation_handles_participants_with_duplicate_names_independently(): void
+    {
+        [$owner, $attendee1, $activity, $participant1] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ]);
+        $attendee1->update(['name' => 'Juan Dela Cruz']);
+        ActivityEvaluation::create([
+            'activity_id' => $activity->id,
+            'participant_type' => 'employee',
+            'participant_id' => $attendee1->id,
+        ]);
+
+        // Second participant with the exact same name — must not collide on storage path.
+        $attendee2 = User::factory()->create([
+            'name' => 'Juan Dela Cruz',
+            'email' => uniqid().'@example.test',
+        ]);
+        $participant2 = ActivityParticipant::create([
+            'activity_id' => $activity->id,
+            'participant_id' => $attendee2->id,
+            'participant_type' => 'employee',
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ]);
+        ActivityEvaluation::create([
+            'activity_id' => $activity->id,
+            'participant_type' => 'employee',
+            'participant_id' => $attendee2->id,
+        ]);
+
+        // Use the real CertificateService to verify the actual generated storage paths differ.
+        \Illuminate\Support\Facades\Storage::fake('s3');
+        $realService = app(CertificateService::class);
+        $path1 = $realService->buildAndSave($activity, $attendee1->name, 8, $attendee1->id, 'employee');
+        $path2 = $realService->buildAndSave($activity, $attendee2->name, 8, $attendee2->id, 'employee');
+
+        $this->assertNotSame($path1, $path2, 'Certificates for participants sharing a name must not collide on storage path.');
+        $this->assertStringContainsString((string) $attendee1->id, $path1);
+        $this->assertStringContainsString((string) $attendee2->id, $path2);
+    }
+
     public function test_training_evaluation_qualifies_participant_for_certificate(): void
     {
         [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
