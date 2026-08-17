@@ -18,7 +18,13 @@ const returnReason = ref('')
       {{ dpcr.division?.division_name }} — {{ dpcr.ratee?.name }} — {{ dpcr.fiscal_period?.label }} — {{ dpcr.status }}
     </p>
 
-    <p v-if="dpcr.rolled_up_rating" class="mb-4 text-sm">Rolled-up rating: <strong>{{ dpcr.rolled_up_rating }}</strong></p>
+    <p v-if="dpcr.rolled_up_rating" class="mb-2 text-sm">Rolled-up rating (computed): <strong>{{ dpcr.rolled_up_rating }}</strong></p>
+
+    <div v-if="dpcr.override_rating" class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+      <p class="font-semibold text-amber-800">Division Chief set an override rating: {{ dpcr.override_rating }}</p>
+      <p class="mt-1 text-amber-700">Reason: {{ dpcr.override_reason }}</p>
+      <p class="mt-1 text-amber-700">This value — not the computed rollup — will become the final rating if approved as-is. Review the reason before approving.</p>
+    </div>
 
     <div class="flex flex-wrap gap-2 mb-4">
       <button v-if="dpcr.status === 'Submitted to Reviewer'" @click="review"

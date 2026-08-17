@@ -63,4 +63,21 @@ class ReviewerDpcrControllerTest extends TestCase
         $this->actingAs($ocd)->post("/spms/dpcr/review/{$dpcr->id}/return", ['reason' => 'Missing Q2 actuals'])->assertRedirect();
         $this->assertSame(Dpcr::STATUS_RETURNED, $dpcr->fresh()->status);
     }
+
+    public function test_show_exposes_override_rating_and_reason_for_review(): void
+    {
+        $ocd = $this->ocd();
+        $dpcr = Dpcr::factory()->create([
+            'status' => Dpcr::STATUS_SUBMITTED_TO_APPROVER,
+            'rolled_up_rating' => 3.0,
+            'override_rating' => 5.0,
+            'override_reason' => 'Self-set by Division Chief',
+        ]);
+
+        $response = $this->actingAs($ocd)->get("/spms/dpcr/review/{$dpcr->id}");
+
+        $response->assertInertia(fn ($page) => $page->component('SPMS/ReviewerDpcrShow')
+            ->where('dpcr.override_rating', '5.00')
+            ->where('dpcr.override_reason', 'Self-set by Division Chief'));
+    }
 }
