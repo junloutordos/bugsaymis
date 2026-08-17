@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 defineProps({ opcrs: Array })
@@ -10,13 +10,24 @@ const statusBadgeColor = (status) => ({
   'ED Approved': 'bg-emerald-100 text-emerald-700',
   'Returned': 'bg-rose-100 text-rose-700',
 }[status] ?? 'bg-slate-100 text-slate-700')
+
+const createOpcr = () => {
+  router.post(route('spms.opcr.store'))
+}
 </script>
 
 <template>
   <Head title="My OPCR (SPMS)" />
   <AdminLayout title="My OPCR (SPMS)">
+    <div class="mb-4 flex justify-end">
+      <button @click="createOpcr" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        Create OPCR
+      </button>
+    </div>
+
     <div class="rounded-lg border border-slate-200 bg-white">
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
+      <p v-if="!opcrs.length" class="p-6 text-sm text-slate-500">No records yet — click Create to get started.</p>
+      <table v-else class="min-w-full divide-y divide-slate-200 text-sm">
         <thead>
           <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
             <th class="px-4 py-3 text-left">Fiscal Year</th>
