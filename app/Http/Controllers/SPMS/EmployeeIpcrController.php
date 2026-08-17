@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SPMS;
 
 use App\Http\Controllers\Controller;
+use App\Models\SPMS\FiscalPeriod;
 use App\Models\SPMS\Ipcr;
 use App\Services\SPMS\IPCRTargetGenerationService;
 use App\Services\SPMS\IPCRWorkflowService;
@@ -26,6 +27,23 @@ class EmployeeIpcrController extends Controller
             ->get();
 
         return Inertia::render('SPMS/EmployeeIpcrIndex', ['ipcrs' => $ipcrs]);
+    }
+
+    public function store(): RedirectResponse
+    {
+        $period = FiscalPeriod::current()->ofCadence('semester')->first();
+        if (!$period) {
+            return back()->withErrors(['fiscal_period' => 'No current semester fiscal period is configured. Ask an SPMS Admin to set one up.']);
+        }
+
+        $existing = Ipcr::where('user_id', Auth::id())->where('fiscal_period_id', $period->id)->first();
+        if ($existing) {
+            return redirect()->route('spms.ipcr.show', $existing->id);
+        }
+
+        $ipcr = Ipcr::create(['user_id' => Auth::id(), 'fiscal_period_id' => $period->id]);
+
+        return redirect()->route('spms.ipcr.show', $ipcr->id)->with('success', 'IPCR created.');
     }
 
     public function show(Ipcr $ipcr): Response

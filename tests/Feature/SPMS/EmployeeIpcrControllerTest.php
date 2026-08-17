@@ -50,4 +50,32 @@ class EmployeeIpcrControllerTest extends TestCase
 
         $this->assertSame(Ipcr::STATUS_TARGET_SUBMITTED, $ipcr->fresh()->status);
     }
+
+    public function test_store_creates_ipcr_for_current_semester_period(): void
+    {
+        $user = $this->actingUserWithPermission();
+        FiscalPeriod::factory()->create(['cadence' => 'semester', 'is_current' => true]);
+
+        $this->actingAs($user)->post('/spms/ipcr')->assertRedirect();
+
+        $this->assertDatabaseHas('spms_ipcrs', ['user_id' => $user->id]);
+    }
+
+    public function test_store_redirects_to_existing_ipcr_instead_of_duplicating(): void
+    {
+        $user = $this->actingUserWithPermission();
+        $period = FiscalPeriod::factory()->create(['cadence' => 'semester', 'is_current' => true]);
+        $existing = Ipcr::factory()->create(['user_id' => $user->id, 'fiscal_period_id' => $period->id]);
+
+        $this->actingAs($user)->post('/spms/ipcr')->assertRedirect(route('spms.ipcr.show', $existing->id));
+
+        $this->assertSame(1, Ipcr::where('user_id', $user->id)->count());
+    }
+
+    public function test_store_errors_when_no_current_semester_period_exists(): void
+    {
+        $user = $this->actingUserWithPermission();
+
+        $this->actingAs($user)->post('/spms/ipcr')->assertSessionHasErrors('fiscal_period');
+    }
 }

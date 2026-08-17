@@ -2831,6 +2831,7 @@ Route::middleware(['auth', 'permission:spms.ipcr.manage|spms.ipcr.review'])->gro
 
 Route::middleware(['auth', 'permission:spms.ipcr.manage'])->prefix('spms/ipcr')->name('spms.ipcr.')->where(['ipcr' => '[0-9]+'])->group(function () {
     Route::get('/', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'store'])->name('store');
     Route::get('/{ipcr}', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'show'])->name('show');
     Route::post('/{ipcr}/generate-targets', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'generateTargets'])->name('generate-targets');
     Route::post('/{ipcr}/submit-target', [\App\Http\Controllers\SPMS\EmployeeIpcrController::class, 'submitTarget'])->name('submit-target');
