@@ -17,10 +17,12 @@ class PerformanceIndicatorController extends Controller
         $selectedFY  = $request->query('fiscal_year', (string) $currentYear);
 
         return Inertia::render('PerformanceManagement/PerformanceIndicators', [
-            'indicators' => PerformanceIndicator::with(['agencyOutcome', 'divisions'])
+            'indicators' => PerformanceIndicator::with(['agencyOutcome.parent', 'divisions'])
                 ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY))
                 ->latest()->get(),
             'outcomes' => AgencyOutcome::query()
+                ->topLevel()
+                ->with('children')
                 ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY))
                 ->get(),
             'divisions' => Division::all(),
