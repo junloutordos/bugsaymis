@@ -205,24 +205,31 @@ class PerDayAttendanceTest extends TestCase
         $section = ActivityParticipant::create([
             'activity_id' => $activity->id, 'participant_id' => 1, 'participant_type' => 'section',
         ]);
+        // `students`/`section_students` are legacy MyISAM tables (non-transactional) —
+        // never hardcode a fixed id here, or repeated test runs collide on a leftover row.
+        $student = \App\Models\Student::forceCreate(['firstname' => 'Juan', 'lastname' => 'Cruz']);
         \Illuminate\Support\Facades\DB::table('section_students')->insert([
-            'sectionid' => 1, 'studentid' => 501,
+            'sectionid' => 1, 'studentid' => $student->id,
         ]);
-        \App\Models\Student::forceCreate(['id' => 501, 'firstname' => 'Juan', 'lastname' => 'Cruz']);
         \App\Models\AMS\ActivityStudentAttendance::create([
-            'activity_id' => $activity->id, 'participant_id' => 501, 'attended' => 'yes', 'hours_attended' => 7,
+            'activity_id' => $activity->id, 'participant_id' => $student->id, 'attended' => 'yes', 'hours_attended' => 7,
         ]);
         ActivityAttendanceDay::create([
             'activity_id' => $activity->id, 'participant_type' => 'student',
-            'participant_id' => 501, 'date' => '2026-08-11', 'attended' => 'yes', 'hours_attended' => 7,
+            'participant_id' => $student->id, 'date' => '2026-08-11', 'attended' => 'yes', 'hours_attended' => 7,
         ]);
 
-        $response = $this->actingAs($owner)
-            ->getJson(route('ams.activities.participants.students', [$activity, $section]))
-            ->assertOk();
+        try {
+            $response = $this->actingAs($owner)
+                ->getJson(route('ams.activities.participants.students', [$activity, $section]))
+                ->assertOk();
 
-        $json = $response->json();
-        $this->assertSame('yes', $json[0]['daily']['2026-08-11']['attended']);
+            $json = $response->json();
+            $this->assertSame('yes', $json[0]['daily']['2026-08-11']['attended']);
+        } finally {
+            \Illuminate\Support\Facades\DB::table('section_students')->where('studentid', $student->id)->delete();
+            $student->delete();
+        }
     }
 
     private function makeMultiDayActivity(User $owner, string $start, string $end): Activity

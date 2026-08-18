@@ -8,6 +8,8 @@ use App\Models\AMS\ActivityEvaluation;
 use App\Models\AMS\ActivityParticipant;
 use App\Models\AMS\ActivityStudentAttendance;
 use App\Models\FacultyLoading\Section;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\AMS\ActivityReportService;
@@ -105,15 +107,83 @@ class ActivityReportTest extends TestCase
             'end_date' => '2026-08-10',
         ]);
         $section = Section::create(['sectionname' => 'Newton', 'levelid' => 7, 'is_active' => true]);
-        DB::table('section_students')->insert(['sectionid' => $section->id, 'studentid' => 501]);
-        Student::forceCreate(['id' => 501, 'firstname' => 'Ada', 'lastname' => 'Lovelace']);
+        // `students`/`section_students` are legacy MyISAM tables (non-transactional) —
+        // never hardcode a fixed id here, or repeated test runs collide on a leftover row.
+        $student = Student::forceCreate(['firstname' => 'Ada', 'lastname' => 'Lovelace']);
+        DB::table('section_students')->insert(['sectionid' => $section->id, 'studentid' => $student->id]);
         ActivityStudentAttendance::create([
-            'activity_id' => $activity->id, 'participant_id' => 501, 'attended' => 'yes', 'hours_attended' => 8,
+            'activity_id' => $activity->id, 'participant_id' => $student->id, 'attended' => 'yes', 'hours_attended' => 8,
         ]);
 
-        $report = app(ActivityReportService::class)->buildReport($activity);
+        try {
+            $report = app(ActivityReportService::class)->buildReport($activity);
 
-        $studentRow = collect($report['rows'])->firstWhere('type', 'Student');
-        $this->assertSame('Grade 7 — Newton', $studentRow['section']);
+            $studentRow = collect($report['rows'])->firstWhere('type', 'Student');
+            $this->assertSame('Grade 7 — Newton', $studentRow['section']);
+        } finally {
+            DB::table('section_students')->where('studentid', $student->id)->delete();
+            $student->delete();
+        }
+    }
+
+    public function test_authorized_user_can_view_report_page(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = Activity::create([
+            'user_id' => $owner->id, 'title' => 'Report Page Activity',
+            'activity_type' => Activity::TYPE_IN_HOUSE, 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('ams.activities.report', $activity))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('AMS/Report')
+                ->where('activity.id', $activity->id)
+                ->has('report.kpis')
+                ->has('report.rows')
+            );
+    }
+
+    public function test_print_page_renders_component(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = Activity::create([
+            'user_id' => $owner->id, 'title' => 'Print Page Activity',
+            'activity_type' => Activity::TYPE_IN_HOUSE, 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('ams.activities.report.print', $activity))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('AMS/ReportPrint'));
+    }
+
+    public function test_unrelated_user_cannot_view_report_page(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $stranger = $this->userWithPermission('activities.manage');
+        $activity = Activity::create([
+            'user_id' => $owner->id, 'title' => 'Private Report Activity',
+            'activity_type' => Activity::TYPE_IN_HOUSE, 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+        ]);
+
+        $this->actingAs($stranger)
+            ->get(route('ams.activities.report', $activity))
+            ->assertForbidden();
+    }
+
+    private function userWithPermission(string $permissionName): User
+    {
+        $permission = Permission::firstOrCreate(
+            ['name' => $permissionName],
+            ['module' => 'Activities', 'description' => $permissionName],
+        );
+        $role = Role::create(['name' => 'AMS Report Test '.uniqid()]);
+        $role->permissions()->attach($permission);
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $user->roles()->attach($role);
+
+        return $user;
     }
 }
