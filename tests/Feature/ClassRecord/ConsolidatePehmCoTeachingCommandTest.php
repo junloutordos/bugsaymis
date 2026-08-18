@@ -141,12 +141,21 @@ class ConsolidatePehmCoTeachingCommandTest extends TestCase
         GradingCategory::create(['grading_option_id' => $template->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 1]);
 
         $cmd = new ConsolidatePehmCoTeaching();
-        $before = \DB::table('grading_options')->count();
+        $beforeOptions = \DB::table('grading_options')->count();
+        $beforeCategories = \DB::table('grading_categories')->count();
 
         $result = $cmd->resolveTargetOptionForGrade($template, 7, $subjects[7], commit: false);
 
-        $this->assertSame($before, \DB::table('grading_options')->count());
+        $this->assertSame($beforeOptions, \DB::table('grading_options')->count());
+        $this->assertSame($beforeCategories, \DB::table('grading_categories')->count());
         $this->assertSame('PEHM 1-3 (Grade 7)', $result->name);
+
+        // The in-memory clone's "categories" relation must be usable WITHOUT
+        // hitting the DB (nothing was persisted) — consolidateSection()
+        // depends on this for dry-run runs against a brand-new grade level.
+        $leaf = $result->categories->firstWhere('code', 'SA 1');
+        $this->assertNotNull($leaf);
+        $this->assertSame($subjects[7]['PE'], $leaf->subject_id);
     }
 
     public function test_resolve_target_option_for_grade_10_mutates_the_existing_template_in_place_no_clone(): void
@@ -283,5 +292,80 @@ class ConsolidatePehmCoTeachingCommandTest extends TestCase
         $this->assertCount(1, $report['unmatched_leaves']);
         $this->assertStringContainsString('Mystery Assessment', $report['unmatched_leaves'][0]);
         $this->assertSame($quarter->id, ClassRecordAssessment::where('title', 'Mystery Assessment')->first()->class_record_quarter_id);
+    }
+
+    public function test_the_command_end_to_end_dry_run_reports_without_writing_commit_writes_and_is_idempotent_on_a_second_run(): void
+    {
+        $subjects = $this->makePehmSubjects(); // grade 7 + 8 subjects
+
+        $template = GradingOption::create(['name' => 'PEHM 1-3']);
+        $sa = GradingCategory::create(['grading_option_id' => $template->id, 'name' => 'Summative Assessment', 'code' => 'SA', 'weight' => 0.30, 'max_assessments' => 1]);
+        GradingCategory::create(['grading_option_id' => $template->id, 'parent_id' => $sa->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 1]);
+        GradingCategory::create(['grading_option_id' => $template->id, 'parent_id' => $sa->id, 'name' => 'SA (Health)', 'code' => 'SA 2', 'weight' => 0.10, 'max_assessments' => 1]);
+
+        $peTeacher = User::factory()->create();
+        $healthTeacher = User::factory()->create();
+        $peRecord = $this->makeClassRecord(['section_id' => 500, 'subject_id' => $subjects[7]['PE'], 'teacher_id' => $peTeacher->id, 'grading_option_id' => $template->id]);
+        $healthRecord = $this->makeClassRecord(['section_id' => 500, 'subject_id' => $subjects[7]['Health'], 'teacher_id' => $healthTeacher->id, 'grading_option_id' => $template->id]);
+
+        // Dry run first
+        $this->artisan('class-record:consolidate-pehm-coteaching')->assertSuccessful();
+        $this->assertSame('draft', ClassRecord::find($peRecord->id)->status);
+        $this->assertSame('draft', ClassRecord::find($healthRecord->id)->status);
+        $this->assertFalse(GradingOption::where('name', 'PEHM 1-3 (Grade 7)')->exists());
+
+        // Commit
+        $this->artisan('class-record:consolidate-pehm-coteaching --commit')->assertSuccessful();
+
+        $grade7Option = GradingOption::where('name', 'PEHM 1-3 (Grade 7)')->first();
+        $this->assertNotNull($grade7Option);
+
+        $survivors = ClassRecord::where('section_id', 500)->where('status', '<>', 'archived')->get();
+        $this->assertCount(1, $survivors);
+        $this->assertSame($grade7Option->id, $survivors->first()->grading_option_id);
+
+        $archived = ClassRecord::where('section_id', 500)->where('status', 'archived')->get();
+        $this->assertCount(1, $archived);
+
+        // Second commit run is a no-op (idempotent) — nothing left to consolidate
+        $this->artisan('class-record:consolidate-pehm-coteaching --commit')->assertSuccessful();
+        $this->assertSame(1, ClassRecord::where('section_id', 500)->where('status', '<>', 'archived')->count());
+        $this->assertSame(1, GradingOption::where('name', 'PEHM 1-3 (Grade 7)')->count()); // no duplicate clone
+    }
+
+    public function test_a_section_with_only_one_pehm_record_is_left_alone(): void
+    {
+        $subjects = $this->makePehmSubjects();
+        $template = GradingOption::create(['name' => 'PEHM 1-3']);
+        GradingCategory::create(['grading_option_id' => $template->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 1]);
+        $record = $this->makeClassRecord(['section_id' => 501, 'subject_id' => $subjects[7]['PE'], 'teacher_id' => User::factory()->create()->id, 'grading_option_id' => $template->id]);
+
+        $this->artisan('class-record:consolidate-pehm-coteaching --commit')->assertSuccessful();
+
+        $this->assertSame('draft', ClassRecord::find($record->id)->status);
+    }
+
+    public function test_a_two_record_section_missing_the_third_subject_still_consolidates_with_no_false_unmatched_leaves(): void
+    {
+        // Mirrors production section 264: Music + PE only, no Health record.
+        $subjects = $this->makePehmSubjects();
+        $template = GradingOption::create(['name' => 'PEHM 1-3']);
+        $sa = GradingCategory::create(['grading_option_id' => $template->id, 'name' => 'Summative Assessment', 'code' => 'SA', 'weight' => 0.30, 'max_assessments' => 1]);
+        GradingCategory::create(['grading_option_id' => $template->id, 'parent_id' => $sa->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 1]);
+        GradingCategory::create(['grading_option_id' => $template->id, 'parent_id' => $sa->id, 'name' => 'SA (Music)', 'code' => 'SA 3', 'weight' => 0.10, 'max_assessments' => 1]);
+
+        $musicRecord = $this->makeClassRecord(['section_id' => 264, 'subject_id' => $subjects[7]['Music'], 'teacher_id' => User::factory()->create()->id, 'grading_option_id' => $template->id]);
+        $peRecord = $this->makeClassRecord(['section_id' => 264, 'subject_id' => $subjects[7]['PE'], 'teacher_id' => User::factory()->create()->id, 'grading_option_id' => $template->id]);
+
+        $this->artisan('class-record:consolidate-pehm-coteaching --commit')->assertSuccessful();
+
+        $survivors = ClassRecord::where('section_id', 264)->where('status', '<>', 'archived')->get();
+        $this->assertCount(1, $survivors);
+
+        $pivotSubjectIds = ClassRecordTeacher::where('class_record_id', $survivors->first()->id)->pluck('subject_id')->sort()->values()->all();
+        $this->assertSame(
+            collect([$musicRecord->subject_id, $peRecord->subject_id])->sort()->values()->all(),
+            $pivotSubjectIds
+        );
     }
 }

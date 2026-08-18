@@ -8,6 +8,7 @@ use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordTeacher;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Subject;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
@@ -21,9 +22,96 @@ class ConsolidatePehmCoTeaching extends Command
 
     public function handle(): int
     {
-        $this->info($this->option('commit') ? 'RUNNING IN COMMIT MODE — writes will be made.' : 'DRY RUN — no writes will be made. Pass --commit to apply.');
+        $commit = (bool) $this->option('commit');
+        $this->info($commit ? 'RUNNING IN COMMIT MODE — writes will be made.' : 'DRY RUN — no writes will be made. Pass --commit to apply.');
 
-        // Populated by later tasks.
+        $schoolYear = SchoolYear::where('is_current', true)->first();
+        if (! $schoolYear) {
+            $this->error('No current school year found.');
+
+            return self::FAILURE;
+        }
+
+        $subjectsByGrade = $this->subjectsByGradeAndRole();
+        $pehmSubjectIds = array_merge(...array_map('array_values', $subjectsByGrade));
+
+        // Idempotency: a "PEHM 1-3 (Grade N)" clone from a prior run already
+        // exists — reuse it instead of cloning again.
+        $sourceTemplate = GradingOption::where('name', 'PEHM 1-3')->first();
+        $grade10Template = GradingOption::where('name', 'PEHM 4 Final')->first();
+
+        $bySection = ClassRecord::whereIn('subject_id', $pehmSubjectIds)
+            ->where('school_year_id', $schoolYear->id)
+            ->where('status', '<>', 'archived')
+            ->with('subject')
+            ->get()
+            ->groupBy('section_id');
+
+        // Full set of grade-10 class record ids across every section in this
+        // run, computed up front — assertOptionOnlyUsedByPehm needs the
+        // COMPLETE expected set on every call, not just the current
+        // section's, or the 2nd+ grade-10 section would false-positive
+        // against the 1st section's already-processed records.
+        $grade10RecordIds = $bySection->flatten()
+            ->filter(fn ($r) => $r->subject?->grade_level === 10)
+            ->pluck('id');
+
+        $totalPivotRows = 0;
+        $totalReparented = 0;
+        $allUnmatched = [];
+
+        foreach ($bySection as $sectionId => $sectionRecords) {
+            if ($sectionRecords->count() < 2) {
+                $this->line("Section {$sectionId}: only ".$sectionRecords->count().' PEHM record, nothing to consolidate.');
+
+                continue;
+            }
+
+            $gradeLevel = $sectionRecords->first()->subject->grade_level;
+            $subjectsByRole = $subjectsByGrade[$gradeLevel] ?? [];
+
+            if ($gradeLevel === 10) {
+                if ($grade10Template === null) {
+                    $this->warn("Section {$sectionId}: no 'PEHM 4 Final' template found, skipping.");
+
+                    continue;
+                }
+                if ($commit) {
+                    $this->assertOptionOnlyUsedByPehm($grade10Template, $grade10RecordIds);
+                }
+                $targetOption = $this->resolveTargetOptionForGrade($grade10Template, 10, $subjectsByRole, $commit, cloneEvenIfSingleGrade: false);
+            } else {
+                $existingClone = GradingOption::where('name', "PEHM 1-3 (Grade {$gradeLevel})")->first();
+                if ($existingClone) {
+                    $targetOption = $existingClone->load('categories');
+                } elseif ($sourceTemplate) {
+                    $targetOption = $this->resolveTargetOptionForGrade($sourceTemplate, $gradeLevel, $subjectsByRole, $commit);
+                } else {
+                    $this->warn("Section {$sectionId}: no 'PEHM 1-3' template found, skipping.");
+
+                    continue;
+                }
+            }
+
+            $report = $this->consolidateSection($sectionRecords, $targetOption, $commit);
+
+            $this->line("Section {$sectionId} (Grade {$gradeLevel}): canonical=cr{$report['canonical_id']}, archived=[".implode(',', $report['archived_ids'])."], pivot_rows={$report['pivot_rows_created']}, reparented={$report['assessments_reparented']}");
+
+            $totalPivotRows += $report['pivot_rows_created'];
+            $totalReparented += $report['assessments_reparented'];
+            $allUnmatched = array_merge($allUnmatched, $report['unmatched_leaves']);
+        }
+
+        $this->newLine();
+        $this->info("Totals: {$totalPivotRows} co-teacher pivot rows, {$totalReparented} assessments re-parented.");
+
+        if (! empty($allUnmatched)) {
+            $this->warn('Unmatched leaves needing manual attention:');
+            foreach ($allUnmatched as $line) {
+                $this->warn("  - {$line}");
+            }
+        }
+
         return self::SUCCESS;
     }
 
@@ -120,13 +208,24 @@ class ConsolidatePehmCoTeaching extends Command
             $clone->id = -1; // sentinel: never persisted, dry-run display only
         }
 
+        // Every created leaf/parent (persisted or not) is collected here and
+        // attached to $clone's "categories" relation in-memory below —
+        // required so consolidateSection()'s $targetOption->categories read
+        // works correctly even for a dry-run clone that was never actually
+        // saved (a lazy DB load of grading_option_id = -1 would return
+        // nothing and make every assessment look "unmatched").
+        $allCreated = collect();
+
         $topLevel = $sourceTemplate->categories()->whereNull('parent_id')->get();
         foreach ($topLevel as $parent) {
             $newParent = $this->cloneCategory($parent, $clone, null, $subjectsByRole, $commit);
+            $allCreated->push($newParent);
             foreach ($parent->children as $child) {
-                $this->cloneCategory($child, $clone, $newParent, $subjectsByRole, $commit);
+                $allCreated->push($this->cloneCategory($child, $clone, $newParent, $subjectsByRole, $commit));
             }
         }
+
+        $clone->setRelation('categories', $allCreated);
 
         return $clone;
     }
