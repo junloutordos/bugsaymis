@@ -15,6 +15,8 @@ class AgencyOutcomeController extends Controller
         $selectedFY  = $request->query('fiscal_year', (string) $currentYear);
 
         $outcomes = AgencyOutcome::query()
+            ->topLevel()
+            ->with('children')
             ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY))
             ->latest()
             ->get();
@@ -30,35 +32,67 @@ class AgencyOutcomeController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'outcome' => 'required|string|max:255',
+            'outcome' => 'required_without:parent_id|string|max:255',
             'sub_outcome' => 'nullable|string|max:255',
-            'function_type' => 'required|string|max:255',
+            'function_type' => 'required_without:parent_id|string|max:255',
             'fiscal_year' => 'nullable|integer|min:2000|max:2100',
+            'parent_id' => 'nullable|exists:agency_org_outcomes,id',
         ]);
+
+        $data = $this->inheritFromParentIfPresent($data);
 
         $outcome = AgencyOutcome::create($data);
 
         return redirect()->back()->with('outcome', $outcome);
     }
 
-    public function update(Request $request, AgencyOutcome $agencyOutcome)
+    public function update(Request $request, $id)
     {
+        $agencyOutcome = AgencyOutcome::findOrFail($id);
+
         $data = $request->validate([
-            'outcome' => 'required|string|max:255',
+            'outcome' => 'required_without:parent_id|string|max:255',
             'sub_outcome' => 'nullable|string|max:255',
-            'function_type' => 'required|string|max:255',
+            'function_type' => 'required_without:parent_id|string|max:255',
             'fiscal_year' => 'nullable|integer|min:2000|max:2100',
+            'parent_id' => 'nullable|exists:agency_org_outcomes,id',
         ]);
+
+        $data = $this->inheritFromParentIfPresent($data);
 
         $agencyOutcome->update($data);
 
         return redirect()->back()->with('outcome', $agencyOutcome);
     }
 
-    public function destroy(AgencyOutcome $agencyOutcome)
+    public function destroy($id)
     {
+        $agencyOutcome = AgencyOutcome::findOrFail($id);
+
+        if ($agencyOutcome->children()->exists()) {
+            return back()->withErrors(['agencyOutcome' => 'Delete its sub-outcomes first before deleting this outcome.']);
+        }
+
+        if ($agencyOutcome->performanceIndicators()->exists()) {
+            return back()->withErrors(['agencyOutcome' => 'This outcome is still referenced by one or more performance indicators.']);
+        }
+
         $agencyOutcome->delete();
 
         return redirect()->back();
+    }
+
+    private function inheritFromParentIfPresent(array $data): array
+    {
+        if (empty($data['parent_id'])) {
+            return $data;
+        }
+
+        $parent = AgencyOutcome::findOrFail($data['parent_id']);
+        $data['outcome'] = $parent->outcome;
+        $data['function_type'] = $parent->function_type;
+        $data['fiscal_year'] = $parent->fiscal_year;
+
+        return $data;
     }
 }

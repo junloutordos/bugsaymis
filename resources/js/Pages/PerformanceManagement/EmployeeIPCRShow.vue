@@ -15,6 +15,7 @@ import Swal from "sweetalert2";
 import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
+import { groupPlansByOutcome, normalizeFunctionType } from "@/Utils/IPCR/outcomeGrouping.js";
 
 const props = defineProps({
   ipcr:             Object,
@@ -224,25 +225,6 @@ const formattedSubmittedForReviewAt = computed(() => formatDateString(props.ipcr
 const formattedTargetApprovedAt = computed(() => formatDateString(props.ipcr?.target_approved_at));
 const formattedSubmittedRatingAt = computed(() => formatDateString(props.ipcr?.submitted_rating_at));
 
-// ---------- normalize function type (maps old -> new canonical labels) ----------
-const normalizeFunctionType = (raw) => {
-  if (!raw) return "Uncategorized";
-  const t = String(raw).trim().toLowerCase();
-
-  // Map possible legacy values to canonical new labels
-  if (t === "strategic" || t === "strategic functions" || t === "strategic function") return "Strategic Functions";
-  if (t === "core" || t === "core functions" || t === "core function") return "Core Functions";
-  if (t === "support" || t === "support functions" || t === "support function") return "Support Functions";
-
-  // If raw already is one of the canonical labels (case-insensitive)
-  if (t === "strategic functions") return "Strategic Functions";
-  if (t === "core functions") return "Core Functions";
-  if (t === "support functions") return "Support Functions";
-
-  // Otherwise, title-case the raw value and return as-is (keeps unknown/new categories)
-  return String(raw).trim();
-};
-
 // ---------- Default CSC Weights (canonical labels) ----------
 const functionTypeWeights = {
   "Strategic Functions": 0.30,
@@ -259,77 +241,7 @@ const functionTypeOrder = {
   "Uncategorized": 4
 };
 
-const groupedPlansByFunction = computed(() => {
-  const groups = {};
-
-  (props.plans || []).forEach(plan => {
-    const aoo = plan.performance_indicator?.agency_outcome;
-
-    const rawFT = aoo?.function_type;
-    const functionType = normalizeFunctionType(rawFT);
-
-    const outcome = aoo?.outcome || "Uncategorized";
-    const subOutcome = aoo?.sub_outcome || "—";
-    const subAbbrev = subOutcome !== "—" ? subOutcome.slice(0, 4) : subOutcome;
-
-    const piDesc = plan.performance_indicator?.description || "—";
-
-    // Initialize buckets
-    if (!groups[functionType]) groups[functionType] = {};
-    if (!groups[functionType][outcome]) groups[functionType][outcome] = {};
-    if (!groups[functionType][outcome][subAbbrev]) groups[functionType][outcome][subAbbrev] = {};
-
-    // NEW: Group by Performance Indicator description
-    if (!groups[functionType][outcome][subAbbrev][piDesc]) {
-      groups[functionType][outcome][subAbbrev][piDesc] = [];
-    }
-
-    groups[functionType][outcome][subAbbrev][piDesc].push(plan);
-  });
-
-  // Apply ordering
-  const sorted = {};
-
-  Object.keys(functionTypeOrder).forEach(ft => {
-    if (groups[ft]) sorted[ft] = groups[ft];
-  });
-
-  Object.keys(groups)
-    .filter(ft => !functionTypeOrder[ft])
-    .sort()
-    .forEach(ft => (sorted[ft] = groups[ft]));
-
-  // Sort nested keys alphabetically
-  Object.keys(sorted).forEach(ft => {
-    const outcomes = sorted[ft];
-    const sortedOutcomes = {};
-
-    Object.keys(outcomes)
-      .sort()
-      .forEach(outcome => {
-        sortedOutcomes[outcome] = {};
-        Object.keys(outcomes[outcome])
-          .sort()
-          .forEach(sub => {
-            // Sort PI descriptions as well
-            const pis = outcomes[outcome][sub];
-            const sortedPI = {};
-
-            Object.keys(pis)
-              .sort()
-              .forEach(piDesc => {
-                sortedPI[piDesc] = pis[piDesc];
-              });
-
-            sortedOutcomes[outcome][sub] = sortedPI;
-          });
-      });
-
-    sorted[ft] = sortedOutcomes;
-  });
-
-  return sorted;
-});
+const groupedPlansByFunction = computed(() => groupPlansByOutcome(props.plans));
 
 
 // ---------- Modal control ----------
@@ -967,7 +879,7 @@ const pullFLAccomplishments = () => {
                   </tr>
 
                   <!-- SUBOUTCOME -->
-                  <template v-for="(pis, subAbbrev) in subGroups" :key="subAbbrev">
+                  <template v-for="(pis, subOutcomeLabel) in subGroups" :key="subOutcomeLabel">
 
                     <!-- PERFORMANCE INDICATOR GROUPING -->
                     <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
@@ -979,7 +891,7 @@ const pullFLAccomplishments = () => {
                         <td v-if="Object.keys(pis)[0] === piDesc"
                             :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
                             class="px-4 py-3 text-sm text-slate-700 border border-slate-200 font-medium align-top">
-                          {{ subAbbrev }}
+                          {{ subOutcomeLabel }}
                         </td>
 
                         <!-- Performance Indicator merged -->

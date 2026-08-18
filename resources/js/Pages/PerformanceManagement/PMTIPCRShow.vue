@@ -9,6 +9,7 @@ import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
+import { groupPlansByOutcome, normalizeFunctionType } from "@/Utils/IPCR/outcomeGrouping.js"
 
 const props = defineProps({
   ipcr:       Object,
@@ -79,15 +80,6 @@ const formattedTargetApprovedAt    = computed(() => formatDateString(props.ipcr?
 const formattedSubmittedRatingAt   = computed(() => formatDateString(props.ipcr?.submitted_rating_at))
 
 // ---------- Function type helpers ----------
-const normalizeFunctionType = (raw) => {
-  if (!raw) return "Uncategorized"
-  const t = String(raw).trim().toLowerCase()
-  if (t === "strategic" || t === "strategic functions" || t === "strategic function") return "Strategic Functions"
-  if (t === "core" || t === "core functions" || t === "core function") return "Core Functions"
-  if (t === "support" || t === "support functions" || t === "support function") return "Support Functions"
-  return String(raw).trim()
-}
-
 const functionTypeWeights = { "Strategic Functions": 0.30, "Core Functions": 0.55, "Support Functions": 0.15, "Uncategorized": 0 }
 const functionTypeOrder   = { "Strategic Functions": 1,    "Core Functions": 2,    "Support Functions": 3,    "Uncategorized": 4 }
 
@@ -103,45 +95,7 @@ const formatAvg = (num) => {
 }
 
 // ---------- Grouped plans: function type → outcome → sub-outcome → PI description ----------
-const groupedPlansByFunction = computed(() => {
-  const groups = {}
-
-  ;(props.plans || []).forEach(plan => {
-    const aoo        = plan.performance_indicator?.agency_outcome
-    const functionType = normalizeFunctionType(aoo?.function_type)
-    const outcome    = aoo?.outcome    || "Uncategorized"
-    const subOutcome = aoo?.sub_outcome || "—"
-    const subAbbrev  = subOutcome !== "—" ? subOutcome.slice(0, 4) : subOutcome
-    const piDesc     = plan.performance_indicator?.description || "—"
-
-    if (!groups[functionType]) groups[functionType] = {}
-    if (!groups[functionType][outcome]) groups[functionType][outcome] = {}
-    if (!groups[functionType][outcome][subAbbrev]) groups[functionType][outcome][subAbbrev] = {}
-    if (!groups[functionType][outcome][subAbbrev][piDesc]) groups[functionType][outcome][subAbbrev][piDesc] = []
-    groups[functionType][outcome][subAbbrev][piDesc].push(plan)
-  })
-
-  const sorted = {}
-  Object.keys(functionTypeOrder).forEach(ft => { if (groups[ft]) sorted[ft] = groups[ft] })
-  Object.keys(groups).filter(ft => !functionTypeOrder[ft]).sort().forEach(ft => (sorted[ft] = groups[ft]))
-
-  Object.keys(sorted).forEach(ft => {
-    const sortedOutcomes = {}
-    Object.keys(sorted[ft]).sort().forEach(outcome => {
-      sortedOutcomes[outcome] = {}
-      Object.keys(sorted[ft][outcome]).sort().forEach(sub => {
-        const sortedPI = {}
-        Object.keys(sorted[ft][outcome][sub]).sort().forEach(piDesc => {
-          sortedPI[piDesc] = sorted[ft][outcome][sub][piDesc]
-        })
-        sortedOutcomes[outcome][sub] = sortedPI
-      })
-    })
-    sorted[ft] = sortedOutcomes
-  })
-
-  return sorted
-})
+const groupedPlansByFunction = computed(() => groupPlansByOutcome(props.plans))
 
 // ---------- Summary by function type (weighted) ----------
 const summaryByFunctionType = computed(() => {
@@ -420,7 +374,7 @@ const printIPCR = () => window.print()
                   <td colspan="10" class="px-4 py-2 font-semibold text-gray-700 border">{{ outcome }}</td>
                 </tr>
 
-                <template v-for="(pis, subAbbrev) in subGroups" :key="subAbbrev">
+                <template v-for="(pis, subOutcomeLabel) in subGroups" :key="subOutcomeLabel">
                   <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
 
                     <!-- First row of each PI group -->
@@ -429,7 +383,7 @@ const printIPCR = () => window.print()
                       <td v-if="Object.keys(pis)[0] === piDesc"
                           :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
                           class="px-4 py-2 font-medium text-gray-700 border">
-                        {{ subAbbrev !== '—' ? subAbbrev : '' }}
+                        {{ subOutcomeLabel !== '—' ? subOutcomeLabel : '' }}
                       </td>
 
                       <!-- PI description merged cell -->

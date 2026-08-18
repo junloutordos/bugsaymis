@@ -8,6 +8,7 @@ import AppModal from "@/Components/AppModal.vue"
 import { ArrowLeftIcon, PrinterIcon } from "@heroicons/vue/24/outline"
 import { ref, computed } from "vue"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
+import { groupPlansByOutcome, normalizeFunctionType } from "@/Utils/IPCR/outcomeGrouping.js"
 
 const props = defineProps({
   ipcr:       Object,
@@ -86,54 +87,11 @@ const formatAvg = (num) => {
   return Number(num).toFixed(2)
 }
 
-// ---------- Normalize function type ----------
-const normalizeFunctionType = (raw) => {
-  if (!raw) return "Uncategorized"
-  const t = String(raw).trim().toLowerCase()
-  if (["strategic", "strategic functions", "strategic function"].includes(t)) return "Strategic Functions"
-  if (["core", "core functions", "core function"].includes(t)) return "Core Functions"
-  if (["support", "support functions", "support function"].includes(t)) return "Support Functions"
-  return String(raw).trim()
-}
-
 const functionTypeWeights = { "Strategic Functions": 0.30, "Core Functions": 0.55, "Support Functions": 0.15, "Uncategorized": 0 }
 const functionTypeOrder   = { "Strategic Functions": 1, "Core Functions": 2, "Support Functions": 3, "Uncategorized": 4 }
 
 // ---------- Grouped plans (same structure as EmployeeIPCRShow) ----------
-const groupedPlansByFunction = computed(() => {
-  const groups = {}
-  ;(props.plans || []).forEach(plan => {
-    const aoo          = plan.performance_indicator?.agency_outcome
-    const functionType = normalizeFunctionType(aoo?.function_type)
-    const outcome      = aoo?.outcome || "Uncategorized"
-    const subOutcome   = aoo?.sub_outcome || "—"
-    const subAbbrev    = subOutcome !== "—" ? subOutcome.slice(0, 4) : subOutcome
-    const piDesc       = plan.performance_indicator?.description || "—"
-    if (!groups[functionType]) groups[functionType] = {}
-    if (!groups[functionType][outcome]) groups[functionType][outcome] = {}
-    if (!groups[functionType][outcome][subAbbrev]) groups[functionType][outcome][subAbbrev] = {}
-    if (!groups[functionType][outcome][subAbbrev][piDesc]) groups[functionType][outcome][subAbbrev][piDesc] = []
-    groups[functionType][outcome][subAbbrev][piDesc].push(plan)
-  })
-  const sorted = {}
-  Object.keys(functionTypeOrder).forEach(ft => { if (groups[ft]) sorted[ft] = groups[ft] })
-  Object.keys(groups).filter(ft => !functionTypeOrder[ft]).sort().forEach(ft => (sorted[ft] = groups[ft]))
-  Object.keys(sorted).forEach(ft => {
-    const outcomes = sorted[ft]
-    const sortedOutcomes = {}
-    Object.keys(outcomes).sort().forEach(outcome => {
-      sortedOutcomes[outcome] = {}
-      Object.keys(outcomes[outcome]).sort().forEach(sub => {
-        const pis = outcomes[outcome][sub]
-        const sortedPI = {}
-        Object.keys(pis).sort().forEach(piDesc => { sortedPI[piDesc] = pis[piDesc] })
-        sortedOutcomes[outcome][sub] = sortedPI
-      })
-    })
-    sorted[ft] = sortedOutcomes
-  })
-  return sorted
-})
+const groupedPlansByFunction = computed(() => groupPlansByOutcome(props.plans))
 
 // ---------- Summary by function type ----------
 const summaryByFunctionType = computed(() => {
@@ -295,14 +253,14 @@ const printIPCR = () => window.print()
                   <td colspan="10" class="px-4 py-2 font-semibold text-gray-700 border border-gray-300">{{ outcome }}</td>
                 </tr>
 
-                <template v-for="(pis, subAbbrev) in subGroups" :key="subAbbrev">
+                <template v-for="(pis, subOutcomeLabel) in subGroups" :key="subOutcomeLabel">
                   <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
 
                     <!-- First row per PI group -->
                     <tr class="hover:bg-gray-50">
                       <td v-if="Object.keys(pis)[0] === piDesc"
                           :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
-                          class="px-4 py-2 font-medium text-gray-700 border border-gray-300">{{ subAbbrev }}</td>
+                          class="px-4 py-2 font-medium text-gray-700 border border-gray-300">{{ subOutcomeLabel }}</td>
                       <td :rowspan="piPlans.length" class="px-4 py-2 border border-gray-300 font-medium">{{ piDesc }}</td>
                       <td class="px-4 py-2 border border-gray-300">{{ piPlans[0].success_indicator }}</td>
                       <td class="px-4 py-2 border border-gray-300">
