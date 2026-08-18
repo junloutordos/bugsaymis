@@ -13,6 +13,7 @@ const props = defineProps({
   qrToken:          { type: String, default: null },
   walkin:           { type: Boolean, default: false },
   alreadyEvaluated: Boolean,
+  evaluationClosed: { type: Boolean, default: false },
 })
 
 const page        = usePage()
@@ -126,6 +127,15 @@ function submit() {
         <h2 class="text-lg font-semibold text-slate-800 mb-1">Evaluation Submitted</h2>
         <p class="text-sm text-slate-500">
           {{ flashSuccess ?? 'You have already submitted an evaluation for this activity. Thank you!' }}
+        </p>
+      </div>
+
+      <!-- Evaluation period closed -->
+      <div v-else-if="evaluationClosed"
+           class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+        <h2 class="text-lg font-semibold text-slate-800 mb-1">Evaluation Period Closed</h2>
+        <p class="text-sm text-slate-500">
+          The evaluation period for this activity has closed. Evaluations are no longer being accepted.
         </p>
       </div>
 
