@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\AMS;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\AMS\GenerateActivityCertificates;
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityCoProponent;
 use App\Models\AMS\ActivityParticipant;
@@ -21,98 +22,17 @@ class CertificateController extends Controller
         private ActivityEvaluationEligibilityService $evaluationEligibility,
     ) {}
     /**
-     * Generate certificates for all 'present' participants of an activity.
-     * Saves each PDF to storage and updates certificate_path on the participant row.
+     * Queue certificate generation for all eligible participants of an activity.
+     * The heavy work (PDF render + S3 upload + email) runs in the background;
+     * the requester is notified via bell/push when it completes.
      */
     public function generate(Activity $activity)
     {
         $this->authorizeManage($activity);
-        $activity->load('participants');
 
-        $generated   = 0;
-        $skipped     = 0;
-        $failedNames = [];
+        GenerateActivityCertificates::dispatch($activity->id, Auth::id());
 
-        $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
-
-        foreach ($activity->participants->where('participant_type', 'employee') as $participant) {
-            if ($participant->attended !== 'yes'
-                || ! isset($evaluations['employee:'.$participant->participant_id])
-                || $participant->certificate_path) {
-                $skipped++;
-                continue;
-            }
-
-            $user = User::find($participant->participant_id);
-            if (! $user) {
-                $skipped++;
-                continue;
-            }
-
-            try {
-                $path = $this->certService->buildAndSave(
-                    activity: $activity,
-                    name: $user->name,
-                    hoursAttended: $participant->hours_attended,
-                    participantId: $participant->participant_id,
-                    participantType: 'employee'
-                );
-
-                $participant->update(['certificate_path' => $path]);
-                if ($user->email) {
-                    $this->certService->sendCertificateEmail($activity, $user->email, $user->name, $path);
-                }
-                $generated++;
-            } catch (\Throwable $e) {
-                $failedNames[] = $user->name;
-                \Log::warning("AMS: certificate generation failed for employee {$participant->participant_id}: ".$e->getMessage());
-            }
-        }
-
-        // Student attendance rows are activity-wide. Process them once rather
-        // than once per participating section, which previously duplicated PDFs.
-        $studentRows = ActivityStudentAttendance::where('activity_id', $activity->id)->get();
-        foreach ($studentRows as $row) {
-            if ($row->attended !== 'yes'
-                || ! isset($evaluations['student:'.$row->participant_id])
-                || $row->certificate_path) {
-                $skipped++;
-                continue;
-            }
-
-            $student = Student::find($row->participant_id);
-            if (! $student) {
-                $skipped++;
-                continue;
-            }
-
-            try {
-                $path = $this->certService->buildAndSave(
-                    activity: $activity,
-                    name: $student->full_name,
-                    hoursAttended: $row->hours_attended,
-                    participantId: $row->participant_id,
-                    participantType: 'student'
-                );
-
-                $row->update(['certificate_path' => $path]);
-                if ($student->student_email) {
-                    $this->certService->sendCertificateEmail($activity, $student->student_email, $student->full_name, $path);
-                }
-                $generated++;
-            } catch (\Throwable $e) {
-                $failedNames[] = $student->full_name;
-                \Log::warning("AMS: certificate generation failed for student {$row->participant_id}: ".$e->getMessage());
-            }
-        }
-
-        $message = "Generated {$generated} eligible certificate(s) and emailed those with an available address. {$skipped} skipped (absent, not evaluated, already generated, or missing).";
-        if ($failedNames) {
-            $failedCount = count($failedNames);
-            $message .= " {$failedCount} failed during generation: ".implode(', ', $failedNames).'.';
-        }
-
-        return back()->with('success', $message);
+        return back()->with('success', 'Certificate generation has started. You will be notified once it finishes.');
     }
 
     public function downloadParticipant(Activity $activity, ActivityParticipant $participant)

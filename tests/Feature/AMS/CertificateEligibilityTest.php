@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\AMS;
 
+use App\Jobs\AMS\GenerateActivityCertificates;
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityEvaluation;
 use App\Models\AMS\ActivityParticipant;
@@ -11,6 +12,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\AMS\CertificateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CertificateEligibilityTest extends TestCase
@@ -40,7 +42,31 @@ class CertificateEligibilityTest extends TestCase
         ]);
     }
 
-    public function test_manual_generation_skips_present_participant_without_evaluation(): void
+    public function test_manual_generation_queues_a_background_job(): void
+    {
+        Queue::fake();
+
+        [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
+            'attended' => 'yes',
+            'hours_attended' => 8,
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.certificates.generate', $activity))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        Queue::assertPushed(
+            GenerateActivityCertificates::class,
+            fn ($job) => $job->activityId === $activity->id && $job->requestedByUserId === $owner->id
+        );
+
+        // The HTTP request itself must not touch certificate generation —
+        // that all happens later, in the queued job.
+        $this->assertNull($participant->fresh()->certificate_path);
+    }
+
+    public function test_generation_job_skips_present_participant_without_evaluation(): void
     {
         [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
             'attended' => 'yes',
@@ -50,15 +76,15 @@ class CertificateEligibilityTest extends TestCase
         $certificate->shouldNotReceive('buildAndSave');
         $certificate->shouldNotReceive('sendCertificateEmail');
 
-        $this->actingAs($owner)
-            ->post(route('ams.activities.certificates.generate', $activity))
-            ->assertRedirect()
-            ->assertSessionHas('success');
+        (new GenerateActivityCertificates($activity->id, $owner->id))->handle(
+            app(CertificateService::class),
+            app(\App\Services\AMS\ActivityEvaluationEligibilityService::class),
+        );
 
         $this->assertNull($participant->fresh()->certificate_path);
     }
 
-    public function test_manual_generation_creates_and_emails_certificate_after_in_house_evaluation(): void
+    public function test_generation_job_creates_and_emails_certificate_after_in_house_evaluation(): void
     {
         [$owner, $attendee, $activity, $participant] = $this->employeeParticipant([
             'attended' => 'yes',
@@ -74,15 +100,15 @@ class CertificateEligibilityTest extends TestCase
         $certificate->shouldReceive('buildAndSave')->once()->andReturn('ams/certificates/eligible.pdf');
         $certificate->shouldReceive('sendCertificateEmail')->once();
 
-        $this->actingAs($owner)
-            ->post(route('ams.activities.certificates.generate', $activity))
-            ->assertRedirect()
-            ->assertSessionHas('success');
+        (new GenerateActivityCertificates($activity->id, $owner->id))->handle(
+            app(CertificateService::class),
+            app(\App\Services\AMS\ActivityEvaluationEligibilityService::class),
+        );
 
         $this->assertSame('ams/certificates/eligible.pdf', $participant->fresh()->certificate_path);
     }
 
-    public function test_generation_continues_and_reports_failed_participant_name_when_build_throws(): void
+    public function test_generation_job_continues_and_reports_failed_participant_name_when_build_throws(): void
     {
         [$owner, $attendee1, $activity, $participant1] = $this->employeeParticipant([
             'attended' => 'yes',
@@ -119,19 +145,16 @@ class CertificateEligibilityTest extends TestCase
             });
         $certificate->shouldReceive('sendCertificateEmail')->once();
 
-        $response = $this->actingAs($owner)
-            ->post(route('ams.activities.certificates.generate', $activity))
-            ->assertRedirect();
+        (new GenerateActivityCertificates($activity->id, $owner->id))->handle(
+            app(CertificateService::class),
+            app(\App\Services\AMS\ActivityEvaluationEligibilityService::class),
+        );
 
         $this->assertNull($participant1->fresh()->certificate_path);
         $this->assertSame('ams/certificates/ok.pdf', $participant2->fresh()->certificate_path);
-
-        $success = $response->getSession()->get('success');
-        $this->assertStringContainsString('1 failed during generation', $success);
-        $this->assertStringContainsString($attendee1->name, $success);
     }
 
-    public function test_generation_handles_participants_with_duplicate_names_independently(): void
+    public function test_generation_job_handles_participants_with_duplicate_names_independently(): void
     {
         [$owner, $attendee1, $activity, $participant1] = $this->employeeParticipant([
             'attended' => 'yes',
@@ -189,9 +212,10 @@ class CertificateEligibilityTest extends TestCase
         $certificate->shouldReceive('buildAndSave')->once()->andReturn('ams/certificates/tws.pdf');
         $certificate->shouldReceive('sendCertificateEmail')->once();
 
-        $this->actingAs($owner)
-            ->post(route('ams.activities.certificates.generate', $activity))
-            ->assertRedirect();
+        (new GenerateActivityCertificates($activity->id, $owner->id))->handle(
+            app(CertificateService::class),
+            app(\App\Services\AMS\ActivityEvaluationEligibilityService::class),
+        );
 
         $this->assertSame('ams/certificates/tws.pdf', $participant->fresh()->certificate_path);
     }
