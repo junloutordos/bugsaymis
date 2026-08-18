@@ -4,6 +4,9 @@ namespace Tests\Feature\ClassRecord;
 
 use App\Console\Commands\ClassRecord\ConsolidatePehmCoTeaching;
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\ClassRecordAssessment;
+use App\Models\ClassRecord\ClassRecordQuarter;
+use App\Models\ClassRecord\ClassRecordTeacher;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\SchoolYear;
@@ -38,6 +41,35 @@ class ConsolidatePehmCoTeachingCommandTest extends TestCase
             7 => ['Health' => $make('HLTH1', 'Health 1', 7), 'Music' => $make('MUS1', 'Music 1', 7), 'PE' => $make('PE1', 'Physical Education 1', 7)],
             8 => ['Health' => $make('HLTH2', 'Health 2', 8), 'Music' => $make('MUS2', 'Music 2', 8), 'PE' => $make('PE2', 'Physical Education 2', 8)],
         ];
+    }
+
+    private function makeClassRecord(array $overrides): ClassRecord
+    {
+        $sy = $this->pehmSchoolYear();
+
+        return ClassRecord::create(array_merge([
+            'school_year_id' => $sy->id,
+            'school_year' => $sy->name,
+            'subject_name' => 'X',
+            'year_level_section' => 'Y',
+            'status' => 'draft',
+        ], $overrides));
+    }
+
+    /** @return array{healthRecord:ClassRecord,musicRecord:?ClassRecord,peRecord:ClassRecord,healthTeacher:User,musicTeacher:?User,peTeacher:User} */
+    private function seedTwoRecordSectionFixture(GradingOption $option, int $sectionId): array
+    {
+        $sy = $this->pehmSchoolYear();
+        $healthSubject = Subject::create(['code' => 'HLTH1', 'name' => 'Health 1', 'subject_group' => 'PEHM', 'grade_level' => 7, 'subject_type' => 'lecture', 'school_year_id' => $sy->id]);
+        $peSubject = Subject::create(['code' => 'PE1', 'name' => 'Physical Education 1', 'subject_group' => 'PEHM', 'grade_level' => 7, 'subject_type' => 'lecture', 'school_year_id' => $sy->id]);
+
+        $healthTeacher = User::factory()->create();
+        $peTeacher = User::factory()->create();
+
+        $healthRecord = $this->makeClassRecord(['section_id' => $sectionId, 'subject_id' => $healthSubject->id, 'teacher_id' => $healthTeacher->id, 'grading_option_id' => $option->id]);
+        $peRecord = $this->makeClassRecord(['section_id' => $sectionId, 'subject_id' => $peSubject->id, 'teacher_id' => $peTeacher->id, 'grading_option_id' => $option->id]);
+
+        return compact('healthRecord', 'peRecord', 'healthTeacher', 'peTeacher');
     }
 
     public function test_role_for_category_detects_pe_health_music_from_name_null_otherwise(): void
@@ -164,5 +196,92 @@ class ConsolidatePehmCoTeachingCommandTest extends TestCase
         $cmd->assertOptionOnlyUsedByPehm($option, [$expectedRecord->id, $anotherExpectedRecord->id]);
 
         $this->assertTrue(true); // reached without throwing
+    }
+
+    public function test_consolidate_section_merges_records_adds_pivot_rows_for_every_teacher_including_canonical_reparents_assessments_and_archives(): void
+    {
+        $option = GradingOption::create(['name' => 'PEHM 1-3 (Grade 7)']);
+        $sa1 = GradingCategory::create(['grading_option_id' => $option->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 1, 'subject_id' => null]);
+        $sa2 = GradingCategory::create(['grading_option_id' => $option->id, 'name' => 'SA (Health)', 'code' => 'SA 2', 'weight' => 0.10, 'max_assessments' => 1, 'subject_id' => null]);
+
+        ['healthRecord' => $healthRecord, 'peRecord' => $peRecord, 'healthTeacher' => $healthTeacher, 'peTeacher' => $peTeacher] =
+            $this->seedTwoRecordSectionFixture($option, sectionId: 999);
+
+        $sa1->update(['subject_id' => $peRecord->subject_id]);
+        $sa2->update(['subject_id' => $healthRecord->subject_id]);
+
+        $healthQuarter = ClassRecordQuarter::create(['class_record_id' => $healthRecord->id, 'quarter' => 1]);
+        ClassRecordAssessment::create(['class_record_quarter_id' => $healthQuarter->id, 'grading_category_id' => $sa2->id, 'title' => 'Health Q1 Test', 'activity_date' => '2026-08-10', 'max_score' => 50, 'assessment_number' => 1]);
+
+        $peQuarter = ClassRecordQuarter::create(['class_record_id' => $peRecord->id, 'quarter' => 1]);
+        ClassRecordAssessment::create(['class_record_quarter_id' => $peQuarter->id, 'grading_category_id' => $sa1->id, 'title' => 'PE Q1 Test', 'activity_date' => '2026-08-11', 'max_score' => 50, 'assessment_number' => 1]);
+
+        $cmd = new ConsolidatePehmCoTeaching();
+        $records = ClassRecord::whereIn('id', [$healthRecord->id, $peRecord->id])->with('subject')->get();
+
+        $report = $cmd->consolidateSection($records, $option->fresh(['categories']), commit: true);
+
+        $canonical = ClassRecord::find($report['canonical_id']);
+        $this->assertNotNull($canonical);
+
+        $pivotUserIds = ClassRecordTeacher::where('class_record_id', $canonical->id)->pluck('user_id')->all();
+        $this->assertContains($healthTeacher->id, $pivotUserIds);
+        $this->assertContains($peTeacher->id, $pivotUserIds);
+
+        $otherId = $report['canonical_id'] === $healthRecord->id ? $peRecord->id : $healthRecord->id;
+        $this->assertSame('archived', ClassRecord::find($otherId)->status);
+
+        $canonicalQuarter = ClassRecordQuarter::where('class_record_id', $canonical->id)->where('quarter', 1)->first();
+        $reparented = ClassRecordAssessment::where('class_record_quarter_id', $canonicalQuarter->id)->pluck('title')->sort()->values()->all();
+        $this->assertSame(['Health Q1 Test', 'PE Q1 Test'], $reparented);
+
+        $this->assertSame(2, $report['pivot_rows_created']);
+        $this->assertSame(2, $report['assessments_reparented']);
+        $this->assertSame([], $report['unmatched_leaves']);
+    }
+
+    public function test_consolidate_section_dry_run_makes_zero_writes(): void
+    {
+        $option = GradingOption::create(['name' => 'PEHM 1-3 (Grade 7)']);
+        GradingCategory::create(['grading_option_id' => $option->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 1]);
+        GradingCategory::create(['grading_option_id' => $option->id, 'name' => 'SA (Health)', 'code' => 'SA 2', 'weight' => 0.10, 'max_assessments' => 1]);
+        $this->seedTwoRecordSectionFixture($option, sectionId: 998);
+
+        $before = [
+            'class_records' => \DB::table('class_records')->count(),
+            'class_record_teachers' => \DB::table('class_record_teachers')->count(),
+            'class_record_assessments' => \DB::table('class_record_assessments')->count(),
+        ];
+
+        $cmd = new ConsolidatePehmCoTeaching();
+        $records = ClassRecord::where('section_id', 998)->with('subject')->get();
+        $report = $cmd->consolidateSection($records, $option->fresh(['categories']), commit: false);
+
+        $this->assertSame($before['class_records'], \DB::table('class_records')->count());
+        $this->assertSame($before['class_record_teachers'], \DB::table('class_record_teachers')->count());
+        $this->assertSame($before['class_record_assessments'], \DB::table('class_record_assessments')->count());
+        $this->assertSame(2, $report['pivot_rows_created']);
+    }
+
+    public function test_consolidate_section_flags_an_assessment_whose_old_leaf_has_no_role_match_instead_of_dropping_it_silently(): void
+    {
+        $sy = $this->pehmSchoolYear();
+        $option = GradingOption::create(['name' => 'PEHM 1-3 (Grade 7)']);
+        $orphanLeaf = GradingCategory::create(['grading_option_id' => $option->id, 'name' => 'Unlabeled Leaf', 'code' => 'XX 9', 'weight' => 0.10, 'max_assessments' => 1]);
+
+        $healthSubject = Subject::create(['code' => 'HLTH1', 'name' => 'Health 1', 'subject_group' => 'PEHM', 'grade_level' => 7, 'subject_type' => 'lecture', 'school_year_id' => $sy->id]);
+        $peSubject = Subject::create(['code' => 'PE1', 'name' => 'Physical Education 1', 'subject_group' => 'PEHM', 'grade_level' => 7, 'subject_type' => 'lecture', 'school_year_id' => $sy->id]);
+        $healthRecord = $this->makeClassRecord(['section_id' => 997, 'subject_id' => $healthSubject->id, 'teacher_id' => User::factory()->create()->id, 'grading_option_id' => $option->id]);
+        $peRecord = $this->makeClassRecord(['section_id' => 997, 'subject_id' => $peSubject->id, 'teacher_id' => User::factory()->create()->id, 'grading_option_id' => $option->id]);
+        $quarter = ClassRecordQuarter::create(['class_record_id' => $peRecord->id, 'quarter' => 1]);
+        ClassRecordAssessment::create(['class_record_quarter_id' => $quarter->id, 'grading_category_id' => $orphanLeaf->id, 'title' => 'Mystery Assessment', 'activity_date' => '2026-08-10', 'max_score' => 50, 'assessment_number' => 1]);
+
+        $cmd = new ConsolidatePehmCoTeaching();
+        $records = ClassRecord::whereIn('id', [$healthRecord->id, $peRecord->id])->with('subject')->get();
+        $report = $cmd->consolidateSection($records, $option->fresh(['categories']), commit: true);
+
+        $this->assertCount(1, $report['unmatched_leaves']);
+        $this->assertStringContainsString('Mystery Assessment', $report['unmatched_leaves'][0]);
+        $this->assertSame($quarter->id, ClassRecordAssessment::where('title', 'Mystery Assessment')->first()->class_record_quarter_id);
     }
 }

@@ -3,10 +3,15 @@
 namespace App\Console\Commands\ClassRecord;
 
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\ClassRecordAssessment;
+use App\Models\ClassRecord\ClassRecordQuarter;
+use App\Models\ClassRecord\ClassRecordTeacher;
 use App\Models\ClassRecord\GradingCategory;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\Subject;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ConsolidatePehmCoTeaching extends Command
 {
@@ -163,5 +168,131 @@ class ConsolidatePehmCoTeaching extends Command
                 'Investigate before proceeding; this option may be in use outside the PEHM consolidation scope.'
             );
         }
+    }
+
+    /**
+     * @param  Collection<int,ClassRecord>  $records  every non-archived PEHM record for one section (2-3 rows)
+     * @return array{canonical_id:int,archived_ids:array<int>,pivot_rows_created:int,assessments_reparented:int,unmatched_leaves:array<string>}
+     */
+    public function consolidateSection(Collection $records, GradingOption $targetOption, bool $commit): array
+    {
+        $canonical = $records->sortBy('id')->first();
+        $others = $records->reject(fn ($r) => $r->id === $canonical->id);
+
+        // Build the target option's role/strippedCode -> new-leaf-id index.
+        $targetIndex = [];
+        foreach ($targetOption->categories as $leaf) {
+            $role = $this->roleForCategory($leaf);
+            if ($role === null) {
+                continue;
+            }
+            $targetIndex[$role.'|'.$this->stripCode($leaf->code)] = $leaf->id;
+        }
+
+        $report = [
+            'canonical_id' => $canonical->id,
+            'archived_ids' => [],
+            'pivot_rows_created' => 0,
+            'assessments_reparented' => 0,
+            'unmatched_leaves' => [],
+        ];
+
+        $run = function () use ($records, $canonical, $others, $targetIndex, $commit, $targetOption, &$report) {
+            // Every teacher on every record in this section gets an explicit
+            // pivot row on the canonical record — including the canonical
+            // record's own original teacher. teacherIdsFor() falls back to
+            // teacher_id ONLY when coTeachers is entirely empty; once we add
+            // any pivot row, the canonical teacher needs one too or they lose
+            // their own edit access.
+            foreach ($records as $record) {
+                $exists = ClassRecordTeacher::where('class_record_id', $canonical->id)
+                    ->where('subject_id', $record->subject_id)
+                    ->where('user_id', $record->teacher_id)
+                    ->exists();
+
+                if (! $exists) {
+                    if ($commit) {
+                        ClassRecordTeacher::create([
+                            'class_record_id' => $canonical->id,
+                            'subject_id' => $record->subject_id,
+                            'user_id' => $record->teacher_id,
+                            'is_primary' => $record->id === $canonical->id,
+                        ]);
+                    }
+                    $report['pivot_rows_created']++;
+                }
+            }
+
+            if ($commit) {
+                $canonical->grading_option_id = $targetOption->id;
+                $canonical->save();
+            }
+
+            // Re-parent every record's assessments onto the target option's
+            // matching leaf — including the canonical record's OWN
+            // pre-existing assessments, which still point at leaves under
+            // its old grading_option_id now that grading_option_id has been
+            // swapped to $targetOption above. Non-canonical records'
+            // assessments additionally move onto the canonical record's
+            // matching quarter (creating it if needed) and the record itself
+            // gets archived once its assessments are moved.
+            foreach ($records as $record) {
+                $isCanonical = $record->id === $canonical->id;
+                $quarters = ClassRecordQuarter::where('class_record_id', $record->id)->get();
+
+                foreach ($quarters as $quarter) {
+                    $assessments = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)
+                        ->with('gradingCategory')
+                        ->get();
+
+                    if ($assessments->isEmpty()) {
+                        continue;
+                    }
+
+                    $canonicalQuarter = $isCanonical
+                        ? $quarter
+                        : ($commit
+                            ? ClassRecordQuarter::firstOrCreate(['class_record_id' => $canonical->id, 'quarter' => $quarter->quarter])
+                            : (ClassRecordQuarter::where('class_record_id', $canonical->id)->where('quarter', $quarter->quarter)->first()
+                                ?? new ClassRecordQuarter(['class_record_id' => $canonical->id, 'quarter' => $quarter->quarter])));
+
+                    foreach ($assessments as $assessment) {
+                        $oldLeaf = $assessment->gradingCategory;
+                        $role = $oldLeaf ? $this->roleForCategory($oldLeaf) : null;
+                        $key = $role !== null ? $role.'|'.$this->stripCode($oldLeaf->code) : null;
+                        $newLeafId = $key !== null ? ($targetIndex[$key] ?? null) : null;
+
+                        if ($newLeafId === null) {
+                            $report['unmatched_leaves'][] = "Assessment '{$assessment->title}' (id {$assessment->id}, old leaf '".($oldLeaf->name ?? 'unknown')."') on class record #{$record->id} — no matching leaf found on target option #{$targetOption->id}, left in place.";
+
+                            continue;
+                        }
+
+                        if ($commit) {
+                            $assessment->class_record_quarter_id = $canonicalQuarter->id;
+                            $assessment->grading_category_id = $newLeafId;
+                            $assessment->save();
+                        }
+                        $report['assessments_reparented']++;
+                    }
+                }
+            }
+
+            foreach ($others as $other) {
+                if ($commit) {
+                    $other->status = 'archived';
+                    $other->save();
+                }
+                $report['archived_ids'][] = $other->id;
+            }
+        };
+
+        if ($commit) {
+            DB::transaction($run);
+        } else {
+            $run();
+        }
+
+        return $report;
     }
 }
