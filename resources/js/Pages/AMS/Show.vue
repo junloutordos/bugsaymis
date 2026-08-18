@@ -382,7 +382,7 @@ async function toggleSectionExpand(p) {
     )
     const list = await res.json()
     sectionStudents.value[p.id] = list
-    secAttendance[p.id] = list.map(s => ({ ...s }))
+    secAttendance[p.id] = list.map(s => ({ ...s, daily: { ...(s.daily ?? {}) } }))
   } finally {
     loadingStudents.value[p.id] = false
   }
@@ -391,6 +391,16 @@ async function toggleSectionExpand(p) {
 function markAllSectionStudents(pid, attended) {
   if (!secAttendance[pid]) return
   secAttendance[pid].forEach(s => { s.attended = attended })
+}
+
+function getStudentDay(student, date) {
+  if (!student.daily[date]) student.daily[date] = { attended: 'no', hours: 0 }
+  return student.daily[date]
+}
+
+const expandedStudentDaily = ref(null)
+function toggleStudentDailyExpand(studentAttendanceId) {
+  expandedStudentDaily.value = expandedStudentDaily.value === studentAttendanceId ? null : studentAttendanceId
 }
 
 function saveSectionAttendance(p) {
@@ -404,6 +414,13 @@ function saveSectionAttendance(p) {
         attended:       s.attended,
         hours_attended: s.hours_attended,
         student_id:     s.id,
+        ...(props.activity.is_multi_day ? {
+          daily: props.activity.attendance_days.map(date => ({
+            date,
+            attended: s.daily[date]?.attended ?? 'no',
+            hours_attended: s.daily[date]?.hours ?? 0,
+          })),
+        } : {}),
       }))
     },
     { preserveScroll: true }
@@ -932,16 +949,24 @@ async function removeCoPro(cp) {
                             </tr>
                           </thead>
                           <tbody class="divide-y divide-slate-50">
-                            <tr v-for="student in secAttendance[p.id]" :key="student.id" class="bg-white hover:bg-slate-50">
-                              <td class="px-3 py-2 text-slate-700">{{ student.name }}</td>
+                            <template v-for="student in secAttendance[p.id]" :key="student.id">
+                            <tr class="bg-white hover:bg-slate-50">
+                              <td class="px-3 py-2 text-slate-700">
+                                <span class="inline-flex items-center gap-1.5">
+                                  <button v-if="activity.is_multi_day" @click="toggleStudentDailyExpand(student.attendance_id)" class="shrink-0">
+                                    <component :is="expandedStudentDaily === student.attendance_id ? ChevronUpIcon : ChevronDownIcon" class="w-3.5 h-3.5 text-slate-400" />
+                                  </button>
+                                  {{ student.name }}
+                                </span>
+                              </td>
                               <td class="px-3 py-2 text-center">
-                                <input v-if="canManage" v-model="student.hours_attended"
+                                <input v-if="canManage && !activity.is_multi_day" v-model="student.hours_attended"
                                        type="number" min="0" max="999" step="0.5"
                                        class="w-20 text-center rounded-lg border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                 <span v-else class="text-slate-600 text-xs">{{ student.hours_attended }}</span>
                               </td>
                               <td class="px-3 py-2 text-center">
-                                <button v-if="canManage" @click="student.attended = student.attended === 'yes' ? 'no' : 'yes'">
+                                <button v-if="canManage && !activity.is_multi_day" @click="student.attended = student.attended === 'yes' ? 'no' : 'yes'">
                                   <AppBadge :color="attendanceColor(student.attended)">
                                     <CheckCircleIcon class="w-3 h-3 mr-1" />
                                     {{ student.attended === 'yes' ? 'Present' : 'Absent' }}
@@ -970,6 +995,24 @@ async function removeCoPro(cp) {
                                 <span v-else class="text-xs text-slate-400">—</span>
                               </td>
                             </tr>
+                            <tr v-if="activity.is_multi_day && expandedStudentDaily === student.attendance_id" class="bg-slate-50">
+                              <td colspan="5" class="px-6 py-3 border-t border-slate-100">
+                                <div class="flex flex-wrap gap-3">
+                                  <div v-for="date in activity.attendance_days" :key="date" class="border border-slate-200 rounded-lg px-3 py-2 bg-white min-w-[140px]">
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-1">{{ formatMealDay(date) }}</p>
+                                    <button v-if="canManage" @click="getStudentDay(student, date).attended = getStudentDay(student, date).attended === 'yes' ? 'no' : 'yes'">
+                                      <AppBadge :color="attendanceColor(getStudentDay(student, date).attended)">
+                                        {{ getStudentDay(student, date).attended === 'yes' ? 'Present' : 'Absent' }}
+                                      </AppBadge>
+                                    </button>
+                                    <input v-if="canManage" v-model="getStudentDay(student, date).hours"
+                                           type="number" min="0" max="999" step="0.5"
+                                           class="mt-1 w-full text-center rounded border border-slate-200 px-1 py-0.5 text-xs" />
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                            </template>
                           </tbody>
                         </table>
                       </div>
