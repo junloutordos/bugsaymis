@@ -368,4 +368,42 @@ class ConsolidatePehmCoTeachingCommandTest extends TestCase
             $pivotSubjectIds
         );
     }
+
+    public function test_dry_run_against_a_never_before_cloned_grade_correctly_matches_leaves_not_just_zero_writes(): void
+    {
+        // Regression test for a real bug found against production: a dry-run
+        // clone's LEAF categories (not just the parent GradingOption) must
+        // get a distinct non-null sentinel id, or `$targetIndex[$key] ?? null`
+        // in consolidateSection() cannot tell "key exists with a null id"
+        // apart from "key missing" — every assessment silently reported as
+        // unmatched even though the leaf genuinely matched by role+code.
+        $template = GradingOption::create(['name' => 'PEHM 1-3']);
+        $sa = GradingCategory::create(['grading_option_id' => $template->id, 'name' => 'Summative Assessment', 'code' => 'SA', 'weight' => 0.30, 'max_assessments' => 1]);
+        $sa1 = GradingCategory::create(['grading_option_id' => $template->id, 'parent_id' => $sa->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 1]);
+        GradingCategory::create(['grading_option_id' => $template->id, 'parent_id' => $sa->id, 'name' => 'SA (Health)', 'code' => 'SA 2', 'weight' => 0.10, 'max_assessments' => 1]);
+        GradingCategory::create(['grading_option_id' => $template->id, 'parent_id' => $sa->id, 'name' => 'SA (Music)', 'code' => 'SA 3', 'weight' => 0.10, 'max_assessments' => 1]);
+
+        // Mirrors the real production data shape: even the Health record's
+        // OWN assessment is (incorrectly, pre-existingly) filed under the
+        // "SA (PE)" leaf — the matcher must still find it by role+code on
+        // the TARGET side, independent of which record it currently sits on.
+        ['healthRecord' => $healthRecord, 'peRecord' => $peRecord] = $this->seedTwoRecordSectionFixture($template, sectionId: 996);
+        $subjectsByRole = ['Health' => $healthRecord->subject_id, 'PE' => $peRecord->subject_id];
+        $healthQuarter = ClassRecordQuarter::create(['class_record_id' => $healthRecord->id, 'quarter' => 1]);
+        ClassRecordAssessment::create(['class_record_quarter_id' => $healthQuarter->id, 'grading_category_id' => $sa1->id, 'title' => 'Health assessment filed under PE leaf', 'activity_date' => '2026-08-10', 'max_score' => 50, 'assessment_number' => 1]);
+
+        $cmd = new ConsolidatePehmCoTeaching();
+        $targetOption = $cmd->resolveTargetOptionForGrade($template, 7, $subjectsByRole, commit: false);
+
+        // Every cloned leaf must have a distinct, non-null id in dry-run mode.
+        $leafIds = $targetOption->categories->pluck('id')->all();
+        $this->assertNotContains(null, $leafIds);
+        $this->assertCount(count($leafIds), array_unique($leafIds));
+
+        $records = ClassRecord::whereIn('id', [$healthRecord->id, $peRecord->id])->with('subject')->get();
+        $report = $cmd->consolidateSection($records, $targetOption, commit: false);
+
+        $this->assertSame([], $report['unmatched_leaves']);
+        $this->assertSame(1, $report['assessments_reparented']);
+    }
 }

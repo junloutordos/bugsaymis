@@ -216,12 +216,20 @@ class ConsolidatePehmCoTeaching extends Command
         // nothing and make every assessment look "unmatched").
         $allCreated = collect();
 
+        // Dry-run sentinel id counter (starts at -2 since the option clone
+        // itself already uses -1). Each cloned LEAF must get its own
+        // distinct non-null id — a null id would make
+        // `$targetIndex[$key] ?? null` in consolidateSection() unable to
+        // distinguish "key exists, id is null" from "key missing", causing
+        // every dry-run match to silently report as unmatched.
+        $sentinelId = -2;
+
         $topLevel = $sourceTemplate->categories()->whereNull('parent_id')->get();
         foreach ($topLevel as $parent) {
-            $newParent = $this->cloneCategory($parent, $clone, null, $subjectsByRole, $commit);
+            $newParent = $this->cloneCategory($parent, $clone, null, $subjectsByRole, $commit, $sentinelId);
             $allCreated->push($newParent);
             foreach ($parent->children as $child) {
-                $allCreated->push($this->cloneCategory($child, $clone, $newParent, $subjectsByRole, $commit));
+                $allCreated->push($this->cloneCategory($child, $clone, $newParent, $subjectsByRole, $commit, $sentinelId));
             }
         }
 
@@ -230,13 +238,17 @@ class ConsolidatePehmCoTeaching extends Command
         return $clone;
     }
 
-    private function cloneCategory(GradingCategory $source, GradingOption $newOption, ?GradingCategory $newParent, array $subjectsByRole, bool $commit): GradingCategory
+    private function cloneCategory(GradingCategory $source, GradingOption $newOption, ?GradingCategory $newParent, array $subjectsByRole, bool $commit, int &$sentinelId): GradingCategory
     {
         $role = $this->roleForCategory($source);
         $new = $source->replicate(['id', 'created_at', 'updated_at']);
         $new->grading_option_id = $commit ? $newOption->id : -1;
         $new->parent_id = $newParent?->id;
         $new->subject_id = ($role !== null && isset($subjectsByRole[$role])) ? $subjectsByRole[$role] : null;
+
+        if (! $commit) {
+            $new->id = $sentinelId--;
+        }
 
         if ($commit) {
             $new->save();
