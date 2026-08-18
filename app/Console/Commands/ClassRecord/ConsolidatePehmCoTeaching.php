@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands\ClassRecord;
 
+use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\GradingCategory;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\Subject;
 use Illuminate\Console\Command;
 
@@ -66,5 +68,100 @@ class ConsolidatePehmCoTeaching extends Command
         }
 
         return $map;
+    }
+
+    /**
+     * For grade levels that share a template with other grade levels (7-9,
+     * all currently on "PEHM 1-3"), clone the template into a grade-specific
+     * copy with every matched leaf's subject_id correctly set — the shared
+     * original is never mutated, since other grade levels' (not-yet-processed)
+     * records may still reference it during the same run.
+     *
+     * For a grade level that is the ONLY consumer of a template (Grade 10 /
+     * "PEHM 4 Final", after repointing away the "PEHM 4" stragglers earlier in
+     * the run), mutate the template's leaves in place — no clone needed, and
+     * doing so avoids leaving an orphaned duplicate option behind.
+     *
+     * @param  array<string,int>  $subjectsByRole  ['PE' => id, 'Health' => id, 'Music' => id] for this grade level
+     */
+    public function resolveTargetOptionForGrade(
+        GradingOption $sourceTemplate,
+        int $gradeLevel,
+        array $subjectsByRole,
+        bool $commit,
+        bool $cloneEvenIfSingleGrade = true,
+    ): GradingOption {
+        if (! $cloneEvenIfSingleGrade) {
+            foreach ($sourceTemplate->categories as $category) {
+                $role = $this->roleForCategory($category);
+                if ($role === null || ! isset($subjectsByRole[$role])) {
+                    continue;
+                }
+                $category->subject_id = $subjectsByRole[$role];
+                if ($commit) {
+                    $category->save();
+                }
+            }
+
+            return $sourceTemplate;
+        }
+
+        $clone = $sourceTemplate->replicate(['id', 'created_at', 'updated_at']);
+        $clone->name = "{$sourceTemplate->name} (Grade {$gradeLevel})";
+
+        if ($commit) {
+            $clone->save();
+        } else {
+            $clone->id = -1; // sentinel: never persisted, dry-run display only
+        }
+
+        $topLevel = $sourceTemplate->categories()->whereNull('parent_id')->get();
+        foreach ($topLevel as $parent) {
+            $newParent = $this->cloneCategory($parent, $clone, null, $subjectsByRole, $commit);
+            foreach ($parent->children as $child) {
+                $this->cloneCategory($child, $clone, $newParent, $subjectsByRole, $commit);
+            }
+        }
+
+        return $clone;
+    }
+
+    private function cloneCategory(GradingCategory $source, GradingOption $newOption, ?GradingCategory $newParent, array $subjectsByRole, bool $commit): GradingCategory
+    {
+        $role = $this->roleForCategory($source);
+        $new = $source->replicate(['id', 'created_at', 'updated_at']);
+        $new->grading_option_id = $commit ? $newOption->id : -1;
+        $new->parent_id = $newParent?->id;
+        $new->subject_id = ($role !== null && isset($subjectsByRole[$role])) ? $subjectsByRole[$role] : null;
+
+        if ($commit) {
+            $new->save();
+        }
+
+        return $new;
+    }
+
+    /**
+     * Refuses to proceed if a shared option we're about to mutate in place
+     * (the grade-10 "no clone" path) is referenced by any class record OUTSIDE
+     * the expected set — protects against silently corrupting an unrelated
+     * module's use of the same GradingOption row.
+     */
+    public function assertOptionOnlyUsedByPehm(GradingOption $option, iterable $expectedClassRecordIds): void
+    {
+        $expected = collect($expectedClassRecordIds)->map(fn ($id) => (int) $id)->all();
+
+        $unexpected = ClassRecord::where('grading_option_id', $option->id)
+            ->where('status', '<>', 'archived')
+            ->whereNotIn('id', $expected)
+            ->pluck('id');
+
+        if ($unexpected->isNotEmpty()) {
+            throw new \RuntimeException(
+                "Refusing to mutate grading option #{$option->id} ({$option->name}) in place — ".
+                "it is referenced by unexpected class record(s): {$unexpected->implode(', ')}. ".
+                'Investigate before proceeding; this option may be in use outside the PEHM consolidation scope.'
+            );
+        }
     }
 }
