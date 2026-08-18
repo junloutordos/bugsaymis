@@ -244,7 +244,7 @@ class EmployeeIPCRController extends Controller
         $ipcr = EmployeeIPCR::with([
             'user.division.divisionchief',
             'period',
-            'plans.performance_indicator.agencyOutcome'
+            'plans.performance_indicator.agencyOutcome.parent'
         ])->findOrFail($id);
 
         $workPlans = WorkDistributionPlan::with(['performance_indicator'])
