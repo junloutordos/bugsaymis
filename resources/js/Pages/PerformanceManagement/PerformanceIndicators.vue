@@ -43,6 +43,13 @@ const {
   submitIndicator,
   deleteIndicator,
 } = usePerformanceIndicators(props)
+
+const outcomeLabel = (indicator) => {
+  const aoo = indicator.agency_outcome
+  if (!aoo) return "—"
+  const parentLabel = aoo.parent?.outcome ?? aoo.outcome
+  return aoo.sub_outcome ? `${parentLabel} — ${aoo.sub_outcome}` : parentLabel
+}
 </script>
 
 <template>
@@ -82,7 +89,7 @@ const {
         <tr v-for="indicator in filteredIndicators" :key="indicator.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700">{{ indicator.id }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ indicator.description }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ indicator.agency_outcome?.sub_outcome ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ outcomeLabel(indicator) }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ indicator.target ?? '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-700">
             <span v-if="indicator.divisions?.length">
@@ -133,7 +140,7 @@ const {
         <div v-if="modalMode==='view' && selectedIndicator" class="space-y-3 text-sm">
           <p><span class="font-medium text-slate-700">Description:</span> <span class="text-slate-600">{{ selectedIndicator.description ?? '—' }}</span></p>
           <p><span class="font-medium text-slate-700">Target:</span> <span class="text-slate-600">{{ selectedIndicator.target ?? '—' }}</span></p>
-          <p><span class="font-medium text-slate-700">Outcome:</span> <span class="text-slate-600">{{ selectedIndicator.agency_outcome?.sub_outcome ?? '—' }}</span></p>
+          <p><span class="font-medium text-slate-700">Outcome:</span> <span class="text-slate-600">{{ outcomeLabel(selectedIndicator) }}</span></p>
           <p><span class="font-medium text-slate-700">Division:</span>
             <span class="text-slate-600" v-if="selectedIndicator.divisions?.length">
               {{ selectedIndicator.divisions.map(d => d.division_name).join(', ') }}
@@ -146,8 +153,16 @@ const {
 
         <!-- CREATE / EDIT FORM -->
         <form v-else id="indicator-form" @submit.prevent="submitIndicator" class="space-y-4">
-          <AppSelect v-model="form.agency_outcome_id" label="Sub-Outcome" required placeholder="-- Select Sub-Outcome --">
-            <option v-for="o in props.outcomes" :key="o.id" :value="o.id">{{ o.sub_outcome }}</option>
+          <AppSelect v-model="form.agency_outcome_id" label="Outcome" required placeholder="-- Select Outcome --">
+            <optgroup v-for="parent in props.outcomes" :key="parent.id" :label="parent.outcome">
+              <option
+                v-for="leaf in (parent.children?.length ? parent.children : [parent])"
+                :key="leaf.id"
+                :value="leaf.id"
+              >
+                {{ leaf.sub_outcome ?? parent.outcome }}
+              </option>
+            </optgroup>
           </AppSelect>
 
           <AppTextarea v-model="form.description" label="Description" :rows="3" />
