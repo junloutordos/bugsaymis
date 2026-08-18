@@ -9,7 +9,7 @@ import AppTable from "@/Components/AppTable.vue";
 import AppBadge from "@/Components/AppBadge.vue";
 import EmptyState from "@/Components/EmptyState.vue";
 import PaginationControl from "@/Components/PaginationControl.vue";
-import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, XMarkIcon, ChevronRightIcon, ChevronDownIcon } from "@heroicons/vue/24/outline";
 import FiscalYearFilter from "@/Components/FiscalYearFilter.vue";
 import { useOutcomes } from "@/Composables/useOutcomes.js";
 
@@ -30,6 +30,8 @@ const {
   totalPages,
   filteredOutcomes,
   form,
+  expandedIds,
+  toggleExpand,
   openModal,
   closeModal,
   submitOutcome,
@@ -86,50 +88,121 @@ function outcomeTypeColor(type) {
           </tr>
         </template>
 
-        <tr v-for="outcome in filteredOutcomes" :key="outcome.id" class="hover:bg-indigo-50/40">
-          <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.id }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.outcome }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.sub_outcome ?? '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-700">
-            <AppBadge v-if="outcome.function_type" :color="outcomeTypeColor(outcome.function_type)">{{ outcome.function_type }}</AppBadge>
-            <span v-else>—</span>
-          </td>
-          <td class="px-4 py-3 text-sm text-slate-700">{{ new Date(outcome.created_at).toLocaleDateString() }}</td>
-          <td class="px-4 py-3 text-center">
-            <div class="flex justify-center gap-1 items-center">
-              <AppIconButton label="View" @click="openModal('view', outcome)">
-                <EyeIcon class="w-4 h-4" />
-              </AppIconButton>
-              <AppIconButton label="Edit" variant="warning" @click="openModal('edit', outcome)">
-                <PencilSquareIcon class="w-4 h-4" />
-              </AppIconButton>
-              <AppIconButton label="Delete" variant="danger" @click="deleteOutcome(outcome)">
-                <TrashIcon class="w-4 h-4" />
-              </AppIconButton>
-            </div>
-          </td>
-        </tr>
+        <template v-for="outcome in filteredOutcomes" :key="outcome.id">
+          <tr class="hover:bg-indigo-50/40">
+            <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.id }}</td>
+            <td class="px-4 py-3 text-sm text-slate-700">
+              <button
+                v-if="outcome.children?.length"
+                type="button"
+                class="mr-1 text-slate-400 hover:text-slate-600"
+                @click="toggleExpand(outcome.id)"
+              >
+                <ChevronDownIcon v-if="expandedIds.has(outcome.id)" class="w-4 h-4 inline" />
+                <ChevronRightIcon v-else class="w-4 h-4 inline" />
+              </button>
+              {{ outcome.outcome }}
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-500">
+              {{ outcome.children?.length ? `${outcome.children.length} sub-outcome(s)` : (outcome.sub_outcome ?? '—') }}
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-700">
+              <AppBadge v-if="outcome.function_type" :color="outcomeTypeColor(outcome.function_type)">{{ outcome.function_type }}</AppBadge>
+              <span v-else>—</span>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-700">{{ new Date(outcome.created_at).toLocaleDateString() }}</td>
+            <td class="px-4 py-3 text-center">
+              <div class="flex justify-center gap-1 items-center">
+                <AppIconButton label="Add Sub-Outcome" @click="openModal('create', null, outcome)">
+                  <PlusIcon class="w-4 h-4" />
+                </AppIconButton>
+                <AppIconButton label="View" @click="openModal('view', outcome)">
+                  <EyeIcon class="w-4 h-4" />
+                </AppIconButton>
+                <AppIconButton label="Edit" variant="warning" @click="openModal('edit', outcome)">
+                  <PencilSquareIcon class="w-4 h-4" />
+                </AppIconButton>
+                <AppIconButton
+                  label="Delete"
+                  variant="danger"
+                  :disabled="outcome.children?.length > 0"
+                  :title="outcome.children?.length ? 'Delete its sub-outcomes first' : 'Delete'"
+                  @click="deleteOutcome(outcome)"
+                >
+                  <TrashIcon class="w-4 h-4" />
+                </AppIconButton>
+              </div>
+            </td>
+          </tr>
+
+          <template v-if="expandedIds.has(outcome.id)">
+            <tr v-for="child in outcome.children" :key="`child-${child.id}`" class="bg-slate-50/60 hover:bg-indigo-50/40">
+              <td class="px-4 py-3 text-sm text-slate-400"></td>
+              <td class="px-4 py-3 text-sm text-slate-400 pl-8">↳ {{ outcome.outcome }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ child.sub_outcome ?? '—' }}</td>
+              <td class="px-4 py-3 text-sm text-slate-400">
+                <AppBadge v-if="child.function_type" :color="outcomeTypeColor(child.function_type)">{{ child.function_type }}</AppBadge>
+                <span v-else>—</span>
+              </td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ new Date(child.created_at).toLocaleDateString() }}</td>
+              <td class="px-4 py-3 text-center">
+                <div class="flex justify-center gap-1 items-center">
+                  <AppIconButton label="View" @click="openModal('view', child)">
+                    <EyeIcon class="w-4 h-4" />
+                  </AppIconButton>
+                  <AppIconButton label="Edit" variant="warning" @click="openModal('edit', child)">
+                    <PencilSquareIcon class="w-4 h-4" />
+                  </AppIconButton>
+                  <AppIconButton label="Delete" variant="danger" @click="deleteOutcome(child)">
+                    <TrashIcon class="w-4 h-4" />
+                  </AppIconButton>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </template>
 
         <template #mobileCard>
           <div v-for="outcome in filteredOutcomes" :key="outcome.id" class="p-4 space-y-2">
             <div class="flex items-start justify-between gap-2">
               <div>
                 <p class="font-medium text-slate-800">{{ outcome.outcome }}</p>
-                <p class="text-xs text-slate-500">{{ outcome.sub_outcome ?? '—' }}</p>
+                <p class="text-xs text-slate-500">
+                  {{ outcome.children?.length ? `${outcome.children.length} sub-outcome(s)` : (outcome.sub_outcome ?? '—') }}
+                </p>
               </div>
               <AppBadge v-if="outcome.function_type" :color="outcomeTypeColor(outcome.function_type)">{{ outcome.function_type }}</AppBadge>
             </div>
             <p class="text-xs text-slate-400">Created {{ new Date(outcome.created_at).toLocaleDateString() }}</p>
             <div class="flex items-center gap-1 pt-1">
+              <AppIconButton label="Add Sub-Outcome" @click="openModal('create', null, outcome)">
+                <PlusIcon class="w-4 h-4" />
+              </AppIconButton>
               <AppIconButton label="View" @click="openModal('view', outcome)">
                 <EyeIcon class="w-4 h-4" />
               </AppIconButton>
               <AppIconButton label="Edit" variant="warning" @click="openModal('edit', outcome)">
                 <PencilSquareIcon class="w-4 h-4" />
               </AppIconButton>
-              <AppIconButton label="Delete" variant="danger" @click="deleteOutcome(outcome)">
+              <AppIconButton
+                label="Delete"
+                variant="danger"
+                :disabled="outcome.children?.length > 0"
+                @click="deleteOutcome(outcome)"
+              >
                 <TrashIcon class="w-4 h-4" />
               </AppIconButton>
+            </div>
+            <div v-for="child in outcome.children" :key="child.id" class="pl-4 pt-2 border-t border-slate-100 flex items-center justify-between">
+              <p class="text-xs text-slate-600">{{ child.sub_outcome }}</p>
+              <div class="flex items-center gap-1">
+                <AppIconButton label="Edit" variant="warning" @click="openModal('edit', child)">
+                  <PencilSquareIcon class="w-4 h-4" />
+                </AppIconButton>
+                <AppIconButton label="Delete" variant="danger" @click="deleteOutcome(child)">
+                  <TrashIcon class="w-4 h-4" />
+                </AppIconButton>
+              </div>
             </div>
           </div>
         </template>
@@ -154,7 +227,7 @@ function outcomeTypeColor(type) {
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-800">
-              {{ modalMode==='create' ? 'New Outcome' : modalMode==='edit' ? 'Edit Outcome' : 'View Outcome' }}
+              {{ modalMode==='create' ? (form.parent_id ? 'New Sub-Outcome' : 'New Outcome') : modalMode==='edit' ? 'Edit Outcome' : 'View Outcome' }}
             </h2>
             <AppIconButton label="Close" @click="closeModal">
               <XMarkIcon class="w-4 h-4" />
@@ -184,7 +257,11 @@ function outcomeTypeColor(type) {
           <!-- CREATE / EDIT FORM -->
           <form v-else @submit.prevent="submitOutcome">
             <div class="px-6 py-5 space-y-4">
-              <div>
+              <div v-if="form.parent_id">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Outcome</label>
+                <p class="text-sm text-slate-500 italic">{{ form.outcome }} (inherited from parent)</p>
+              </div>
+              <div v-else>
                 <label class="block text-xs font-medium text-slate-600 mb-1">Outcome</label>
                 <input v-model="form.outcome" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
               </div>
@@ -192,14 +269,14 @@ function outcomeTypeColor(type) {
                 <label class="block text-xs font-medium text-slate-600 mb-1">Sub-Outcome</label>
                 <input v-model="form.sub_outcome" type="text" placeholder="Optional" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
-              <div>
+              <div v-if="!form.parent_id">
                 <label class="block text-xs font-medium text-slate-600 mb-1">Type</label>
                 <select v-model="form.function_type" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
                   <option value="" disabled>Select type</option>
                   <option v-for="type in outcomeTypes" :key="type" :value="type">{{ type }}</option>
                 </select>
               </div>
-              <div>
+              <div v-if="!form.parent_id">
                 <label class="block text-xs font-medium text-slate-600 mb-1">Fiscal Year</label>
                 <select v-model="form.fiscal_year" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   <option :value="null">All years (unscoped)</option>
