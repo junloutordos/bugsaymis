@@ -29,6 +29,9 @@ class Activity extends Model
         'activity_report',
         'official_documentation',
         'qr_token',
+        'evaluation_open',
+        'evaluation_status_changed_at',
+        'evaluation_status_changed_by',
     ];
 
     protected static function booted(): void
@@ -43,6 +46,8 @@ class Activity extends Model
     protected $casts = [
         'start_date' => 'date:Y-m-d',
         'end_date'   => 'date:Y-m-d',
+        'evaluation_open' => 'boolean',
+        'evaluation_status_changed_at' => 'datetime',
     ];
 
     public const TYPE_IN_HOUSE = 'in_house';
@@ -86,5 +91,32 @@ class Activity extends Model
     public function isTrainingWorkshopSeminar(): bool
     {
         return $this->activity_type === self::TYPE_TRAINING_WORKSHOP_SEMINAR;
+    }
+
+    public function statusChangedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'evaluation_status_changed_by');
+    }
+
+    public function isMultiDay(): bool
+    {
+        return $this->start_date && $this->end_date && $this->end_date->gt($this->start_date);
+    }
+
+    /** Inclusive list of Y-m-d date strings from start_date to end_date. Empty if not multi-day. */
+    public function attendanceDayList(): array
+    {
+        if (! $this->isMultiDay()) {
+            return [];
+        }
+
+        $days = [];
+        $cursor = $this->start_date->copy();
+        while ($cursor->lte($this->end_date) && count($days) < 60) {
+            $days[] = $cursor->toDateString();
+            $cursor->addDay();
+        }
+
+        return $days;
     }
 }
