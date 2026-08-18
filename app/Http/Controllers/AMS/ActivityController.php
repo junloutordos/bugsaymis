@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\AMS\ActivityEvaluationInviteMail;
 use App\Mail\AMS\ActivityInvitationMail;
 use App\Models\AMS\Activity;
+use App\Models\AMS\ActivityAttendanceDay;
 use App\Models\AMS\ActivityCoProponent;
 use App\Models\AMS\ActivityParticipant;
 use App\Models\AMS\ActivityStudentAttendance;
@@ -385,9 +386,21 @@ class ActivityController extends Controller
         );
 
         $data = $request->validate([
-            'attended'       => 'required|in:yes,no',
-            'hours_attended' => 'nullable|numeric|min:0|max:99.99',
+            'attended'                       => 'required|in:yes,no',
+            'hours_attended'                 => 'nullable|numeric|min:0|max:99.99',
+            'daily'                          => 'nullable|array',
+            'daily.*.date'                   => 'required_with:daily|date',
+            'daily.*.attended'               => 'required_with:daily|in:yes,no',
+            'daily.*.hours_attended'         => 'nullable|numeric|min:0|max:99.99',
         ]);
+
+        if ($activity->isMultiDay() && ! empty($data['daily'])) {
+            $data = array_merge(
+                $data,
+                $this->applyDailyAttendance($activity, 'employee', $participant->participant_id, $data['daily'])
+            );
+        }
+        unset($data['daily']);
 
         if ($participant->certificate_path && (
             ! $this->evaluationEligibility->hasEvaluated($activity, 'employee', $participant->participant_id)
@@ -477,6 +490,42 @@ class ActivityController extends Controller
         }
 
         return back()->with('success', 'Attendance saved. Certificates are generated only for students who have completed the evaluation.');
+    }
+
+    /**
+     * Upserts per-day attendance rows for one participant and returns the
+     * recomputed rollup: present on any day → 'yes'; hours summed across
+     * days actually marked present. Callers only invoke this for multi-day
+     * activities — single-day activities keep using the plain scalar fields.
+     */
+    private function applyDailyAttendance(Activity $activity, string $participantType, int $participantId, array $daily): array
+    {
+        DB::transaction(function () use ($activity, $participantType, $participantId, $daily) {
+            foreach ($daily as $day) {
+                ActivityAttendanceDay::updateOrCreate(
+                    [
+                        'activity_id'      => $activity->id,
+                        'participant_type' => $participantType,
+                        'participant_id'   => $participantId,
+                        'date'             => $day['date'],
+                    ],
+                    [
+                        'attended'       => $day['attended'],
+                        'hours_attended' => $day['hours_attended'] ?? 0,
+                    ]
+                );
+            }
+        });
+
+        $rows = ActivityAttendanceDay::where('activity_id', $activity->id)
+            ->where('participant_type', $participantType)
+            ->where('participant_id', $participantId)
+            ->get();
+
+        return [
+            'attended'       => $rows->contains('attended', 'yes') ? 'yes' : 'no',
+            'hours_attended' => (float) $rows->where('attended', 'yes')->sum('hours_attended'),
+        ];
     }
 
     private function shouldInvalidateCertificate($record, array $newAttendance): bool

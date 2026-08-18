@@ -4,6 +4,10 @@ namespace Tests\Feature\AMS;
 
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityAttendanceDay;
+use App\Models\AMS\ActivityParticipant;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -42,5 +46,118 @@ class PerDayAttendanceTest extends TestCase
             'attended' => 'no',
             'hours_attended' => 0,
         ]);
+    }
+
+    public function test_single_day_activity_ignores_daily_payload(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeMultiDayActivity($owner, '2026-08-10', '2026-08-10');
+        $attendee = User::factory()->create();
+        $participant = ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'no', 'hours_attended' => 0,
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.participants.save-attendance', [$activity, $participant]), [
+                'attended' => 'yes',
+                'hours_attended' => 8,
+                'daily' => [
+                    ['date' => '2026-08-10', 'attended' => 'yes', 'hours_attended' => 8],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseCount('ams_activity_attendance_days', 0);
+        $this->assertSame('yes', $participant->fresh()->attended);
+        $this->assertSame('8.00', $participant->fresh()->hours_attended);
+    }
+
+    public function test_multiday_employee_attendance_upserts_daily_rows_and_computes_rollup(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeMultiDayActivity($owner, '2026-08-10', '2026-08-12');
+        $attendee = User::factory()->create();
+        $participant = ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'no', 'hours_attended' => 0,
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.participants.save-attendance', [$activity, $participant]), [
+                'attended' => 'no',
+                'hours_attended' => 0,
+                'daily' => [
+                    ['date' => '2026-08-10', 'attended' => 'yes', 'hours_attended' => 8],
+                    ['date' => '2026-08-11', 'attended' => 'no', 'hours_attended' => 0],
+                    ['date' => '2026-08-12', 'attended' => 'yes', 'hours_attended' => 6],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseCount('ams_activity_attendance_days', 3);
+        $this->assertDatabaseHas('ams_activity_attendance_days', [
+            'activity_id' => $activity->id, 'participant_type' => 'employee',
+            'participant_id' => $attendee->id, 'date' => '2026-08-10', 'attended' => 'yes',
+        ]);
+
+        $participant->refresh();
+        $this->assertSame('yes', $participant->attended); // present on any day
+        $this->assertSame('14.00', $participant->hours_attended); // 8 + 6, day 2 absent contributes 0
+    }
+
+    public function test_resaving_daily_attendance_updates_existing_rows_not_duplicates(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeMultiDayActivity($owner, '2026-08-10', '2026-08-11');
+        $attendee = User::factory()->create();
+        $participant = ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'no', 'hours_attended' => 0,
+        ]);
+        $payload = [
+            'attended' => 'no', 'hours_attended' => 0,
+            'daily' => [
+                ['date' => '2026-08-10', 'attended' => 'yes', 'hours_attended' => 8],
+                ['date' => '2026-08-11', 'attended' => 'yes', 'hours_attended' => 8],
+            ],
+        ];
+
+        $this->actingAs($owner)->post(route('ams.activities.participants.save-attendance', [$activity, $participant]), $payload);
+        $this->assertDatabaseCount('ams_activity_attendance_days', 2);
+
+        $payload['daily'][1]['hours_attended'] = 4;
+        $this->actingAs($owner)->post(route('ams.activities.participants.save-attendance', [$activity, $participant]), $payload);
+
+        $this->assertDatabaseCount('ams_activity_attendance_days', 2); // still 2, not 4
+        $this->assertDatabaseHas('ams_activity_attendance_days', [
+            'activity_id' => $activity->id, 'date' => '2026-08-11', 'hours_attended' => 4,
+        ]);
+        $this->assertSame('12.00', $participant->fresh()->hours_attended); // 8 + 4
+    }
+
+    private function makeMultiDayActivity(User $owner, string $start, string $end): Activity
+    {
+        return Activity::create([
+            'user_id' => $owner->id,
+            'title' => 'Multi-day Test Activity',
+            'activity_type' => Activity::TYPE_IN_HOUSE,
+            'start_date' => $start,
+            'end_date' => $end,
+        ]);
+    }
+
+    private function userWithPermission(string $permissionName): User
+    {
+        $permission = Permission::firstOrCreate(
+            ['name' => $permissionName],
+            ['module' => 'Activities', 'description' => $permissionName],
+        );
+        $role = Role::create(['name' => 'AMS Daily Test '.uniqid()]);
+        $role->permissions()->attach($permission);
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $user->roles()->attach($role);
+
+        return $user;
     }
 }
