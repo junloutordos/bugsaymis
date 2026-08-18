@@ -4,6 +4,8 @@ namespace Tests\Feature\AMS;
 
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityCoProponent;
+use App\Models\AMS\ActivityEvaluation;
+use App\Models\AMS\ActivityParticipant;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -105,6 +107,148 @@ class EvaluationPeriodTest extends TestCase
             ->assertForbidden();
 
         $this->assertTrue($activity->fresh()->evaluation_open);
+    }
+
+    public function test_closed_period_shows_closed_message_instead_of_in_house_form(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner, ['evaluation_open' => false]);
+        $attendee = User::factory()->create();
+        ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'yes',
+        ]);
+        $hash = md5($attendee->id . '-' . $activity->id);
+
+        $this->get(route('ams.activities.evaluate.show', [$activity, $hash]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('AMS/Evaluate')
+                ->where('evaluationClosed', true)
+            );
+    }
+
+    public function test_closed_period_blocks_in_house_evaluation_submission(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner, ['evaluation_open' => false]);
+        $attendee = User::factory()->create();
+        ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'yes',
+        ]);
+        $hash = md5($attendee->id . '-' . $activity->id);
+
+        $this->post(route('ams.activities.evaluate.store', [$activity, $hash]), [
+            'obj_1' => 'agree', 'obj_2' => 'agree', 'obj_3' => 'agree', 'obj_4' => 'agree',
+            'mgmt_1' => 'agree', 'mgmt_2' => 'agree', 'mgmt_3' => 'agree',
+            'mgmt_4' => 'agree', 'mgmt_5' => 'agree', 'mgmt_6' => 'agree',
+            'phys_1' => 'agree', 'phys_2' => 'agree', 'phys_3' => 'agree',
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('ams_activity_evaluations', 0);
+    }
+
+    public function test_closed_period_blocks_tws_evaluation_submission(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner, [
+            'activity_type' => Activity::TYPE_TRAINING_WORKSHOP_SEMINAR,
+            'evaluation_open' => false,
+        ]);
+        $speaker = $activity->speakers()->create(['name' => 'Speaker One', 'sort_order' => 0]);
+        $attendee = User::factory()->create();
+        ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'yes',
+        ]);
+        $hash = md5($attendee->id . '-' . $activity->id);
+
+        $this->post(route('ams.activities.evaluate.store', [$activity, $hash]), [
+            'content_1' => 'agree', 'content_2' => 'agree', 'content_3' => 'agree',
+            'content_4' => 'agree', 'content_5' => 'agree',
+            'mgmt_length_of_program' => 'satisfied', 'mgmt_schedule' => 'satisfied',
+            'mgmt_secretariat_support' => 'satisfied', 'mgmt_venue' => 'satisfied',
+            'mgmt_accommodation' => 'satisfied', 'mgmt_food_meals' => 'satisfied',
+            'overall_1_objectives_accomplished' => 'agree', 'overall_2_knowledge_increased' => 'agree',
+            'speakers' => [[
+                'speaker_id' => $speaker->id,
+                'topic_depth_of_content' => 'excellent', 'topic_scope_coverage' => 'excellent',
+                'topic_relevance_appropriateness' => 'excellent', 'attainment_of_objectives' => 'agree',
+                'mastery_1_command_of_subject' => 'agree', 'mastery_2_pace_timing' => 'agree',
+                'mastery_3_theory_application_balance' => 'agree', 'mastery_4_current_trends' => 'agree',
+                'presentation_1_listened' => 'agree', 'presentation_2_answered_questions' => 'agree',
+                'presentation_3_inspired_participation' => 'agree', 'presentation_4_held_interest' => 'agree',
+                'acceptability_as_speaker' => 'agree',
+            ]],
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('ams_activity_tws_evaluations', 0);
+    }
+
+    public function test_closed_period_blocks_walkin_evaluation_submission(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner, ['evaluation_open' => false]);
+
+        $this->get(route('ams.activities.evaluate.walkin.show', [$activity, $activity->qr_token]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('evaluationClosed', true));
+
+        $this->post(route('ams.activities.evaluate.walkin.store', [$activity, $activity->qr_token]), [
+            'sex' => 'male',
+            'obj_1' => 'agree', 'obj_2' => 'agree', 'obj_3' => 'agree', 'obj_4' => 'agree',
+            'mgmt_1' => 'agree', 'mgmt_2' => 'agree', 'mgmt_3' => 'agree',
+            'mgmt_4' => 'agree', 'mgmt_5' => 'agree', 'mgmt_6' => 'agree',
+            'phys_1' => 'agree', 'phys_2' => 'agree', 'phys_3' => 'agree',
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('ams_activity_evaluations', 0);
+    }
+
+    public function test_open_period_still_allows_evaluation_submission(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner); // evaluation_open defaults true
+        $attendee = User::factory()->create();
+        ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'yes',
+        ]);
+        $hash = md5($attendee->id . '-' . $activity->id);
+
+        $this->post(route('ams.activities.evaluate.store', [$activity, $hash]), [
+            'obj_1' => 'agree', 'obj_2' => 'agree', 'obj_3' => 'agree', 'obj_4' => 'agree',
+            'mgmt_1' => 'agree', 'mgmt_2' => 'agree', 'mgmt_3' => 'agree',
+            'mgmt_4' => 'agree', 'mgmt_5' => 'agree', 'mgmt_6' => 'agree',
+            'phys_1' => 'agree', 'phys_2' => 'agree', 'phys_3' => 'agree',
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('ams_activity_evaluations', 1);
+    }
+
+    public function test_certificate_download_still_works_after_period_closed_for_prior_evaluation(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner);
+        $attendee = User::factory()->create(['email' => uniqid().'@example.test']);
+        $participant = ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'yes', 'hours_attended' => 8,
+            'certificate_path' => 'ams/certificates/already-issued.pdf',
+        ]);
+        \Illuminate\Support\Facades\Storage::disk('public')->put('ams/certificates/already-issued.pdf', 'dummy-pdf-content');
+        ActivityEvaluation::create([
+            'activity_id' => $activity->id, 'participant_type' => 'employee', 'participant_id' => $attendee->id,
+        ]);
+
+        // Close the period after the evaluation/certificate already exist.
+        $activity->update(['evaluation_open' => false]);
+
+        $this->actingAs($owner)
+            ->get(route('ams.activities.certificates.download.participant', [$activity, $participant]))
+            ->assertOk();
     }
 
     private function makeActivity(User $owner, array $overrides = []): Activity

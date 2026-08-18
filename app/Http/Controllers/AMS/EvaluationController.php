@@ -75,6 +75,7 @@ class EvaluationController extends Controller
                 'qrToken'          => $qrToken,
                 'walkin'           => true,
                 'alreadyEvaluated' => false,
+                'evaluationClosed' => ! $activity->evaluation_open,
             ]);
         }
 
@@ -84,12 +85,17 @@ class EvaluationController extends Controller
             'qrToken'          => $qrToken,
             'walkin'           => true,
             'alreadyEvaluated' => false,
+            'evaluationClosed' => ! $activity->evaluation_open,
         ]);
     }
 
     public function storeWalkin(Request $request, Activity $activity, string $qrToken)
     {
         abort_if($activity->qr_token !== $qrToken, 404);
+
+        if (! $activity->evaluation_open) {
+            return back()->with('error', 'This evaluation period has closed.');
+        }
 
         // No duplicate check for walk-ins — there's no stable identity to key
         // it on, and each QR scan is meant to behave like a paper form (any
@@ -258,6 +264,7 @@ class EvaluationController extends Controller
             'participant'      => $resolved,
             'hash'             => $hash,
             'alreadyEvaluated' => $alreadyEvaluated,
+            'evaluationClosed' => ! $activity->evaluation_open,
         ]);
     }
 
@@ -276,6 +283,7 @@ class EvaluationController extends Controller
             'participant'      => $resolved,
             'hash'             => $hash,
             'alreadyEvaluated' => $alreadyEvaluated,
+            'evaluationClosed' => ! $activity->evaluation_open,
         ]);
     }
 
@@ -285,6 +293,10 @@ class EvaluationController extends Controller
     {
         $resolved = $this->resolveParticipant($activity, $hash);
         if (!$resolved) abort(404, 'Evaluation link is invalid or has expired.');
+
+        if (! $activity->evaluation_open) {
+            return back()->with('error', 'This evaluation period has closed.');
+        }
 
         if ($activity->isTrainingWorkshopSeminar()) {
             return $this->storeTws($request, $activity, $hash, $resolved);
