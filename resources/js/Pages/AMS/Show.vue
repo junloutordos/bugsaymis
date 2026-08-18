@@ -38,15 +38,16 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  activity:     Object,
-  participants: Array,
-  employees:    Array,
-  sections:     Array,
-  canEdit:      Boolean,
-  canManage:    Boolean,
-  evaluations:  Object,
-  walkinEvalQr: Object,
-  quizzes:      { type: Array, default: () => [] },
+  activity:                  Object,
+  participants:               Array,
+  employees:                  Array,
+  sections:                   Array,
+  canEdit:                    Boolean,
+  canManage:                  Boolean,
+  canToggleEvaluationPeriod:  Boolean,
+  evaluations:                Object,
+  walkinEvalQr:                Object,
+  quizzes:                    { type: Array, default: () => [] },
 })
 
 const page       = usePage()
@@ -130,6 +131,35 @@ async function sendEvaluationLinks() {
       },
     }
   )
+}
+
+const togglingPeriod = ref(false)
+
+async function toggleEvaluationPeriod() {
+  const closing = props.activity.evaluation_open
+  const confirmed = await confirmAction({
+    icon: 'warning',
+    title: closing ? 'Close Evaluation Period?' : 'Reopen Evaluation Period?',
+    text: closing
+      ? 'Participants and walk-ins who have not yet evaluated will no longer be able to evaluate or receive a certificate. This does not affect anyone already evaluated/certified.'
+      : 'Participants and walk-ins will be able to submit evaluations again.',
+    confirmText: closing ? 'Yes, close it' : 'Yes, reopen it',
+  })
+  if (!confirmed) return
+
+  togglingPeriod.value = true
+  router.post(
+    route('ams.activities.evaluation-period.toggle', props.activity.id),
+    { open: !closing },
+    { preserveScroll: true, onFinish: () => { togglingPeriod.value = false } }
+  )
+}
+
+function formatDateTime(dt) {
+  if (!dt) return '—'
+  return new Date(dt.replace(' ', 'T')).toLocaleString('en-PH', {
+    year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -931,6 +961,33 @@ async function removeCoPro(cp) {
 
     <!-- ── EVALUATIONS TAB ──────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'evaluations'" class="space-y-6">
+
+      <!-- Evaluation Period -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div class="flex items-center gap-2">
+            <AppBadge :color="activity.evaluation_open ? 'green' : 'red'">
+              {{ activity.evaluation_open ? 'Evaluation Period Open' : 'Evaluation Period Closed' }}
+            </AppBadge>
+          </div>
+          <p v-if="activity.evaluation_status_changed_at" class="text-xs text-slate-400 mt-1">
+            Last changed by {{ activity.evaluation_status_changed_by ?? 'unknown' }} on {{ formatDateTime(activity.evaluation_status_changed_at) }}
+          </p>
+          <p v-if="!activity.evaluation_open" class="text-xs text-slate-500 mt-1">
+            New evaluations (and certificates for anyone who hasn't evaluated) are blocked while closed.
+          </p>
+        </div>
+        <AppButton
+          v-if="canToggleEvaluationPeriod"
+          :variant="activity.evaluation_open ? 'danger' : 'success'"
+          size="sm"
+          :loading="togglingPeriod"
+          :disabled="togglingPeriod"
+          @click="toggleEvaluationPeriod"
+        >
+          {{ activity.evaluation_open ? 'Close Evaluation Period' : 'Reopen Evaluation Period' }}
+        </AppButton>
+      </div>
 
       <!-- Walk-in (QR) evaluation -->
       <div v-if="walkinEvalQr" class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4">

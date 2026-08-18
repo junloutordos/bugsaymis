@@ -95,7 +95,7 @@ class ActivityController extends Controller
     public function show(Activity $activity)
     {
         $this->authorizeView($activity);
-        $activity->load(['creator', 'coProponents.employee', 'participants', 'studentAttendance', 'mealPlans', 'speakers']);
+        $activity->load(['creator', 'coProponents.employee', 'participants', 'studentAttendance', 'mealPlans', 'speakers', 'statusChangedBy']);
 
         $sectionIds  = $activity->participants->where('participant_type', 'section')->pluck('participant_id');
         $employeeIds = $activity->participants->where('participant_type', 'employee')->pluck('participant_id');
@@ -146,6 +146,7 @@ class ActivityController extends Controller
             'sections'     => $this->sectionList(),
             'canEdit'      => $canEdit,
             'canManage'    => $canManage,
+            'canToggleEvaluationPeriod' => $this->canToggleEvaluationPeriod($activity),
             'evaluations'  => $this->buildEvaluationSummary($activity),
             'walkinEvalQr' => $this->buildWalkinEvalQr($activity),
             'quizzes'      => \App\Models\Quiz\Quiz::where('source_type', 'activity')
@@ -693,6 +694,9 @@ class ActivityController extends Controller
             'special_order'          => $this->resolveFileUrl($a->special_order, $a, 'special_order'),
             'activity_report'        => $this->resolveFileUrl($a->activity_report, $a, 'activity_report'),
             'official_documentation' => $this->resolveFileUrl($a->official_documentation, $a, 'official_documentation'),
+            'evaluation_open'              => (bool) $a->evaluation_open,
+            'evaluation_status_changed_at' => $a->evaluation_status_changed_at?->toDateTimeString(),
+            'evaluation_status_changed_by' => $a->relationLoaded('statusChangedBy') ? $a->statusChangedBy?->name : null,
             'creator'                => $a->relationLoaded('creator') && $a->creator
                 ? ['id' => $a->creator->id, 'name' => $a->creator->name]
                 : null,
