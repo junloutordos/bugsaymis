@@ -88,6 +88,11 @@ class Activity extends Model
         return $this->hasMany(ActivityTwsEvaluation::class, 'activity_id');
     }
 
+    public function attendanceDays(): HasMany
+    {
+        return $this->hasMany(ActivityAttendanceDay::class, 'activity_id');
+    }
+
     public function isTrainingWorkshopSeminar(): bool
     {
         return $this->activity_type === self::TYPE_TRAINING_WORKSHOP_SEMINAR;
