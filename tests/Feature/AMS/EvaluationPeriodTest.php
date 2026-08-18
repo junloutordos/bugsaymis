@@ -3,6 +3,7 @@
 namespace Tests\Feature\AMS;
 
 use App\Models\AMS\Activity;
+use App\Models\AMS\ActivityCoProponent;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -40,6 +41,70 @@ class EvaluationPeriodTest extends TestCase
             ['2026-08-10', '2026-08-11', '2026-08-12'],
             $multiDay->attendanceDayList()
         );
+    }
+
+    public function test_owner_can_close_and_reopen_evaluation_period(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner);
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.evaluation-period.toggle', $activity), ['open' => false])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $activity->refresh();
+        $this->assertFalse($activity->evaluation_open);
+        $this->assertNotNull($activity->evaluation_status_changed_at);
+        $this->assertSame($owner->id, $activity->evaluation_status_changed_by);
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.evaluation-period.toggle', $activity), ['open' => true])
+            ->assertRedirect();
+
+        $this->assertTrue($activity->fresh()->evaluation_open);
+    }
+
+    public function test_co_proponent_can_toggle_evaluation_period(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner);
+        $coProponent = $this->userWithPermission('activities.view_all');
+        ActivityCoProponent::create(['activity_id' => $activity->id, 'employee_id' => $coProponent->id]);
+
+        $this->actingAs($coProponent)
+            ->post(route('ams.activities.evaluation-period.toggle', $activity), ['open' => false])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertFalse($activity->fresh()->evaluation_open);
+    }
+
+    public function test_evaluation_committee_permission_holder_can_toggle_evaluation_period(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner);
+        $committeeMember = $this->userWithPermission('activities.evaluation_committee');
+
+        $this->actingAs($committeeMember)
+            ->post(route('ams.activities.evaluation-period.toggle', $activity), ['open' => false])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertFalse($activity->fresh()->evaluation_open);
+    }
+
+    public function test_unrelated_user_cannot_toggle_evaluation_period(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeActivity($owner);
+        $stranger = $this->userWithPermission('activities.view_all');
+
+        $this->actingAs($stranger)
+            ->post(route('ams.activities.evaluation-period.toggle', $activity), ['open' => false])
+            ->assertForbidden();
+
+        $this->assertTrue($activity->fresh()->evaluation_open);
     }
 
     private function makeActivity(User $owner, array $overrides = []): Activity

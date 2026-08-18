@@ -336,6 +336,25 @@ class ActivityController extends Controller
         return back()->with('success', $msg);
     }
 
+    /** Open/close the evaluation period. Closing blocks new evaluations (and therefore new certificates for anyone who hasn't evaluated yet) without affecting anyone already evaluated/certified. */
+    public function toggleEvaluationPeriod(Request $request, Activity $activity)
+    {
+        $this->authorizeEvaluationPeriod($activity);
+        $data = $request->validate(['open' => 'required|boolean']);
+
+        $activity->update([
+            'evaluation_open'               => $data['open'],
+            'evaluation_status_changed_at'  => now(),
+            'evaluation_status_changed_by'  => Auth::id(),
+        ]);
+
+        $message = $data['open']
+            ? 'Evaluation period reopened. Participants can submit evaluations again.'
+            : 'Evaluation period closed. Anyone who has not yet evaluated can no longer evaluate or receive a certificate.';
+
+        return back()->with('success', $message);
+    }
+
     public function removeParticipant(Activity $activity, ActivityParticipant $participant)
     {
         $this->authorizeManage($activity);
@@ -514,6 +533,24 @@ class ActivityController extends Controller
     {
         $user = Auth::user();
         if (!$user->isSuperAdmin() && !$user->hasPermission('activities.manage')) abort(403);
+    }
+
+    private function canToggleEvaluationPeriod(Activity $activity): bool
+    {
+        $user = Auth::user();
+        if ($user->isSuperAdmin() || $user->hasPermission('activities.evaluation_committee')) {
+            return true;
+        }
+
+        $isOwner = $activity->user_id === $user->id;
+        $isCo    = ActivityCoProponent::where('activity_id', $activity->id)->where('employee_id', $user->id)->exists();
+
+        return $isOwner || $isCo;
+    }
+
+    private function authorizeEvaluationPeriod(Activity $activity): void
+    {
+        abort_unless($this->canToggleEvaluationPeriod($activity), 403);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

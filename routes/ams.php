@@ -56,6 +56,10 @@ Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|acti
         Route::post('/{activity}/participants/send-evaluation-links',
             [ActivityController::class, 'sendEvaluationLinks'])->name('participants.send-evaluation-links');
 
+        // ── Evaluation period ────────────────────────────────────────────────
+        Route::post('/{activity}/evaluation-period/toggle',
+            [ActivityController::class, 'toggleEvaluationPeriod'])->name('evaluation-period.toggle');
+
         // ── Certificates ─────────────────────────────────────────────────────
         Route::post('/{activity}/certificates/generate',
             [CertificateController::class, 'generate'])->name('certificates.generate');
