@@ -173,6 +173,58 @@ class PerDayAttendanceTest extends TestCase
         $this->assertSame('14.00', $studentAttendance->hours_attended);
     }
 
+    public function test_show_page_exposes_multi_day_flag_and_per_participant_daily_data(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeMultiDayActivity($owner, '2026-08-10', '2026-08-11');
+        $attendee = User::factory()->create();
+        ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => $attendee->id,
+            'participant_type' => 'employee', 'attended' => 'yes', 'hours_attended' => 8,
+        ]);
+        ActivityAttendanceDay::create([
+            'activity_id' => $activity->id, 'participant_type' => 'employee',
+            'participant_id' => $attendee->id, 'date' => '2026-08-10',
+            'attended' => 'yes', 'hours_attended' => 8,
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('ams.activities.show', $activity))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('activity.is_multi_day', true)
+                ->where('activity.attendance_days', ['2026-08-10', '2026-08-11'])
+                ->where("participants.0.daily.2026-08-10.attended", 'yes')
+            );
+    }
+
+    public function test_section_students_endpoint_exposes_per_day_data(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeMultiDayActivity($owner, '2026-08-10', '2026-08-11');
+        $section = ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => 1, 'participant_type' => 'section',
+        ]);
+        \Illuminate\Support\Facades\DB::table('section_students')->insert([
+            'sectionid' => 1, 'studentid' => 501,
+        ]);
+        \App\Models\Student::forceCreate(['id' => 501, 'firstname' => 'Juan', 'lastname' => 'Cruz']);
+        \App\Models\AMS\ActivityStudentAttendance::create([
+            'activity_id' => $activity->id, 'participant_id' => 501, 'attended' => 'yes', 'hours_attended' => 7,
+        ]);
+        ActivityAttendanceDay::create([
+            'activity_id' => $activity->id, 'participant_type' => 'student',
+            'participant_id' => 501, 'date' => '2026-08-11', 'attended' => 'yes', 'hours_attended' => 7,
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->getJson(route('ams.activities.participants.students', [$activity, $section]))
+            ->assertOk();
+
+        $json = $response->json();
+        $this->assertSame('yes', $json[0]['daily']['2026-08-11']['attended']);
+    }
+
     private function makeMultiDayActivity(User $owner, string $start, string $end): Activity
     {
         return Activity::create([

@@ -107,7 +107,12 @@ class ActivityController extends Controller
         // Evaluation lookup: keyed by "type:participant_id"
         $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
-        $participants = $activity->participants->map(function ($p) use ($sectionsMap, $employeesMap, $evaluations, $activity) {
+        $attendanceDays = $activity->isMultiDay()
+            ? ActivityAttendanceDay::where('activity_id', $activity->id)->get()
+                ->groupBy(fn ($row) => $row->participant_type . ':' . $row->participant_id)
+            : collect();
+
+        $participants = $activity->participants->map(function ($p) use ($sectionsMap, $employeesMap, $evaluations, $activity, $attendanceDays) {
             $evalHash      = md5($p->participant_id . '-' . $activity->id);
             $evaluateUrl   = route('ams.activities.evaluate.show', [$activity->id, $evalHash]);
 
@@ -135,6 +140,8 @@ class ActivityController extends Controller
                 'evaluated'      => isset($evaluations['employee:' . $p->participant_id]),
                 'has_certificate' => (bool) $p->certificate_path,
                 'evaluate_url'   => $evaluateUrl,
+                'daily'          => $attendanceDays->get('employee:' . $p->participant_id, collect())
+                    ->mapWithKeys(fn ($row) => [$row->date => ['attended' => $row->attended, 'hours' => (float) $row->hours_attended]]),
             ];
         })->values()->all();
 
@@ -434,6 +441,14 @@ class ActivityController extends Controller
             ->keyBy('participant_id');
         $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
+        $attendanceDays = $activity->isMultiDay()
+            ? ActivityAttendanceDay::where('activity_id', $activity->id)
+                ->where('participant_type', 'student')
+                ->whereIn('participant_id', $studentIds)
+                ->get()
+                ->groupBy('participant_id')
+            : collect();
+
         $students = Student::whereIn('id', $studentIds)
             ->orderBy('lastname')
             ->get(['id', 'firstname', 'lastname', 'middlename', 'student_email']);
@@ -447,6 +462,8 @@ class ActivityController extends Controller
                 'attendance_id'  => $attendance[$s->id]?->id,
                 'evaluated'      => isset($evaluations['student:' . $s->id]),
                 'has_certificate' => (bool) $attendance[$s->id]?->certificate_path,
+                'daily'          => $attendanceDays->get($s->id, collect())
+                    ->mapWithKeys(fn ($row) => [$row->date => ['attended' => $row->attended, 'hours' => (float) $row->hours_attended]]),
             ])->values()
         );
     }
@@ -758,6 +775,8 @@ class ActivityController extends Controller
             'evaluation_open'              => (bool) $a->evaluation_open,
             'evaluation_status_changed_at' => $a->evaluation_status_changed_at?->toDateTimeString(),
             'evaluation_status_changed_by' => $a->relationLoaded('statusChangedBy') ? $a->statusChangedBy?->name : null,
+            'is_multi_day'     => $a->isMultiDay(),
+            'attendance_days'  => $a->attendanceDayList(),
             'creator'                => $a->relationLoaded('creator') && $a->creator
                 ? ['id' => $a->creator->id, 'name' => $a->creator->name]
                 : null,
