@@ -38,15 +38,16 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  activity:     Object,
-  participants: Array,
-  employees:    Array,
-  sections:     Array,
-  canEdit:      Boolean,
-  canManage:    Boolean,
-  evaluations:  Object,
-  walkinEvalQr: Object,
-  quizzes:      { type: Array, default: () => [] },
+  activity:                  Object,
+  participants:               Array,
+  employees:                  Array,
+  sections:                   Array,
+  canEdit:                    Boolean,
+  canManage:                  Boolean,
+  canToggleEvaluationPeriod:  Boolean,
+  evaluations:                Object,
+  walkinEvalQr:                Object,
+  quizzes:                    { type: Array, default: () => [] },
 })
 
 const page       = usePage()
@@ -130,6 +131,35 @@ async function sendEvaluationLinks() {
       },
     }
   )
+}
+
+const togglingPeriod = ref(false)
+
+async function toggleEvaluationPeriod() {
+  const closing = props.activity.evaluation_open
+  const confirmed = await confirmAction({
+    icon: 'warning',
+    title: closing ? 'Close Evaluation Period?' : 'Reopen Evaluation Period?',
+    text: closing
+      ? 'Participants and walk-ins who have not yet evaluated will no longer be able to evaluate or receive a certificate. This does not affect anyone already evaluated/certified.'
+      : 'Participants and walk-ins will be able to submit evaluations again.',
+    confirmText: closing ? 'Yes, close it' : 'Yes, reopen it',
+  })
+  if (!confirmed) return
+
+  togglingPeriod.value = true
+  router.post(
+    route('ams.activities.evaluation-period.toggle', props.activity.id),
+    { open: !closing },
+    { preserveScroll: true, onFinish: () => { togglingPeriod.value = false } }
+  )
+}
+
+function formatDateTime(dt) {
+  if (!dt) return '—'
+  return new Date(dt.replace(' ', 'T')).toLocaleString('en-PH', {
+    year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -276,11 +306,28 @@ function copyEvalLink(p) {
 // Local editable state for employee attendance rows
 const empAttendance = reactive({})
 props.participants.filter(p => p.type === 'employee').forEach(p => {
-  empAttendance[p.id] = { attended: p.attended, hours: p.hours_attended ?? '0.00' }
+  empAttendance[p.id] = {
+    attended: p.attended,
+    hours: p.hours_attended ?? '0.00',
+    daily: { ...(p.daily ?? {}) },
+  }
 })
 
 function initEmpRow(p) {
-  if (!empAttendance[p.id]) empAttendance[p.id] = { attended: p.attended, hours: p.hours_attended ?? '0.00' }
+  if (!empAttendance[p.id]) {
+    empAttendance[p.id] = { attended: p.attended, hours: p.hours_attended ?? '0.00', daily: { ...(p.daily ?? {}) } }
+  }
+}
+
+function getEmpDay(p, date) {
+  const row = empAttendance[p.id]
+  if (!row.daily[date]) row.daily[date] = { attended: 'no', hours: 0 }
+  return row.daily[date]
+}
+
+const expandedEmpDaily = ref(null)
+function toggleEmpDailyExpand(p) {
+  expandedEmpDaily.value = expandedEmpDaily.value === p.id ? null : p.id
 }
 
 async function toggleAttendance(p) {
@@ -300,9 +347,17 @@ async function toggleAttendance(p) {
 
 function saveEmpAttendance(p) {
   const row = empAttendance[p.id]
+  const payload = { attended: row.attended, hours_attended: row.hours }
+  if (props.activity.is_multi_day) {
+    payload.daily = props.activity.attendance_days.map(date => ({
+      date,
+      attended: row.daily[date]?.attended ?? 'no',
+      hours_attended: row.daily[date]?.hours ?? 0,
+    }))
+  }
   router.post(
     route('ams.activities.participants.save-attendance', [props.activity.id, p.id]),
-    { attended: row.attended, hours_attended: row.hours },
+    payload,
     { preserveScroll: true }
   )
 }
@@ -327,7 +382,7 @@ async function toggleSectionExpand(p) {
     )
     const list = await res.json()
     sectionStudents.value[p.id] = list
-    secAttendance[p.id] = list.map(s => ({ ...s }))
+    secAttendance[p.id] = list.map(s => ({ ...s, daily: { ...(s.daily ?? {}) } }))
   } finally {
     loadingStudents.value[p.id] = false
   }
@@ -336,6 +391,16 @@ async function toggleSectionExpand(p) {
 function markAllSectionStudents(pid, attended) {
   if (!secAttendance[pid]) return
   secAttendance[pid].forEach(s => { s.attended = attended })
+}
+
+function getStudentDay(student, date) {
+  if (!student.daily[date]) student.daily[date] = { attended: 'no', hours: 0 }
+  return student.daily[date]
+}
+
+const expandedStudentDaily = ref(null)
+function toggleStudentDailyExpand(studentAttendanceId) {
+  expandedStudentDaily.value = expandedStudentDaily.value === studentAttendanceId ? null : studentAttendanceId
 }
 
 function saveSectionAttendance(p) {
@@ -349,6 +414,13 @@ function saveSectionAttendance(p) {
         attended:       s.attended,
         hours_attended: s.hours_attended,
         student_id:     s.id,
+        ...(props.activity.is_multi_day ? {
+          daily: props.activity.attendance_days.map(date => ({
+            date,
+            attended: s.daily[date]?.attended ?? 'no',
+            hours_attended: s.daily[date]?.hours ?? 0,
+          })),
+        } : {}),
       }))
     },
     { preserveScroll: true }
@@ -409,6 +481,9 @@ async function removeCoPro(cp) {
         <ArrowLeftIcon class="w-4 h-4" /> All Activities
       </a>
       <div class="flex items-center gap-2">
+        <AppButton as="a" :href="route('ams.activities.report', activity.id)" variant="secondary" size="sm">
+          <ChartBarIcon class="w-4 h-4" /> View Report
+        </AppButton>
         <template v-if="canEdit">
           <AppButton as="a" :href="route('ams.activities.edit', activity.id)" variant="warning" size="sm">
             <PencilSquareIcon class="w-4 h-4" /> Edit
@@ -732,27 +807,34 @@ async function removeCoPro(cp) {
             <template v-for="p in paginatedParticipants" :key="p.id">
               <!-- Employee row -->
               <tr v-if="p.type === 'employee'" :ref="() => initEmpRow(p)" class="hover:bg-slate-50">
-                <td class="px-4 py-3 font-medium text-slate-700">{{ p.label }}</td>
+                <td class="px-4 py-3 font-medium text-slate-700">
+                  <span class="inline-flex items-center gap-1.5">
+                    <button v-if="activity.is_multi_day" @click="toggleEmpDailyExpand(p)" class="shrink-0">
+                      <component :is="expandedEmpDaily === p.id ? ChevronUpIcon : ChevronDownIcon" class="w-4 h-4 text-slate-400" />
+                    </button>
+                    {{ p.label }}
+                  </span>
+                </td>
                 <td class="px-3 py-3 text-center">
                   <AppBadge color="indigo">Employee</AppBadge>
                 </td>
                 <td class="px-3 py-3 text-center">
-                  <input v-if="canManage && empAttendance[p.id]"
+                  <input v-if="canManage && empAttendance[p.id] && !activity.is_multi_day"
                          v-model="empAttendance[p.id].hours"
                          type="number" min="0" max="99" step="0.5"
                          class="w-20 text-center rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <span v-else class="text-slate-600">{{ p.hours_attended ?? '—' }}</span>
+                  <span v-else class="text-slate-600">{{ empAttendance[p.id]?.hours ?? p.hours_attended ?? '—' }}</span>
                 </td>
                 <td class="px-3 py-3 text-center">
-                  <button v-if="canManage && empAttendance[p.id]" @click="toggleAttendance(p)">
+                  <button v-if="canManage && empAttendance[p.id] && !activity.is_multi_day" @click="toggleAttendance(p)">
                     <AppBadge :color="attendanceColor(empAttendance[p.id].attended)">
                       <CheckCircleIcon class="w-3.5 h-3.5 mr-1" />
                       {{ empAttendance[p.id].attended === 'yes' ? 'Present' : 'Absent' }}
                     </AppBadge>
                   </button>
-                  <AppBadge v-else :color="attendanceColor(p.attended)">
+                  <AppBadge v-else :color="attendanceColor(empAttendance[p.id]?.attended ?? p.attended)">
                     <CheckCircleIcon class="w-3.5 h-3.5 mr-1" />
-                    {{ p.attended === 'yes' ? 'Present' : 'Absent' }}
+                    {{ (empAttendance[p.id]?.attended ?? p.attended) === 'yes' ? 'Present' : 'Absent' }}
                   </AppBadge>
                 </td>
                 <td class="px-3 py-3 text-center">
@@ -778,6 +860,48 @@ async function removeCoPro(cp) {
                     <AppIconButton label="Remove participant" variant="danger" size="sm" @click="removeParticipant(p)">
                       <XMarkIcon class="w-4 h-4" />
                     </AppIconButton>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Employee per-day attendance grid (multi-day activities only) -->
+              <tr v-if="p.type === 'employee' && activity.is_multi_day && expandedEmpDaily === p.id">
+                <td colspan="6" class="bg-slate-50 px-6 py-4 border-t border-slate-100">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-slate-500">Per-day attendance</span>
+                    <AppButton v-if="canManage" size="sm" @click="saveEmpAttendance(p)">Save Daily Attendance</AppButton>
+                  </div>
+                  <div class="border border-slate-200 rounded-lg overflow-hidden overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead>
+                        <tr class="bg-white border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                          <th class="text-left px-3 py-2">Day</th>
+                          <th class="text-center px-3 py-2 w-28">Attendance</th>
+                          <th class="text-center px-3 py-2 w-24">Hours</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-50">
+                        <tr v-for="date in activity.attendance_days" :key="date" class="bg-white">
+                          <td class="px-3 py-2 text-slate-700">{{ formatMealDay(date) }}</td>
+                          <td class="px-3 py-2 text-center">
+                            <button v-if="canManage" @click="getEmpDay(p, date).attended = getEmpDay(p, date).attended === 'yes' ? 'no' : 'yes'">
+                              <AppBadge :color="attendanceColor(getEmpDay(p, date).attended)">
+                                {{ getEmpDay(p, date).attended === 'yes' ? 'Present' : 'Absent' }}
+                              </AppBadge>
+                            </button>
+                            <AppBadge v-else :color="attendanceColor(getEmpDay(p, date).attended)">
+                              {{ getEmpDay(p, date).attended === 'yes' ? 'Present' : 'Absent' }}
+                            </AppBadge>
+                          </td>
+                          <td class="px-3 py-2 text-center">
+                            <input v-if="canManage" v-model="getEmpDay(p, date).hours"
+                                   type="number" min="0" max="99" step="0.5"
+                                   class="w-20 text-center rounded-lg border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <span v-else class="text-slate-600 text-xs">{{ getEmpDay(p, date).hours }}</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </td>
               </tr>
@@ -828,16 +952,24 @@ async function removeCoPro(cp) {
                             </tr>
                           </thead>
                           <tbody class="divide-y divide-slate-50">
-                            <tr v-for="student in secAttendance[p.id]" :key="student.id" class="bg-white hover:bg-slate-50">
-                              <td class="px-3 py-2 text-slate-700">{{ student.name }}</td>
+                            <template v-for="student in secAttendance[p.id]" :key="student.id">
+                            <tr class="bg-white hover:bg-slate-50">
+                              <td class="px-3 py-2 text-slate-700">
+                                <span class="inline-flex items-center gap-1.5">
+                                  <button v-if="activity.is_multi_day" @click="toggleStudentDailyExpand(student.attendance_id)" class="shrink-0">
+                                    <component :is="expandedStudentDaily === student.attendance_id ? ChevronUpIcon : ChevronDownIcon" class="w-3.5 h-3.5 text-slate-400" />
+                                  </button>
+                                  {{ student.name }}
+                                </span>
+                              </td>
                               <td class="px-3 py-2 text-center">
-                                <input v-if="canManage" v-model="student.hours_attended"
+                                <input v-if="canManage && !activity.is_multi_day" v-model="student.hours_attended"
                                        type="number" min="0" max="999" step="0.5"
                                        class="w-20 text-center rounded-lg border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                 <span v-else class="text-slate-600 text-xs">{{ student.hours_attended }}</span>
                               </td>
                               <td class="px-3 py-2 text-center">
-                                <button v-if="canManage" @click="student.attended = student.attended === 'yes' ? 'no' : 'yes'">
+                                <button v-if="canManage && !activity.is_multi_day" @click="student.attended = student.attended === 'yes' ? 'no' : 'yes'">
                                   <AppBadge :color="attendanceColor(student.attended)">
                                     <CheckCircleIcon class="w-3 h-3 mr-1" />
                                     {{ student.attended === 'yes' ? 'Present' : 'Absent' }}
@@ -866,6 +998,24 @@ async function removeCoPro(cp) {
                                 <span v-else class="text-xs text-slate-400">—</span>
                               </td>
                             </tr>
+                            <tr v-if="activity.is_multi_day && expandedStudentDaily === student.attendance_id" class="bg-slate-50">
+                              <td colspan="5" class="px-6 py-3 border-t border-slate-100">
+                                <div class="flex flex-wrap gap-3">
+                                  <div v-for="date in activity.attendance_days" :key="date" class="border border-slate-200 rounded-lg px-3 py-2 bg-white min-w-[140px]">
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mb-1">{{ formatMealDay(date) }}</p>
+                                    <button v-if="canManage" @click="getStudentDay(student, date).attended = getStudentDay(student, date).attended === 'yes' ? 'no' : 'yes'">
+                                      <AppBadge :color="attendanceColor(getStudentDay(student, date).attended)">
+                                        {{ getStudentDay(student, date).attended === 'yes' ? 'Present' : 'Absent' }}
+                                      </AppBadge>
+                                    </button>
+                                    <input v-if="canManage" v-model="getStudentDay(student, date).hours"
+                                           type="number" min="0" max="999" step="0.5"
+                                           class="mt-1 w-full text-center rounded border border-slate-200 px-1 py-0.5 text-xs" />
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                            </template>
                           </tbody>
                         </table>
                       </div>
@@ -931,6 +1081,33 @@ async function removeCoPro(cp) {
 
     <!-- ── EVALUATIONS TAB ──────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'evaluations'" class="space-y-6">
+
+      <!-- Evaluation Period -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div class="flex items-center gap-2">
+            <AppBadge :color="activity.evaluation_open ? 'green' : 'red'">
+              {{ activity.evaluation_open ? 'Evaluation Period Open' : 'Evaluation Period Closed' }}
+            </AppBadge>
+          </div>
+          <p v-if="activity.evaluation_status_changed_at" class="text-xs text-slate-400 mt-1">
+            Last changed by {{ activity.evaluation_status_changed_by ?? 'unknown' }} on {{ formatDateTime(activity.evaluation_status_changed_at) }}
+          </p>
+          <p v-if="!activity.evaluation_open" class="text-xs text-slate-500 mt-1">
+            New evaluations (and certificates for anyone who hasn't evaluated) are blocked while closed.
+          </p>
+        </div>
+        <AppButton
+          v-if="canToggleEvaluationPeriod"
+          :variant="activity.evaluation_open ? 'danger' : 'success'"
+          size="sm"
+          :loading="togglingPeriod"
+          :disabled="togglingPeriod"
+          @click="toggleEvaluationPeriod"
+        >
+          {{ activity.evaluation_open ? 'Close Evaluation Period' : 'Reopen Evaluation Period' }}
+        </AppButton>
+      </div>
 
       <!-- Walk-in (QR) evaluation -->
       <div v-if="walkinEvalQr" class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4">

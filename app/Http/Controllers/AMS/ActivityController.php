@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\AMS\ActivityEvaluationInviteMail;
 use App\Mail\AMS\ActivityInvitationMail;
 use App\Models\AMS\Activity;
+use App\Models\AMS\ActivityAttendanceDay;
 use App\Models\AMS\ActivityCoProponent;
 use App\Models\AMS\ActivityParticipant;
 use App\Models\AMS\ActivityStudentAttendance;
@@ -95,7 +96,7 @@ class ActivityController extends Controller
     public function show(Activity $activity)
     {
         $this->authorizeView($activity);
-        $activity->load(['creator', 'coProponents.employee', 'participants', 'studentAttendance', 'mealPlans', 'speakers']);
+        $activity->load(['creator', 'coProponents.employee', 'participants', 'studentAttendance', 'mealPlans', 'speakers', 'statusChangedBy']);
 
         $sectionIds  = $activity->participants->where('participant_type', 'section')->pluck('participant_id');
         $employeeIds = $activity->participants->where('participant_type', 'employee')->pluck('participant_id');
@@ -106,7 +107,12 @@ class ActivityController extends Controller
         // Evaluation lookup: keyed by "type:participant_id"
         $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
-        $participants = $activity->participants->map(function ($p) use ($sectionsMap, $employeesMap, $evaluations, $activity) {
+        $attendanceDays = $activity->isMultiDay()
+            ? ActivityAttendanceDay::where('activity_id', $activity->id)->get()
+                ->groupBy(fn ($row) => $row->participant_type . ':' . $row->participant_id)
+            : collect();
+
+        $participants = $activity->participants->map(function ($p) use ($sectionsMap, $employeesMap, $evaluations, $activity, $attendanceDays) {
             $evalHash      = md5($p->participant_id . '-' . $activity->id);
             $evaluateUrl   = route('ams.activities.evaluate.show', [$activity->id, $evalHash]);
 
@@ -134,6 +140,8 @@ class ActivityController extends Controller
                 'evaluated'      => isset($evaluations['employee:' . $p->participant_id]),
                 'has_certificate' => (bool) $p->certificate_path,
                 'evaluate_url'   => $evaluateUrl,
+                'daily'          => $attendanceDays->get('employee:' . $p->participant_id, collect())
+                    ->mapWithKeys(fn ($row) => [$row->date => ['attended' => $row->attended, 'hours' => (float) $row->hours_attended]]),
             ];
         })->values()->all();
 
@@ -146,6 +154,7 @@ class ActivityController extends Controller
             'sections'     => $this->sectionList(),
             'canEdit'      => $canEdit,
             'canManage'    => $canManage,
+            'canToggleEvaluationPeriod' => $this->canToggleEvaluationPeriod($activity),
             'evaluations'  => $this->buildEvaluationSummary($activity),
             'walkinEvalQr' => $this->buildWalkinEvalQr($activity),
             'quizzes'      => \App\Models\Quiz\Quiz::where('source_type', 'activity')
@@ -336,6 +345,25 @@ class ActivityController extends Controller
         return back()->with('success', $msg);
     }
 
+    /** Open/close the evaluation period. Closing blocks new evaluations (and therefore new certificates for anyone who hasn't evaluated yet) without affecting anyone already evaluated/certified. */
+    public function toggleEvaluationPeriod(Request $request, Activity $activity)
+    {
+        $this->authorizeEvaluationPeriod($activity);
+        $data = $request->validate(['open' => 'required|boolean']);
+
+        $activity->update([
+            'evaluation_open'               => $data['open'],
+            'evaluation_status_changed_at'  => now(),
+            'evaluation_status_changed_by'  => Auth::id(),
+        ]);
+
+        $message = $data['open']
+            ? 'Evaluation period reopened. Participants can submit evaluations again.'
+            : 'Evaluation period closed. Anyone who has not yet evaluated can no longer evaluate or receive a certificate.';
+
+        return back()->with('success', $message);
+    }
+
     public function removeParticipant(Activity $activity, ActivityParticipant $participant)
     {
         $this->authorizeManage($activity);
@@ -365,9 +393,21 @@ class ActivityController extends Controller
         );
 
         $data = $request->validate([
-            'attended'       => 'required|in:yes,no',
-            'hours_attended' => 'nullable|numeric|min:0|max:99.99',
+            'attended'                       => 'required|in:yes,no',
+            'hours_attended'                 => 'nullable|numeric|min:0|max:99.99',
+            'daily'                          => 'nullable|array',
+            'daily.*.date'                   => 'required_with:daily|date',
+            'daily.*.attended'               => 'required_with:daily|in:yes,no',
+            'daily.*.hours_attended'         => 'nullable|numeric|min:0|max:99.99',
         ]);
+
+        if ($activity->isMultiDay() && ! empty($data['daily'])) {
+            $data = array_merge(
+                $data,
+                $this->applyDailyAttendance($activity, 'employee', $participant->participant_id, $data['daily'])
+            );
+        }
+        unset($data['daily']);
 
         if ($participant->certificate_path && (
             ! $this->evaluationEligibility->hasEvaluated($activity, 'employee', $participant->participant_id)
@@ -401,6 +441,14 @@ class ActivityController extends Controller
             ->keyBy('participant_id');
         $evaluations = $this->evaluationEligibility->evaluatedMap($activity);
 
+        $attendanceDays = $activity->isMultiDay()
+            ? ActivityAttendanceDay::where('activity_id', $activity->id)
+                ->where('participant_type', 'student')
+                ->whereIn('participant_id', $studentIds)
+                ->get()
+                ->groupBy('participant_id')
+            : collect();
+
         $students = Student::whereIn('id', $studentIds)
             ->orderBy('lastname')
             ->get(['id', 'firstname', 'lastname', 'middlename', 'student_email']);
@@ -414,6 +462,8 @@ class ActivityController extends Controller
                 'attendance_id'  => $attendance[$s->id]?->id,
                 'evaluated'      => isset($evaluations['student:' . $s->id]),
                 'has_certificate' => (bool) $attendance[$s->id]?->certificate_path,
+                'daily'          => $attendanceDays->get($s->id, collect())
+                    ->mapWithKeys(fn ($row) => [$row->date => ['attended' => $row->attended, 'hours' => (float) $row->hours_attended]]),
             ])->values()
         );
     }
@@ -428,11 +478,15 @@ class ActivityController extends Controller
         );
 
         $data = $request->validate([
-            'students'                 => 'required|array',
-            'students.*.attendance_id' => 'required|integer',
-            'students.*.attended'      => 'required|in:yes,no',
-            'students.*.hours_attended'=> 'nullable|numeric|min:0|max:999.99',
-            'students.*.student_id'    => 'required|integer',
+            'students'                          => 'required|array',
+            'students.*.attendance_id'          => 'required|integer',
+            'students.*.attended'               => 'required|in:yes,no',
+            'students.*.hours_attended'         => 'nullable|numeric|min:0|max:999.99',
+            'students.*.student_id'             => 'required|integer',
+            'students.*.daily'                  => 'nullable|array',
+            'students.*.daily.*.date'           => 'required_with:students.*.daily|date',
+            'students.*.daily.*.attended'       => 'required_with:students.*.daily|in:yes,no',
+            'students.*.daily.*.hours_attended' => 'nullable|numeric|min:0|max:999.99',
         ]);
 
         foreach ($data['students'] as $row) {
@@ -446,6 +500,14 @@ class ActivityController extends Controller
                 'attended'       => $row['attended'],
                 'hours_attended' => $row['hours_attended'] ?? 0,
             ];
+
+            if ($activity->isMultiDay() && ! empty($row['daily'])) {
+                $attendanceData = array_merge(
+                    $attendanceData,
+                    $this->applyDailyAttendance($activity, 'student', $row['student_id'], $row['daily'])
+                );
+            }
+
             if ($attendance->certificate_path && (
                 ! $this->evaluationEligibility->hasEvaluated($activity, 'student', $attendance->participant_id)
                 || $this->shouldInvalidateCertificate($attendance, $attendanceData)
@@ -457,6 +519,42 @@ class ActivityController extends Controller
         }
 
         return back()->with('success', 'Attendance saved. Certificates are generated only for students who have completed the evaluation.');
+    }
+
+    /**
+     * Upserts per-day attendance rows for one participant and returns the
+     * recomputed rollup: present on any day → 'yes'; hours summed across
+     * days actually marked present. Callers only invoke this for multi-day
+     * activities — single-day activities keep using the plain scalar fields.
+     */
+    private function applyDailyAttendance(Activity $activity, string $participantType, int $participantId, array $daily): array
+    {
+        DB::transaction(function () use ($activity, $participantType, $participantId, $daily) {
+            foreach ($daily as $day) {
+                ActivityAttendanceDay::updateOrCreate(
+                    [
+                        'activity_id'      => $activity->id,
+                        'participant_type' => $participantType,
+                        'participant_id'   => $participantId,
+                        'date'             => $day['date'],
+                    ],
+                    [
+                        'attended'       => $day['attended'],
+                        'hours_attended' => $day['hours_attended'] ?? 0,
+                    ]
+                );
+            }
+        });
+
+        $rows = ActivityAttendanceDay::where('activity_id', $activity->id)
+            ->where('participant_type', $participantType)
+            ->where('participant_id', $participantId)
+            ->get();
+
+        return [
+            'attended'       => $rows->contains('attended', 'yes') ? 'yes' : 'no',
+            'hours_attended' => (float) $rows->where('attended', 'yes')->sum('hours_attended'),
+        ];
     }
 
     private function shouldInvalidateCertificate($record, array $newAttendance): bool
@@ -514,6 +612,24 @@ class ActivityController extends Controller
     {
         $user = Auth::user();
         if (!$user->isSuperAdmin() && !$user->hasPermission('activities.manage')) abort(403);
+    }
+
+    private function canToggleEvaluationPeriod(Activity $activity): bool
+    {
+        $user = Auth::user();
+        if ($user->isSuperAdmin() || $user->hasPermission('activities.evaluation_committee')) {
+            return true;
+        }
+
+        $isOwner = $activity->user_id === $user->id;
+        $isCo    = ActivityCoProponent::where('activity_id', $activity->id)->where('employee_id', $user->id)->exists();
+
+        return $isOwner || $isCo;
+    }
+
+    private function authorizeEvaluationPeriod(Activity $activity): void
+    {
+        abort_unless($this->canToggleEvaluationPeriod($activity), 403);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -656,6 +772,11 @@ class ActivityController extends Controller
             'special_order'          => $this->resolveFileUrl($a->special_order, $a, 'special_order'),
             'activity_report'        => $this->resolveFileUrl($a->activity_report, $a, 'activity_report'),
             'official_documentation' => $this->resolveFileUrl($a->official_documentation, $a, 'official_documentation'),
+            'evaluation_open'              => (bool) $a->evaluation_open,
+            'evaluation_status_changed_at' => $a->evaluation_status_changed_at?->toDateTimeString(),
+            'evaluation_status_changed_by' => $a->relationLoaded('statusChangedBy') ? $a->statusChangedBy?->name : null,
+            'is_multi_day'     => $a->isMultiDay(),
+            'attendance_days'  => $a->attendanceDayList(),
             'creator'                => $a->relationLoaded('creator') && $a->creator
                 ? ['id' => $a->creator->id, 'name' => $a->creator->name]
                 : null,

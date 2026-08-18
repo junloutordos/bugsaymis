@@ -3,6 +3,7 @@
 use App\Http\Controllers\AMS\ActivityController;
 use App\Http\Controllers\AMS\ActivityFileController;
 use App\Http\Controllers\AMS\ActivityMonitorController;
+use App\Http\Controllers\AMS\ActivityReportController;
 use App\Http\Controllers\AMS\CertificateController;
 use App\Http\Controllers\AMS\EvaluationController;
 use App\Http\Controllers\AMS\MyActivityController;
@@ -55,6 +56,14 @@ Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|acti
         // ── Evaluation links ──────────────────────────────────────────────────
         Route::post('/{activity}/participants/send-evaluation-links',
             [ActivityController::class, 'sendEvaluationLinks'])->name('participants.send-evaluation-links');
+
+        // ── Evaluation period ────────────────────────────────────────────────
+        Route::post('/{activity}/evaluation-period/toggle',
+            [ActivityController::class, 'toggleEvaluationPeriod'])->name('evaluation-period.toggle');
+
+        // ── Comprehensive report ─────────────────────────────────────────────
+        Route::get('/{activity}/report',       [ActivityReportController::class, 'show'])->name('report');
+        Route::get('/{activity}/report/print', [ActivityReportController::class, 'print'])->name('report.print');
 
         // ── Certificates ─────────────────────────────────────────────────────
         Route::post('/{activity}/certificates/generate',
