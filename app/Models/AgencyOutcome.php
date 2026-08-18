@@ -16,6 +16,7 @@ class AgencyOutcome extends Model
         'sub_outcome',
         'function_type', // ✅ new field
         'fiscal_year',
+        'parent_id',
     ];
 
     // NULL fiscal_year = applies to all years (legacy rows)
@@ -28,5 +29,25 @@ class AgencyOutcome extends Model
         return $query->where(function ($q) use ($year) {
             $q->whereNull('fiscal_year')->orWhere('fiscal_year', $year);
         });
+    }
+
+    public function scopeTopLevel($query)
+    {
+        return $query->whereNull('parent_id');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function performanceIndicators()
+    {
+        return $this->hasMany(PerformanceIndicator::class, 'agency_outcome_id');
     }
 }
