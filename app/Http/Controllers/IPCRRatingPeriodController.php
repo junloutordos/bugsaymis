@@ -193,6 +193,16 @@ class IPCRRatingPeriodController extends Controller
                 $outcomeMap[$outcome->id] = $clone->id;
             }
 
+            foreach ($outcomes as $outcome) {
+                if ($outcome->parent_id === null) {
+                    continue;
+                }
+
+                $newId = $outcomeMap[$outcome->id];
+                $newParentId = $outcomeMap[$outcome->parent_id] ?? null;
+                AgencyOutcome::whereKey($newId)->update(['parent_id' => $newParentId]);
+            }
+
             $indicators = PerformanceIndicator::with('divisions')->forFiscalYear($source)->get();
             $indicatorMap = [];
             foreach ($indicators as $indicator) {
