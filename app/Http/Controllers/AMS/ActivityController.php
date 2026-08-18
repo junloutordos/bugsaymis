@@ -461,11 +461,15 @@ class ActivityController extends Controller
         );
 
         $data = $request->validate([
-            'students'                 => 'required|array',
-            'students.*.attendance_id' => 'required|integer',
-            'students.*.attended'      => 'required|in:yes,no',
-            'students.*.hours_attended'=> 'nullable|numeric|min:0|max:999.99',
-            'students.*.student_id'    => 'required|integer',
+            'students'                          => 'required|array',
+            'students.*.attendance_id'          => 'required|integer',
+            'students.*.attended'               => 'required|in:yes,no',
+            'students.*.hours_attended'         => 'nullable|numeric|min:0|max:999.99',
+            'students.*.student_id'             => 'required|integer',
+            'students.*.daily'                  => 'nullable|array',
+            'students.*.daily.*.date'           => 'required_with:students.*.daily|date',
+            'students.*.daily.*.attended'       => 'required_with:students.*.daily|in:yes,no',
+            'students.*.daily.*.hours_attended' => 'nullable|numeric|min:0|max:999.99',
         ]);
 
         foreach ($data['students'] as $row) {
@@ -479,6 +483,14 @@ class ActivityController extends Controller
                 'attended'       => $row['attended'],
                 'hours_attended' => $row['hours_attended'] ?? 0,
             ];
+
+            if ($activity->isMultiDay() && ! empty($row['daily'])) {
+                $attendanceData = array_merge(
+                    $attendanceData,
+                    $this->applyDailyAttendance($activity, 'student', $row['student_id'], $row['daily'])
+                );
+            }
+
             if ($attendance->certificate_path && (
                 ! $this->evaluationEligibility->hasEvaluated($activity, 'student', $attendance->participant_id)
                 || $this->shouldInvalidateCertificate($attendance, $attendanceData)

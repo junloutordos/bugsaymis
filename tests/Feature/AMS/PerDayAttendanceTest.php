@@ -136,6 +136,43 @@ class PerDayAttendanceTest extends TestCase
         $this->assertSame('12.00', $participant->fresh()->hours_attended); // 8 + 4
     }
 
+    public function test_multiday_section_student_attendance_upserts_daily_rows_and_rollup(): void
+    {
+        $owner = $this->userWithPermission('activities.manage');
+        $activity = $this->makeMultiDayActivity($owner, '2026-08-10', '2026-08-11');
+        $section = \App\Models\AMS\ActivityParticipant::create([
+            'activity_id' => $activity->id, 'participant_id' => 1, 'participant_type' => 'section',
+        ]);
+        $studentAttendance = \App\Models\AMS\ActivityStudentAttendance::create([
+            'activity_id' => $activity->id, 'participant_id' => 501, 'attended' => 'no', 'hours_attended' => 0,
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('ams.activities.participants.save-section-attendance', [$activity, $section]), [
+                'students' => [[
+                    'attendance_id' => $studentAttendance->id,
+                    'student_id' => 501,
+                    'attended' => 'no',
+                    'hours_attended' => 0,
+                    'daily' => [
+                        ['date' => '2026-08-10', 'attended' => 'yes', 'hours_attended' => 7],
+                        ['date' => '2026-08-11', 'attended' => 'yes', 'hours_attended' => 7],
+                    ],
+                ]],
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseCount('ams_activity_attendance_days', 2);
+        $this->assertDatabaseHas('ams_activity_attendance_days', [
+            'activity_id' => $activity->id, 'participant_type' => 'student',
+            'participant_id' => 501, 'date' => '2026-08-10', 'attended' => 'yes',
+        ]);
+
+        $studentAttendance->refresh();
+        $this->assertSame('yes', $studentAttendance->attended);
+        $this->assertSame('14.00', $studentAttendance->hours_attended);
+    }
+
     private function makeMultiDayActivity(User $owner, string $start, string $end): Activity
     {
         return Activity::create([
