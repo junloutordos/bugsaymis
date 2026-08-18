@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\AMS;
 
 use App\Http\Controllers\Controller;
-use App\Mail\AMS\ActivityEvaluationInviteMail;
+use App\Jobs\AMS\SendActivityEvaluationLinks;
 use App\Mail\AMS\ActivityInvitationMail;
 use App\Models\AMS\Activity;
 use App\Models\AMS\ActivityAttendanceDay;
@@ -306,43 +306,17 @@ class ActivityController extends Controller
     }
 
     /**
-     * Bulk-send evaluation invite emails to all present employee participants.
+     * Queue bulk-sending of evaluation invite emails to all present employee
+     * participants. The heavy work (per-participant SMTP send) runs in the
+     * background; the requester is notified via bell/push when it completes.
      */
     public function sendEvaluationLinks(Activity $activity)
     {
         $this->authorizeManage($activity);
 
-        $participants = ActivityParticipant::where('activity_id', $activity->id)
-            ->where('participant_type', 'employee')
-            ->where('attended', 'yes')
-            ->get();
+        SendActivityEvaluationLinks::dispatch($activity->id, Auth::id());
 
-        $sent   = 0;
-        $failed = 0;
-
-        foreach ($participants as $p) {
-            $user = User::find($p->participant_id);
-            if (!$user?->email) { $failed++; continue; }
-
-            $hash          = md5($p->participant_id . '-' . $activity->id);
-            $evaluationUrl = route('ams.activities.evaluate.show', [$activity->id, $hash]);
-
-            try {
-                Mail::to($user->email)->send(
-                    new ActivityEvaluationInviteMail($activity, $user->name, $evaluationUrl)
-                );
-                $sent++;
-            } catch (\Throwable $e) {
-                $failed++;
-                \Log::warning("AMS: evaluation invite failed for {$user->email}: " . $e->getMessage());
-                report($e);
-            }
-        }
-
-        $msg = "Evaluation links sent to {$sent} participant(s).";
-        if ($failed) $msg .= " {$failed} could not be sent (no email or delivery error).";
-
-        return back()->with('success', $msg);
+        return back()->with('success', 'Sending evaluation links has started. You will be notified once it finishes.');
     }
 
     /** Open/close the evaluation period. Closing blocks new evaluations (and therefore new certificates for anyone who hasn't evaluated yet) without affecting anyone already evaluated/certified. */

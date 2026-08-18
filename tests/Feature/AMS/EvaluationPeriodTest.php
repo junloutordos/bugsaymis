@@ -229,7 +229,7 @@ class EvaluationPeriodTest extends TestCase
 
     public function test_certificate_download_still_works_after_period_closed_for_prior_evaluation(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('public');
+        \Illuminate\Support\Facades\Storage::fake('s3');
         $owner = $this->userWithPermission('activities.manage');
         $activity = $this->makeActivity($owner);
         $attendee = User::factory()->create(['email' => uniqid().'@example.test']);
@@ -238,7 +238,7 @@ class EvaluationPeriodTest extends TestCase
             'participant_type' => 'employee', 'attended' => 'yes', 'hours_attended' => 8,
             'certificate_path' => 'ams/certificates/already-issued.pdf',
         ]);
-        \Illuminate\Support\Facades\Storage::disk('public')->put('ams/certificates/already-issued.pdf', 'dummy-pdf-content');
+        \Illuminate\Support\Facades\Storage::disk('s3')->put('ams/certificates/already-issued.pdf', 'dummy-pdf-content');
         ActivityEvaluation::create([
             'activity_id' => $activity->id, 'participant_type' => 'employee', 'participant_id' => $attendee->id,
         ]);
