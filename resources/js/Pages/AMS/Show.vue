@@ -481,6 +481,9 @@ async function removeCoPro(cp) {
         <ArrowLeftIcon class="w-4 h-4" /> All Activities
       </a>
       <div class="flex items-center gap-2">
+        <AppButton as="a" :href="route('ams.activities.report', activity.id)" variant="secondary" size="sm">
+          <ChartBarIcon class="w-4 h-4" /> View Report
+        </AppButton>
         <template v-if="canEdit">
           <AppButton as="a" :href="route('ams.activities.edit', activity.id)" variant="warning" size="sm">
             <PencilSquareIcon class="w-4 h-4" /> Edit
