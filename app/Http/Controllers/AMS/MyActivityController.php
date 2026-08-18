@@ -146,7 +146,7 @@ class MyActivityController extends Controller
             abort(404, 'Certificate has not been generated yet. Please contact the activity organizer.');
         }
 
-        $content  = Storage::disk('public')->get($participant->certificate_path);
+        $content  = Storage::disk('s3')->get($participant->certificate_path);
         $filename = 'Certificate_' . str_replace(' ', '_', $activity->title) . '.pdf';
 
         return response($content, 200, [

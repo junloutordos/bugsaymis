@@ -210,7 +210,7 @@ class CertificateController extends Controller
 
     private function streamPdf(string $storagePath, string $activityTitle): \Illuminate\Http\Response
     {
-        $content = Storage::disk('public')->get($storagePath);
+        $content = Storage::disk('s3')->get($storagePath);
         $filename = 'Certificate_' . str_replace(' ', '_', $activityTitle) . '.pdf';
 
         return response($content, 200, [

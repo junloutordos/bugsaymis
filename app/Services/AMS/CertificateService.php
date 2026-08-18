@@ -88,7 +88,11 @@ class CertificateService
         $filename = 'Certificate_'.$participantType.'_'.$participantId.'.pdf';
         $fullPath = "{$dir}/{$filename}";
 
-        Storage::disk('s3')->makeDirectory($dir);
+        // Note: S3 has no real directories — a slashed key is sufficient.
+        // Do not call makeDirectory() here: it tries to set an ACL on the
+        // placeholder object, which this bucket rejects (ACLs disabled via
+        // Block Public Access / bucket-owner-enforced), causing every
+        // certificate generation to fail with AccessControlListNotSupported.
         Storage::disk('s3')->put($fullPath, $pdfContent);
 
         return $fullPath;
