@@ -18,7 +18,15 @@ export function useOutcomes(props) {
     sub_outcome: "",
     function_type: "",
     fiscal_year: props.currentFiscalYear ?? null,
+    parent_id: null,
   });
+
+  const expandedIds = ref(new Set());
+  const toggleExpand = (id) => {
+    const next = new Set(expandedIds.value);
+    next.has(id) ? next.delete(id) : next.add(id);
+    expandedIds.value = next;
+  };
 
   const filteredOutcomes = computed(() => {
     const results = outcomesList.value.filter((o) =>
@@ -30,7 +38,7 @@ export function useOutcomes(props) {
 
   const totalPages = computed(() => Math.ceil(outcomesList.value.length / perPage));
 
-  const openModal = (mode, outcome = null) => {
+  const openModal = (mode, outcome = null, parent = null) => {
   modalMode.value = mode;
   showModal.value = true;
 
@@ -41,6 +49,16 @@ export function useOutcomes(props) {
       sub_outcome: outcome.sub_outcome ?? "",
       function_type: outcome.function_type ?? "",
       fiscal_year: outcome.fiscal_year ?? null,
+      parent_id: outcome.parent_id ?? null,
+    });
+  } else if (mode === "create" && parent) {
+    Object.assign(form.value, {
+      id: null,
+      outcome: parent.outcome,
+      sub_outcome: "",
+      function_type: parent.function_type ?? "",
+      fiscal_year: parent.fiscal_year ?? null,
+      parent_id: parent.id,
     });
   } else {
     Object.assign(form.value, {
@@ -49,6 +67,7 @@ export function useOutcomes(props) {
       sub_outcome: "",
       function_type: "",
       fiscal_year: props.currentFiscalYear ?? null,
+      parent_id: null,
     });
   }
 
@@ -132,6 +151,8 @@ export function useOutcomes(props) {
     totalPages,
     filteredOutcomes,
     form,
+    expandedIds,
+    toggleExpand,
     openModal,
     closeModal,
     submitOutcome,
