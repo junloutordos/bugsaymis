@@ -21,7 +21,12 @@ class ResendIssuanceEmails implements ShouldQueue
     // double-send emails to recipients who already succeeded.
     public int $tries = 1;
 
-    public function __construct(public int $issuanceId, public array $recipientIds) {}
+    public function __construct(public int $issuanceId, public array $recipientIds)
+    {
+        // Loops over every recipient synchronously — keep off 'default'
+        // so it never blocks fast single-unit jobs.
+        $this->onQueue('bulk');
+    }
 
     public function handle(IssuanceService $svc): void
     {

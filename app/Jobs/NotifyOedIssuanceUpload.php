@@ -18,7 +18,12 @@ class NotifyOedIssuanceUpload implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public int $oedIssuanceId) {}
+    public function __construct(public int $oedIssuanceId)
+    {
+        // Loops over every targeted employee — keep off 'default' so it
+        // never blocks fast single-unit jobs.
+        $this->onQueue('bulk');
+    }
 
     public function handle(): void
     {

@@ -22,7 +22,11 @@ class ProcessBiometricImport implements ShouldQueue
         public readonly string  $filePath,
         public readonly string  $importBatch,
         public readonly ?string $deviceId = null,
-    ) {}
+    ) {
+        // Parses a whole biometric device file (timeout=300s) — keep off
+        // 'default' so it never blocks fast single-unit jobs.
+        $this->onQueue('bulk');
+    }
 
     public function handle(BiometricImportService $service): void
     {

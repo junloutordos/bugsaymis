@@ -32,7 +32,11 @@ class SendActivityEvaluationLinks implements ShouldQueue
     public function __construct(
         public int $activityId,
         public int $requestedByUserId,
-    ) {}
+    ) {
+        // Loops over every present employee participant (SMTP send each) —
+        // keep off 'default' so it never blocks fast single-unit jobs.
+        $this->onQueue('bulk');
+    }
 
     public function handle(): void
     {

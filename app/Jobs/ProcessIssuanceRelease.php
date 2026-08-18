@@ -29,7 +29,13 @@ class ProcessIssuanceRelease implements ShouldQueue
     // produced "__PHP_Incomplete_Class" errors during rolling deploys
     // where the old worker received a payload referencing a class it
     // had not autoloaded yet). We re-fetch fresh on handle().
-    public function __construct(public int $issuanceId) {}
+    public function __construct(public int $issuanceId)
+    {
+        // Long-running (PDF stamp + up to 300+ emails) — keep off the
+        // 'default' lane so it never head-of-line-blocks fast jobs like
+        // bell notifications or single-recipient sends.
+        $this->onQueue('bulk');
+    }
 
     public function handle(IssuanceService $svc): void
     {

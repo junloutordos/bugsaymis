@@ -58,7 +58,9 @@ class CertificateEligibilityTest extends TestCase
 
         Queue::assertPushed(
             GenerateActivityCertificates::class,
-            fn ($job) => $job->activityId === $activity->id && $job->requestedByUserId === $owner->id
+            fn ($job) => $job->activityId === $activity->id
+                && $job->requestedByUserId === $owner->id
+                && $job->queue === 'bulk'
         );
 
         // The HTTP request itself must not touch certificate generation —

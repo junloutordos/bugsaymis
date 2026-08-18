@@ -34,7 +34,11 @@ class GenerateActivityCertificates implements ShouldQueue
     public function __construct(
         public int $activityId,
         public int $requestedByUserId,
-    ) {}
+    ) {
+        // Loops over every eligible participant (PDF + S3 upload + email
+        // each) — keep off 'default' so it never blocks fast single-unit jobs.
+        $this->onQueue('bulk');
+    }
 
     public function handle(
         CertificateService $certService,

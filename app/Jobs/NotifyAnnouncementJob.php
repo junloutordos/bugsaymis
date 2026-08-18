@@ -20,7 +20,12 @@ class NotifyAnnouncementJob implements ShouldQueue
     public int $tries = 1;
 
     // Primitive ID, not the model (see ProcessIssuanceRelease).
-    public function __construct(public int $announcementId) {}
+    public function __construct(public int $announcementId)
+    {
+        // Loops over every targeted user — keep off 'default' so it
+        // never blocks fast single-unit jobs.
+        $this->onQueue('bulk');
+    }
 
     public function handle(): void
     {

@@ -23,7 +23,12 @@ class ProcessCoaIssue implements ShouldQueue
 
     // Primitive ID, not the model — avoids SerializesModels deserialization
     // issues during rolling deploys (see ProcessIssuanceRelease).
-    public function __construct(public int $visitId) {}
+    public function __construct(public int $visitId)
+    {
+        // Loops over every certificate in the visit (PDF + email each) —
+        // keep off 'default' so it never blocks fast single-unit jobs.
+        $this->onQueue('bulk');
+    }
 
     public function handle(CertificateOfAppearanceService $svc): void
     {

@@ -33,7 +33,9 @@ class SendEvaluationLinksTest extends TestCase
 
         Queue::assertPushed(
             SendActivityEvaluationLinks::class,
-            fn ($job) => $job->activityId === $activity->id && $job->requestedByUserId === $owner->id
+            fn ($job) => $job->activityId === $activity->id
+                && $job->requestedByUserId === $owner->id
+                && $job->queue === 'bulk'
         );
     }
 
