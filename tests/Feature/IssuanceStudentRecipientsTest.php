@@ -238,6 +238,47 @@ class IssuanceStudentRecipientsTest extends TestCase
         ]);
     }
 
+    public function test_release_endpoint_builds_combined_staff_and_student_recipients_without_error(): void
+    {
+        Queue::fake();
+        $admin = $this->admin();
+        $sy = $this->currentSchoolYear();
+        $staffMember = User::factory()->create(['status' => 'active']);
+        $studentId = $this->makeStudent();
+        $this->enroll($studentId, $sy, null, 8);
+
+        $issuance = Issuance::create([
+            'type' => 'MEMO',
+            'control_number' => 'MEMO-2026-08-' . uniqid(),
+            'series_no' => 1,
+            'year' => 2026,
+            'month' => 8,
+            'title' => 'Combined Recipients Draft',
+            'content' => '<p>Draft body.</p>',
+            'recipient_type' => 'individual_staff',
+            'status' => 'draft',
+            'created_by' => $admin->id,
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('issuances.release', $issuance->id), [
+            'user_ids' => [$staffMember->id],
+            'student_ids' => [$studentId],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame('released', $issuance->fresh()->status);
+        $this->assertDatabaseHas('issuance_recipients', [
+            'issuance_id' => $issuance->id,
+            'user_id' => $staffMember->id,
+            'student_id' => null,
+        ]);
+        $this->assertDatabaseHas('issuance_recipients', [
+            'issuance_id' => $issuance->id,
+            'student_id' => $studentId,
+            'user_id' => null,
+        ]);
+    }
+
     public function test_release_endpoint_rejects_empty_recipient_selection_with_validation_error(): void
     {
         $admin = $this->admin();

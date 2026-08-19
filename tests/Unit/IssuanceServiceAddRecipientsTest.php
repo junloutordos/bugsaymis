@@ -272,4 +272,30 @@ class IssuanceServiceAddRecipientsTest extends TestCase
 
         $this->assertSame('office', $issuance->fresh()->recipient_type);
     }
+
+    public function test_it_adds_staff_and_student_recipients_together_without_cross_writing_columns(): void
+    {
+        $issuance = $this->releasedIssuance();
+        $sy = $this->currentSchoolYear();
+        $user = User::factory()->create();
+        $studentId = $this->makeStudent();
+        $this->enroll($studentId, $sy, null, 9);
+
+        $newIds = (new IssuanceService())->addRecipients($issuance, [
+            'user_ids' => [$user->id],
+            'student_ids' => [$studentId],
+        ]);
+
+        $this->assertCount(2, $newIds);
+        $this->assertDatabaseHas('issuance_recipients', [
+            'issuance_id' => $issuance->id,
+            'user_id' => $user->id,
+            'student_id' => null,
+        ]);
+        $this->assertDatabaseHas('issuance_recipients', [
+            'issuance_id' => $issuance->id,
+            'student_id' => $studentId,
+            'user_id' => null,
+        ]);
+    }
 }

@@ -76,10 +76,12 @@ class IssuanceService
         $rows = $staffIds->map(fn ($uid) => [
             'issuance_id' => $issuance->id,
             'user_id'     => $uid,
+            'student_id'  => null,
             'created_at'  => now(),
             'updated_at'  => now(),
         ])->concat($studentIds->map(fn ($sid) => [
             'issuance_id' => $issuance->id,
+            'user_id'     => null,
             'student_id'  => $sid,
             'created_at'  => now(),
             'updated_at'  => now(),
@@ -110,10 +112,10 @@ class IssuanceService
 
         $now = now();
         $rows = $newStaffIds->map(fn ($uid) => [
-            'issuance_id' => $issuance->id, 'user_id' => $uid,
+            'issuance_id' => $issuance->id, 'user_id' => $uid, 'student_id' => null,
             'notified_at' => $now, 'created_at' => $now, 'updated_at' => $now,
         ])->concat($newStudentIds->map(fn ($sid) => [
-            'issuance_id' => $issuance->id, 'student_id' => $sid,
+            'issuance_id' => $issuance->id, 'user_id' => null, 'student_id' => $sid,
             'notified_at' => $now, 'created_at' => $now, 'updated_at' => $now,
         ]))->all();
 
