@@ -508,14 +508,15 @@ function presentCountForDate(dateId) {
         </thead>
         <tbody class="divide-y divide-slate-100">
           <tr v-for="(student, idx) in students" :key="student.id"
+            class="group hover:bg-indigo-50/70 transition-colors"
             :class="idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'">
             <!-- # -->
-            <td class="sticky left-0 z-10 px-3 py-2 text-slate-400 text-center border-r border-slate-100"
+            <td class="sticky left-0 z-10 px-3 py-2 text-slate-400 text-center border-r border-slate-100 group-hover:bg-indigo-50 transition-colors"
               :class="idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'">
               {{ student.sequence_number }}
             </td>
             <!-- Name -->
-            <td class="sticky left-8 z-10 px-4 py-2 font-medium text-slate-700 border-r border-slate-200 whitespace-nowrap"
+            <td class="sticky left-8 z-10 px-4 py-2 font-medium text-slate-700 border-r border-slate-200 whitespace-nowrap group-hover:bg-indigo-50 transition-colors"
               :class="idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'">
               {{ student.family_name }}, {{ student.given_name }}
               <span v-if="student.middle_initial"> {{ student.middle_initial }}.</span>
