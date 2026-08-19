@@ -190,7 +190,11 @@ class AssessmentPlottingService
             $isGraded = array_key_exists('is_graded', $attributes)
                 ? (bool) $attributes['is_graded']
                 : true;
-            $isMajor = WatRuleService::isMajor($assessmentType, $category);
+            // $nextNumber is also the true post-insert count for this
+            // category (existing max + the one being created) — may exceed
+            // the category's configured max_assessments cap, which nothing
+            // enforces.
+            $isMajor = WatRuleService::isMajor($assessmentType, $category, $nextNumber);
             if ($isGraded && $record->section?->levelid !== null) {
                 $grade = (int) $record->section->levelid;
                 $countedDates = $dates->reject(fn ($occurrenceDate) => WatRuleService::isExamExempt(

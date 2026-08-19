@@ -96,7 +96,7 @@ class WatRuleService
 
     // ── Major-assessment derivation ───────────────────────────────────────────
 
-    public static function isMajor(?string $type, GradingCategory $category): bool
+    public static function isMajor(?string $type, GradingCategory $category, int $actualCount = 0): bool
     {
         // Compliance-mode grading options (e.g. Values Education) score a
         // checkbox, not a number — there is no "major exam" concept to
@@ -114,9 +114,18 @@ class WatRuleService
         // assessment is worth less than 10% of the quarter grade is not a
         // major assessment, the same as any other category.
         //
+        // Nothing stops a teacher from plotting more assessments under a
+        // category than its configured max_assessments cap (Show.vue's Setup
+        // tab explicitly tolerates it — "show at least max_assessments rows
+        // OR all saved rows, whichever is more"). The share must divide by
+        // however many actually exist when that's larger than the configured
+        // cap, never by the smaller, stale, configured number — callers pass
+        // the real in-progress/plotted count via $actualCount.
+        //
         // round() guards the exact-10% boundary against float division
         // (0.30 / 3 === 0.0999…) — QE at 10% each must count as major
-        $perAssessmentShare = round((float) $category->weight / max(1, (int) $category->max_assessments), 6);
+        $denominator = max(1, (int) $category->max_assessments, $actualCount);
+        $perAssessmentShare = round((float) $category->weight / $denominator, 6);
 
         return $perAssessmentShare >= self::MAJOR_WEIGHT_SHARE;
     }

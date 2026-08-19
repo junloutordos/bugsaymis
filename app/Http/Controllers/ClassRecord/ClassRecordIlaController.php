@@ -258,8 +258,17 @@ class ClassRecordIlaController extends Controller
         $grade = $classRecord->section?->levelid;
         abort_if($grade === null, 422, 'This class record has no section linked.');
 
+        // Computed here (not just below, where it's needed again for the
+        // actual row) so isMajor() can divide by the true post-insert count
+        // for this category — ILA dates accumulate daily and can exceed the
+        // category's configured max_assessments cap just like any other
+        // assessment type.
+        $nextNumber = 1 + (int) ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)
+            ->where('grading_category_id', $category->id)
+            ->max('assessment_number');
+
         $assessmentType = WatRuleService::deriveType($category->code, 1);
-        $isMajor = WatRuleService::isMajor($assessmentType, $category);
+        $isMajor = WatRuleService::isMajor($assessmentType, $category, $nextNumber);
 
         // Daily/weekly caps — pooled with Science Core/Elective synthetic
         // sections, same rule as any other plotted assessment. ILA dates are
@@ -305,9 +314,6 @@ class ClassRecordIlaController extends Controller
             abort(422, 'This section would have '.$weekCounts['major']." major assessments in the week of {$weekStart} — the WAT limit is ".WatRuleService::WEEKLY_MAJOR_MAX.' major assessments per week.');
         }
 
-        $nextNumber = 1 + (int) ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)
-            ->where('grading_category_id', $category->id)
-            ->max('assessment_number');
         $nextSort = 1 + (int) ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)->max('sort_order');
 
         $assessment = null;

@@ -183,4 +183,42 @@ class WatRuleServiceIsMajorTest extends TestCase
         $this->assertSame('long_test_1', $type);
         $this->assertFalse(WatRuleService::isMajor($type, $category));
     }
+
+    // ── Actual plotted count can exceed the configured max_assessments cap ──
+    // (nothing prevents a teacher from plotting more items than a category
+    // was configured for — the Setup tab explicitly tolerates it) and the
+    // per-assessment share must shrink accordingly, not stay pinned to the
+    // stale configured cap.
+
+    public function test_actual_count_exceeding_max_assessments_drops_share_below_floor(): void
+    {
+        // Configured for 1, but 6 were actually plotted: 0.25 / 6 = 4.1667%
+        // — below the floor, even though 0.25 / 1 = 25% would wrongly clear it.
+        $category = $this->makeCategory('FA', 0.25, 1);
+        $type = WatRuleService::deriveType($category->code, 6);
+
+        $this->assertFalse(WatRuleService::isMajor($type, $category, 6));
+    }
+
+    public function test_actual_count_exceeding_max_assessments_still_major_when_share_stays_at_or_above_floor(): void
+    {
+        // Configured for 3, 6 actually plotted: 0.70 / 6 = 11.67% — still
+        // clears the floor even against the larger, corrected denominator.
+        $category = $this->makeCategory('AA', 0.70, 3);
+        $type = WatRuleService::deriveType($category->code, 6);
+
+        $this->assertTrue(WatRuleService::isMajor($type, $category, 6));
+    }
+
+    public function test_actual_count_below_max_assessments_does_not_shrink_the_denominator(): void
+    {
+        // Only 3 plotted so far out of a configured 7 — the share must still
+        // be computed against the full configured 7 (0.30 / 7 = 4.29%), not
+        // the smaller in-progress count (which would wrongly inflate it to
+        // 0.30 / 3 = 10%).
+        $category = $this->makeCategory('FA', 0.30, 7);
+        $type = WatRuleService::deriveType($category->code, 3);
+
+        $this->assertFalse(WatRuleService::isMajor($type, $category, 3));
+    }
 }

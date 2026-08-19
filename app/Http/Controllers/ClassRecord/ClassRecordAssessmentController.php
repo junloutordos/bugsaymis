@@ -277,9 +277,17 @@ class ClassRecordAssessmentController extends Controller
             ->get()
             ->keyBy('id');
 
+        // The Setup tab always resubmits every leaf's complete row set on
+        // every save (see the co-teacher note above) — so a per-category
+        // count of THIS payload is the true, current number of assessments
+        // under each category, which may exceed its configured
+        // max_assessments cap (nothing enforces that cap). isMajor() must
+        // divide by the larger of the two, never just the stale cap.
+        $countsByCategory = $assessmentsInput->countBy(fn ($item) => (int) $item['grading_category_id']);
+
         // Type and is_major are always derived server-side — never trusted from
         // the client (the grading category already identifies the type)
-        $items = $assessmentsInput->map(function ($item) use ($categories, $existingById) {
+        $items = $assessmentsInput->map(function ($item) use ($categories, $existingById, $countsByCategory) {
             $category = $categories[$item['grading_category_id']];
 
             $item['is_graded'] = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
@@ -290,7 +298,11 @@ class ClassRecordAssessmentController extends Controller
             }
             $item['max_score'] = $item['is_graded'] ? (float) $item['max_score'] : 0;
             $item['assessment_type'] = WatRuleService::deriveType($category->code, (int) $item['assessment_number']);
-            $item['is_major'] = WatRuleService::isMajor($item['assessment_type'], $category);
+            $item['is_major'] = WatRuleService::isMajor(
+                $item['assessment_type'],
+                $category,
+                $countsByCategory[(int) $item['grading_category_id']] ?? 1
+            );
             $item['_existing'] = ! empty($item['id']) ? $existingById->get($item['id']) : null;
             $item['activity_dates'] = collect($item['activity_dates'] ?? [$item['activity_date']])
                 ->push($item['activity_date'])

@@ -481,8 +481,13 @@ function isMajorRow(row) {
   const cat = categoriesById.value[row.grading_category_id]
   if (!cat) return false
   if (currentGradingOption.value?.grading_mode === 'compliance') return false
+  // Nothing stops plotting more rows than max_assessments (see buildDraft's
+  // rowCount above) — divide by however many actually exist when that's
+  // larger than the configured cap, mirroring WatRuleService::isMajor().
+  const actualCount = assessmentDraft.value[cat.id]?.length ?? 0
+  const denominator = Math.max(1, cat.max_assessments, actualCount)
   // rounding guards the exact-10% boundary against float division (0.30 / 3)
-  return Math.round((cat.weight / Math.max(1, cat.max_assessments)) * 1e6) / 1e6 >= 0.10
+  return Math.round((cat.weight / denominator) * 1e6) / 1e6 >= 0.10
 }
 
 // Overlays this quarter's own unsaved-but-dated draft rows onto the

@@ -1014,6 +1014,48 @@ class ClassRecordAssessmentControllerTest extends TestCase
         $this->assertSame('You do not have access to that class record.', $response->json('skipped.0.reason'));
     }
 
+    // ── Plotting more assessments than a category's configured cap allows ────
+    // Regression: nothing blocks a teacher from plotting more rows under a
+    // category than its configured max_assessments — isMajor() used to keep
+    // dividing by that stale, too-small cap regardless, overstating every
+    // item's true share of the quarter grade.
+
+    public function test_plotting_more_assessments_than_the_configured_cap_shrinks_each_ones_major_share(): void
+    {
+        $admin = $this->admin();
+        $category = GradingCategory::create([
+            'grading_option_id' => $this->option->id, 'name' => 'Formative', 'code' => 'FA',
+            'weight' => 0.25, 'max_assessments' => 1, 'sort_order' => 2,
+        ]);
+        $quarter = $this->makeRecordAndQuarter($admin, $this->makeSection(), $this->makeSubject());
+
+        $dates = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11', '2026-09-14'];
+        $assessments = collect($dates)->map(fn ($date, $i) => [
+            'grading_category_id' => $category->id,
+            'assessment_number'   => $i + 1,
+            'title'               => 'Formative '.($i + 1),
+            'is_graded'           => true,
+            'activity_date'       => $date,
+            'max_score'           => 20,
+        ])->all();
+
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $quarter->class_record_id, 'q' => 1]), [
+                'assessments' => $assessments,
+            ])
+            ->assertOk();
+
+        // 0.25 / 6 = 4.1667% — below the 10% floor, even though the
+        // configured cap of 1 would have wrongly computed 0.25 / 1 = 25%.
+        $this->assertSame(
+            0,
+            ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)
+                ->where('grading_category_id', $category->id)
+                ->where('is_major', true)
+                ->count()
+        );
+    }
+
     public function test_apply_to_sections_applies_valid_targets_and_skips_invalid_ones_in_the_same_batch(): void
     {
         $teacher = User::factory()->create();
