@@ -210,7 +210,12 @@ class ClassRecordAssessmentController extends Controller
         $optionId = $quarter->grading_option_id ?? $classRecord->grading_option_id;
         $option = GradingOption::with('categories')->find($optionId);
         $leafIds = $option ? $option->leafCategories()->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
-        $categories = GradingCategory::whereIn('id', $leafIds)->get()->keyBy('id');
+        // Every leaf here belongs to $option itself (leafIds is derived from
+        // it) — hydrate the gradingOption relation from what's already
+        // loaded instead of an extra query per category (isMajor() below
+        // needs it to detect compliance-mode grading).
+        $categories = GradingCategory::whereIn('id', $leafIds)->get()->keyBy('id')
+            ->each(fn ($category) => $category->setRelation('gradingOption', $option));
         $isAdminUser = $this->isAdmin();
 
         foreach ($validated['assessments'] as $item) {

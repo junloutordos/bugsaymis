@@ -98,6 +98,14 @@ class WatRuleService
 
     public static function isMajor(?string $type, GradingCategory $category): bool
     {
+        // Compliance-mode grading options (e.g. Values Education) score a
+        // checkbox, not a number — there is no "major exam" concept to
+        // apply the weight-share floor against, regardless of the
+        // category's own weight/max_assessments or code.
+        if (($category->gradingOption?->grading_mode ?? 'numeric') === 'compliance') {
+            return false;
+        }
+
         // A long_test_1/long_test_2 type (QE/SE/PE category, assessment #1
         // or #2) still has to clear the same 10%-per-assessment floor as
         // every other category — it is NOT automatically major regardless

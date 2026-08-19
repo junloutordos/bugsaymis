@@ -131,4 +131,56 @@ class WatRuleServiceIsMajorTest extends TestCase
         $this->assertSame('formative', $type);
         $this->assertTrue(WatRuleService::isMajor($type, $category));
     }
+
+    // ── Compliance-mode categories (e.g. Values Education) are never major ──
+
+    public function test_compliance_mode_category_above_10_percent_share_is_not_major(): void
+    {
+        // Mirrors the real production Values Education setup: weight 0.2 /
+        // max_assessments 1 = 20% per item, which would clear the 10% floor
+        // under numeric rules — but a compliance (checkbox/Pass-Completed)
+        // grading option has no concept of a "major" exam category at all.
+        $complianceOption = GradingOption::create([
+            'name' => 'Values Education Grading '.uniqid(),
+            'is_active' => true,
+            'grading_mode' => 'compliance',
+            'compliance_pass_threshold' => 0.75,
+        ]);
+        $category = GradingCategory::create([
+            'grading_option_id' => $complianceOption->id,
+            'name' => 'Required Output #1',
+            'code' => 'A1',
+            'weight' => 0.2,
+            'max_assessments' => 1,
+            'sort_order' => 0,
+        ]);
+        $type = WatRuleService::deriveType($category->code, 1);
+
+        $this->assertFalse(WatRuleService::isMajor($type, $category));
+    }
+
+    public function test_compliance_mode_long_test_coded_category_is_not_major(): void
+    {
+        // Even a QE/SE/PE-coded category (normally exam-shaped) under a
+        // compliance grading option must not be forced major — grading_mode
+        // takes priority over the code-derived type.
+        $complianceOption = GradingOption::create([
+            'name' => 'Compliance Opt '.uniqid(),
+            'is_active' => true,
+            'grading_mode' => 'compliance',
+            'compliance_pass_threshold' => 0.75,
+        ]);
+        $category = GradingCategory::create([
+            'grading_option_id' => $complianceOption->id,
+            'name' => 'Category QE',
+            'code' => 'QE',
+            'weight' => 0.30,
+            'max_assessments' => 1,
+            'sort_order' => 0,
+        ]);
+        $type = WatRuleService::deriveType($category->code, 1);
+
+        $this->assertSame('long_test_1', $type);
+        $this->assertFalse(WatRuleService::isMajor($type, $category));
+    }
 }
