@@ -474,10 +474,13 @@ const categoriesById = computed(() =>
 )
 
 // Major = worth ≥10% of the quarterly grade (type is server-derived from the
-// category, so the weight rule is the whole client-side check)
+// category, so the weight rule is the whole client-side check). Mirrors
+// WatRuleService::isMajor() — compliance-mode options (e.g. Values Ed) score
+// a checkbox, not a number, so there is no major-exam concept to apply here.
 function isMajorRow(row) {
   const cat = categoriesById.value[row.grading_category_id]
   if (!cat) return false
+  if (currentGradingOption.value?.grading_mode === 'compliance') return false
   // rounding guards the exact-10% boundary against float division (0.30 / 3)
   return Math.round((cat.weight / Math.max(1, cat.max_assessments)) * 1e6) / 1e6 >= 0.10
 }
