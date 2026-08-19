@@ -18,9 +18,6 @@ class TeacherAttendanceService
     // Minutes before class start that a tap is accepted
     const EARLY_WINDOW_MINUTES = 15;
 
-    // Minutes after class start that a tap is still accepted (after = late, not absent)
-    const LATE_CUTOFF_MINUTES = 30;
-
     // Minutes after class start before "on_time" becomes "late"
     const GRACE_PERIOD_MINUTES = 5;
 
@@ -116,17 +113,15 @@ class TeacherAttendanceService
      */
     private function findMatchingSchedule(int $userId, int $classroomId, string $dayOfWeek, Carbon $now): ?ClassSchedule
     {
-        $earlyOpen = $now->copy()->subMinutes(self::EARLY_WINDOW_MINUTES)->format('H:i:s');
-        $lateCutoff = $now->copy()->subMinutes(self::LATE_CUTOFF_MINUTES)->format('H:i:s');
+        $earlyOpen = $now->copy()->addMinutes(self::EARLY_WINDOW_MINUTES)->format('H:i:s');
 
-        // start_time is within [-30 min, +15 min] of now, and class hasn't ended yet
+        // start_time starts within the next 15 min (or already started), and class hasn't ended yet
         return ClassSchedule::with(['subject', 'section', 'academicTerm'])
             ->classes()
             ->where('user_id', $userId)
             ->where('classroom_id', $classroomId)
             ->where('day_of_week', $dayOfWeek)
             ->where('status', 'active')
-            ->where('start_time', '>=', $lateCutoff)    // started no more than 30 min ago
             ->where('start_time', '<=', $earlyOpen)     // started or starts within next 15 min
             ->where('end_time', '>', $now->format('H:i:s')) // class not yet over
             ->orderBy('start_time')

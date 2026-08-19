@@ -148,6 +148,62 @@ class TeacherAttendanceServiceTest extends TestCase
         $this->assertEquals(125.5, (float) $tap->longitude);
     }
 
+    public function test_tap_matches_schedule_when_tapped_right_at_class_start(): void
+    {
+        // Class starts 09:40; teacher taps at the literal start time.
+        Carbon::setTestNow('2026-07-22 09:40:00');
+
+        [$teacher, $classroom] = $this->makeScheduledTeacherAndClassroom();
+
+        $service = app(TeacherAttendanceService::class);
+        $result = $service->tap($classroom->nfc_uuid, $teacher);
+
+        $this->assertSame('on_time', $result['status']);
+        $this->assertNotNull($result['schedule']);
+    }
+
+    public function test_tap_matches_schedule_when_tapped_before_class_start(): void
+    {
+        // Class starts 09:40; teacher taps 10 minutes early (within the 15-min early window).
+        Carbon::setTestNow('2026-07-22 09:30:00');
+
+        [$teacher, $classroom] = $this->makeScheduledTeacherAndClassroom();
+
+        $service = app(TeacherAttendanceService::class);
+        $result = $service->tap($classroom->nfc_uuid, $teacher);
+
+        $this->assertSame('on_time', $result['status']);
+        $this->assertNotNull($result['schedule']);
+    }
+
+    public function test_tap_matches_schedule_any_time_before_class_ends(): void
+    {
+        // Class runs 09:40-11:00; teacher taps 50 min after start (past the old
+        // 30-min late cutoff) but still well before end_time.
+        Carbon::setTestNow('2026-07-22 10:30:00');
+
+        [$teacher, $classroom] = $this->makeScheduledTeacherAndClassroom();
+
+        $service = app(TeacherAttendanceService::class);
+        $result = $service->tap($classroom->nfc_uuid, $teacher);
+
+        $this->assertSame('late', $result['status']);
+        $this->assertNotNull($result['schedule']);
+    }
+
+    public function test_tap_does_not_match_after_class_has_ended(): void
+    {
+        // Class runs 09:40-11:00; teacher taps after end_time.
+        Carbon::setTestNow('2026-07-22 11:05:00');
+
+        [$teacher, $classroom] = $this->makeScheduledTeacherAndClassroom();
+
+        $service = app(TeacherAttendanceService::class);
+        $result = $service->tap($classroom->nfc_uuid, $teacher);
+
+        $this->assertSame('no_match', $result['status']);
+    }
+
     private function makeScheduledTeacherAndClassroom(): array
     {
         $teacher = User::factory()->create();
