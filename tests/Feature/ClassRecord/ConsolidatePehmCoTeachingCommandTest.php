@@ -406,4 +406,43 @@ class ConsolidatePehmCoTeachingCommandTest extends TestCase
         $this->assertSame([], $report['unmatched_leaves']);
         $this->assertSame(1, $report['assessments_reparented']);
     }
+
+    public function test_commit_auto_renumbers_on_an_assessment_number_collision_instead_of_crashing(): void
+    {
+        // Regression test for a real production incident: PEHM records
+        // pre-date subject-scoped categories, so Health/Music/PE teachers'
+        // assessments were historically ALL filed under the same "SA (PE)"
+        // leaf, each independently numbered from 1. Merging two records
+        // whose assessment_number=1 both land on the same target leaf must
+        // not violate crq_category_assessment_unique — it must renumber.
+        $option = GradingOption::create(['name' => 'PEHM 1-3 (Grade 7)']);
+        $sa1 = GradingCategory::create(['grading_option_id' => $option->id, 'name' => 'SA (PE)', 'code' => 'SA 1', 'weight' => 0.10, 'max_assessments' => 5, 'subject_id' => null]);
+
+        ['healthRecord' => $healthRecord, 'peRecord' => $peRecord] = $this->seedTwoRecordSectionFixture($option, sectionId: 995);
+        $sa1->update(['subject_id' => $peRecord->subject_id]);
+
+        // Both records' assessment #1 filed under the SAME "SA (PE)" leaf —
+        // the real-world mis-filing pattern found in production.
+        $healthQuarter = ClassRecordQuarter::create(['class_record_id' => $healthRecord->id, 'quarter' => 1]);
+        $healthAssessment = ClassRecordAssessment::create(['class_record_quarter_id' => $healthQuarter->id, 'grading_category_id' => $sa1->id, 'title' => 'Health Assessment 1', 'activity_date' => '2026-08-10', 'max_score' => 50, 'assessment_number' => 1]);
+
+        $peQuarter = ClassRecordQuarter::create(['class_record_id' => $peRecord->id, 'quarter' => 1]);
+        $peAssessment = ClassRecordAssessment::create(['class_record_quarter_id' => $peQuarter->id, 'grading_category_id' => $sa1->id, 'title' => 'PE Assessment 1', 'activity_date' => '2026-08-11', 'max_score' => 50, 'assessment_number' => 1]);
+
+        $cmd = new ConsolidatePehmCoTeaching();
+        $records = ClassRecord::whereIn('id', [$healthRecord->id, $peRecord->id])->with('subject')->get();
+
+        $report = $cmd->consolidateSection($records, $option->fresh(['categories']), commit: true);
+
+        $this->assertSame(2, $report['assessments_reparented']);
+        $this->assertCount(1, $report['renumbered']);
+        $this->assertSame([], $report['unmatched_leaves']);
+
+        // Both assessments survive, on distinct numbers, no data lost.
+        $numbers = ClassRecordAssessment::whereIn('id', [$healthAssessment->id, $peAssessment->id])
+            ->pluck('assessment_number')->sort()->values()->all();
+        $this->assertSame([1, 2], $numbers);
+        $this->assertSame('Health Assessment 1', ClassRecordAssessment::find($healthAssessment->id)->title);
+        $this->assertSame('PE Assessment 1', ClassRecordAssessment::find($peAssessment->id)->title);
+    }
 }

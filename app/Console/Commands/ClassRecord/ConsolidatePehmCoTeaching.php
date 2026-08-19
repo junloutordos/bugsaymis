@@ -59,6 +59,7 @@ class ConsolidatePehmCoTeaching extends Command
         $totalPivotRows = 0;
         $totalReparented = 0;
         $allUnmatched = [];
+        $allRenumbered = [];
 
         foreach ($bySection as $sectionId => $sectionRecords) {
             if ($sectionRecords->count() < 2) {
@@ -100,6 +101,7 @@ class ConsolidatePehmCoTeaching extends Command
             $totalPivotRows += $report['pivot_rows_created'];
             $totalReparented += $report['assessments_reparented'];
             $allUnmatched = array_merge($allUnmatched, $report['unmatched_leaves']);
+            $allRenumbered = array_merge($allRenumbered, $report['renumbered']);
         }
 
         $this->newLine();
@@ -108,6 +110,13 @@ class ConsolidatePehmCoTeaching extends Command
         if (! empty($allUnmatched)) {
             $this->warn('Unmatched leaves needing manual attention:');
             foreach ($allUnmatched as $line) {
+                $this->warn("  - {$line}");
+            }
+        }
+
+        if (! empty($allRenumbered)) {
+            $this->warn('Assessments renumbered to avoid a slot collision on the merged leaf (pre-existing data mis-filed under the wrong subject leaf before subject-scoping existed — worth a manual review pass, not data loss):');
+            foreach ($allRenumbered as $line) {
                 $this->warn("  - {$line}");
             }
         }
@@ -306,6 +315,7 @@ class ConsolidatePehmCoTeaching extends Command
             'pivot_rows_created' => 0,
             'assessments_reparented' => 0,
             'unmatched_leaves' => [],
+            'renumbered' => [],
         ];
 
         $run = function () use ($records, $canonical, $others, $targetIndex, $commit, $targetOption, &$report) {
@@ -347,7 +357,23 @@ class ConsolidatePehmCoTeaching extends Command
             // assessments additionally move onto the canonical record's
             // matching quarter (creating it if needed) and the record itself
             // gets archived once its assessments are moved.
-            foreach ($records as $record) {
+            //
+            // Process canonical FIRST, then the merged-in records — so
+            // canonical's own pre-existing (quarter, leaf, number) slots are
+            // "claimed" before any other record's assessment is checked
+            // against them. This matters because these PEHM records
+            // pre-date subject-scoped categories: every teacher's
+            // assessments were historically filed under the SAME leaf (e.g.
+            // "SA (PE)") regardless of their actual subject, each numbered
+            // independently from 1 — so two or three different records can
+            // easily want the exact same (quarter, leaf, number) slot once
+            // merged. `crq_category_assessment_unique` enforces uniqueness
+            // on that triple; a collision here auto-renumbers to the next
+            // free slot for that quarter+leaf rather than crashing.
+            $orderedRecords = collect([$canonical])->merge($others);
+            $usedNumbers = []; // "$quarterId|$leafId" => array<int> of taken numbers
+
+            foreach ($orderedRecords as $record) {
                 $isCanonical = $record->id === $canonical->id;
                 $quarters = ClassRecordQuarter::where('class_record_id', $record->id)->get();
 
@@ -379,9 +405,32 @@ class ConsolidatePehmCoTeaching extends Command
                             continue;
                         }
 
+                        $slotKey = $canonicalQuarter->id.'|'.$newLeafId;
+                        if (! isset($usedNumbers[$slotKey])) {
+                            $usedNumbers[$slotKey] = $commit
+                                ? ClassRecordAssessment::where('class_record_quarter_id', $canonicalQuarter->id)
+                                    ->where('grading_category_id', $newLeafId)
+                                    ->where('id', '!=', $assessment->id)
+                                    ->pluck('assessment_number')
+                                    ->all()
+                                : [];
+                        }
+
+                        $number = (int) $assessment->assessment_number;
+                        $originalNumber = $number;
+                        while (in_array($number, $usedNumbers[$slotKey], true)) {
+                            $number++;
+                        }
+                        $usedNumbers[$slotKey][] = $number;
+
+                        if ($number !== $originalNumber) {
+                            $report['renumbered'][] = "Assessment '{$assessment->title}' (id {$assessment->id}) on class record #{$record->id} — assessment_number {$originalNumber} was already taken on the merged leaf, renumbered to {$number}.";
+                        }
+
                         if ($commit) {
                             $assessment->class_record_quarter_id = $canonicalQuarter->id;
                             $assessment->grading_category_id = $newLeafId;
+                            $assessment->assessment_number = $number;
                             $assessment->save();
                         }
                         $report['assessments_reparented']++;
