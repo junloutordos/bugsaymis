@@ -17,6 +17,7 @@ import {
   ClipboardDocumentCheckIcon,
   DocumentCheckIcon,
   Cog6ToothIcon,
+  ExclamationTriangleIcon,
   UserGroupIcon,
   ChartBarIcon,
   CloudArrowUpIcon,
@@ -78,6 +79,27 @@ export const menuItems = [
     routeName: "dashboard",
     href: route("dashboard"),
     icon: HomeIcon,
+  },
+  {
+    label: "SOS Emergency",
+    icon: ExclamationTriangleIcon,
+    permissions: ["sos.respond", "sos.manage"],
+    children: [
+      {
+        label: "Command Center",
+        routeName: "sos.index",
+        href: route("sos.index"),
+        icon: ExclamationTriangleIcon,
+        permissions: ["sos.respond"],
+      },
+      {
+        label: "Settings",
+        routeName: "sos.settings.index",
+        href: route("sos.settings.index"),
+        icon: Cog6ToothIcon,
+        permissions: ["sos.manage"],
+      },
+    ],
   },
   {
     label: "ManCom Deck",
