@@ -2,6 +2,8 @@
 
 namespace App\Jobs\Sos;
 
+use App\Models\Sos\SosAlert;
+use App\Services\Sos\SosNotificationDispatchService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -14,8 +16,11 @@ class NotifySosEmergencyContact implements ShouldQueue
 
     public function __construct(public readonly int $sosAlertId) {}
 
-    public function handle(): void
+    public function handle(SosNotificationDispatchService $dispatch): void
     {
-        // Implemented in Task 12.
+        $alert = SosAlert::find($this->sosAlertId);
+        if (! $alert) return;
+
+        $dispatch->notifyEmergencyContact($alert);
     }
 }

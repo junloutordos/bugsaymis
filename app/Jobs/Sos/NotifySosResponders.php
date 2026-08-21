@@ -2,6 +2,9 @@
 
 namespace App\Jobs\Sos;
 
+use App\Models\Sos\SosAlert;
+use App\Models\Sos\SosEscalationTier;
+use App\Services\Sos\SosNotificationDispatchService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,8 +20,13 @@ class NotifySosResponders implements ShouldQueue
         public readonly int $tierId,
     ) {}
 
-    public function handle(): void
+    public function handle(SosNotificationDispatchService $dispatch): void
     {
-        // Implemented in Task 12.
+        $alert = SosAlert::find($this->sosAlertId);
+        $tier  = SosEscalationTier::find($this->tierId);
+
+        if (! $alert || ! $tier) return;
+
+        $dispatch->notifyTier($alert, $tier);
     }
 }
