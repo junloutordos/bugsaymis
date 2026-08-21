@@ -32,8 +32,11 @@
 - Create: `database/migrations/2026_08_21_170300_create_sos_escalation_tiers_table.php`
 - Create: `database/migrations/2026_08_21_170400_create_sos_escalation_tier_users_table.php`
 - Create: `database/migrations/2026_08_21_170500_create_sos_external_contacts_table.php`
+- Create: `database/migrations/2026_08_21_170550_add_emergency_contact_to_employee_profiles_table.php` (added mid-implementation — see note below)
 - Create: `database/migrations/2026_08_21_170600_add_mobile_number_to_employee_profiles_table.php`
 - Test: `tests/Feature/Sos/SosSchemaTest.php`
+
+**Mid-implementation addendum:** `EmployeeProfile::$fillable` had already declared `emergency_contact_name`/`emergency_contact_phone` (and several other fields — `blood_type`, `civil_status`, `division`, `tin`, etc.) with no migration anywhere actually adding them; the real table's columns are almost entirely different names from a much earlier, unrelated HR/Payroll migration. This is a pre-existing gap, not introduced by this feature. Since Task 11's `notifyEmergencyContact()` genuinely needs `emergency_contact_name`/`emergency_contact_phone` to exist, user approved adding just those two columns now (additive, backward-compatible) rather than leaving that code path permanently inert. The broader `$fillable`/schema mismatch on this model is otherwise out of scope.
 
 **Interfaces:**
 - Produces tables: `sos_alerts` (`id, triggerable_type, triggerable_id, alert_type, is_silent, status, lat, lng, accuracy, geofence_zone_id, current_tier_order, triggered_at, resolved_at, resolved_by, resolution_notes, timestamps`), `sos_alert_events` (`id, sos_alert_id, type, actor_type, actor_id, payload, created_at`), `sos_notification_logs` (`id, sos_alert_id, channel, recipient_type, recipient_id, recipient_label, sent, sent_at, timestamps`), `sos_escalation_tiers` (`id, alert_type, order, role_id, timeout_minutes, channels, notify_external, timestamps`), `sos_escalation_tier_users` (`id, sos_escalation_tier_id, user_id, timestamps`), `sos_external_contacts` (`id, name, org, phone, email, alert_types, channel, active, timestamps`); `employee_profiles.mobile_number` (nullable string).
@@ -81,7 +84,9 @@ class SosSchemaTest extends TestCase
             'name', 'org', 'phone', 'email', 'alert_types', 'channel', 'active',
         ]));
 
-        $this->assertTrue(Schema::hasColumn('employee_profiles', 'mobile_number'));
+        $this->assertTrue(Schema::hasColumns('employee_profiles', [
+            'mobile_number', 'emergency_contact_name', 'emergency_contact_phone',
+        ]));
     }
 }
 ```
@@ -309,7 +314,14 @@ return new class extends Migration
             // Own work contact number, used by the SOS module to SMS this
             // employee when they're an assigned responder. Distinct from
             // emergency_contact_phone, which is someone ELSE'S number.
-            $table->string('mobile_number')->nullable()->after('emergency_contact_phone');
+            //
+            // No ->after() positional hint: emergency_contact_phone is listed
+            // in EmployeeProfile::$fillable but has no tracked migration in
+            // this codebase and doesn't exist in every environment (confirmed
+            // absent in dev) — a schema-drift gap that predates this feature
+            // and is out of scope here. Anchoring to a column that may not
+            // exist would make this migration fail in some environments.
+            $table->string('mobile_number')->nullable();
         });
     }
 
