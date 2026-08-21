@@ -371,6 +371,34 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
+    // ── SOS Emergency Button ───────────────────────────────────────────────────
+    // Any authenticated user can trigger — no permission gate on that action,
+    // by design (a real emergency must never be blocked by policy). Command
+    // Center and settings are gated separately.
+    Route::prefix('sos')->name('sos.')->group(function () {
+        Route::post('/trigger', [\App\Http\Controllers\Sos\SosAlertController::class, 'trigger'])->name('trigger');
+
+        Route::middleware('permission:sos.respond')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Sos\SosAlertController::class, 'index'])->name('index');
+            Route::get('/{alert}', [\App\Http\Controllers\Sos\SosAlertController::class, 'show'])->name('show')->whereNumber('alert');
+            Route::post('/{alert}/acknowledge', [\App\Http\Controllers\Sos\SosAlertController::class, 'acknowledge'])->name('acknowledge')->whereNumber('alert');
+            Route::post('/{alert}/verify', [\App\Http\Controllers\Sos\SosAlertController::class, 'verify'])->name('verify')->whereNumber('alert');
+            Route::post('/{alert}/false-alarm', [\App\Http\Controllers\Sos\SosAlertController::class, 'falseAlarm'])->name('false-alarm')->whereNumber('alert');
+            Route::post('/{alert}/resolve', [\App\Http\Controllers\Sos\SosAlertController::class, 'resolve'])->name('resolve')->whereNumber('alert');
+        });
+
+        Route::middleware('permission:sos.manage')->prefix('settings')->name('settings.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Sos\SosSettingsController::class, 'index'])->name('index');
+            Route::post('/tiers', [\App\Http\Controllers\Sos\SosSettingsController::class, 'storeTier'])->name('tiers.store');
+            Route::put('/tiers/{tier}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'updateTier'])->name('tiers.update')->whereNumber('tier');
+            Route::delete('/tiers/{tier}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'destroyTier'])->name('tiers.destroy')->whereNumber('tier');
+            Route::post('/external-contacts', [\App\Http\Controllers\Sos\SosSettingsController::class, 'storeExternalContact'])->name('external-contacts.store');
+            Route::put('/external-contacts/{contact}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'updateExternalContact'])->name('external-contacts.update')->whereNumber('contact');
+            Route::delete('/external-contacts/{contact}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'destroyExternalContact'])->name('external-contacts.destroy')->whereNumber('contact');
+            Route::post('/responders/{user}/mobile', [\App\Http\Controllers\Sos\SosSettingsController::class, 'updateResponderMobile'])->name('responders.mobile')->whereNumber('user');
+        });
+    });
+
     // ── Issuances ─────────────────────────────────────────────────────────────
     // No group-level permission gate: any tagged recipient must be able to
     // reach these routes, and every method below already enforces its own
@@ -2702,6 +2730,8 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
     // Requires full student session (linked + authenticated)
     Route::middleware('student.portal')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\StudentPortal\DashboardController::class, 'index'])->name('dashboard');
+
+        Route::post('/sos/trigger', [\App\Http\Controllers\StudentPortal\SosAlertController::class, 'trigger'])->name('sos.trigger');
 
         Route::get('/profile',                   [\App\Http\Controllers\StudentPortal\ProfileController::class, 'show'])->name('profile');
         Route::post('/profile/{section}',        [\App\Http\Controllers\StudentPortal\ProfileController::class, 'saveSection'])->name('profile.save')

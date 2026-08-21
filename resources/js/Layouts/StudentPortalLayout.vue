@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import { AcademicCapIcon, ArrowRightStartOnRectangleIcon } from '@heroicons/vue/24/outline'
+import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue'
 
 defineProps({
     title: String,
@@ -79,5 +80,7 @@ function logout() {
         <footer class="text-center py-4 text-xs text-slate-400">
             Philippine Science High School – Caraga Region Campus
         </footer>
+
+        <SosFloatingButton trigger-route="student-portal.sos.trigger" />
     </div>
 </template>

@@ -336,6 +336,10 @@ class HandleInertiaRequests extends Middleware
                 }
             },
             'atlasGoVersion' => config('atlasgo.mobile_version'),
+            'sosConfig' => [
+                'holdConfirmSeconds' => config('sos.hold_confirm_seconds'),
+                'countdownSeconds'   => config('sos.countdown_seconds'),
+            ],
             'actingAs' => function () use ($request) {
                 try {
                     $substitution = app(ActingAsService::class)->currentSubstitution($request);
