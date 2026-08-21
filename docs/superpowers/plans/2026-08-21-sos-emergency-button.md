@@ -41,7 +41,7 @@
 **Interfaces:**
 - Produces tables: `sos_alerts` (`id, triggerable_type, triggerable_id, alert_type, is_silent, status, lat, lng, accuracy, geofence_zone_id, current_tier_order, triggered_at, resolved_at, resolved_by, resolution_notes, timestamps`), `sos_alert_events` (`id, sos_alert_id, type, actor_type, actor_id, payload, created_at`), `sos_notification_logs` (`id, sos_alert_id, channel, recipient_type, recipient_id, recipient_label, sent, sent_at, timestamps`), `sos_escalation_tiers` (`id, alert_type, order, role_id, timeout_minutes, channels, notify_external, timestamps`), `sos_escalation_tier_users` (`id, sos_escalation_tier_id, user_id, timestamps`), `sos_external_contacts` (`id, name, org, phone, email, alert_types, channel, active, timestamps`); `employee_profiles.mobile_number` (nullable string).
 
-- [ ] **Step 1: Write the failing schema test**
+- [x] **Step 1: Write the failing schema test**
 
 ```php
 <?php
@@ -91,12 +91,12 @@ class SosSchemaTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosSchemaTest.php"`
 Expected: FAIL — tables/columns don't exist yet.
 
-- [ ] **Step 3: Write the migrations**
+- [x] **Step 3: Write the migrations**
 
 `create_sos_alerts_table.php`:
 ```php
@@ -334,16 +334,16 @@ return new class extends Migration
 };
 ```
 
-- [ ] **Step 4: Run migrations in dev**
+- [x] **Step 4: Run migrations in dev**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan migrate --path=database/migrations/2026_08_21_170000_create_sos_alerts_table.php --path=database/migrations/2026_08_21_170100_create_sos_alert_events_table.php --path=database/migrations/2026_08_21_170200_create_sos_notification_logs_table.php --path=database/migrations/2026_08_21_170300_create_sos_escalation_tiers_table.php --path=database/migrations/2026_08_21_170400_create_sos_escalation_tier_users_table.php --path=database/migrations/2026_08_21_170500_create_sos_external_contacts_table.php --path=database/migrations/2026_08_21_170600_add_mobile_number_to_employee_profiles_table.php"`
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosSchemaTest.php"`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add database/migrations/2026_08_21_170000_create_sos_alerts_table.php database/migrations/2026_08_21_170100_create_sos_alert_events_table.php database/migrations/2026_08_21_170200_create_sos_notification_logs_table.php database/migrations/2026_08_21_170300_create_sos_escalation_tiers_table.php database/migrations/2026_08_21_170400_create_sos_escalation_tier_users_table.php database/migrations/2026_08_21_170500_create_sos_external_contacts_table.php database/migrations/2026_08_21_170600_add_mobile_number_to_employee_profiles_table.php tests/Feature/Sos/SosSchemaTest.php
@@ -367,7 +367,7 @@ git commit -m "feat(sos): add SOS alert schema migrations"
 - Consumes: tables from Task 1.
 - Produces: `SosAlert::triggerable()` (MorphTo), `SosAlert::events()` (HasMany `SosAlertEvent`), `SosAlert::resolvedBy()` (BelongsTo `User`), `SosAlert::falseAlarmCount(string $triggerableType, int $triggerableId, int $windowDays): int`; `SosAlertEvent::alert()` (BelongsTo); `SosNotificationLog::alert()` (BelongsTo); `SosEscalationTier::role()` (BelongsTo `Role`), `SosEscalationTier::users()` (BelongsToMany `User` via `sos_escalation_tier_users`); `SosExternalContact` plain model with `alert_types`/`active` casts.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -471,12 +471,12 @@ class SosModelsTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosModelsTest.php"`
 Expected: FAIL — model classes don't exist.
 
-- [ ] **Step 3: Write the models**
+- [x] **Step 3: Write the models**
 
 `app/Models/Sos/SosAlert.php`:
 ```php
@@ -634,12 +634,12 @@ class SosExternalContact extends Model
 
 Modify `app/Models/HR/EmployeeProfile.php` — add `'mobile_number',` to `$fillable`, right after `'emergency_contact_phone',`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosModelsTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Models/Sos app/Models/HR/EmployeeProfile.php tests/Feature/Sos/SosModelsTest.php
@@ -658,7 +658,7 @@ git commit -m "feat(sos): add Sos domain models"
 **Interfaces:**
 - Produces: roles `DRRM Coordinator`, `Security Guard` (idempotent); permissions `sos.trigger`, `sos.respond`, `sos.manage`; `sos.respond` granted to `DRRM Coordinator`, `Security Guard`, `Administrator`, `Nurse`; `sos.manage` granted to `Administrator`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -694,12 +694,12 @@ class SosPermissionSeederTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosPermissionSeederTest.php"`
 Expected: FAIL — `SosPermissionSeeder` doesn't exist, roles missing.
 
-- [ ] **Step 3: Modify RolesSeeder and create SosPermissionSeeder**
+- [x] **Step 3: Modify RolesSeeder and create SosPermissionSeeder**
 
 In `database/seeders/RolesSeeder.php`, add to the `$roles` array (inside the "Non-staff" / general block, e.g. right after the `'Nurse'` entry):
 
@@ -759,12 +759,12 @@ class SosPermissionSeeder extends Seeder
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosPermissionSeederTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add database/seeders/RolesSeeder.php database/seeders/SosPermissionSeeder.php tests/Feature/Sos/SosPermissionSeederTest.php
@@ -781,7 +781,7 @@ git commit -m "feat(sos): add DRRM/Security roles and sos.* permissions"
 **Interfaces:**
 - Produces: `config('sos.emergency_hotline_number')`, `config('sos.off_campus_message')`, `config('sos.false_alarm_threshold')`, `config('sos.false_alarm_window_days')`, `config('sos.hold_confirm_seconds')`, `config('sos.countdown_seconds')` — consumed by `SosAlertController`, `StudentPortal\SosAlertController`, `SosAlertService`, and the frontend (via an Inertia shared prop added in Task 18).
 
-- [ ] **Step 1: Write the config file**
+- [x] **Step 1: Write the config file**
 
 ```php
 <?php
@@ -805,7 +805,7 @@ return [
 ];
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add config/sos.php
@@ -823,7 +823,7 @@ git commit -m "feat(sos): add SOS configuration"
 **Interfaces:**
 - Produces: `Broadcast::channel('sos-responders', ...)` — authorized for `isSuperAdmin()` or `hasPermission('sos.respond')`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 **Environment note discovered mid-implementation:** `.env.testing` has no `BROADCAST_CONNECTION`, so tests default to the `null` broadcast driver, which trivially authorizes every channel — a naive test would pass regardless of what's actually registered. Worse, `Broadcast::channel()` registrations attach to whichever driver is default **at boot time**; overriding `config(['broadcasting.default' => 'pusher'])` from inside a test (after boot) creates a second, unregistered driver instance and silently no-ops. The fix is `putenv()` before `parent::setUp()` — Dotenv's default immutable loader won't override an already-set env var, so this makes `routes/channels.php` register against the real `pusher` driver from boot. HMAC auth signing is a local computation, so this needs no live Pusher/Soketi server.
 
@@ -895,12 +895,12 @@ class SosChannelAuthTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosChannelAuthTest.php"`
 Expected: FAIL — channel not registered, first test 403s (second test correctly passes even pre-registration, since with no channel matching, everyone gets 403).
 
-- [ ] **Step 3: Add the channel**
+- [x] **Step 3: Add the channel**
 
 In `routes/channels.php`, after the `biometric-feed` channel:
 
@@ -910,12 +910,12 @@ Broadcast::channel('sos-responders', function ($user) {
 });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosChannelAuthTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add routes/channels.php tests/Feature/Sos/SosChannelAuthTest.php
@@ -934,7 +934,7 @@ git commit -m "feat(sos): add sos-responders broadcast channel"
 **Interfaces:**
 - Produces: `new SosAlertTriggered(array $payload)` broadcasting as `sos.alert.triggered`; `new SosAlertUpdated(array $payload)` broadcasting as `sos.alert.updated`; both on `PrivateChannel('sos-responders')`. Consumed by `SosAlertService` (Task 7-9).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -969,12 +969,12 @@ class SosBroadcastEventsTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosBroadcastEventsTest.php"`
 Expected: FAIL — classes don't exist.
 
-- [ ] **Step 3: Write the events**
+- [x] **Step 3: Write the events**
 
 `app/Events/Sos/SosAlertTriggered.php`:
 ```php
@@ -1046,12 +1046,12 @@ class SosAlertUpdated implements ShouldBroadcastNow
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosBroadcastEventsTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Events/Sos tests/Feature/Sos/SosBroadcastEventsTest.php
@@ -1070,7 +1070,7 @@ git commit -m "feat(sos): add SosAlertTriggered/SosAlertUpdated broadcast events
 - Consumes: `App\Services\CampusPresenceService::resolveLocationGate(?float $lat, ?float $lng, ?float $accuracy, ?string $ip): array` (existing).
 - Produces: `SosAlertService::trigger(Model $triggerable, string $alertType, bool $isSilent, ?float $lat, ?float $lng, ?float $accuracy, ?string $ip): array` returning `['blocked' => bool, 'reason' => ?string, 'alert' => ?SosAlert]`. Fires `SosAlertTriggered`. Dispatches `App\Jobs\Sos\NotifySosResponders` and `App\Jobs\Sos\NotifySosEmergencyContact` (stubbed as `ShouldQueue` no-op classes in this task — full implementation in Task 12; declare them now so `trigger()` compiles and can be tested with `Queue::fake()`).
 
-- [ ] **Step 1: Write minimal job stubs `trigger()` depends on**
+- [x] **Step 1: Write minimal job stubs `trigger()` depends on**
 
 `app/Jobs/Sos/NotifySosResponders.php`:
 ```php
@@ -1125,7 +1125,7 @@ class NotifySosEmergencyContact implements ShouldQueue
 }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```php
 <?php
@@ -1217,12 +1217,12 @@ class SosAlertServiceTriggerTest extends TestCase
 }
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceTriggerTest.php"`
 Expected: FAIL — `SosAlertService` doesn't exist.
 
-- [ ] **Step 4: Write `SosAlertService::trigger()`**
+- [x] **Step 4: Write `SosAlertService::trigger()`**
 
 `app/Services/Sos/SosAlertService.php`:
 ```php
@@ -1316,12 +1316,12 @@ class SosAlertService
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceTriggerTest.php"`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/Services/Sos/SosAlertService.php app/Jobs/Sos tests/Feature/Sos/SosAlertServiceTriggerTest.php
@@ -1340,7 +1340,7 @@ git commit -m "feat(sos): implement SosAlertService::trigger() with campus geofe
 - Consumes: `App\Services\NotificationService::notifyUser(User $user, string $requestType, string $referenceNo, string $newStatus, string $url, ?string $remarks = null): void` (existing).
 - Produces: `acknowledge(SosAlert $alert, User $responder): SosAlertEvent`, `verify(SosAlert $alert, User $responder, ?string $note = null): SosAlertEvent`, `markFalseAlarm(SosAlert $alert, User $responder, string $reason): SosAlertEvent`, `resolve(SosAlert $alert, User $responder, ?string $notes = null): SosAlertEvent`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1447,12 +1447,12 @@ class SosAlertServiceLifecycleTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceLifecycleTest.php"`
 Expected: FAIL — methods don't exist.
 
-- [ ] **Step 3: Add the lifecycle methods**
+- [x] **Step 3: Add the lifecycle methods**
 
 Add to `app/Services/Sos/SosAlertService.php` (new imports: `App\Models\Sos\SosAlert`, `App\Services\NotificationService`, `App\Models\Role` not needed — query via `roles()`):
 
@@ -1556,12 +1556,12 @@ Add to `app/Services/Sos/SosAlertService.php` (new imports: `App\Models\Sos\SosA
 
 Add `use App\Models\Sos\SosAlert;` and `use App\Models\Sos\SosAlertEvent;` if not already imported (they are, from Task 7).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceLifecycleTest.php"`
 Expected: PASS. (Uses `url("/sos/{$alert->id}")` rather than `route('sos.show', ...)` specifically to avoid a forward dependency on Task 14's named route — this task is fully green on its own, no need to circle back later.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Services/Sos/SosAlertService.php tests/Feature/Sos/SosAlertServiceLifecycleTest.php
@@ -1579,7 +1579,7 @@ git commit -m "feat(sos): add SOS alert lifecycle transitions and repeat-offende
 **Interfaces:**
 - Produces: `processEscalations(): int` — returns count of alerts advanced.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1657,12 +1657,12 @@ class SosAlertServiceEscalationTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceEscalationTest.php"`
 Expected: FAIL — `processEscalations()` doesn't exist.
 
-- [ ] **Step 3: Add `processEscalations()`**
+- [x] **Step 3: Add `processEscalations()`**
 
 Add to `app/Services/Sos/SosAlertService.php`:
 
@@ -1732,12 +1732,12 @@ Add to `app/Services/Sos/SosAlertService.php`:
     }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceEscalationTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Services/Sos/SosAlertService.php tests/Feature/Sos/SosAlertServiceEscalationTest.php
@@ -1756,7 +1756,7 @@ git commit -m "feat(sos): add cron-driven escalation sweep to SosAlertService"
 - Consumes: `App\Services\StudentAttendance\SmsGateService::send(string $phone, string $message): bool` (existing).
 - Produces: `SosNotificationDispatchService::notifyTier(SosAlert $alert, SosEscalationTier $tier): void` — resolves responders (role + explicit users), sends SMS/email per `$tier->channels`, logs an `in_app` entry for audit, and notifies configured external contacts when `$tier->notify_external`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1846,12 +1846,12 @@ class SosNotificationDispatchServiceTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosNotificationDispatchServiceTest.php"`
 Expected: FAIL — service and `SosAlertMail` don't exist.
 
-- [ ] **Step 3: Write `SosAlertMail` + blade + `SosNotificationDispatchService::notifyTier()`**
+- [x] **Step 3: Write `SosAlertMail` + blade + `SosNotificationDispatchService::notifyTier()`**
 
 `app/Mail/SosAlertMail.php`:
 ```php
@@ -2017,12 +2017,12 @@ class SosNotificationDispatchService
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosNotificationDispatchServiceTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Services/Sos/SosNotificationDispatchService.php app/Mail/SosAlertMail.php resources/views/emails/sos_alert.blade.php tests/Feature/Sos/SosNotificationDispatchServiceTest.php
@@ -2041,7 +2041,7 @@ git commit -m "feat(sos): notify tier responders and external contacts via SMS/e
 - Consumes: `App\Services\StudentAttendance\FcmService::send(string $token, string $title, string $body, array $data = []): bool` (existing), `Student::parentContacts()` (existing).
 - Produces: `notifyEmergencyContact(SosAlert $alert): void` — staff → SMS to `EmployeeProfile.emergency_contact_phone`; students → push + SMS to linked `ParentContact` rows per their `notify_push`/`notify_sms` flags.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -2118,12 +2118,12 @@ class SosEmergencyContactNotificationTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosEmergencyContactNotificationTest.php"`
 Expected: FAIL — `notifyEmergencyContact()` doesn't exist.
 
-- [ ] **Step 3: Add `notifyEmergencyContact()`**
+- [x] **Step 3: Add `notifyEmergencyContact()`**
 
 Add to `app/Services/Sos/SosNotificationDispatchService.php` (add constructor param `FcmService $fcm`, imports `App\Models\Student`, `App\Services\StudentAttendance\FcmService`):
 
@@ -2177,12 +2177,12 @@ Add to `app/Services/Sos/SosNotificationDispatchService.php` (add constructor pa
     }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosEmergencyContactNotificationTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Services/Sos/SosNotificationDispatchService.php tests/Feature/Sos/SosEmergencyContactNotificationTest.php
@@ -2201,7 +2201,7 @@ git commit -m "feat(sos): notify triggering user's own emergency contact/guardia
 **Interfaces:**
 - Consumes: `SosNotificationDispatchService::notifyTier()`, `::notifyEmergencyContact()` (Tasks 10-11).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -2262,12 +2262,12 @@ class SosNotifyJobsTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosNotifyJobsTest.php"`
 Expected: FAIL — `handle()` is still a no-op stub from Task 7.
 
-- [ ] **Step 3: Implement the jobs' `handle()`**
+- [x] **Step 3: Implement the jobs' `handle()`**
 
 `app/Jobs/Sos/NotifySosResponders.php` — replace the `handle()` body:
 ```php
@@ -2335,12 +2335,12 @@ class NotifySosEmergencyContact implements ShouldQueue
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosNotifyJobsTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Jobs/Sos tests/Feature/Sos/SosNotifyJobsTest.php
@@ -2356,7 +2356,7 @@ git commit -m "feat(sos): wire notification jobs to SosNotificationDispatchServi
 - Modify: `routes/console.php`
 - Test: `tests/Feature/Sos/ProcessSosEscalationsCommandTest.php`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -2397,12 +2397,12 @@ class ProcessSosEscalationsCommandTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/ProcessSosEscalationsCommandTest.php"`
 Expected: FAIL — command doesn't exist.
 
-- [ ] **Step 3: Write the command and register the schedule**
+- [x] **Step 3: Write the command and register the schedule**
 
 `app/Console/Commands/ProcessSosEscalations.php`:
 ```php
@@ -2434,12 +2434,12 @@ In `routes/console.php`, add near the other `everyMinute()` entry:
 Schedule::command('sos:process-escalations')->everyMinute()->withoutOverlapping();
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/ProcessSosEscalationsCommandTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Console/Commands/ProcessSosEscalations.php routes/console.php tests/Feature/Sos/ProcessSosEscalationsCommandTest.php
@@ -2458,7 +2458,7 @@ git commit -m "feat(sos): add sos:process-escalations scheduled command"
 **Interfaces:**
 - Produces routes: `POST /sos/trigger` (`sos.trigger`, any authenticated user), `GET /sos` (`sos.index`, `sos.respond`), `GET /sos/{alert}` (`sos.show`, `sos.respond`), `POST /sos/{alert}/acknowledge|verify|false-alarm|resolve` (`sos.respond`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -2533,12 +2533,12 @@ class SosAlertControllerTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertControllerTest.php"`
 Expected: FAIL — controller/routes don't exist.
 
-- [ ] **Step 3: Write the controller and routes**
+- [x] **Step 3: Write the controller and routes**
 
 `app/Http/Controllers/Sos/SosAlertController.php`:
 ```php
@@ -2668,17 +2668,17 @@ Route::middleware(['auth'])->prefix('sos')->name('sos.')->group(function () {
 });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertControllerTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Re-run Task 8's lifecycle test**, which depends on `route('sos.show', ...)`:
+- [x] **Step 5: Re-run Task 8's lifecycle test**, which depends on `route('sos.show', ...)`:
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceLifecycleTest.php"`
 Expected: PASS (was previously blocked on this route existing).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/Http/Controllers/Sos/SosAlertController.php routes/web.php tests/Feature/Sos/SosAlertControllerTest.php
@@ -2694,7 +2694,7 @@ git commit -m "feat(sos): add staff SOS trigger and Command Center endpoints"
 - Modify: `routes/web.php`
 - Test: `tests/Feature/Sos/StudentPortalSosTriggerTest.php`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -2736,12 +2736,12 @@ class StudentPortalSosTriggerTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/StudentPortalSosTriggerTest.php"`
 Expected: FAIL — controller/route don't exist.
 
-- [ ] **Step 3: Write the controller and route**
+- [x] **Step 3: Write the controller and route**
 
 `app/Http/Controllers/StudentPortal/SosAlertController.php`:
 ```php
@@ -2797,12 +2797,12 @@ In `routes/web.php`, inside the existing `Route::middleware('student.portal')->g
         Route::post('/sos/trigger', [\App\Http\Controllers\StudentPortal\SosAlertController::class, 'trigger'])->name('sos.trigger');
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/StudentPortalSosTriggerTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Http/Controllers/StudentPortal/SosAlertController.php routes/web.php tests/Feature/Sos/StudentPortalSosTriggerTest.php
@@ -2818,7 +2818,7 @@ git commit -m "feat(sos): add Student Portal SOS trigger endpoint"
 - Modify: `routes/web.php`
 - Test: `tests/Feature/Sos/SosSettingsControllerTest.php`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -2887,12 +2887,12 @@ class SosSettingsControllerTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosSettingsControllerTest.php"`
 Expected: FAIL — controller/routes don't exist.
 
-- [ ] **Step 3: Write the controller and routes**
+- [x] **Step 3: Write the controller and routes**
 
 `app/Http/Controllers/Sos/SosSettingsController.php`:
 ```php
@@ -3039,12 +3039,12 @@ In `routes/web.php`, inside the `sos.` route group added in Task 14, add a neste
     });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosSettingsControllerTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Http/Controllers/Sos/SosSettingsController.php routes/web.php tests/Feature/Sos/SosSettingsControllerTest.php
@@ -3062,7 +3062,7 @@ git commit -m "feat(sos): add admin SOS settings endpoints"
 **Interfaces:**
 - Produces: two tiers per `alert_type` (`medical`, `security`, `fire_disaster`, `general`) — tier 1 role-routed per spec defaults, 10-minute timeout, `['in_app','sms']`; tier 2 `Administrator`, no timeout (final), `notify_external = true`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -3104,12 +3104,12 @@ class SosDefaultEscalationTierSeederTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosDefaultEscalationTierSeederTest.php"`
 Expected: FAIL — seeder doesn't exist.
 
-- [ ] **Step 3: Write the seeder**
+- [x] **Step 3: Write the seeder**
 
 `database/seeders/SosDefaultEscalationTierSeeder.php`:
 ```php
@@ -3169,12 +3169,12 @@ class SosDefaultEscalationTierSeeder extends Seeder
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosDefaultEscalationTierSeederTest.php"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add database/seeders/SosDefaultEscalationTierSeeder.php tests/Feature/Sos/SosDefaultEscalationTierSeederTest.php
@@ -3193,7 +3193,7 @@ git commit -m "feat(sos): seed default escalation tiers"
 **Interfaces:**
 - Produces: `<SosFloatingButton :trigger-route="'sos.trigger'" />` — self-contained component: floating action button, category picker, hold-to-confirm + cancellable countdown, and a discreet long-press silent trigger. Posts to the given Ziggy route name via axios.
 
-- [ ] **Step 1: Share SOS config as an Inertia prop**
+- [x] **Step 1: Share SOS config as an Inertia prop**
 
 In `app/Http/Middleware/HandleInertiaRequests.php`, inside the `share()` method's returned array, add:
 
@@ -3204,7 +3204,7 @@ In `app/Http/Middleware/HandleInertiaRequests.php`, inside the `share()` method'
             ],
 ```
 
-- [ ] **Step 2: Write `SosFloatingButton.vue`**
+- [x] **Step 2: Write `SosFloatingButton.vue`**
 
 ```vue
 <script setup>
@@ -3417,7 +3417,7 @@ onBeforeUnmount(() => {
 </template>
 ```
 
-- [ ] **Step 3: Mount in `AdminLayout.vue`**
+- [x] **Step 3: Mount in `AdminLayout.vue`**
 
 In `resources/js/Layouts/AdminLayout.vue`, add the import near the other component imports:
 
@@ -3427,11 +3427,11 @@ import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue';
 
 And add `<SosFloatingButton trigger-route="sos.trigger" />` near the end of the template's root, alongside the other always-mounted overlays (e.g. next to `<AppLoadingOverlay />` / `<SessionExpiredOverlay />`).
 
-- [ ] **Step 4: Manual verification**
+- [x] **Step 4: Manual verification**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && npm run build"` (or start `npm run dev` and check in-browser) — confirm no build errors, and that the SOS button renders bottom-right on any authenticated Atlas page.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add resources/js/Components/Sos/SosFloatingButton.vue resources/js/Layouts/AdminLayout.vue app/Http/Middleware/HandleInertiaRequests.php
@@ -3445,7 +3445,7 @@ git commit -m "feat(sos): add SOS floating trigger button to Atlas web"
 **Files:**
 - Modify: `resources/js/Layouts/StudentPortalLayout.vue`
 
-- [ ] **Step 1: Mount the component**
+- [x] **Step 1: Mount the component**
 
 In `resources/js/Layouts/StudentPortalLayout.vue`, add the import:
 
@@ -3455,11 +3455,11 @@ import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue'
 
 Add `<SosFloatingButton trigger-route="student-portal.sos.trigger" />` just before the closing `</div>` of the root layout element (after `<footer>`).
 
-- [ ] **Step 2: Manual verification**
+- [x] **Step 2: Manual verification**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && npm run build"` — confirm no build errors; log in to `/student-portal` in dev and confirm the SOS button renders.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add resources/js/Layouts/StudentPortalLayout.vue
@@ -3476,7 +3476,7 @@ git commit -m "feat(sos): add SOS floating trigger button to Student Portal"
 **Interfaces:**
 - Consumes: `props.alerts` (from `SosAlertController::index()`), Echo channel `sos-responders` events `.sos.alert.triggered` / `.sos.alert.updated`.
 
-- [ ] **Step 1: Write the page**
+- [x] **Step 1: Write the page**
 
 ```vue
 <script setup>
@@ -3594,11 +3594,11 @@ async function act(alert, action, body = {}) {
 </template>
 ```
 
-- [ ] **Step 2: Manual verification**
+- [x] **Step 2: Manual verification**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && npm run build"` — confirm no build errors. Log in as a `sos.respond`-permitted user in dev, visit `/sos`, trigger a test alert from another tab, confirm it appears live.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add resources/js/Pages/Sos/CommandCenter.vue
@@ -3615,7 +3615,7 @@ git commit -m "feat(sos): add real-time SOS Command Center page"
 **Interfaces:**
 - Consumes: `props.tiers`, `props.externalContacts`, `props.roles`, `props.users` (each with a nested `employee_profile.mobile_number`, from `SosSettingsController::index()` per Task 16's `with('employeeProfile:...')` eager load).
 
-- [ ] **Step 1: Write the page**
+- [x] **Step 1: Write the page**
 
 ```vue
 <script setup>
@@ -3745,11 +3745,11 @@ function saveMobile(user) {
 </template>
 ```
 
-- [ ] **Step 2: Manual verification**
+- [x] **Step 2: Manual verification**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && npm run build"` — confirm no build errors. Log in as Administrator in dev, visit `/sos/settings`, create a tier and an external contact, confirm they persist and appear in the list; set a responder's mobile number and confirm it persists on reload.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add resources/js/Pages/Sos/Settings.vue
@@ -3762,22 +3762,22 @@ git commit -m "feat(sos): add admin SOS settings page"
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Run the full PHP test suite**
+- [x] **Step 1: Run the full PHP test suite**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test"`
 Expected: all tests pass, zero regressions in unrelated suites.
 
-- [ ] **Step 2: PHP lint all touched files**
+- [x] **Step 2: PHP lint all touched files**
 
 Run the project's `lint` skill (or `docker compose exec php bash -c "cd /var/www/html/bugsaymis && find app/Models/Sos app/Services/Sos app/Events/Sos app/Jobs/Sos app/Http/Controllers/Sos app/Http/Controllers/StudentPortal/SosAlertController.php app/Console/Commands/ProcessSosEscalations.php app/Mail/SosAlertMail.php database/seeders/SosPermissionSeeder.php database/seeders/SosDefaultEscalationTierSeeder.php -name '*.php' -exec php -l {} \;"`).
 Expected: `No syntax errors detected` for every file.
 
-- [ ] **Step 3: Build frontend assets**
+- [x] **Step 3: Build frontend assets**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && npm run build"`
 Expected: build succeeds with no errors.
 
-- [ ] **Step 4: Manual smoke test in dev browser**
+- [x] **Step 4: Manual smoke test in dev browser**
 
 Using Chrome dev tools / the app in a browser against the dev Docker stack:
 1. Log in as a plain staff user, trigger a test "general" SOS from the floating button (category → hold 3s → cancel during the 8s countdown) — confirm cancel works and no alert row is created (`SELECT * FROM sos_alerts` empty for that trigger).
@@ -3786,7 +3786,7 @@ Using Chrome dev tools / the app in a browser against the dev Docker stack:
 4. Trigger a silent alert (long-press the icon directly) — confirm no visible UI change on the triggering side, and that the resulting alert in the Command Center shows the `SILENT` badge.
 5. Visit `/sos/settings` as Administrator, edit a tier's channels, confirm the change persists on reload.
 
-- [ ] **Step 5: Commit (only if any fixes were needed in the prior steps)**
+- [x] **Step 5: Commit (only if any fixes were needed in the prior steps)**
 
 ```bash
 git add -A -- app resources database tests config routes
