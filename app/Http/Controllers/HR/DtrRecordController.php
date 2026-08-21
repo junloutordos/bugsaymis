@@ -9,11 +9,14 @@ use App\Models\HR\LeaveApplication;
 use App\Models\User;
 use App\Models\WFHAttendance;
 use App\Services\HR\DTRService;
+use App\Services\HR\HazardReportService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Mpdf\Mpdf;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DtrRecordController extends Controller
 {
@@ -54,19 +57,28 @@ class DtrRecordController extends Controller
             ->sortBy('user.name')
             ->values();
 
-        $pennedSubmissions = DtrRecord::whereYear('work_date', $y)
-            ->whereMonth('work_date', $m)
-            ->whereNotNull('penned_submitted_at')
-            ->select('user_id', DB::raw('MIN(penned_submitted_at) as submitted_at'), DB::raw('COUNT(*) as entry_count'))
-            ->groupBy('user_id')
+        // Not scoped to the selected month — this is a standing review queue,
+        // not a monthly report, so a submission from an earlier month HR
+        // hasn't gotten to yet doesn't silently disappear from the badge
+        // just because the page is currently viewing a different month.
+        $pennedSubmissions = DtrRecord::whereNotNull('penned_submitted_at')
+            ->whereNull('penned_reviewed_at')
+            ->select(
+                'user_id',
+                DB::raw("DATE_FORMAT(work_date, '%Y-%m') as submission_month"),
+                DB::raw('MIN(penned_submitted_at) as submitted_at'),
+                DB::raw('COUNT(*) as entry_count')
+            )
+            ->groupBy('user_id', 'submission_month')
             ->with('user:id,name')
             ->get()
             ->filter(fn ($r) => $r->user !== null)
             ->map(fn ($r) => [
-                'id'           => $r->user_id,
-                'name'         => $r->user->name,
-                'entry_count'  => $r->entry_count,
-                'submitted_at' => $r->submitted_at,
+                'id'               => $r->user_id,
+                'name'             => $r->user->name,
+                'entry_count'      => $r->entry_count,
+                'submitted_at'     => $r->submitted_at,
+                'submission_month' => $r->submission_month,
             ])
             ->values();
 
@@ -92,7 +104,7 @@ class DtrRecordController extends Controller
         $records = DtrRecord::where('user_id', $user->id)
             ->whereYear('work_date', $y)
             ->whereMonth('work_date', $m)
-            ->with('schedule', 'leaveApplication.leaveType')
+            ->with('schedule', 'leaveApplication.leaveType', 'pennedReviewedBy:id,name')
             ->orderBy('work_date')
             ->get()
             ->map(function ($record) {
@@ -125,14 +137,20 @@ class DtrRecordController extends Controller
             $r->penned_time_in_pm || $r->penned_time_out_pm || $r->penned_remarks
         );
         $allSubmitted = $nonAdvance->isNotEmpty() && $nonAdvance->every(fn ($r) => $r->penned_submitted_at !== null);
+        $submitted    = $nonAdvance->filter(fn ($r) => $r->penned_submitted_at !== null);
+        $allReviewed  = $allSubmitted && $submitted->every(fn ($r) => $r->penned_reviewed_at !== null);
+        $reviewedRecord = $submitted->first(fn ($r) => $r->penned_reviewed_at !== null);
 
         return Inertia::render('HR/DTR/Show', [
-            'employee'     => $user->load('employeeProfile'),
-            'records'      => $records,
-            'summary'      => $summary,
-            'month'        => $month,
-            'hasPenned'    => $hasPenned,
-            'allSubmitted' => $allSubmitted,
+            'employee'       => $user->load('employeeProfile'),
+            'records'        => $records,
+            'summary'        => $summary,
+            'month'          => $month,
+            'hasPenned'      => $hasPenned,
+            'allSubmitted'   => $allSubmitted,
+            'allReviewed'    => $allReviewed,
+            'reviewedAt'     => $reviewedRecord?->penned_reviewed_at,
+            'reviewedByName' => $reviewedRecord?->pennedReviewedBy?->name,
         ]);
     }
 
@@ -447,7 +465,9 @@ class DtrRecordController extends Controller
 
     /**
      * HR / Administrator unlocks penned entries for an employee's month,
-     * allowing them to re-submit corrections.
+     * allowing them to re-submit corrections. Also clears any prior review —
+     * an approval only stands until the next unlock, since the underlying
+     * data is being reopened for correction.
      */
     public function unlockPenned(Request $request, User $user)
     {
@@ -463,9 +483,39 @@ class DtrRecordController extends Controller
             ->update([
                 'penned_submitted_at' => null,
                 'penned_submitted_by' => null,
+                'penned_reviewed_at'  => null,
+                'penned_reviewed_by'  => null,
             ]);
 
         return back()->with('success', "Penned entries unlocked for {$user->name} — {$month}.");
+    }
+
+    /**
+     * HR / Administrator approves an employee's submitted penned entries for
+     * the month. This is a review marker, not a payroll finalization lock
+     * (that remains is_locked, set separately) — it records that HR has
+     * reviewed the self-declared entries, which is also what makes a penned
+     * day eligible for Hazard Report exposure (HazardReportService excludes
+     * unreviewed penned days).
+     */
+    public function approvePenned(Request $request, User $user)
+    {
+        $this->authorize('hr.dtr.manage');
+
+        $month = $request->input('month', now()->format('Y-m'));
+        [$y, $m] = explode('-', $month);
+
+        DtrRecord::where('user_id', $user->id)
+            ->whereYear('work_date', $y)
+            ->whereMonth('work_date', $m)
+            ->whereNotNull('penned_submitted_at')
+            ->whereNull('penned_reviewed_at')
+            ->update([
+                'penned_reviewed_at' => now(),
+                'penned_reviewed_by' => Auth::id(),
+            ]);
+
+        return back()->with('success', "Penned entries approved for {$user->name} — {$month}.");
     }
 
     public function generate(Request $request, DTRService $dtrService)
@@ -786,6 +836,83 @@ class DtrRecordController extends Controller
             'absentCount'     => $absentCount,
             'totalTardy'      => $totalTardy,
         ]);
+    }
+
+    /**
+     * Basis-for-Hazard-Pay roster: every active Plantilla employee (teaching
+     * and non-teaching, alphabetical) with their Hazard Actual Exposure days
+     * for the period — see HazardReportService for the classification rules.
+     */
+    public function hazardReport(Request $request, HazardReportService $hazardReportService)
+    {
+        $this->authorize('hr.dtr.manage');
+
+        [$dateFrom, $dateTo] = $this->resolveHazardReportRange($request);
+
+        return Inertia::render('HR/DTR/HazardReport', [
+            'rows'      => $hazardReportService->generate($dateFrom, $dateTo),
+            'date_from' => $dateFrom,
+            'date_to'   => $dateTo,
+        ]);
+    }
+
+    public function hazardReportPdf(Request $request, HazardReportService $hazardReportService): StreamedResponse
+    {
+        $this->authorize('hr.dtr.manage');
+
+        [$dateFrom, $dateTo] = $this->resolveHazardReportRange($request);
+        $rows = $hazardReportService->generate($dateFrom, $dateTo);
+
+        $html = view('hr.dtr.hazard-report-pdf', [
+            'rows'      => $rows,
+            'date_from' => $dateFrom,
+            'date_to'   => $dateTo,
+        ])->render();
+
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_left' => 20,
+            'margin_right' => 20,
+            'margin_top' => 42,
+            'margin_bottom' => 24,
+            'margin_header' => 0,
+            'margin_footer' => 0,
+            'tempDir' => sys_get_temp_dir(),
+        ]);
+
+        $mpdf->SetHTMLHeader('<img src="'.public_path('images/report_header.jpeg').'" style="width:100%;display:block;">');
+        $mpdf->SetHTMLFooter('<img src="'.public_path('images/report_footer.jpeg').'" style="width:100%;display:block;">');
+        $mpdf->SetTitle("Hazard Report — {$dateFrom} to {$dateTo}");
+        $mpdf->WriteHTML($html);
+
+        $pdfBytes = $mpdf->Output('', 'S');
+        $filename = "Hazard_Report_{$dateFrom}_to_{$dateTo}.pdf";
+
+        return new StreamedResponse(function () use ($pdfBytes) {
+            echo $pdfBytes;
+        }, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            'Content-Length' => strlen($pdfBytes),
+        ]);
+    }
+
+    /**
+     * @return array{0: string, 1: string} [date_from, date_to]
+     */
+    private function resolveHazardReportRange(Request $request): array
+    {
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            return [$request->input('date_from'), $request->input('date_to')];
+        }
+
+        $month   = $request->input('month', now()->format('Y-m'));
+        [$y, $m] = explode('-', $month);
+        $dateFrom = "$y-".str_pad($m, 2, '0', STR_PAD_LEFT).'-01';
+        $dateTo   = Carbon::createFromDate($y, $m, 1)->endOfMonth()->format('Y-m-d');
+
+        return [$dateFrom, $dateTo];
     }
 
     public function edit(ManualDtrEditRequest $request, DtrRecord $record)

@@ -66,19 +66,33 @@
         </div>
       </AppCard>
 
-      <!-- Penned entries submitted banner + unlock -->
-      <div v-if="allSubmitted" class="bg-warning-50 border border-warning-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden">
+      <!-- Penned entries submitted banner + approve/unlock -->
+      <div v-if="allSubmitted" class="rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden"
+        :class="allReviewed ? 'bg-success-50 border-success-100' : 'bg-warning-50 border-warning-100'">
         <div class="flex items-start gap-2">
-          <LockClosedIcon class="h-5 w-5 text-warning-500 shrink-0 mt-0.5" />
+          <CheckCircleIcon v-if="allReviewed" class="h-5 w-5 text-success-500 shrink-0 mt-0.5" />
+          <LockClosedIcon v-else class="h-5 w-5 text-warning-500 shrink-0 mt-0.5" />
           <div>
-            <p class="text-sm font-semibold text-amber-800">Penned entries submitted</p>
-            <p class="text-xs text-amber-600 mt-0.5">{{ employee.name }} has locked their penned entries for {{ currentMonth }}. Review and unlock if corrections are needed.</p>
+            <p class="text-sm font-semibold" :class="allReviewed ? 'text-success-800' : 'text-amber-800'">
+              {{ allReviewed ? 'Penned entries approved' : 'Penned entries submitted' }}
+            </p>
+            <p v-if="allReviewed" class="text-xs text-success-600 mt-0.5">
+              Reviewed by {{ reviewedByName }} on {{ new Date(reviewedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) }}.
+              These days now count toward Hazard Actual Exposure. Unlock if corrections are still needed.
+            </p>
+            <p v-else class="text-xs text-amber-600 mt-0.5">{{ employee.name }} has locked their penned entries for {{ currentMonth }}. Approve to accept, or unlock if corrections are needed.</p>
           </div>
         </div>
-        <AppButton variant="warning" class="shrink-0" :disabled="unlocking" @click="unlockPenned">
-          <LockOpenIcon class="h-4 w-4" />
-          {{ unlocking ? 'Unlocking…' : 'Unlock Submissions' }}
-        </AppButton>
+        <div class="flex items-center gap-2 shrink-0">
+          <AppButton v-if="!allReviewed" variant="success" :disabled="approving" @click="approvePenned">
+            <CheckCircleIcon class="h-4 w-4" />
+            {{ approving ? 'Approving…' : 'Approve' }}
+          </AppButton>
+          <AppButton variant="warning" :disabled="unlocking" @click="unlockPenned">
+            <LockOpenIcon class="h-4 w-4" />
+            {{ unlocking ? 'Unlocking…' : 'Unlock Submissions' }}
+          </AppButton>
+        </div>
       </div>
 
       <!-- Summary Stats -->
@@ -434,15 +448,19 @@ import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
   PencilSquareIcon, LockClosedIcon, ArrowPathIcon,
   ClipboardDocumentListIcon, BoltIcon, LockOpenIcon,
+  CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  employee:     Object,
-  records:      Array,
-  summary:      Object,
-  month:        String,
-  hasPenned:    { type: Boolean, default: false },
-  allSubmitted: { type: Boolean, default: false },
+  employee:       Object,
+  records:        Array,
+  summary:        Object,
+  month:          String,
+  hasPenned:      { type: Boolean, default: false },
+  allSubmitted:   { type: Boolean, default: false },
+  allReviewed:    { type: Boolean, default: false },
+  reviewedAt:     { type: String, default: null },
+  reviewedByName: { type: String, default: null },
 })
 
 const page = usePage()
@@ -503,14 +521,23 @@ function cosChecklistUrl() {
   return `${base}?month=${currentMonth.value}`
 }
 
-// ── Unlock penned entries ──────────────────────────────────────────────────
+// ── Unlock / approve penned entries ─────────────────────────────────────────
 const unlocking = ref(false)
+const approving = ref(false)
 
 function unlockPenned() {
   unlocking.value = true
   router.post(route('hr.dtr.unlock-penned', props.employee.id), { month: currentMonth.value }, {
     preserveScroll: true,
     onFinish: () => { unlocking.value = false },
+  })
+}
+
+function approvePenned() {
+  approving.value = true
+  router.post(route('hr.dtr.approve-penned', props.employee.id), { month: currentMonth.value }, {
+    preserveScroll: true,
+    onFinish: () => { approving.value = false },
   })
 }
 

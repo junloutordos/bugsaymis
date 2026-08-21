@@ -42,6 +42,8 @@ class DtrRecord extends Model
         'penned_at',
         'penned_submitted_at',
         'penned_submitted_by',
+        'penned_reviewed_at',
+        'penned_reviewed_by',
         'wfh_attendance_id',
         'wfh_overridden',
         'is_travel',
@@ -66,6 +68,7 @@ class DtrRecord extends Model
         'processed_at'        => 'datetime',
         'penned_at'           => 'datetime',
         'penned_submitted_at' => 'datetime',
+        'penned_reviewed_at'  => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -91,5 +94,10 @@ class DtrRecord extends Model
     public function wfhAttendance(): BelongsTo
     {
         return $this->belongsTo(WFHAttendance::class, 'wfh_attendance_id');
+    }
+
+    public function pennedReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'penned_reviewed_by');
     }
 }

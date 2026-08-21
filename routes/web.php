@@ -2111,6 +2111,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('dtr.recompute');
     Route::post('/dtr/{user}/unlock-penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'unlockPenned'])
         ->name('dtr.unlock-penned');
+    Route::post('/dtr/{user}/approve-penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'approvePenned'])
+        ->name('dtr.approve-penned');
     Route::patch('/dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'penned'])
         ->name('dtr.penned');
     Route::get('/dtr/print-batch', [\App\Http\Controllers\HR\DtrRecordController::class, 'printBatch'])
@@ -2119,6 +2121,10 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('dtr.print');
     Route::get('/dtr/{user}/checklist', [\App\Http\Controllers\HR\DtrRecordController::class, 'printChecklist'])
         ->name('dtr.checklist');
+    Route::get('/dtr/hazard-report', [\App\Http\Controllers\HR\DtrRecordController::class, 'hazardReport'])
+        ->name('dtr.hazard-report');
+    Route::get('/dtr/hazard-report/pdf', [\App\Http\Controllers\HR\DtrRecordController::class, 'hazardReportPdf'])
+        ->name('dtr.hazard-report.pdf');
 
     // ── Work Schedules — HR Admin ─────────────────────────────────────────────
     Route::get('/schedules', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'index'])

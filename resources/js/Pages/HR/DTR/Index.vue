@@ -6,6 +6,18 @@
       <!-- ── Page Header ────────────────────────────────────────────── -->
       <AppPageHeader title="Daily Time Records" subtitle="Monthly attendance summary per employee.">
         <template #actions>
+          <AppButton
+            :variant="activeView === 'penned' ? 'primary' : 'secondary'"
+            @click="activeView = activeView === 'penned' ? 'summary' : 'penned'"
+          >
+            <InboxArrowDownIcon class="h-4 w-4" />
+            Penned Entries
+            <AppBadge v-if="pennedSubmissions.length" color="amber" class="ml-1">{{ pennedSubmissions.length }}</AppBadge>
+          </AppButton>
+          <AppButton as="a" :href="route('hr.dtr.hazard-report')" variant="secondary">
+            <FireIcon class="h-4 w-4" />
+            Generate Hazard Report
+          </AppButton>
           <AppButton variant="secondary" @click="batchPrintModal = true">
             <PrinterIcon class="h-4 w-4" />
             Batch Print
@@ -25,31 +37,34 @@
         <XCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
       </div>
 
-      <!-- ── Penned Submissions ────────────────────────────────────── -->
-      <div v-if="pennedSubmissions.length" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+      <!-- ── Penned Submissions tab panel ───────────────────────────── -->
+      <div v-if="activeView === 'penned'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <div class="flex items-center gap-2 mb-3">
           <InboxArrowDownIcon class="h-4 w-4 text-amber-600" />
-          <h3 class="text-sm font-semibold text-amber-800">Penned Entries Awaiting Review</h3>
-          <AppBadge color="amber" class="ml-auto">{{ pennedSubmissions.length }}</AppBadge>
+          <h3 class="text-sm font-semibold text-slate-800">Penned Entries Awaiting Review</h3>
+          <span class="text-xs text-slate-400 ml-1">— all months, not just the one selected below</span>
+          <AppBadge v-if="pennedSubmissions.length" color="amber" class="ml-auto">{{ pennedSubmissions.length }}</AppBadge>
         </div>
-        <div class="divide-y divide-amber-100">
-          <div v-for="sub in pennedSubmissions" :key="sub.id" class="py-2 flex items-center justify-between gap-3">
+        <div v-if="pennedSubmissions.length" class="divide-y divide-slate-100">
+          <div v-for="sub in pennedSubmissions" :key="`${sub.id}-${sub.submission_month}`" class="py-2.5 flex items-center justify-between gap-3">
             <div>
               <span class="text-sm font-medium text-slate-800">{{ sub.name }}</span>
-              <span class="ml-2 text-xs text-amber-600">{{ sub.entry_count }} record(s)</span>
+              <span class="ml-2 text-xs text-amber-600">{{ sub.entry_count }} record(s) — {{ sub.submission_month }}</span>
             </div>
             <div class="flex items-center gap-3">
               <span class="text-xs text-slate-500">Submitted {{ new Date(sub.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
-              <a :href="route('hr.dtr.show', sub.id) + '?month=' + month"
+              <Link :href="route('hr.dtr.show', sub.id) + '?month=' + sub.submission_month"
                 class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors">
-                <EyeIcon class="h-3.5 w-3.5" />View
-              </a>
+                <EyeIcon class="h-3.5 w-3.5" />Review
+              </Link>
             </div>
           </div>
         </div>
+        <EmptyState v-else :icon="InboxArrowDownIcon" title="Nothing awaiting review." subtitle="Penned submissions will appear here once employees submit them." />
       </div>
 
       <!-- ── Controls: Month + Search ──────────────────────────────── -->
+      <template v-if="activeView === 'summary'">
       <AppFilterBar :result-label="`${filteredSummaries.length} result(s) — ${monthLabel}`">
         <div>
           <label class="block text-xs font-medium text-slate-500 mb-1">Month</label>
@@ -235,6 +250,7 @@
           </template>
         </AppTable>
       </div>
+      </template>
     </div>
 
     <!-- ── Batch Print Modal ──────────────────────────────────────── -->
@@ -397,6 +413,7 @@ import {
   CalendarDaysIcon,
   ClipboardDocumentListIcon,
   InboxArrowDownIcon,
+  FireIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -433,6 +450,7 @@ const tabs = [
 ]
 
 const activeTab = ref('all')
+const activeView = ref('summary') // 'summary' | 'penned'
 
 function tabCount (tabValue) {
   if (tabValue === 'all') return props.summaries.length
