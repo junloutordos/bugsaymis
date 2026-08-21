@@ -73,6 +73,102 @@ class SosAlertService
         return ['blocked' => false, 'reason' => null, 'alert' => $alert];
     }
 
+    public function acknowledge(SosAlert $alert, User $responder): SosAlertEvent
+    {
+        $alert->update(['status' => 'acknowledged']);
+
+        $event = SosAlertEvent::create([
+            'sos_alert_id' => $alert->id,
+            'type'         => 'acknowledged',
+            'actor_type'   => User::class,
+            'actor_id'     => $responder->id,
+            'payload'      => null,
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        return $event;
+    }
+
+    public function verify(SosAlert $alert, User $responder, ?string $note = null): SosAlertEvent
+    {
+        $alert->update(['status' => 'verified']);
+
+        $event = SosAlertEvent::create([
+            'sos_alert_id' => $alert->id,
+            'type'         => 'verified',
+            'actor_type'   => User::class,
+            'actor_id'     => $responder->id,
+            'payload'      => $note ? ['note' => $note] : null,
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        return $event;
+    }
+
+    public function markFalseAlarm(SosAlert $alert, User $responder, string $reason): SosAlertEvent
+    {
+        $alert->update(['status' => 'false_alarm']);
+
+        $event = SosAlertEvent::create([
+            'sos_alert_id' => $alert->id,
+            'type'         => 'false_alarm',
+            'actor_type'   => User::class,
+            'actor_id'     => $responder->id,
+            'payload'      => ['reason' => $reason],
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        $count = SosAlert::falseAlarmCount(
+            $alert->triggerable_type,
+            $alert->triggerable_id,
+            (int) config('sos.false_alarm_window_days'),
+        );
+
+        if ($count >= (int) config('sos.false_alarm_threshold')) {
+            $admins = User::whereHas('roles', fn ($q) => $q->where('name', 'Administrator'))->get();
+            foreach ($admins as $admin) {
+                \App\Services\NotificationService::notifyUser(
+                    user: $admin,
+                    requestType: 'SOS Repeat False Alarm',
+                    referenceNo: "SOS-{$alert->id}",
+                    newStatus: 'Needs Review',
+                    url: url("/sos/{$alert->id}"),
+                );
+            }
+        }
+
+        return $event;
+    }
+
+    public function resolve(SosAlert $alert, User $responder, ?string $notes = null): SosAlertEvent
+    {
+        if ($alert->status === 'false_alarm') {
+            throw new \RuntimeException("Alert #{$alert->id} is already closed as a false alarm.");
+        }
+
+        $alert->update([
+            'status'           => 'resolved',
+            'resolved_at'      => now(),
+            'resolved_by'      => $responder->id,
+            'resolution_notes' => $notes,
+        ]);
+
+        $event = SosAlertEvent::create([
+            'sos_alert_id' => $alert->id,
+            'type'         => 'resolved',
+            'actor_type'   => User::class,
+            'actor_id'     => $responder->id,
+            'payload'      => $notes ? ['notes' => $notes] : null,
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        return $event;
+    }
+
     private function broadcastPayload(SosAlert $alert): array
     {
         return [

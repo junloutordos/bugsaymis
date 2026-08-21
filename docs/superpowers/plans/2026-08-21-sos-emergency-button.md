@@ -1413,7 +1413,7 @@ class SosAlertServiceLifecycleTest extends TestCase
 
         // 2 prior false alarms + this one crosses the default threshold of 3
         for ($i = 0; $i < 2; $i++) {
-            $this->alert(['triggerable_id' => $triggerable->id, 'status' => 'false_alarm'])->save();
+            $this->alert(['triggerable_id' => $triggerable->id, 'status' => 'false_alarm']);
         }
         $alert = $this->alert(['triggerable_id' => $triggerable->id]);
 
@@ -1519,7 +1519,7 @@ Add to `app/Services/Sos/SosAlertService.php` (new imports: `App\Models\Sos\SosA
                     requestType: 'SOS Repeat False Alarm',
                     referenceNo: "SOS-{$alert->id}",
                     newStatus: 'Needs Review',
-                    url: route('sos.show', $alert->id),
+                    url: url("/sos/{$alert->id}"),
                 );
             }
         }
@@ -1559,7 +1559,7 @@ Add `use App\Models\Sos\SosAlert;` and `use App\Models\Sos\SosAlertEvent;` if no
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosAlertServiceLifecycleTest.php"`
-Expected: PASS (note: `test_repeat_false_alarms_notify_administrators` and `test_resolve_sets_resolution_fields` reference `route('sos.show', ...)`, which is added in Task 14 — if this task is executed before Task 14, temporarily run this test after Task 14, or add a minimal `sos.show` route stub now. Recommended: implement Task 14's routes file skeleton first if executing tasks out of order; the dependency is noted here for the executor's awareness.)
+Expected: PASS. (Uses `url("/sos/{$alert->id}")` rather than `route('sos.show', ...)` specifically to avoid a forward dependency on Task 14's named route — this task is fully green on its own, no need to circle back later.)
 
 - [ ] **Step 5: Commit**
 
