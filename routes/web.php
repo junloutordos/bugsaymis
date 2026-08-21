@@ -2720,6 +2720,8 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
     Route::middleware('student.portal')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\StudentPortal\DashboardController::class, 'index'])->name('dashboard');
 
+        Route::post('/sos/trigger', [\App\Http\Controllers\StudentPortal\SosAlertController::class, 'trigger'])->name('sos.trigger');
+
         Route::get('/profile',                   [\App\Http\Controllers\StudentPortal\ProfileController::class, 'show'])->name('profile');
         Route::post('/profile/{section}',        [\App\Http\Controllers\StudentPortal\ProfileController::class, 'saveSection'])->name('profile.save')
             ->where('section', 'academic|activities|social|career|residence|health');
