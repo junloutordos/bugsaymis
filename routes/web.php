@@ -386,6 +386,17 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             Route::post('/{alert}/false-alarm', [\App\Http\Controllers\Sos\SosAlertController::class, 'falseAlarm'])->name('false-alarm')->whereNumber('alert');
             Route::post('/{alert}/resolve', [\App\Http\Controllers\Sos\SosAlertController::class, 'resolve'])->name('resolve')->whereNumber('alert');
         });
+
+        Route::middleware('permission:sos.manage')->prefix('settings')->name('settings.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Sos\SosSettingsController::class, 'index'])->name('index');
+            Route::post('/tiers', [\App\Http\Controllers\Sos\SosSettingsController::class, 'storeTier'])->name('tiers.store');
+            Route::put('/tiers/{tier}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'updateTier'])->name('tiers.update')->whereNumber('tier');
+            Route::delete('/tiers/{tier}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'destroyTier'])->name('tiers.destroy')->whereNumber('tier');
+            Route::post('/external-contacts', [\App\Http\Controllers\Sos\SosSettingsController::class, 'storeExternalContact'])->name('external-contacts.store');
+            Route::put('/external-contacts/{contact}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'updateExternalContact'])->name('external-contacts.update')->whereNumber('contact');
+            Route::delete('/external-contacts/{contact}', [\App\Http\Controllers\Sos\SosSettingsController::class, 'destroyExternalContact'])->name('external-contacts.destroy')->whereNumber('contact');
+            Route::post('/responders/{user}/mobile', [\App\Http\Controllers\Sos\SosSettingsController::class, 'updateResponderMobile'])->name('responders.mobile')->whereNumber('user');
+        });
     });
 
     // ── Issuances ─────────────────────────────────────────────────────────────
