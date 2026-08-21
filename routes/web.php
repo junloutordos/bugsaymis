@@ -371,6 +371,23 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
+    // ── SOS Emergency Button ───────────────────────────────────────────────────
+    // Any authenticated user can trigger — no permission gate on that action,
+    // by design (a real emergency must never be blocked by policy). Command
+    // Center and settings are gated separately.
+    Route::prefix('sos')->name('sos.')->group(function () {
+        Route::post('/trigger', [\App\Http\Controllers\Sos\SosAlertController::class, 'trigger'])->name('trigger');
+
+        Route::middleware('permission:sos.respond')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Sos\SosAlertController::class, 'index'])->name('index');
+            Route::get('/{alert}', [\App\Http\Controllers\Sos\SosAlertController::class, 'show'])->name('show')->whereNumber('alert');
+            Route::post('/{alert}/acknowledge', [\App\Http\Controllers\Sos\SosAlertController::class, 'acknowledge'])->name('acknowledge')->whereNumber('alert');
+            Route::post('/{alert}/verify', [\App\Http\Controllers\Sos\SosAlertController::class, 'verify'])->name('verify')->whereNumber('alert');
+            Route::post('/{alert}/false-alarm', [\App\Http\Controllers\Sos\SosAlertController::class, 'falseAlarm'])->name('false-alarm')->whereNumber('alert');
+            Route::post('/{alert}/resolve', [\App\Http\Controllers\Sos\SosAlertController::class, 'resolve'])->name('resolve')->whereNumber('alert');
+        });
+    });
+
     // ── Issuances ─────────────────────────────────────────────────────────────
     // No group-level permission gate: any tagged recipient must be able to
     // reach these routes, and every method below already enforces its own
