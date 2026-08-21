@@ -169,6 +169,70 @@ class SosAlertService
         return $event;
     }
 
+    public function processEscalations(): int
+    {
+        $count = 0;
+
+        $alerts = SosAlert::whereNotIn('status', ['resolved', 'false_alarm'])->get();
+
+        foreach ($alerts as $alert) {
+            $currentTier = SosEscalationTier::where('alert_type', $alert->alert_type)
+                ->where('order', $alert->current_tier_order)
+                ->first();
+
+            // No tier configured for this order, or this is the final tier
+            // (null timeout) — nothing further to advance to.
+            if (! $currentTier || $currentTier->timeout_minutes === null) {
+                continue;
+            }
+
+            // ->first()?->created_at (not ->value()) — value() returns the raw
+            // DB scalar, bypassing model hydration, so it would NOT be a Carbon
+            // instance and ->copy() below would fatal.
+            $enteredAt = $alert->events()
+                ->whereIn('type', ['triggered', 'escalated'])
+                ->latest('created_at')
+                ->first()?->created_at ?? $alert->triggered_at;
+
+            if (now()->lessThan($enteredAt->copy()->addMinutes($currentTier->timeout_minutes))) {
+                continue;
+            }
+
+            if ($this->escalate($alert)) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private function escalate(SosAlert $alert): bool
+    {
+        $nextTier = SosEscalationTier::where('alert_type', $alert->alert_type)
+            ->where('order', $alert->current_tier_order + 1)
+            ->first();
+
+        if (! $nextTier) {
+            return false;
+        }
+
+        $alert->update(['status' => 'escalated', 'current_tier_order' => $nextTier->order]);
+
+        SosAlertEvent::create([
+            'sos_alert_id' => $alert->id,
+            'type'         => 'escalated',
+            'actor_type'   => null,
+            'actor_id'     => null,
+            'payload'      => ['tier_order' => $nextTier->order],
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        NotifySosResponders::dispatch($alert->id, $nextTier->id);
+
+        return true;
+    }
+
     private function broadcastPayload(SosAlert $alert): array
     {
         return [
