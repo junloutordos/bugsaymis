@@ -277,33 +277,11 @@ class ClassRecordController extends Controller
     }
 
     /**
-     * Once a record has co-teachers, its subject_name becomes a synthesized
-     * "group — subject / subject / subject" label (e.g. "PEHM — PE / Health
-     * / Music") reflecting every subject currently attached, instead of just
-     * the creator's own subject name. subject_id itself is left pointing at
-     * the original creator's subject for legacy-field compatibility —
-     * anything reading ->subject_id/->subject directly still gets a valid
-     * single subject; category_label is untouched (it means something else:
-     * splitting ONE subject's records, e.g. "Ongoing" vs "Completed").
+     * @see ClassRecord::syncSharedDisplayLabel()
      */
     private function syncSharedDisplayLabel(ClassRecord $classRecord): void
     {
-        $classRecord->loadMissing('coTeachers.subject:id,name,subject_group');
-        $subjectIds = $classRecord->coTeachers->pluck('subject_id')->unique();
-        if ($subjectIds->count() < 2) {
-            return;
-        }
-
-        $group = $classRecord->coTeachers->first()->subject?->subject_group ?? 'Shared';
-        $names = $classRecord->coTeachers
-            ->sortBy('subject_id')
-            ->pluck('subject.name')
-            ->filter()
-            ->unique()
-            ->values()
-            ->implode(' / ');
-
-        $classRecord->update(['subject_name' => "{$group} — {$names}"]);
+        $classRecord->syncSharedDisplayLabel();
     }
 
     // ── GET /class-records ────────────────────────────────────────────────────

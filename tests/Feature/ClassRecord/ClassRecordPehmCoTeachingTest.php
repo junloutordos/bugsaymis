@@ -59,12 +59,12 @@ class ClassRecordPehmCoTeachingTest extends TestCase
         ]);
     }
 
-    private function makeSubject(string $name, string $code): Subject
+    private function makeSubject(string $name, string $code, int $gradeLevel = 8): Subject
     {
         return Subject::create([
             'school_year_id' => $this->sy->id, 'code' => $code, 'name' => $name,
             'credit_units' => 3, 'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture',
-            'grade_level' => 8, 'subject_group' => 'PEHM', 'sessions_per_week' => 2,
+            'grade_level' => $gradeLevel, 'subject_group' => 'PEHM', 'sessions_per_week' => 2,
             'minutes_per_session' => 60, 'is_active' => true,
         ]);
     }
@@ -713,6 +713,45 @@ class ClassRecordPehmCoTeachingTest extends TestCase
 
         $record->refresh();
         $this->assertStringContainsString('PEHM', $record->subject_name);
+    }
+
+    public function test_synced_shared_label_uses_concise_pehm_grade_number_not_subject_name(): void
+    {
+        $peTeacher = User::factory()->create();
+        $healthTeacher = User::factory()->create();
+        // grade_level 8 -> the PEHM group's own "2" (7=1, 8=2, 9=3, 10=4).
+        $peSubject = $this->makeSubject('Physical Education 2', 'PE2', 8);
+        $healthSubject = $this->makeSubject('Health 2', 'HEA2', 8);
+
+        $record = $this->makeRecord($peTeacher, $peSubject);
+
+        $this->actingAs($healthTeacher)
+            ->postJson(route('class-records.join', ['classRecord' => $record->id]), [
+                'subject_id' => $healthSubject->id,
+            ])
+            ->assertOk();
+
+        $record->refresh();
+        $this->assertSame('PEHM 2', $record->subject_name);
+    }
+
+    public function test_synced_shared_label_maps_grade_level_to_matching_pehm_number(): void
+    {
+        $peTeacher = User::factory()->create();
+        $musicTeacher = User::factory()->create();
+        $peSubject = $this->makeSubject('Physical Education 1', 'PE1G7', 7);
+        $musicSubject = $this->makeSubject('Music 1', 'MUS1G7', 7);
+
+        $record = $this->makeRecord($peTeacher, $peSubject);
+
+        $this->actingAs($musicTeacher)
+            ->postJson(route('class-records.join', ['classRecord' => $record->id]), [
+                'subject_id' => $musicSubject->id,
+            ])
+            ->assertOk();
+
+        $record->refresh();
+        $this->assertSame('PEHM 1', $record->subject_name);
     }
 
     public function test_non_admin_cannot_steal_another_teachers_already_claimed_subject_slot(): void

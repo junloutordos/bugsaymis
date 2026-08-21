@@ -110,6 +110,54 @@ class ClassRecord extends Model
     }
 
     /**
+     * Once a record has co-teachers, its subject_name becomes a synthesized
+     * label reflecting the whole group instead of just the creator's own
+     * subject name. For the PEHM group this is the concise "PEHM {n}" the
+     * school already uses elsewhere (grading-option templates "PEHM 1-3" /
+     * "PEHM 4 Final", subject names "Health 2"/"Music 2"/"PE 2") — grade 7
+     * is PEHM's own "1" through grade 10 as "4". Any other/future
+     * subject_group without that per-grade convention falls back to a
+     * verbose "group — subject / subject / subject" label. subject_id
+     * itself is left pointing at the original creator's subject for
+     * legacy-field compatibility — anything reading ->subject_id/->subject
+     * directly still gets a valid single subject; category_label is
+     * untouched (it means something else: splitting ONE subject's records,
+     * e.g. "Ongoing" vs "Completed"). No-ops (returns false) when fewer
+     * than 2 distinct subjects are attached.
+     */
+    public function syncSharedDisplayLabel(): bool
+    {
+        $this->loadMissing('coTeachers.subject:id,name,subject_group,grade_level');
+        $subjectIds = $this->coTeachers->pluck('subject_id')->unique();
+        if ($subjectIds->count() < 2) {
+            return false;
+        }
+
+        $primarySubject = $this->coTeachers->first()->subject;
+        $group = $primarySubject?->subject_group ?? 'Shared';
+        $gradeLevel = $primarySubject?->grade_level;
+
+        if ($group === 'PEHM' && $gradeLevel !== null) {
+            $label = 'PEHM '.($gradeLevel - 6);
+        } else {
+            $names = $this->coTeachers
+                ->sortBy('subject_id')
+                ->pluck('subject.name')
+                ->filter()
+                ->unique()
+                ->values()
+                ->implode(' / ');
+            $label = "{$group} — {$names}";
+        }
+
+        if ($label !== $this->subject_name) {
+            $this->update(['subject_name' => $label]);
+        }
+
+        return true;
+    }
+
+    /**
      * User IDs allowed to write to the given subject's portion of this
      * record. Falls back to the single teacher_id when there are no
      * co-teacher pivot rows (every existing/non-PEHM record) — the $subjectId
