@@ -29,12 +29,14 @@ class RolesSeeder extends Seeder
             ['name' => 'Guidance',           'description' => 'Guidance counselor with access to consultation records.'],
             ['name' => 'Student Discipline Officer', 'description' => 'Manages student discipline cases, offense catalog, and confiscated items.'],
             ['name' => 'Nurse',              'description' => 'Health personnel with access to clinic and health records.'],
+            ['name' => 'DRRM Coordinator',   'description' => 'Disaster Risk Reduction & Management Coordinator. Responds to SOS alerts and coordinates campus emergency response.'],
             ['name' => 'Librarian',          'description' => 'Manages library collections, borrowings, and attendance.'],
             ['name' => 'Records',            'description' => 'Records officer. Manages document tracking.'],
             ['name' => 'InformationOfficer', 'description' => 'Manages public information and communications.'],
             ['name' => 'PMT',                'description' => 'Performance Management Team member.'],
             ['name' => 'GSU Head',           'description' => 'General Services Unit Head.'],
             ['name' => 'Dorm Manager',       'description' => 'Manages dormitory operations.'],
+            ['name' => 'Security Guard',     'description' => 'Campus security personnel. Monitors gate attendance and responds to SOS alerts.'],
 
             // ── General Services ──────────────────────────────────────────────
             ['name' => 'FAD Chief',          'description' => 'Finance and Administrative Division Chief. Approves facility, work, and service requests.'],
