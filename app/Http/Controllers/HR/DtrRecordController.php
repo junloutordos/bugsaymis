@@ -869,20 +869,41 @@ class DtrRecordController extends Controller
             'date_to'   => $dateTo,
         ])->render();
 
+        $headerPath = public_path('images/report_header.jpeg');
+        $footerPath = public_path('images/report_footer.jpeg');
+
+        // mPDF renders SetHTMLHeader/Footer content within the margin-inset
+        // printable width, not the full page width (verified: with
+        // margin_left/right = 20, a "width:100%" header image renders at
+        // 170mm, not 210mm) — so margin_top/bottom must be sized from the
+        // image's aspect ratio at THAT width, same idea as
+        // WeeklyAssessmentTrackerController::renderPdf() (which can use the
+        // full page width directly only because it sets margin_left/right
+        // to 0 for a full-bleed banner). A fixed guess here previously left
+        // an ~11mm gap below the header and slightly under-sized the footer.
+        $marginLeft  = 20;
+        $marginRight = 20;
+        $printableWidthMm = 210 - $marginLeft - $marginRight;
+
+        $hInfo = @getimagesize($headerPath);
+        $fInfo = @getimagesize($footerPath);
+        $headerMm = $hInfo ? round(($hInfo[1] / $hInfo[0]) * $printableWidthMm) + 3 : 28;
+        $footerMm = $fInfo ? round(($fInfo[1] / $fInfo[0]) * $printableWidthMm) + 3 : 28;
+
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
             'format' => 'A4',
-            'margin_left' => 20,
-            'margin_right' => 20,
-            'margin_top' => 42,
-            'margin_bottom' => 24,
+            'margin_left' => $marginLeft,
+            'margin_right' => $marginRight,
+            'margin_top' => $headerMm,
+            'margin_bottom' => $footerMm,
             'margin_header' => 0,
             'margin_footer' => 0,
             'tempDir' => sys_get_temp_dir(),
         ]);
 
-        $mpdf->SetHTMLHeader('<img src="'.public_path('images/report_header.jpeg').'" style="width:100%;display:block;">');
-        $mpdf->SetHTMLFooter('<img src="'.public_path('images/report_footer.jpeg').'" style="width:100%;display:block;">');
+        $mpdf->SetHTMLHeader('<img src="'.$headerPath.'" style="width:100%;display:block;">');
+        $mpdf->SetHTMLFooter('<img src="'.$footerPath.'" style="width:100%;display:block;">');
         $mpdf->SetTitle("Hazard Report — {$dateFrom} to {$dateTo}");
         $mpdf->WriteHTML($html);
 
