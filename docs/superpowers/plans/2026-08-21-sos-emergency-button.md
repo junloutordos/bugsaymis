@@ -1185,7 +1185,7 @@ class SosAlertServiceTriggerTest extends TestCase
     public function test_trigger_is_blocked_when_geofence_reports_no_permission(): void
     {
         \App\Models\HR\OnlinePunchGeofenceZone::create([
-            'name' => 'Main Campus', 'latitude' => 8.9475, 'longitude' => 125.5406,
+            'label' => 'Main Campus', 'latitude' => 8.9475, 'longitude' => 125.5406,
             'radius_meters' => 200, 'is_active' => true,
         ]);
 
