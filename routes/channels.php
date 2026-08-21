@@ -38,3 +38,7 @@ Broadcast::channel('attendance', function ($user) {
 Broadcast::channel('biometric-feed', function ($user) {
     return $user->isSuperAdmin() || $user->hasAnyPermission(['hr.biometric.monitor', 'hr.biometric.manage']);
 });
+
+Broadcast::channel('sos-responders', function ($user) {
+    return $user->isSuperAdmin() || $user->hasPermission('sos.respond');
+});

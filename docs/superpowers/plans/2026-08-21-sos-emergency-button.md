@@ -825,6 +825,8 @@ git commit -m "feat(sos): add SOS configuration"
 
 - [ ] **Step 1: Write the failing test**
 
+**Environment note discovered mid-implementation:** `.env.testing` has no `BROADCAST_CONNECTION`, so tests default to the `null` broadcast driver, which trivially authorizes every channel — a naive test would pass regardless of what's actually registered. Worse, `Broadcast::channel()` registrations attach to whichever driver is default **at boot time**; overriding `config(['broadcasting.default' => 'pusher'])` from inside a test (after boot) creates a second, unregistered driver instance and silently no-ops. The fix is `putenv()` before `parent::setUp()` — Dotenv's default immutable loader won't override an already-set env var, so this makes `routes/channels.php` register against the real `pusher` driver from boot. HMAC auth signing is a local computation, so this needs no live Pusher/Soketi server.
+
 ```php
 <?php
 
@@ -840,11 +842,31 @@ class SosChannelAuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        putenv('BROADCAST_CONNECTION=pusher');
+        putenv('PUSHER_APP_KEY=test-key');
+        putenv('PUSHER_APP_SECRET=test-secret');
+        putenv('PUSHER_APP_ID=test-app-id');
+
+        parent::setUp();
+    }
+
+    protected function tearDown(): void
+    {
+        putenv('BROADCAST_CONNECTION');
+        putenv('PUSHER_APP_KEY');
+        putenv('PUSHER_APP_SECRET');
+        putenv('PUSHER_APP_ID');
+
+        parent::tearDown();
+    }
+
     public function test_user_with_sos_respond_permission_can_join_channel(): void
     {
         $permission = Permission::firstOrCreate(['name' => 'sos.respond'], ['module' => 'SOS', 'description' => 'x']);
         $role = Role::firstOrCreate(['name' => 'DRRM Coordinator']);
-        $role->permissions()->attach($permission->id);
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
         $user = User::factory()->create();
         $user->roles()->attach($role->id);
 
@@ -852,6 +874,7 @@ class SosChannelAuthTest extends TestCase
 
         $response = $this->postJson('/broadcasting/auth', [
             'channel_name' => 'private-sos-responders',
+            'socket_id' => '1234.5678',
         ]);
 
         $response->assertOk();
@@ -864,6 +887,7 @@ class SosChannelAuthTest extends TestCase
 
         $response = $this->postJson('/broadcasting/auth', [
             'channel_name' => 'private-sos-responders',
+            'socket_id' => '1234.5678',
         ]);
 
         $response->assertForbidden();
@@ -874,7 +898,7 @@ class SosChannelAuthTest extends TestCase
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan test tests/Feature/Sos/SosChannelAuthTest.php"`
-Expected: FAIL — channel not registered, first test 403s.
+Expected: FAIL — channel not registered, first test 403s (second test correctly passes even pre-registration, since with no channel matching, everyone gets 403).
 
 - [ ] **Step 3: Add the channel**
 
