@@ -417,7 +417,7 @@ class SosModelsTest extends TestCase
 
     public function test_escalation_tier_role_and_explicit_users(): void
     {
-        $role = Role::create(['name' => 'Security Guard']);
+        $role = Role::firstOrCreate(['name' => 'Security Guard']);
         $tier = SosEscalationTier::create([
             'alert_type'      => 'security',
             'order'           => 1,
@@ -843,7 +843,7 @@ class SosChannelAuthTest extends TestCase
     public function test_user_with_sos_respond_permission_can_join_channel(): void
     {
         $permission = Permission::firstOrCreate(['name' => 'sos.respond'], ['module' => 'SOS', 'description' => 'x']);
-        $role = Role::create(['name' => 'DRRM Coordinator']);
+        $role = Role::firstOrCreate(['name' => 'DRRM Coordinator']);
         $role->permissions()->attach($permission->id);
         $user = User::factory()->create();
         $user->roles()->attach($role->id);
@@ -1383,7 +1383,7 @@ class SosAlertServiceLifecycleTest extends TestCase
     public function test_repeat_false_alarms_notify_administrators(): void
     {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::create(['name' => 'Administrator'])->id);
+        $admin->roles()->attach(Role::firstOrCreate(['name' => 'Administrator'])->id);
         $triggerable = User::factory()->create();
         $responder = User::factory()->create();
 
@@ -1761,7 +1761,7 @@ class SosNotificationDispatchServiceTest extends TestCase
         Http::fake(['sms.test/*' => Http::response(['ok' => true], 200)]);
         Mail::fake();
 
-        $role = Role::create(['name' => 'Security Guard']);
+        $role = Role::firstOrCreate(['name' => 'Security Guard']);
         $roleUser = User::factory()->create(['email' => 'guard@crc.pshs.edu.ph']);
         $roleUser->roles()->attach($role->id);
         EmployeeProfile::create(['user_id' => $roleUser->id, 'mobile_number' => '09171234567']);
@@ -1800,7 +1800,7 @@ class SosNotificationDispatchServiceTest extends TestCase
 
     public function test_notify_tier_skips_sms_for_responder_without_mobile_number(): void
     {
-        $role = Role::create(['name' => 'Nurse']);
+        $role = Role::firstOrCreate(['name' => 'Nurse']);
         $user = User::factory()->create();
         $user->roles()->attach($role->id);
         EmployeeProfile::create(['user_id' => $user->id]); // no mobile_number
@@ -2456,7 +2456,7 @@ class SosAlertControllerTest extends TestCase
     private function responder(): User
     {
         $permission = Permission::firstOrCreate(['name' => 'sos.respond'], ['module' => 'SOS', 'description' => 'x']);
-        $role = Role::create(['name' => 'DRRM Coordinator']);
+        $role = Role::firstOrCreate(['name' => 'DRRM Coordinator']);
         $role->permissions()->attach($permission->id);
         $user = User::factory()->create();
         $user->roles()->attach($role->id);
@@ -2815,7 +2815,7 @@ class SosSettingsControllerTest extends TestCase
     private function admin(): User
     {
         $permission = Permission::firstOrCreate(['name' => 'sos.manage'], ['module' => 'SOS', 'description' => 'x']);
-        $role = Role::create(['name' => 'Administrator']);
+        $role = Role::firstOrCreate(['name' => 'Administrator']);
         $role->permissions()->attach($permission->id);
         $user = User::factory()->create();
         $user->roles()->attach($role->id);

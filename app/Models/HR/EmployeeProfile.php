@@ -36,6 +36,7 @@ class EmployeeProfile extends Model
         'blood_type',
         'emergency_contact_name',
         'emergency_contact_phone',
+        'mobile_number',
         'is_active',
     ];
 
