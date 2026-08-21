@@ -8,6 +8,7 @@ use App\Models\Sos\SosEscalationTier;
 use App\Models\Sos\SosExternalContact;
 use App\Models\Sos\SosNotificationLog;
 use App\Models\User;
+use App\Services\StudentAttendance\FcmService;
 use App\Services\StudentAttendance\SmsGateService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +17,53 @@ use Throwable;
 
 class SosNotificationDispatchService
 {
-    public function __construct(private readonly SmsGateService $sms) {}
+    public function __construct(
+        private readonly SmsGateService $sms,
+        private readonly FcmService $fcm,
+    ) {}
+
+    public function notifyEmergencyContact(SosAlert $alert): void
+    {
+        $triggerable = $alert->triggerable;
+
+        if ($triggerable instanceof User) {
+            $profile = $triggerable->employeeProfile;
+            if ($profile && $profile->emergency_contact_phone) {
+                $sent = $this->sms->send(
+                    $profile->emergency_contact_phone,
+                    "PSHS-CRC SOS Alert: {$triggerable->name} triggered an emergency alert on campus. Please contact the school immediately.",
+                );
+                $this->log($alert, 'sms', 'user_emergency_contact', null, $profile->emergency_contact_name, $sent);
+            }
+            return;
+        }
+
+        if ($triggerable instanceof \App\Models\Student) {
+            // Student has no `name` attribute — the legacy table only has
+            // firstname/lastname (see app/Models/Student.php, read-only/guarded).
+            $studentName = trim("{$triggerable->firstname} {$triggerable->lastname}") ?: 'Your child';
+
+            foreach ($triggerable->parentContacts as $parent) {
+                if ($parent->wantsPushNotification()) {
+                    $sent = $this->fcm->send(
+                        $parent->fcm_device_token,
+                        'Emergency SOS Alert',
+                        "{$studentName} triggered an SOS alert on campus.",
+                        ['type' => 'sos_alert', 'alert_id' => (string) $alert->id],
+                    );
+                    $this->log($alert, 'push', 'parent_contact', $parent->id, $parent->name, $sent);
+                }
+
+                if ($parent->notify_sms && ! empty($parent->mobile_phone)) {
+                    $sent = $this->sms->send(
+                        $parent->mobile_phone,
+                        "PSHS-CRC SOS Alert: {$studentName} triggered an emergency alert on campus.",
+                    );
+                    $this->log($alert, 'sms', 'parent_contact', $parent->id, $parent->name, $sent);
+                }
+            }
+        }
+    }
 
     public function notifyTier(SosAlert $alert, SosEscalationTier $tier): void
     {
