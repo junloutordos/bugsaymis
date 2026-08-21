@@ -12,6 +12,7 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\User;
+use App\Services\ClassRecord\WatPdfPaginator;
 use App\Services\ClassRecord\WatRuleService;
 use App\Services\FacultyLoading\AdvisoryScheduleScopeService;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
@@ -185,6 +186,26 @@ class WeeklyAssessmentTrackerController extends Controller
         $fInfo = @getimagesize($footerPath);
         $headerMm = $hInfo ? round(($hInfo[1] / $hInfo[0]) * 297) + 3 : 28;
         $footerMm = $fInfo ? round(($fInfo[1] / $fInfo[0]) * 297) + 3 : 28;
+
+        // Decide per-day rowspan chunk boundaries before the real render —
+        // mPDF can't split a rowspan cell across a page break, so this picks
+        // the split points itself (see WatPdfPaginator) instead of leaving
+        // mPDF to push a whole busy day onto the next page and blank out
+        // the remaining space on the current one. Margins here mirror
+        // .page-body's CSS padding (1mm 10mm 0) via real mPDF page margins
+        // instead — an open <div>'s CSS padding does NOT carry over to
+        // child tables written in later separate WriteHTML() calls
+        // (verified empirically), so native margins are the only way to
+        // get the measurement pass's usable width to match the real one.
+        $wat['days'] = app(WatPdfPaginator::class)->chunk($section, $wat, $extra['schoolYear'] ?? null, [
+            'format' => 'A4',
+            'orientation' => 'L',
+            'margin_left' => 10,
+            'margin_right' => 10,
+            'margin_top' => $headerMm + 1,
+            'margin_bottom' => $footerMm,
+            'tempDir' => sys_get_temp_dir(),
+        ]);
 
         $html = view('class-record.wat-pdf', array_merge(compact('section', 'wat'), $extra))->render();
 
