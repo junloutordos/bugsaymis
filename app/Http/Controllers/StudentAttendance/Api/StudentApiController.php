@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\StudentAttendance\ParentContact;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,11 +15,7 @@ class StudentApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->first();
-
-        if (! $parentContact) {
-            return response()->json(['data' => []]);
-        }
+        $parentContact = $request->user();
 
         $students = DB::table('student_parent_contact as spc')
             ->join('students as s', 's.id', '=', 'spc.student_id')
@@ -69,7 +64,7 @@ class StudentApiController extends Controller
             'relationship' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->firstOrFail();
+        $parentContact = $request->user();
 
         // Upsert the pivot row
         DB::table('student_parent_contact')->upsert(
@@ -100,7 +95,7 @@ class StudentApiController extends Controller
             return response()->json(['message' => 'Student not found.'], 404);
         }
 
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->firstOrFail();
+        $parentContact = $request->user();
 
         DB::table('student_parent_contact')
             ->where('student_id', $student->id)

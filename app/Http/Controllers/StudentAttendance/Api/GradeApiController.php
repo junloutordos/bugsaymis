@@ -5,7 +5,6 @@ namespace App\Http\Controllers\StudentAttendance\Api;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentAnnualGrade;
-use App\Models\StudentAttendance\ParentContact;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +19,7 @@ class GradeApiController extends Controller
      */
     public function show(Request $request, int $studentId): JsonResponse
     {
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->firstOrFail();
+        $parentContact = $request->user();
 
         $linked = DB::table('student_parent_contact')
             ->where('parent_contact_id', $parentContact->id)

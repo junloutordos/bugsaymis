@@ -59,6 +59,15 @@ class GoogleAuthController extends Controller
             ]);
         }
 
+        // Defense-in-depth: students/parents must only reach /student-portal
+        // and AtlasGo — never the main Atlas web app, even if a legacy
+        // users row still exists for them (pre-cleanup transition window).
+        if (in_array($user->account_type, ['student', 'parent'], true)) {
+            $this->securityLog('warning', 'Socialite login rejected: student/parent account_type', ['email' => $email, 'ip' => $ip]);
+            return redirect()->route('login')
+                ->with('error', 'Student and parent accounts must use the Student Portal or the AtlasGo app.');
+        }
+
         // Block inactive accounts
         if (isset($user->status) && $user->status !== 'active') {
             $this->securityLog('warning', 'Socialite login rejected: inactive account', ['email' => $email, 'ip' => $ip]);
@@ -105,6 +114,13 @@ class GoogleAuthController extends Controller
         if (! $user) {
             $this->securityLog('warning', 'Google login rejected: account not found', ['email' => $email, 'ip' => $ip]);
             return response()->json(['success' => false, 'message' => 'Account not found. Contact MIS administrator.'], 403);
+        }
+
+        // Defense-in-depth: students/parents must only reach /student-portal
+        // and AtlasGo — never the main Atlas web app.
+        if (in_array($user->account_type, ['student', 'parent'], true)) {
+            $this->securityLog('warning', 'Google login rejected: student/parent account_type', ['email' => $email, 'ip' => $ip]);
+            return response()->json(['success' => false, 'message' => 'Student and parent accounts must use the Student Portal or the AtlasGo app.'], 403);
         }
 
         if (isset($user->status) && $user->status !== 'active') {

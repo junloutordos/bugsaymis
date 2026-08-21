@@ -8,7 +8,6 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentAnnualGrade;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\StudentAttendance\StudentAttendanceLog;
-use App\Models\StudentMobileLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,13 +15,13 @@ use Illuminate\Support\Facades\DB;
 class StudentSelfController extends Controller
 {
     /**
-     * Resolve the student_id for the authenticated student user.
-     * Returns null if no link exists (account not fully set up).
+     * Resolve the student_id for the authenticated student.
+     * The Sanctum token is issued directly against the Student model, so
+     * $request->user() already IS the student — no users/mobile-link lookup.
      */
     private function resolveStudentId(Request $request): ?int
     {
-        $link = StudentMobileLink::where('user_id', $request->user()->id)->first();
-        return $link?->student_id;
+        return $request->user()?->id;
     }
 
     /**

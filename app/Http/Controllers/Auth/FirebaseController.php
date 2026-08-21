@@ -20,8 +20,15 @@ class FirebaseController extends Controller
 
         $user = User::firstOrCreate(
             ['email' => $email],
-            ['name' => $verifiedIdToken->claims()->get('name')]
+            ['name' => $verifiedIdToken->claims()->get('name'), 'account_type' => 'employee']
         );
+
+        // Defense-in-depth: students/parents must only reach /student-portal
+        // and AtlasGo — never the main Atlas web app, even if a legacy
+        // users row still exists for them (pre-cleanup transition window).
+        if (in_array($user->account_type, ['student', 'parent'], true)) {
+            return response()->json(['error' => 'Student and parent accounts must use the Student Portal or the AtlasGo app.'], 403);
+        }
 
         // Prevent inactive accounts from logging in via Firebase SSO
         if (isset($user->status) && $user->status !== 'active') {

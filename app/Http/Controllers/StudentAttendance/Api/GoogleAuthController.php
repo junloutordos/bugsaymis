@@ -3,19 +3,21 @@
 namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Role;
-use App\Models\StudentMobileLink;
-use App\Models\User;
+use App\Models\Student;
+use App\Services\StudentAttendance\StudentGoogleClientFactory;
 use App\Services\StudentAttendance\StudentGoogleLinkGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Google sign-in for students on the AtlasGo app — mirrors the
  * /student-portal Firebase flow: official @crc.pshs.edu.ph accounts only,
  * shared student_google_links table (link once, works on web + mobile).
+ *
+ * Students authenticate directly against the `students` table — no row is
+ * ever created in the main Atlas `users` table, so a student account can
+ * never sign in to Atlas proper (see Auth\GoogleAuthController's guard).
  *
  * The app sends the Google ID token; we verify it server-side against
  * Google's certs (audience = the Firebase web client ID the app requests
@@ -23,6 +25,10 @@ use Illuminate\Support\Str;
  */
 class GoogleAuthController extends Controller
 {
+    public function __construct(private StudentGoogleClientFactory $googleClientFactory)
+    {
+    }
+
     /**
      * POST /api/mobile/student/google-login
      */
@@ -142,7 +148,7 @@ class GoogleAuthController extends Controller
      */
     private function verifyIdToken(string $idToken): ?array
     {
-        $client = new \Google\Client(['client_id' => config('services.google.mobile_client_id')]);
+        $client = $this->googleClientFactory->make();
 
         try {
             $payload = $client->verifyIdToken($idToken);
@@ -154,48 +160,25 @@ class GoogleAuthController extends Controller
     }
 
     /**
-     * Find-or-create the app User for this student, sync the mobile link,
-     * and return the same response shape as the password login endpoint.
+     * Issue a Sanctum token directly against the Student model — no row is
+     * created or looked up in the main Atlas `users` table.
      */
     private function issueStudentSession(object $student, string $email, string $name, string $deviceName): JsonResponse
     {
-        $studentRole = Role::where('name', 'Student')->first();
+        $studentModel = Student::find($student->id);
 
-        $user = User::where('email', $email)->first();
-
-        if (! $user) {
-            $user = User::create([
-                'name'         => $name,
-                'email'        => $email,
-                'password'     => bcrypt(Str::random(40)),
-                'status'       => 'active',
-                'role_id'      => $studentRole?->id,
-                'account_type' => 'student',
-            ]);
-        } elseif ($studentRole && (string) $user->role_id !== (string) $studentRole->id) {
-            // Existing account (e.g. legacy OTP registration) — make sure it
-            // is recognized as a student by the mobile login role check.
-            $user->role_id = $studentRole->id;
-            $user->save();
-        }
-
-        if ($studentRole) {
-            $user->roles()->syncWithoutDetaching([$studentRole->id]);
-        }
-
-        StudentMobileLink::updateOrCreate(
-            ['user_id' => $user->id],
-            ['student_id' => $student->id]
-        );
-
-        $user->tokens()->where('name', $deviceName)->delete();
-        $token = $user->createToken($deviceName, ['mobile'])->plainTextToken;
+        $studentModel->tokens()->where('name', $deviceName)->delete();
+        $token = $studentModel->createToken($deviceName, ['mobile'])->plainTextToken;
 
         return response()->json([
             'token'      => $token,
             'role'       => 'student',
-            'user'       => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
-            'student_id' => $student->id,
+            'user'       => [
+                'id'    => $studentModel->id,
+                'name'  => trim("{$studentModel->firstname} {$studentModel->lastname}"),
+                'email' => $email,
+            ],
+            'student_id' => $studentModel->id,
         ]);
     }
 }

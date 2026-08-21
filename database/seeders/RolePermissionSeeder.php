@@ -421,9 +421,11 @@ class RolePermissionSeeder extends Seeder
         // Dedicated cross-cutting role for individually-assigned evaluation committee members
         $assign('Evaluation Committee', ['activities.evaluation_committee']);
 
-        // ── Student / Parent — very limited read-only ─────────────────────────
-        $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
-        $assign('Parent', ['library.view', 'messengerial.view', 'messengerial.create']);
+        // ── Student / Parent ────────────────────────────────────────────────
+        // No permission grants: students/parents never get a `users` row
+        // (they authenticate against `students`/`student_credentials` and
+        // `parent_contacts` respectively) and only ever reach /student-portal
+        // and the AtlasGo mobile API, never Atlas proper.
 
         // ── Class Records ─────────────────────────────────────────────────────
         $assign('CID Chief', ['class-records.view', 'class-records.manage', 'class-records.admin']);

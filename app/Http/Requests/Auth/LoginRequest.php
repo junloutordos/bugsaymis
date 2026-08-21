@@ -51,6 +51,15 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // Defense-in-depth: students/parents must only reach /student-portal
+        // and AtlasGo — never the main Atlas web app, even if a legacy
+        // users row still exists for them (pre-cleanup transition window).
+        if ($user && in_array($user->account_type, ['student', 'parent'], true)) {
+            throw ValidationException::withMessages([
+                'email' => 'Student and parent accounts must use the Student Portal or the AtlasGo app.',
+            ]);
+        }
+
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 

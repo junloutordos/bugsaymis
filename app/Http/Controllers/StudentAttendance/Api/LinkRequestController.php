@@ -22,11 +22,7 @@ class LinkRequestController extends Controller
             'relationship' => ['sometimes', 'string', 'in:mother,father,guardian'],
         ]);
 
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->first();
-
-        if (! $parentContact) {
-            return response()->json(['message' => 'Parent account not found.'], 404);
-        }
+        $parentContact = $request->user();
 
         // Find student internally — NEVER return student info to the app
         $student = Student::where('pisaysystemID', $validated['student_id'])->first();
@@ -71,11 +67,7 @@ class LinkRequestController extends Controller
     /** GET /api/mobile/link-requests */
     public function index(Request $request): JsonResponse
     {
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->first();
-
-        if (! $parentContact) {
-            return response()->json(['data' => []]);
-        }
+        $parentContact = $request->user();
 
         $requests = StudentLinkRequest::where('parent_contact_id', $parentContact->id)
             ->where('status', 'pending')
@@ -98,7 +90,7 @@ class LinkRequestController extends Controller
     /** DELETE /api/mobile/link-requests/{id} */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->first();
+        $parentContact = $request->user();
 
         $linkRequest = StudentLinkRequest::where('id', $id)
             ->where('parent_contact_id', $parentContact?->id)

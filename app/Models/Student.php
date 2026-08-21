@@ -7,9 +7,16 @@ use App\Models\StudentAttendance\StudentAttendanceLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Sanctum\HasApiTokens;
 
 class Student extends Model
 {
+    // AtlasGo issues Sanctum tokens directly against this model (polymorphic
+    // tokenable — no write to the `students` table itself, so the read-only
+    // convention below is preserved). This is what lets AtlasGo authenticate
+    // students without ever creating a row in the main Atlas `users` table.
+    use HasApiTokens;
+
     protected $table = 'students';
 
     // Legacy table has no updated_at

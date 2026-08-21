@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\StudentAttendance\ParentContact;
 use App\Models\StudentAttendance\StudentAttendanceLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,7 +23,7 @@ class AttendanceApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->firstOrFail();
+        $parentContact = $request->user();
 
         // IDs of students linked to this parent
         $linkedStudentIds = DB::table('student_parent_contact')
@@ -98,7 +97,7 @@ class AttendanceApiController extends Controller
      */
     public function today(Request $request, int $studentId): JsonResponse
     {
-        $parentContact = ParentContact::where('user_id', $request->user()->id)->firstOrFail();
+        $parentContact = $request->user();
 
         // Verify this parent is linked to the requested student
         $linked = DB::table('student_parent_contact')

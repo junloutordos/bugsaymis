@@ -5,24 +5,28 @@ namespace App\Http\Controllers\StudentAttendance\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\MobileEmailVerificationMail;
 use App\Models\MobileEmailOtp;
-use App\Models\Role;
-use App\Models\Student;
-use App\Models\StudentMobileLink;
-use App\Models\User;
+use App\Models\StudentAttendance\ParentContact;
+use App\Models\StudentCredential;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 
+/**
+ * AtlasGo email+password registration. Neither path creates a row in the
+ * main Atlas `users` table — parents are persisted to `parent_contacts`,
+ * students to `student_credentials` (the legacy `students` table is
+ * bulk re-imported and treated as read-only).
+ */
 class RegisterController extends Controller
 {
-    /** POST /api/mobile/register */
+    /** POST /api/mobile/register (parent) */
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'name'                  => ['required', 'string', 'max:200'],
-            'email'                 => ['required', 'email', 'unique:users,email'],
+            'email'                 => ['required', 'email', 'unique:parent_contacts,email'],
             'password'              => ['required', 'string', 'min:8', 'confirmed'],
             'password_confirmation' => ['required'],
         ]);
@@ -38,18 +42,12 @@ class RegisterController extends Controller
             ], 422);
         }
 
-        $parentRole = Role::where('name', 'Parent')->firstOrFail();
-
-        $user = User::create([
-            'name'         => $validated['name'],
-            'email'        => $validated['email'],
-            'password'     => Hash::make($validated['password']),
-            'status'       => 'pending_verification',
-            'role_id'      => (string) $parentRole->id,
-            'account_type' => 'parent',
+        ParentContact::create([
+            'name'     => $validated['name'],
+            'email'    => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'status'   => 'pending_verification',
         ]);
-
-        $user->roles()->syncWithoutDetaching([$parentRole->id]);
 
         $this->sendOtp($validated['email'], $validated['name']);
 
@@ -75,33 +73,29 @@ class RegisterController extends Controller
             return response()->json(['message' => 'Invalid or expired verification code.'], 422);
         }
 
-        $user = User::where('email', $validated['email'])->first();
+        $record->delete();
 
-        if (! $user) {
+        $studentCredential = StudentCredential::where('email', $validated['email'])->first();
+
+        if ($studentCredential) {
+            $studentCredential->update([
+                'status'            => 'active',
+                'email_verified_at' => now(),
+            ]);
+
+            return response()->json(['message' => 'Email verified. You can now sign in.']);
+        }
+
+        $parentContact = ParentContact::where('email', $validated['email'])->first();
+
+        if (! $parentContact) {
             return response()->json(['message' => 'Account not found.'], 404);
         }
 
-        $user->update([
+        $parentContact->update([
             'status'            => 'active',
             'email_verified_at' => now(),
         ]);
-
-        $record->delete();
-
-        // If this is a student account, create the mobile link now
-        $studentRole = Role::where('name', 'Student')->first();
-        if ($studentRole && (string) $user->role_id === (string) $studentRole->id) {
-            $student = DB::table('students')
-                ->where('student_email', $validated['email'])
-                ->first(['id']);
-
-            if ($student) {
-                StudentMobileLink::firstOrCreate(
-                    ['student_id' => $student->id],
-                    ['user_id' => $user->id]
-                );
-            }
-        }
 
         return response()->json(['message' => 'Email verified. You can now sign in.']);
     }
@@ -127,23 +121,19 @@ class RegisterController extends Controller
         }
 
         // Prevent duplicate accounts — same generic response to prevent enumeration
-        if (User::where('email', $validated['student_email'])->exists()) {
+        if (StudentCredential::where('student_id', $student->id)->exists()
+            || StudentCredential::where('email', $validated['student_email'])->exists()) {
             return response()->json(['message' => $genericMessage]);
         }
 
-        $studentRole = Role::where('name', 'Student')->firstOrFail();
         $name = trim("{$student->firstname} {$student->lastname}");
 
-        $user = User::create([
-            'name'         => $name,
-            'email'        => $validated['student_email'],
-            'password'     => Hash::make($validated['password']),
-            'status'       => 'pending_verification',
-            'role_id'      => (string) $studentRole->id,
-            'account_type' => 'student',
+        StudentCredential::create([
+            'student_id' => $student->id,
+            'email'      => $validated['student_email'],
+            'password'   => Hash::make($validated['password']),
+            'status'     => 'pending_verification',
         ]);
-
-        $user->roles()->syncWithoutDetaching([$studentRole->id]);
 
         $this->sendOtp($validated['student_email'], $name);
 
@@ -157,13 +147,21 @@ class RegisterController extends Controller
     {
         $validated = $request->validate(['email' => ['required', 'email']]);
 
-        $user = User::where('email', $validated['email'])
+        $studentCredential = StudentCredential::where('email', $validated['email'])
             ->where('status', 'pending_verification')
             ->first();
 
-        // Same response whether user exists or not (prevent enumeration)
-        if ($user) {
-            $this->sendOtp($validated['email'], $user->name);
+        $parentContact = $studentCredential ? null : ParentContact::where('email', $validated['email'])
+            ->where('status', 'pending_verification')
+            ->first();
+
+        $name = $studentCredential
+            ? DB::table('students')->where('id', $studentCredential->student_id)->value('firstname')
+            : $parentContact?->name;
+
+        // Same response whether an account exists or not (prevent enumeration)
+        if ($studentCredential || $parentContact) {
+            $this->sendOtp($validated['email'], (string) $name);
         }
 
         return response()->json([

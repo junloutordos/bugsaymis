@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\StudentAttendance;
 
-use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -15,7 +14,6 @@ class MobileParentRegistrationTest extends TestCase
     public function test_parent_registration_succeeds_for_a_non_student_email(): void
     {
         Mail::fake();
-        Role::create(['name' => 'Parent']);
 
         $this->postJson(route('mobile.register'), [
             'name'                  => 'Maria Santos',
@@ -24,16 +22,19 @@ class MobileParentRegistrationTest extends TestCase
             'password_confirmation' => 'password123',
         ])->assertOk();
 
-        $this->assertDatabaseHas('users', [
-            'email'        => 'maria.santos.parent@gmail.com',
-            'account_type' => 'parent',
+        $this->assertDatabaseHas('parent_contacts', [
+            'email'  => 'maria.santos.parent@gmail.com',
+            'status' => 'pending_verification',
+        ]);
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'maria.santos.parent@gmail.com',
         ]);
     }
 
     public function test_parent_registration_rejected_when_email_belongs_to_a_student(): void
     {
         Mail::fake();
-        Role::create(['name' => 'Parent']);
 
         DB::table('students')->insert([
             'lastname'      => 'Aguilera',
@@ -53,6 +54,10 @@ class MobileParentRegistrationTest extends TestCase
             ->assertJsonValidationErrors('email');
 
         $this->assertDatabaseMissing('users', [
+            'email' => 'naguilera2029@crc.pshs.edu.ph',
+        ]);
+
+        $this->assertDatabaseMissing('parent_contacts', [
             'email' => 'naguilera2029@crc.pshs.edu.ph',
         ]);
     }

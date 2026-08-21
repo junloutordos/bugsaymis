@@ -7,15 +7,25 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class ParentContact extends Model
 {
+    // AtlasGo authenticates parents directly against this model and issues
+    // Sanctum tokens against it — parents no longer need a row in the main
+    // Atlas `users` table. `user_id` is kept only for legacy/front-desk rows.
+    use HasApiTokens, Notifiable;
+
     protected $table = 'parent_contacts';
 
     protected $fillable = [
         'user_id',
         'name',
         'email',
+        'password',
+        'status',
+        'email_verified_at',
         'mobile_phone',
         'fcm_device_token',
         'notify_email',
@@ -23,10 +33,16 @@ class ParentContact extends Model
         'notify_sms',
     ];
 
+    protected $hidden = [
+        'password',
+    ];
+
     protected $casts = [
-        'notify_email' => 'boolean',
-        'notify_push'  => 'boolean',
-        'notify_sms'   => 'boolean',
+        'notify_email'      => 'boolean',
+        'notify_push'       => 'boolean',
+        'notify_sms'        => 'boolean',
+        'password'          => 'hashed',
+        'email_verified_at' => 'datetime',
     ];
 
     // ── Relations ──────────────────────────────────────────────────────────────

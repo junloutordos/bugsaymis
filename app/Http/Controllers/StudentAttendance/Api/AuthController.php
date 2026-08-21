@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Role;
-use App\Models\StudentMobileLink;
+use App\Models\Student;
 use App\Models\StudentAttendance\ParentContact;
-use App\Models\User;
+use App\Models\StudentCredential;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -17,9 +16,9 @@ class AuthController extends Controller
     /**
      * POST /api/mobile/login
      *
-     * Authenticate a system user and return a Sanctum token.
-     * The parent app logs in using their school-system email + password.
-     * On first login, a ParentContact record is auto-created/linked to their User.
+     * Authenticate a student or parent by email + password and return a
+     * Sanctum token issued directly against their own model (StudentCredential
+     * → Student, or ParentContact) — no row in the main Atlas `users` table.
      */
     public function login(Request $request): JsonResponse
     {
@@ -29,60 +28,87 @@ class AuthController extends Controller
             'device_name' => ['required', 'string', 'max:100'],
         ]);
 
-        $user = User::where('email', $validated['email'])->first();
+        $studentCredential = StudentCredential::where('email', $validated['email'])->first();
 
-        if (! $user || ! Hash::check($validated['password'], $user->password)) {
+        if ($studentCredential) {
+            return $this->loginStudent($studentCredential, $validated['password'], $validated['device_name']);
+        }
+
+        $parentContact = ParentContact::where('email', $validated['email'])->first();
+
+        if ($parentContact && $parentContact->password) {
+            return $this->loginParent($parentContact, $validated['password'], $validated['device_name']);
+        }
+
+        throw ValidationException::withMessages([
+            'email' => ['The provided credentials are incorrect.'],
+        ]);
+    }
+
+    private function loginStudent(StudentCredential $credential, string $password, string $deviceName): JsonResponse
+    {
+        if (! Hash::check($password, $credential->password)) {
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
 
-        if (isset($user->status) && $user->status === 'pending_verification') {
+        if ($credential->status === 'pending_verification') {
             return response()->json([
-                'message'              => 'Please verify your email before signing in.',
+                'message'               => 'Please verify your email before signing in.',
                 'requires_verification' => true,
-                'email'                => $user->email,
+                'email'                 => $credential->email,
             ], 403);
         }
 
-        if (isset($user->status) && $user->status === 'inactive') {
+        if ($credential->status === 'inactive') {
             return response()->json(['message' => 'Account is inactive.'], 403);
         }
 
-        // Revoke all existing tokens for this device to prevent accumulation
-        $user->tokens()->where('name', $validated['device_name'])->delete();
-        $token = $user->createToken($validated['device_name'], ['mobile'])->plainTextToken;
+        $student = Student::find($credential->student_id);
 
-        // Detect student vs parent role
-        $studentRole = Role::where('name', 'Student')->first();
-        $isStudent   = $studentRole && (string) $user->role_id === (string) $studentRole->id;
+        if (! $student) {
+            return response()->json(['message' => 'Student record not found.'], 404);
+        }
 
-        if ($isStudent) {
-            $link = StudentMobileLink::where('user_id', $user->id)->first();
+        $student->tokens()->where('name', $deviceName)->delete();
+        $token = $student->createToken($deviceName, ['mobile'])->plainTextToken;
 
-            return response()->json([
-                'token'      => $token,
-                'role'       => 'student',
-                'user'       => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
-                'student_id' => $link?->student_id,
+        return response()->json([
+            'token'      => $token,
+            'role'       => 'student',
+            'user'       => ['id' => $student->id, 'name' => $student->full_name, 'email' => $credential->email],
+            'student_id' => $student->id,
+        ]);
+    }
+
+    private function loginParent(ParentContact $parentContact, string $password, string $deviceName): JsonResponse
+    {
+        if (! Hash::check($password, $parentContact->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials are incorrect.'],
             ]);
         }
 
-        // Parent path — auto-create or retrieve parent contact
-        $parentContact = ParentContact::firstOrCreate(
-            ['user_id' => $user->id],
-            [
-                'name'         => $user->name,
-                'email'        => $user->email,
-                'notify_email' => true,
-                'notify_push'  => true,
-            ]
-        );
+        if ($parentContact->status === 'pending_verification') {
+            return response()->json([
+                'message'               => 'Please verify your email before signing in.',
+                'requires_verification' => true,
+                'email'                 => $parentContact->email,
+            ], 403);
+        }
+
+        if ($parentContact->status === 'inactive') {
+            return response()->json(['message' => 'Account is inactive.'], 403);
+        }
+
+        $parentContact->tokens()->where('name', $deviceName)->delete();
+        $token = $parentContact->createToken($deviceName, ['mobile'])->plainTextToken;
 
         return response()->json([
             'token'          => $token,
             'role'           => 'parent',
-            'user'           => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
+            'user'           => ['id' => $parentContact->id, 'name' => $parentContact->name, 'email' => $parentContact->email],
             'parent_contact' => ['id' => $parentContact->id],
         ]);
     }
@@ -93,7 +119,7 @@ class AuthController extends Controller
      */
     public function getNotificationPreferences(Request $request): JsonResponse
     {
-        $contact = ParentContact::where('user_id', $request->user()->id)->first();
+        $contact = $request->user();
 
         return response()->json([
             'notify_push'  => (bool) ($contact?->notify_push ?? true),
@@ -112,8 +138,7 @@ class AuthController extends Controller
             'notify_email' => ['required', 'boolean'],
         ]);
 
-        ParentContact::where('user_id', $request->user()->id)
-            ->update($validated);
+        $request->user()->update($validated);
 
         return response()->json(['message' => 'Preferences updated.']);
     }
@@ -132,7 +157,8 @@ class AuthController extends Controller
     /**
      * PUT /api/mobile/fcm-token
      * Called by the Flutter app on startup or when FCM token refreshes.
-     * Updates both the User's linked ParentContact record.
+     * Updates the authenticated parent's FCM token. No-op for students
+     * (students don't currently receive push notifications).
      */
     public function updateFcmToken(Request $request): JsonResponse
     {
@@ -142,10 +168,12 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        ParentContact::where('user_id', $user->id)->update([
-            'fcm_device_token' => $validated['fcm_token'],
-            'notify_push'      => true,
-        ]);
+        if ($user instanceof ParentContact) {
+            $user->update([
+                'fcm_device_token' => $validated['fcm_token'],
+                'notify_push'      => true,
+            ]);
+        }
 
         return response()->json(['message' => 'FCM token updated.']);
     }

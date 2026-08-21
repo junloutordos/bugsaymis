@@ -5,7 +5,6 @@ namespace App\Http\Controllers\StudentAttendance\Api;
 use App\Http\Controllers\Controller;
 use App\Models\LostFound\LostFoundItem;
 use App\Models\Student;
-use App\Models\StudentMobileLink;
 use App\Services\StudentClearance\StudentClearancePdfService;
 use App\Services\StudentClearance\StudentClearanceService;
 use App\Services\StudentPortal\GradeLevel;
@@ -23,8 +22,8 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  * Student-portal features (guidance forms, medical records, RH services,
  * clearance) exposed to the AtlasGo mobile app. Mirrors the web
  * StudentPortal controllers via the shared App\Services\StudentPortal
- * services; the student is resolved from the Sanctum user's mobile link
- * instead of the web portal session.
+ * services; the Sanctum token is issued directly against the Student
+ * model, so the authenticated user IS the student row.
  */
 class StudentPortalApiController extends Controller
 {
@@ -33,13 +32,13 @@ class StudentPortalApiController extends Controller
      */
     private function resolveStudent(Request $request): ?object
     {
-        $link = StudentMobileLink::where('user_id', $request->user()->id)->first();
+        $studentId = $request->user()?->id;
 
-        if (! $link) {
+        if (! $studentId) {
             return null;
         }
 
-        return DB::table('students')->where('id', $link->student_id)->first();
+        return DB::table('students')->where('id', $studentId)->first();
     }
 
     private function notLinked(): JsonResponse
