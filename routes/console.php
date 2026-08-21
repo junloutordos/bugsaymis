@@ -66,5 +66,8 @@ Schedule::command('class-record:generate-ila-dates')->dailyAt('05:30')->withoutO
 //    abandoned request rotates its one-time password promptly) ─────────────
 Schedule::command('atlas-sentinel:expire-remote-help')->everyMinute()->withoutOverlapping();
 
+// ── SOS: advance alerts past their current tier's timeout ──────────────────
+Schedule::command('sos:process-escalations')->everyMinute()->withoutOverlapping();
+
 // NOTE: no pulse:trim schedule — the command does not exist. Pulse trims old
 // entries itself from the pulse:work daemon (per pulse.storage.trim.keep).
