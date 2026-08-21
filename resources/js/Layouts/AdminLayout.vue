@@ -21,6 +21,7 @@ import SignatureSetupModal from '@/Components/Layout/SignatureSetupModal.vue';
 import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
 import AppLoadingOverlay from '@/Components/AppLoadingOverlay.vue'
+import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
 import { menuItems } from './navigation.js';
 
@@ -774,6 +775,8 @@ watch(() => page.url, async () => {
   <SessionExpiredOverlay :show="sessionExpired" />
 
   <AppLoadingOverlay />
+
+  <SosFloatingButton trigger-route="sos.trigger" />
 
 </template>
 
