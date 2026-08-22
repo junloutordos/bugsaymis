@@ -1,7 +1,7 @@
 # AtlasGo Premium UI/UX Redesign (Phase B2) — Full-App Visual System, Hero Card, SOS Live Status
 
 **Date:** 2026-08-22
-**Status:** Approved (design), pending implementation plan
+**Status:** Phase 1 SHIPPED (see [[project_atlasgo_premium_redesign]] — design tokens, Hero Card on Home/Student Dashboard, SOS live status, Auth screens, `RadialProgressRing`/`TrendChart`). Phase 2 + Phase 3 scope revised below and approved 2026-08-22 (later session) — combined into one implementation pass per user decision, rather than sequenced. Pending implementation plan for the combined Phase 2+3 scope.
 
 ## Problem
 
@@ -25,13 +25,15 @@ Separately, two gaps surfaced once the SOS trigger flow existed:
 
 ## Scope
 
-Three phases, each independently spec'd-enough to build and Simulator-verify before moving to the next:
+Three phases. Phase 1 shipped as its own set of sessions (see Status above — the work was actually done incrementally as "Phase 1a", "reference-driven visual refresh", and "auth + hero refresh", together covering everything described as Phase 1 here). Phases 2 and 3 were re-scoped and approved together in a later 2026-08-22 session, per the user's explicit choice to build them as one combined pass rather than sequenced:
 
-1. **Phase 1 — System + hero screens.** Token extensions (bold/vibrant gradients, color-blocking, illustration-style empty states), new animation primitives, Hero Card on Home + Student Dashboard, and the SOS live-status + end-SOS feature (backend + Flutter). Applied to: Auth (login/register), Home, Student Dashboard, Portal dashboard, SOS.
-2. **Phase 2 — Daily-use screens.** Same tokens/primitives applied to Grades, Schedule, Attendance, Notifications, Profile (incl. the three repurposed-`AppHeader` screens: Services, Notification Preferences, Children).
-3. **Phase 3 — Deep/form screens.** Portal sub-forms (leave passes, medical, RH application, clearance, lost & found).
+1. **Phase 1 — System + hero screens. SHIPPED.** Token extensions (bold/vibrant gradients, color-blocking), new animation primitives (`Pressable`, `StaggeredList` — built but not yet wired up outside Phase 1's own screens), Hero Card on Home + Student Dashboard, `RadialProgressRing`/`TrendChart` data-viz, and the SOS live-status + end-SOS feature (backend + Flutter). Applied to: Auth (Login/Register), Home, Student Dashboard, Student Attendance, Student Grades, Portal dashboard, SOS.
+2. **Phase 2 — Subject-dashboard + settings screens.** Same tokens/primitives applied to: parent-side `Attendance`, parent-side `Grades`, `Schedule` + `Student Schedule`, `Children`, `Profile` (all get `HeroHeader` where there's a real subject+stat — `Schedule`/`Children` carry identity/count only, no invented chart), plus `Notification Preferences` and `Student ID` (settings-tier — header/card/spacing/motion tokens only, no invented visualization; `Student ID` was missed by the original Phase 2/3 split and is added here).
+3. **Phase 3 — Portal action/form + auth-utility screens.** `Services` hub, `Clearance`, `Leave Passes`, `RH Application`, `Forms Overview`, `Lost & Found`, `Profile Section Form`, `Medical Section Form` (header/card motion + `Pressable` on rows + `StaggeredList` on lists; `HeroHeader` only where a real subject/progress stat exists, e.g. Clearance). Also: `Verify Email`, `Student Link`, `Link Child` — missed by the original spec, added here; these match the Login/Register auth-arc pattern (`AppGradients.hero` + `kFormShadow`), not `HeroHeader`, since they're pre-nav-shell screens.
 
-This document covers the full token/primitive system (used by all three phases) and the Phase 1 feature work in detail. Phases 2 and 3 are mechanical reapplications of the same system to more screens — each gets its own short implementation plan when picked up, not a fresh design spec.
+Also in this pass: the two small Phase-1 loose ends found while planning Phase 2/3 — `register_screen.dart`'s top arc still uses the older `AppGradients.authDecoration` instead of `AppGradients.hero` (so Register visually breaks from Login), and Login has no footer. Since Verify Email/Student Link/Link Child are being brought onto the same auth-arc pattern in this same pass, all five auth-family screens (Login, Register, Verify Email, Student Link, Link Child) get `AppGradients.hero` uniformly, and Login gets a small centered footer caption: "AtlasGo is the Mobile app of Philippine Science High School – Caraga Region Campus in Butuan City" (`AppTextStyles.caption`).
+
+This document covers the full token/primitive system (used by all three phases) and the Phase 1 feature work in detail. Phase 2 and Phase 3 are mechanical reapplications of the same system to more screens, built together as one implementation pass — each screen still verified individually via Simulator click-through, batched by archetype (4 checkpoints: subject-dashboards, settings, portal-forms, auth-utility) rather than one signoff per screen.
 
 ## Key architectural decisions
 
@@ -96,9 +98,9 @@ No new tables, no new columns, no destructive changes. Two new routes (additive)
 ### Design system (all three phases)
 - Per-feature gradients, bolder color-blocked cards/chips, SVG illustration empty states.
 - `AppPageTransition` (app-wide), `StaggeredList`, `Pressable`, refreshed pull-to-refresh + shimmer shapes.
-- Phase 1: Auth, Home, Student Dashboard, Portal dashboard, SOS.
-- Phase 2: Grades, Schedule, Attendance, Notifications, Profile (+ Services/Notification-Preferences/Children header restyle).
-- Phase 3: Portal sub-forms (leave passes, medical, RH application, clearance, lost & found).
+- **Phase 1 (SHIPPED):** Auth (Login/Register), Home, Student Dashboard, Student Attendance, Student Grades, Portal dashboard, SOS.
+- **Phase 2:** parent-side Attendance, parent-side Grades, Schedule, Student Schedule, Children, Profile, Notification Preferences, Student ID.
+- **Phase 3:** Services, Clearance, Leave Passes, RH Application, Forms Overview, Lost & Found, Profile Section Form, Medical Section Form, Verify Email, Student Link, Link Child. Plus the Phase-1 gradient/footer cleanup described in Scope (Register → `AppGradients.hero`, Login footer).
 
 ## Data flow summary
 
@@ -112,4 +114,4 @@ No new tables, no new columns, no destructive changes. Two new routes (additive)
 
 ## Rollout
 
-Phase 1 (system + hero screens + SOS live status) ships first, Simulator-verified, before Phase 2 and Phase 3 are scoped into their own short plans. Matches the Foundation Redesign's own phased/verified pattern rather than one large plan across all ~35 screens.
+Phase 1 (system + hero screens + SOS live status) shipped first, Simulator-verified. Phase 2 and Phase 3 are built together as one implementation pass (user's explicit choice over further sequencing), still verified in 4 archetype-batched Simulator checkpoints rather than per-screen, before merging. Distribution (APK/IPA rebuild) is explicitly out of scope — same standing pattern as every prior phase; Flutter changes land on `bugsaymis-mobile` `main` only.
