@@ -157,8 +157,10 @@ class AuthController extends Controller
     /**
      * PUT /api/mobile/fcm-token
      * Called by the Flutter app on startup or when FCM token refreshes.
-     * Updates the authenticated parent's FCM token. No-op for students
-     * (students don't currently receive push notifications).
+     * Updates the authenticated recipient's FCM token — a parent updates
+     * their own row directly; a student's token lives on their
+     * `student_credentials` row (the `students` table itself is legacy/
+     * read-only and never gets app-owned columns).
      */
     public function updateFcmToken(Request $request): JsonResponse
     {
@@ -173,6 +175,8 @@ class AuthController extends Controller
                 'fcm_device_token' => $validated['fcm_token'],
                 'notify_push'      => true,
             ]);
+        } elseif ($user instanceof Student) {
+            $user->credential?->update(['fcm_device_token' => $validated['fcm_token']]);
         }
 
         return response()->json(['message' => 'FCM token updated.']);
