@@ -3,8 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\Administration\Announcement;
-use App\Models\User;
+use App\Services\NoticeAudienceResolver;
 use App\Services\NotificationService;
+use App\Services\StudentAttendance\FcmService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -16,18 +17,15 @@ class NotifyAnnouncementJob implements ShouldQueue
 
     public int $timeout = 600;
 
-    // Single attempt — a retry would double-notify every targeted user.
+    // Single attempt — a retry would double-notify every targeted recipient.
     public int $tries = 1;
 
-    // Primitive ID, not the model (see ProcessIssuanceRelease).
     public function __construct(public int $announcementId)
     {
-        // Loops over every targeted user — keep off 'default' so it
-        // never blocks fast single-unit jobs.
         $this->onQueue('bulk');
     }
 
-    public function handle(): void
+    public function handle(NoticeAudienceResolver $resolver, FcmService $fcm): void
     {
         $announcement = Announcement::find($this->announcementId);
 
@@ -38,9 +36,16 @@ class NotifyAnnouncementJob implements ShouldQueue
             return;
         }
 
-        $users = $announcement->audience === 'all'
-            ? User::employees()->where('status', '<>', 'inactive')->get()
-            : $announcement->targets()->where('status', '<>', 'inactive')->get();
+        if ($announcement->audience === 'specific') {
+            $users = $announcement->targets()->where('status', '<>', 'inactive')->get();
+            $students = collect();
+            $parents = collect();
+        } else {
+            $resolved = $resolver->resolve($announcement->audience);
+            $users = $resolved['users'];
+            $students = $resolved['students'];
+            $parents = $resolved['parents'];
+        }
 
         $sent = 0;
         $failed = 0;
@@ -61,6 +66,39 @@ class NotifyAnnouncementJob implements ShouldQueue
                     'announcement_id' => $announcement->id,
                     'user_id'         => $user->id,
                     'error'           => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $pushData = ['type' => 'announcement', 'announcement_id' => (string) $announcement->id];
+
+        foreach ($students as $student) {
+            $token = $student->credential?->fcm_device_token;
+            if (! $token) {
+                continue;
+            }
+            try {
+                $fcm->send($token, 'New Announcement', $announcement->title, $pushData);
+                $sent++;
+            } catch (\Throwable $e) {
+                $failed++;
+                logger()->warning('NotifyAnnouncementJob: student push failed', [
+                    'announcement_id' => $announcement->id, 'student_id' => $student->id, 'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        foreach ($parents as $parent) {
+            if (! $parent->wantsPushNotification()) {
+                continue;
+            }
+            try {
+                $fcm->send($parent->fcm_device_token, 'New Announcement', $announcement->title, $pushData);
+                $sent++;
+            } catch (\Throwable $e) {
+                $failed++;
+                logger()->warning('NotifyAnnouncementJob: parent push failed', [
+                    'announcement_id' => $announcement->id, 'parent_contact_id' => $parent->id, 'error' => $e->getMessage(),
                 ]);
             }
         }

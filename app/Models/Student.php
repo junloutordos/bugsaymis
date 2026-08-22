@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Laravel\Sanctum\HasApiTokens;
 
 class Student extends Model implements AuthenticatableContract
@@ -51,6 +52,11 @@ class Student extends Model implements AuthenticatableContract
             'student_id',
             'parent_contact_id'
         )->withPivot('relationship');
+    }
+
+    public function credential(): HasOne
+    {
+        return $this->hasOne(StudentCredential::class, 'student_id');
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

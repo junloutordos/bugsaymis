@@ -371,6 +371,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
+    // ── Notices (Announcements + Emergency Alerts, unified read-tracking) ─────
+    Route::get('/notices/pending', [\App\Http\Controllers\NoticeController::class, 'pending'])->name('notices.pending');
+    Route::post('/notices/{type}/{id}/acknowledge', [\App\Http\Controllers\NoticeController::class, 'acknowledge'])
+        ->whereIn('type', ['announcement', 'emergency-alert'])
+        ->whereNumber('id')
+        ->name('notices.acknowledge');
+
     // ── SOS Emergency Button ───────────────────────────────────────────────────
     // Any authenticated user can trigger — no permission gate on that action,
     // by design (a real emergency must never be blocked by policy). Command
@@ -385,6 +392,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             Route::post('/{alert}/verify', [\App\Http\Controllers\Sos\SosAlertController::class, 'verify'])->name('verify')->whereNumber('alert');
             Route::post('/{alert}/false-alarm', [\App\Http\Controllers\Sos\SosAlertController::class, 'falseAlarm'])->name('false-alarm')->whereNumber('alert');
             Route::post('/{alert}/resolve', [\App\Http\Controllers\Sos\SosAlertController::class, 'resolve'])->name('resolve')->whereNumber('alert');
+
+            Route::get('/broadcast/history', [\App\Http\Controllers\Sos\EmergencyAlertController::class, 'index'])->name('broadcast.index');
+            Route::post('/broadcast', [\App\Http\Controllers\Sos\EmergencyAlertController::class, 'store'])->name('broadcast.store');
+            Route::post('/{alert}/broadcast', [\App\Http\Controllers\Sos\EmergencyAlertController::class, 'storeFromSos'])->name('broadcast.from-sos')->whereNumber('alert');
+            Route::post('/broadcast/{emergencyAlert}/resolve', [\App\Http\Controllers\Sos\EmergencyAlertController::class, 'resolve'])->name('broadcast.resolve')->whereNumber('emergencyAlert');
         });
 
         Route::middleware('permission:sos.manage')->prefix('settings')->name('settings.')->group(function () {

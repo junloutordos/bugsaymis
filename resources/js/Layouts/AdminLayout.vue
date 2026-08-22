@@ -23,10 +23,12 @@ import ErrorReportModal from '@/Components/ErrorReportModal.vue'
 import AppLoadingOverlay from '@/Components/AppLoadingOverlay.vue'
 import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
+import NoticeQueueModal from '@/Components/Notices/NoticeQueueModal.vue'
 import { menuItems } from './navigation.js';
 
 // --- State ---
 const collapsed = ref(false);
+const noticeQueueModal = ref(null);
 const mobileOpen = ref(false);
 const sidebarNav = ref(null);
 const sidebarSearch = ref(null);
@@ -73,6 +75,15 @@ function setupChatNotifications() {
           icon: '/favicon.ico',
         });
       }
+    });
+}
+
+function setupEmergencyAlertListener() {
+  if (!window.Echo) return;
+
+  window.Echo.private('emergency-alerts')
+    .listen('.emergency.alert.broadcast', (payload) => {
+      noticeQueueModal.value?.receiveEmergencyAlert(payload);
     });
 }
 
@@ -125,6 +136,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleSidebarSearchShortcut);
   fetchChatUnread();
   setupChatNotifications();
+  setupEmergencyAlertListener();
 
   // Request browser notification permission (non-blocking)
   if ('Notification' in window && Notification.permission === 'default') {
@@ -777,6 +789,8 @@ watch(() => page.url, async () => {
   <AppLoadingOverlay />
 
   <SosFloatingButton trigger-route="sos.trigger" />
+
+  <NoticeQueueModal ref="noticeQueueModal" />
 
 </template>
 

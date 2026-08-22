@@ -19,6 +19,7 @@ class StudentCredential extends Model
         'password',
         'status',
         'email_verified_at',
+        'fcm_device_token',
     ];
 
     protected $hidden = [
