@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Administration\Announcement;
+use App\Models\Sos\EmergencyAlert;
 use App\Models\Student;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,9 +28,20 @@ class NoticeController extends Controller
             ])
             ->values();
 
+        $emergencyAlerts = EmergencyAlert::visibleToAudienceGroup($group)
+            ->get()
+            ->reject(fn (EmergencyAlert $a) => $a->isAcknowledgedBy($recipient))
+            ->map(fn (EmergencyAlert $a) => [
+                'id'       => $a->id,
+                'title'    => $a->title,
+                'message'  => $a->message,
+                'severity' => $a->severity,
+            ])
+            ->values();
+
         return response()->json([
             'announcements'    => $announcements,
-            'emergency_alerts' => [],
+            'emergency_alerts' => $emergencyAlerts,
         ]);
     }
 
@@ -39,8 +51,9 @@ class NoticeController extends Controller
         $group = $recipient instanceof Student ? 'students' : 'parents';
 
         $notice = match ($type) {
-            'announcement' => Announcement::visibleToAudienceGroup($group)->findOrFail($id),
-            default        => abort(404),
+            'announcement'    => Announcement::visibleToAudienceGroup($group)->findOrFail($id),
+            'emergency-alert' => EmergencyAlert::visibleToAudienceGroup($group)->findOrFail($id),
+            default           => abort(404),
         };
 
         $notice->acknowledgeFor($recipient);

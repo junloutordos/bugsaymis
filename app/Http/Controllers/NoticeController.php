@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Administration\Announcement;
+use App\Models\Sos\EmergencyAlert;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,9 +26,20 @@ class NoticeController extends Controller
             ])
             ->values();
 
+        $emergencyAlerts = EmergencyAlert::visibleTo($user)
+            ->get()
+            ->reject(fn (EmergencyAlert $a) => $a->isAcknowledgedBy($user))
+            ->map(fn (EmergencyAlert $a) => [
+                'id'       => $a->id,
+                'title'    => $a->title,
+                'message'  => $a->message,
+                'severity' => $a->severity,
+            ])
+            ->values();
+
         return response()->json([
             'announcements'    => $announcements,
-            'emergency_alerts' => [],
+            'emergency_alerts' => $emergencyAlerts,
         ]);
     }
 
@@ -36,8 +48,9 @@ class NoticeController extends Controller
         $user = Auth::user();
 
         $notice = match ($type) {
-            'announcement' => Announcement::visibleTo($user)->findOrFail($id),
-            default        => abort(404),
+            'announcement'    => Announcement::visibleTo($user)->findOrFail($id),
+            'emergency-alert' => EmergencyAlert::visibleTo($user)->findOrFail($id),
+            default           => abort(404),
         };
 
         $notice->acknowledgeFor($user);
