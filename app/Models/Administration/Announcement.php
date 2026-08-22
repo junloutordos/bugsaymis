@@ -3,6 +3,7 @@
 namespace App\Models\Administration;
 
 use App\Models\User;
+use App\Traits\HasNoticeAcknowledgments;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Announcement extends Model
 {
+    use HasNoticeAcknowledgments;
+
     protected $table = 'announcements';
 
     protected $fillable = [
