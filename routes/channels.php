@@ -42,3 +42,10 @@ Broadcast::channel('biometric-feed', function ($user) {
 Broadcast::channel('sos-responders', function ($user) {
     return $user->isSuperAdmin() || $user->hasPermission('sos.respond');
 });
+
+// Any authenticated Atlas web user should see an active campus-wide
+// emergency broadcast in real time — unlike sos-responders (triage-only
+// staff), this channel is intentionally open to every logged-in employee.
+Broadcast::channel('emergency-alerts', function ($user) {
+    return true;
+});
