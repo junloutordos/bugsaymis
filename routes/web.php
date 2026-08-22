@@ -371,6 +371,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
+    // ── Notices (Announcements + Emergency Alerts, unified read-tracking) ─────
+    Route::get('/notices/pending', [\App\Http\Controllers\NoticeController::class, 'pending'])->name('notices.pending');
+    Route::post('/notices/{type}/{id}/acknowledge', [\App\Http\Controllers\NoticeController::class, 'acknowledge'])
+        ->whereIn('type', ['announcement', 'emergency-alert'])
+        ->whereNumber('id')
+        ->name('notices.acknowledge');
+
     // ── SOS Emergency Button ───────────────────────────────────────────────────
     // Any authenticated user can trigger — no permission gate on that action,
     // by design (a real emergency must never be blocked by policy). Command
