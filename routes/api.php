@@ -12,6 +12,7 @@ use App\Http\Controllers\StudentAttendance\Api\StudentPortalApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSosController;
 use App\Http\Controllers\StudentAttendance\Api\StudentProfileChangeRequestApiController;
+use App\Http\Controllers\StudentAttendance\Api\NoticeController;
 use App\Http\Controllers\Api\AtlasSentinelController;
 use App\Http\Controllers\Api\AtlasSentinelRemoteHelpController;
 use App\Http\Controllers\Api\BiometricPunchIngestController;
@@ -55,6 +56,13 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
         // Notification preferences (push + email toggles)
         Route::get('/notification-preferences',  [AuthController::class, 'getNotificationPreferences'])->name('notification-preferences.show');
         Route::put('/notification-preferences',  [AuthController::class, 'updateNotificationPreferences'])->name('notification-preferences.update');
+
+        // Announcements + Emergency Alerts (unified read-tracking, mirrors the web /notices endpoints)
+        Route::get('/notices/pending', [NoticeController::class, 'pending'])->name('notices.pending');
+        Route::post('/notices/{type}/{id}/acknowledge', [NoticeController::class, 'acknowledge'])
+            ->whereIn('type', ['announcement', 'emergency-alert'])
+            ->whereNumber('id')
+            ->name('notices.acknowledge');
 
         // List all students linked to this parent
         Route::get('/students', [StudentApiController::class, 'index'])->name('students.index');
