@@ -78,6 +78,15 @@ function setupChatNotifications() {
     });
 }
 
+function setupEmergencyAlertListener() {
+  if (!window.Echo) return;
+
+  window.Echo.private('emergency-alerts')
+    .listen('.emergency.alert.broadcast', (payload) => {
+      noticeQueueModal.value?.receiveEmergencyAlert(payload);
+    });
+}
+
 // Reset badge when navigating to Chat
 watch(() => route().current('chat.index'), (onChat) => {
   if (onChat) chatUnreadCount.value = 0;
@@ -127,6 +136,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleSidebarSearchShortcut);
   fetchChatUnread();
   setupChatNotifications();
+  setupEmergencyAlertListener();
 
   // Request browser notification permission (non-blocking)
   if ('Notification' in window && Notification.permission === 'default') {
