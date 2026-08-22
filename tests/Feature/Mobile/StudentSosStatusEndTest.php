@@ -106,4 +106,30 @@ class StudentSosStatusEndTest extends TestCase
             ->postJson("/api/mobile/student/portal/sos/{$alert->id}/end")
             ->assertStatus(409);
     }
+
+    /**
+     * Laravel's bare `throttle:max,decay` middleware keys its rate-limit
+     * bucket purely by authenticated-user-id (see
+     * ThrottleRequests::resolveRequestSignature) — with no route/URI
+     * component at all. Without distinct prefixes, the GET status-poll
+     * route (throttle:30,1) and this POST end route (throttle:10,1) would
+     * share one counter: polling ~11+ times exhausts the shared bucket and
+     * 429s the very next end-SOS call, even though the end route's own
+     * 10/min quota was never independently exceeded.
+     */
+    public function test_polling_status_repeatedly_does_not_exhaust_the_end_endpoints_quota(): void
+    {
+        $student = $this->makeStudent();
+        $alert = $this->alertFor($student);
+        $token = $this->tokenFor($student);
+        $client = $this->withHeader('Authorization', "Bearer {$token}");
+
+        for ($i = 0; $i < 15; $i++) {
+            $client->getJson("/api/mobile/student/portal/sos/{$alert->id}")->assertOk();
+        }
+
+        $client->postJson("/api/mobile/student/portal/sos/{$alert->id}/end")
+            ->assertOk()
+            ->assertJson(['status' => 'resolved']);
+    }
 }

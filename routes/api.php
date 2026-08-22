@@ -125,10 +125,17 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
                 Route::get('/sos/config', [StudentSosController::class, 'config'])->name('sos.config');
                 Route::post('/sos/trigger', [StudentSosController::class, 'trigger'])->name('sos.trigger')
                     ->middleware('throttle:10,1');
+                // Distinct prefixes here are load-bearing, not cosmetic:
+                // Laravel's bare throttle:max,decay keys its bucket purely
+                // by authenticated-user-id (no route component), so without
+                // these two routes would share one counter with each other
+                // and with every other unprefixed throttle:* route the
+                // student hits — polling status would silently exhaust the
+                // end route's quota.
                 Route::get('/sos/{alert}', [StudentSosController::class, 'show'])->name('sos.show')
-                    ->whereNumber('alert')->middleware('throttle:30,1');
+                    ->whereNumber('alert')->middleware('throttle:30,1,sos-status');
                 Route::post('/sos/{alert}/end', [StudentSosController::class, 'end'])->name('sos.end')
-                    ->whereNumber('alert')->middleware('throttle:10,1');
+                    ->whereNumber('alert')->middleware('throttle:10,1,sos-end');
 
                 Route::get('/profile-update', [StudentProfileChangeRequestApiController::class, 'show'])->name('profile-update.show');
                 Route::post('/profile-update', [StudentProfileChangeRequestApiController::class, 'store'])->name('profile-update.store')
