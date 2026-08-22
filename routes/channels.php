@@ -46,6 +46,11 @@ Broadcast::channel('sos-responders', function ($user) {
 // Any authenticated Atlas web user should see an active campus-wide
 // emergency broadcast in real time — unlike sos-responders (triage-only
 // staff), this channel is intentionally open to every logged-in employee.
-Broadcast::channel('emergency-alerts', function ($user) {
+// Not a broadcast-scope bypass: only a `User` (Atlas web session) can ever
+// reach this closure — Students/Parents are Sanctum API-only in this app
+// (see student_credentials/parent_contacts migrations) and never establish
+// a web session capable of hitting the broadcasting auth route at all, so
+// this is equivalent to "any authenticated employee", not "any principal".
+Broadcast::channel('emergency-alerts', function (\App\Models\User $user) {
     return true;
 });
