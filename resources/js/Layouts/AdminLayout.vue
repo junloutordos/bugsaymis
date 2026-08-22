@@ -23,10 +23,12 @@ import ErrorReportModal from '@/Components/ErrorReportModal.vue'
 import AppLoadingOverlay from '@/Components/AppLoadingOverlay.vue'
 import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
+import NoticeQueueModal from '@/Components/Notices/NoticeQueueModal.vue'
 import { menuItems } from './navigation.js';
 
 // --- State ---
 const collapsed = ref(false);
+const noticeQueueModal = ref(null);
 const mobileOpen = ref(false);
 const sidebarNav = ref(null);
 const sidebarSearch = ref(null);
@@ -777,6 +779,8 @@ watch(() => page.url, async () => {
   <AppLoadingOverlay />
 
   <SosFloatingButton trigger-route="sos.trigger" />
+
+  <NoticeQueueModal ref="noticeQueueModal" />
 
 </template>
 
