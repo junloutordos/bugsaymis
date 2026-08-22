@@ -49,7 +49,17 @@ class SosAlertController extends Controller
             ->get()
             ->map(fn (SosAlert $alert) => $this->serialize($alert));
 
-        return Inertia::render('Sos/CommandCenter', ['alerts' => $alerts]);
+        $emergencyAlerts = \App\Models\Sos\EmergencyAlert::orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id, 'title' => $a->title, 'message' => $a->message,
+                'severity' => $a->severity, 'audience' => $a->audience, 'status' => $a->status,
+                'source' => $a->source, 'sos_alert_id' => $a->sos_alert_id,
+                'created_at' => $a->created_at->toIso8601String(),
+            ]);
+
+        return Inertia::render('Sos/CommandCenter', ['alerts' => $alerts, 'emergencyAlerts' => $emergencyAlerts]);
     }
 
     public function show(SosAlert $alert)
