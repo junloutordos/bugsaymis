@@ -43,13 +43,20 @@ class Announcement extends Model
 
     // ── Scopes ────────────────────────────────────────────────────────────────
 
-    /** Published announcements addressed to everyone or specifically to $user. */
+    /** Published announcements addressed to everyone, all employees, or specifically to $user. */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         return $query->where('status', 'published')
             ->where(fn ($q) => $q
-                ->where('audience', 'all')
+                ->whereIn('audience', ['all', 'employees'])
                 ->orWhereHas('targets', fn ($t) => $t->where('users.id', $user->id)));
+    }
+
+    /** Published announcements addressed to everyone or to the given non-employee group (students|parents). */
+    public function scopeVisibleToAudienceGroup(Builder $query, string $group): Builder
+    {
+        return $query->where('status', 'published')
+            ->whereIn('audience', ['all', $group]);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

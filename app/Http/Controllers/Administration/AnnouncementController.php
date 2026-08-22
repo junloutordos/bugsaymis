@@ -127,7 +127,7 @@ class AnnouncementController extends Controller
         return $request->validate([
             'title'         => 'required|string|max:255',
             'body'          => 'required|string|max:10000',
-            'audience'      => 'required|in:all,specific',
+            'audience'      => 'required|in:all,employees,students,parents,specific',
             'targets'       => 'required_if:audience,specific|array',
             'targets.*'     => 'integer|exists:users,id',
             'poster_base64' => 'nullable|string',
