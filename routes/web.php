@@ -1491,6 +1491,9 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     Route::delete('/students/{id}', [\App\Http\Controllers\StudentController::class, 'destroy'])->name('students.destroy');
     Route::get('/students/{id}/photo', [\App\Http\Controllers\StudentController::class, 'proxyPhoto'])->name('students.photo');
     Route::post('/students/{id}/photo', [\App\Http\Controllers\StudentController::class, 'updatePhoto'])->name('students.photo.update');
+    Route::get('/students/change-requests', [\App\Http\Controllers\StudentProfileChangeRequestController::class, 'index'])->name('students.change-requests.index');
+    Route::post('/students/change-requests/{changeRequest}/approve', [\App\Http\Controllers\StudentProfileChangeRequestController::class, 'approve'])->name('students.change-requests.approve');
+    Route::post('/students/change-requests/{changeRequest}/reject', [\App\Http\Controllers\StudentProfileChangeRequestController::class, 'reject'])->name('students.change-requests.reject');
     // Library attendance (authenticated view)
     Route::get('/library/attendance', [\App\Http\Controllers\LibraryAttendanceController::class, 'index'])
         ->name('library.attendance.index')
