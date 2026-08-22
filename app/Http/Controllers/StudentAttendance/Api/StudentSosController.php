@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Sos\SosAlert;
 use App\Services\Sos\SosAlertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,5 +60,56 @@ class StudentSosController extends Controller
         }
 
         return response()->json(['blocked' => false, 'alert_id' => $result['alert']->id], 201);
+    }
+
+    /**
+     * GET /api/mobile/student/portal/sos/{alert}
+     */
+    public function show(Request $request, SosAlert $alert): JsonResponse
+    {
+        $user = $request->user();
+        if ($alert->triggerable_type !== get_class($user) || $alert->triggerable_id !== $user->getKey()) {
+            abort(403);
+        }
+
+        return response()->json($this->serialize($alert->load('events')));
+    }
+
+    /**
+     * POST /api/mobile/student/portal/sos/{alert}/end
+     */
+    public function end(Request $request, SosAlert $alert, SosAlertService $service): JsonResponse
+    {
+        $user = $request->user();
+        if ($alert->triggerable_type !== get_class($user) || $alert->triggerable_id !== $user->getKey()) {
+            abort(403);
+        }
+
+        try {
+            $service->endByReporter($alert, $user);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+
+        return response()->json($this->serialize($alert->fresh()->load('events')));
+    }
+
+    private function serialize(SosAlert $alert): array
+    {
+        return [
+            'id' => $alert->id,
+            'alert_type' => $alert->alert_type,
+            'is_silent' => $alert->is_silent,
+            'status' => $alert->status,
+            'triggered_at' => $alert->triggered_at->toIso8601String(),
+            'resolved_at' => $alert->resolved_at?->toIso8601String(),
+            'events' => $alert->relationLoaded('events')
+                ? $alert->events->map(fn ($e) => [
+                    'type' => $e->type,
+                    'payload' => $e->payload,
+                    'created_at' => $e->created_at->toIso8601String(),
+                ])->values()
+                : [],
+        ];
     }
 }

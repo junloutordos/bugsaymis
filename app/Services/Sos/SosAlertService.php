@@ -169,6 +169,32 @@ class SosAlertService
         return $event;
     }
 
+    public function endByReporter(SosAlert $alert, Model $reporter): SosAlertEvent
+    {
+        if (in_array($alert->status, ['resolved', 'false_alarm'], true)) {
+            throw new \RuntimeException("Alert #{$alert->id} is already closed.");
+        }
+
+        $alert->update([
+            'status'           => 'resolved',
+            'resolved_at'      => now(),
+            'resolved_by'      => null,
+            'resolution_notes' => 'Ended by reporting student.',
+        ]);
+
+        $event = SosAlertEvent::create([
+            'sos_alert_id' => $alert->id,
+            'type'         => 'resolved',
+            'actor_type'   => get_class($reporter),
+            'actor_id'     => $reporter->getKey(),
+            'payload'      => ['ended_by' => 'reporter'],
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        return $event;
+    }
+
     public function processEscalations(): int
     {
         $count = 0;
