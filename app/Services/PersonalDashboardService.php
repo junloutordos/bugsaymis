@@ -80,6 +80,7 @@ class PersonalDashboardService
                 'title' => $a->title,
                 'has_poster' => (bool) $a->poster_path,
                 'published_at' => $a->published_at?->toIso8601String(),
+                'is_read' => $a->isAcknowledgedBy($user),
             ])
             ->all();
     }

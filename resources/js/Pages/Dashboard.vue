@@ -42,6 +42,7 @@ const props = defineProps({
 
 const page = usePage()
 const authUser = computed(() => page.props.auth?.user)
+const unreadAnnouncementCount = computed(() => props.announcements.filter(a => !a.is_read).length)
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
@@ -531,7 +532,15 @@ function statusClass(status) {
                   <MegaphoneIcon class="h-4 w-4 text-indigo-600" />
                 </span>
                 <div class="min-w-0">
-                  <h2 class="font-heading text-sm font-semibold text-slate-900">Announcements</h2>
+                  <h2 class="flex items-center gap-2 font-heading text-sm font-semibold text-slate-900">
+                    Announcements
+                    <span
+                      v-if="unreadAnnouncementCount > 0"
+                      class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700"
+                    >
+                      {{ unreadAnnouncementCount }}
+                    </span>
+                  </h2>
                   <p class="truncate text-xs text-slate-500">Latest campus announcements for you</p>
                 </div>
               </div>
@@ -545,6 +554,7 @@ function statusClass(status) {
                 :key="a.id"
                 :href="route('announcements.index')"
                 class="flex items-start gap-3 px-4 py-3 transition hover:bg-slate-50"
+                :class="a.is_read ? '' : 'bg-indigo-50/40'"
               >
                 <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50">
                   <component :is="a.has_poster ? PhotoIcon : MegaphoneIcon" class="h-4 w-4 text-indigo-600" />
@@ -553,6 +563,7 @@ function statusClass(status) {
                   <p class="truncate text-sm font-semibold text-slate-900">{{ a.title }}</p>
                   <p class="mt-0.5 text-xs text-slate-500">{{ timeAgo(a.published_at) }}</p>
                 </div>
+                <span v-if="!a.is_read" class="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
               </Link>
             </div>
           </div>
