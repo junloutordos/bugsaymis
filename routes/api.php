@@ -125,6 +125,10 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
                 Route::get('/sos/config', [StudentSosController::class, 'config'])->name('sos.config');
                 Route::post('/sos/trigger', [StudentSosController::class, 'trigger'])->name('sos.trigger')
                     ->middleware('throttle:10,1');
+                Route::get('/sos/{alert}', [StudentSosController::class, 'show'])->name('sos.show')
+                    ->whereNumber('alert')->middleware('throttle:30,1');
+                Route::post('/sos/{alert}/end', [StudentSosController::class, 'end'])->name('sos.end')
+                    ->whereNumber('alert')->middleware('throttle:10,1');
 
                 Route::get('/profile-update', [StudentProfileChangeRequestApiController::class, 'show'])->name('profile-update.show');
                 Route::post('/profile-update', [StudentProfileChangeRequestApiController::class, 'store'])->name('profile-update.store')
