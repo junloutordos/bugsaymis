@@ -89,6 +89,7 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
             Route::get('/grades',     [StudentSelfController::class, 'grades'])->name('grades');
             Route::get('/schedule',   [StudentSelfController::class, 'schedule'])->name('schedule');
             Route::get('/attendance', [StudentSelfController::class, 'attendance'])->name('attendance');
+            Route::get('/attendance/summary', [StudentSelfController::class, 'attendanceSummary'])->name('attendance.summary');
 
             // Student-portal features for the AtlasGo app — mirrors the
             // /student-portal web routes via shared StudentPortal services.

@@ -8,6 +8,8 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentAnnualGrade;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\StudentAttendance\StudentAttendanceLog;
+use App\Services\SchoolCalendarService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -255,5 +257,96 @@ class StudentSelfController extends Controller
                 'has_more'     => $paginated->hasMorePages(),
             ],
         ]);
+    }
+
+    /**
+     * GET /api/mobile/student/attendance/summary
+     */
+    public function attendanceSummary(Request $request, SchoolCalendarService $calendar): JsonResponse
+    {
+        $studentId = $this->resolveStudentId($request);
+
+        if (! $studentId) {
+            return response()->json(['message' => 'Student account not fully set up.'], 404);
+        }
+
+        $gradeLevel = $this->currentGradeLevel($studentId);
+        $today = Carbon::now()->startOfDay();
+        $monthStart = $today->copy()->startOfMonth();
+
+        [$monthPresent, $monthSchoolDays] = $this->presentAndSchoolDays(
+            $studentId, $monthStart, $today, $gradeLevel, $calendar,
+        );
+
+        $weekly = [];
+        for ($i = 8; $i >= 0; $i--) {
+            $weekStart = $today->copy()->subWeeks($i)->startOfWeek(Carbon::MONDAY);
+            $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
+            if ($weekEnd->greaterThan($today)) {
+                $weekEnd = $today->copy();
+            }
+
+            [$present, $schoolDays] = $this->presentAndSchoolDays(
+                $studentId, $weekStart, $weekEnd, $gradeLevel, $calendar,
+            );
+
+            $weekly[] = [
+                'week_start' => $weekStart->toDateString(),
+                'present' => $present,
+                'school_days' => $schoolDays,
+                'rate' => $schoolDays > 0 ? round($present / $schoolDays, 4) : null,
+            ];
+        }
+
+        return response()->json([
+            'month_present' => $monthPresent,
+            'month_school_days' => $monthSchoolDays,
+            'month_rate' => $monthSchoolDays > 0 ? round($monthPresent / $monthSchoolDays, 4) : null,
+            'weekly' => $weekly,
+        ]);
+    }
+
+    private function currentGradeLevel(int $studentId): ?int
+    {
+        $schoolYear = SchoolYear::where('is_current', true)->first();
+        if (! $schoolYear) {
+            return null;
+        }
+
+        $enrollment = StudentEnrollment::where('student_id', $studentId)
+            ->where('school_year_id', $schoolYear->id)
+            ->where('status', 'enrolled')
+            ->first();
+
+        return $enrollment?->grade_level;
+    }
+
+    /**
+     * @return array{0: int, 1: int} [present days, school days] in the
+     *   inclusive [$start, $end] range.
+     */
+    private function presentAndSchoolDays(
+        int $studentId,
+        Carbon $start,
+        Carbon $end,
+        ?int $gradeLevel,
+        SchoolCalendarService $calendar,
+    ): array {
+        $present = StudentAttendanceLog::where('student_id', $studentId)
+            ->where('type', 'in')
+            ->whereBetween('scan_time', [$start, $end->copy()->endOfDay()])
+            ->get()
+            ->map(fn ($log) => $log->scan_time->toDateString())
+            ->unique()
+            ->count();
+
+        $schoolDays = 0;
+        for ($date = $start->copy(); $date->lessThanOrEqualTo($end); $date->addDay()) {
+            if ($calendar->isSchoolDay($date->toDateString(), $gradeLevel)) {
+                $schoolDays++;
+            }
+        }
+
+        return [$present, $schoolDays];
     }
 }
