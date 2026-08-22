@@ -28,6 +28,7 @@ const props = defineProps({
   section_options: { type: Array, default: () => [] },
   grade_options: { type: Array, default: () => [] },
   current_school_year: String,
+  pending_change_requests_count: { type: Number, default: 0 },
 })
 
 const students = ref(props.students?.data ?? props.students ?? [])
@@ -377,7 +378,14 @@ const confirmCrop = async () => {
   <Head title="Students" />
   <AdminLayout title="Students">
     <div class="space-y-5">
-      <AppPageHeader title="Students" subtitle="Browse and view student records" />
+      <AppPageHeader title="Students" subtitle="Browse and view student records">
+        <template #actions>
+          <AppButton size="sm" variant="secondary" as="a" :href="route('students.change-requests.index')">
+            Pending Update Requests
+            <span v-if="pending_change_requests_count" class="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{{ pending_change_requests_count }}</span>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <AppTabs v-model="activeTab" :tabs="tabs" />
 

@@ -155,6 +155,7 @@ class StudentController extends Controller
             'grade_options' => $gradeOptions,
             'current_school_year' => $currentSY?->name,
             'can_manage_students' => auth()->user()->hasPermission('manage-students') || auth()->user()->isSuperAdmin(),
+            'pending_change_requests_count' => \App\Models\StudentProfileChangeRequest::where('status', 'pending')->count(),
         ]);
     }
 

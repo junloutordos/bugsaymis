@@ -10,6 +10,8 @@ use App\Http\Controllers\StudentAttendance\Api\ScheduleApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentPortalApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
+use App\Http\Controllers\StudentAttendance\Api\StudentSosController;
+use App\Http\Controllers\StudentAttendance\Api\StudentProfileChangeRequestApiController;
 use App\Http\Controllers\Api\AtlasSentinelController;
 use App\Http\Controllers\Api\AtlasSentinelRemoteHelpController;
 use App\Http\Controllers\Api\BiometricPunchIngestController;
@@ -119,6 +121,14 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
                     ->middleware('throttle:6,1');
                 Route::get('/lost-found/photo/{item}', [StudentPortalApiController::class, 'lostFoundPhoto'])->name('lost-found.photo')
                     ->whereNumber('item');
+
+                Route::get('/sos/config', [StudentSosController::class, 'config'])->name('sos.config');
+                Route::post('/sos/trigger', [StudentSosController::class, 'trigger'])->name('sos.trigger')
+                    ->middleware('throttle:10,1');
+
+                Route::get('/profile-update', [StudentProfileChangeRequestApiController::class, 'show'])->name('profile-update.show');
+                Route::post('/profile-update', [StudentProfileChangeRequestApiController::class, 'store'])->name('profile-update.store')
+                    ->middleware('throttle:6,1');
             });
         });
     });
