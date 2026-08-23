@@ -39,7 +39,7 @@ class StudentSelfController extends Controller
 
         $student = DB::table('students')
             ->where('id', $studentId)
-            ->first(['id', 'pisaysystemID', 'lastname', 'firstname', 'middlename', 'sex', 'student_email']);
+            ->first(['id', 'pisaysystemID', 'lastname', 'firstname', 'middlename', 'sex', 'student_email', 'img']);
 
         if (! $student) {
             return response()->json(['message' => 'Student record not found.'], 404);
@@ -61,6 +61,7 @@ class StudentSelfController extends Controller
                 'name'        => trim("{$student->lastname}, {$student->firstname}"),
                 'sex'         => $student->sex,
                 'email'       => $student->student_email,
+                'has_photo'   => (bool) $student->img,
                 'grade_level' => $enrollment?->grade_level,
                 'section'     => $enrollment?->section
                     ? $enrollment->section->sectionname
