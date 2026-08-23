@@ -88,4 +88,53 @@ class StudentIdCardApiTest extends TestCase
     {
         $this->getJson('/api/mobile/student/photo')->assertStatus(401);
     }
+
+    public function test_id_card_returns_the_full_card_fields(): void
+    {
+        $role = Role::create(['name' => 'OCD']);
+        $ocdUser = User::factory()->create();
+        $ocdUser->roles()->attach($role->id);
+
+        $student = $this->makeStudent([
+            'lastname' => 'Dela Cruz',
+            'firstname' => 'Juan',
+            'lrn' => '123456789012',
+            'pisaysystemID' => '2024-00123',
+            'img' => 'students/1/photo.jpg',
+            'contactperson' => 'Maria Dela Cruz',
+            'contactno1' => '09171234567',
+            'houseno' => '123',
+            'barangay' => 'Poblacion',
+            'municipal' => 'Butuan City',
+            'province' => 'Agusan del Norte',
+        ]);
+        $token = $this->tokenFor($student);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/mobile/student/id-card')
+            ->assertOk();
+
+        $response->assertJson([
+            'student' => [
+                'name'      => 'Dela Cruz, Juan',
+                'barcode'   => '2024-00123',
+                'lrn'       => '123456789012',
+                'has_photo' => true,
+            ],
+            'ocd' => [
+                'name'     => 'MELBA C. PATACSIL, PhD',
+                'position' => 'Campus Director',
+            ],
+            'emergency' => [
+                'guardian_name' => 'Maria Dela Cruz',
+                'contact_no'    => '09171234567',
+                'address'       => '123, Brgy. Poblacion, Butuan City, Agusan del Norte',
+            ],
+        ]);
+    }
+
+    public function test_id_card_rejects_unauthenticated_requests(): void
+    {
+        $this->getJson('/api/mobile/student/id-card')->assertStatus(401);
+    }
 }

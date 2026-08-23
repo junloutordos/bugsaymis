@@ -8,7 +8,9 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentAnnualGrade;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\StudentAttendance\StudentAttendanceLog;
+use App\Models\User;
 use App\Services\SchoolCalendarService;
+use App\Services\DigitalSignatureService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,10 @@ use Illuminate\Support\Facades\Storage;
 
 class StudentSelfController extends Controller
 {
+    public function __construct(private DigitalSignatureService $sigService)
+    {
+    }
+
     /**
      * Resolve the student_id for the authenticated student.
      * The Sanctum token is issued directly against the Student model, so
@@ -103,6 +109,68 @@ class StudentSelfController extends Controller
         abort_if(! file_exists($localPath), 404);
 
         return response()->file($localPath, ['Cache-Control' => 'private, max-age=3600']);
+    }
+
+    /**
+     * GET /api/mobile/student/id-card
+     *
+     * Every field the physical CR-80 card prints (see
+     * StudentController::idCard, the web/print equivalent this mirrors),
+     * self-scoped the same way the rest of this controller is.
+     */
+    public function idCard(Request $request): JsonResponse
+    {
+        $studentId = $this->resolveStudentId($request);
+
+        if (! $studentId) {
+            return response()->json(['message' => 'Student account not fully set up.'], 404);
+        }
+
+        $student = DB::table('students')->where('id', $studentId)->first();
+
+        if (! $student) {
+            return response()->json(['message' => 'Student record not found.'], 404);
+        }
+
+        $schoolYear = SchoolYear::where('is_current', true)->first();
+        $enrollment = $schoolYear
+            ? StudentEnrollment::with('section')
+                ->where('student_id', $studentId)
+                ->where('school_year_id', $schoolYear->id)
+                ->where('status', 'enrolled')
+                ->first()
+            : null;
+
+        $ocdUser = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
+
+        $address = implode(', ', array_filter([
+            $student->houseno,
+            filled($student->barangay ?? '') ? 'Brgy. ' . $student->barangay : null,
+            $student->municipal,
+            $student->province,
+        ], fn ($v) => filled($v)));
+
+        return response()->json([
+            'student' => [
+                'name'        => trim("{$student->lastname}, {$student->firstname}"),
+                'barcode'     => $student->pisaysystemID ?: null,
+                'lrn'         => $student->lrn,
+                'has_photo'   => (bool) $student->img,
+                'grade_level' => $enrollment?->grade_level,
+                'section'     => $enrollment?->section?->sectionname,
+                'school_year' => $schoolYear?->name,
+            ],
+            'ocd' => [
+                'name'          => 'MELBA C. PATACSIL, PhD',
+                'position'      => 'Campus Director',
+                'signature_uri' => $ocdUser ? $this->sigService->getSignatureDataUri($ocdUser) : null,
+            ],
+            'emergency' => [
+                'guardian_name' => $student->contactperson ?: null,
+                'contact_no'    => $student->contactno1 ?: null,
+                'address'       => $address ?: null,
+            ],
+        ]);
     }
 
     /**

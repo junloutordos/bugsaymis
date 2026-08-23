@@ -114,6 +114,7 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
         Route::prefix('student')->name('student.')->group(function () {
             Route::get('/profile',    [StudentSelfController::class, 'profile'])->name('profile');
             Route::get('/photo',      [StudentSelfController::class, 'photo'])->name('photo');
+            Route::get('/id-card',    [StudentSelfController::class, 'idCard'])->name('id-card');
             Route::get('/grades',     [StudentSelfController::class, 'grades'])->name('grades');
             Route::get('/schedule',   [StudentSelfController::class, 'schedule'])->name('schedule');
             Route::get('/attendance', [StudentSelfController::class, 'attendance'])->name('attendance');
