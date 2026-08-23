@@ -59,4 +59,33 @@ class StudentIdCardApiTest extends TestCase
             ->assertOk()
             ->assertJson(['student' => ['has_photo' => false]]);
     }
+
+    public function test_photo_streams_the_students_own_s3_photo(): void
+    {
+        Storage::fake('s3');
+        Storage::disk('s3')->put('students/1/photo.jpg', 'fake-image-bytes');
+        $student = $this->makeStudent(['img' => 'students/1/photo.jpg']);
+        $token = $this->tokenFor($student);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->get('/api/mobile/student/photo');
+
+        $response->assertOk();
+        $this->assertSame('fake-image-bytes', $response->getContent());
+    }
+
+    public function test_photo_returns_404_when_no_photo_on_file(): void
+    {
+        $student = $this->makeStudent();
+        $token = $this->tokenFor($student);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->get('/api/mobile/student/photo')
+            ->assertStatus(404);
+    }
+
+    public function test_photo_rejects_unauthenticated_requests(): void
+    {
+        $this->getJson('/api/mobile/student/photo')->assertStatus(401);
+    }
 }

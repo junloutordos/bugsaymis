@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class StudentSelfController extends Controller
 {
@@ -69,6 +70,39 @@ class StudentSelfController extends Controller
                 'school_year' => $schoolYear?->name,
             ],
         ]);
+    }
+
+    /**
+     * GET /api/mobile/student/photo
+     *
+     * Self-scoped mirror of StudentController::proxyPhoto — deliberately
+     * takes no student-id parameter so it can only ever stream the token's
+     * own photo (Sanctum tokens for students are issued directly against
+     * the Student model, per resolveStudentId()).
+     */
+    public function photo(Request $request)
+    {
+        $studentId = $this->resolveStudentId($request);
+        abort_if(! $studentId, 404);
+
+        $img = DB::table('students')->where('id', $studentId)->value('img');
+        abort_if(! $img, 404);
+
+        if (str_contains($img, '/')) {
+            abort_if(! Storage::disk('s3')->exists($img), 404);
+            $content = Storage::disk('s3')->get($img);
+            $mime = Storage::disk('s3')->mimeType($img) ?: 'image/jpeg';
+
+            return response($content, 200, [
+                'Content-Type'  => $mime,
+                'Cache-Control' => 'private, max-age=3600',
+            ]);
+        }
+
+        $localPath = storage_path("app/public/students_profile_picture/{$img}");
+        abort_if(! file_exists($localPath), 404);
+
+        return response()->file($localPath, ['Cache-Control' => 'private, max-age=3600']);
     }
 
     /**
