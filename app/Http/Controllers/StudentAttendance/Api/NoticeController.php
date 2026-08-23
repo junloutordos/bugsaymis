@@ -45,6 +45,30 @@ class NoticeController extends Controller
         ]);
     }
 
+    public function history(Request $request): JsonResponse
+    {
+        $recipient = $request->user();
+        $group = $recipient instanceof Student ? 'students' : 'parents';
+
+        $paginator = Announcement::visibleToAudienceGroup($group)
+            ->with(['acknowledgments' => fn ($q) => $q
+                ->where('recipient_type', get_class($recipient))
+                ->where('recipient_id', $recipient->getKey())])
+            ->orderByDesc('published_at')
+            ->paginate(15);
+
+        $paginator->getCollection()->transform(fn (Announcement $a) => [
+            'id'           => $a->id,
+            'title'        => $a->title,
+            'body'         => $a->body,
+            'poster_path'  => $a->poster_path,
+            'published_at' => $a->published_at?->toIso8601String(),
+            'is_read'      => $a->acknowledgments->isNotEmpty(),
+        ]);
+
+        return response()->json($paginator);
+    }
+
     public function acknowledge(Request $request, string $type, int $id): JsonResponse
     {
         $recipient = $request->user();

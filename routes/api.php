@@ -63,6 +63,7 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
             ->whereIn('type', ['announcement', 'emergency-alert'])
             ->whereNumber('id')
             ->name('notices.acknowledge');
+        Route::get('/notices/history', [NoticeController::class, 'history'])->name('notices.history');
 
         // List all students linked to this parent
         Route::get('/students', [StudentApiController::class, 'index'])->name('students.index');
