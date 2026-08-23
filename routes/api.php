@@ -69,8 +69,18 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
         // Private-S3-via-proxy for mobile — reuses the exact same controller
         // method the web /media/{path} route uses (routes/web.php:279), just
         // reachable via Sanctum instead of the session guard mobile can't use.
+        // Unlike the web route, this is deliberately scoped to the
+        // `announcements/` prefix only — Students/Parents are a much larger,
+        // less-trusted population than employees, and StorageProxyController
+        // itself does no path/ownership allowlisting (any existing S3 key
+        // streams if requested). The web route accepting any path is an
+        // accepted existing risk for employees; extending that same breadth
+        // to every mobile account would let any Student/Parent fetch
+        // unrelated private files (PDS, medical records, WFH photos, etc.)
+        // just by guessing a key. Posters are the only mobile use case, so
+        // the prefix constraint costs nothing functionally.
         Route::get('/media/{path}', [StorageProxyController::class, 'serve'])
-            ->where('path', '.+')
+            ->where('path', 'announcements/.+')
             ->name('media');
 
         // List all students linked to this parent

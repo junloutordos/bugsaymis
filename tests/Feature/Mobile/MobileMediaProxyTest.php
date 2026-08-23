@@ -48,4 +48,30 @@ class MobileMediaProxyTest extends TestCase
         // fallback for requests that don't ask for JSON.
         $this->getJson('/api/mobile/media/announcements/test.jpg')->assertUnauthorized();
     }
+
+    public function test_rejects_a_path_outside_the_announcements_prefix_even_when_authenticated(): void
+    {
+        // Regression guard for a real finding: StorageProxyController does no
+        // path/ownership allowlisting of its own — it streams whatever S3 key
+        // it's given. Students/Parents are a much larger, less-trusted
+        // population than employees, so this route must never widen to the
+        // web route's unrestricted `.+`, or any mobile account could fetch
+        // unrelated private files (PDS, medical records, WFH photos, etc.)
+        // just by guessing a key.
+        Storage::fake('s3');
+        Storage::disk('s3')->put('pds/some-employee-document.pdf', 'private-bytes');
+
+        $studentId = DB::table('students')->insertGetId([
+            'pisaysystemID' => 'TST-MEDIA-2', 'firstname' => 'Media', 'lastname' => 'StudentTwo',
+        ]);
+        StudentCredential::create([
+            'student_id' => $studentId, 'email' => 'mediastudent2@example.com',
+            'password' => bcrypt('x'), 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $token = Student::find($studentId)->createToken('device', ['mobile'])->plainTextToken;
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/mobile/media/pds/some-employee-document.pdf')
+            ->assertNotFound();
+    }
 }
