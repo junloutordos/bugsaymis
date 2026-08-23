@@ -20,6 +20,16 @@ class EmergencyAlertController extends Controller
         );
     }
 
+    public function status(): JsonResponse
+    {
+        $alert = EmergencyAlert::active()->latest()->first();
+
+        return response()->json([
+            'active'   => $alert !== null,
+            'severity' => $alert?->severity,
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $alert = $this->create($this->validated($request), sosAlertId: null);

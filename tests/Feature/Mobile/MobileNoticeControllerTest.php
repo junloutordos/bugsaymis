@@ -93,4 +93,67 @@ class MobileNoticeControllerTest extends TestCase
 
         $this->assertFalse($announcement->fresh()->isAcknowledgedBy($parent));
     }
+
+    public function test_history_returns_all_published_announcements_for_the_audience_group_with_read_flag(): void
+    {
+        $studentId = DB::table('students')->insertGetId([
+            'pisaysystemID' => 'TEST-HIST-1', 'firstname' => 'Hist', 'lastname' => 'Student',
+        ]);
+        StudentCredential::create([
+            'student_id' => $studentId, 'email' => 'histstudent@example.com',
+            'password' => bcrypt('x'), 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $student = Student::find($studentId);
+        $token = $student->createToken('device', ['mobile'])->plainTextToken;
+
+        $creator = User::factory()->create();
+        $read = Announcement::create([
+            'title' => 'Already Read', 'body' => 'Body', 'audience' => 'students',
+            'status' => 'published', 'published_at' => now()->subDay(), 'created_by' => $creator->id,
+        ]);
+        Announcement::create([
+            'title' => 'Still Unread', 'body' => 'Body', 'audience' => 'students',
+            'status' => 'published', 'published_at' => now(), 'created_by' => $creator->id,
+        ]);
+        Announcement::create([
+            'title' => 'For Parents', 'body' => 'Body', 'audience' => 'parents',
+            'status' => 'published', 'published_at' => now(), 'created_by' => $creator->id,
+        ]);
+        $read->acknowledgeFor($student);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")->getJson('/api/mobile/notices/history');
+
+        $response->assertOk();
+        $items = collect($response->json('data'));
+        $this->assertCount(2, $items);
+        $this->assertTrue($items->firstWhere('title', 'Already Read')['is_read']);
+        $this->assertFalse($items->firstWhere('title', 'Still Unread')['is_read']);
+        $this->assertNull($items->firstWhere('title', 'For Parents'));
+    }
+
+    public function test_history_is_paginated_at_15_per_page(): void
+    {
+        $studentId = DB::table('students')->insertGetId([
+            'pisaysystemID' => 'TEST-HIST-2', 'firstname' => 'Page', 'lastname' => 'Student',
+        ]);
+        StudentCredential::create([
+            'student_id' => $studentId, 'email' => 'pagestudent@example.com',
+            'password' => bcrypt('x'), 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $token = Student::find($studentId)->createToken('device', ['mobile'])->plainTextToken;
+
+        $creator = User::factory()->create();
+        for ($i = 0; $i < 20; $i++) {
+            Announcement::create([
+                'title' => "Announcement {$i}", 'body' => 'Body', 'audience' => 'students',
+                'status' => 'published', 'published_at' => now()->subMinutes($i), 'created_by' => $creator->id,
+            ]);
+        }
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")->getJson('/api/mobile/notices/history');
+
+        $response->assertOk();
+        $this->assertCount(15, $response->json('data'));
+        $this->assertSame(20, $response->json('total'));
+    }
 }

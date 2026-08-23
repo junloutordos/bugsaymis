@@ -113,4 +113,26 @@ class EmergencyAlertControllerTest extends TestCase
                 'title' => 'X', 'message' => 'Y', 'severity' => 'info', 'audience' => 'all',
             ])->assertForbidden();
     }
+
+    public function test_emergency_status_reports_active_alert_and_severity_to_any_employee(): void
+    {
+        EmergencyAlert::create([
+            'title' => 'Test', 'message' => 'Body', 'severity' => 'critical',
+            'audience' => 'all', 'status' => 'active', 'source' => 'manual', 'created_by' => $this->responder()->id,
+        ]);
+
+        // A plain employee with no sos.respond permission must still get 200 —
+        // this endpoint is intentionally open, mirroring the emergency-alerts
+        // Echo channel's own authorization policy.
+        $response = $this->actingAs(User::factory()->create())->getJson(route('sos.emergency-status'));
+
+        $response->assertOk()->assertJson(['active' => true, 'severity' => 'critical']);
+    }
+
+    public function test_emergency_status_reports_inactive_when_nothing_is_active(): void
+    {
+        $response = $this->actingAs(User::factory()->create())->getJson(route('sos.emergency-status'));
+
+        $response->assertOk()->assertJson(['active' => false, 'severity' => null]);
+    }
 }

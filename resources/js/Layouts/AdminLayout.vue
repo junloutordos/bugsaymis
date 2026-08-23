@@ -24,11 +24,13 @@ import AppLoadingOverlay from '@/Components/AppLoadingOverlay.vue'
 import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
 import NoticeQueueModal from '@/Components/Notices/NoticeQueueModal.vue'
+import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
 import { menuItems } from './navigation.js';
 
 // --- State ---
 const collapsed = ref(false);
 const noticeQueueModal = ref(null);
+const hasActiveEmergency = ref(false);
 const mobileOpen = ref(false);
 const sidebarNav = ref(null);
 const sidebarSearch = ref(null);
@@ -78,12 +80,31 @@ function setupChatNotifications() {
     });
 }
 
+async function fetchEmergencyStatus() {
+  try {
+    const res = await window.axios.get(route('sos.emergency-status'));
+    hasActiveEmergency.value = res.data.active;
+  } catch {
+    // Fail closed — a failed bootstrap fetch must not leave the border
+    // stuck on. A real active emergency will still arrive via the live
+    // Echo listener below or is already visible elsewhere (Command Center,
+    // NoticeQueueModal).
+    hasActiveEmergency.value = false;
+  }
+}
+
 function setupEmergencyAlertListener() {
   if (!window.Echo) return;
 
   window.Echo.private('emergency-alerts')
     .listen('.emergency.alert.broadcast', (payload) => {
       noticeQueueModal.value?.receiveEmergencyAlert(payload);
+      hasActiveEmergency.value = true;
+    })
+    .listen('.emergency.alert.resolved', () => {
+      // Re-fetch rather than blindly clearing — another emergency alert
+      // could still be active if more than one was ever broadcast at once.
+      fetchEmergencyStatus();
     });
 }
 
@@ -137,6 +158,7 @@ onMounted(() => {
   fetchChatUnread();
   setupChatNotifications();
   setupEmergencyAlertListener();
+  fetchEmergencyStatus();
 
   // Request browser notification permission (non-blocking)
   if ('Notification' in window && Notification.permission === 'default') {
@@ -791,6 +813,8 @@ watch(() => page.url, async () => {
   <SosFloatingButton trigger-route="sos.trigger" />
 
   <NoticeQueueModal ref="noticeQueueModal" />
+
+  <EmergencyBorderOverlay :active="hasActiveEmergency" />
 
 </template>
 

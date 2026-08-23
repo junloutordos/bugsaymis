@@ -385,6 +385,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::prefix('sos')->name('sos.')->group(function () {
         Route::post('/trigger', [\App\Http\Controllers\Sos\SosAlertController::class, 'trigger'])->name('trigger');
 
+        // Open to any authenticated employee (no permission gate) — mirrors
+        // the emergency-alerts Echo channel's own authorization policy, since
+        // this feeds the site-wide emergency border every employee needs to see.
+        Route::get('/emergency-status', [\App\Http\Controllers\Sos\EmergencyAlertController::class, 'status'])->name('emergency-status');
+
         Route::middleware('permission:sos.respond')->group(function () {
             Route::get('/', [\App\Http\Controllers\Sos\SosAlertController::class, 'index'])->name('index');
             Route::get('/{alert}', [\App\Http\Controllers\Sos\SosAlertController::class, 'show'])->name('show')->whereNumber('alert');

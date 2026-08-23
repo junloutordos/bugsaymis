@@ -43,7 +43,7 @@
                   <h3 class="text-base font-semibold text-slate-800">{{ a.title }}</h3>
                   <AppBadge v-if="a.status === 'draft'" color="amber">Draft</AppBadge>
                   <AppBadge v-if="canManage" :color="a.audience === 'all' ? 'indigo' : 'blue'">
-                    {{ a.audience === 'all' ? 'All users' : `${a.target_count} recipient(s)` }}
+                    {{ audienceLabel(a) }}
                   </AppBadge>
                 </div>
                 <p class="text-xs text-slate-400 mt-0.5">
@@ -142,14 +142,12 @@
       <!-- Audience -->
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1.5">Audience *</label>
-        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm">
-          <button type="button" @click="form.audience = 'all'"
-            :class="['px-4 py-2 font-medium transition-colors', form.audience === 'all' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
-            All Users
-          </button>
-          <button type="button" @click="form.audience = 'specific'"
-            :class="['px-4 py-2 font-medium border-l border-slate-200 transition-colors', form.audience === 'specific' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
-            Specific Users
+        <div class="inline-flex flex-wrap rounded-lg border border-slate-200 overflow-hidden text-sm">
+          <button v-for="(opt, i) in audienceOptions" :key="opt.value" type="button"
+            @click="form.audience = opt.value"
+            :class="['px-4 py-2 font-medium transition-colors', i > 0 ? 'border-l border-slate-200' : '',
+                     form.audience === opt.value ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+            {{ opt.label }}
           </button>
         </div>
       </div>
@@ -258,9 +256,22 @@ function employeeName(id) {
   return props.employees.find(e => e.id === id)?.name ?? `User ${id}`
 }
 
+function audienceLabel(a) {
+  if (a.audience === 'specific') return `${a.target_count} recipient(s)`
+  return { all: 'All users', employees: 'Employees', students: 'Students', parents: 'Parents' }[a.audience] ?? a.audience
+}
+
 // ── Form & modal ─────────────────────────────────────────────────────────────
 
 const modal = ref(false)
+
+const audienceOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'employees', label: 'Employees' },
+  { value: 'students', label: 'Students' },
+  { value: 'parents', label: 'Parents' },
+  { value: 'specific', label: 'Specific Users' },
+]
 
 const form = useForm({
   id: null,
