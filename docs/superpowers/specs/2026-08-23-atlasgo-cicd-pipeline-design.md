@@ -57,14 +57,16 @@ Keeping the actual build/sign/publish logic in fastlane (not inline GitHub Actio
 
 A new private repo `junloutordos/bugsaymis-mobile-certificates` stores match's encrypted cert/profile bundle. One-time, run locally by the user (not automatable — it's an interactive Apple ID login the first time): `fastlane match init`, `fastlane match appstore`. From then on, CI only ever runs `match(..., readonly: true)` — it fetches, it never generates or revokes, so a compromised CI credential can't invalidate the production certificate. The match passphrase and the certificates-repo's deploy key are the two secrets CI needs for this.
 
-### 6. Shorebird: release-time wiring now, patch workflow now, patch *UX* is Phase 2
+### 6. Shorebird: release-time wiring now, patch workflow now, patch *UX* is Phase 2 — Android only, iOS deferred by a confirmed upstream bug
 
 Two things ship in this spec because they're pipeline concerns (an app can't receive Shorebird patches unless the release that shipped it went out *through* Shorebird):
-- One-time `shorebird apps create atlasgo`, committing the generated `shorebird.yaml` (non-secret app id) to the repo.
-- The `release` fastlane lanes use `shorebird release android`/`shorebird release ios` in place of plain `flutter build`, so every tagged release is patchable afterward.
+- One-time `shorebird apps create atlasgo` (in practice `shorebird init`, per the CLI's current naming — see execution notes), committing the generated `shorebird.yaml` (non-secret app id) to the repo.
+- The Android `release` fastlane lane uses `shorebird release android` in place of plain `flutter build`, so every tagged Android release is patchable afterward.
 - A third workflow, `.github/workflows/shorebird-patch.yml`, triggered by `workflow_dispatch` only (never automatic — a patch targets one specific already-released version and picking which one is a human decision), runs `shorebird patch android`/`shorebird patch ios` against the currently-live release track.
 
-What's explicitly **not** in this spec: any code in the Flutter app that surfaces "a patch is available" or controls when it's applied — Shorebird's default runtime behavior (check-and-apply-on-next-launch) is left as-is, and any custom UX around it is Phase 2 territory alongside the store-update banner.
+**iOS exception, discovered during Task 11's real tagged-release verification, not foreseeable at design time:** `shorebird release ios` has a reproducible upstream bug — it falsely reports CocoaPods as broken and aborts, in an environment where plain `flutter build ipa` (identical CocoaPods install, identical everything) builds and archives successfully every time. Confirmed not caused by CocoaPods version, install method, or Xcode/Swift toolchain version (all independently tried and ruled out). Per user decision, the iOS lane builds via plain `flutter build ios` + fastlane's `build_app` instead of Shorebird, and does not get OTA patch capability until Shorebird fixes this upstream. Android is unaffected and keeps full Shorebird release+patch support as designed.
+
+What's explicitly **not** in this spec: any code in the Flutter app that surfaces "a patch is available" or controls when it's applied — Shorebird's default runtime behavior (check-and-apply-on-next-launch) is left as-is, and any custom UX around it is Phase 2 territory alongside the store-update banner. (For iOS, this is currently moot until Shorebird support is re-added there.)
 
 ## Secrets inventory
 
