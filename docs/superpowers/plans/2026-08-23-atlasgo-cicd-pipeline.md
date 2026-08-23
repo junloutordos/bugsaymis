@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Package identity: `ph.edu.pshs.crc.bugsaymis_mobile` (Android `applicationId` / iOS bundle id) — unchanged, do not touch.
+- Package identity — the two platforms use DIFFERENT identifiers, confirmed during Task 6 execution (fastlane match failed against the assumed-shared value): Android `applicationId` is `ph.edu.pshs.crc.bugsaymis_mobile` (with underscore, `android/app/build.gradle`); iOS bundle id is `ph.edu.pshs.crc.bugsaymisMobile` (camelCase, no underscore, `ios/Runner.xcodeproj/project.pbxproj`). Both unchanged, do not touch — use the correct one per platform's Appfile.
 - Flutter version pinned in every workflow: exactly `3.41.6`, `channel: stable` — never `flutter-version: stable` (floating).
 - Release trigger: push of a tag matching `v*.*.*` only. No release on plain pushes to `main` — `main` pushes only run analyze+test.
 - Android: reuse the existing `atlasgo-release.jks` keystore as-is (no key rotation). Play Store track is **production**. No Play App Signing enrollment decision is made in this plan — that's a one-time Play Console action, out of scope.
@@ -39,7 +39,7 @@ Ask the user to open Play Console → select AtlasGo → **Setup → App integri
 
 Once the user answers, replace this line with the actual finding before moving on:
 
-> **Play App Signing status: [PENDING — fill in from Task 1 Step 1 before Task 11]**
+> **Play App Signing status: Enabled** (confirmed by user, 2026-08-23). Google re-signs Play Store downloads with its own key — existing sideloaded self-hosted-APK users will hit a one-time "app not installed" signature conflict if they later install from Play Store, requiring one manual uninstall of the sideloaded copy. Flag this to the user again in Task 11 once the first production Play Store rollout actually goes live.
 
 If **enabled**: Google re-signs Play Store downloads with its own key, so a user who currently has the sideloaded, self-signed APK installed will see a one-time "app not installed" signature conflict the first time they try to get the app from Play Store — they'd need to uninstall the sideloaded copy once. This doesn't block anything in this plan; it's a fact to tell the user before the first production Play Store rollout (Task 11) and to mention in any release-announcement copy later. If **not enabled**, Play Store distributes the exact APK fastlane uploads (signed with `atlasgo-release.jks`, same key as the sideloaded APK) — existing sideloaded users get a seamless in-place update with no action needed.
 
@@ -265,7 +265,7 @@ gem "fastlane"
 
 `ios/fastlane/Appfile`:
 ```ruby
-app_identifier("ph.edu.pshs.crc.bugsaymis_mobile")
+app_identifier("ph.edu.pshs.crc.bugsaymisMobile")
 team_id(ENV["APPLE_TEAM_ID"])
 ```
 
@@ -732,6 +732,13 @@ If a fastlane action, Shorebird flag, or workflow step fails against the real se
 If Task 1 found Play App Signing **enabled**, remind the user now (with the app actually live on Play Store) that existing sideloaded users will hit a one-time reinstall prompt if they get the app from Play Store instead of continuing to use the self-hosted APK path.
 
 ---
+
+## Execution Notes (added during real run)
+
+- **Task 5/6 correction:** `ios/fastlane/Appfile`'s `app_identifier` was originally written as `ph.edu.pshs.crc.bugsaymis_mobile` (copied from the Android value, wrongly assumed shared). Running `fastlane match appstore` for real in Task 6 failed with "Could not find App ID with bundle identifier 'ph.edu.pshs.crc.bugsaymis_mobile'" — App Store Connect's actual registered app is `ph.edu.pshs.crc.bugsaymisMobile` (confirmed against `ios/Runner.xcodeproj/project.pbxproj`'s `PRODUCT_BUNDLE_IDENTIFIER`). Fixed in the Appfile and in this plan's Global Constraints. Android's Appfile (`android/fastlane/Appfile`, `package_name`) was already correct and untouched.
+- **Task 6 App Store Connect API key:** reused an existing key rather than creating a new one — Key ID `9MZ8Y4F7ZV`, Issuer ID `68721f3c-4990-4f4a-9e02-b5b87690a688`, `.p8` at `~/Downloads/AuthKey_9MZ8Y4F7ZV.p8`. Its access role is "Developer", not "App Manager" — sufficient for a plain TestFlight upload (this lane never calls `deliver`/submit-for-review), revisit only if Task 11's real run hits a permission error.
+- **Task 6 Play Console service account:** the classic "API access" page is gone from the current Play Console UI. Actual path used: created a new GCP project (`atlasgo-ci`, personal/no-org, under `junloutordos@gmail.com` — the same account that owns the Play Console developer account "PSHS-CRC MIS") → IAM & Admin → Service Accounts → created `atlasgo-ci@atlasgo-ci.iam.gserviceaccount.com` → JSON key downloaded to `~/Downloads/atlasgo-ci-c3bfeec4688f.json` → invited into Play Console (Users and permissions → Invite user) scoped to the AtlasGo app only, granted "Release to production, exclude devices and use Play app signing" + "Release apps to testing tracks" (the closest current equivalent to the old "Release manager" role — Play Console now uses granular per-app checkboxes instead of named roles).
+- **Play Console account gotcha:** `jtordos@crc.pshs.edu.ph` (the Workspace account active in Chrome by default) is NOT the Play Console account — the real one is `junloutordos@gmail.com` ("PSHS-CRC MIS" developer account). Browser account-switching via the profile-chooser dialog only affects the current tab/origin; a fresh navigation to a different Google product can silently fall back to `authuser=0`. Confirm the account chip in the top-left of any Play Console/Cloud Console page before acting.
 
 ## Self-Review Notes
 
