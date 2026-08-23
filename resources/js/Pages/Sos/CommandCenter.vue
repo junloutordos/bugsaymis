@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
 import axios from 'axios'
 
 const props = defineProps({ alerts: Array, emergencyAlerts: Array })
@@ -255,4 +256,10 @@ function subscribeEmergencyChannel() {
       </div>
     </div>
   </AdminLayout>
+
+  <!-- Second, independent overlay instance: reacts to a raw un-triaged SOS
+       trigger (sos-responders channel, responder-only), ahead of any
+       decision to promote it to the site-wide emergency-alerts broadcast
+       that AdminLayout's own overlay reacts to. -->
+  <EmergencyBorderOverlay :active="activeAlerts.length > 0" />
 </template>
