@@ -13,6 +13,7 @@ use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSosController;
 use App\Http\Controllers\StudentAttendance\Api\StudentProfileChangeRequestApiController;
 use App\Http\Controllers\StudentAttendance\Api\NoticeController;
+use App\Http\Controllers\StorageProxyController;
 use App\Http\Controllers\Api\AtlasSentinelController;
 use App\Http\Controllers\Api\AtlasSentinelRemoteHelpController;
 use App\Http\Controllers\Api\BiometricPunchIngestController;
@@ -64,6 +65,13 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
             ->whereNumber('id')
             ->name('notices.acknowledge');
         Route::get('/notices/history', [NoticeController::class, 'history'])->name('notices.history');
+
+        // Private-S3-via-proxy for mobile — reuses the exact same controller
+        // method the web /media/{path} route uses (routes/web.php:279), just
+        // reachable via Sanctum instead of the session guard mobile can't use.
+        Route::get('/media/{path}', [StorageProxyController::class, 'serve'])
+            ->where('path', '.+')
+            ->name('media');
 
         // List all students linked to this parent
         Route::get('/students', [StudentApiController::class, 'index'])->name('students.index');
