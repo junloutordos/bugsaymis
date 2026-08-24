@@ -348,6 +348,48 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertStringContainsString('Grade 8', session('warning'));
     }
 
+    public function test_same_section_period_drift_does_not_false_positive_room_conflict(): void
+    {
+        // Real production bug: a section's own periods can drift a bit from
+        // the canonical bell-schedule grid (e.g. Period 1 actually running
+        // 07:20-08:10 instead of 07:30-08:20). Two classes for the SAME
+        // section/room, genuinely 10 minutes apart and never double-booked,
+        // can land on opposite sides of a canonical period boundary and get
+        // compressed by different amounts — appearing to overlap even though
+        // the section (and therefore its own fixed room) was never actually
+        // double-booked.
+        $this->tuesdayClass->update(['start_time' => '07:20', 'end_time' => '08:10']);
+
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $subject = Subject::where('code', 'MATH7')->firstOrFail();
+
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $subject->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '08:20',
+            'end_time' => '09:10',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 1);
+    }
+
     public function test_same_grade_room_double_booking_still_blocks_save(): void
     {
         $room = Classroom::where('code', 'R101')->firstOrFail();

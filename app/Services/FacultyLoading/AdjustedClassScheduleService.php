@@ -69,6 +69,8 @@ class AdjustedClassScheduleService
                 $entries = ($scheduleRows->get($section->id) ?? collect())
                     ->map(function (ClassSchedule $schedule) use ($classSlots, $classDuration, $shift) {
                         $entry = $schedule->toCalendarArray();
+                        $entry['raw_start_time'] = substr((string) $schedule->start_time, 0, 5);
+                        $entry['raw_end_time'] = substr((string) $schedule->end_time, 0, 5);
                         $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $classSlots, $classDuration, $shift);
                         $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $classSlots, $classDuration, $shift);
 
@@ -214,18 +216,21 @@ class AdjustedClassScheduleService
     }
 
     /**
-     * Same-grade room/faculty overlaps after compression are genuine
-     * conflicts (both sides shrink by the identical per-grade shift, so
-     * compression cannot have manufactured them) and still block the save.
+     * An overlap after compression is only a genuine conflict if the two
+     * bookings ALSO overlapped at their original, uncompressed times — a
+     * real pre-existing double-booking, independent of compression, which
+     * still blocks the save regardless of grade.
      *
-     * Cross-grade overlaps cannot be trusted the same way: different grade
-     * groups bank different amounts of compression savings by the same
-     * wall-clock moment (their break/homeroom placement genuinely differs),
-     * so two originally back-to-back, non-conflicting bookings can appear to
-     * invert order after independent compression. Those are downgraded to a
-     * warning instead of a blocking error.
+     * Compression can fabricate an overlap between two originally
+     * non-overlapping bookings even within the same section or grade: real
+     * section timetables drift from the idealized canonical bell-schedule
+     * grid by different amounts (different sections bank different
+     * compression savings by the same wall-clock moment), so two genuinely
+     * sequential, non-conflicting bookings can appear to invert order after
+     * independent per-entry compression. Those are downgraded to a warning
+     * instead of a blocking error.
      *
-     * @return array<int,string> warning messages for cross-grade overlaps
+     * @return array<int,string> warning messages for compression-only overlaps
      */
     private function assertNoGeneratedConflicts(array $grades): array
     {
@@ -251,7 +256,8 @@ class AdjustedClassScheduleService
                         continue;
                     }
 
-                    if ($current['grade_level'] === $previous['grade_level']) {
+                    if ($current['raw_start_time'] < $previous['raw_end_time']
+                        && $previous['raw_start_time'] < $current['raw_end_time']) {
                         throw ValidationException::withMessages([
                             'activity_start_time' => "The compressed timetable creates a {$label} conflict. Review the preview or choose another activity time.",
                         ]);
