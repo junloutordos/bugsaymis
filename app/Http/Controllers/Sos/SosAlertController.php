@@ -151,6 +151,55 @@ class SosAlertController extends Controller
         return response()->json($query->paginate(20)->through(fn (SosAlert $alert) => $this->serialize($alert)));
     }
 
+    public function stats(Request $request)
+    {
+        $validated = $request->validate(['from' => 'nullable|date', 'to' => 'nullable|date']);
+
+        $base = SosAlert::query();
+        if (! empty($validated['from'])) {
+            $base->where('triggered_at', '>=', $validated['from']);
+        }
+        if (! empty($validated['to'])) {
+            $base->where('triggered_at', '<=', $validated['to']);
+        }
+
+        $byType = (clone $base)->select('alert_type', DB::raw('count(*) as total'))
+            ->groupBy('alert_type')->pluck('total', 'alert_type');
+
+        $byMonth = (clone $base)->select(DB::raw("DATE_FORMAT(triggered_at, '%Y-%m') as month"), DB::raw('count(*) as total'))
+            ->groupBy('month')->orderBy('month')->pluck('total', 'month');
+
+        $closedAlerts = (clone $base)->whereIn('status', ['resolved', 'false_alarm'])
+            ->whereNotNull('resolved_at')->get(['id', 'triggered_at', 'resolved_at']);
+
+        $avgResolutionMinutes = $closedAlerts->isEmpty() ? null
+            : round($closedAlerts->avg(fn (SosAlert $a) => $a->triggered_at->diffInMinutes($a->resolved_at)), 1);
+
+        $alertIds = (clone $base)->pluck('id');
+        $triggeredAtByAlert = (clone $base)->pluck('triggered_at', 'id');
+
+        $firstClaimByAlert = \App\Models\Sos\SosAlertEvent::where('type', 'claimed')
+            ->whereIn('sos_alert_id', $alertIds)
+            ->orderBy('created_at')
+            ->get()
+            ->unique('sos_alert_id');
+
+        $claimMinutes = $firstClaimByAlert
+            ->map(fn ($event) => isset($triggeredAtByAlert[$event->sos_alert_id])
+                ? $triggeredAtByAlert[$event->sos_alert_id]->diffInMinutes($event->created_at)
+                : null)
+            ->filter(fn ($minutes) => $minutes !== null);
+
+        $avgFirstClaimMinutes = $claimMinutes->isEmpty() ? null : round($claimMinutes->avg(), 1);
+
+        return response()->json([
+            'by_type'                  => $byType,
+            'by_month'                 => $byMonth,
+            'avg_first_claim_minutes'  => $avgFirstClaimMinutes,
+            'avg_resolution_minutes'   => $avgResolutionMinutes,
+        ]);
+    }
+
     private function serialize(SosAlert $alert): array
     {
         $isActive = ! in_array($alert->status, ['resolved', 'false_alarm'], true);
