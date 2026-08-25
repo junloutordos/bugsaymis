@@ -164,6 +164,29 @@ class LocationResolverServiceTest extends TestCase
         $this->assertSame('unknown', $result['type']);
     }
 
+    /**
+     * Real prod bug (found live, 2026-08-25): `users` has both an `office_id`
+     * FK and a separate legacy `office` free-text column. Eloquent resolves a
+     * raw attribute before a same-named relation method, so $user->office
+     * silently returns that string instead of the Office model, and
+     * ->division on a string fatals with a 500 on every real trigger. The
+     * legacy column isn't in User::$fillable, so it must be force-filled to
+     * reproduce — a plain factory create() can't shadow the relation.
+     */
+    public function test_staff_with_legacy_office_text_column_still_resolves_via_relation(): void
+    {
+        $this->currentTerm();
+        $division = \App\Models\Division::create(['division_name' => 'Curriculum & Instruction Division', 'status' => 'active']);
+        $office = \App\Models\Office::create(['name' => 'CID Office', 'division_id' => $division->id]);
+        $staff = User::factory()->create(['office_id' => $office->id]);
+        $staff->forceFill(['office' => 'Legacy free-text office value'])->save();
+
+        $result = app(LocationResolverService::class)->resolve($staff, Carbon::now());
+
+        $this->assertSame('office', $result['type']);
+        $this->assertSame('CID Office (Curriculum & Instruction Division)', $result['label']);
+    }
+
     public function test_student_location_uses_adjusted_day_snapshot_when_published(): void
     {
         $term = $this->currentTerm();

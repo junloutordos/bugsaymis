@@ -93,18 +93,27 @@ class LocationResolverService
             }
         }
 
-        if ($user->office_id && $user->office) {
-            $label = $user->office->division
-                ? "{$user->office->name} ({$user->office->division->division_name})"
-                : $user->office->name;
+        if ($user->office_id) {
+            // Deliberately NOT $user->office — the `users` table has both an
+            // `office_id` FK and a separate legacy `office` free-text column,
+            // and Eloquent resolves a raw attribute before a same-named
+            // relation method, so the dynamic accessor silently returns that
+            // string instead of the Office model. Query the relation directly.
+            $office = \App\Models\Office::with('division')->find($user->office_id);
 
-            return [
-                'type' => 'office',
-                'label' => $label,
-                'building' => null,
-                'room' => $user->office->name,
-                'source' => 'office',
-            ];
+            if ($office) {
+                $label = $office->division
+                    ? "{$office->name} ({$office->division->division_name})"
+                    : $office->name;
+
+                return [
+                    'type' => 'office',
+                    'label' => $label,
+                    'building' => null,
+                    'room' => $office->name,
+                    'source' => 'office',
+                ];
+            }
         }
 
         return $this->unknown();
