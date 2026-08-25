@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Sos;
 
 use App\Http\Controllers\Controller;
 use App\Models\Sos\SosAlert;
+use App\Services\Sos\LocationResolverService;
 use App\Services\Sos\SosAlertService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class SosAlertController extends Controller
 {
+    public function __construct(private readonly LocationResolverService $locationResolver) {}
+
     public function trigger(Request $request, SosAlertService $service)
     {
         $validated = $request->validate([
@@ -43,7 +46,7 @@ class SosAlertController extends Controller
 
     public function index()
     {
-        $alerts = SosAlert::with(['events' => fn ($q) => $q->orderByDesc('created_at')])
+        $alerts = SosAlert::with(['events' => fn ($q) => $q->orderByDesc('created_at'), 'triggerable', 'responders.user'])
             ->orderByDesc('triggered_at')
             ->limit(100)
             ->get()
@@ -64,7 +67,7 @@ class SosAlertController extends Controller
 
     public function show(SosAlert $alert)
     {
-        return response()->json($this->serialize($alert->load('events')));
+        return response()->json($this->serialize($alert->load(['events', 'triggerable', 'responders.user'])));
     }
 
     public function acknowledge(Request $request, SosAlert $alert, SosAlertService $service)
@@ -96,6 +99,8 @@ class SosAlertController extends Controller
 
     private function serialize(SosAlert $alert): array
     {
+        $isActive = ! in_array($alert->status, ['resolved', 'false_alarm'], true);
+
         return [
             'id'           => $alert->id,
             'alert_type'   => $alert->alert_type,
@@ -105,6 +110,24 @@ class SosAlertController extends Controller
             'lng'          => $alert->lng,
             'triggered_at' => $alert->triggered_at->toIso8601String(),
             'resolved_at'  => $alert->resolved_at?->toIso8601String(),
+            'resolved_location' => [
+                'type'     => $alert->resolved_location_type,
+                'label'    => $alert->resolved_location_label,
+                'building' => $alert->resolved_building,
+                'room'     => $alert->resolved_room,
+                'source'   => $alert->resolved_source,
+            ],
+            'current_location' => $isActive && $alert->relationLoaded('triggerable') && $alert->triggerable
+                ? $this->locationResolver->resolve($alert->triggerable, now())
+                : null,
+            'gps_badge' => $this->locationResolver->gpsBadge($alert->lat, $alert->lng),
+            'responders' => $alert->relationLoaded('responders')
+                ? $alert->responders->whereNull('unclaimed_at')->values()->map(fn ($r) => [
+                    'user_id'    => $r->user_id,
+                    'name'       => $r->user->name,
+                    'claimed_at' => $r->claimed_at->toIso8601String(),
+                ])->values()
+                : [],
             'events'       => $alert->relationLoaded('events')
                 ? $alert->events->map(fn ($e) => [
                     'type'       => $e->type,

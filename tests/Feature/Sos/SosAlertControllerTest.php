@@ -67,4 +67,33 @@ class SosAlertControllerTest extends TestCase
         $this->actingAs($responder)->postJson("/sos/{$alert->id}/resolve", ['notes' => 'Handled'])
             ->assertOk()->assertJsonPath('status', 'resolved');
     }
+
+    public function test_index_includes_resolved_and_current_location(): void
+    {
+        SosEscalationTier::create(['alert_type' => 'general', 'order' => 1, 'timeout_minutes' => 10, 'channels' => ['in_app'], 'notify_external' => false]);
+        $reporter = User::factory()->create(['office_id' => null]);
+        $this->actingAs($reporter)->postJson('/sos/trigger', ['alert_type' => 'general']);
+
+        $responder = $this->responder();
+        $response = $this->actingAs($responder)->getJson('/sos/'.SosAlert::first()->id);
+
+        $response->assertOk()
+            ->assertJsonPath('resolved_location.type', 'unknown')
+            ->assertJsonStructure(['current_location' => ['type', 'label', 'building', 'room', 'source']])
+            ->assertJsonStructure(['gps_badge' => ['on_campus', 'zone_label']])
+            ->assertJsonPath('responders', []);
+    }
+
+    public function test_closed_alert_has_no_live_current_location(): void
+    {
+        $responder = $this->responder();
+        $alert = SosAlert::create([
+            'triggerable_type' => User::class, 'triggerable_id' => User::factory()->create()->id,
+            'alert_type' => 'medical', 'status' => 'resolved', 'current_tier_order' => 1,
+            'triggered_at' => now(), 'resolved_at' => now(),
+        ]);
+
+        $this->actingAs($responder)->getJson("/sos/{$alert->id}")
+            ->assertOk()->assertJsonPath('current_location', null);
+    }
 }
