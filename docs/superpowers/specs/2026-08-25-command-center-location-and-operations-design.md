@@ -24,6 +24,10 @@ to an alert, no way to search/filter past alerts, and no response-time visibilit
 3. Let responders self-claim an alert so everyone watching the Command Center can see
    who's already handling it.
 4. Give responders a filterable history of past alerts and basic response-time stats.
+5. Notify responders (DRRM/Responder/Administrator) the moment an SOS fires, wherever
+   they are in the app — not only when they happen to be on the Command Center page.
+6. Give the reporter themselves a live view of their own alert's status, with a way to
+   stand it down ("I'm safe now") — matching what AtlasGo already offers students.
 
 ## 1. Location resolution
 
@@ -201,6 +205,74 @@ All schema changes are additive/nullable — safe within a single blue-green dep
 CLAUDE.md's migration discipline. `leaflet` is a pure frontend dependency. No changes
 to existing SOS trigger, escalation, or broadcast code paths beyond adding the
 location-resolution call at the end of `SosAlertService::trigger()`.
+
+## 9. Real-time responder notification (site-wide)
+
+Today a responder only learns about a new SOS alert if they're already on the Command
+Center page (`CommandCenter.vue`'s own `sos-responders` Echo subscription) — anywhere
+else in the app, they'd have to refresh and navigate there manually. `SosAlertService::trigger()`
+already fires `App\Events\Sos\SosAlertTriggered` (`ShouldBroadcastNow`, broadcast as
+`.sos.alert.triggered` on the existing private `sos-responders` channel) — the gap is
+purely that nothing outside `CommandCenter.vue` listens for it.
+
+- Lift the Echo subscription to `AdminLayout.vue` (mirrors the existing
+  `setupEmergencyAlertListener()`/`fetchEmergencyStatus()` pattern already used for the
+  public Emergency Alert Broadcast), gated by `hasPerm('sos.respond')` so only
+  DRRM/Responder/Administrator accounts subscribe at all.
+- A new bootstrap endpoint `GET /sos/active-status` (permission `sos.respond`) returns
+  `{ active: bool, count: int }`, fetched on `AdminLayout` mount and re-fetched whenever
+  `.sos.alert.triggered` or the existing `.sos.alert.updated` broadcast fires — mirrors
+  `fetchEmergencyStatus()`'s existing re-fetch-rather-than-blindly-clear approach.
+- Reuse the existing `EmergencyBorderOverlay.vue` component as-is (it already just takes
+  an `:active` boolean) for a second, responder-only instance driven by this active-SOS
+  state — a pulsing border visible on every page for as long as any SOS alert is open,
+  regardless of what the responder is doing.
+- New `SosResponderAlertModal.vue`, mounted in `AdminLayout.vue` next to
+  `NoticeQueueModal`/`EmergencyBorderOverlay`, exposing a `receiveNewAlert(payload)`
+  method the same way `noticeQueueModal.value?.receiveEmergencyAlert(payload)` already
+  works. Pops on `.sos.alert.triggered` with alert type, silent-mode flag, reporter name,
+  and resolved location. **Dismissible, not a hard block** — a responder mid-task
+  shouldn't be trapped by it — but visually urgent (red header), with a "View in Command
+  Center" action that Inertia-visits `sos.index`. The persistent border (above) carries
+  awareness after the modal is dismissed.
+- `SosAlertService::broadcastPayload()` (already used by `SosAlertTriggered`, and by
+  Task 8's claim/unclaim broadcasts) needs two more fields for the modal to be
+  self-contained without an extra fetch: `reporter_name` (built from `User->name` or a
+  `Student`'s `firstname`+`lastname`, matching the existing
+  `notifyEmergencyContact()` pattern) and the `resolved_location_label`/`type` persisted
+  by section 1's trigger-time snapshot.
+
+## 10. Reporter self-service status ("my SOS")
+
+AtlasGo already lets a student poll their own alert's status and mark themselves safe
+(`StudentSosController::show()`/`end()`, `SosAlertService::endByReporter()`, added
+2026-08-22 Phase C). No equivalent exists for a web/Atlas reporter (`User`) — someone
+without `sos.respond` who triggers their own SOS today has no way to check on it or
+stand it down themselves.
+
+- New `App\Http\Controllers\Sos\SosSelfServiceController` with `status()`/`end()`,
+  structurally identical to `StudentSosController`'s ownership check
+  (`$alert->triggerable_type === get_class($user) && $alert->triggerable_id ===
+  $user->getKey()`, else `abort(403)`) — generic enough to reuse `endByReporter()`
+  as-is, since it already types its second parameter as `Model $reporter`, not
+  `Student`.
+- Two new routes in the existing open (no permission-gate) `sos.*` group, alongside
+  `trigger`/`emergency-status`: `GET /sos/{alert}/mine` (`sos.mine.status`) and
+  `POST /sos/{alert}/mine/end` (`sos.mine.end`). **Use distinct throttle names**
+  (`throttle:30,1,sos-status` / `throttle:10,1,sos-end`) — a prior AtlasGo bug
+  (2026-08-22) shared one throttle key between a status-poll route and an end route,
+  exhausting the end route's quota via polling; this pass must not repeat it.
+- New `SosMyStatusModal.vue`, mounted in `AdminLayout.vue`. Auto-opens after a
+  successful **non-silent** trigger (checked via the existing `is_silent` flag in the
+  trigger response — a silent/duress alert must never surface any UI, or it defeats the
+  purpose of silent mode). Polls `sos.mine.status` every 5-10 seconds while open, shows
+  the current status (triggered → acknowledged → escalating → resolved/false alarm) and
+  resolved location, with a prominent "I'm safe now" button calling `sos.mine.end`.
+- The active alert id is kept in `localStorage` (not just component state), so a page
+  refresh or navigation doesn't lose track of an in-flight alert — `AdminLayout` checks
+  for it on mount and, if the alert is still active, reopens the modal/shows a small
+  persistent status chip. Not a hard block — reachable any time via the chip, closable
+  without ending the alert.
 
 ## Out of scope (this pass)
 
