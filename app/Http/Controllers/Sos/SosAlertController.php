@@ -64,7 +64,7 @@ class SosAlertController extends Controller
                 'created_at' => $a->created_at->toIso8601String(),
             ]);
 
-        return Inertia::render('Sos/CommandCenter', ['alerts' => $alerts, 'emergencyAlerts' => $emergencyAlerts]);
+        return Inertia::render('Sos/CommandCenter', ['alerts' => $alerts, 'emergencyAlerts' => $emergencyAlerts, 'authUserId' => auth()->id()]);
     }
 
     public function show(SosAlert $alert)

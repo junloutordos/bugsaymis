@@ -4,9 +4,10 @@ import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
 import AlertLocationPanel from '@/Components/Sos/AlertLocationPanel.vue'
+import ResponderList from '@/Components/Sos/ResponderList.vue'
 import axios from 'axios'
 
-const props = defineProps({ alerts: Array, emergencyAlerts: Array })
+const props = defineProps({ alerts: Array, emergencyAlerts: Array, authUserId: Number })
 
 const alerts = ref([...props.alerts])
 const selected = ref(null)
@@ -190,6 +191,10 @@ function subscribeEmergencyChannel() {
 
         <div class="mt-4">
           <AlertLocationPanel :alert="selected" />
+        </div>
+
+        <div class="mt-4">
+          <ResponderList :alert="selected" :current-user-id="authUserId" @updated="(data) => { upsertAlert(data); selected = data }" />
         </div>
 
         <div class="mt-4 flex flex-col gap-2">
