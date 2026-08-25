@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
+import AlertLocationPanel from '@/Components/Sos/AlertLocationPanel.vue'
 import axios from 'axios'
 
 const props = defineProps({ alerts: Array, emergencyAlerts: Array })
@@ -186,6 +187,10 @@ function subscribeEmergencyChannel() {
       <div v-if="selected" class="rounded-xl border border-slate-200 bg-white p-5">
         <h3 class="text-sm font-semibold text-slate-900">Alert #{{ selected.id }}</h3>
         <p class="mt-1 text-xs text-slate-500">{{ selected.alert_type.replace('_', ' ') }} · {{ selected.status }}</p>
+
+        <div class="mt-4">
+          <AlertLocationPanel :alert="selected" />
+        </div>
 
         <div class="mt-4 flex flex-col gap-2">
           <button class="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white" @click="act(selected, 'acknowledge')">Acknowledge</button>
