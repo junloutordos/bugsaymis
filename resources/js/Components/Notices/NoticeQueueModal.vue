@@ -5,6 +5,15 @@ import { storageUrl } from '@/Composables/useStorage'
 
 const pending = ref({ emergency_alerts: [], announcements: [] })
 const loaded = ref(false)
+const fullscreenImage = ref(null)
+
+function openFullscreen(src) {
+  fullscreenImage.value = src
+}
+
+function closeFullscreen() {
+  fullscreenImage.value = null
+}
 
 // Emergency alerts always come first — a life-safety notice must never
 // wait behind "no classes Friday" in the queue.
@@ -49,7 +58,16 @@ function receiveEmergencyAlert(alert) {
 
 defineExpose({ receiveEmergencyAlert })
 
-onMounted(fetchPending)
+function handleKeydown(e) {
+  if (e.key === 'Escape' && fullscreenImage.value) {
+    closeFullscreen()
+  }
+}
+
+onMounted(() => {
+  fetchPending()
+  window.addEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
@@ -77,7 +95,8 @@ onMounted(fetchPending)
           v-if="current.poster_path"
           :src="storageUrl(current.poster_path)"
           :alt="current.title"
-          class="mt-3 max-h-64 w-full rounded-lg object-cover"
+          class="mt-3 max-h-64 w-full cursor-zoom-in rounded-lg object-contain"
+          @click="openFullscreen(storageUrl(current.poster_path))"
         />
       </div>
 
@@ -88,6 +107,28 @@ onMounted(fetchPending)
       >
         {{ current.kind === 'emergency-alert' ? 'Acknowledge' : 'Mark as Read' }}
       </button>
+    </div>
+
+    <div
+      v-if="fullscreenImage"
+      class="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"
+      @click="closeFullscreen"
+    >
+      <button
+        class="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+        aria-label="Close fullscreen image"
+        @click.stop="closeFullscreen"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <img
+        :src="fullscreenImage"
+        :alt="current?.title"
+        class="max-h-full max-w-full cursor-zoom-out rounded-lg object-contain"
+        @click.stop="closeFullscreen"
+      />
     </div>
   </div>
 </template>
