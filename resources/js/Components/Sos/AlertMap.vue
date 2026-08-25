@@ -23,7 +23,16 @@ function render() {
 
   if (marker) marker.remove()
   marker = L.marker([props.lat, props.lng]).addTo(map)
-  if (props.label) marker.bindPopup(props.label).openPopup()
+  if (props.label) {
+    // Leaflet's bindPopup() treats a string argument as raw HTML — label is
+    // built server-side from classroom/subject/office/faculty names, which
+    // are admin-entered data with no HTML-safety guarantee. Pass a DOM node
+    // with textContent instead of a string, so it can never be interpreted
+    // as markup.
+    const popupEl = document.createElement('div')
+    popupEl.textContent = props.label
+    marker.bindPopup(popupEl).openPopup()
+  }
 }
 
 onMounted(render)
