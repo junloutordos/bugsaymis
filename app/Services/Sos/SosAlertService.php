@@ -11,11 +11,15 @@ use App\Models\Sos\SosAlertEvent;
 use App\Models\Sos\SosEscalationTier;
 use App\Models\User;
 use App\Services\CampusPresenceService;
+use App\Services\Sos\LocationResolverService;
 use Illuminate\Database\Eloquent\Model;
 
 class SosAlertService
 {
-    public function __construct(private readonly CampusPresenceService $campusPresence) {}
+    public function __construct(
+        private readonly CampusPresenceService $campusPresence,
+        private readonly LocationResolverService $locationResolver,
+    ) {}
 
     /**
      * @return array{blocked: bool, reason: ?string, alert: ?SosAlert}
@@ -40,6 +44,8 @@ class SosAlertService
             return ['blocked' => true, 'reason' => $gate['status'], 'alert' => null];
         }
 
+        $location = $this->locationResolver->resolve($triggerable, now());
+
         $alert = SosAlert::create([
             'triggerable_type'   => get_class($triggerable),
             'triggerable_id'     => $triggerable->getKey(),
@@ -50,6 +56,11 @@ class SosAlertService
             'lng'                => $lng,
             'accuracy'           => $accuracy,
             'geofence_zone_id'   => $gate['geofence']['zoneId'] ?? null,
+            'resolved_location_type'  => $location['type'],
+            'resolved_location_label' => $location['label'],
+            'resolved_building'       => $location['building'],
+            'resolved_room'           => $location['room'],
+            'resolved_source'         => $location['source'],
             'current_tier_order' => 1,
             'triggered_at'       => now(),
         ]);

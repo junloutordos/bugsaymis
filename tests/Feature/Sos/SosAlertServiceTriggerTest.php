@@ -84,4 +84,19 @@ class SosAlertServiceTriggerTest extends TestCase
 
         $this->assertTrue($result['alert']->is_silent);
     }
+
+    public function test_trigger_persists_a_resolved_location_snapshot(): void
+    {
+        SosEscalationTier::create(['alert_type' => 'general', 'order' => 1, 'timeout_minutes' => 10, 'channels' => ['in_app'], 'notify_external' => false]);
+        $user = User::factory()->create(['office_id' => null]);
+
+        $result = app(SosAlertService::class)->trigger(
+            triggerable: $user, alertType: 'general', isSilent: false,
+            lat: null, lng: null, accuracy: null, ip: null,
+        );
+
+        $this->assertSame('unknown', $result['alert']->resolved_location_type);
+        $this->assertSame('fallback', $result['alert']->resolved_source);
+        $this->assertNotNull($result['alert']->resolved_location_label);
+    }
 }
