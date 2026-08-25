@@ -55,31 +55,34 @@ onMounted(fetchPending)
 <template>
   <div v-if="loaded && current" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4">
     <div
-      class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+      class="flex w-full max-w-2xl max-h-[90vh] flex-col rounded-2xl bg-white p-6 shadow-2xl"
       :class="current.kind === 'emergency-alert' ? 'border-4 border-red-600' : ''"
     >
-      <p v-if="queue.length > 1" class="mb-2 text-xs font-medium text-slate-400">
+      <p v-if="queue.length > 1" class="mb-2 shrink-0 text-xs font-medium text-slate-400">
         {{ currentIndex + 1 }} of {{ queue.length }}
       </p>
 
       <span
         v-if="current.kind === 'emergency-alert'"
-        class="mb-2 inline-block rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white"
+        class="mb-2 inline-block w-fit shrink-0 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white"
       >
         Emergency Alert{{ current.severity ? ` — ${current.severity}` : '' }}
       </span>
 
-      <h2 class="text-lg font-semibold text-slate-900">{{ current.title }}</h2>
-      <p class="mt-2 whitespace-pre-line text-sm text-slate-600">{{ current.body || current.message }}</p>
-      <img
-        v-if="current.poster_path"
-        :src="storageUrl(current.poster_path)"
-        :alt="current.title"
-        class="mt-3 max-h-64 w-full rounded-lg object-cover"
-      />
+      <h2 class="shrink-0 text-lg font-semibold text-slate-900">{{ current.title }}</h2>
+
+      <div class="mt-2 min-h-0 flex-1 overflow-y-auto">
+        <p class="whitespace-pre-line text-sm text-slate-600">{{ current.body || current.message }}</p>
+        <img
+          v-if="current.poster_path"
+          :src="storageUrl(current.poster_path)"
+          :alt="current.title"
+          class="mt-3 max-h-64 w-full rounded-lg object-cover"
+        />
+      </div>
 
       <button
-        class="mt-5 w-full rounded-lg px-4 py-2 text-sm font-medium text-white"
+        class="mt-5 w-full shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-white"
         :class="current.kind === 'emergency-alert' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'"
         @click="acknowledge"
       >
