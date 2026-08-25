@@ -16,6 +16,8 @@ class SosSchemaTest extends TestCase
             'triggerable_type', 'triggerable_id', 'alert_type', 'is_silent', 'status',
             'lat', 'lng', 'accuracy', 'geofence_zone_id', 'current_tier_order',
             'triggered_at', 'resolved_at', 'resolved_by', 'resolution_notes',
+            'resolved_location_type', 'resolved_location_label',
+            'resolved_building', 'resolved_room', 'resolved_source',
         ]));
 
         $this->assertTrue(Schema::hasColumns('sos_alert_events', [
