@@ -5,9 +5,12 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
 import AlertLocationPanel from '@/Components/Sos/AlertLocationPanel.vue'
 import ResponderList from '@/Components/Sos/ResponderList.vue'
+import CommandCenterHistoryTab from '@/Components/Sos/CommandCenterHistoryTab.vue'
 import axios from 'axios'
 
 const props = defineProps({ alerts: Array, emergencyAlerts: Array, authUserId: Number })
+
+const activeTab = ref('active')
 
 const alerts = ref([...props.alerts])
 const selected = ref(null)
@@ -126,7 +129,12 @@ function subscribeEmergencyChannel() {
 <template>
   <Head title="SOS Command Center" />
   <AdminLayout title="SOS Command Center">
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="mb-4 flex gap-2 border-b border-slate-200">
+      <button class="px-3 py-2 text-sm font-medium" :class="activeTab === 'active' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500'" @click="activeTab = 'active'">Active</button>
+      <button class="px-3 py-2 text-sm font-medium" :class="activeTab === 'history' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500'" @click="activeTab = 'history'">History</button>
+    </div>
+
+    <div v-show="activeTab === 'active'" class="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div class="lg:col-span-2">
         <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Active Alerts</h2>
         <div v-if="activeAlerts.length === 0" class="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-slate-400">
@@ -225,6 +233,8 @@ function subscribeEmergencyChannel() {
         </div>
       </div>
     </div>
+
+    <CommandCenterHistoryTab v-if="activeTab === 'history'" />
 
     <!-- Broadcast form modal -->
     <div v-if="showBroadcastForm" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4">
