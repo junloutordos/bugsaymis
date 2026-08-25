@@ -36,6 +36,10 @@ class SosSchemaTest extends TestCase
             'sos_escalation_tier_id', 'user_id',
         ]));
 
+        $this->assertTrue(Schema::hasColumns('sos_alert_responders', [
+            'sos_alert_id', 'user_id', 'claimed_at', 'unclaimed_at',
+        ]));
+
         $this->assertTrue(Schema::hasColumns('sos_external_contacts', [
             'name', 'org', 'phone', 'email', 'alert_types', 'channel', 'active',
         ]));

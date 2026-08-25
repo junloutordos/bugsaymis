@@ -37,6 +37,16 @@ class SosAlert extends Model
         return $this->hasMany(SosAlertEvent::class);
     }
 
+    public function responders(): HasMany
+    {
+        return $this->hasMany(SosAlertResponder::class);
+    }
+
+    public function activeResponders(): HasMany
+    {
+        return $this->hasMany(SosAlertResponder::class)->whereNull('unclaimed_at');
+    }
+
     public function resolvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'resolved_by');
