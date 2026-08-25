@@ -96,4 +96,20 @@ class SosAlertControllerTest extends TestCase
         $this->actingAs($responder)->getJson("/sos/{$alert->id}")
             ->assertOk()->assertJsonPath('current_location', null);
     }
+
+    public function test_active_status_reports_open_alert_count(): void
+    {
+        $responder = $this->responder();
+        SosAlert::create(['triggerable_type' => User::class, 'triggerable_id' => User::factory()->create()->id, 'alert_type' => 'medical', 'status' => 'triggered', 'current_tier_order' => 1, 'triggered_at' => now()]);
+        SosAlert::create(['triggerable_type' => User::class, 'triggerable_id' => User::factory()->create()->id, 'alert_type' => 'general', 'status' => 'resolved', 'current_tier_order' => 1, 'triggered_at' => now(), 'resolved_at' => now()]);
+
+        $this->actingAs($responder)->getJson('/sos/active-status')
+            ->assertOk()->assertJsonPath('active', true)->assertJsonPath('count', 1);
+    }
+
+    public function test_active_status_requires_sos_respond_permission(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user)->getJson('/sos/active-status')->assertForbidden();
+    }
 }

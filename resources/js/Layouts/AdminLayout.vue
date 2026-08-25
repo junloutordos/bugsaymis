@@ -25,12 +25,15 @@ import SosFloatingButton from '@/Components/Sos/SosFloatingButton.vue'
 import PageSkeleton from '@/Components/PageSkeleton.vue';
 import NoticeQueueModal from '@/Components/Notices/NoticeQueueModal.vue'
 import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
+import SosResponderAlertModal from '@/Components/Sos/SosResponderAlertModal.vue'
 import { menuItems } from './navigation.js';
 
 // --- State ---
 const collapsed = ref(false);
 const noticeQueueModal = ref(null);
 const hasActiveEmergency = ref(false);
+const sosResponderModal = ref(null);
+const hasActiveSosAlert = ref(false);
 const mobileOpen = ref(false);
 const sidebarNav = ref(null);
 const sidebarSearch = ref(null);
@@ -108,6 +111,30 @@ function setupEmergencyAlertListener() {
     });
 }
 
+async function fetchSosActiveStatus() {
+  if (!hasPerm('sos.respond')) return;
+  try {
+    const res = await window.axios.get(route('sos.active-status'));
+    hasActiveSosAlert.value = res.data.active;
+  } catch {
+    hasActiveSosAlert.value = false;
+  }
+}
+
+let sosResponderChannel = null;
+function setupSosResponderListener() {
+  if (!window.Echo || !hasPerm('sos.respond')) return;
+
+  sosResponderChannel = window.Echo.private('sos-responders')
+    .listen('.sos.alert.triggered', (payload) => {
+      sosResponderModal.value?.receiveNewAlert(payload);
+      hasActiveSosAlert.value = true;
+    })
+    .listen('.sos.alert.updated', () => {
+      fetchSosActiveStatus();
+    });
+}
+
 // Reset badge when navigating to Chat
 watch(() => route().current('chat.index'), (onChat) => {
   if (onChat) chatUnreadCount.value = 0;
@@ -159,6 +186,8 @@ onMounted(() => {
   setupChatNotifications();
   setupEmergencyAlertListener();
   fetchEmergencyStatus();
+  setupSosResponderListener();
+  fetchSosActiveStatus();
 
   // Request browser notification permission (non-blocking)
   if ('Notification' in window && Notification.permission === 'default') {
@@ -815,6 +844,9 @@ watch(() => page.url, async () => {
   <NoticeQueueModal ref="noticeQueueModal" />
 
   <EmergencyBorderOverlay :active="hasActiveEmergency" />
+
+  <SosResponderAlertModal v-if="hasPerm('sos.respond')" ref="sosResponderModal" />
+  <EmergencyBorderOverlay v-if="hasPerm('sos.respond')" :active="hasActiveSosAlert" />
 
 </template>
 

@@ -67,6 +67,13 @@ class SosAlertController extends Controller
         return Inertia::render('Sos/CommandCenter', ['alerts' => $alerts, 'emergencyAlerts' => $emergencyAlerts, 'authUserId' => auth()->id()]);
     }
 
+    public function activeStatus(): \Illuminate\Http\JsonResponse
+    {
+        $count = SosAlert::whereNotIn('status', ['resolved', 'false_alarm'])->count();
+
+        return response()->json(['active' => $count > 0, 'count' => $count]);
+    }
+
     public function show(SosAlert $alert)
     {
         return response()->json($this->serialize($alert->load(['events', 'triggerable', 'responders.user'])));
