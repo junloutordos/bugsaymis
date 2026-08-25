@@ -6,6 +6,7 @@ import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
 import AlertLocationPanel from '@/Components/Sos/AlertLocationPanel.vue'
 import ResponderList from '@/Components/Sos/ResponderList.vue'
 import CommandCenterHistoryTab from '@/Components/Sos/CommandCenterHistoryTab.vue'
+import CommandCenterStatsTab from '@/Components/Sos/CommandCenterStatsTab.vue'
 import axios from 'axios'
 
 const props = defineProps({ alerts: Array, emergencyAlerts: Array, authUserId: Number })
@@ -132,6 +133,7 @@ function subscribeEmergencyChannel() {
     <div class="mb-4 flex gap-2 border-b border-slate-200">
       <button class="px-3 py-2 text-sm font-medium" :class="activeTab === 'active' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500'" @click="activeTab = 'active'">Active</button>
       <button class="px-3 py-2 text-sm font-medium" :class="activeTab === 'history' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500'" @click="activeTab = 'history'">History</button>
+      <button class="px-3 py-2 text-sm font-medium" :class="activeTab === 'stats' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500'" @click="activeTab = 'stats'">Stats</button>
     </div>
 
     <div v-show="activeTab === 'active'" class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -235,6 +237,7 @@ function subscribeEmergencyChannel() {
     </div>
 
     <CommandCenterHistoryTab v-if="activeTab === 'history'" />
+    <CommandCenterStatsTab v-if="activeTab === 'stats'" />
 
     <!-- Broadcast form modal -->
     <div v-if="showBroadcastForm" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4">
