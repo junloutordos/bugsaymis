@@ -2,6 +2,20 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+
+// Leaflet's default marker icon resolves its image paths relative to
+// leaflet.css at runtime, which breaks once Vite bundles/hashes assets —
+// the marker silently fails to render with no console error. Point the
+// default icon at Vite-resolved asset URLs instead.
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+})
 
 const props = defineProps({ lat: { type: Number, default: null }, lng: { type: Number, default: null }, label: { type: String, default: null } })
 

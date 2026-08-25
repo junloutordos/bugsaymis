@@ -13,6 +13,7 @@ use App\Models\Sos\SosEscalationTier;
 use App\Models\User;
 use App\Services\CampusPresenceService;
 use App\Services\Sos\LocationResolverService;
+use App\Services\Sos\ReporterIdentityService;
 use Illuminate\Database\Eloquent\Model;
 
 class SosAlertService
@@ -20,6 +21,7 @@ class SosAlertService
     public function __construct(
         private readonly CampusPresenceService $campusPresence,
         private readonly LocationResolverService $locationResolver,
+        private readonly ReporterIdentityService $reporterIdentity,
     ) {}
 
     /**
@@ -222,6 +224,13 @@ class SosAlertService
             ]);
         }
 
+        // Claiming an untriaged alert IS the acknowledgment — a responder
+        // saying "I'm on it" is functionally identical to acknowledging, and
+        // requiring both is redundant friction during a live emergency.
+        if ($alert->status === 'triggered') {
+            $alert->update(['status' => 'acknowledged']);
+        }
+
         $event = SosAlertEvent::create([
             'sos_alert_id' => $alert->id, 'type' => 'claimed',
             'actor_type' => User::class, 'actor_id' => $responder->id, 'payload' => null,
@@ -234,6 +243,13 @@ class SosAlertService
 
     public function unclaim(SosAlert $alert, User $responder): ?SosAlertEvent
     {
+        // Once verified (or beyond), "I'm responding" is a one-way commitment
+        // in the UI — see SosAlertController::unclaim() for the primary guard.
+        // Kept here too since other callers may invoke the service directly.
+        if (in_array($alert->status, ['verified', 'escalated', 'resolved', 'false_alarm'], true)) {
+            return null;
+        }
+
         $updated = SosAlertResponder::where('sos_alert_id', $alert->id)
             ->where('user_id', $responder->id)
             ->whereNull('unclaimed_at')
@@ -317,17 +333,10 @@ class SosAlertService
         return true;
     }
 
-    private function reporterName(Model $triggerable): string
-    {
-        if ($triggerable instanceof User) {
-            return $triggerable->name;
-        }
-
-        return trim($triggerable->firstname.' '.$triggerable->lastname);
-    }
-
     private function broadcastPayload(SosAlert $alert): array
     {
+        $reporter = $this->reporterIdentity->resolve($alert->triggerable);
+
         return [
             'id'                      => $alert->id,
             'alert_type'              => $alert->alert_type,
@@ -336,7 +345,8 @@ class SosAlertService
             'lat'                     => $alert->lat,
             'lng'                     => $alert->lng,
             'triggered_at'            => $alert->triggered_at->toIso8601String(),
-            'reporter_name'           => $this->reporterName($alert->triggerable),
+            'reporter_name'           => $reporter['name'],
+            'reporter'                => $reporter,
             'resolved_location_type'  => $alert->resolved_location_type,
             'resolved_location_label' => $alert->resolved_location_label,
             'responders'              => $alert->responders()->whereNull('unclaimed_at')->with('user:id,name')->get()

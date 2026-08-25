@@ -82,4 +82,43 @@ class SosAlertClaimTest extends TestCase
 
         $this->actingAs($user)->postJson("/sos/{$alert->id}/claim")->assertForbidden();
     }
+
+    public function test_claiming_a_triggered_alert_bumps_status_to_acknowledged(): void
+    {
+        $responder = $this->responder();
+        $alert = $this->alert();
+
+        $this->actingAs($responder)->postJson("/sos/{$alert->id}/claim")
+            ->assertOk()
+            ->assertJsonPath('status', 'acknowledged');
+
+        $this->assertSame('acknowledged', $alert->fresh()->status);
+    }
+
+    public function test_claiming_an_already_acknowledged_alert_does_not_change_status(): void
+    {
+        $responder = $this->responder();
+        $alert = $this->alert();
+        $alert->update(['status' => 'acknowledged']);
+
+        $this->actingAs($responder)->postJson("/sos/{$alert->id}/claim")
+            ->assertOk()
+            ->assertJsonPath('status', 'acknowledged');
+    }
+
+    public function test_unclaim_is_blocked_once_alert_is_verified(): void
+    {
+        $responder = $this->responder();
+        $alert = $this->alert();
+
+        $this->actingAs($responder)->postJson("/sos/{$alert->id}/claim")->assertOk();
+        $alert->update(['status' => 'verified']);
+
+        $this->actingAs($responder)->postJson("/sos/{$alert->id}/unclaim")
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('sos_alert_responders', [
+            'sos_alert_id' => $alert->id, 'user_id' => $responder->id, 'unclaimed_at' => null,
+        ]);
+    }
 }

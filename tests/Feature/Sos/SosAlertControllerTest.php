@@ -112,4 +112,37 @@ class SosAlertControllerTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user)->getJson('/sos/active-status')->assertForbidden();
     }
+
+    public function test_index_includes_reporter_identity_for_user_triggerable(): void
+    {
+        $responder = $this->responder();
+        $reporter = User::factory()->create(['name' => 'Juan Dela Cruz']);
+        $alert = SosAlert::create([
+            'triggerable_type' => User::class, 'triggerable_id' => $reporter->id,
+            'alert_type' => 'medical', 'status' => 'triggered', 'current_tier_order' => 1, 'triggered_at' => now(),
+        ]);
+
+        $this->actingAs($responder)->getJson("/sos/{$alert->id}")
+            ->assertOk()
+            ->assertJsonPath('reporter.name', 'Juan Dela Cruz')
+            ->assertJsonPath('reporter.type', 'user')
+            ->assertJsonPath('reporter.grade_level', null);
+    }
+
+    public function test_index_includes_reporter_identity_for_student_triggerable(): void
+    {
+        $responder = $this->responder();
+        $studentId = \Illuminate\Support\Facades\DB::table('students')->insertGetId([
+            'pisaysystemID' => 'REP-1', 'firstname' => 'Ana', 'lastname' => 'Reyes',
+        ]);
+        $alert = SosAlert::create([
+            'triggerable_type' => \App\Models\Student::class, 'triggerable_id' => $studentId,
+            'alert_type' => 'general', 'status' => 'triggered', 'current_tier_order' => 1, 'triggered_at' => now(),
+        ]);
+
+        $this->actingAs($responder)->getJson("/sos/{$alert->id}")
+            ->assertOk()
+            ->assertJsonPath('reporter.name', 'Ana Reyes')
+            ->assertJsonPath('reporter.type', 'student');
+    }
 }

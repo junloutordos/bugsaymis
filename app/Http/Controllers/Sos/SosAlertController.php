@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Sos\SosAlert;
 use App\Models\Student;
 use App\Services\Sos\LocationResolverService;
+use App\Services\Sos\ReporterIdentityService;
 use App\Services\Sos\SosAlertService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,10 @@ use Inertia\Inertia;
 
 class SosAlertController extends Controller
 {
-    public function __construct(private readonly LocationResolverService $locationResolver) {}
+    public function __construct(
+        private readonly LocationResolverService $locationResolver,
+        private readonly ReporterIdentityService $reporterIdentity,
+    ) {}
 
     public function trigger(Request $request, SosAlertService $service)
     {
@@ -93,6 +97,12 @@ class SosAlertController extends Controller
 
     public function unclaim(Request $request, SosAlert $alert, SosAlertService $service)
     {
+        if (in_array($alert->status, ['verified', 'escalated', 'resolved', 'false_alarm'], true)) {
+            return response()->json([
+                'message' => 'This alert has already been verified — responders can no longer unclaim.',
+            ], 422);
+        }
+
         $service->unclaim($alert, $request->user());
         return response()->json($this->serialize($alert->fresh(['events', 'triggerable', 'responders.user'])));
     }
@@ -220,6 +230,7 @@ class SosAlertController extends Controller
             'lng'          => $alert->lng,
             'triggered_at' => $alert->triggered_at->toIso8601String(),
             'resolved_at'  => $alert->resolved_at?->toIso8601String(),
+            'reporter'     => $this->reporterIdentity->resolve($alert->triggerable),
             'resolved_location' => [
                 'type'     => $alert->resolved_location_type,
                 'label'    => $alert->resolved_location_label,
