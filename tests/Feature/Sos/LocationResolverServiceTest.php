@@ -103,4 +103,64 @@ class LocationResolverServiceTest extends TestCase
         $this->assertSame('unknown', $result['type']);
         $this->assertSame('fallback', $result['source']);
     }
+
+    public function test_faculty_mid_class_resolves_to_classroom(): void
+    {
+        $term = $this->currentTerm();
+        $classroom = Classroom::create(['school_year_id' => $term->school_year_id, 'name' => 'Room 305', 'code' => 'R305', 'building' => 'Science Wing']);
+        $section = Section::create(['levelid' => 8, 'sectionname' => 'Darwin', 'syid' => $term->school_year_id, 'school_year_id' => $term->school_year_id, 'is_active' => true]);
+        $subject = Subject::create(['school_year_id' => $term->school_year_id, 'code' => 'MATH8', 'name' => 'Math 8', 'subject_type' => 'science_core', 'load_units' => 1, 'grade_level' => 8]);
+        $teacher = User::factory()->create(['name' => 'Mr. Newton']);
+
+        $monday = Carbon::now()->next(Carbon::MONDAY)->setTime(13, 0);
+
+        ClassSchedule::create([
+            'user_id' => $teacher->id, 'subject_id' => $subject->id, 'section_id' => $section->id,
+            'classroom_id' => $classroom->id, 'school_year_id' => $term->school_year_id, 'academic_term_id' => $term->id,
+            'entry_type' => 'class', 'session_type' => 'regular', 'day_of_week' => 'Monday',
+            'start_time' => '12:30:00', 'end_time' => '13:30:00', 'status' => 'active',
+        ]);
+
+        $result = app(LocationResolverService::class)->resolve($teacher, $monday);
+
+        $this->assertSame('classroom', $result['type']);
+        $this->assertSame('Teaching Math 8 — Room 305', $result['label']);
+        $this->assertSame('schedule', $result['source']);
+    }
+
+    public function test_faculty_with_no_current_class_falls_back_to_office(): void
+    {
+        $this->currentTerm();
+        $division = \App\Models\Division::create(['division_name' => 'Curriculum & Instruction Division', 'status' => 'active']);
+        $office = \App\Models\Office::create(['name' => 'CID Office', 'division_id' => $division->id]);
+        $teacher = User::factory()->create(['office_id' => $office->id]);
+
+        $result = app(LocationResolverService::class)->resolve($teacher, Carbon::now()->next(Carbon::SUNDAY));
+
+        $this->assertSame('office', $result['type']);
+        $this->assertSame('CID Office (Curriculum & Instruction Division)', $result['label']);
+        $this->assertSame('office', $result['source']);
+    }
+
+    public function test_staff_with_no_teaching_load_resolves_straight_to_office(): void
+    {
+        $this->currentTerm();
+        $office = \App\Models\Office::create(['name' => 'General Services Office']);
+        $staff = User::factory()->create(['office_id' => $office->id]);
+
+        $result = app(LocationResolverService::class)->resolve($staff, Carbon::now());
+
+        $this->assertSame('office', $result['type']);
+        $this->assertSame('General Services Office', $result['label']);
+    }
+
+    public function test_staff_with_no_office_is_unknown(): void
+    {
+        $this->currentTerm();
+        $staff = User::factory()->create(['office_id' => null]);
+
+        $result = app(LocationResolverService::class)->resolve($staff, Carbon::now());
+
+        $this->assertSame('unknown', $result['type']);
+    }
 }

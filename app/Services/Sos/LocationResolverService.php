@@ -69,7 +69,36 @@ class LocationResolverService
 
     private function resolveEmployee(User $user, Carbon $atTime): array
     {
-        return $this->unknown(); // faculty/staff branch added in Task 4
+        $term = $this->currentTerm();
+
+        if ($term) {
+            $entry = $this->matchScheduleEntry($term, $atTime, sectionId: null, facultyId: $user->id);
+            if ($entry) {
+                return [
+                    'type' => 'classroom',
+                    'label' => "Teaching {$entry['subject']} — {$entry['classroom']}",
+                    'building' => $entry['building'],
+                    'room' => $entry['classroom'],
+                    'source' => 'schedule',
+                ];
+            }
+        }
+
+        if ($user->office_id && $user->office) {
+            $label = $user->office->division
+                ? "{$user->office->name} ({$user->office->division->division_name})"
+                : $user->office->name;
+
+            return [
+                'type' => 'office',
+                'label' => $label,
+                'building' => null,
+                'room' => $user->office->name,
+                'source' => 'office',
+            ];
+        }
+
+        return $this->unknown();
     }
 
     protected function currentTerm(): ?AcademicTerm
