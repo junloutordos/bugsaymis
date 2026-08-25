@@ -317,17 +317,29 @@ class SosAlertService
         return true;
     }
 
+    private function reporterName(Model $triggerable): string
+    {
+        if ($triggerable instanceof User) {
+            return $triggerable->name;
+        }
+
+        return trim($triggerable->firstname.' '.$triggerable->lastname);
+    }
+
     private function broadcastPayload(SosAlert $alert): array
     {
         return [
-            'id'           => $alert->id,
-            'alert_type'   => $alert->alert_type,
-            'is_silent'    => $alert->is_silent,
-            'status'       => $alert->status,
-            'lat'          => $alert->lat,
-            'lng'          => $alert->lng,
-            'triggered_at' => $alert->triggered_at->toIso8601String(),
-            'responders'   => $alert->responders()->whereNull('unclaimed_at')->with('user:id,name')->get()
+            'id'                      => $alert->id,
+            'alert_type'              => $alert->alert_type,
+            'is_silent'               => $alert->is_silent,
+            'status'                  => $alert->status,
+            'lat'                     => $alert->lat,
+            'lng'                     => $alert->lng,
+            'triggered_at'            => $alert->triggered_at->toIso8601String(),
+            'reporter_name'           => $this->reporterName($alert->triggerable),
+            'resolved_location_type'  => $alert->resolved_location_type,
+            'resolved_location_label' => $alert->resolved_location_label,
+            'responders'              => $alert->responders()->whereNull('unclaimed_at')->with('user:id,name')->get()
                 ->map(fn ($r) => ['user_id' => $r->user_id, 'name' => $r->user->name, 'claimed_at' => $r->claimed_at->toIso8601String()])
                 ->values()->all(),
         ];
