@@ -392,6 +392,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
         Route::middleware('permission:sos.respond')->group(function () {
             Route::get('/', [\App\Http\Controllers\Sos\SosAlertController::class, 'index'])->name('index');
+            Route::get('/history', [\App\Http\Controllers\Sos\SosAlertController::class, 'history'])->name('history');
             Route::get('/{alert}', [\App\Http\Controllers\Sos\SosAlertController::class, 'show'])->name('show')->whereNumber('alert');
             Route::post('/{alert}/claim', [\App\Http\Controllers\Sos\SosAlertController::class, 'claim'])->name('claim')->whereNumber('alert');
             Route::post('/{alert}/unclaim', [\App\Http\Controllers\Sos\SosAlertController::class, 'unclaim'])->name('unclaim')->whereNumber('alert');

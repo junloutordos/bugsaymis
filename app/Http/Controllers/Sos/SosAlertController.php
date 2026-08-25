@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Sos;
 
 use App\Http\Controllers\Controller;
 use App\Models\Sos\SosAlert;
+use App\Models\Student;
 use App\Services\Sos\LocationResolverService;
 use App\Services\Sos\SosAlertService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class SosAlertController extends Controller
@@ -107,6 +109,46 @@ class SosAlertController extends Controller
         $validated = $request->validate(['notes' => 'nullable|string|max:2000']);
         $service->resolve($alert, $request->user(), $validated['notes'] ?? null);
         return response()->json($this->serialize($alert->fresh()));
+    }
+
+    public function history(Request $request)
+    {
+        $validated = $request->validate([
+            'from'       => 'nullable|date',
+            'to'         => 'nullable|date',
+            'alert_type' => 'nullable|in:medical,security,fire_disaster,general',
+            'status'     => 'nullable|in:resolved,false_alarm',
+            'reporter'   => 'nullable|string|max:255',
+        ]);
+
+        $query = SosAlert::with(['events', 'triggerable'])
+            ->whereIn('status', ['resolved', 'false_alarm'])
+            ->orderByDesc('triggered_at');
+
+        if (! empty($validated['from'])) {
+            $query->where('triggered_at', '>=', $validated['from']);
+        }
+        if (! empty($validated['to'])) {
+            $query->where('triggered_at', '<=', $validated['to']);
+        }
+        if (! empty($validated['alert_type'])) {
+            $query->where('alert_type', $validated['alert_type']);
+        }
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+        if (! empty($validated['reporter'])) {
+            $term = '%'.$validated['reporter'].'%';
+            $userIds = \App\Models\User::where('name', 'like', $term)->pluck('id');
+            $studentIds = DB::table('students')->whereRaw("CONCAT(firstname, ' ', lastname) LIKE ?", [$term])->pluck('id');
+
+            $query->where(function ($q) use ($userIds, $studentIds) {
+                $q->where(fn ($q2) => $q2->where('triggerable_type', \App\Models\User::class)->whereIn('triggerable_id', $userIds))
+                  ->orWhere(fn ($q2) => $q2->where('triggerable_type', Student::class)->whereIn('triggerable_id', $studentIds));
+            });
+        }
+
+        return response()->json($query->paginate(20)->through(fn (SosAlert $alert) => $this->serialize($alert)));
     }
 
     private function serialize(SosAlert $alert): array
