@@ -26,6 +26,7 @@ import PageSkeleton from '@/Components/PageSkeleton.vue';
 import NoticeQueueModal from '@/Components/Notices/NoticeQueueModal.vue'
 import EmergencyBorderOverlay from '@/Components/Sos/EmergencyBorderOverlay.vue'
 import SosResponderAlertModal from '@/Components/Sos/SosResponderAlertModal.vue'
+import SosMyStatusModal from '@/Components/Sos/SosMyStatusModal.vue'
 import { menuItems } from './navigation.js';
 
 // --- State ---
@@ -34,6 +35,12 @@ const noticeQueueModal = ref(null);
 const hasActiveEmergency = ref(false);
 const sosResponderModal = ref(null);
 const hasActiveSosAlert = ref(false);
+const myStatusModal = ref(null);
+
+function onSosTriggered(alertId) {
+  localStorage.setItem('sos_my_active_alert_id', String(alertId));
+  myStatusModal.value?.open(alertId);
+}
 const mobileOpen = ref(false);
 const sidebarNav = ref(null);
 const sidebarSearch = ref(null);
@@ -188,6 +195,11 @@ onMounted(() => {
   fetchEmergencyStatus();
   setupSosResponderListener();
   fetchSosActiveStatus();
+
+  const savedAlertId = localStorage.getItem('sos_my_active_alert_id');
+  if (savedAlertId) {
+    myStatusModal.value?.open(Number(savedAlertId));
+  }
 
   // Request browser notification permission (non-blocking)
   if ('Notification' in window && Notification.permission === 'default') {
@@ -839,7 +851,7 @@ watch(() => page.url, async () => {
 
   <AppLoadingOverlay />
 
-  <SosFloatingButton trigger-route="sos.trigger" />
+  <SosFloatingButton trigger-route="sos.trigger" @triggered="onSosTriggered" />
 
   <NoticeQueueModal ref="noticeQueueModal" />
 
@@ -847,6 +859,8 @@ watch(() => page.url, async () => {
 
   <SosResponderAlertModal v-if="hasPerm('sos.respond')" ref="sosResponderModal" />
   <EmergencyBorderOverlay v-if="hasPerm('sos.respond')" :active="hasActiveSosAlert" />
+
+  <SosMyStatusModal ref="myStatusModal" />
 
 </template>
 

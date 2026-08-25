@@ -8,6 +8,8 @@ const props = defineProps({
   triggerRoute: { type: String, required: true },
 })
 
+const emit = defineEmits(['triggered'])
+
 const page = usePage()
 const holdSeconds = computed(() => page.props.sosConfig?.holdConfirmSeconds ?? 3)
 const countdownTotal = computed(() => page.props.sosConfig?.countdownSeconds ?? 8)
@@ -106,6 +108,7 @@ async function dispatch(alertType, isSilent) {
     if (!isSilent) {
       pickerOpen.value = false
       selectedCategory.value = null
+      emit('triggered', data.alert_id)
     }
   } catch (e) {
     if (e.response?.status === 422 && e.response?.data?.blocked) {
