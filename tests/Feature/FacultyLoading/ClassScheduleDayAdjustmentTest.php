@@ -277,6 +277,14 @@ class ClassScheduleDayAdjustmentTest extends TestCase
     public function test_cross_grade_room_overlap_after_compression_is_a_warning_not_a_blocking_error(): void
     {
         $room = Classroom::where('code', 'R101')->firstOrFail();
+        $otherRoom = Classroom::create([
+            'school_year_id' => $this->term->school_year_id,
+            'name' => 'Room 102',
+            'code' => 'R102',
+            'classroom_type' => 'lecture',
+            'capacity' => 40,
+            'is_available' => true,
+        ]);
         $grade7Section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
         $grade7Subject = Subject::where('code', 'MATH7')->firstOrFail();
 
@@ -303,14 +311,41 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         // Grade 7 Period 1 (10:00-10:50) and Grade 8 Period 3 (10:50-11:40)
         // share Room 101 back-to-back on Monday — zero real gap, not a real
-        // conflict. Different grade-day structures make G8 bank more
-        // compression savings than G7 by 10:50, which currently inverts
-        // their order after 30-minute compression.
+        // conflict. Grade 8's section genuinely has two real periods earlier
+        // in the day (08:50-09:40, 10:00-10:50) that Grade 7's section
+        // doesn't, so it banks more real compression savings by 10:50,
+        // inverting their order after 30-minute compression — a real,
+        // data-driven difference (not fabricated from unused canonical
+        // slots the section never actually has classes in).
         ClassSchedule::create([
             'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
             'subject_id' => $grade7Subject->id,
             'section_id' => $grade7Section->id,
             'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade8Subject->id,
+            'section_id' => $grade8Section->id,
+            'classroom_id' => $otherRoom->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '08:50',
+            'end_time' => '09:40',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade8Subject->id,
+            'section_id' => $grade8Section->id,
+            'classroom_id' => $otherRoom->id,
             'school_year_id' => $this->term->school_year_id,
             'academic_term_id' => $this->term->id,
             'day_of_week' => 'Monday',
@@ -445,5 +480,111 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         ])->assertSessionHasErrors('activity_start_time');
 
         $this->assertDatabaseCount('class_schedule_day_adjustments', 0);
+    }
+
+    public function test_non_teaching_blocks_are_excluded_and_off_grid_classes_compress_correctly(): void
+    {
+        // Real production bug (adjustments published for 2026-08-25/26/27):
+        // a short entry_type=non_teaching block sandwiched between two real
+        // classes was rendered as if it were a compressible 30-minute class
+        // (collapsing toward zero minutes), and its presence knocked every
+        // class after it out of alignment with the idealized canonical grid
+        // used for compression — corrupting even genuine, correctly-sized
+        // classes down to 10 minutes.
+        $period2Subject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'AT1-G7',
+            'name' => 'Araling Panlipunan 1',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'lecture',
+            'grade_level' => 7,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        $period3Subject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'EN1-G7',
+            'name' => 'English 1',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'lecture',
+            'grade_level' => 7,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $period2Subject->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '08:40',
+            'end_time' => '09:30',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => $this->manager->id,
+            'section_id' => $section->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '09:30',
+            'end_time' => '09:40',
+            'status' => 'active',
+            'entry_type' => 'non_teaching',
+            'title' => 'Advisory',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $period3Subject->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '09:40',
+            'end_time' => '10:30',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $entries = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'];
+
+        // The non-teaching block must not appear at all.
+        $this->assertCount(3, $entries);
+
+        $this->assertSame('07:30', $entries[0]['start_time']);
+        $this->assertSame('08:00', $entries[0]['end_time']);
+        $this->assertSame('08:20', $entries[1]['start_time']);
+        $this->assertSame('08:50', $entries[1]['end_time']);
+        // Previously corrupted to 09:30-09:40 (10 minutes) by the
+        // non-teaching block throwing off the canonical-grid compression.
+        $this->assertSame('09:00', $entries[2]['start_time']);
+        $this->assertSame('09:30', $entries[2]['end_time']);
     }
 }

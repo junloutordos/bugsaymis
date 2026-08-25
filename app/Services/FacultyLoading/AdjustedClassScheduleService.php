@@ -56,6 +56,7 @@ class AdjustedClassScheduleService
             ->where('day_of_week', $day)
             ->whereIn('section_id', $sections->pluck('id'))
             ->occupying()
+            ->classes()
             ->orderBy('start_time')
             ->get()
             ->groupBy('section_id');
@@ -63,16 +64,32 @@ class AdjustedClassScheduleService
         $grades = [];
         foreach (range(7, 12) as $gradeLevel) {
             $gradeSections = [];
-            $classSlots = SchedulingConstants::getClassSlots($gradeLevel, $day);
 
             foreach ($sections->where('levelid', $gradeLevel) as $section) {
-                $entries = ($scheduleRows->get($section->id) ?? collect())
-                    ->map(function (ClassSchedule $schedule) use ($classSlots, $classDuration, $shift) {
+                $sectionSchedule = $scheduleRows->get($section->id) ?? collect();
+
+                // Compression is measured against this section's OWN actual
+                // scheduled times, not the idealized bell-schedule grid — real
+                // timetables routinely drift from the canonical periods (see
+                // test_same_section_period_drift_does_not_false_positive_room_conflict).
+                // Anchoring to the canonical grid instead of reality let classes
+                // compress to the wrong — sometimes zero — duration whenever a
+                // section's actual periods didn't tile it exactly.
+                $sectionSlots = $sectionSchedule
+                    ->map(fn (ClassSchedule $s) => [
+                        'start' => substr((string) $s->start_time, 0, 5),
+                        'end' => substr((string) $s->end_time, 0, 5),
+                    ])
+                    ->values()
+                    ->all();
+
+                $entries = $sectionSchedule
+                    ->map(function (ClassSchedule $schedule) use ($sectionSlots, $classDuration, $shift) {
                         $entry = $schedule->toCalendarArray();
                         $entry['raw_start_time'] = substr((string) $schedule->start_time, 0, 5);
                         $entry['raw_end_time'] = substr((string) $schedule->end_time, 0, 5);
-                        $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $classSlots, $classDuration, $shift);
-                        $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $classSlots, $classDuration, $shift);
+                        $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $sectionSlots, $classDuration, $shift);
+                        $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $sectionSlots, $classDuration, $shift);
 
                         return $entry;
                     })
@@ -108,8 +125,8 @@ class AdjustedClassScheduleService
                     ))
                     ->map(fn (array $band) => [
                         ...$band,
-                        'start' => $this->transformTime((string) $band['start'], $classSlots, $classDuration, $shift),
-                        'end' => $this->transformTime((string) $band['end'], $classSlots, $classDuration, $shift),
+                        'start' => $this->transformTime((string) $band['start'], $sectionSlots, $classDuration, $shift),
+                        'end' => $this->transformTime((string) $band['end'], $sectionSlots, $classDuration, $shift),
                     ])
                     ->when($activityStart, fn ($items) => $items->filter(
                         fn (array $band) => $band['end'] <= $activityStart,
@@ -192,16 +209,22 @@ class AdjustedClassScheduleService
     }
 
     /**
-     * Compress each completed canonical class period to the requested duration,
-     * then apply an optional campus-wide shift (the transferred flag ceremony).
+     * Compress each of this section's own already-completed class periods
+     * down to the requested duration, then apply an optional campus-wide
+     * shift (the transferred flag ceremony).
+     *
+     * $slots are this section's own actual scheduled class times for the
+     * day — not the idealized canonical bell-schedule grid — so the savings
+     * reflect what this section's real timetable actually did, regardless of
+     * how it may drift from the campus-wide canonical periods.
      */
-    private function transformTime(string $time, array $classSlots, ?int $classDuration, int $shift): string
+    private function transformTime(string $time, array $slots, ?int $classDuration, int $shift): string
     {
         $sourceMinutes = SchedulingConstants::toMinutes(substr($time, 0, 5));
         $minutes = $sourceMinutes;
 
         if ($classDuration !== null) {
-            foreach ($classSlots as $slot) {
+            foreach ($slots as $slot) {
                 $slotEnd = SchedulingConstants::toMinutes($slot['end']);
                 if ($slotEnd > $sourceMinutes) {
                     continue;
