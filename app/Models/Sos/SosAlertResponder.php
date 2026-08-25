@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SosAlertResponder extends Model
 {
-    const UPDATED_AT = null;
+    public $timestamps = false;
 
     protected $fillable = ['sos_alert_id', 'user_id', 'claimed_at', 'unclaimed_at'];
 

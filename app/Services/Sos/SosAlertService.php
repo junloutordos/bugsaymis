@@ -8,6 +8,7 @@ use App\Jobs\Sos\NotifySosEmergencyContact;
 use App\Jobs\Sos\NotifySosResponders;
 use App\Models\Sos\SosAlert;
 use App\Models\Sos\SosAlertEvent;
+use App\Models\Sos\SosAlertResponder;
 use App\Models\Sos\SosEscalationTier;
 use App\Models\User;
 use App\Services\CampusPresenceService;
@@ -206,6 +207,52 @@ class SosAlertService
         return $event;
     }
 
+    public function claim(SosAlert $alert, User $responder): SosAlertEvent
+    {
+        $alreadyClaimed = SosAlertResponder::where('sos_alert_id', $alert->id)
+            ->where('user_id', $responder->id)
+            ->whereNull('unclaimed_at')
+            ->exists();
+
+        if (! $alreadyClaimed) {
+            SosAlertResponder::create([
+                'sos_alert_id' => $alert->id,
+                'user_id'      => $responder->id,
+                'claimed_at'   => now(),
+            ]);
+        }
+
+        $event = SosAlertEvent::create([
+            'sos_alert_id' => $alert->id, 'type' => 'claimed',
+            'actor_type' => User::class, 'actor_id' => $responder->id, 'payload' => null,
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        return $event;
+    }
+
+    public function unclaim(SosAlert $alert, User $responder): ?SosAlertEvent
+    {
+        $updated = SosAlertResponder::where('sos_alert_id', $alert->id)
+            ->where('user_id', $responder->id)
+            ->whereNull('unclaimed_at')
+            ->update(['unclaimed_at' => now()]);
+
+        if ($updated === 0) {
+            return null;
+        }
+
+        $event = SosAlertEvent::create([
+            'sos_alert_id' => $alert->id, 'type' => 'unclaimed',
+            'actor_type' => User::class, 'actor_id' => $responder->id, 'payload' => null,
+        ]);
+
+        event(new SosAlertUpdated($this->broadcastPayload($alert->fresh())));
+
+        return $event;
+    }
+
     public function processEscalations(): int
     {
         $count = 0;
@@ -280,6 +327,9 @@ class SosAlertService
             'lat'          => $alert->lat,
             'lng'          => $alert->lng,
             'triggered_at' => $alert->triggered_at->toIso8601String(),
+            'responders'   => $alert->responders()->whereNull('unclaimed_at')->with('user:id,name')->get()
+                ->map(fn ($r) => ['user_id' => $r->user_id, 'name' => $r->user->name, 'claimed_at' => $r->claimed_at->toIso8601String()])
+                ->values()->all(),
         ];
     }
 }

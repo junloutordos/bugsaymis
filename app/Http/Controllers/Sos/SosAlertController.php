@@ -76,6 +76,18 @@ class SosAlertController extends Controller
         return response()->json($this->serialize($alert->fresh()));
     }
 
+    public function claim(Request $request, SosAlert $alert, SosAlertService $service)
+    {
+        $service->claim($alert, $request->user());
+        return response()->json($this->serialize($alert->fresh(['events', 'triggerable', 'responders.user'])));
+    }
+
+    public function unclaim(Request $request, SosAlert $alert, SosAlertService $service)
+    {
+        $service->unclaim($alert, $request->user());
+        return response()->json($this->serialize($alert->fresh(['events', 'triggerable', 'responders.user'])));
+    }
+
     public function verify(Request $request, SosAlert $alert, SosAlertService $service)
     {
         $validated = $request->validate(['note' => 'nullable|string|max:1000']);
