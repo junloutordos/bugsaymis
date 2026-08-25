@@ -390,6 +390,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         // this feeds the site-wide emergency border every employee needs to see.
         Route::get('/emergency-status', [\App\Http\Controllers\Sos\EmergencyAlertController::class, 'status'])->name('emergency-status');
 
+        Route::get('/{alert}/mine', [\App\Http\Controllers\Sos\SosSelfServiceController::class, 'status'])
+            ->name('mine.status')->whereNumber('alert')->middleware('throttle:30,1,sos-status');
+        Route::post('/{alert}/mine/end', [\App\Http\Controllers\Sos\SosSelfServiceController::class, 'end'])
+            ->name('mine.end')->whereNumber('alert')->middleware('throttle:10,1,sos-end');
+
         Route::middleware('permission:sos.respond')->group(function () {
             Route::get('/', [\App\Http\Controllers\Sos\SosAlertController::class, 'index'])->name('index');
             Route::get('/history', [\App\Http\Controllers\Sos\SosAlertController::class, 'history'])->name('history');

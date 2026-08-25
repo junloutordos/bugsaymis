@@ -43,7 +43,7 @@ class SosAlertServiceEndByReporterTest extends TestCase
         $this->assertSame('resolved', $fresh->status);
         $this->assertNotNull($fresh->resolved_at);
         $this->assertNull($fresh->resolved_by);
-        $this->assertSame('Ended by reporting student.', $fresh->resolution_notes);
+        $this->assertSame('Ended by reporter.', $fresh->resolution_notes);
         $this->assertDatabaseHas('sos_alert_events', [
             'sos_alert_id' => $alert->id,
             'type'         => 'resolved',

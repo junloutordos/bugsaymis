@@ -191,7 +191,7 @@ class SosAlertService
             'status'           => 'resolved',
             'resolved_at'      => now(),
             'resolved_by'      => null,
-            'resolution_notes' => 'Ended by reporting student.',
+            'resolution_notes' => 'Ended by reporter.',
         ]);
 
         $event = SosAlertEvent::create([
