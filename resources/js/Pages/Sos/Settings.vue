@@ -2,6 +2,7 @@
 import { useForm } from '@inertiajs/vue3'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { AdjustmentsHorizontalIcon, PhoneIcon, DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   tiers: Array,
@@ -51,9 +52,14 @@ function saveMobile(user) {
   <Head title="SOS Settings" />
   <AdminLayout title="SOS Settings">
     <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-      <section>
-        <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Escalation Tiers</h2>
+      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <AdjustmentsHorizontalIcon class="h-4 w-4" /> Escalation Tiers
+        </h2>
 
+        <div v-if="tiers.length === 0" class="mb-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-sm text-slate-400">
+          No escalation tiers configured yet.
+        </div>
         <div v-for="tier in tiers" :key="tier.id" class="mb-2 flex items-center justify-between rounded-lg border border-slate-200 p-3 text-sm">
           <div>
             <strong>{{ tier.alert_type.replace('_', ' ') }}</strong> — tier {{ tier.order }} —
@@ -82,9 +88,14 @@ function saveMobile(user) {
         </form>
       </section>
 
-      <section>
-        <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">External Contacts</h2>
+      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <PhoneIcon class="h-4 w-4" /> External Contacts
+        </h2>
 
+        <div v-if="externalContacts.length === 0" class="mb-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-sm text-slate-400">
+          No external contacts added yet.
+        </div>
         <div v-for="contact in externalContacts" :key="contact.id" class="mb-2 flex items-center justify-between rounded-lg border border-slate-200 p-3 text-sm">
           <div>
             <strong>{{ contact.name }}</strong> ({{ contact.org }}) — {{ contact.phone }} — {{ contact.alert_types.join(', ') }}
@@ -111,9 +122,15 @@ function saveMobile(user) {
         </form>
       </section>
 
-      <section class="lg:col-span-2">
-        <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Responder Mobile Numbers</h2>
+      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <h2 class="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <DevicePhoneMobileIcon class="h-4 w-4" /> Responder Mobile Numbers
+        </h2>
         <p class="mb-3 text-xs text-slate-500">Used for the SMS channel on escalation tiers — a responder with no number set here won't receive SMS, only in-app/email.</p>
+
+        <div v-if="users.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-sm text-slate-400">
+          No responders to configure.
+        </div>
         <div v-for="user in users" :key="user.id" class="mb-2 flex items-center gap-2">
           <span class="w-48 truncate text-sm text-slate-700">{{ user.name }}</span>
           <input v-model="mobileForms[user.id].mobile_number" placeholder="09XXXXXXXXX" class="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />

@@ -212,46 +212,53 @@ function subscribeEmergencyChannel() {
     </div>
 
     <div v-show="activeTab === 'active'">
-      <h2 class="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        <BellAlertIcon class="h-4 w-4" /> Active Alerts
-      </h2>
-      <div v-if="activeAlerts.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-sm text-slate-400">
-        No active SOS alerts.
-      </div>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div v-for="alert in activeAlerts" :key="alert.id"
-             class="group cursor-pointer rounded-2xl border border-slate-200 border-l-4 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-             :class="[accentClass(alert.status), alert.status === 'triggered' ? 'animate-pulse' : '']"
-             @click="openAlert(alert)">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-semibold text-slate-900">#{{ alert.id }} — {{ alertTypeLabels[alert.alert_type] ?? alert.alert_type }}</span>
-            <span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="statusClass(alert.status)">{{ alert.status }}</span>
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <BellAlertIcon class="h-4 w-4" /> Active Alerts
+        </h2>
+        <div v-if="activeAlerts.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-sm text-slate-400">
+          No active SOS alerts.
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div v-for="alert in activeAlerts" :key="alert.id"
+               class="group cursor-pointer rounded-2xl border border-slate-200 border-l-4 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+               :class="[accentClass(alert.status), alert.status === 'triggered' ? 'animate-pulse' : '']"
+               @click="openAlert(alert)">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-slate-900">#{{ alert.id }} — {{ alertTypeLabels[alert.alert_type] ?? alert.alert_type }}</span>
+              <span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="statusClass(alert.status)">{{ alert.status }}</span>
+            </div>
+            <div class="mt-2 flex items-center gap-1.5 text-sm text-slate-700">
+              <AcademicCapIcon v-if="alert.reporter?.type === 'student'" class="h-4 w-4 shrink-0 text-slate-400" />
+              <UserIcon v-else class="h-4 w-4 shrink-0 text-slate-400" />
+              <span class="truncate font-medium">{{ reporterLabel(alert) }}</span>
+            </div>
+            <span v-if="alert.is_silent" class="mt-2 inline-block rounded bg-slate-800 px-2 py-0.5 text-xs font-medium text-white">SILENT</span>
+            <p class="mt-2 flex items-center gap-1 text-xs text-slate-400">
+              <ClockIcon class="h-3.5 w-3.5" /> {{ new Date(alert.triggered_at).toLocaleString('en-PH') }}
+            </p>
           </div>
-          <div class="mt-2 flex items-center gap-1.5 text-sm text-slate-700">
-            <AcademicCapIcon v-if="alert.reporter?.type === 'student'" class="h-4 w-4 shrink-0 text-slate-400" />
-            <UserIcon v-else class="h-4 w-4 shrink-0 text-slate-400" />
-            <span class="truncate font-medium">{{ reporterLabel(alert) }}</span>
-          </div>
-          <span v-if="alert.is_silent" class="mt-2 inline-block rounded bg-slate-800 px-2 py-0.5 text-xs font-medium text-white">SILENT</span>
-          <p class="mt-2 flex items-center gap-1 text-xs text-slate-400">
-            <ClockIcon class="h-3.5 w-3.5" /> {{ new Date(alert.triggered_at).toLocaleString('en-PH') }}
-          </p>
         </div>
       </div>
 
-      <h2 class="mb-3 mt-8 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        <CheckBadgeIcon class="h-4 w-4" /> Closed
-      </h2>
-      <div class="space-y-2">
-        <div v-for="alert in closedAlerts" :key="alert.id"
-             class="flex cursor-pointer items-center justify-between rounded-xl border border-slate-100 p-3 text-sm text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50"
-             @click="openAlert(alert)">
-          <div class="flex items-center gap-2">
-            <span class="font-medium text-slate-700">#{{ alert.id }} — {{ alertTypeLabels[alert.alert_type] ?? alert.alert_type }}</span>
-            <span class="text-slate-400">·</span>
-            <span>{{ reporterLabel(alert) }}</span>
+      <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <CheckBadgeIcon class="h-4 w-4" /> Closed
+        </h2>
+        <div v-if="closedAlerts.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-sm text-slate-400">
+          No closed alerts yet.
+        </div>
+        <div v-else class="space-y-2">
+          <div v-for="alert in closedAlerts" :key="alert.id"
+               class="flex cursor-pointer items-center justify-between rounded-xl border border-slate-100 p-3 text-sm text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50"
+               @click="openAlert(alert)">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-slate-700">#{{ alert.id }} — {{ alertTypeLabels[alert.alert_type] ?? alert.alert_type }}</span>
+              <span class="text-slate-400">·</span>
+              <span>{{ reporterLabel(alert) }}</span>
+            </div>
+            <span :class="statusClass(alert.status)" class="rounded-full px-2 py-0.5 text-xs">{{ alert.status }}</span>
           </div>
-          <span :class="statusClass(alert.status)" class="rounded-full px-2 py-0.5 text-xs">{{ alert.status }}</span>
         </div>
       </div>
 

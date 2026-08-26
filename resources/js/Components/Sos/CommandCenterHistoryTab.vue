@@ -35,7 +35,7 @@ onMounted(() => load())
 
 <template>
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-    <div class="lg:col-span-2">
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
       <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <input v-model="filters.from" type="date" class="rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <input v-model="filters.to" type="date" class="rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
