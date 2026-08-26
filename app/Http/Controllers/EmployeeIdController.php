@@ -97,11 +97,28 @@ class EmployeeIdController extends Controller
             $info->residential_house,
             $info->residential_street,
             $info->residential_subdivision,
-            filled($info->residential_barangay) ? 'Brgy. ' . $info->residential_barangay : null,
+            self::isMeaningfulValue($info->residential_barangay) ? 'Brgy. ' . $info->residential_barangay : null,
             $info->residential_city,
             $info->residential_province,
-        ], fn ($v) => filled($v));
+        ], fn ($v) => self::isMeaningfulValue($v));
 
         return $parts ? implode(', ', $parts) : null;
+    }
+
+    /**
+     * Excludes blank values and common "not applicable" placeholders (N/A,
+     * NA, none, n.a.) that employees sometimes type into a PDS sub-field
+     * instead of leaving it empty — these should never appear on the
+     * printed ID card.
+     */
+    private static function isMeaningfulValue(?string $value): bool
+    {
+        if (! filled($value)) {
+            return false;
+        }
+
+        $normalized = strtolower(str_replace('.', '', trim($value)));
+
+        return ! in_array($normalized, ['n/a', 'na', 'none', 'n a'], true);
     }
 }

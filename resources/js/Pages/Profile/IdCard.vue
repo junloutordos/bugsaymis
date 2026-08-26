@@ -121,10 +121,22 @@ onMounted(() => {
       <!-- Back -->
       <div class="id-card">
         <div class="id-back-band">
-          <div class="id-band-title">In Case of Emergency, Notify</div>
+          <div class="id-band-title">Employee Information</div>
         </div>
 
         <div class="id-card-inner">
+          <div class="id-info-field">
+            <div class="id-info-label">Date of Birth</div>
+            <div class="id-info-value">{{ employee.date_of_birth || '—' }}</div>
+          </div>
+          <div v-if="employee.residential_address" class="id-info-field">
+            <div class="id-info-label">Residential Address</div>
+            <div class="id-info-value id-info-value-wrap">{{ employee.residential_address }}</div>
+          </div>
+
+          <div class="id-divider"></div>
+
+          <div class="id-subheader">In Case of Emergency, Notify</div>
           <div class="id-info-field">
             <div class="id-info-label">Contact Person</div>
             <div class="id-info-value">{{ emergency.contact_name || '—' }}</div>
@@ -136,17 +148,6 @@ onMounted(() => {
           <div class="id-info-field">
             <div class="id-info-label">Address</div>
             <div class="id-info-value">{{ emergency.contact_address || '—' }}</div>
-          </div>
-
-          <div class="id-divider"></div>
-
-          <div class="id-info-field">
-            <div class="id-info-label">Date of Birth</div>
-            <div class="id-info-value">{{ employee.date_of_birth || '—' }}</div>
-          </div>
-          <div class="id-info-field">
-            <div class="id-info-label">Residential Address</div>
-            <div class="id-info-value id-info-value-wrap">{{ employee.residential_address || '—' }}</div>
           </div>
 
           <div class="id-divider"></div>
@@ -351,6 +352,16 @@ html, body { background: #f1f5f9; }
 .id-sig-position { font-size: 6px; color: #1e293b; letter-spacing: .5px; }
 
 /* ── Back face ─────────────────────────────────────────────────── */
+.id-subheader {
+  width: 100%;
+  font-size: 6.5px;
+  font-weight: 700;
+  color: #1447c0;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  text-align: center;
+  margin-bottom: 0.8mm;
+}
 .id-info-field { width: 100%; margin-top: 1.2mm; }
 .id-info-field:first-child { margin-top: 0.5mm; }
 .id-info-label {

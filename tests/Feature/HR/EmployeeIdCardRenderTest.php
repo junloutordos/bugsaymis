@@ -60,6 +60,44 @@ class EmployeeIdCardRenderTest extends TestCase
         );
     }
 
+    public function test_residential_address_strips_na_placeholders_from_subfields(): void
+    {
+        $user = User::factory()->create(['employee_idno_new' => 'E13-2020-01-001']);
+        $pds = Pds::create(['user_id' => $user->id]);
+        PDSPersonalInfo::create([
+            'pds_id' => $pds->id, 'surname' => 'Cruz', 'first_name' => 'Juan',
+            'residential_house' => '123 Main St',
+            'residential_street' => 'N/A',
+            'residential_subdivision' => 'n/a',
+            'residential_barangay' => 'Ampayon',
+            'residential_city' => 'Butuan City',
+            'residential_province' => 'N.A.',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('profile.id-card'));
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('employee.residential_address', '123 Main St, Brgy. Ampayon, Butuan City')
+        );
+    }
+
+    public function test_residential_address_null_when_all_subfields_are_na_or_blank(): void
+    {
+        $user = User::factory()->create(['employee_idno_new' => 'E13-2020-01-001']);
+        $pds = Pds::create(['user_id' => $user->id]);
+        PDSPersonalInfo::create([
+            'pds_id' => $pds->id, 'surname' => 'Cruz', 'first_name' => 'Juan',
+            'residential_house' => 'N/A', 'residential_barangay' => 'None',
+            'residential_city' => '', 'residential_province' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('profile.id-card'));
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('employee.residential_address', null)
+        );
+    }
+
     public function test_hr_admin_can_print_any_employee_id_card(): void
     {
         $admin = $this->userWithPermission('hr.employees.manage');
