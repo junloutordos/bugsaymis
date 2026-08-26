@@ -61,7 +61,7 @@ class SubjectController extends Controller
 
         $assignmentsBySubject = collect();
         if ($termId) {
-            $assignmentsBySubject = LoadAssignment::with('faculty:id,name', 'faculty.pds.personalInfo')
+            $assignmentsBySubject = LoadAssignment::with('faculty:id,name,email', 'faculty.pds.personalInfo')
                 ->where('assignment_type', 'teaching')
                 ->where('academic_term_id', $termId)
                 ->whereIn('subject_id', $subjectList->pluck('id'))
@@ -72,7 +72,7 @@ class SubjectController extends Controller
                     ->map(fn ($a) => [
                         'id'        => $a->user_id,
                         'name'      => $a->faculty?->name ?? '—',
-                        'email'     => $a->faculty?->pds?->personalInfo?->email_address,
+                        'email'     => $a->faculty?->email,
                         'mobile_no' => $a->faculty?->pds?->personalInfo?->mobile_no,
                     ])
                     ->values()

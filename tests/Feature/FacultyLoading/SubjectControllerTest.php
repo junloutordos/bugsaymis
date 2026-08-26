@@ -117,7 +117,7 @@ class SubjectControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_index_includes_assigned_faculty_email_and_mobile_from_pds(): void
+    public function test_index_includes_assigned_faculty_email_from_users_and_mobile_from_pds(): void
     {
         $manageUser = $this->userWith('faculty_loading.subjects.manage');
         $subject = Subject::create($this->subjectPayload());
@@ -128,13 +128,13 @@ class SubjectControllerTest extends TestCase
             'end_date' => '2025-12-31', 'is_current' => true,
         ]);
 
-        $faculty = User::factory()->create(['name' => 'Juan Dela Cruz']);
+        $faculty = User::factory()->create(['name' => 'Juan Dela Cruz', 'email' => 'juan@crc.pshs.edu.ph']);
         $pds = \App\Models\Pds::create(['user_id' => $faculty->id]);
         \App\Models\PDSPersonalInfo::create([
             'pds_id' => $pds->id,
             'surname' => 'Dela Cruz',
             'first_name' => 'Juan',
-            'email_address' => 'juan@example.com',
+            'email_address' => 'juan.personal@example.com',
             'mobile_no' => '09171234567',
         ]);
 
@@ -160,7 +160,7 @@ class SubjectControllerTest extends TestCase
                 $matched = collect($page->toArray()['props']['subjects'])->firstWhere('id', $subject->id);
                 $facultyEntry = $matched['faculty'][0];
 
-                return $facultyEntry['email'] === 'juan@example.com'
+                return $facultyEntry['email'] === 'juan@crc.pshs.edu.ph'
                     && $facultyEntry['mobile_no'] === '09171234567';
             });
     }
