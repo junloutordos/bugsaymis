@@ -103,12 +103,13 @@ class UserController extends Controller
         if ($pdsId) {
             $pdsInfo = \App\Models\PDSPersonalInfo::where('pds_id', $pdsId)
                 ->first([
-                    'blood_type', 'tin_no', 'philhealth_no', 'pagibig_id_no', 'philsys_no',
                     'date_of_birth',
                     'residential_house', 'residential_street', 'residential_subdivision',
                     'residential_barangay', 'residential_city', 'residential_province', 'residential_zip_code',
                 ]);
         }
+
+        $profile = $user->employeeProfile;
 
         $ocd = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
         $signatures = app(DigitalSignatureService::class);
@@ -125,12 +126,10 @@ class UserController extends Controller
                 'date_of_birth'        => $pdsInfo?->date_of_birth ? \Carbon\Carbon::parse($pdsInfo->date_of_birth)->format('F j, Y') : null,
                 'residential_address'  => EmployeeIdController::formatAddress($pdsInfo),
             ],
-            'ids' => [
-                'blood_type' => $pdsInfo?->blood_type,
-                'tin'        => $pdsInfo?->tin_no,
-                'philhealth' => $pdsInfo?->philhealth_no,
-                'pagibig'    => $pdsInfo?->pagibig_id_no,
-                'philsys'    => $pdsInfo?->philsys_no,
+            'emergency' => [
+                'contact_name'    => $profile?->emergency_contact_name,
+                'contact_phone'   => $profile?->emergency_contact_phone,
+                'contact_address' => $profile?->emergency_contact_address,
             ],
             'qr_svg'     => $qrSvg,
             'verify_url' => $verifyUrl,

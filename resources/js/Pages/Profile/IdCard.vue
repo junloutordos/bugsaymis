@@ -6,7 +6,7 @@ import { storageUrl } from '@/Composables/useStorage.js'
 
 const props = defineProps({
   employee:   Object,
-  ids:        Object,
+  emergency:  Object,
   qr_svg:     String,
   verify_url: String,
   back_route: String,
@@ -25,14 +25,6 @@ const displayName = computed(() => {
   const rest = raw.slice(commaIndex + 1).trim()
   return `${rest} ${lastName}`.trim()
 })
-
-const idRows = computed(() => [
-  { label: 'TIN',        value: props.ids.tin },
-  { label: 'PhilHealth',  value: props.ids.philhealth },
-  { label: 'Pag-IBIG',    value: props.ids.pagibig },
-  { label: 'PhilSys',     value: props.ids.philsys },
-  { label: 'Blood Type',  value: props.ids.blood_type },
-].filter(r => r.value))
 
 function printCard() {
   window.print()
@@ -111,14 +103,6 @@ onMounted(() => {
             {{ employee.office || employee.division }}
           </div>
 
-          <div v-if="employee.date_of_birth" class="id-dob">
-            <span class="id-dob-label">Date of Birth:</span> {{ employee.date_of_birth }}
-          </div>
-
-          <div v-if="employee.residential_address" class="id-address">
-            {{ employee.residential_address }}
-          </div>
-
           <div v-if="employee.employee_no" class="id-empno">
             <div class="id-empno-label">Employee ID Number</div>
             <div class="id-empno-value">{{ employee.employee_no }}</div>
@@ -137,17 +121,33 @@ onMounted(() => {
       <!-- Back -->
       <div class="id-card">
         <div class="id-back-band">
-          <div class="id-band-title">Government ID Numbers</div>
+          <div class="id-band-title">In Case of Emergency, Notify</div>
         </div>
 
         <div class="id-card-inner">
-          <div v-for="row in idRows" :key="row.label" class="id-info-field">
-            <div class="id-info-label">{{ row.label }}</div>
-            <div class="id-info-value">{{ row.value }}</div>
+          <div class="id-info-field">
+            <div class="id-info-label">Contact Person</div>
+            <div class="id-info-value">{{ emergency.contact_name || '—' }}</div>
           </div>
-          <p v-if="!idRows.length" class="id-info-empty">
-            Government ID numbers appear here once encoded in your PDS.
-          </p>
+          <div class="id-info-field">
+            <div class="id-info-label">Mobile No.</div>
+            <div class="id-info-value">{{ emergency.contact_phone || '—' }}</div>
+          </div>
+          <div class="id-info-field">
+            <div class="id-info-label">Address</div>
+            <div class="id-info-value">{{ emergency.contact_address || '—' }}</div>
+          </div>
+
+          <div class="id-divider"></div>
+
+          <div class="id-info-field">
+            <div class="id-info-label">Date of Birth</div>
+            <div class="id-info-value">{{ employee.date_of_birth || '—' }}</div>
+          </div>
+          <div class="id-info-field">
+            <div class="id-info-label">Residential Address</div>
+            <div class="id-info-value id-info-value-wrap">{{ employee.residential_address || '—' }}</div>
+          </div>
 
           <div class="id-divider"></div>
 
@@ -318,22 +318,6 @@ html, body { background: #f1f5f9; }
   margin-top: 0.2mm;
 }
 
-.id-dob {
-  font-size: 6px;
-  color: #475569;
-  margin-top: 0.8mm;
-}
-.id-dob-label { font-weight: 700; color: #94a3b8; }
-
-.id-address {
-  font-size: 5.5px;
-  color: #64748b;
-  line-height: 1.3;
-  margin-top: 0.5mm;
-  width: 100%;
-  padding: 0 1mm;
-}
-
 .id-empno { margin-top: 1mm; width: 100%; border-top: 1px solid #f1f5f9; padding-top: 1mm; }
 .id-empno-label {
   font-size: 5.5px;
@@ -382,7 +366,11 @@ html, body { background: #f1f5f9; }
   color: #1e293b;
   margin-top: 0.3mm;
 }
-.id-info-empty { font-size: 6px; color: #94a3b8; margin-top: 1mm; }
+.id-info-value-wrap {
+  font-size: 6.5px;
+  line-height: 1.3;
+  white-space: normal;
+}
 
 .id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 1.5mm 0 1mm; }
 

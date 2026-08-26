@@ -24,6 +24,12 @@ class EmployeeIdCardRenderTest extends TestCase
             'residential_city' => 'Butuan City',
             'residential_province' => 'Agusan del Norte',
         ]);
+        \App\Models\HR\EmployeeProfile::create([
+            'user_id' => $user->id,
+            'emergency_contact_name' => 'Maria Cruz',
+            'emergency_contact_phone' => '09171234567',
+            'emergency_contact_address' => 'Brgy. Libertad, Butuan City',
+        ]);
 
         $response = $this->actingAs($user)->get(route('profile.id-card'));
 
@@ -33,6 +39,9 @@ class EmployeeIdCardRenderTest extends TestCase
             ->where('employee.date_of_birth', 'May 15, 1990')
             ->where('employee.residential_address', '123 Main St, Brgy. Ampayon, Butuan City, Agusan del Norte')
             ->where('employee.employee_no', 'E13-2020-01-001')
+            ->where('emergency.contact_name', 'Maria Cruz')
+            ->where('emergency.contact_phone', '09171234567')
+            ->where('emergency.contact_address', 'Brgy. Libertad, Butuan City')
             ->has('qr_svg')
             ->has('back_route')
         );
