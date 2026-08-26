@@ -23,6 +23,7 @@ const props = defineProps({
   schoolYears:         { type: Array,  default: () => [] },
   currentSchoolYearId: { type: Number, default: null },
   filters:             { type: Object, default: () => ({}) },
+  can:                 { type: Object, default: () => ({ manage: false }) },
 })
 
 const filters = reactive({
@@ -123,7 +124,7 @@ function doCopy() {
     <div class="space-y-5">
 
       <AppPageHeader title="Subject Catalog" subtitle="Manage subjects and their load unit assignments">
-        <template #actions>
+        <template v-if="can.manage" #actions>
           <AppButton variant="secondary" @click="copyModal = true">
             <DocumentDuplicateIcon class="h-4 w-4" /> Copy from Year
           </AppButton>
@@ -183,7 +184,7 @@ function doCopy() {
       </AppFilterBar>
 
       <!-- Table -->
-      <AppTable :is-empty="subjects.length === 0" :skeleton-cols="9">
+      <AppTable :is-empty="subjects.length === 0" :skeleton-cols="can.manage ? 9 : 8">
         <template #head>
           <tr>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Code</th>
@@ -194,7 +195,7 @@ function doCopy() {
             <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Lec/Lab hrs</th>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Assigned Faculty</th>
             <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
-            <th class="px-4 py-3"></th>
+            <th v-if="can.manage" class="px-4 py-3"></th>
           </tr>
         </template>
 
@@ -211,8 +212,11 @@ function doCopy() {
           <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ s.load_units }}</td>
           <td class="px-4 py-3 text-center text-slate-500">{{ s.lecture_hours }} / {{ s.lab_hours ?? 0 }}</td>
           <td class="px-4 py-3">
-            <div v-if="s.faculty && s.faculty.length" class="flex flex-wrap gap-1">
-              <AppBadge v-for="f in s.faculty" :key="f.id" color="indigo">{{ f.name }}</AppBadge>
+            <div v-if="s.faculty && s.faculty.length" class="flex flex-col gap-2">
+              <div v-for="f in s.faculty" :key="f.id">
+                <AppBadge color="indigo">{{ f.name }}</AppBadge>
+                <p class="mt-0.5 text-xs text-slate-400">{{ f.email ?? '—' }} · {{ f.mobile_no ?? '—' }}</p>
+              </div>
             </div>
             <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
           </td>
@@ -222,7 +226,7 @@ function doCopy() {
               <AppBadge v-if="s.requires_computer_lab" color="indigo">ComLab priority</AppBadge>
             </div>
           </td>
-          <td class="px-4 py-3 text-right">
+          <td v-if="can.manage" class="px-4 py-3 text-right">
             <div class="flex items-center justify-end gap-1">
               <AppIconButton label="Edit" @click="openForm(s)"><PencilIcon class="h-4 w-4" /></AppIconButton>
               <AppIconButton label="Delete" variant="danger" @click="deleteSubject(s)"><TrashIcon class="h-4 w-4" /></AppIconButton>
@@ -246,11 +250,14 @@ function doCopy() {
               <span class="text-xs text-slate-500">{{ s.load_units }} units</span>
             </div>
             <p class="text-xs text-slate-500">Lec/Lab: {{ s.lecture_hours }} / {{ s.lab_hours ?? 0 }}</p>
-            <div v-if="s.faculty && s.faculty.length" class="flex flex-wrap gap-1">
-              <AppBadge v-for="f in s.faculty" :key="f.id" color="indigo">{{ f.name }}</AppBadge>
+            <div v-if="s.faculty && s.faculty.length" class="flex flex-col gap-2">
+              <div v-for="f in s.faculty" :key="f.id">
+                <AppBadge color="indigo">{{ f.name }}</AppBadge>
+                <p class="mt-0.5 text-xs text-slate-400">{{ f.email ?? '—' }} · {{ f.mobile_no ?? '—' }}</p>
+              </div>
             </div>
             <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
-            <div class="flex items-center gap-1 pt-1">
+            <div v-if="can.manage" class="flex items-center gap-1 pt-1">
               <AppIconButton label="Edit" @click="openForm(s)"><PencilIcon class="h-4 w-4" /></AppIconButton>
               <AppIconButton label="Delete" variant="danger" @click="deleteSubject(s)"><TrashIcon class="h-4 w-4" /></AppIconButton>
             </div>

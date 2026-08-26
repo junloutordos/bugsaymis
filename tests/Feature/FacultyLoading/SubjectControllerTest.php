@@ -65,7 +65,7 @@ class SubjectControllerTest extends TestCase
 
     public function test_subject_group_is_saved_on_create(): void
     {
-        $user = $this->userWith('faculty_loading.subjects');
+        $user = $this->userWith('faculty_loading.subjects.manage');
 
         $this->actingAs($user)
             ->post(route('faculty-loading.subjects.store'), $this->subjectPayload(['subject_group' => 'PEHM']))
@@ -78,7 +78,7 @@ class SubjectControllerTest extends TestCase
 
     public function test_subject_group_is_saved_on_update(): void
     {
-        $user = $this->userWith('faculty_loading.subjects');
+        $user = $this->userWith('faculty_loading.subjects.manage');
         $subject = Subject::create($this->subjectPayload());
 
         $this->actingAs($user)
@@ -88,5 +88,80 @@ class SubjectControllerTest extends TestCase
         $this->assertDatabaseHas('subjects', [
             'id' => $subject->id, 'subject_group' => 'PEHM',
         ]);
+    }
+
+    public function test_view_only_user_can_view_index_but_not_create(): void
+    {
+        $user = $this->userWith('faculty_loading.subjects.view');
+
+        $this->actingAs($user)
+            ->get(route('faculty-loading.subjects.index'))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->post(route('faculty-loading.subjects.store'), $this->subjectPayload())
+            ->assertForbidden();
+    }
+
+    public function test_view_only_user_cannot_update_or_delete(): void
+    {
+        $user = $this->userWith('faculty_loading.subjects.view');
+        $subject = Subject::create($this->subjectPayload());
+
+        $this->actingAs($user)
+            ->put(route('faculty-loading.subjects.update', $subject->id), $this->subjectPayload(['subject_group' => 'PEHM']))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->delete(route('faculty-loading.subjects.destroy', $subject->id))
+            ->assertForbidden();
+    }
+
+    public function test_index_includes_assigned_faculty_email_and_mobile_from_pds(): void
+    {
+        $manageUser = $this->userWith('faculty_loading.subjects.manage');
+        $subject = Subject::create($this->subjectPayload());
+
+        $term = \App\Models\FacultyLoading\AcademicTerm::create([
+            'school_year_id' => $this->sy->id, 'name' => '1st Semester',
+            'term_type' => '1st_semester', 'start_date' => '2025-08-01',
+            'end_date' => '2025-12-31', 'is_current' => true,
+        ]);
+
+        $faculty = User::factory()->create(['name' => 'Juan Dela Cruz']);
+        $pds = \App\Models\Pds::create(['user_id' => $faculty->id]);
+        \App\Models\PDSPersonalInfo::create([
+            'pds_id' => $pds->id,
+            'surname' => 'Dela Cruz',
+            'first_name' => 'Juan',
+            'email_address' => 'juan@example.com',
+            'mobile_no' => '09171234567',
+        ]);
+
+        $facultyLoad = \App\Models\FacultyLoading\FacultyLoad::create([
+            'user_id' => $faculty->id,
+            'school_year_id' => $this->sy->id,
+            'academic_term_id' => $term->id,
+        ]);
+
+        \App\Models\FacultyLoading\LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id,
+            'user_id' => $faculty->id,
+            'school_year_id' => $this->sy->id,
+            'subject_id' => $subject->id,
+            'academic_term_id' => $term->id,
+            'assignment_type' => 'teaching',
+        ]);
+
+        $this->actingAs($manageUser)
+            ->get(route('faculty-loading.subjects.index', ['term_id' => $term->id]))
+            ->assertOk()
+            ->assertInertia(function ($page) use ($subject) {
+                $matched = collect($page->toArray()['props']['subjects'])->firstWhere('id', $subject->id);
+                $facultyEntry = $matched['faculty'][0];
+
+                return $facultyEntry['email'] === 'juan@example.com'
+                    && $facultyEntry['mobile_no'] === '09171234567';
+            });
     }
 }

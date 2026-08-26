@@ -376,9 +376,12 @@ Route::middleware(['web', 'auth', 'verified'])
         // ══════════════════════════════════════════════════════════════════════
 
         // Subjects
-        Route::middleware('permission:faculty_loading.subjects')
+        Route::middleware('permission:faculty_loading.subjects.view|faculty_loading.subjects.manage')
             ->prefix('subjects')->name('subjects.')->group(function () {
-                Route::get('/',                    [SubjectController::class, 'index'])->name('index');
+                Route::get('/', [SubjectController::class, 'index'])->name('index');
+            });
+        Route::middleware('permission:faculty_loading.subjects.manage')
+            ->prefix('subjects')->name('subjects.')->group(function () {
                 Route::post('/',                   [SubjectController::class, 'store'])->name('store');
                 Route::post('/copy-from-year',     [SubjectController::class, 'copyFromYear'])->name('copy-from-year');
                 Route::put('/{subject}',           [SubjectController::class, 'update'])->name('update');

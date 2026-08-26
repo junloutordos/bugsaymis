@@ -17,7 +17,9 @@ class SubjectController extends Controller
 {
     public function index(Request $request): Response
     {
-        $this->authorize('faculty_loading.subjects');
+        if (! $request->user()->hasAnyPermission(['faculty_loading.subjects.view', 'faculty_loading.subjects.manage'])) {
+            abort(403);
+        }
 
         $currentSy   = SchoolYear::where('is_current', true)->first();
         $schoolYearId = (int) $request->input('school_year_id', $currentSy?->id);
@@ -59,7 +61,7 @@ class SubjectController extends Controller
 
         $assignmentsBySubject = collect();
         if ($termId) {
-            $assignmentsBySubject = LoadAssignment::with('faculty:id,name')
+            $assignmentsBySubject = LoadAssignment::with('faculty:id,name', 'faculty.pds.personalInfo')
                 ->where('assignment_type', 'teaching')
                 ->where('academic_term_id', $termId)
                 ->whereIn('subject_id', $subjectList->pluck('id'))
@@ -67,7 +69,12 @@ class SubjectController extends Controller
                 ->groupBy('subject_id')
                 ->map(fn ($rows) => $rows
                     ->unique('user_id')
-                    ->map(fn ($a) => ['id' => $a->user_id, 'name' => $a->faculty?->name ?? '—'])
+                    ->map(fn ($a) => [
+                        'id'        => $a->user_id,
+                        'name'      => $a->faculty?->name ?? '—',
+                        'email'     => $a->faculty?->pds?->personalInfo?->email_address,
+                        'mobile_no' => $a->faculty?->pds?->personalInfo?->mobile_no,
+                    ])
                     ->values()
                 );
         }
@@ -103,12 +110,15 @@ class SubjectController extends Controller
             'schoolYears'         => $schoolYears,
             'currentSchoolYearId' => $schoolYearId,
             'filters'             => $request->only(['search', 'grade_level', 'subject_type', 'active', 'term_id', 'school_year_id']),
+            'can'                 => [
+                'manage' => $request->user()->hasPermission('faculty_loading.subjects.manage'),
+            ],
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('faculty_loading.subjects');
+        $this->authorize('faculty_loading.subjects.manage');
 
         $schoolYearId = (int) $request->input('school_year_id',
             SchoolYear::where('is_current', true)->value('id')
@@ -147,7 +157,7 @@ class SubjectController extends Controller
 
     public function update(Request $request, Subject $subject): RedirectResponse
     {
-        $this->authorize('faculty_loading.subjects');
+        $this->authorize('faculty_loading.subjects.manage');
 
         $schoolYearId = $subject->school_year_id;
 
@@ -185,7 +195,7 @@ class SubjectController extends Controller
 
     public function destroy(Subject $subject): RedirectResponse
     {
-        $this->authorize('faculty_loading.subjects');
+        $this->authorize('faculty_loading.subjects.manage');
 
         if ($subject->loadAssignments()->exists() || $subject->classSchedules()->exists()) {
             return back()->withErrors(['error' => 'Cannot delete: subject has load assignments or schedules.']);
@@ -202,7 +212,7 @@ class SubjectController extends Controller
      */
     public function copyFromYear(Request $request): RedirectResponse
     {
-        $this->authorize('faculty_loading.subjects');
+        $this->authorize('faculty_loading.subjects.manage');
 
         $data = $request->validate([
             'source_school_year_id' => 'required|exists:school_years,id',

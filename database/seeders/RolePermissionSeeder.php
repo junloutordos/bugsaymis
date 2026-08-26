@@ -221,7 +221,8 @@ class RolePermissionSeeder extends Seeder
             'faculty_loading.manage',
             'faculty_loading.load_assignments',
             'faculty_loading.reports',
-            'faculty_loading.subjects',
+            'faculty_loading.subjects.view',
+            'faculty_loading.subjects.manage',
             'faculty_loading.classrooms',
             'faculty_loading.school_year',
             'faculty_loading.setup',
@@ -242,7 +243,7 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // Faculty: view own load only
-        $assign('Faculty', ['faculty_loading.view_own']);
+        $assign('Faculty', ['faculty_loading.view_own', 'faculty_loading.subjects.view']);
 
         // ── Faculty ───────────────────────────────────────────────────────────
         $assign('Faculty', [

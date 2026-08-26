@@ -57,7 +57,8 @@ class FacultyLoadingHttpTest extends TestCase
     {
         return $this->userWith([
             'faculty_loading.view', 'faculty_loading.manage',
-            'faculty_loading.subjects', 'faculty_loading.classrooms',
+            'faculty_loading.subjects.view', 'faculty_loading.subjects.manage',
+            'faculty_loading.classrooms',
             'faculty_loading.school_year',
         ]);
     }

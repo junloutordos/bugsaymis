@@ -1583,7 +1583,7 @@ export const menuItems = [
         href: route("faculty-loading.subjects.index"),
         icon: BookOpenIcon,
         roles: [],
-        permissions: ["faculty_loading.subjects"],
+        permissions: ["faculty_loading.subjects.view", "faculty_loading.subjects.manage"],
       },
       {
         label: "Classrooms",

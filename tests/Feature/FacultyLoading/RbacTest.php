@@ -23,7 +23,7 @@ use Tests\TestCase;
  *   faculty_loading.manage    → assignments, schedules, sections, etc.
  *   faculty_loading.approve   → overload-computations, salary-schedules
  *   faculty_loading.reports   → reports/loads, reports/overload-pay
- *   faculty_loading.subjects  → subjects catalog
+ *   faculty_loading.subjects.view/.manage → subjects catalog
  *   faculty_loading.classrooms → classrooms catalog
  *   faculty_loading.school_year → school-years catalog
  */
@@ -323,9 +323,27 @@ class RbacTest extends TestCase
     // Catalog permissions
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public function test_subjects_permission_allows_subjects_index(): void
+    public function test_subjects_view_permission_allows_subjects_index(): void
     {
-        $user = $this->userWith('faculty_loading.subjects');
+        $user = $this->userWith('faculty_loading.subjects.view');
+
+        $this->actingAs($user)
+            ->get(route('faculty-loading.subjects.index'))
+            ->assertOk();
+    }
+
+    public function test_subjects_view_permission_denies_subjects_store(): void
+    {
+        $user = $this->userWith('faculty_loading.subjects.view');
+
+        $this->actingAs($user)
+            ->post(route('faculty-loading.subjects.store'), [])
+            ->assertForbidden();
+    }
+
+    public function test_subjects_manage_permission_allows_subjects_index(): void
+    {
+        $user = $this->userWith('faculty_loading.subjects.manage');
 
         $this->actingAs($user)
             ->get(route('faculty-loading.subjects.index'))
@@ -334,7 +352,7 @@ class RbacTest extends TestCase
 
     public function test_subjects_permission_denies_classrooms(): void
     {
-        $user = $this->userWith('faculty_loading.subjects');
+        $user = $this->userWith('faculty_loading.subjects.manage');
 
         $this->actingAs($user)
             ->get(route('faculty-loading.classrooms.index'))
@@ -403,7 +421,8 @@ class RbacTest extends TestCase
         $this->seedTerm();
         $user = $this->userWith([
             'faculty_loading.view', 'faculty_loading.manage', 'faculty_loading.reports',
-            'faculty_loading.subjects', 'faculty_loading.classrooms', 'faculty_loading.school_year',
+            'faculty_loading.subjects.view', 'faculty_loading.subjects.manage',
+            'faculty_loading.classrooms', 'faculty_loading.school_year',
         ]);
 
         $this->actingAs($user)
