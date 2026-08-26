@@ -53,7 +53,7 @@ class EmployeeIdController extends Controller
             'employee' => [
                 'name'            => mb_strtoupper($user->name),
                 'position'        => $user->position,
-                'employee_no'     => $user->employee_no,
+                'employee_no'     => $user->employee_idno_new,
                 'division'        => $division?->division_name,
                 'office'          => $office?->name,
                 'profile_picture' => $user->profile_picture,

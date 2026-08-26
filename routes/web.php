@@ -1348,6 +1348,7 @@ Route::middleware(['auth', 'permission:roles.assign'])
 Route::middleware(['auth','permission:hr.employees.manage'])->get('/hr/employees', [UserController::class, 'employeesIndex'])->name('hr.employees.index');
 Route::middleware(['auth','permission:hr.employees.manage'])->post('/hr/employees', [UserController::class, 'employeesStore'])->name('hr.employees.store');
 Route::middleware(['auth','permission:hr.employees.manage'])->patch('/hr/employees/{user}/salary-grade', [UserController::class, 'assignSalaryGrade'])->name('hr.employees.salary-grade');
+Route::middleware(['auth','permission:hr.employees.manage'])->get('/hr/employees/{user}/id-card', [UserController::class, 'idCard'])->name('hr.employees.id-card');
 
     // Human Resource attendance viewer (scoped for Staff/Faculty)
     Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
@@ -1671,6 +1672,9 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
 
     // Employee Digital ID — own card, print layout with verify QR
     Route::get('/profile/id-card', [\App\Http\Controllers\EmployeeIdController::class, 'show'])->name('profile.id-card');
+
+    // Mandatory hire year/month prompt — generates employee_idno_new
+    Route::post('/profile/employee-id/setup', [\App\Http\Controllers\HR\EmployeeIdSetupController::class, 'store'])->name('employee-id.setup');
 
     // Digital Signature — profile setup
     Route::get('/profile/signature', [\App\Http\Controllers\UserSignatureController::class, 'show'])->name('profile.signature');

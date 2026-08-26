@@ -103,7 +103,7 @@ class DocumentVerificationController extends Controller
             'employee' => [
                 'name'        => $user->name,
                 'position'    => $user->position,
-                'employee_no' => $user->employee_no,
+                'employee_no' => $user->employee_idno_new,
                 'division'    => $division?->division_name,
                 'office'      => $office?->name,
                 'is_active'   => $user->status === 'active',

@@ -79,6 +79,7 @@ class GoogleAuthController extends Controller
         $this->securityLog('info', 'Socialite login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
         $this->flagSignatureSetupPrompt($user);
+        $this->flagEmployeeIdSetupPrompt($user);
 
         $role = $user->role ?? 'staff';
 
@@ -132,6 +133,7 @@ class GoogleAuthController extends Controller
         $this->securityLog('info', 'Google login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
         $this->flagSignatureSetupPrompt($user);
+        $this->flagEmployeeIdSetupPrompt($user);
 
         $role         = $user->role ?? 'staff';
         $redirectPath = $this->getRedirectPath($role);
@@ -151,6 +153,18 @@ class GoogleAuthController extends Controller
     {
         if (empty($user->electronic_signature) || empty($user->signature_pin)) {
             session(['prompt_signature_setup' => true]);
+        }
+    }
+
+    /**
+     * Flag the session so the mandatory hire-year/month prompt shows on the
+     * next Inertia page render — only while employee_idno_new is still
+     * unset. This prompt cannot be dismissed until answered.
+     */
+    protected function flagEmployeeIdSetupPrompt(User $user): void
+    {
+        if (empty($user->employee_idno_new)) {
+            session(['prompt_employee_id_setup' => true]);
         }
     }
 

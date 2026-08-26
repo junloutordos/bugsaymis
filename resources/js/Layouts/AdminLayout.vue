@@ -18,6 +18,7 @@ import ReportDateRangeModal from '@/Components/Layout/ReportDateRangeModal.vue';
 import SessionExpiredOverlay from '@/Components/Layout/SessionExpiredOverlay.vue';
 import VersionHistoryModal from '@/Components/Layout/VersionHistoryModal.vue';
 import SignatureSetupModal from '@/Components/Layout/SignatureSetupModal.vue';
+import EmployeeIdSetupModal from '@/Components/Layout/EmployeeIdSetupModal.vue';
 import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
 import AppLoadingOverlay from '@/Components/AppLoadingOverlay.vue'
@@ -50,6 +51,7 @@ const expanded = ref({});
 const showVersionModal = ref(false);
 const showErrorReportModal = ref(false);
 const showSignatureSetupModal = ref(false);
+const showEmployeeIdSetupModal = ref(false);
 
 // ─── Chat unread badge (Phase 8) ──────────────────────────────────────────
 const chatUnreadCount = ref(0);
@@ -165,6 +167,17 @@ const handleSidebarSearchShortcut = (event) => {
   }
 };
 
+// Mandatory employee ID setup — server tells us via `needsEmployeeIdSetup`
+// (always-present, not one-shot) whether employee_idno_new is still unset.
+// Re-checked on every mount/navigation so it cannot be bypassed.
+function checkEmployeeIdSetup() {
+  if (page.props.needsEmployeeIdSetup) {
+    showEmployeeIdSetupModal.value = true;
+  } else {
+    showEmployeeIdSetupModal.value = false;
+  }
+}
+
 onMounted(() => {
   // Only show skeleton for GET navigations (page changes), not POST/PUT/PATCH/DELETE (saves)
   removeStartListener = router.on('start', (event) => {
@@ -186,6 +199,9 @@ onMounted(() => {
     sidebarSearchQuery.value = '';
     // Reset badge when navigating to Chat page
     if (route().current('chat.index')) chatUnreadCount.value = 0;
+    // Mandatory employee ID setup — re-checked on every navigation since it
+    // cannot be dismissed or bypassed by clicking away.
+    checkEmployeeIdSetup();
   });
 
   window.addEventListener('keydown', handleSidebarSearchShortcut);
@@ -216,6 +232,9 @@ onMounted(() => {
   ) {
     showSignatureSetupModal.value = true;
   }
+
+  // Mandatory hire year/month prompt — not dismissable, forced until answered.
+  checkEmployeeIdSetup();
 
   restoreSidebarScroll();
 });
@@ -815,6 +834,7 @@ watch(() => page.url, async () => {
   <ProfileEditModal :show="showProfileModal" @close="showProfileModal = false" />
   <ErrorReportModal :open="showErrorReportModal" @close="showErrorReportModal = false" />
   <SignatureSetupModal :show="showSignatureSetupModal" @close="showSignatureSetupModal = false" />
+  <EmployeeIdSetupModal :show="showEmployeeIdSetupModal" @done="showEmployeeIdSetupModal = false" />
   <ReportDateRangeModal
     :show="showConsultationLogModal"
     title="Consultation Log Generation"

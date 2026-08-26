@@ -9,6 +9,7 @@ import {
   ArrowUpOnSquareIcon,
   BanknotesIcon,
   XMarkIcon,
+  IdentificationIcon,
 } from "@heroicons/vue/24/outline"
 import { useUsers } from "@/Composables/useUsers.js"
 import { storageUrl } from "@/Composables/useStorage.js"
@@ -381,6 +382,12 @@ function formatSg(user) {
                       <AppIconButton v-if="isEmployeesPage" label="Assign / Update Salary Grade" variant="success" @click="openSgModal(user)">
                         <BanknotesIcon class="w-4 h-4" />
                       </AppIconButton>
+                      <!-- Print CR-80 ID card (employees page only) -->
+                      <a v-if="isEmployeesPage" :href="route('hr.employees.id-card', user.id)" target="_blank" rel="noopener">
+                        <AppIconButton label="Print ID Card">
+                          <IdentificationIcon class="w-4 h-4" />
+                        </AppIconButton>
+                      </a>
                       <!-- Signature upload -->
                       <div class="relative">
                         <input :id="'sig-input-' + user.id" type="file" accept=".png,image/png" class="hidden" @change="(e) => handleUpload(user, e)" />
@@ -465,6 +472,12 @@ function formatSg(user) {
               <p class="text-sm text-slate-700">Division Chief: <strong>{{ selectedUser.division?.chief?.name ?? '—' }}</strong></p>
               <p class="text-sm text-slate-700">Office: <strong>{{ selectedUser.office?.name ?? selectedUser.office ?? '—' }}</strong></p>
               <p class="text-sm text-slate-700">Created At: <strong>{{ new Date(selectedUser.created_at).toLocaleString() }}</strong></p>
+
+              <div v-if="isEmployeesPage" class="flex justify-end gap-2 pt-4">
+                <AppButton as="a" :href="route('hr.employees.id-card', selectedUser.id)" target="_blank" variant="secondary">
+                  <IdentificationIcon class="w-4 h-4" /> Print ID Card
+                </AppButton>
+              </div>
             </div>
 
             <!-- CREATE / EDIT FORM -->

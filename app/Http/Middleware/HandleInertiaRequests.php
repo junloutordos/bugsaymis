@@ -99,6 +99,17 @@ class HandleInertiaRequests extends Middleware
             // and/or signing PIN — pulled (consumed) on the first Inertia page
             // render so the setup prompt shows once per login.
             'promptSignatureSetup' => fn () => (bool) $request->session()->pull('prompt_signature_setup', false),
+            // Mandatory hire year/month prompt (generates employee_idno_new).
+            // Unlike the signature prompt, this is NOT dismissable: besides the
+            // one-shot session flag (shown right after login), we also expose
+            // an always-on flag so the modal is force-shown on every subsequent
+            // navigation within the session until the employee answers it.
+            'promptEmployeeIdSetup' => fn () => (bool) $request->session()->pull('prompt_employee_id_setup', false),
+            'needsEmployeeIdSetup' => function () use ($request) {
+                $user = $request->user();
+
+                return $user ? empty($user->employee_idno_new) : false;
+            },
             // ── Sidebar badge counts — cached 60s to reduce DB queries ────────
             'consultationsNotificationCount' => function () use ($request) {
                 try {

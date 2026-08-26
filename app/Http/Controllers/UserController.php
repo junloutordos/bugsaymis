@@ -79,6 +79,62 @@ class UserController extends Controller
         ]);
     }
 
+    /**
+     * HR/Admin-facing CR-80 employee ID card preview/print page for any
+     * employee (as opposed to profile.id-card, which is self-service).
+     * Uses employee_idno_new — never employee_no (payroll's identifier).
+     */
+    public function idCard(User $user)
+    {
+        // Lazily issue the verification token on first render, same as the
+        // self-service card — the QR must never encode employee_idno_new.
+        if (empty($user->id_verification_token)) {
+            $user->forceFill(['id_verification_token' => Str::random(48)])->save();
+        }
+
+        $verifyUrl = route('employee.verify', $user->id_verification_token);
+        $qrSvg = (string) \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(240)->margin(0)->generate($verifyUrl);
+
+        $division = $user->division_id ? Division::find($user->division_id) : null;
+        $office   = $user->office_id ? Office::find($user->office_id) : null;
+
+        $pdsInfo = null;
+        $pdsId   = \App\Models\Pds::where('user_id', $user->id)->value('id');
+        if ($pdsId) {
+            $pdsInfo = \App\Models\PDSPersonalInfo::where('pds_id', $pdsId)
+                ->first(['blood_type', 'tin_no', 'philhealth_no', 'pagibig_id_no', 'philsys_no']);
+        }
+
+        $ocd = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
+        $signatures = app(DigitalSignatureService::class);
+
+        return Inertia::render('Profile/IdCard', [
+            'employee' => [
+                'name'              => mb_strtoupper($user->name),
+                'position'          => $user->position,
+                'employee_no'       => $user->employee_idno_new,
+                'division'          => $division?->division_name,
+                'office'            => $office?->name,
+                'profile_picture'   => $user->profile_picture,
+                'is_active'         => $user->status !== 'inactive',
+            ],
+            'ids' => [
+                'blood_type' => $pdsInfo?->blood_type,
+                'tin'        => $pdsInfo?->tin_no,
+                'philhealth' => $pdsInfo?->philhealth_no,
+                'pagibig'    => $pdsInfo?->pagibig_id_no,
+                'philsys'    => $pdsInfo?->philsys_no,
+            ],
+            'qr_svg'     => $qrSvg,
+            'verify_url' => $verifyUrl,
+            'ocd'        => [
+                'name'          => $ocd?->name,
+                'position'      => $ocd?->position ?? 'Campus Director',
+                'signature_uri' => $ocd ? $signatures->getSignatureDataUri($ocd) : null,
+            ],
+        ]);
+    }
+
     public function assignSalaryGrade(Request $request, User $user)
     {
         $data = $request->validate([

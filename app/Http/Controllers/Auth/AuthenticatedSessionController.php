@@ -40,6 +40,12 @@ class AuthenticatedSessionController extends Controller
             session(['prompt_signature_setup' => true]);
         }
 
+        // Mandatory (non-dismissable) prompt for hire year/month, used to
+        // generate employee_idno_new. Fires every login until answered.
+        if (empty($user->employee_idno_new)) {
+            session(['prompt_employee_id_setup' => true]);
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 
