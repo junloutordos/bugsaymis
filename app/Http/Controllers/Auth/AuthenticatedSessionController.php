@@ -44,6 +44,11 @@ class AuthenticatedSessionController extends Controller
         // generate employee_idno_new. Fires every login until answered.
         if (empty($user->employee_idno_new)) {
             session(['prompt_employee_id_setup' => true]);
+        } elseif (! empty(app(\App\Services\HR\EmployeeEssentialInfoService::class)->missingFields($user))) {
+            // Sequential — only flag the second mandatory prompt (DOB,
+            // residential address, emergency contact) once the employee ID
+            // prompt has already been resolved, so they never overlap.
+            session(['prompt_essential_info_setup' => true]);
         }
 
         return redirect()->intended(route('dashboard', absolute: false));

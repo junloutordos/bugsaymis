@@ -102,7 +102,12 @@ class UserController extends Controller
         $pdsId   = \App\Models\Pds::where('user_id', $user->id)->value('id');
         if ($pdsId) {
             $pdsInfo = \App\Models\PDSPersonalInfo::where('pds_id', $pdsId)
-                ->first(['blood_type', 'tin_no', 'philhealth_no', 'pagibig_id_no', 'philsys_no']);
+                ->first([
+                    'blood_type', 'tin_no', 'philhealth_no', 'pagibig_id_no', 'philsys_no',
+                    'date_of_birth',
+                    'residential_house', 'residential_street', 'residential_subdivision',
+                    'residential_barangay', 'residential_city', 'residential_province', 'residential_zip_code',
+                ]);
         }
 
         $ocd = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
@@ -110,13 +115,15 @@ class UserController extends Controller
 
         return Inertia::render('Profile/IdCard', [
             'employee' => [
-                'name'              => mb_strtoupper($user->name),
-                'position'          => $user->position,
-                'employee_no'       => $user->employee_idno_new,
-                'division'          => $division?->division_name,
-                'office'            => $office?->name,
-                'profile_picture'   => $user->profile_picture,
-                'is_active'         => $user->status !== 'inactive',
+                'name'                 => mb_strtoupper($user->name),
+                'position'             => $user->position,
+                'employee_no'          => $user->employee_idno_new,
+                'division'             => $division?->division_name,
+                'office'               => $office?->name,
+                'profile_picture'      => $user->profile_picture,
+                'is_active'            => $user->status !== 'inactive',
+                'date_of_birth'        => $pdsInfo?->date_of_birth ? \Carbon\Carbon::parse($pdsInfo->date_of_birth)->format('F j, Y') : null,
+                'residential_address'  => EmployeeIdController::formatAddress($pdsInfo),
             ],
             'ids' => [
                 'blood_type' => $pdsInfo?->blood_type,
@@ -127,6 +134,7 @@ class UserController extends Controller
             ],
             'qr_svg'     => $qrSvg,
             'verify_url' => $verifyUrl,
+            'back_route' => route('hr.employees.index'),
             'ocd'        => [
                 'name'          => $ocd?->name,
                 'position'      => $ocd?->position ?? 'Campus Director',

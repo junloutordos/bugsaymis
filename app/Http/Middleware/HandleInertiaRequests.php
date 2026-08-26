@@ -110,6 +110,37 @@ class HandleInertiaRequests extends Middleware
 
                 return $user ? empty($user->employee_idno_new) : false;
             },
+            // Second mandatory prompt — date of birth, residential address,
+            // emergency contact — fires only after the employee ID prompt is
+            // resolved, and only asks for whichever fields are still missing
+            // from PDS/EmployeeProfile.
+            'promptEssentialInfoSetup' => fn () => (bool) $request->session()->pull('prompt_essential_info_setup', false),
+            'missingEssentialInfoFields' => function () use ($request) {
+                $user = $request->user();
+                if (! $user) {
+                    return [];
+                }
+
+                try {
+                    return app(\App\Services\HR\EmployeeEssentialInfoService::class)->missingFields($user);
+                } catch (\Throwable) {
+                    return [];
+                }
+            },
+            'needsEssentialInfoSetup' => function () use ($request) {
+                $user = $request->user();
+                if (! $user || empty($user->employee_idno_new)) {
+                    // Never force this prompt before the employee-ID prompt
+                    // has been resolved — the two must stay sequential.
+                    return false;
+                }
+
+                try {
+                    return ! empty(app(\App\Services\HR\EmployeeEssentialInfoService::class)->missingFields($user));
+                } catch (\Throwable) {
+                    return false;
+                }
+            },
             // ── Sidebar badge counts — cached 60s to reduce DB queries ────────
             'consultationsNotificationCount' => function () use ($request) {
                 try {

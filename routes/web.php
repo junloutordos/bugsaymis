@@ -1676,6 +1676,9 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     // Mandatory hire year/month prompt — generates employee_idno_new
     Route::post('/profile/employee-id/setup', [\App\Http\Controllers\HR\EmployeeIdSetupController::class, 'store'])->name('employee-id.setup');
 
+    // Second mandatory prompt — date of birth, residential address, emergency contact
+    Route::post('/profile/essential-info/setup', [\App\Http\Controllers\HR\EmployeeEssentialInfoController::class, 'store'])->name('essential-info.setup');
+
     // Digital Signature — profile setup
     Route::get('/profile/signature', [\App\Http\Controllers\UserSignatureController::class, 'show'])->name('profile.signature');
     Route::post('/profile/signature', [\App\Http\Controllers\UserSignatureController::class, 'saveSignature'])->name('profile.signature.save');

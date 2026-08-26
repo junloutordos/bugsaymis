@@ -159,12 +159,21 @@ class GoogleAuthController extends Controller
     /**
      * Flag the session so the mandatory hire-year/month prompt shows on the
      * next Inertia page render — only while employee_idno_new is still
-     * unset. This prompt cannot be dismissed until answered.
+     * unset. This prompt cannot be dismissed until answered. Once resolved,
+     * chains into the second mandatory prompt (DOB, residential address,
+     * emergency contact) so the two never show simultaneously.
      */
     protected function flagEmployeeIdSetupPrompt(User $user): void
     {
         if (empty($user->employee_idno_new)) {
             session(['prompt_employee_id_setup' => true]);
+
+            return;
+        }
+
+        $missing = app(\App\Services\HR\EmployeeEssentialInfoService::class)->missingFields($user);
+        if (! empty($missing)) {
+            session(['prompt_essential_info_setup' => true]);
         }
     }
 
