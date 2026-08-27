@@ -26,6 +26,29 @@ class EmployeeIdController extends Controller
     {
         $user = $request->user();
 
+        return Inertia::render('Profile/IdCard', $this->buildCardData($user, route('profile.edit')));
+    }
+
+    /**
+     * Self-service digital ID — front-first flip-card view (screen only,
+     * no print layout). Separate page from the CR-80 print view so the two
+     * can evolve independently; shares the same underlying data.
+     */
+    public function digitalId(Request $request): Response
+    {
+        $user = $request->user();
+
+        return Inertia::render('Profile/DigitalId', $this->buildCardData($user, route('profile.edit')));
+    }
+
+    /**
+     * Assembles the ID card data shared by both the print view (show) and
+     * the digital flip-card view (digitalId). $backRoute is the "Back"
+     * link target, which differs between self-service and HR-print
+     * contexts (see UserController::idCard).
+     */
+    private function buildCardData(User $user, string $backRoute): array
+    {
         // Lazily issue the verification token on first render. forceFill —
         // the token must never be mass-assignable.
         if (empty($user->id_verification_token)) {
@@ -55,7 +78,7 @@ class EmployeeIdController extends Controller
 
         $ocd = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
 
-        return Inertia::render('Profile/IdCard', [
+        return [
             'employee' => [
                 'name'              => mb_strtoupper($user->name),
                 'position'          => $user->position,
@@ -74,13 +97,14 @@ class EmployeeIdController extends Controller
             ],
             'qr_svg'     => $qrSvg,
             'verify_url' => $verifyUrl,
-            'back_route' => route('profile.edit'),
+            'back_route' => $backRoute,
+            'print_route' => route('profile.id-card'),
             'ocd'        => [
                 'name'          => $ocd ? $this->formatDirectorName($ocd) : null,
                 'position'      => $ocd?->position ?? 'Campus Director',
                 'signature_uri' => $ocd ? $this->signatures->getSignatureDataUri($ocd) : null,
             ],
-        ]);
+        ];
     }
 
     /**

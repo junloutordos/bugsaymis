@@ -79,12 +79,12 @@ function logout() {
               <ArrowRightIcon class="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400" />
             </button>
 
-            <button @click="go(route('profile.id-card'))"
+            <button @click="go(route('profile.digital-id'))"
               class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-left group">
               <IdentificationIcon class="h-4 w-4 text-slate-400 group-hover:text-indigo-500 shrink-0" />
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-slate-700">Employee Digital ID</p>
-                <p class="text-xs text-slate-400">View & print ID card</p>
+                <p class="text-xs text-slate-400">View card, flip to see back</p>
               </div>
               <ArrowRightIcon class="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400" />
             </button>

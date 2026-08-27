@@ -1674,6 +1674,9 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     // Employee Digital ID — own card, print layout with verify QR
     Route::get('/profile/id-card', [\App\Http\Controllers\EmployeeIdController::class, 'show'])->name('profile.id-card');
 
+    // Employee Digital ID — self-service front-first flip-card view (screen only)
+    Route::get('/profile/digital-id', [\App\Http\Controllers\EmployeeIdController::class, 'digitalId'])->name('profile.digital-id');
+
     // Mandatory hire year/month prompt — generates employee_idno_new
     Route::post('/profile/employee-id/setup', [\App\Http\Controllers\HR\EmployeeIdSetupController::class, 'store'])->name('employee-id.setup');
 

@@ -57,7 +57,7 @@ defineProps({
                 </div>
 
                 <!-- Employee Digital ID -->
-                <Link :href="route('profile.id-card')"
+                <Link :href="route('profile.digital-id')"
                       class="block bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 px-6 py-5 hover:border-indigo-300 hover:shadow-md transition-all group">
                     <div class="flex items-center justify-between max-w-xl">
                         <div class="flex items-center gap-3">
@@ -66,7 +66,7 @@ defineProps({
                             </div>
                             <div>
                                 <p class="text-sm font-semibold text-slate-800">Employee Digital ID</p>
-                                <p class="text-xs text-slate-500">View and print your ID card with a verifiable QR code</p>
+                                <p class="text-xs text-slate-500">View your ID card and flip to see the back</p>
                             </div>
                         </div>
                         <span class="text-slate-400 group-hover:text-indigo-500 text-sm transition-colors">&rarr;</span>

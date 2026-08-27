@@ -253,16 +253,16 @@ html, body { background: #f1f5f9; }
 .id-band-title { font-size: 8px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .id-back-footer {
   border-top: 1.5px solid #1447c0;
-  padding: 1mm 3mm;
+  padding: 2mm 3mm;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3mm;
+  gap: 0.8mm;
 }
-.id-back-qr { width: 11mm; height: 11mm; }
+.id-back-qr { width: 20mm; height: 20mm; }
 .id-back-qr svg { width: 100%; height: 100%; }
 .id-back-qr-caption {
-  font-size: 4.5px;
+  font-size: 5px;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .3px;
