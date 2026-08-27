@@ -74,6 +74,11 @@ onMounted(() => {
         back as a single print job — make sure dual-sided / duplex printing is enabled
         in the printer driver so both sides print on one card.
       </p>
+      <p class="text-xs leading-relaxed text-amber-600 mt-1.5">
+        In the print dialog, set <strong>Scale</strong> to "Actual size / 100%" (not "Fit to
+        page") and select paper size <strong>54&nbsp;x&nbsp;86&nbsp;mm (CR-80)</strong>. If the
+        driver falls back to A4/Letter, it will rescale the card and clip an edge.
+      </p>
     </div>
 
     <div class="cards">
@@ -412,16 +417,35 @@ html, body { background: #f1f5f9; }
 /* ── Print ─────────────────────────────────────────────────────── */
 @media print {
   @page { size: 54mm 86mm; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #fff; }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff;
+    width: 54mm;
+    height: 86mm;
+  }
   .no-print { display: none !important; }
-  .page { padding: 0; gap: 0; }
-  .cards { display: block; }
+  .page {
+    min-height: 0;
+    width: 54mm;
+    padding: 0;
+    margin: 0;
+    gap: 0;
+  }
+  .cards {
+    display: block;
+    gap: 0;
+  }
   .id-card {
     box-shadow: none;
     border-radius: 0;
-    width: 54mm;
-    height: 86mm;
+    width: 54mm !important;
+    height: 86mm !important;
+    margin: 0;
     page-break-after: always;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .id-card:last-child { page-break-after: auto; }
 }

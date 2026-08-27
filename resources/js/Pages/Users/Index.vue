@@ -486,7 +486,7 @@ function formatSg(user) {
                   </div>
                 </td>
                 <td v-if="!isEmployeesPage" :class="TD">{{ user.email }}</td>
-                <td v-if="isEmployeesPage" :class="TD_MONO">{{ user.employee_no ?? '—' }}</td>
+                <td v-if="isEmployeesPage" :class="TD_MONO">{{ user.employee_idno_new ?? '—' }}</td>
                 <td :class="TD">{{ user.position ?? '—' }}</td>
                 <td class="px-4 py-3 text-xs text-slate-700">{{ user.division?.division_name ?? '—' }}</td>
                 <td v-if="isEmployeesPage" :class="TD">
