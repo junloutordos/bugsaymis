@@ -121,6 +121,45 @@ class EmployeeIdCardRenderTest extends TestCase
         $this->actingAs($staff)->get(route('hr.employees.id-card', $employee->id))->assertForbidden();
     }
 
+    public function test_director_name_formats_as_firstname_mi_lastname_postnominal(): void
+    {
+        $director = User::factory()->create([
+            'name' => 'Patacsil, Melba C.',
+            'postnominal_title' => 'PhD',
+        ]);
+
+        $formatted = \App\Http\Controllers\EmployeeIdController::formatDirectorName($director);
+
+        $this->assertSame('MELBA C. PATACSIL, PhD', $formatted);
+    }
+
+    public function test_director_name_formats_without_postnominal_when_absent(): void
+    {
+        $director = User::factory()->create([
+            'name' => 'Patacsil, Melba C.',
+            'postnominal_title' => null,
+        ]);
+
+        $formatted = \App\Http\Controllers\EmployeeIdController::formatDirectorName($director);
+
+        $this->assertSame('MELBA C. PATACSIL', $formatted);
+    }
+
+    public function test_card_ocd_name_uses_firstname_mi_lastname_postnominal_format(): void
+    {
+        $role = \App\Models\Role::firstOrCreate(['name' => 'OCD']);
+        $ocd = User::factory()->create(['name' => 'Patacsil, Melba C.', 'postnominal_title' => 'PhD']);
+        $ocd->roles()->attach($role);
+
+        $user = User::factory()->create(['employee_idno_new' => 'E13-2020-01-001']);
+
+        $response = $this->actingAs($user)->get(route('profile.id-card'));
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('ocd.name', 'MELBA C. PATACSIL, PhD')
+        );
+    }
+
     private function userWithPermission(string $permissionName): User
     {
         $role = \App\Models\Role::create(['name' => 'Test Role '.uniqid()]);

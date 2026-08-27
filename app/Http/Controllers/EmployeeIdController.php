@@ -76,11 +76,33 @@ class EmployeeIdController extends Controller
             'verify_url' => $verifyUrl,
             'back_route' => route('profile.edit'),
             'ocd'        => [
-                'name'          => $ocd?->name,
+                'name'          => $ocd ? $this->formatDirectorName($ocd) : null,
                 'position'      => $ocd?->position ?? 'Campus Director',
                 'signature_uri' => $ocd ? $this->signatures->getSignatureDataUri($ocd) : null,
             ],
         ]);
+    }
+
+    /**
+     * Formats the Campus Director's name as "FIRSTNAME M.I. LASTNAME, Post-
+     * Nominal Title" for the ID card signature block. Stored name is in
+     * filing order ("Lastname, Firstname M.I."); postnominal_title is
+     * stored without its leading comma.
+     */
+    public static function formatDirectorName(User $director): string
+    {
+        $raw = $director->name ?? '';
+        $commaIndex = strpos($raw, ',');
+
+        $reading = $commaIndex === false
+            ? $raw
+            : trim(substr($raw, $commaIndex + 1)) . ' ' . trim(substr($raw, 0, $commaIndex));
+
+        $reading = mb_strtoupper(trim($reading));
+
+        return filled($director->postnominal_title)
+            ? $reading . ', ' . $director->postnominal_title
+            : $reading;
     }
 
     /**

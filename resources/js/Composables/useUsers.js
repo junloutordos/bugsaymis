@@ -30,6 +30,10 @@ export function useUsers(props) {
     division_id: "",
     office_id: "",
     emp_category: '',
+    employee_idno_new: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    emergency_contact_address: "",
   })
 
   const isEmployeesPage = !!(props.pageTitle && String(props.pageTitle).toLowerCase().includes('employee'))
@@ -90,6 +94,7 @@ export function useUsers(props) {
         sex: user.sex,
         badge_id: user.badge_id ?? "",
         employee_no: user.employee_no ?? "",
+        employee_idno_new: user.employee_idno_new ?? "",
         role_id: Array.isArray(user.role_id)
           ? user.role_id
           : user.role_id
@@ -101,6 +106,9 @@ export function useUsers(props) {
         office_id: user.office_id ?? user.office?.id ?? "",
         emp_category: user.emp_category ?? '',
         status: user.status ?? 'active',
+        emergency_contact_name: user.employee_profile?.emergency_contact_name ?? "",
+        emergency_contact_phone: user.employee_profile?.emergency_contact_phone ?? "",
+        emergency_contact_address: user.employee_profile?.emergency_contact_address ?? "",
       }
     } else {
       form.value = {
@@ -112,6 +120,7 @@ export function useUsers(props) {
         sex: "",
         badge_id: "",
         employee_no: "",
+        employee_idno_new: "",
         role_id: [],
         position: "",
         specialization: "",
@@ -119,6 +128,9 @@ export function useUsers(props) {
         office_id: "",
         emp_category: '',
         status: 'active',
+        emergency_contact_name: "",
+        emergency_contact_phone: "",
+        emergency_contact_address: "",
       }
     }
     selectedUser.value = user

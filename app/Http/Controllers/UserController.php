@@ -20,8 +20,8 @@ class UserController extends Controller
     public function index()
     {
         // Exclude users explicitly marked as 'inactive'
-        $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'emp_category', 'created_at')
+        $users = User::with(['role', 'division.divisionchief', 'office', 'employeeProfile'])
+            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'employee_idno_new', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'emp_category', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -49,8 +49,8 @@ class UserController extends Controller
     public function employeesIndex()
     {
         // Exclude users explicitly marked as 'inactive' for the employees list as well
-        $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization',
+        $users = User::with(['role', 'division.divisionchief', 'office', 'employeeProfile'])
+            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'employee_idno_new', 'role_id', 'position', 'specialization',
                      'division_id', 'office_id', 'profile_picture', 'electronic_signature',
                      'status', 'emp_category', 'salary_grade', 'salary_step', 'created_at')
             ->where('status', '<>', 'inactive')
@@ -135,7 +135,7 @@ class UserController extends Controller
             'verify_url' => $verifyUrl,
             'back_route' => route('hr.employees.index'),
             'ocd'        => [
-                'name'          => $ocd?->name,
+                'name'          => $ocd ? EmployeeIdController::formatDirectorName($ocd) : null,
                 'position'      => $ocd?->position ?? 'Campus Director',
                 'signature_uri' => $ocd ? $signatures->getSignatureDataUri($ocd) : null,
             ],
@@ -159,8 +159,8 @@ class UserController extends Controller
      */
     public function inactiveIndex()
     {
-        $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status', 'emp_category')
+        $users = User::with(['role', 'division.divisionchief', 'office', 'employeeProfile'])
+            ->select('id', 'name', 'prenominal_title', 'postnominal_title', 'sex', 'email', 'badge_id', 'employee_no', 'employee_idno_new', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status', 'emp_category')
             ->where('status', 'inactive')
             ->get();
 
@@ -318,15 +318,30 @@ class UserController extends Controller
             'emp_category'       => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
             'badge_id'           => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
             'employee_no'        => ['nullable','string','max:50','unique:users,employee_no,' . $user->id],
+            'employee_idno_new'  => ['nullable','string','max:30','regex:/^E13-\d{4}-\d{2}-\d{3,}$/','unique:users,employee_idno_new,' . $user->id],
             'position'           => 'nullable|string|max:255',
             'specialization'     => 'nullable|string|max:150',
             'division_id'        => 'nullable|exists:divisions,id',
             'office_id'          => 'nullable|exists:offices,id',
             'status'             => 'nullable|in:active,inactive',
+            'emergency_contact_name'    => 'nullable|string|max:150',
+            'emergency_contact_phone'   => 'nullable|string|max:20',
+            'emergency_contact_address' => 'nullable|string|max:255',
         ]);
+
+        $emergencyContact = array_filter([
+            'emergency_contact_name'    => $data['emergency_contact_name'] ?? null,
+            'emergency_contact_phone'   => $data['emergency_contact_phone'] ?? null,
+            'emergency_contact_address' => $data['emergency_contact_address'] ?? null,
+        ], fn ($v) => $v !== null);
+        unset($data['emergency_contact_name'], $data['emergency_contact_phone'], $data['emergency_contact_address']);
 
         $previousStatus = $user->status;
         $user->update($data);
+
+        if (! empty($emergencyContact)) {
+            $user->employeeProfile()->updateOrCreate(['user_id' => $user->id], $emergencyContact);
+        }
 
         // Keep the Workspace account's lifecycle in sync when status is
         // changed from this general edit form too, not just the dedicated
@@ -377,5 +392,36 @@ class UserController extends Controller
         app(DigitalSignatureService::class)->saveSignatureImage($user, $request->signature_base64);
 
         return redirect()->route('users.index')->with('success', 'Electronic signature uploaded.');
+    }
+
+    /**
+     * HR/Admin-facing profile photo update for any user — mirrors
+     * StudentController::updatePhoto (base64 JSON, never multipart/form-data,
+     * since Cloudflare WAF blocks multipart uploads on this app).
+     */
+    public function updatePhoto(Request $request, User $user)
+    {
+        $request->validate(['photo_base64' => 'required|string']);
+
+        $dataUri = $request->input('photo_base64');
+        if (! preg_match('/^data:(image\/[\w+\-]+);base64,(.+)$/s', $dataUri, $m)) {
+            return response()->json(['error' => 'Invalid image data'], 422);
+        }
+
+        $mime   = $m[1];
+        $ext    = str_contains($mime, 'png') ? 'png' : (str_contains($mime, 'webp') ? 'webp' : 'jpg');
+        $binary = base64_decode($m[2]);
+
+        $existing = $user->profile_picture;
+        if ($existing && Storage::disk('s3')->exists($existing)) {
+            Storage::disk('s3')->delete($existing);
+        }
+
+        $s3Key = "profile_pictures/{$user->id}_" . time() . ".{$ext}";
+        Storage::disk('s3')->put($s3Key, $binary, ['ContentType' => $mime]);
+
+        $user->update(['profile_picture' => $s3Key]);
+
+        return response()->json(['success' => true, 'profile_picture' => $s3Key]);
     }
 }

@@ -13,7 +13,7 @@ import {
 } from "@heroicons/vue/24/outline"
 import { useUsers } from "@/Composables/useUsers.js"
 import { storageUrl } from "@/Composables/useStorage.js"
-import { ref, watch, computed } from "vue"
+import { ref, watch, computed, nextTick } from "vue"
 import { useSubmit } from "@/Composables/useSubmit"
 import AppButton from "@/Components/AppButton.vue"
 import AppCard from "@/Components/AppCard.vue"
@@ -134,6 +134,142 @@ const getRoleNames = (user) => {
 const openSignaturePicker = (user) => {
   const el = document.getElementById('sig-input-' + user.id)
   if (el) el.click()
+}
+
+// ── Profile photo crop/upload (ported from Students/Index.vue) ─────────────────
+const FRAME = 240        // fixed crop square size in px
+const CONTAINER_H = 320  // crop container height in px
+
+const showPhotoModal = ref(false)
+const photoTargetUser = ref(null)
+const photoPreviewSrc = ref(null)
+const cropImg = ref(null)
+const cropContainerRef = ref(null)
+const photoUploading = ref(false)
+const photoError = ref(null)
+const photoVersions = ref({})
+
+// Zoom & pan state
+const imgScale  = ref(1)    // user zoom multiplier (1 = just covers frame)
+const minScale  = ref(1)    // base: image just covers frame at this value
+const panX      = ref(0)    // image-center offset from container-center, px
+const panY      = ref(0)
+const containerW = ref(400)
+const isDragging = ref(false)
+const dragStart  = ref({ x: 0, y: 0, px: 0, py: 0 })
+
+const effectiveScale = computed(() => minScale.value * imgScale.value)
+const imgDispW = computed(() => cropImg.value ? Math.round(cropImg.value.naturalWidth * effectiveScale.value) : 0)
+const imgDispH = computed(() => {
+  if (!cropImg.value || !imgDispW.value) return 0
+  const { naturalWidth, naturalHeight } = cropImg.value
+  return naturalWidth > 0 ? Math.round(imgDispW.value * naturalHeight / naturalWidth) : 0
+})
+const imgLeft  = computed(() => Math.round(containerW.value / 2 + panX.value - imgDispW.value / 2))
+const imgTop   = computed(() => Math.round(CONTAINER_H      / 2 + panY.value - imgDispH.value / 2))
+const frameLeft = computed(() => Math.round((containerW.value - FRAME) / 2))
+const frameTop  = computed(() => Math.round((CONTAINER_H     - FRAME) / 2))
+const maxPanX  = computed(() => Math.max(0, (imgDispW.value - FRAME) / 2))
+const maxPanY  = computed(() => Math.max(0, (imgDispH.value - FRAME) / 2))
+
+const clampPan = () => {
+  panX.value = Math.max(-maxPanX.value, Math.min(maxPanX.value, panX.value))
+  panY.value = Math.max(-maxPanY.value, Math.min(maxPanY.value, panY.value))
+}
+
+const openPhotoModal = (user) => {
+  photoTargetUser.value = user
+  photoPreviewSrc.value = null
+  photoError.value = null
+  imgScale.value = 1
+  panX.value = 0
+  panY.value = 0
+  showPhotoModal.value = true
+}
+
+const onPhotoFileSelect = (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => { photoPreviewSrc.value = ev.target.result }
+  reader.readAsDataURL(file)
+}
+
+const onPhotoImgLoad = () => {
+  nextTick(() => {
+    const container = cropContainerRef.value
+    const img = cropImg.value
+    if (!container || !img) return
+    containerW.value = container.clientWidth
+    minScale.value = Math.max(FRAME / img.naturalWidth, FRAME / img.naturalHeight)
+    imgScale.value = 1
+    panX.value = 0
+    panY.value = 0
+  })
+}
+
+// ── Pan (drag image within the fixed frame) ───────────────────────
+const onPhotoPan = (e) => {
+  if (!isDragging.value) return
+  if (e.cancelable) e.preventDefault()
+  const clientX = e.touches?.[0]?.clientX ?? e.clientX
+  const clientY = e.touches?.[0]?.clientY ?? e.clientY
+  panX.value = Math.max(-maxPanX.value, Math.min(maxPanX.value, dragStart.value.px + clientX - dragStart.value.x))
+  panY.value = Math.max(-maxPanY.value, Math.min(maxPanY.value, dragStart.value.py + clientY - dragStart.value.y))
+}
+
+const endPhotoPan = () => {
+  isDragging.value = false
+  window.removeEventListener('mousemove', onPhotoPan)
+  window.removeEventListener('mouseup', endPhotoPan)
+  window.removeEventListener('touchmove', onPhotoPan)
+  window.removeEventListener('touchend', endPhotoPan)
+}
+
+const startPhotoPan = (e) => {
+  e.preventDefault()
+  isDragging.value = true
+  const clientX = e.touches?.[0]?.clientX ?? e.clientX
+  const clientY = e.touches?.[0]?.clientY ?? e.clientY
+  dragStart.value = { x: clientX, y: clientY, px: panX.value, py: panY.value }
+  window.addEventListener('mousemove', onPhotoPan)
+  window.addEventListener('mouseup', endPhotoPan)
+  window.addEventListener('touchmove', onPhotoPan, { passive: false })
+  window.addEventListener('touchend', endPhotoPan)
+}
+
+const confirmPhotoCrop = async () => {
+  if (!cropImg.value || !photoPreviewSrc.value || !photoTargetUser.value) return
+  photoUploading.value = true
+  photoError.value = null
+  try {
+    const img = cropImg.value
+    const eff  = effectiveScale.value
+    // Frame center in natural-image coordinates
+    const natCX   = img.naturalWidth  / 2 - panX.value / eff
+    const natCY   = img.naturalHeight / 2 - panY.value / eff
+    const natSize = FRAME / eff
+    const canvas  = document.createElement('canvas')
+    canvas.width  = 400
+    canvas.height = 400
+    canvas.getContext('2d').drawImage(img, natCX - natSize / 2, natCY - natSize / 2, natSize, natSize, 0, 0, 400, 400)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+
+    const { data } = await axios.post(route('users.photo.update', { user: photoTargetUser.value.id }), { photo_base64: dataUrl })
+
+    photoVersions.value[photoTargetUser.value.id] = Date.now()
+    if (selectedUser.value?.id === photoTargetUser.value.id) {
+      selectedUser.value = { ...selectedUser.value, profile_picture: data.profile_picture }
+    }
+    const idx = usersList.value.findIndex(u => u.id === photoTargetUser.value.id)
+    if (idx !== -1) usersList.value[idx] = { ...usersList.value[idx], profile_picture: data.profile_picture }
+
+    showPhotoModal.value = false
+  } catch {
+    photoError.value = 'Failed to upload photo. Please try again.'
+  } finally {
+    photoUploading.value = false
+  }
 }
 
 const handleUpload = (user, e) => {
@@ -535,6 +671,13 @@ function formatSg(user) {
               </div>
 
               <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Employee ID Number</label>
+                <input v-model="form.employee_idno_new" type="text" placeholder="e.g. E13-2020-06-001"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full font-mono" />
+                <p class="mt-1 text-[11px] text-slate-400">Printed on the CR-80 ID card. Format: E13-YYYY-MM-XXX.</p>
+              </div>
+
+              <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">Specialization</label>
                 <input v-model="form.specialization" type="text" placeholder="e.g. Mathematics, Biology"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
@@ -594,6 +737,42 @@ function formatSg(user) {
                 </div>
               </div>
 
+              <div v-if="modalMode === 'edit'" class="sm:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Profile Photo</label>
+                <div class="flex items-center gap-4 rounded-xl border border-slate-200 p-4">
+                  <div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                    <img v-if="selectedUser?.profile_picture"
+                      :src="storageUrl(selectedUser.profile_picture.startsWith('profile_pictures/') ? selectedUser.profile_picture : 'profile_pictures/' + selectedUser.profile_picture) + '?v=' + (photoVersions[selectedUser.id] || 0)"
+                      alt="Current photo" class="h-full w-full object-cover" />
+                    <div v-else class="flex h-full w-full items-center justify-center text-[10px] text-slate-400">No photo</div>
+                  </div>
+                  <AppButton type="button" variant="secondary" @click="openPhotoModal(selectedUser)">
+                    <ArrowUpOnSquareIcon class="h-4 w-4" /> Change Photo
+                  </AppButton>
+                </div>
+              </div>
+
+              <div v-if="modalMode === 'edit'" class="sm:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Emergency Contact</label>
+                <div class="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-2">
+                  <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Contact Person Name</label>
+                    <input v-model="form.emergency_contact_name" type="text"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Mobile No.</label>
+                    <input v-model="form.emergency_contact_phone" type="text"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Address</label>
+                    <input v-model="form.emergency_contact_address" type="text"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+                  </div>
+                </div>
+              </div>
+
               <div class="flex justify-end gap-2 pt-4 sm:col-span-2">
                 <AppButton type="button" variant="secondary" @click="closeModal">
                   Cancel
@@ -603,6 +782,94 @@ function formatSg(user) {
                 </AppButton>
               </div>
             </form>
+      </AppModal>
+
+      <!-- ── Profile Photo Crop Modal (ported from Students/Index.vue) ───────── -->
+      <AppModal :show="showPhotoModal" title="Update Profile Photo" size="sm" @close="showPhotoModal = false">
+        <!-- File picker -->
+        <div v-if="!photoPreviewSrc" class="flex flex-col items-center gap-4 py-6">
+          <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </div>
+          <label class="cursor-pointer">
+            <span class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Choose Photo</span>
+            <input type="file" accept="image/*" @change="onPhotoFileSelect" class="sr-only" />
+          </label>
+          <p class="text-xs text-slate-500 text-center">JPG, PNG, or WebP.</p>
+        </div>
+
+        <!-- Crop UI -->
+        <div v-else>
+          <!-- Crop container: image pans freely under the fixed square frame -->
+          <div
+            ref="cropContainerRef"
+            class="relative overflow-hidden rounded-lg bg-slate-900 select-none"
+            :class="isDragging ? 'cursor-grabbing' : 'cursor-grab'"
+            :style="{ height: CONTAINER_H + 'px' }"
+            @mousedown.prevent="startPhotoPan"
+            @touchstart.prevent="startPhotoPan"
+          >
+            <img
+              ref="cropImg"
+              :src="photoPreviewSrc"
+              @load="onPhotoImgLoad"
+              class="absolute pointer-events-none"
+              :style="{
+                width: imgDispW + 'px',
+                maxWidth: 'none',
+                left: imgLeft + 'px',
+                top: imgTop + 'px',
+              }"
+              alt=""
+            />
+            <!-- Fixed square frame: box-shadow darkens everything outside it -->
+            <div
+              class="absolute pointer-events-none"
+              :style="{
+                top: frameTop + 'px',
+                left: frameLeft + 'px',
+                width: FRAME + 'px',
+                height: FRAME + 'px',
+                boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
+                border: '2px solid rgba(255,255,255,0.75)',
+              }"
+            ></div>
+          </div>
+
+          <!-- Zoom slider -->
+          <div class="mt-3 flex items-center gap-3 px-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="6"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input
+              type="range"
+              v-model.number="imgScale"
+              :min="1"
+              :max="3"
+              step="0.001"
+              @input="clampPan"
+              class="w-full h-1.5 accent-indigo-600 cursor-pointer"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="6"/><path stroke-linecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>
+            </svg>
+          </div>
+          <p class="text-xs text-slate-500 mt-1.5 text-center">Drag to reposition · slider to zoom</p>
+          <div v-if="photoError" class="mt-2 text-xs text-danger-600 text-center">{{ photoError }}</div>
+        </div>
+
+        <template #footer>
+          <div class="flex w-full items-center justify-between gap-2">
+            <AppButton v-if="photoPreviewSrc" variant="secondary" @click="photoPreviewSrc = null">Change Image</AppButton>
+            <div v-else></div>
+            <div class="flex gap-2">
+              <AppButton variant="secondary" @click="showPhotoModal = false">Cancel</AppButton>
+              <AppButton v-if="photoPreviewSrc" :disabled="photoUploading" @click="confirmPhotoCrop">
+                {{ photoUploading ? 'Uploading…' : 'Save Photo' }}
+              </AppButton>
+            </div>
+          </div>
+        </template>
       </AppModal>
 
       <!-- ── Salary Grade Modal ────────────────────────────────────────────── -->

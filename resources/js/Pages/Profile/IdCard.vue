@@ -124,7 +124,7 @@ onMounted(() => {
           <div class="id-band-title">Employee Information</div>
         </div>
 
-        <div class="id-card-inner">
+        <div class="id-card-inner id-card-inner-back">
           <div class="id-info-field">
             <div class="id-info-label">Date of Birth</div>
             <div class="id-info-value">{{ employee.date_of_birth || '—' }}</div>
@@ -154,9 +154,7 @@ onMounted(() => {
 
           <div class="id-notice">
             <div class="id-notice-title">Important</div>
-            <p>This card identifies the bearer as an employee of the Philippine Science High School – Caraga Region Campus.</p>
-            <p>This ID is non-transferable and must be surrendered upon separation from the service.</p>
-            <p>If found, please return to PSHS-CRC, Brgy. Ampayon, Butuan City.</p>
+            <p>This card identifies the bearer as an employee of PSHS – Caraga Region Campus. Non-transferable; must be surrendered upon separation from the service. If found, return to PSHS-CRC, Brgy. Ampayon, Butuan City.</p>
           </div>
         </div>
 
@@ -249,22 +247,22 @@ html, body { background: #f1f5f9; }
 .id-back-band {
   text-align: center;
   color: #1447c0;
-  padding: 1.5mm 2mm;
+  padding: 1mm 2mm;
   border-bottom: 1.5px solid #1447c0;
 }
-.id-band-title { font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.id-band-title { font-size: 8px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .id-back-footer {
   border-top: 1.5px solid #1447c0;
-  padding: 1.5mm 3mm;
+  padding: 1mm 3mm;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5mm;
+  gap: 0.3mm;
 }
-.id-back-qr { width: 13mm; height: 13mm; }
+.id-back-qr { width: 11mm; height: 11mm; }
 .id-back-qr svg { width: 100%; height: 100%; }
 .id-back-qr-caption {
-  font-size: 5px;
+  font-size: 4.5px;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .3px;
@@ -352,57 +350,64 @@ html, body { background: #f1f5f9; }
 .id-sig-position { font-size: 6px; color: #1e293b; letter-spacing: .5px; }
 
 /* ── Back face ─────────────────────────────────────────────────── */
+/* Tighter vertical rhythm than the front — the back now carries more
+   content (DOB, address, emergency contact, notice) within the same
+   fixed 86mm card height, so margins/padding are compressed throughout
+   to guarantee the notice is never clipped by id-card-inner's overflow. */
+.id-card-inner-back {
+  padding: 1.5mm 3mm;
+  justify-content: flex-start;
+}
 .id-subheader {
   width: 100%;
-  font-size: 6.5px;
+  font-size: 6px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
   letter-spacing: .5px;
   text-align: center;
-  margin-bottom: 0.8mm;
+  margin-bottom: 0.5mm;
 }
-.id-info-field { width: 100%; margin-top: 1.2mm; }
-.id-info-field:first-child { margin-top: 0.5mm; }
+.id-info-field { width: 100%; margin-top: 0.8mm; }
+.id-info-field:first-child { margin-top: 0; }
 .id-info-label {
-  font-size: 6px;
+  font-size: 5.5px;
   font-weight: 700;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .5px;
 }
 .id-info-value {
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 600;
   color: #1e293b;
-  margin-top: 0.3mm;
+  margin-top: 0.2mm;
 }
 .id-info-value-wrap {
-  font-size: 6.5px;
-  line-height: 1.3;
+  font-size: 6px;
+  line-height: 1.2;
   white-space: normal;
 }
 
-.id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 1.5mm 0 1mm; }
+.id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 1mm 0 0.8mm; }
 
 .id-notice {
-  font-size: 6px;
+  font-size: 5.5px;
   color: #475569;
-  line-height: 1.4;
+  line-height: 1.3;
   text-align: justify;
   width: 100%;
 }
 .id-notice-title {
-  font-size: 6.5px;
+  font-size: 6px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
   letter-spacing: .5px;
   text-align: center;
-  margin-bottom: 1mm;
+  margin-bottom: 0.6mm;
 }
-.id-notice p { margin-bottom: 1mm; }
-.id-notice p:last-child { margin-bottom: 0; }
+.id-notice p { margin-bottom: 0; }
 
 /* ── Print ─────────────────────────────────────────────────────── */
 @media print {

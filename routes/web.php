@@ -1210,6 +1210,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{id}', [UserController::class, 'update'])->name('users.update')->middleware('permission:hr.employees.manage');
+        Route::post('users/{user}/photo', [UserController::class, 'updatePhoto'])->name('users.photo.update')->middleware('permission:hr.employees.manage');
         Route::delete('users/{id}', [UserController::class, 'destroy'])->name('users.destroy');
         Route::post('users/{user}/upload-signature', [UserController::class, 'uploadSignature'])->name('users.upload_signature');
         Route::get('/users/inactive', [UserController::class, 'inactiveIndex'])->name('users.inactive')->middleware('permission:hr.employees.manage');
