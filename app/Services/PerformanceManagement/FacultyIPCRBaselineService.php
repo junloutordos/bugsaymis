@@ -16,12 +16,22 @@ use Illuminate\Support\Facades\DB;
 /**
  * Builds a faculty member's IPCR baseline from Faculty Loading:
  * attaches the faculty framework WDPs (tagged via load_source), the WDPs
- * linked to their committees, and any WDPs they are assigned to as
- * personnel — then personalizes each framework row's individual_target
+ * linked to their committees, any WDPs they are assigned to as personnel,
+ * and any WDPs linked directly to their own load assignments / committee
+ * assignments — then personalizes each framework row's individual_target
  * from their actual load assignments (subjects, sections, units).
+ *
+ * Load assignments / committee assignments with no explicitly-linked WDP of
+ * their own each get their own dedicated, auto-classified Core/Support
+ * Functions WDP (WorkDistributionPlanClassifier) — nothing is merged, so a
+ * faculty member teaching two subjects gets two separate rows on their IPCR.
  */
 class FacultyIPCRBaselineService
 {
+    public function __construct(private WorkDistributionPlanClassifier $classifier = new WorkDistributionPlanClassifier())
+    {
+    }
+
     /**
      * @return array{attached: int, personalized: int}
      */
@@ -40,10 +50,17 @@ class FacultyIPCRBaselineService
             ->get();
 
         // (b) Plans linked to the teacher's active committee assignments
-        $committeeIds = FacultyCommitteeAssignment::where('user_id', $user->id)
+        $committeeAssignments = FacultyCommitteeAssignment::where('user_id', $user->id)
             ->where('status', 'active')
-            ->whereNotNull('committee_id')
-            ->pluck('committee_id');
+            ->when($period?->start_date && $period?->end_date, function ($q) use ($period) {
+                $termIds = AcademicTerm::where('start_date', '<=', $period->end_date)
+                    ->where('end_date', '>=', $period->start_date)
+                    ->pluck('id');
+                $q->whereIn('academic_term_id', $termIds);
+            })
+            ->get();
+
+        $committeeIds = $committeeAssignments->pluck('committee_id')->filter();
 
         $committeePlanIds = $committeeIds->isEmpty() ? collect() : DB::table('committee_work_distribution_plan')
             ->whereIn('committee_id', $committeeIds)
@@ -54,11 +71,17 @@ class FacultyIPCRBaselineService
             ->where('user_id', $user->id)
             ->pluck('work_distribution_plan_id');
 
+        // (d) Plans linked directly to the teacher's own load assignments /
+        // committee assignments via the new pivots. Any assignment with no
+        // explicit link of its own falls back to the Core/Support default.
+        $directPlanIds = $this->directPlanIdsFor($assignments, $committeeAssignments, $period?->year);
+
         $attachIds = WorkDistributionPlan::whereIn(
                 'id',
                 $frameworkPlans->pluck('id')
                     ->merge($committeePlanIds)
                     ->merge($personnelPlanIds)
+                    ->merge($directPlanIds)
                     ->unique()
             )
             ->forFiscalYear($period?->year)
@@ -92,6 +115,54 @@ class FacultyIPCRBaselineService
             'attached'     => count(array_diff($attachIds, $before->all())),
             'personalized' => $personalized,
         ];
+    }
+
+    /**
+     * Resolve WDP ids linked directly to this teacher's own load assignments
+     * and committee assignments. Any assignment with an explicit link uses
+     * only its own linked plan(s); an assignment with no explicit link gets
+     * its own dedicated, auto-classified Core/Support default (never shared
+     * with another assignment).
+     */
+    private function directPlanIdsFor(Collection $assignments, Collection $committeeAssignments, ?int $fiscalYear): Collection
+    {
+        $planIds = collect();
+
+        if ($assignments->isNotEmpty()) {
+            $explicitByLoad = DB::table('load_assignment_work_distribution_plan')
+                ->whereIn('load_assignment_id', $assignments->pluck('id'))
+                ->get()
+                ->groupBy('load_assignment_id');
+
+            foreach ($assignments as $assignment) {
+                $linked = $explicitByLoad->get($assignment->id);
+                if ($linked && $linked->isNotEmpty()) {
+                    $planIds = $planIds->merge($linked->pluck('work_distribution_plan_id'));
+                    continue;
+                }
+
+                $planIds->push($this->classifier->defaultPlanForLoadAssignment($assignment, $fiscalYear)->id);
+            }
+        }
+
+        if ($committeeAssignments->isNotEmpty()) {
+            $explicitByCommittee = DB::table('faculty_committee_assignment_work_distribution_plan')
+                ->whereIn('faculty_committee_assignment_id', $committeeAssignments->pluck('id'))
+                ->get()
+                ->groupBy('faculty_committee_assignment_id');
+
+            foreach ($committeeAssignments as $committeeAssignment) {
+                $linked = $explicitByCommittee->get($committeeAssignment->id);
+                if ($linked && $linked->isNotEmpty()) {
+                    $planIds = $planIds->merge($linked->pluck('work_distribution_plan_id'));
+                    continue;
+                }
+
+                $planIds->push($this->classifier->defaultPlanForCommitteeAssignment($committeeAssignment, $fiscalYear)->id);
+            }
+        }
+
+        return $planIds->unique()->values();
     }
 
     /**

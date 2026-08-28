@@ -229,6 +229,21 @@
             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             :class="form.subject_id ? 'bg-indigo-50 border-indigo-200' : ''" />
         </div>
+
+        <!-- Linked Work Distribution Plans (edit only — needs a persisted assignment id) -->
+        <div v-if="form.id">
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            Linked Work Distribution Plans (IPCR)
+          </label>
+          <p class="text-xs text-slate-400 mb-1">
+            {{ form.load_units > 0 ? 'This load carries units and defaults to a Core Function on IPCR.' : 'This load has no units and defaults to a Support Function on IPCR.' }}
+            Select specific plans to link explicitly; leave blank to use the automatic default.
+          </p>
+          <select v-model="form.plan_ids" multiple size="4"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option v-for="p in plans" :key="p.id" :value="p.id">{{ p.success_indicator || `Plan #${p.id}` }}</option>
+          </select>
+        </div>
       </div>
 
       <template #footer>
@@ -699,6 +714,7 @@ const props = defineProps({
   faculty:      { type: Array,  default: () => [] },
   subjects:     { type: Array,  default: () => [] },
   sections:     { type: Array,  default: () => [] },
+  plans:        { type: Array,  default: () => [] },
   currentTerm:  { type: Object, default: null },
   filters:      { type: Object, default: () => ({}) },
 })
@@ -854,6 +870,7 @@ const form = useForm({
   section_id: null,
   load_units: 3,
   description: '',
+  plan_ids: [],
 })
 
 function openForm(a = null, prefillFacultyId = null) {
@@ -868,12 +885,14 @@ function openForm(a = null, prefillFacultyId = null) {
       section_id: a.section_id,
       load_units: a.load_units,
       description: a.description ?? '',
+      plan_ids: a.plan_ids ? [...a.plan_ids] : [],
     })
   } else {
     form.reset()
     form.id = null
     form.academic_term_id = filters.term_id ? Number(filters.term_id) : null
     form.load_units = 3
+    form.plan_ids = []
     if (prefillFacultyId) form.user_id = prefillFacultyId
     // Pre-derive school_year_id from the pre-selected term
     const t = props.terms.find(t => t.id === form.academic_term_id)
@@ -882,10 +901,17 @@ function openForm(a = null, prefillFacultyId = null) {
   modal.value = true
 }
 
+function savePlans(assignmentId) {
+  useForm({ plan_ids: form.plan_ids }).put(route('faculty-loading.assignments.plans.sync', assignmentId), {
+    onSuccess: () => router.reload({ only: ['facultyLoads'], onSuccess: refreshDetailFaculty }),
+  })
+}
+
 function save() {
   if (form.id) {
     form.put(route('faculty-loading.assignments.update', form.id), {
       onSuccess: () => {
+        savePlans(form.id)
         modal.value = false
         router.reload({ only: ['facultyLoads'], onSuccess: refreshDetailFaculty })
       },

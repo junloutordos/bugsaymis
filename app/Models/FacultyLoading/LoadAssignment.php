@@ -3,8 +3,10 @@
 namespace App\Models\FacultyLoading;
 
 use App\Models\User;
+use App\Models\WorkDistributionPlan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\FacultyLoading\Section;
@@ -91,6 +93,12 @@ class LoadAssignment extends Model
         return $this->belongsTo(Designation::class);
     }
 
+    public function workDistributionPlans(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkDistributionPlan::class, 'load_assignment_work_distribution_plan')
+            ->withTimestamps();
+    }
+
     // ── Scopes ───────────────────────────────────────────────────────────────
 
     public function scopeOfType($query, string $type)
@@ -108,6 +116,17 @@ class LoadAssignment extends Model
     public function isTeaching(): bool
     {
         return $this->assignment_type === 'teaching';
+    }
+
+    /**
+     * True when this assignment carries an actual unit load (> 0) — the
+     * signal used to auto-classify its linked Work Distribution Plans as
+     * Core Functions on IPCR. A zero/null load_units assignment is treated
+     * as a Support Function.
+     */
+    public function hasUnitLoad(): bool
+    {
+        return (float) ($this->load_units ?? 0) > 0;
     }
 
     public function getDisplayLabelAttribute(): string

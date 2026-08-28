@@ -261,6 +261,7 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::post('/sync-loads',              [LoadAssignmentController::class, 'syncAllLoads'])->name('sync-loads');
                     Route::put('/{loadAssignment}',         [LoadAssignmentController::class, 'update'])->name('update');
                     Route::delete('/{loadAssignment}',      [LoadAssignmentController::class, 'destroy'])->name('destroy');
+                    Route::put('/{loadAssignment}/plans',   [LoadAssignmentController::class, 'syncPlans'])->name('plans.sync');
                 });
 
                 // Load Assignment Versions (save/compare/restore drafts)
@@ -281,6 +282,7 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::post('/',                                        [CommitteeAssignmentController::class, 'store'])->name('store');
                     Route::put('/{committeeAssignment}',                    [CommitteeAssignmentController::class, 'update'])->name('update');
                     Route::delete('/{committeeAssignment}',                 [CommitteeAssignmentController::class, 'destroy'])->name('destroy');
+                    Route::put('/{committeeAssignment}/plans',              [CommitteeAssignmentController::class, 'syncPlans'])->name('plans.sync');
                 });
 
                 // Supervisory Positions

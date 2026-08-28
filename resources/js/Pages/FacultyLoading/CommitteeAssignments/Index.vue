@@ -215,6 +215,31 @@
           </div>
           <p class="text-xs text-slate-400 mt-1">{{ form.plan_ids.length }} plan(s) selected</p>
         </div>
+
+        <!-- This member's own linked WDPs (edit only — needs a persisted assignment id) -->
+        <div v-if="form.id" class="col-span-2 border-t border-slate-100 pt-3">
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            This Member's Own Linked Work Distribution Plans (IPCR)
+          </label>
+          <p class="text-xs text-slate-400 mb-1">
+            {{ form.load_units > 0 ? 'This assignment carries units and defaults to a Core Function on IPCR.' : 'This assignment has no load and defaults to a Support Function on IPCR.' }}
+            Select specific plans to link explicitly to this member; leave blank to use the automatic default.
+          </p>
+          <AppInput v-model="ownPlanSearch" type="text" placeholder="Search plans..." />
+          <div class="mt-2 border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+            <label v-for="p in filteredOwnPlans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+              <input type="checkbox" :checked="ownPlanIds.includes(p.id)" @change="toggleOwnPlan(p.id)"
+                class="mt-0.5 rounded border-slate-300 text-indigo-600" />
+              <span class="text-slate-700 leading-snug">{{ p.success_indicator }}
+                <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+              </span>
+            </label>
+            <p v-if="!filteredOwnPlans.length" class="text-slate-400 text-xs px-1">
+              {{ ownPlanSearch ? 'No plans match your search.' : 'No plans available.' }}
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">{{ ownPlanIds.length }} plan(s) selected for this member</p>
+        </div>
       </div>
 
       <template #footer>
@@ -336,8 +361,25 @@ const form  = useForm({
   load_units: 0.5, status: 'active', remarks: '', plan_ids: [],
 })
 
+// Plans linked directly to THIS faculty member's committee assignment (as
+// opposed to `form.plan_ids`, which tags the committee itself). Editable
+// only once the assignment exists (needs a persisted id).
+const ownPlanIds = ref([])
+const ownPlanSearch = ref('')
+const filteredOwnPlans = computed(() => {
+  if (!ownPlanSearch.value) return props.plans
+  const q = ownPlanSearch.value.toLowerCase()
+  return props.plans.filter(p => p.success_indicator.toLowerCase().includes(q))
+})
+function toggleOwnPlan(id) {
+  const idx = ownPlanIds.value.indexOf(id)
+  if (idx === -1) ownPlanIds.value.push(id)
+  else ownPlanIds.value.splice(idx, 1)
+}
+
 function openForm(a = null) {
   planSearch.value = ''
+  ownPlanSearch.value = ''
   if (a) {
     const parentId = a.committee?.parent_committee_id ?? a.committee?.id ?? null
     selectedParentId.value = parentId
@@ -349,6 +391,7 @@ function openForm(a = null) {
       role: a.role, load_units: a.load_units, status: a.status,
       remarks: a.remarks ?? '', plan_ids: committee?.plan_ids ? [...committee.plan_ids] : [],
     })
+    ownPlanIds.value = a.plan_ids ? [...a.plan_ids] : []
   } else {
     selectedParentId.value = null
     form.reset()
@@ -358,6 +401,7 @@ function openForm(a = null) {
     form.status = 'active'
     form.plan_ids = []
     form.academic_term_id = filters.term_id ?? null
+    ownPlanIds.value = []
   }
   modal.value = true
 }
@@ -406,10 +450,14 @@ function togglePlan(id) {
   else form.plan_ids.splice(idx, 1)
 }
 
+function saveOwnPlans(assignmentId) {
+  useForm({ plan_ids: ownPlanIds.value }).put(route('faculty-loading.committee-assignments.plans.sync', assignmentId))
+}
+
 function save() {
   if (form.id) {
     form.put(route('faculty-loading.committee-assignments.update', form.id), {
-      onSuccess: () => { modal.value = false },
+      onSuccess: () => { saveOwnPlans(form.id); modal.value = false },
     })
   } else {
     form.post(route('faculty-loading.committee-assignments.store'), {

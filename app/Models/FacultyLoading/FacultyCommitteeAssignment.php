@@ -4,8 +4,10 @@ namespace App\Models\FacultyLoading;
 
 use App\Models\Committee;
 use App\Models\User;
+use App\Models\WorkDistributionPlan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FacultyCommitteeAssignment extends Model
@@ -57,6 +59,23 @@ class FacultyCommitteeAssignment extends Model
     public function accomplishments(): HasMany
     {
         return $this->hasMany(FacultyCommitteeAccomplishment::class, 'faculty_committee_assignment_id');
+    }
+
+    public function workDistributionPlans(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkDistributionPlan::class, 'faculty_committee_assignment_work_distribution_plan')
+            ->withTimestamps();
+    }
+
+    /**
+     * True when this committee assignment carries an actual unit load (> 0)
+     * — the signal used to auto-classify its linked Work Distribution Plans
+     * as Core Functions on IPCR. A zero/null load_units assignment (a
+     * committee assignment "without load") is treated as a Support Function.
+     */
+    public function hasUnitLoad(): bool
+    {
+        return (float) ($this->load_units ?? 0) > 0;
     }
 
     public function isChairperson(): bool

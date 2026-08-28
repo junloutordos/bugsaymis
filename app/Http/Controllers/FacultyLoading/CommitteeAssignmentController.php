@@ -380,7 +380,6 @@ class CommitteeAssignmentController extends Controller
     }
 
     // ── Save member accomplishment ────────────────────────────────────────────
-
     public function saveAccomplishment(Request $request, FacultyCommitteeAssignment $committeeAssignment): RedirectResponse
     {
         abort_if(auth()->id() !== $committeeAssignment->user_id, 403, 'You can only update your own accomplishment.');
@@ -446,6 +445,26 @@ class CommitteeAssignmentController extends Controller
         return back()->with('success', 'Rating saved.');
     }
 
+    // ── Link / replace this assignment's own Work Distribution Plans ─────────
+    // (distinct from the committee-level workDistributionPlans() tagging —
+    // this lets one specific faculty member's committee assignment carry its
+    // own plan links, e.g. when the assignment has no unit load and should
+    // surface as a Support Function on their IPCR.)
+
+    public function syncPlans(Request $request, FacultyCommitteeAssignment $committeeAssignment): RedirectResponse
+    {
+        $this->authorize('faculty_loading.manage');
+
+        $data = $request->validate([
+            'plan_ids'   => 'nullable|array',
+            'plan_ids.*' => 'exists:work_distribution_plans,id',
+        ]);
+
+        $committeeAssignment->workDistributionPlans()->sync($data['plan_ids'] ?? []);
+
+        return back()->with('success', 'Work Distribution Plans updated for this committee assignment.');
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private function mapAssignment(FacultyCommitteeAssignment $a): array
@@ -459,6 +478,7 @@ class CommitteeAssignmentController extends Controller
             'status'         => $a->status,
             'remarks'        => $a->remarks,
             'is_chairperson' => $a->isChairperson(),
+            'plan_ids'       => $a->workDistributionPlans->pluck('id')->toArray(),
             'faculty'        => $a->faculty ? $a->faculty->only('id', 'name') : null,
             'committee'      => $a->committee ? ['id' => $a->committee->id, 'name' => $a->committee->name, 'code' => $a->committee->code, 'parent_committee_id' => $a->committee->parent_committee_id] : null,
             'term'           => $a->academicTerm ? ['id' => $a->academicTerm->id, 'label' => $a->academicTerm->full_label] : null,

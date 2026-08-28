@@ -47,6 +47,24 @@ class WorkDistributionPlan extends Model
         return $this->belongsToMany(\App\Models\SpecialAssignment::class, 'special_assignment_work_distribution_plan');
     }
 
+    // Load assignments (teaching or non-teaching) directly linked to this plan
+    public function loadAssignments()
+    {
+        return $this->belongsToMany(
+            \App\Models\FacultyLoading\LoadAssignment::class,
+            'load_assignment_work_distribution_plan'
+        )->withTimestamps();
+    }
+
+    // Faculty committee assignments directly linked to this plan
+    public function facultyCommitteeAssignments()
+    {
+        return $this->belongsToMany(
+            \App\Models\FacultyLoading\FacultyCommitteeAssignment::class,
+            'faculty_committee_assignment_work_distribution_plan'
+        )->withTimestamps();
+    }
+
     // Each plan belongs to one performance indicator
     public function performanceIndicator()
     {
