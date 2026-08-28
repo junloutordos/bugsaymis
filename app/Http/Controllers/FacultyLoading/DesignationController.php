@@ -9,6 +9,7 @@ use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
+use App\Models\WorkDistributionPlan;
 use App\Services\FacultyLoading\DesignationService;
 use App\Services\FacultyLoading\LoadComputationService;
 use Illuminate\Http\RedirectResponse;
@@ -42,7 +43,7 @@ class DesignationController extends Controller
                 ->groupBy('designation_id')
             : collect();
 
-        $categories = DesignationCategory::with('designations')
+        $categories = DesignationCategory::with('designations.workDistributionPlans:id')
             ->orderBy('sort_order')
             ->get()
             ->map(fn ($cat) => [
@@ -64,6 +65,7 @@ class DesignationController extends Controller
                     'sort_order'      => $d->sort_order,
                     'is_active'       => $d->is_active,
                     'section_id'      => $d->section_id,
+                    'plan_ids'        => $d->workDistributionPlans->pluck('id')->toArray(),
                     // Current holders — from any module (AUH, adviser, supervisory, etc.)
                     'holders'       => ($holdersByDesig->get($d->id) ?? collect())
                         ->map(fn ($a) => [
@@ -91,6 +93,7 @@ class DesignationController extends Controller
             'categories'  => $categories,
             'terms'       => $terms,
             'faculty'     => $faculty,
+            'plans'       => WorkDistributionPlan::orderBy('success_indicator')->get(['id', 'success_indicator', 'rated_by']),
             'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
             'filters'     => $request->only('term_id'),
         ]);
@@ -217,6 +220,25 @@ class DesignationController extends Controller
         $designation->delete();
 
         return back()->with('success', 'Designation deleted.');
+    }
+
+    // ── Link / replace this designation's Work Distribution Plans ────────────
+    // Set once on the "mother" designation record — every current and future
+    // holder of the designation inherits these same plans on their IPCR
+    // automatically, without re-tagging each individual load assignment.
+
+    public function syncPlans(Request $request, Designation $designation): RedirectResponse
+    {
+        $this->authorize('faculty_loading.setup');
+
+        $data = $request->validate([
+            'plan_ids'   => 'nullable|array',
+            'plan_ids.*' => 'exists:work_distribution_plans,id',
+        ]);
+
+        $designation->workDistributionPlans()->sync($data['plan_ids'] ?? []);
+
+        return back()->with('success', 'Work Distribution Plans updated for this designation.');
     }
 
     // ── Assign / Revoke direct from Designations catalog page ────────────────

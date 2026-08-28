@@ -3,10 +3,8 @@
 namespace App\Models\FacultyLoading;
 
 use App\Models\User;
-use App\Models\WorkDistributionPlan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\FacultyLoading\Section;
@@ -91,12 +89,6 @@ class LoadAssignment extends Model
     public function designation(): BelongsTo
     {
         return $this->belongsTo(Designation::class);
-    }
-
-    public function workDistributionPlans(): BelongsToMany
-    {
-        return $this->belongsToMany(WorkDistributionPlan::class, 'load_assignment_work_distribution_plan')
-            ->withTimestamps();
     }
 
     // ── Scopes ───────────────────────────────────────────────────────────────

@@ -47,12 +47,13 @@ class WorkDistributionPlan extends Model
         return $this->belongsToMany(\App\Models\SpecialAssignment::class, 'special_assignment_work_distribution_plan');
     }
 
-    // Load assignments (teaching or non-teaching) directly linked to this plan
-    public function loadAssignments()
+    // Designations directly tagged with this plan — every current/future
+    // holder of the designation inherits it on their IPCR automatically.
+    public function designations()
     {
         return $this->belongsToMany(
-            \App\Models\FacultyLoading\LoadAssignment::class,
-            'load_assignment_work_distribution_plan'
+            \App\Models\FacultyLoading\Designation::class,
+            'designation_work_distribution_plan'
         )->withTimestamps();
     }
 

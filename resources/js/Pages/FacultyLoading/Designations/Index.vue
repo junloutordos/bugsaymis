@@ -249,6 +249,29 @@
             </div>
           </div>
         </div>
+
+        <!-- Work Distribution Plans (edit only — needs a persisted designation id) -->
+        <div v-if="desigForm.id" class="border-t border-slate-100 pt-3">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Work Distribution Plans (IPCR)</label>
+          <p class="text-xs text-slate-400 mb-1">
+            Tag the plans this designation contributes to. Every current and future faculty member holding this
+            designation inherits these same plans on their IPCR automatically — no need to re-tag per assignment.
+          </p>
+          <AppInput v-model="planSearch" type="text" placeholder="Search plans..." />
+          <div class="mt-2 border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+            <label v-for="p in filteredPlans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+              <input type="checkbox" :checked="planIds.includes(p.id)" @change="togglePlan(p.id)"
+                class="mt-0.5 rounded border-slate-300 text-indigo-600" />
+              <span class="text-slate-700 leading-snug">{{ p.success_indicator || `Plan #${p.id}` }}
+                <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+              </span>
+            </label>
+            <p v-if="!filteredPlans.length" class="text-slate-400 text-xs px-1">
+              {{ planSearch ? 'No plans match your search.' : 'No plans available.' }}
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">{{ planIds.length }} plan(s) selected</p>
+        </div>
       </div>
       <template #footer>
         <AppButton variant="secondary" @click="desigModal = false">Cancel</AppButton>
@@ -353,6 +376,7 @@ const props = defineProps({
   categories:  { type: Array,  default: () => [] },
   terms:       { type: Array,  default: () => [] },
   faculty:     { type: Array,  default: () => [] },
+  plans:       { type: Array,  default: () => [] },
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
 })
@@ -432,19 +456,44 @@ async function deleteCat(cat) {
 const desigModal = ref(false)
 const desigForm  = useForm({ id: null, designation_category_id: null, code: '', name: '', description: '', load_units: 0, assignment_type: 'admin', requires_unit: false, max_holders: null, sort_order: 0, is_active: true })
 
+// Work Distribution Plans tagged directly on the designation ("mother
+// record") — every current and future holder inherits these on their IPCR
+// automatically. Editable only once the designation exists (needs an id).
+const planIds = ref([])
+const planSearch = ref('')
+const filteredPlans = computed(() => {
+  if (!planSearch.value) return props.plans
+  const q = planSearch.value.toLowerCase()
+  return props.plans.filter(p => (p.success_indicator ?? '').toLowerCase().includes(q))
+})
+function togglePlan(id) {
+  const idx = planIds.value.indexOf(id)
+  if (idx === -1) planIds.value.push(id)
+  else planIds.value.splice(idx, 1)
+}
+
 function openDesigForm(d = null, cat = null) {
+  planSearch.value = ''
   if (d) {
     Object.assign(desigForm, { id: d.id, designation_category_id: d.designation_category_id ?? cat?.id, code: d.code, name: d.name, description: d.description ?? '', load_units: d.load_units, assignment_type: d.assignment_type ?? 'admin', requires_unit: d.requires_unit, max_holders: d.max_holders, sort_order: d.sort_order, is_active: d.is_active })
+    planIds.value = d.plan_ids ? [...d.plan_ids] : []
   } else {
     desigForm.reset(); desigForm.id = null; desigForm.is_active = true; desigForm.load_units = 0; desigForm.assignment_type = 'admin'
     desigForm.designation_category_id = cat?.id ?? null
+    planIds.value = []
   }
   desigModal.value = true
 }
 
+function savePlans(designationId) {
+  useForm({ plan_ids: planIds.value }).put(route('faculty-loading.designations.plans.sync', designationId))
+}
+
 function saveDesig() {
   if (desigForm.id) {
-    desigForm.put(route('faculty-loading.designations.update', desigForm.id), { onSuccess: () => { desigModal.value = false } })
+    desigForm.put(route('faculty-loading.designations.update', desigForm.id), {
+      onSuccess: () => { savePlans(desigForm.id); desigModal.value = false },
+    })
   } else {
     desigForm.post(route('faculty-loading.designations.store'), { onSuccess: () => { desigModal.value = false } })
   }

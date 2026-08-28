@@ -5,6 +5,8 @@ namespace Tests\Feature\FacultyLoading;
 use App\Models\AgencyOutcome;
 use App\Models\EmployeeIPCR;
 use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
@@ -20,9 +22,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Covers the LoadAssignment / FacultyCommitteeAssignment ↔ WorkDistributionPlan
- * pivots, the Core/Support auto-classification default, and the baseline
- * service's direct-link attachment onto a faculty member's IPCR.
+ * Covers the Designation ↔ WorkDistributionPlan pivot (the "mother record"
+ * pattern — one tag on a Designation applies to every current and future
+ * holder), the Core/Support auto-classification default for non-designation
+ * teaching loads, and the baseline service's attachment onto a faculty
+ * member's IPCR.
  */
 class LoadAssignmentWorkDistributionPlanTest extends TestCase
 {
@@ -42,28 +46,52 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         return compact('sy', 'term');
     }
 
-    private function makeLoadAssignment(array $fx, User $faculty, float $units, string $type = 'teaching'): LoadAssignment
+    private function makeTeachingAssignment(array $fx, User $faculty, float $units): LoadAssignment
     {
         $facultyLoad = FacultyLoad::create([
             'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
             'teaching_units' => $units, 'total_units' => $units, 'full_load_threshold' => 18, 'load_status' => 'underload',
         ]);
-
-        $subjectId = null;
-        if ($type === 'teaching') {
-            $subject = Subject::create([
-                'school_year_id' => $fx['sy']->id,
-                'code' => 'MATH' . uniqid(), 'name' => 'Mathematics 1', 'credit_units' => 3, 'lecture_hours' => 3,
-                'load_units' => $units, 'subject_type' => 'lecture', 'grade_level' => 9,
-                'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
-            ]);
-            $subjectId = $subject->id;
-        }
+        $subject = Subject::create([
+            'school_year_id' => $fx['sy']->id,
+            'code' => 'SUBJ' . uniqid(), 'name' => 'Mathematics 1', 'credit_units' => 3, 'lecture_hours' => 3,
+            'load_units' => $units, 'subject_type' => 'lecture', 'grade_level' => 9,
+            'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
 
         return LoadAssignment::create([
             'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
             'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
-            'assignment_type' => $type, 'subject_id' => $subjectId, 'load_units' => $units,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'load_units' => $units,
+        ]);
+    }
+
+    private function makeDesignation(array $overrides = []): Designation
+    {
+        $category = DesignationCategory::create(['code' => 'ADMIN-' . uniqid(), 'name' => 'Admin']);
+
+        return Designation::create(array_merge([
+            'designation_category_id' => $category->id,
+            'code'                    => 'DESIG-' . uniqid(),
+            'name'                    => 'Prefect of Discipline',
+            'load_units'              => 3,
+            'assignment_type'         => 'admin',
+            'is_active'               => true,
+        ], $overrides));
+    }
+
+    private function makeDesignationAssignment(array $fx, User $faculty, Designation $designation, float $units): LoadAssignment
+    {
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'teaching_units' => 0, 'total_units' => $units, 'full_load_threshold' => 18, 'load_status' => 'underload',
+        ]);
+
+        return LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
+            'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'assignment_type' => $designation->assignment_type, 'load_units' => $units,
+            'designation_id' => $designation->id, 'description' => $designation->name,
         ]);
     }
 
@@ -75,28 +103,25 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         return WorkDistributionPlan::create(['performance_indicator_id' => $indicator->id, 'success_indicator' => 'Explicit Plan']);
     }
 
-    // ── Pivot relations ────────────────────────────────────────────────────
+    // ── Designation ↔ WorkDistributionPlan pivot ───────────────────────────
 
-    public function test_load_assignment_can_link_multiple_work_distribution_plans(): void
+    public function test_designation_can_link_multiple_work_distribution_plans(): void
     {
-        $fx      = $this->makeTerm();
-        $faculty = User::factory()->create();
-        $la      = $this->makeLoadAssignment($fx, $faculty, 3);
-
+        $designation = $this->makeDesignation();
         $planA = $this->makePlan();
         $planB = $this->makePlan();
 
-        $la->workDistributionPlans()->sync([$planA->id, $planB->id]);
+        $designation->workDistributionPlans()->sync([$planA->id, $planB->id]);
 
-        $this->assertCount(2, $la->workDistributionPlans);
-        $this->assertTrue($la->workDistributionPlans->pluck('id')->contains($planA->id));
-        $this->assertTrue($la->workDistributionPlans->pluck('id')->contains($planB->id));
+        $this->assertCount(2, $designation->workDistributionPlans);
+        $this->assertTrue($designation->workDistributionPlans->pluck('id')->contains($planA->id));
+        $this->assertTrue($designation->workDistributionPlans->pluck('id')->contains($planB->id));
 
         // Inverse relation
-        $this->assertTrue($planA->loadAssignments->pluck('id')->contains($la->id));
+        $this->assertTrue($planA->designations->pluck('id')->contains($designation->id));
     }
 
-    public function test_committee_assignment_can_link_multiple_work_distribution_plans(): void
+    public function test_committee_assignment_can_still_link_multiple_work_distribution_plans(): void
     {
         $fx      = $this->makeTerm();
         $faculty = User::factory()->create();
@@ -113,34 +138,7 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $this->assertTrue($planB->facultyCommitteeAssignments->pluck('id')->contains($fca->id));
     }
 
-    // ── hasUnitLoad() ──────────────────────────────────────────────────────
-
-    public function test_has_unit_load_reflects_load_units(): void
-    {
-        $fx        = $this->makeTerm();
-        $facultyA  = User::factory()->create();
-        $facultyB  = User::factory()->create();
-
-        $withUnits    = $this->makeLoadAssignment($fx, $facultyA, 3, 'teaching');
-        $withoutUnits = $this->makeLoadAssignment($fx, $facultyB, 0, 'admin');
-
-        $this->assertTrue($withUnits->hasUnitLoad());
-        $this->assertFalse($withoutUnits->hasUnitLoad());
-
-        $fcaWithUnits = FacultyCommitteeAssignment::create([
-            'user_id' => $facultyA->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
-            'committee_name' => 'Chair Committee', 'role' => 'chairperson', 'load_units' => 1.5, 'status' => 'active',
-        ]);
-        $fcaWithoutUnits = FacultyCommitteeAssignment::create([
-            'user_id' => $facultyB->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
-            'committee_name' => 'No-Load Committee', 'role' => 'member', 'load_units' => 0, 'status' => 'active',
-        ]);
-
-        $this->assertTrue($fcaWithUnits->hasUnitLoad());
-        $this->assertFalse($fcaWithoutUnits->hasUnitLoad());
-    }
-
-    // ── WorkDistributionPlanClassifier ─────────────────────────────────────
+    // ── WorkDistributionPlanClassifier (still used for non-designation loads) ──
 
     public function test_classifier_resolves_core_and_support_function_types(): void
     {
@@ -150,25 +148,21 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $this->assertSame('Support Functions', $classifier->functionTypeFor(false));
     }
 
-    public function test_classifier_gives_each_load_assignment_its_own_plan_never_merging(): void
+    public function test_classifier_gives_each_teaching_load_its_own_plan_never_merging(): void
     {
         $fx      = $this->makeTerm();
         $faculty = User::factory()->create();
-        $math    = $this->makeLoadAssignment($fx, $faculty, 3, 'teaching');
+        $math    = $this->makeTeachingAssignment($fx, $faculty, 3);
 
         $facultyB = User::factory()->create();
-        $science  = $this->makeLoadAssignment($fx, $facultyB, 3, 'teaching');
+        $science  = $this->makeTeachingAssignment($fx, $facultyB, 3);
 
         $classifier = new WorkDistributionPlanClassifier();
         $mathPlan    = $classifier->defaultPlanForLoadAssignment($math, 2026);
         $sciencePlan = $classifier->defaultPlanForLoadAssignment($science, 2026);
 
-        // Two different assignments — even same units, same function type —
-        // never share a plan.
         $this->assertNotSame($mathPlan->id, $sciencePlan->id);
 
-        // Calling it again for the SAME assignment reuses the same plan
-        // (idempotent, doesn't duplicate on repeated IPCR generation).
         $mathPlanAgain = $classifier->defaultPlanForLoadAssignment($math, 2026);
         $this->assertSame($mathPlan->id, $mathPlanAgain->id);
     }
@@ -180,19 +174,18 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
 
         $fx      = $this->makeTerm();
         $faculty = User::factory()->create();
-        $la      = $this->makeLoadAssignment($fx, $faculty, 3, 'teaching');
+        $la      = $this->makeTeachingAssignment($fx, $faculty, 3);
 
         $classifier = new WorkDistributionPlanClassifier();
         $classifier->defaultPlanForLoadAssignment($la, null);
 
-        // The pre-existing, explicitly-tagged outcome must be untouched
         $this->assertSame(
             'Strategic Functions',
             AgencyOutcome::find($explicitOutcomeId)->function_type
         );
     }
 
-    // ── FacultyIPCRBaselineService direct-link attachment ─────────────────
+    // ── FacultyIPCRBaselineService ─────────────────────────────────────────
 
     private function makeIpcrFor(User $faculty, ?IPCRRatingPeriod $period = null): EmployeeIPCR
     {
@@ -207,38 +200,83 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         ]);
     }
 
-    public function test_baseline_service_attaches_explicitly_linked_plan_for_a_load_assignment(): void
+    public function test_baseline_service_attaches_designation_tagged_plans_to_a_holder(): void
     {
-        $fx      = $this->makeTerm();
-        $faculty = User::factory()->create();
-        $la      = $this->makeLoadAssignment($fx, $faculty, 3, 'teaching');
-        $plan    = $this->makePlan();
-        $la->workDistributionPlans()->sync([$plan->id]);
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation();
+        $plan        = $this->makePlan();
+        $designation->workDistributionPlans()->sync([$plan->id]);
+
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
 
         $ipcr = $this->makeIpcrFor($faculty);
-
         $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
 
         $this->assertGreaterThan(0, $summary['attached']);
         $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $plan->id)->exists());
     }
 
-    public function test_baseline_service_auto_classifies_unlinked_load_assignment_as_core_when_it_has_units(): void
+    public function test_baseline_service_inherits_the_same_plans_for_every_current_holder_of_a_designation(): void
     {
-        $fx      = $this->makeTerm();
-        $faculty = User::factory()->create();
-        $this->makeLoadAssignment($fx, $faculty, 3, 'teaching'); // no explicit plan link
+        $fx          = $this->makeTerm();
+        $designation = $this->makeDesignation();
+        $plan        = $this->makePlan();
+        $designation->workDistributionPlans()->sync([$plan->id]);
+
+        $facultyA = User::factory()->create();
+        $facultyB = User::factory()->create();
+        $this->makeDesignationAssignment($fx, $facultyA, $designation, 3);
+        $this->makeDesignationAssignment($fx, $facultyB, $designation, 3);
+
+        $ipcrA = $this->makeIpcrFor($facultyA);
+        $ipcrB = $this->makeIpcrFor($facultyB);
+        app(FacultyIPCRBaselineService::class)->generate($ipcrA);
+        app(FacultyIPCRBaselineService::class)->generate($ipcrB);
+
+        $this->assertTrue($ipcrA->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+        $this->assertTrue($ipcrB->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+    }
+
+    public function test_baseline_service_inherits_plans_for_a_future_holder_tagged_after_the_fact(): void
+    {
+        $fx          = $this->makeTerm();
+        $designation = $this->makeDesignation();
+
+        // Designation tagged with a plan AFTER a faculty is already assigned —
+        // proves the "mother record" pattern: no per-assignment re-tagging needed.
+        $facultyA = User::factory()->create();
+        $this->makeDesignationAssignment($fx, $facultyA, $designation, 3);
+
+        $plan = $this->makePlan();
+        $designation->workDistributionPlans()->sync([$plan->id]);
+
+        // A second faculty holds the SAME designation, assigned after the tag
+        $facultyB = User::factory()->create();
+        $this->makeDesignationAssignment($fx, $facultyB, $designation, 3);
+
+        $ipcrA = $this->makeIpcrFor($facultyA);
+        $ipcrB = $this->makeIpcrFor($facultyB);
+        app(FacultyIPCRBaselineService::class)->generate($ipcrA);
+        app(FacultyIPCRBaselineService::class)->generate($ipcrB);
+
+        $this->assertTrue($ipcrA->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+        $this->assertTrue($ipcrB->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+    }
+
+    public function test_baseline_service_attaches_nothing_for_a_designation_with_no_plans_tagged_yet(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation(); // no WDPs tagged
+
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
 
         $ipcr = $this->makeIpcrFor($faculty);
-        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
 
-        $corePlan = WorkDistributionPlan::whereHas(
-            'performanceIndicator.agencyOutcome',
-            fn ($q) => $q->where('function_type', 'Core Functions')
-        )->first();
-
-        $this->assertNotNull($corePlan);
-        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $corePlan->id)->exists());
+        $this->assertSame(0, $summary['attached']);
+        $this->assertSame(0, WorkDistributionPlan::count());
     }
 
     public function test_baseline_service_gives_each_subject_taught_its_own_ipcr_row_never_merging(): void
@@ -246,8 +284,8 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $fx      = $this->makeTerm();
         $faculty = User::factory()->create();
 
-        // Two separate teaching loads for the same faculty, same term —
-        // e.g. Math 1 and Science 1 — neither explicitly linked to a WDP.
+        // Two separate raw teaching loads (no designation) for the same
+        // faculty, same term — e.g. Math 1 and Science 1.
         $facultyLoad = FacultyLoad::create([
             'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
             'teaching_units' => 6, 'total_units' => 6, 'full_load_threshold' => 18, 'load_status' => 'underload',
@@ -262,12 +300,12 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
             'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture', 'grade_level' => 9,
             'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
         ]);
-        $mathLoad = LoadAssignment::create([
+        LoadAssignment::create([
             'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
             'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
             'assignment_type' => 'teaching', 'subject_id' => $math->id, 'load_units' => 3,
         ]);
-        $scienceLoad = LoadAssignment::create([
+        LoadAssignment::create([
             'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
             'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
             'assignment_type' => 'teaching', 'subject_id' => $science->id, 'load_units' => 3,
@@ -276,7 +314,6 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $ipcr = $this->makeIpcrFor($faculty);
         app(FacultyIPCRBaselineService::class)->generate($ipcr);
 
-        // Both subjects auto-classify as Core Functions, but as two SEPARATE plans
         $corePlans = WorkDistributionPlan::whereHas(
             'performanceIndicator.agencyOutcome',
             fn ($q) => $q->where('function_type', 'Core Functions')
@@ -289,30 +326,12 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
             $this->assertTrue($attachedPlanIds->contains($plan->id));
         }
 
-        // Re-generating the baseline again must not duplicate — same two plans reused
+        // Re-generating must not duplicate — same two plans reused
         app(FacultyIPCRBaselineService::class)->generate($ipcr);
         $this->assertCount(2, WorkDistributionPlan::whereHas(
             'performanceIndicator.agencyOutcome',
             fn ($q) => $q->where('function_type', 'Core Functions')
         )->get());
-    }
-
-    public function test_baseline_service_auto_classifies_unlinked_zero_unit_assignment_as_support(): void
-    {
-        $fx      = $this->makeTerm();
-        $faculty = User::factory()->create();
-        $this->makeLoadAssignment($fx, $faculty, 0, 'admin'); // no units, no explicit plan link
-
-        $ipcr = $this->makeIpcrFor($faculty);
-        app(FacultyIPCRBaselineService::class)->generate($ipcr);
-
-        $supportPlan = WorkDistributionPlan::whereHas(
-            'performanceIndicator.agencyOutcome',
-            fn ($q) => $q->where('function_type', 'Support Functions')
-        )->first();
-
-        $this->assertNotNull($supportPlan);
-        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $supportPlan->id)->exists());
     }
 
     public function test_baseline_service_auto_classifies_unlinked_committee_assignment_without_load_as_support(): void
@@ -352,7 +371,6 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
 
         $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $explicitPlan->id)->exists());
 
-        // No auto-generated Core/Support placeholder should have been created for this assignment
         $corePlan = WorkDistributionPlan::whereHas(
             'performanceIndicator.agencyOutcome',
             fn ($q) => $q->where('function_type', 'Core Functions')

@@ -261,7 +261,6 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::post('/sync-loads',              [LoadAssignmentController::class, 'syncAllLoads'])->name('sync-loads');
                     Route::put('/{loadAssignment}',         [LoadAssignmentController::class, 'update'])->name('update');
                     Route::delete('/{loadAssignment}',      [LoadAssignmentController::class, 'destroy'])->name('destroy');
-                    Route::put('/{loadAssignment}/plans',   [LoadAssignmentController::class, 'syncPlans'])->name('plans.sync');
                 });
 
                 // Load Assignment Versions (save/compare/restore drafts)
@@ -432,6 +431,7 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/',                          [DesignationController::class, 'store'])->name('store');
                 Route::put('/{designation}',              [DesignationController::class, 'update'])->name('update');
                 Route::delete('/{designation}',           [DesignationController::class, 'destroy'])->name('destroy');
+                Route::put('/{designation}/plans',        [DesignationController::class, 'syncPlans'])->name('plans.sync');
             });
 
         // Designation assign/revoke (requires load_assignments permission, not setup)

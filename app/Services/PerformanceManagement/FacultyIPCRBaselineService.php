@@ -17,14 +17,19 @@ use Illuminate\Support\Facades\DB;
  * Builds a faculty member's IPCR baseline from Faculty Loading:
  * attaches the faculty framework WDPs (tagged via load_source), the WDPs
  * linked to their committees, any WDPs they are assigned to as personnel,
- * and any WDPs linked directly to their own load assignments / committee
- * assignments — then personalizes each framework row's individual_target
- * from their actual load assignments (subjects, sections, units).
+ * and any WDPs linked directly to their own designation-backed load
+ * assignments / committee assignments — then personalizes each framework
+ * row's individual_target from their actual load assignments (subjects,
+ * sections, units).
  *
- * Load assignments / committee assignments with no explicitly-linked WDP of
- * their own each get their own dedicated, auto-classified Core/Support
- * Functions WDP (WorkDistributionPlanClassifier) — nothing is merged, so a
- * faculty member teaching two subjects gets two separate rows on their IPCR.
+ * A LoadAssignment backed by a Designation (e.g. ACIDAA, Prefect of
+ * Discipline) inherits whatever WDPs are tagged on that Designation's own
+ * "mother record" — set once by CID/HR, applies to every current and future
+ * holder automatically, never per individual assignment. A LoadAssignment
+ * with no designation (a raw per-subject teaching load) each gets its own
+ * dedicated, auto-classified Core/Support Functions WDP — nothing is merged,
+ * so a faculty member teaching two subjects gets two separate rows on their
+ * IPCR.
  */
 class FacultyIPCRBaselineService
 {
@@ -119,30 +124,39 @@ class FacultyIPCRBaselineService
 
     /**
      * Resolve WDP ids linked directly to this teacher's own load assignments
-     * and committee assignments. Any assignment with an explicit link uses
-     * only its own linked plan(s); an assignment with no explicit link gets
-     * its own dedicated, auto-classified Core/Support default (never shared
-     * with another assignment).
+     * and committee assignments.
+     *
+     * LoadAssignment rows backed by a Designation (admin/committee/etc. via
+     * DesignationService::assign()) inherit whatever WDPs are tagged on that
+     * Designation's own "mother record" — set once by CID/HR, applies to
+     * every current and future holder automatically. A designation with no
+     * WDPs tagged yet gets no plan (nothing to auto-generate at this level).
+     *
+     * LoadAssignment rows with NO designation (raw per-subject teaching
+     * loads) keep the previous per-assignment auto-classified Core/Support
+     * default — each subject taught gets its own dedicated row, never merged.
+     *
+     * FacultyCommitteeAssignment rows use their own explicit WDP link (set
+     * per assignment, since committee membership is individual); with no
+     * explicit link, they fall back to the same auto-classified default.
      */
     private function directPlanIdsFor(Collection $assignments, Collection $committeeAssignments, ?int $fiscalYear): Collection
     {
         $planIds = collect();
 
-        if ($assignments->isNotEmpty()) {
-            $explicitByLoad = DB::table('load_assignment_work_distribution_plan')
-                ->whereIn('load_assignment_id', $assignments->pluck('id'))
-                ->get()
-                ->groupBy('load_assignment_id');
+        foreach ($assignments as $assignment) {
+            if ($assignment->designation_id) {
+                $designationPlanIds = $assignment->designation
+                    ?->workDistributionPlans()
+                    ->pluck('work_distribution_plans.id');
 
-            foreach ($assignments as $assignment) {
-                $linked = $explicitByLoad->get($assignment->id);
-                if ($linked && $linked->isNotEmpty()) {
-                    $planIds = $planIds->merge($linked->pluck('work_distribution_plan_id'));
-                    continue;
+                if ($designationPlanIds) {
+                    $planIds = $planIds->merge($designationPlanIds);
                 }
-
-                $planIds->push($this->classifier->defaultPlanForLoadAssignment($assignment, $fiscalYear)->id);
+                continue;
             }
+
+            $planIds->push($this->classifier->defaultPlanForLoadAssignment($assignment, $fiscalYear)->id);
         }
 
         if ($committeeAssignments->isNotEmpty()) {

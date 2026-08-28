@@ -9,7 +9,6 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
-use App\Models\WorkDistributionPlan;
 use App\Services\FacultyLoading\LoadComputationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -110,7 +109,6 @@ class LoadAssignmentController extends Controller
             'faculty'      => $faculty,
             'subjects'     => $subjects,
             'sections'     => $sections,
-            'plans'        => WorkDistributionPlan::orderBy('success_indicator')->get(['id', 'success_indicator', 'rated_by']),
             'currentTerm'  => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
             'filters'      => $request->only(['term_id']),
         ]);
@@ -242,22 +240,6 @@ class LoadAssignmentController extends Controller
         return back()->with('success', 'All faculty load totals re-synced.');
     }
 
-    // ── Link / replace this assignment's Work Distribution Plans ─────────────
-
-    public function syncPlans(Request $request, LoadAssignment $loadAssignment): RedirectResponse
-    {
-        $this->authorize('faculty_loading.manage');
-
-        $data = $request->validate([
-            'plan_ids'   => 'nullable|array',
-            'plan_ids.*' => 'exists:work_distribution_plans,id',
-        ]);
-
-        $loadAssignment->workDistributionPlans()->sync($data['plan_ids'] ?? []);
-
-        return back()->with('success', 'Work Distribution Plans updated for this load assignment.');
-    }
-
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private function mapAssignment(LoadAssignment $a): array
@@ -271,7 +253,6 @@ class LoadAssignmentController extends Controller
             'display_label'   => $a->display_label,
             'section_id'      => $a->section_id,
             'section_name'    => null,
-            'plan_ids'        => $a->workDistributionPlans->pluck('id')->toArray(),
             'faculty'         => $a->faculty ? ['id' => $a->faculty->id, 'name' => $a->faculty->name] : null,
             'subject'         => $a->subject ? ['id' => $a->subject->id, 'code' => $a->subject->code, 'name' => $a->subject->name] : null,
             'term'            => $a->academicTerm ? ['id' => $a->academicTerm->id, 'label' => $a->academicTerm->full_label] : null,
