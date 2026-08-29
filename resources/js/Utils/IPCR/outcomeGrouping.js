@@ -39,20 +39,25 @@ function subOutcomeGroupKey(raw) {
 /**
  * Display text for a merged Sub-Outcome cell (rowspan across every plan
  * sharing that label). A load_source-tagged plan (e.g. a shared framework
- * row) or a materialized per-subject Teaching Load row (marker-based
- * sub_outcome) has its individual_target personalized per faculty member —
- * when one exists in the group, it replaces the static sub_outcome label
- * (which for a materialized row is just its own technical marker), shown
- * once no matter how many plans share the group. Falls back to the static
- * label when nothing in the group is personalized this way, or the
- * personalized plan has no target yet.
+ * row), a materialized per-subject Teaching Load row or per-assignment
+ * fallback (marker-based sub_outcome), or a plan explicitly tagged on a
+ * Designations-module Category/Designation (no sub_outcome identity of its
+ * own at all — intentionally NULL) all get their individual_target
+ * personalized per faculty member — when one exists in the group, it
+ * replaces the static sub_outcome label (which for a marker-based row is
+ * just its own technical marker, and for a NULL-sub_outcome row is nothing
+ * at all — the group key falls back to "—"), shown once no matter how many
+ * plans share the group. Falls back to the static label only when nothing
+ * in the group is personalized this way.
  */
 export function subOutcomeDisplayFor(pis, staticLabel) {
   const allPlans = Object.values(pis).flat();
   const tagged = allPlans.find((p) => {
     if (!p.pivot?.individual_target) return false;
     if (p.load_source) return true;
-    return AUTO_GENERATED_MARKER.test(p.performance_indicator?.agency_outcome?.sub_outcome || '');
+    const subOutcome = p.performance_indicator?.agency_outcome?.sub_outcome;
+    if (!subOutcome) return true; // no static identity marker to fall back to — must use the personalized text
+    return AUTO_GENERATED_MARKER.test(subOutcome);
   });
   return tagged ? tagged.pivot.individual_target : staticLabel;
 }
