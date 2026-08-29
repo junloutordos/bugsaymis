@@ -14,18 +14,28 @@ export function normalizeFunctionType(raw) {
   return String(raw).trim();
 }
 
+// Marker format written by WorkDistributionPlanClassifier for a
+// materialized Teaching Load row: "<SourceClass>#<assignmentId>@<taggedPlanId>".
+const MATERIALIZED_MARKER = /#\d+@\d+$/;
+
 /**
  * Display text for a merged Sub-Outcome cell (rowspan across every plan
- * sharing that label). A load_source-tagged plan (e.g. Teaching Load) has
- * its individual_target personalized per faculty member (e.g. every subject
- * taught, listed as a bullet) — when one exists in the group, it replaces
- * the static sub_outcome label, shown once no matter how many tagged plans
- * share the group. Falls back to the static label when nothing in the
- * group is load_source-tagged, or the tagged plan has no target yet.
+ * sharing that label). A load_source-tagged plan (e.g. a shared framework
+ * row) or a materialized per-subject Teaching Load row (marker-based
+ * sub_outcome) has its individual_target personalized per faculty member —
+ * when one exists in the group, it replaces the static sub_outcome label
+ * (which for a materialized row is just its own technical marker), shown
+ * once no matter how many plans share the group. Falls back to the static
+ * label when nothing in the group is personalized this way, or the
+ * personalized plan has no target yet.
  */
 export function subOutcomeDisplayFor(pis, staticLabel) {
   const allPlans = Object.values(pis).flat();
-  const tagged = allPlans.find((p) => p.load_source && p.pivot?.individual_target);
+  const tagged = allPlans.find((p) => {
+    if (!p.pivot?.individual_target) return false;
+    if (p.load_source) return true;
+    return MATERIALIZED_MARKER.test(p.performance_indicator?.agency_outcome?.sub_outcome || '');
+  });
   return tagged ? tagged.pivot.individual_target : staticLabel;
 }
 

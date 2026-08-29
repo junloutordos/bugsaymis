@@ -7,6 +7,7 @@ use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\PerformanceIndicator;
 use App\Models\WorkDistributionPlan;
+use Illuminate\Support\Collection;
 
 /**
  * Auto-classifies Faculty Loading assignments into Core or Support Function
@@ -70,6 +71,53 @@ class WorkDistributionPlanClassifier
             sourceType: FacultyCommitteeAssignment::class,
             sourceId: $assignment->id,
             label: $assignment->committee_name,
+        );
+    }
+
+    /**
+     * Find or create (and keep in sync with) an independently-rateable
+     * WorkDistributionPlan for one distinct teaching load — a group of
+     * LoadAssignment rows sharing the same subject (multiple sections of
+     * the same subject merge into one group upstream) — mirroring the
+     * content of a `load_source`-tagged "mother" plan (e.g. the
+     * Designations module's Teaching Load tab).
+     *
+     * Keyed 1:1 on (the group's lowest assignment id, the tagged plan's
+     * id), so two distinct subjects — or the same subject tagged with two
+     * different mother plans — never share a row, and each stays
+     * separately rateable (own accomplishment, MOV, rating). Content is
+     * refreshed on every call via updateOrCreate so edits to the tagged
+     * mother plan's own text propagate to every materialized copy.
+     */
+    public function materializedTeachingPlanFor(Collection $assignmentGroup, WorkDistributionPlan $taggedPlan): WorkDistributionPlan
+    {
+        $representativeId = $assignmentGroup->pluck('id')->sort()->first();
+        $subOutcome = LoadAssignment::class . '#' . $representativeId . '@' . $taggedPlan->id;
+
+        $taggedOutcome = $taggedPlan->performanceIndicator?->agencyOutcome;
+        $functionType  = $taggedOutcome?->function_type
+            ?? $this->functionTypeFor($assignmentGroup->contains(fn ($a) => $a->hasUnitLoad()));
+
+        $outcome = AgencyOutcome::firstOrCreate(
+            [
+                'outcome'       => $taggedOutcome?->outcome ?? $functionType,
+                'sub_outcome'   => $subOutcome,
+                'function_type' => $functionType,
+                'fiscal_year'   => null,
+            ],
+            [
+                'parent_id' => $taggedOutcome?->parent_id,
+            ]
+        );
+
+        $indicator = PerformanceIndicator::updateOrCreate(
+            ['agency_outcome_id' => $outcome->id, 'fiscal_year' => null],
+            ['description' => $taggedPlan->performanceIndicator?->description ?? 'Faculty Loading — Teaching Load (auto-generated)']
+        );
+
+        return WorkDistributionPlan::updateOrCreate(
+            ['performance_indicator_id' => $indicator->id, 'fiscal_year' => null],
+            ['success_indicator' => $taggedPlan->success_indicator, 'rated_by' => $taggedPlan->rated_by, 'load_source' => null]
         );
     }
 

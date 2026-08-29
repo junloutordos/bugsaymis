@@ -12,6 +12,7 @@ use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\IPCRRatingPeriod;
 use App\Models\PerformanceIndicator;
@@ -419,60 +420,144 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
 
     // ── Teaching Load framework-plan tagging (replaces per-subject fallback) ─
 
-    public function test_baseline_service_uses_a_tagged_teaching_load_plan_instead_of_per_subject_fallback_rows(): void
+    // ── Teaching Load tagging: one independent row per distinct subject ────
+
+    private function makeTeachingSubjectAssignment(array $fx, User $faculty, FacultyLoad $facultyLoad, string $code, string $name, float $units, ?int $sectionId = null): LoadAssignment
+    {
+        $subject = Subject::create([
+            'school_year_id' => $fx['sy']->id, 'code' => $code, 'name' => $name, 'credit_units' => $units,
+            'lecture_hours' => $units, 'load_units' => $units, 'subject_type' => 'lecture', 'grade_level' => 9,
+            'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+
+        return LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
+            'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'section_id' => $sectionId, 'load_units' => $units,
+        ]);
+    }
+
+    public function test_baseline_service_materializes_one_independent_row_per_distinct_subject_for_a_tagged_teaching_plan(): void
     {
         $fx      = $this->makeTerm();
         $faculty = User::factory()->create();
-
-        $outcome   = AgencyOutcome::create(['outcome' => 'Teaching Outcome', 'function_type' => 'Core Functions']);
-        $indicator = PerformanceIndicator::create(['agency_outcome_id' => $outcome->id, 'description' => 'Teaching Indicator']);
-        $teachingPlan = WorkDistributionPlan::create([
-            'performance_indicator_id' => $indicator->id,
-            'success_indicator' => 'Delivers instruction per DepEd curriculum',
-            'load_source' => 'teaching',
-        ]);
+        $teachingPlan = $this->makePlan(['load_source' => 'teaching', 'success_indicator' => 'Delivers instruction per DepEd curriculum']);
 
         $facultyLoad = FacultyLoad::create([
             'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
             'teaching_units' => 6, 'total_units' => 6, 'full_load_threshold' => 18, 'load_status' => 'underload',
         ]);
-        $math = Subject::create([
+        $this->makeTeachingSubjectAssignment($fx, $faculty, $facultyLoad, 'MATH1', 'Mathematics 1', 3);
+        $this->makeTeachingSubjectAssignment($fx, $faculty, $facultyLoad, 'SCI1', 'Science 1', 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        // Two distinct subjects — two independent materialized rows, never
+        // the tagged mother plan itself, never merged into one shared row.
+        $this->assertSame(2, $summary['attached']);
+        $this->assertFalse($ipcr->plans()->where('work_distribution_plans.id', $teachingPlan->id)->exists());
+
+        $clones = WorkDistributionPlan::where('success_indicator', $teachingPlan->success_indicator)
+            ->where('id', '!=', $teachingPlan->id)->get();
+        $this->assertCount(2, $clones);
+        foreach ($clones as $clone) {
+            $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $clone->id)->exists());
+        }
+
+        $targets = DB::table('employee_ipcrs_plan')->where('ipcr_id', $ipcr->id)
+            ->whereIn('plan_id', $clones->pluck('id'))->pluck('individual_target');
+        $this->assertTrue($targets->contains(fn ($t) => str_contains($t, 'Mathematics 1')));
+        $this->assertTrue($targets->contains(fn ($t) => str_contains($t, 'Science 1')));
+        $this->assertFalse($targets->contains(fn ($t) => str_contains($t, 'Mathematics 1') && str_contains($t, 'Science 1')));
+    }
+
+    public function test_baseline_service_merges_the_same_subject_across_multiple_sections_into_one_row(): void
+    {
+        $fx      = $this->makeTerm();
+        $faculty = User::factory()->create();
+        $this->makePlan(['load_source' => 'teaching']);
+
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'teaching_units' => 6, 'total_units' => 6, 'full_load_threshold' => 18, 'load_status' => 'underload',
+        ]);
+        $subject = Subject::create([
             'school_year_id' => $fx['sy']->id, 'code' => 'MATH1', 'name' => 'Mathematics 1', 'credit_units' => 3,
             'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture', 'grade_level' => 9,
             'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
         ]);
-        $science = Subject::create([
-            'school_year_id' => $fx['sy']->id, 'code' => 'SCI1', 'name' => 'Science 1', 'credit_units' => 3,
-            'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture', 'grade_level' => 9,
-            'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        $sectionA = Section::create(['sectionname' => 'Section A']);
+        $sectionB = Section::create(['sectionname' => 'Section B']);
+        LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
+            'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'section_id' => $sectionA->id, 'load_units' => 3,
         ]);
         LoadAssignment::create([
             'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
             'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
-            'assignment_type' => 'teaching', 'subject_id' => $math->id, 'load_units' => 3,
-        ]);
-        LoadAssignment::create([
-            'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
-            'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
-            'assignment_type' => 'teaching', 'subject_id' => $science->id, 'load_units' => 3,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'section_id' => $sectionB->id, 'load_units' => 3,
         ]);
 
         $ipcr = $this->makeIpcrFor($faculty);
-        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
 
-        // Only the tagged Teaching Load plan attaches — no auto-generated
-        // per-subject fallback rows alongside it.
-        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $teachingPlan->id)->exists());
-        $this->assertNull(WorkDistributionPlan::where('id', '!=', $teachingPlan->id)->whereHas(
-            'performanceIndicator.agencyOutcome',
-            fn ($q) => $q->where('function_type', 'Core Functions')
-        )->first());
+        $this->assertSame(1, $summary['attached'], 'Same subject across two sections must merge into one row.');
 
-        $target = \Illuminate\Support\Facades\DB::table('employee_ipcrs_plan')
-            ->where('ipcr_id', $ipcr->id)->where('plan_id', $teachingPlan->id)
-            ->value('individual_target');
-        $this->assertStringContainsString('Mathematics 1', $target);
-        $this->assertStringContainsString('Science 1', $target);
+        $attachedId = $ipcr->plans()->pluck('work_distribution_plans.id')->first();
+        $target = DB::table('employee_ipcrs_plan')->where('ipcr_id', $ipcr->id)->where('plan_id', $attachedId)->value('individual_target');
+        $this->assertStringContainsString('Section A', $target);
+        $this->assertStringContainsString('Section B', $target);
+    }
+
+    public function test_baseline_service_materializes_one_row_per_tagged_plan_for_the_same_subject(): void
+    {
+        $fx      = $this->makeTerm();
+        $faculty = User::factory()->create();
+        $planA = $this->makePlan(['load_source' => 'teaching', 'success_indicator' => 'Plan A text']);
+        $planB = $this->makePlan(['load_source' => 'teaching', 'success_indicator' => 'Plan B text']);
+
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'teaching_units' => 3, 'total_units' => 3, 'full_load_threshold' => 18, 'load_status' => 'underload',
+        ]);
+        $this->makeTeachingSubjectAssignment($fx, $faculty, $facultyLoad, 'MATH1', 'Mathematics 1', 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        // One subject, two tagged plans — two independent rows, each
+        // mirroring one tagged plan's own text.
+        $this->assertSame(2, $summary['attached']);
+        $cloneA = WorkDistributionPlan::where('success_indicator', $planA->success_indicator)->where('id', '!=', $planA->id)->first();
+        $cloneB = WorkDistributionPlan::where('success_indicator', $planB->success_indicator)->where('id', '!=', $planB->id)->first();
+        $this->assertNotNull($cloneA);
+        $this->assertNotNull($cloneB);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $cloneA->id)->exists());
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $cloneB->id)->exists());
+    }
+
+    public function test_baseline_service_keeps_similarly_named_electives_at_different_grade_levels_separate(): void
+    {
+        $fx      = $this->makeTerm();
+        $faculty = User::factory()->create();
+        $this->makePlan(['load_source' => 'teaching']);
+
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'teaching_units' => 10, 'total_units' => 10, 'full_load_threshold' => 18, 'load_status' => 'underload',
+        ]);
+        // Two DISTINCT Subject catalog records sharing a display name (a
+        // common elective offered at two different grade levels) — must
+        // stay as two separate rows, never merged.
+        $this->makeTeachingSubjectAssignment($fx, $faculty, $facultyLoad, 'ELEC-EL-DMT-G11', 'Elective: Design and Make Technology', 5);
+        $this->makeTeachingSubjectAssignment($fx, $faculty, $facultyLoad, 'ELEC-EL-DMT-G12', 'Elective: Design and Make Technology', 5);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertSame(2, $summary['attached']);
     }
 
     // ── Designations-module tagging is evergreen — ignores WorkDistributionPlan.fiscal_year ──
@@ -502,15 +587,15 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $this->makeTeachingAssignment($fx, $faculty, 3);
 
         $ipcr = $this->makeIpcrFor($faculty, IPCRRatingPeriod::create(['label' => 'FY 2026', 'year' => 2026]));
-        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
 
-        // Attaches despite the year mismatch, and still replaces the
-        // per-subject fallback (no separate auto-generated Core row).
-        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $teachingPlan->id)->exists());
-        $this->assertNull(WorkDistributionPlan::where('id', '!=', $teachingPlan->id)->whereHas(
-            'performanceIndicator.agencyOutcome',
-            fn ($q) => $q->where('function_type', 'Core Functions')
-        )->first());
+        // The materialized clone attaches despite the tag's own year
+        // mismatch, and still replaces the per-subject fallback.
+        $this->assertSame(1, $summary['attached']);
+        $clone = WorkDistributionPlan::where('success_indicator', $teachingPlan->success_indicator)
+            ->where('id', '!=', $teachingPlan->id)->first();
+        $this->assertNotNull($clone);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $clone->id)->exists());
     }
 
     public function test_baseline_service_still_respects_fiscal_year_for_a_personnel_linked_plan(): void

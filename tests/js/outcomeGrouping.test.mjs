@@ -87,3 +87,33 @@ test('subOutcomeDisplayFor falls back to the static label when the load_source-t
 
   assert.equal(subOutcomeDisplayFor(pis, 'B.1 Static Label'), 'B.1 Static Label')
 })
+
+test('subOutcomeDisplayFor shows a materialized Teaching Load row\'s own target instead of its raw marker', () => {
+  const pis = {
+    'Indicator A': [plan({
+      piDesc: 'Indicator A',
+      subOutcome: 'App\\Models\\FacultyLoading\\LoadAssignment#261@536',
+      individualTarget: 'Elective: Design and Make Technology — Section A (5.00 u)',
+    })],
+  }
+
+  assert.equal(
+    subOutcomeDisplayFor(pis, 'App\\Models\\FacultyLoading\\LoadAssignment#261@536'),
+    'Elective: Design and Make Technology — Section A (5.00 u)'
+  )
+})
+
+test('subOutcomeDisplayFor falls back to the static label for a plain (untagged) auto-generated marker with no target', () => {
+  const pis = {
+    'Indicator A': [plan({
+      piDesc: 'Indicator A',
+      subOutcome: 'App\\Models\\FacultyLoading\\LoadAssignment#117',
+      individualTarget: null,
+    })],
+  }
+
+  assert.equal(
+    subOutcomeDisplayFor(pis, 'App\\Models\\FacultyLoading\\LoadAssignment#117'),
+    'App\\Models\\FacultyLoading\\LoadAssignment#117'
+  )
+})
