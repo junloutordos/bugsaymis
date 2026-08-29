@@ -85,9 +85,16 @@ class WorkDistributionPlanClassifier
      * Keyed 1:1 on (the group's lowest assignment id, the tagged plan's
      * id), so two distinct subjects — or the same subject tagged with two
      * different mother plans — never share a row, and each stays
-     * separately rateable (own accomplishment, MOV, rating). Content is
-     * refreshed on every call via updateOrCreate so edits to the tagged
-     * mother plan's own text propagate to every materialized copy.
+     * separately rateable (own accomplishment, MOV, rating).
+     *
+     * Identity is the marker (sub_outcome) ALONE — never combined with any
+     * value mirrored from the tagged plan. Content (outcome, function_type,
+     * description, success_indicator) is refreshed via updateOrCreate on
+     * every call so edits to the tagged mother plan's own text propagate to
+     * the SAME materialized row, in place. Mixing mutable mirrored content
+     * into the identity lookup would make the match fail the moment that
+     * content changes, creating a duplicate row under the same marker
+     * instead of updating the existing one.
      */
     public function materializedTeachingPlanFor(Collection $assignmentGroup, WorkDistributionPlan $taggedPlan): WorkDistributionPlan
     {
@@ -98,15 +105,12 @@ class WorkDistributionPlanClassifier
         $functionType  = $taggedOutcome?->function_type
             ?? $this->functionTypeFor($assignmentGroup->contains(fn ($a) => $a->hasUnitLoad()));
 
-        $outcome = AgencyOutcome::firstOrCreate(
+        $outcome = AgencyOutcome::updateOrCreate(
+            ['sub_outcome' => $subOutcome, 'fiscal_year' => null],
             [
                 'outcome'       => $taggedOutcome?->outcome ?? $functionType,
-                'sub_outcome'   => $subOutcome,
                 'function_type' => $functionType,
-                'fiscal_year'   => null,
-            ],
-            [
-                'parent_id' => $taggedOutcome?->parent_id,
+                'parent_id'     => $taggedOutcome?->parent_id,
             ]
         );
 

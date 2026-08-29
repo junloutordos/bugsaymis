@@ -261,9 +261,15 @@ class FacultyIPCRBaselineService
                     foreach ($currentSourceMarkers as $marker) {
                         // Exact match (plain fallback) or "<marker>@..."
                         // prefix (a materialized per-tag copy of the same
-                        // assignment/subject group).
+                        // assignment/subject group). Markers are fully-
+                        // qualified class names containing "\" — MySQL's
+                        // LIKE treats "\" as an escape character, so it
+                        // MUST be escaped (along with % and _) before being
+                        // used as a LIKE pattern, or the match silently
+                        // finds nothing.
+                        $escapedMarker = addcslashes($marker, '\\%_');
                         $q2->orWhere('sub_outcome', $marker)
-                            ->orWhere('sub_outcome', 'like', $marker . '@%');
+                            ->orWhere('sub_outcome', 'like', $escapedMarker . '@%');
                     }
                 });
             })

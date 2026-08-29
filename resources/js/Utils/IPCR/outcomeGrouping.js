@@ -19,6 +19,20 @@ export function normalizeFunctionType(raw) {
 const MATERIALIZED_MARKER = /#\d+@\d+$/;
 
 /**
+ * Grouping key for the Sub-Outcome column. A materialized Teaching Load
+ * row's marker is unique per (subject group, tagged plan) so that each
+ * stays independently rateable — but two tagged plans for the SAME subject
+ * group should still merge into one Sub-Outcome cell instead of rendering
+ * as two separate blocks. Stripping the "@<taggedPlanId>" suffix collapses
+ * them back to one grouping key while each plan's own row (and its own
+ * marker, used elsewhere for identity/reconciliation) is untouched.
+ */
+function subOutcomeGroupKey(raw) {
+  if (!raw) return "—";
+  return String(raw).replace(/@\d+$/, "");
+}
+
+/**
  * Display text for a merged Sub-Outcome cell (rowspan across every plan
  * sharing that label). A load_source-tagged plan (e.g. a shared framework
  * row) or a materialized per-subject Teaching Load row (marker-based
@@ -46,7 +60,7 @@ export function groupPlansByOutcome(plans) {
     const aoo = plan.performance_indicator?.agency_outcome;
     const functionType = normalizeFunctionType(aoo?.function_type);
     const outcome = aoo?.parent?.outcome ?? aoo?.outcome ?? "Uncategorized";
-    const subOutcome = aoo?.sub_outcome || "—";
+    const subOutcome = subOutcomeGroupKey(aoo?.sub_outcome);
     const piDesc = plan.performance_indicator?.description || "—";
 
     if (!groups[functionType]) groups[functionType] = {};

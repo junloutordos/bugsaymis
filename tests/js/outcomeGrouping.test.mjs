@@ -49,6 +49,24 @@ test('does not truncate sub_outcome text and keeps two long sub-outcomes distinc
   ])
 })
 
+test('groupPlansByOutcome merges materialized rows for the same subject group across different tagged plans', () => {
+  const plans = [
+    plan({ functionType: 'Core Functions', outcome: 'Core Functions', subOutcome: 'App\\Models\\FacultyLoading\\LoadAssignment#261@536', piDesc: 'Core Functions' }),
+    plan({ functionType: 'Core Functions', outcome: 'Core Functions', subOutcome: 'App\\Models\\FacultyLoading\\LoadAssignment#261@537', piDesc: 'Core Functions' }),
+    // A different subject group (261 vs 262) must stay separate.
+    plan({ functionType: 'Core Functions', outcome: 'Core Functions', subOutcome: 'App\\Models\\FacultyLoading\\LoadAssignment#262@536', piDesc: 'Core Functions' }),
+  ]
+
+  const grouped = groupPlansByOutcome(plans)
+  const subKeys = Object.keys(grouped['Core Functions']['Core Functions']).sort()
+
+  assert.deepEqual(subKeys, [
+    'App\\Models\\FacultyLoading\\LoadAssignment#261',
+    'App\\Models\\FacultyLoading\\LoadAssignment#262',
+  ])
+  assert.equal(grouped['Core Functions']['Core Functions']['App\\Models\\FacultyLoading\\LoadAssignment#261']['Core Functions'].length, 2)
+})
+
 test('normalizeFunctionType maps legacy casing/spelling to canonical labels', () => {
   assert.equal(normalizeFunctionType('strategic'), 'Strategic Functions')
   assert.equal(normalizeFunctionType('Core function'), 'Core Functions')

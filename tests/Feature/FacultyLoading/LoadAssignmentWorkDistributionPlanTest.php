@@ -560,6 +560,71 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $this->assertSame(2, $summary['attached']);
     }
 
+    public function test_baseline_service_detaches_a_stale_materialized_teaching_row_once_its_tag_is_removed(): void
+    {
+        $fx         = $this->makeTerm();
+        $faculty    = User::factory()->create();
+        $taggedPlan = $this->makePlan(['load_source' => 'teaching']);
+
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'teaching_units' => 3, 'total_units' => 3, 'full_load_threshold' => 18, 'load_status' => 'underload',
+        ]);
+        $this->makeTeachingSubjectAssignment($fx, $faculty, $facultyLoad, 'MATH1', 'Mathematics 1', 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $clone = WorkDistributionPlan::where('success_indicator', $taggedPlan->success_indicator)
+            ->where('id', '!=', $taggedPlan->id)->first();
+        $this->assertNotNull($clone);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $clone->id)->exists());
+
+        // The tag is removed — the materialized row (marker contains
+        // backslashes, e.g. "App\Models\FacultyLoading\LoadAssignment#1@2")
+        // is now superseded by the plain fallback and must be detached, not
+        // silently left attached because MySQL LIKE treats "\" as an escape
+        // character.
+        $taggedPlan->update(['load_source' => null]);
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertFalse($ipcr->plans()->where('work_distribution_plans.id', $clone->id)->exists());
+    }
+
+    public function test_baseline_service_refreshes_a_materialized_teaching_row_in_place_instead_of_duplicating_it(): void
+    {
+        $fx         = $this->makeTerm();
+        $faculty    = User::factory()->create();
+        $taggedPlan = $this->makePlan(['load_source' => 'teaching', 'success_indicator' => 'Original wording']);
+
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'teaching_units' => 3, 'total_units' => 3, 'full_load_threshold' => 18, 'load_status' => 'underload',
+        ]);
+        $this->makeTeachingSubjectAssignment($fx, $faculty, $facultyLoad, 'MATH1', 'Mathematics 1', 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $cloneBefore = WorkDistributionPlan::where('success_indicator', 'Original wording')
+            ->where('id', '!=', $taggedPlan->id)->first();
+        $this->assertNotNull($cloneBefore);
+
+        // CID edits the tagged mother plan's own wording AND its outcome
+        // classification — must update the SAME materialized row, never
+        // create a second one under the same marker.
+        $taggedPlan->update(['success_indicator' => 'Revised wording']);
+        $taggedPlan->performanceIndicator->agencyOutcome->update(['outcome' => 'A Different Outcome Bucket']);
+
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $cloneAfter = WorkDistributionPlan::where('success_indicator', 'Revised wording')
+            ->where('id', '!=', $taggedPlan->id)->first();
+        $this->assertNotNull($cloneAfter);
+        $this->assertSame($cloneBefore->id, $cloneAfter->id, 'Editing the tagged plan must refresh the same materialized row, not create a duplicate.');
+        $this->assertFalse(WorkDistributionPlan::where('success_indicator', 'Original wording')->exists());
+    }
+
     // ── Designations-module tagging is evergreen — ignores WorkDistributionPlan.fiscal_year ──
 
     public function test_baseline_service_attaches_a_category_tagged_plan_even_when_its_fiscal_year_does_not_match_the_ipcr_period(): void
