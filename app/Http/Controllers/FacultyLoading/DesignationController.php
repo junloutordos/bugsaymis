@@ -43,7 +43,7 @@ class DesignationController extends Controller
                 ->groupBy('designation_id')
             : collect();
 
-        $categories = DesignationCategory::with('designations.workDistributionPlans:id')
+        $categories = DesignationCategory::with(['designations', 'workDistributionPlans:id'])
             ->orderBy('sort_order')
             ->get()
             ->map(fn ($cat) => [
@@ -53,6 +53,7 @@ class DesignationController extends Controller
                 'description'  => $cat->description,
                 'sort_order'   => $cat->sort_order,
                 'is_active'    => $cat->is_active,
+                'plan_ids'     => $cat->workDistributionPlans->pluck('id')->toArray(),
                 'designations' => $cat->designations->map(fn ($d) => [
                     'id'              => $d->id,
                     'code'            => $d->code,
@@ -65,7 +66,6 @@ class DesignationController extends Controller
                     'sort_order'      => $d->sort_order,
                     'is_active'       => $d->is_active,
                     'section_id'      => $d->section_id,
-                    'plan_ids'        => $d->workDistributionPlans->pluck('id')->toArray(),
                     // Current holders — from any module (AUH, adviser, supervisory, etc.)
                     'holders'       => ($holdersByDesig->get($d->id) ?? collect())
                         ->map(fn ($a) => [
@@ -222,12 +222,13 @@ class DesignationController extends Controller
         return back()->with('success', 'Designation deleted.');
     }
 
-    // ── Link / replace this designation's Work Distribution Plans ────────────
-    // Set once on the "mother" designation record — every current and future
-    // holder of the designation inherits these same plans on their IPCR
-    // automatically, without re-tagging each individual load assignment.
+    // ── Link / replace this category's Work Distribution Plans ───────────────
+    // Set once on the "mother" category record — every designation under it,
+    // and every current and future holder of any of them, inherits these
+    // same plans on their IPCR automatically, without re-tagging each
+    // individual designation.
 
-    public function syncPlans(Request $request, Designation $designation): RedirectResponse
+    public function syncCategoryPlans(Request $request, DesignationCategory $category): RedirectResponse
     {
         $this->authorize('faculty_loading.setup');
 
@@ -236,9 +237,9 @@ class DesignationController extends Controller
             'plan_ids.*' => 'exists:work_distribution_plans,id',
         ]);
 
-        $designation->workDistributionPlans()->sync($data['plan_ids'] ?? []);
+        $category->workDistributionPlans()->sync($data['plan_ids'] ?? []);
 
-        return back()->with('success', 'Work Distribution Plans updated for this designation.');
+        return back()->with('success', 'Work Distribution Plans updated for this category.');
     }
 
     // ── Assign / Revoke direct from Designations catalog page ────────────────

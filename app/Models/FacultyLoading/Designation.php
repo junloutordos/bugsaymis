@@ -4,9 +4,7 @@ namespace App\Models\FacultyLoading;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\WorkDistributionPlan;
 
 class Designation extends Model
 {
@@ -51,19 +49,6 @@ class Designation extends Model
     public function loadAssignments(): HasMany
     {
         return $this->hasMany(LoadAssignment::class);
-    }
-
-    /**
-     * Work Distribution Plans tagged directly on this designation. Every
-     * current and future faculty member holding this designation (via
-     * LoadAssignment::designation_id) inherits these same plans on their
-     * IPCR automatically — set once on the "mother" designation record
-     * instead of per individual assignment.
-     */
-    public function workDistributionPlans(): BelongsToMany
-    {
-        return $this->belongsToMany(WorkDistributionPlan::class, 'designation_work_distribution_plan')
-            ->withTimestamps();
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────

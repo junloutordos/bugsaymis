@@ -24,12 +24,13 @@ use Illuminate\Support\Facades\DB;
  *
  * A LoadAssignment backed by a Designation (e.g. ACIDAA, Prefect of
  * Discipline) inherits whatever WDPs are tagged on that Designation's own
- * "mother record" — set once by CID/HR, applies to every current and future
- * holder automatically, never per individual assignment. A LoadAssignment
- * with no designation (a raw per-subject teaching load) each gets its own
- * dedicated, auto-classified Core/Support Functions WDP — nothing is merged,
- * so a faculty member teaching two subjects gets two separate rows on their
- * IPCR.
+ * Category "mother record" — set once by CID/HR, applies to every
+ * designation under that category and every current and future holder of
+ * any of them automatically, never per individual designation or
+ * assignment. A LoadAssignment with no designation (a raw per-subject
+ * teaching load) each gets its own dedicated, auto-classified Core/Support
+ * Functions WDP — nothing is merged, so a faculty member teaching two
+ * subjects gets two separate rows on their IPCR.
  */
 class FacultyIPCRBaselineService
 {
@@ -128,9 +129,10 @@ class FacultyIPCRBaselineService
      *
      * LoadAssignment rows backed by a Designation (admin/committee/etc. via
      * DesignationService::assign()) inherit whatever WDPs are tagged on that
-     * Designation's own "mother record" — set once by CID/HR, applies to
-     * every current and future holder automatically. A designation with no
-     * WDPs tagged yet gets no plan (nothing to auto-generate at this level).
+     * Designation's Category "mother record" — set once by CID/HR, applies
+     * to every designation under that category and every current and future
+     * holder of any of them automatically. A category with no WDPs tagged
+     * yet gets no plan (nothing to auto-generate at this level).
      *
      * LoadAssignment rows with NO designation (raw per-subject teaching
      * loads) keep the previous per-assignment auto-classified Core/Support
@@ -146,12 +148,13 @@ class FacultyIPCRBaselineService
 
         foreach ($assignments as $assignment) {
             if ($assignment->designation_id) {
-                $designationPlanIds = $assignment->designation
+                $categoryPlanIds = $assignment->designation
+                    ?->category
                     ?->workDistributionPlans()
                     ->pluck('work_distribution_plans.id');
 
-                if ($designationPlanIds) {
-                    $planIds = $planIds->merge($designationPlanIds);
+                if ($categoryPlanIds) {
+                    $planIds = $planIds->merge($categoryPlanIds);
                 }
                 continue;
             }
@@ -186,7 +189,7 @@ class FacultyIPCRBaselineService
      */
     private function loadAssignmentsFor(User $user, ?IPCRRatingPeriod $period): Collection
     {
-        $query = LoadAssignment::with(['subject', 'section', 'designation'])
+        $query = LoadAssignment::with(['subject', 'section', 'designation.category'])
             ->where('user_id', $user->id);
 
         $termIds = collect();

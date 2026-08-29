@@ -426,12 +426,12 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/categories',                [DesignationController::class, 'storeCategory'])->name('categories.store');
                 Route::put('/categories/{category}',      [DesignationController::class, 'updateCategory'])->name('categories.update');
                 Route::delete('/categories/{category}',   [DesignationController::class, 'destroyCategory'])->name('categories.destroy');
+                Route::put('/categories/{category}/plans', [DesignationController::class, 'syncCategoryPlans'])->name('categories.plans.sync');
 
                 // Designations
                 Route::post('/',                          [DesignationController::class, 'store'])->name('store');
                 Route::put('/{designation}',              [DesignationController::class, 'update'])->name('update');
                 Route::delete('/{designation}',           [DesignationController::class, 'destroy'])->name('destroy');
-                Route::put('/{designation}/plans',        [DesignationController::class, 'syncPlans'])->name('plans.sync');
             });
 
         // Designation assign/revoke (requires load_assignments permission, not setup)

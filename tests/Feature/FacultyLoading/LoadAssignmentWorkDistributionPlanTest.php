@@ -22,11 +22,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Covers the Designation ↔ WorkDistributionPlan pivot (the "mother record"
- * pattern — one tag on a Designation applies to every current and future
- * holder), the Core/Support auto-classification default for non-designation
- * teaching loads, and the baseline service's attachment onto a faculty
- * member's IPCR.
+ * Covers the DesignationCategory ↔ WorkDistributionPlan pivot (the "mother
+ * record" pattern — one tag on a Category applies to every current and
+ * future holder of ANY designation under that category), the Core/Support
+ * auto-classification default for non-designation teaching loads, and the
+ * baseline service's attachment onto a faculty member's IPCR.
  */
 class LoadAssignmentWorkDistributionPlanTest extends TestCase
 {
@@ -44,6 +44,13 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         ]);
 
         return compact('sy', 'term');
+    }
+
+    private function makeCategory(array $overrides = []): DesignationCategory
+    {
+        return DesignationCategory::create(array_merge([
+            'code' => 'ADMIN-' . uniqid(), 'name' => 'Admin',
+        ], $overrides));
     }
 
     private function makeTeachingAssignment(array $fx, User $faculty, float $units): LoadAssignment
@@ -66,9 +73,9 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         ]);
     }
 
-    private function makeDesignation(array $overrides = []): Designation
+    private function makeDesignation(array $overrides = [], ?DesignationCategory $category = null): Designation
     {
-        $category = DesignationCategory::create(['code' => 'ADMIN-' . uniqid(), 'name' => 'Admin']);
+        $category ??= $this->makeCategory();
 
         return Designation::create(array_merge([
             'designation_category_id' => $category->id,
@@ -103,22 +110,22 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         return WorkDistributionPlan::create(['performance_indicator_id' => $indicator->id, 'success_indicator' => 'Explicit Plan']);
     }
 
-    // ── Designation ↔ WorkDistributionPlan pivot ───────────────────────────
+    // ── DesignationCategory ↔ WorkDistributionPlan pivot ────────────────────
 
-    public function test_designation_can_link_multiple_work_distribution_plans(): void
+    public function test_designation_category_can_link_multiple_work_distribution_plans(): void
     {
-        $designation = $this->makeDesignation();
+        $category = $this->makeCategory();
         $planA = $this->makePlan();
         $planB = $this->makePlan();
 
-        $designation->workDistributionPlans()->sync([$planA->id, $planB->id]);
+        $category->workDistributionPlans()->sync([$planA->id, $planB->id]);
 
-        $this->assertCount(2, $designation->workDistributionPlans);
-        $this->assertTrue($designation->workDistributionPlans->pluck('id')->contains($planA->id));
-        $this->assertTrue($designation->workDistributionPlans->pluck('id')->contains($planB->id));
+        $this->assertCount(2, $category->workDistributionPlans);
+        $this->assertTrue($category->workDistributionPlans->pluck('id')->contains($planA->id));
+        $this->assertTrue($category->workDistributionPlans->pluck('id')->contains($planB->id));
 
         // Inverse relation
-        $this->assertTrue($planA->designations->pluck('id')->contains($designation->id));
+        $this->assertTrue($planA->designationCategories->pluck('id')->contains($category->id));
     }
 
     public function test_committee_assignment_can_still_link_multiple_work_distribution_plans(): void
@@ -200,13 +207,13 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         ]);
     }
 
-    public function test_baseline_service_attaches_designation_tagged_plans_to_a_holder(): void
+    public function test_baseline_service_attaches_category_tagged_plans_to_a_holder(): void
     {
         $fx          = $this->makeTerm();
         $faculty     = User::factory()->create();
         $designation = $this->makeDesignation();
         $plan        = $this->makePlan();
-        $designation->workDistributionPlans()->sync([$plan->id]);
+        $designation->category->workDistributionPlans()->sync([$plan->id]);
 
         $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
 
@@ -222,12 +229,37 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $fx          = $this->makeTerm();
         $designation = $this->makeDesignation();
         $plan        = $this->makePlan();
-        $designation->workDistributionPlans()->sync([$plan->id]);
+        $designation->category->workDistributionPlans()->sync([$plan->id]);
 
         $facultyA = User::factory()->create();
         $facultyB = User::factory()->create();
         $this->makeDesignationAssignment($fx, $facultyA, $designation, 3);
         $this->makeDesignationAssignment($fx, $facultyB, $designation, 3);
+
+        $ipcrA = $this->makeIpcrFor($facultyA);
+        $ipcrB = $this->makeIpcrFor($facultyB);
+        app(FacultyIPCRBaselineService::class)->generate($ipcrA);
+        app(FacultyIPCRBaselineService::class)->generate($ipcrB);
+
+        $this->assertTrue($ipcrA->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+        $this->assertTrue($ipcrB->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+    }
+
+    public function test_baseline_service_cascades_category_tagged_plans_to_every_designation_in_that_category(): void
+    {
+        $fx       = $this->makeTerm();
+        $category = $this->makeCategory(['name' => 'Coordinatorship']);
+        $mathCoord = $this->makeDesignation(['name' => 'Math Coordinator', 'code' => 'MATH-COORD-' . uniqid()], $category);
+        $sciCoord  = $this->makeDesignation(['name' => 'Science Coordinator', 'code' => 'SCI-COORD-' . uniqid()], $category);
+
+        // Tagged ONCE on the category — not on either individual designation.
+        $plan = $this->makePlan();
+        $category->workDistributionPlans()->sync([$plan->id]);
+
+        $facultyA = User::factory()->create();
+        $facultyB = User::factory()->create();
+        $this->makeDesignationAssignment($fx, $facultyA, $mathCoord, 3);
+        $this->makeDesignationAssignment($fx, $facultyB, $sciCoord, 3);
 
         $ipcrA = $this->makeIpcrFor($facultyA);
         $ipcrB = $this->makeIpcrFor($facultyB);
@@ -243,13 +275,13 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $fx          = $this->makeTerm();
         $designation = $this->makeDesignation();
 
-        // Designation tagged with a plan AFTER a faculty is already assigned —
+        // Category tagged with a plan AFTER a faculty is already assigned —
         // proves the "mother record" pattern: no per-assignment re-tagging needed.
         $facultyA = User::factory()->create();
         $this->makeDesignationAssignment($fx, $facultyA, $designation, 3);
 
         $plan = $this->makePlan();
-        $designation->workDistributionPlans()->sync([$plan->id]);
+        $designation->category->workDistributionPlans()->sync([$plan->id]);
 
         // A second faculty holds the SAME designation, assigned after the tag
         $facultyB = User::factory()->create();
@@ -264,11 +296,11 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $this->assertTrue($ipcrB->plans()->where('work_distribution_plans.id', $plan->id)->exists());
     }
 
-    public function test_baseline_service_attaches_nothing_for_a_designation_with_no_plans_tagged_yet(): void
+    public function test_baseline_service_attaches_nothing_for_a_designation_whose_category_has_no_plans_tagged_yet(): void
     {
         $fx          = $this->makeTerm();
         $faculty     = User::factory()->create();
-        $designation = $this->makeDesignation(); // no WDPs tagged
+        $designation = $this->makeDesignation(); // category has no WDPs tagged
 
         $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
 
