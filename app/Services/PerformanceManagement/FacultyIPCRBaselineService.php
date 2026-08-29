@@ -106,7 +106,7 @@ class FacultyIPCRBaselineService
         // (d) Plans linked directly to the teacher's own designation-backed
         // load assignments / committee assignments. Any assignment with no
         // explicit link of its own falls back to the Core/Support default.
-        $directPlanIds = $this->directPlanIdsFor($otherAssignments, $committeeAssignments, $period?->year);
+        [$directPlanIds, $directTargets] = $this->directPlanIdsFor($otherAssignments, $committeeAssignments, $period?->year);
 
         // Committee- and personnel-linked plans stay fiscal-year-scoped
         // (pre-existing, unchanged behavior). Framework (load_source),
@@ -151,6 +151,19 @@ class FacultyIPCRBaselineService
 
         // Personalize materialized Teaching Load rows
         foreach ($teachingTargets as $planId => $target) {
+            if (filled($existingTargets[$planId] ?? null)) {
+                continue;
+            }
+
+            $ipcr->plans()->updateExistingPivot($planId, ['individual_target' => $target]);
+            $personalized++;
+        }
+
+        // Personalize auto-classified Core/Support fallback rows with the
+        // assignment's real label (designation name, committee name, or
+        // subject) — otherwise the Sub-Outcome column falls back to the raw
+        // technical identity marker (e.g. "LoadAssignment#621").
+        foreach ($directTargets as $planId => $target) {
             if (filled($existingTargets[$planId] ?? null)) {
                 continue;
             }
@@ -318,10 +331,17 @@ class FacultyIPCRBaselineService
      * FacultyCommitteeAssignment rows use their own explicit WDP link (set
      * per assignment, since committee membership is individual); with no
      * explicit link, they fall back to the same auto-classified default.
+     *
+     * @return array{0: Collection, 1: array<int, string>} plan ids, and a
+     *         map of auto-classified fallback plan id => its personalized
+     *         target line (the designation/committee name) — explicitly-
+     *         tagged plans are real framework rows and aren't personalized
+     *         here.
      */
-    private function directPlanIdsFor(Collection $assignments, Collection $committeeAssignments, ?int $fiscalYear): Collection
+    private function directPlanIdsFor(Collection $assignments, Collection $committeeAssignments, ?int $fiscalYear): array
     {
         $planIds = collect();
+        $targets = [];
 
         $coveredLoadTypes = WorkDistributionPlan::whereNotNull('load_source')
             ->pluck('load_source')
@@ -340,7 +360,10 @@ class FacultyIPCRBaselineService
                 continue; // covered by a load_source-tagged framework plan, attached in generate() part (a)
             }
 
-            $planIds->push($this->classifier->defaultPlanForLoadAssignment($assignment, $fiscalYear)->id);
+            $plan = $this->classifier->defaultPlanForLoadAssignment($assignment, $fiscalYear);
+            $planIds->push($plan->id);
+            $units = number_format((float) $assignment->load_units, 2);
+            $targets[$plan->id] = "{$assignment->display_label} ({$units} u)";
         }
 
         if ($committeeAssignments->isNotEmpty()) {
@@ -356,11 +379,13 @@ class FacultyIPCRBaselineService
                     continue;
                 }
 
-                $planIds->push($this->classifier->defaultPlanForCommitteeAssignment($committeeAssignment, $fiscalYear)->id);
+                $plan = $this->classifier->defaultPlanForCommitteeAssignment($committeeAssignment, $fiscalYear);
+                $planIds->push($plan->id);
+                $targets[$plan->id] = $committeeAssignment->committee_name;
             }
         }
 
-        return $planIds->unique()->values();
+        return [$planIds->unique()->values(), $targets];
     }
 
     /**

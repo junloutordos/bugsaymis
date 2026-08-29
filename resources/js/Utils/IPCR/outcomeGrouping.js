@@ -14,9 +14,13 @@ export function normalizeFunctionType(raw) {
   return String(raw).trim();
 }
 
-// Marker format written by WorkDistributionPlanClassifier for a
-// materialized Teaching Load row: "<SourceClass>#<assignmentId>@<taggedPlanId>".
-const MATERIALIZED_MARKER = /#\d+@\d+$/;
+// Marker formats written by WorkDistributionPlanClassifier for an
+// auto-generated row's identity — a plain per-assignment Core/Support
+// fallback ("<SourceClass>#<assignmentId>") or a materialized Teaching Load
+// row ("<SourceClass>#<assignmentId>@<taggedPlanId>"). Both are technical
+// identifiers, never meant to be shown to a user — a plan carrying one of
+// these must have its own personalized individual_target instead.
+const AUTO_GENERATED_MARKER = /#\d+(@\d+)?$/;
 
 /**
  * Grouping key for the Sub-Outcome column. A materialized Teaching Load
@@ -48,7 +52,7 @@ export function subOutcomeDisplayFor(pis, staticLabel) {
   const tagged = allPlans.find((p) => {
     if (!p.pivot?.individual_target) return false;
     if (p.load_source) return true;
-    return MATERIALIZED_MARKER.test(p.performance_indicator?.agency_outcome?.sub_outcome || '');
+    return AUTO_GENERATED_MARKER.test(p.performance_indicator?.agency_outcome?.sub_outcome || '');
   });
   return tagged ? tagged.pivot.individual_target : staticLabel;
 }
