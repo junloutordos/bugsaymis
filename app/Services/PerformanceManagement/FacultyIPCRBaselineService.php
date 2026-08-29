@@ -159,10 +159,12 @@ class FacultyIPCRBaselineService
             $personalized++;
         }
 
-        // Personalize auto-classified Core/Support fallback rows with the
-        // assignment's real label (designation name, committee name, or
-        // subject) — otherwise the Sub-Outcome column falls back to the raw
-        // technical identity marker (e.g. "LoadAssignment#621").
+        // Personalize direct rows (both explicitly category/designation-
+        // tagged plans and per-assignment auto-classified fallbacks) with
+        // the assignment's real label. Without this, the Sub-Outcome column
+        // falls back to the raw technical identity marker (e.g.
+        // "LoadAssignment#621") for fallback rows, or renders blank for
+        // explicitly-tagged plans (their sub_outcome is intentionally NULL).
         foreach ($directTargets as $planId => $target) {
             if (filled($existingTargets[$planId] ?? null)) {
                 continue;
@@ -333,10 +335,12 @@ class FacultyIPCRBaselineService
      * explicit link, they fall back to the same auto-classified default.
      *
      * @return array{0: Collection, 1: array<int, string>} plan ids, and a
-     *         map of auto-classified fallback plan id => its personalized
-     *         target line (the designation/committee name) — explicitly-
-     *         tagged plans are real framework rows and aren't personalized
-     *         here.
+     *         map of plan id => its personalized target line (designation
+     *         display label or committee name), covering both the
+     *         explicitly-tagged shared plans (which carry no per-teacher
+     *         sub_outcome identity of their own — without this the
+     *         Sub-Outcome cell would render blank) and the per-assignment
+     *         auto-classified fallback plans.
      */
     private function directPlanIdsFor(Collection $assignments, Collection $committeeAssignments, ?int $fiscalYear): array
     {
@@ -354,6 +358,15 @@ class FacultyIPCRBaselineService
 
                 if ($explicitPlanIds->isNotEmpty()) {
                     $planIds = $planIds->merge($explicitPlanIds);
+
+                    $units = number_format((float) $assignment->load_units, 2);
+                    $line  = "{$assignment->display_label} ({$units} u)";
+                    foreach ($explicitPlanIds as $pid) {
+                        // A category/designation tag can attach the same
+                        // shared plan for more than one of this teacher's
+                        // own assignments — append rather than clobber.
+                        $targets[$pid] = isset($targets[$pid]) ? $targets[$pid] . "\n" . $line : $line;
+                    }
                     continue;
                 }
             } elseif ($coveredLoadTypes->contains($assignment->assignment_type)) {
