@@ -14,7 +14,7 @@ import { ref, computed } from "vue";
 import Swal from "sweetalert2";
 import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
-import { groupPlansByOutcome, normalizeFunctionType } from "@/Utils/IPCR/outcomeGrouping.js";
+import { groupPlansByOutcome, normalizeFunctionType, subOutcomeDisplayFor } from "@/Utils/IPCR/outcomeGrouping.js";
 
 const props = defineProps({
   ipcr: Object,
@@ -633,8 +633,8 @@ const formatSessionDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { y
                       <tr class="hover:bg-indigo-50/40">
                         <td v-if="Object.keys(pis)[0] === piDesc"
                             :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
-                            class="px-4 py-3 font-medium text-slate-700 border border-slate-200 text-sm">
-                          {{ subOutcomeLabel !== '—' ? subOutcomeLabel : '' }}
+                            class="px-4 py-3 font-medium text-slate-700 border border-slate-200 text-sm whitespace-pre-line">
+                          {{ subOutcomeDisplayFor(pis, subOutcomeLabel) !== '—' ? subOutcomeDisplayFor(pis, subOutcomeLabel) : '' }}
                         </td>
 
                         <td :rowspan="piPlans.length" class="px-4 py-3 border border-slate-200 font-medium text-slate-700 text-sm">
@@ -643,7 +643,7 @@ const formatSessionDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { y
 
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <div>{{ piPlans[0].success_indicator }}</div>
-                          <p v-if="piPlans[0].pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p>
+                          <p v-if="piPlans[0].pivot?.individual_target && !piPlans[0].load_source" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p>
                           <div class="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
                             <span>Rater: {{ piPlans[0].rated_by || 'Division Chief' }}<template v-if="piPlans[0].offices?.length"> — {{ piPlans[0].offices.map(o => o.name).join(', ') }}</template><template v-if="piPlans[0].committees?.length"> — {{ piPlans[0].committees.map(c => c.name).join(', ') }}</template><template v-if="piPlans[0].special_assignments?.length"> — {{ piPlans[0].special_assignments.map(a => a.name).join(', ') }}</template></span>
                             <AppBadge :color="ratingStatusChip(piPlans[0]).rated ? 'green' : 'amber'">
@@ -716,7 +716,7 @@ const formatSessionDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { y
                       <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-indigo-50/40">
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <div>{{ plan.success_indicator }}</div>
-                          <p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
+                          <p v-if="plan.pivot?.individual_target && !plan.load_source" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
                           <div class="text-xs text-slate-400 mt-1">
                             Rater: {{ plan.rated_by || 'Division Chief' }}<template v-if="plan.offices?.length"> — {{ plan.offices.map(o => o.name).join(', ') }}</template><template v-if="plan.committees?.length"> — {{ plan.committees.map(c => c.name).join(', ') }}</template><template v-if="plan.special_assignments?.length"> — {{ plan.special_assignments.map(a => a.name).join(', ') }}</template>
                           </div>

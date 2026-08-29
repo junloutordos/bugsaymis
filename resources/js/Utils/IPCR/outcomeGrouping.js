@@ -14,6 +14,21 @@ export function normalizeFunctionType(raw) {
   return String(raw).trim();
 }
 
+/**
+ * Display text for a merged Sub-Outcome cell (rowspan across every plan
+ * sharing that label). A load_source-tagged plan (e.g. Teaching Load) has
+ * its individual_target personalized per faculty member (e.g. every subject
+ * taught, listed as a bullet) — when one exists in the group, it replaces
+ * the static sub_outcome label, shown once no matter how many tagged plans
+ * share the group. Falls back to the static label when nothing in the
+ * group is load_source-tagged, or the tagged plan has no target yet.
+ */
+export function subOutcomeDisplayFor(pis, staticLabel) {
+  const allPlans = Object.values(pis).flat();
+  const tagged = allPlans.find((p) => p.load_source && p.pivot?.individual_target);
+  return tagged ? tagged.pivot.individual_target : staticLabel;
+}
+
 export function groupPlansByOutcome(plans) {
   const groups = {};
 

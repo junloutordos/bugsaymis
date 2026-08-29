@@ -102,12 +102,14 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         ]);
     }
 
-    private function makePlan(): WorkDistributionPlan
+    private function makePlan(array $overrides = []): WorkDistributionPlan
     {
         $outcome   = AgencyOutcome::create(['outcome' => 'X. Explicit Outcome', 'function_type' => 'Strategic Functions']);
         $indicator = PerformanceIndicator::create(['agency_outcome_id' => $outcome->id, 'description' => 'Explicit Indicator']);
 
-        return WorkDistributionPlan::create(['performance_indicator_id' => $indicator->id, 'success_indicator' => 'Explicit Plan']);
+        return WorkDistributionPlan::create(array_merge([
+            'performance_indicator_id' => $indicator->id, 'success_indicator' => 'Explicit Plan',
+        ], $overrides));
     }
 
     // ── DesignationCategory ↔ WorkDistributionPlan pivot ────────────────────
@@ -456,6 +458,59 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
             ->value('individual_target');
         $this->assertStringContainsString('Mathematics 1', $target);
         $this->assertStringContainsString('Science 1', $target);
+    }
+
+    // ── Designations-module tagging is evergreen — ignores WorkDistributionPlan.fiscal_year ──
+
+    public function test_baseline_service_attaches_a_category_tagged_plan_even_when_its_fiscal_year_does_not_match_the_ipcr_period(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation();
+        $plan        = $this->makePlan(['fiscal_year' => 2020]);
+        $designation->category->workDistributionPlans()->sync([$plan->id]);
+
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
+
+        $ipcr = $this->makeIpcrFor($faculty, IPCRRatingPeriod::create(['label' => 'FY 2026', 'year' => 2026]));
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+    }
+
+    public function test_baseline_service_attaches_a_teaching_load_tagged_plan_even_when_its_fiscal_year_does_not_match_the_ipcr_period(): void
+    {
+        $fx      = $this->makeTerm();
+        $faculty = User::factory()->create();
+        $teachingPlan = $this->makePlan(['load_source' => 'teaching', 'fiscal_year' => 2020]);
+
+        $this->makeTeachingAssignment($fx, $faculty, 3);
+
+        $ipcr = $this->makeIpcrFor($faculty, IPCRRatingPeriod::create(['label' => 'FY 2026', 'year' => 2026]));
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        // Attaches despite the year mismatch, and still replaces the
+        // per-subject fallback (no separate auto-generated Core row).
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $teachingPlan->id)->exists());
+        $this->assertNull(WorkDistributionPlan::where('id', '!=', $teachingPlan->id)->whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->first());
+    }
+
+    public function test_baseline_service_still_respects_fiscal_year_for_a_personnel_linked_plan(): void
+    {
+        $fx      = $this->makeTerm();
+        $faculty = User::factory()->create();
+        $plan    = $this->makePlan(['fiscal_year' => 2020]);
+        $plan->personnel()->sync([$faculty->id]);
+
+        $ipcr = $this->makeIpcrFor($faculty, IPCRRatingPeriod::create(['label' => 'FY 2026', 'year' => 2026]));
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        // Unlike Designations-module tagging, personnel-linked plans stay
+        // fiscal-year-scoped — unchanged, pre-existing behavior.
+        $this->assertFalse($ipcr->plans()->where('work_distribution_plans.id', $plan->id)->exists());
     }
 
     public function test_baseline_service_gives_each_subject_taught_its_own_ipcr_row_never_merging(): void

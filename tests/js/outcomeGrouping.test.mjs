@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { groupPlansByOutcome, normalizeFunctionType } from '../../resources/js/Utils/IPCR/outcomeGrouping.js'
+import { groupPlansByOutcome, normalizeFunctionType, subOutcomeDisplayFor } from '../../resources/js/Utils/IPCR/outcomeGrouping.js'
 
-function plan({ functionType, outcome, subOutcome, piDesc, parentOutcome = null }) {
+function plan({ functionType, outcome, subOutcome, piDesc, parentOutcome = null, loadSource = null, individualTarget = null }) {
   return {
+    load_source: loadSource,
+    pivot: individualTarget ? { individual_target: individualTarget } : {},
     performance_indicator: {
       description: piDesc,
       agency_outcome: {
@@ -51,4 +53,37 @@ test('normalizeFunctionType maps legacy casing/spelling to canonical labels', ()
   assert.equal(normalizeFunctionType('strategic'), 'Strategic Functions')
   assert.equal(normalizeFunctionType('Core function'), 'Core Functions')
   assert.equal(normalizeFunctionType(null), 'Uncategorized')
+})
+
+test('subOutcomeDisplayFor falls back to the static label when nothing in the group is load_source-tagged', () => {
+  const pis = {
+    'Indicator A': [plan({ piDesc: 'Indicator A' })],
+  }
+
+  assert.equal(subOutcomeDisplayFor(pis, 'B.1 Static Label'), 'B.1 Static Label')
+})
+
+test('subOutcomeDisplayFor shows the personalized subject list from a load_source-tagged plan instead of the static label', () => {
+  const pis = {
+    'Indicator A': [plan({ piDesc: 'Indicator A', loadSource: 'teaching', individualTarget: '• Mathematics 1\n• Science 1' })],
+  }
+
+  assert.equal(subOutcomeDisplayFor(pis, 'B.1 Static Label'), '• Mathematics 1\n• Science 1')
+})
+
+test('subOutcomeDisplayFor shows the subject list once even when multiple tagged plans share the group', () => {
+  const pis = {
+    'Indicator A': [plan({ piDesc: 'Indicator A', loadSource: 'teaching', individualTarget: '• Mathematics 1\n• Science 1' })],
+    'Indicator B': [plan({ piDesc: 'Indicator B', loadSource: 'teaching', individualTarget: '• Mathematics 1\n• Science 1' })],
+  }
+
+  assert.equal(subOutcomeDisplayFor(pis, 'B.1 Static Label'), '• Mathematics 1\n• Science 1')
+})
+
+test('subOutcomeDisplayFor falls back to the static label when the load_source-tagged plan has no personalized target yet', () => {
+  const pis = {
+    'Indicator A': [plan({ piDesc: 'Indicator A', loadSource: 'teaching', individualTarget: null })],
+  }
+
+  assert.equal(subOutcomeDisplayFor(pis, 'B.1 Static Label'), 'B.1 Static Label')
 })

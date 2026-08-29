@@ -52,11 +52,11 @@ class FacultyIPCRBaselineService
 
         $assignments = $this->loadAssignmentsFor($user, $period);
 
-        // (a) Framework plans matching the teacher's load types
+        // (a) Framework plans matching the teacher's load types — evergreen
+        // "mother record" tags (e.g. the Designations module's Teaching Load
+        // tab), not fiscal-year-scoped.
         $loadTypes = $assignments->pluck('assignment_type')->filter()->unique()->values();
-        $frameworkPlans = WorkDistributionPlan::forFiscalYear($period?->year)
-            ->whereIn('load_source', $loadTypes)
-            ->get();
+        $frameworkPlans = WorkDistributionPlan::whereIn('load_source', $loadTypes)->get();
 
         // (b) Plans linked to the teacher's active committee assignments
         $committeeAssignments = FacultyCommitteeAssignment::where('user_id', $user->id)
@@ -85,16 +85,19 @@ class FacultyIPCRBaselineService
         // explicit link of its own falls back to the Core/Support default.
         $directPlanIds = $this->directPlanIdsFor($assignments, $committeeAssignments, $period?->year);
 
-        $attachIds = WorkDistributionPlan::whereIn(
-                'id',
-                $frameworkPlans->pluck('id')
-                    ->merge($committeePlanIds)
-                    ->merge($personnelPlanIds)
-                    ->merge($directPlanIds)
-                    ->unique()
-            )
+        // Committee- and personnel-linked plans stay fiscal-year-scoped
+        // (pre-existing, unchanged behavior). Framework (load_source) and
+        // direct (Designations-module Category/Designation) tags are
+        // evergreen "mother record" tags — they don't need to match the
+        // IPCR's fiscal year to apply.
+        $fiscalScopedIds = WorkDistributionPlan::whereIn('id', $committeePlanIds->merge($personnelPlanIds)->unique())
             ->forFiscalYear($period?->year)
-            ->pluck('id')
+            ->pluck('id');
+
+        $attachIds = $frameworkPlans->pluck('id')
+            ->merge($directPlanIds)
+            ->merge($fiscalScopedIds)
+            ->unique()
             ->all();
 
         $before = $ipcr->plans()->pluck('work_distribution_plans.id');
@@ -160,8 +163,7 @@ class FacultyIPCRBaselineService
     {
         $planIds = collect();
 
-        $coveredLoadTypes = WorkDistributionPlan::forFiscalYear($fiscalYear)
-            ->whereNotNull('load_source')
+        $coveredLoadTypes = WorkDistributionPlan::whereNotNull('load_source')
             ->pluck('load_source')
             ->unique();
 

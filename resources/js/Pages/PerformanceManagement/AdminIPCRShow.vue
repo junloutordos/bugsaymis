@@ -8,7 +8,7 @@ import AppModal from "@/Components/AppModal.vue"
 import { ArrowLeftIcon, PrinterIcon } from "@heroicons/vue/24/outline"
 import { ref, computed } from "vue"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
-import { groupPlansByOutcome, normalizeFunctionType } from "@/Utils/IPCR/outcomeGrouping.js"
+import { groupPlansByOutcome, normalizeFunctionType, subOutcomeDisplayFor } from "@/Utils/IPCR/outcomeGrouping.js"
 
 const props = defineProps({
   ipcr:       Object,
@@ -260,7 +260,7 @@ const printIPCR = () => window.print()
                     <tr class="hover:bg-gray-50">
                       <td v-if="Object.keys(pis)[0] === piDesc"
                           :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
-                          class="px-4 py-2 font-medium text-gray-700 border border-gray-300">{{ subOutcomeLabel }}</td>
+                          class="px-4 py-2 font-medium text-gray-700 border border-gray-300 whitespace-pre-line">{{ subOutcomeDisplayFor(pis, subOutcomeLabel) }}</td>
                       <td :rowspan="piPlans.length" class="px-4 py-2 border border-gray-300 font-medium">{{ piDesc }}</td>
                       <td class="px-4 py-2 border border-gray-300">{{ piPlans[0].success_indicator }}</td>
                       <td class="px-4 py-2 border border-gray-300">

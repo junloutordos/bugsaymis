@@ -15,7 +15,7 @@ import Swal from "sweetalert2";
 import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
-import { groupPlansByOutcome, normalizeFunctionType } from "@/Utils/IPCR/outcomeGrouping.js";
+import { groupPlansByOutcome, normalizeFunctionType, subOutcomeDisplayFor } from "@/Utils/IPCR/outcomeGrouping.js";
 
 const props = defineProps({
   ipcr:             Object,
@@ -890,8 +890,8 @@ const pullFLAccomplishments = () => {
                         <!-- SubOutcome merged -->
                         <td v-if="Object.keys(pis)[0] === piDesc"
                             :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
-                            class="px-4 py-3 text-sm text-slate-700 border border-slate-200 font-medium align-top">
-                          {{ subOutcomeLabel }}
+                            class="px-4 py-3 text-sm text-slate-700 border border-slate-200 font-medium align-top whitespace-pre-line">
+                          {{ subOutcomeDisplayFor(pis, subOutcomeLabel) }}
                         </td>
 
                         <!-- Performance Indicator merged -->
@@ -903,7 +903,7 @@ const pullFLAccomplishments = () => {
                         <!-- FIRST PLAN ROW -->
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
                           {{ piPlans[0].success_indicator }}
-                          <p v-if="piPlans[0].pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p>
+                          <p v-if="piPlans[0].pivot?.individual_target && !piPlans[0].load_source" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p>
                           <button v-if="canEditTargets" @click="editIndividualTarget(piPlans[0])" class="mt-1 text-xs text-indigo-600 hover:underline no-print block">
                             {{ piPlans[0].pivot?.individual_target ? 'Edit individual target' : '+ Individual target' }}
                           </button>
@@ -998,7 +998,7 @@ const pullFLAccomplishments = () => {
 
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
                           {{ plan.success_indicator }}
-                          <p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
+                          <p v-if="plan.pivot?.individual_target && !plan.load_source" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p>
                           <button v-if="canEditTargets" @click="editIndividualTarget(plan)" class="mt-1 text-xs text-indigo-600 hover:underline no-print block">
                             {{ plan.pivot?.individual_target ? 'Edit individual target' : '+ Individual target' }}
                           </button>

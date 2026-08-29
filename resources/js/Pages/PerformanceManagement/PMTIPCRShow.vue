@@ -9,7 +9,7 @@ import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
-import { groupPlansByOutcome, normalizeFunctionType } from "@/Utils/IPCR/outcomeGrouping.js"
+import { groupPlansByOutcome, normalizeFunctionType, subOutcomeDisplayFor } from "@/Utils/IPCR/outcomeGrouping.js"
 
 const props = defineProps({
   ipcr:       Object,
@@ -382,14 +382,14 @@ const printIPCR = () => window.print()
                       <!-- Sub-outcome merged cell -->
                       <td v-if="Object.keys(pis)[0] === piDesc"
                           :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
-                          class="px-4 py-2 font-medium text-gray-700 border">
-                        {{ subOutcomeLabel !== '—' ? subOutcomeLabel : '' }}
+                          class="px-4 py-2 font-medium text-gray-700 border whitespace-pre-line">
+                        {{ subOutcomeDisplayFor(pis, subOutcomeLabel) !== '—' ? subOutcomeDisplayFor(pis, subOutcomeLabel) : '' }}
                       </td>
 
                       <!-- PI description merged cell -->
                       <td :rowspan="piPlans.length" class="px-4 py-2 border font-medium">{{ piDesc }}</td>
 
-                      <td class="px-4 py-2 border">{{ piPlans[0].success_indicator }}<p v-if="piPlans[0].pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p></td>
+                      <td class="px-4 py-2 border">{{ piPlans[0].success_indicator }}<p v-if="piPlans[0].pivot?.individual_target && !piPlans[0].load_source" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ piPlans[0].pivot.individual_target }}</p></td>
                       <td class="px-4 py-2 border">{{ piPlans[0].pivot?.accomplishment || '—' }}</td>
                       <td class="px-4 py-2 border">
                         <a v-if="piPlans[0].pivot?.mov_link" :href="piPlans[0].pivot.mov_link" target="_blank"
@@ -405,7 +405,7 @@ const printIPCR = () => window.print()
 
                     <!-- Remaining rows -->
                     <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-gray-50">
-                      <td class="px-4 py-2 border">{{ plan.success_indicator }}<p v-if="plan.pivot?.individual_target" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p></td>
+                      <td class="px-4 py-2 border">{{ plan.success_indicator }}<p v-if="plan.pivot?.individual_target && !plan.load_source" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ plan.pivot.individual_target }}</p></td>
                       <td class="px-4 py-2 border">{{ plan.pivot?.accomplishment || '—' }}</td>
                       <td class="px-4 py-2 border">
                         <a v-if="plan.pivot?.mov_link" :href="plan.pivot.mov_link" target="_blank"
