@@ -296,19 +296,65 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         $this->assertTrue($ipcrB->plans()->where('work_distribution_plans.id', $plan->id)->exists());
     }
 
-    public function test_baseline_service_attaches_nothing_for_a_designation_whose_category_has_no_plans_tagged_yet(): void
+    public function test_baseline_service_falls_back_to_auto_classified_core_row_for_a_designation_whose_category_has_no_plans_tagged(): void
     {
         $fx          = $this->makeTerm();
         $faculty     = User::factory()->create();
         $designation = $this->makeDesignation(); // category has no WDPs tagged
 
-        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3); // carries units
 
         $ipcr = $this->makeIpcrFor($faculty);
         $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
 
-        $this->assertSame(0, $summary['attached']);
-        $this->assertSame(0, WorkDistributionPlan::count());
+        $this->assertSame(1, $summary['attached']);
+        $corePlan = WorkDistributionPlan::whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->first();
+        $this->assertNotNull($corePlan);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $corePlan->id)->exists());
+    }
+
+    public function test_baseline_service_falls_back_to_auto_classified_support_row_for_a_zero_unit_designation_with_no_category_tag(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation(); // category has no WDPs tagged
+
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 0); // no units
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertSame(1, $summary['attached']);
+        $supportPlan = WorkDistributionPlan::whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Support Functions')
+        )->first();
+        $this->assertNotNull($supportPlan);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $supportPlan->id)->exists());
+    }
+
+    public function test_baseline_service_does_not_also_auto_generate_a_fallback_row_when_the_category_is_already_tagged(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation();
+        $plan        = $this->makePlan();
+        $designation->category->workDistributionPlans()->sync([$plan->id]);
+
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3); // carries units
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertSame(1, $summary['attached']);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $plan->id)->exists());
+        $this->assertNull(WorkDistributionPlan::whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->first());
     }
 
     public function test_baseline_service_gives_each_subject_taught_its_own_ipcr_row_never_merging(): void

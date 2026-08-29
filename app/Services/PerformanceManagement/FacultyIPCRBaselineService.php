@@ -131,12 +131,16 @@ class FacultyIPCRBaselineService
      * DesignationService::assign()) inherit whatever WDPs are tagged on that
      * Designation's Category "mother record" — set once by CID/HR, applies
      * to every designation under that category and every current and future
-     * holder of any of them automatically. A category with no WDPs tagged
-     * yet gets no plan (nothing to auto-generate at this level).
+     * holder of any of them automatically.
      *
-     * LoadAssignment rows with NO designation (raw per-subject teaching
-     * loads) keep the previous per-assignment auto-classified Core/Support
-     * default — each subject taught gets its own dedicated row, never merged.
+     * Any LoadAssignment that isn't covered by a category tag — either it
+     * has no designation (a raw per-subject teaching load) or its
+     * designation's category has nothing tagged yet — falls back to the
+     * same per-assignment auto-classified Core/Support default: a unit load
+     * (> 0) becomes its own dedicated Core Functions row, no unit load
+     * becomes Support Functions, one row per distinct assignment, never
+     * merged. This guarantees every load assignment shows up somewhere on
+     * the IPCR even before CID/HR tags its category.
      *
      * FacultyCommitteeAssignment rows use their own explicit WDP link (set
      * per assignment, since committee membership is individual); with no
@@ -153,10 +157,10 @@ class FacultyIPCRBaselineService
                     ?->workDistributionPlans()
                     ->pluck('work_distribution_plans.id');
 
-                if ($categoryPlanIds) {
+                if ($categoryPlanIds && $categoryPlanIds->isNotEmpty()) {
                     $planIds = $planIds->merge($categoryPlanIds);
+                    continue;
                 }
-                continue;
             }
 
             $planIds->push($this->classifier->defaultPlanForLoadAssignment($assignment, $fiscalYear)->id);
