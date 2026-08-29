@@ -43,7 +43,7 @@ class DesignationController extends Controller
                 ->groupBy('designation_id')
             : collect();
 
-        $categories = DesignationCategory::with(['designations', 'workDistributionPlans:id'])
+        $categories = DesignationCategory::with(['designations.workDistributionPlans:id', 'workDistributionPlans:id'])
             ->orderBy('sort_order')
             ->get()
             ->map(fn ($cat) => [
@@ -66,6 +66,7 @@ class DesignationController extends Controller
                     'sort_order'      => $d->sort_order,
                     'is_active'       => $d->is_active,
                     'section_id'      => $d->section_id,
+                    'plan_ids'        => $d->workDistributionPlans->pluck('id')->toArray(),
                     // Current holders — from any module (AUH, adviser, supervisory, etc.)
                     'holders'       => ($holdersByDesig->get($d->id) ?? collect())
                         ->map(fn ($a) => [
@@ -90,12 +91,13 @@ class DesignationController extends Controller
             ->get(['id', 'name', 'position']);
 
         return Inertia::render('FacultyLoading/Designations/Index', [
-            'categories'  => $categories,
-            'terms'       => $terms,
-            'faculty'     => $faculty,
-            'plans'       => WorkDistributionPlan::orderBy('success_indicator')->get(['id', 'success_indicator', 'rated_by']),
-            'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
-            'filters'     => $request->only('term_id'),
+            'categories'          => $categories,
+            'terms'               => $terms,
+            'faculty'             => $faculty,
+            'plans'               => WorkDistributionPlan::orderBy('success_indicator')->get(['id', 'success_indicator', 'rated_by']),
+            'teachingLoadPlanIds' => WorkDistributionPlan::where('load_source', 'teaching')->pluck('id'),
+            'currentTerm'         => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
+            'filters'             => $request->only('term_id'),
         ]);
     }
 
@@ -240,6 +242,47 @@ class DesignationController extends Controller
         $category->workDistributionPlans()->sync($data['plan_ids'] ?? []);
 
         return back()->with('success', 'Work Distribution Plans updated for this category.');
+    }
+
+    // ── Link / replace one Designation's OWN Work Distribution Plans ─────────
+    // Additional to whatever its category already tags — every current and
+    // future holder of this specific designation inherits the union of both.
+
+    public function syncPlans(Request $request, Designation $designation): RedirectResponse
+    {
+        $this->authorize('faculty_loading.setup');
+
+        $data = $request->validate([
+            'plan_ids'   => 'nullable|array',
+            'plan_ids.*' => 'exists:work_distribution_plans,id',
+        ]);
+
+        $designation->workDistributionPlans()->sync($data['plan_ids'] ?? []);
+
+        return back()->with('success', 'Work Distribution Plans updated for this designation.');
+    }
+
+    // ── Tag Work Distribution Plans for ALL teaching loads ────────────────────
+    // Sets/clears WorkDistributionPlan.load_source = 'teaching' on the
+    // selected plans — every faculty member with any teaching load
+    // automatically inherits them on their IPCR (FacultyIPCRBaselineService
+    // "framework plans"), replacing the per-subject auto-generated fallback.
+
+    public function syncTeachingLoadPlans(Request $request): RedirectResponse
+    {
+        $this->authorize('faculty_loading.setup');
+
+        $data = $request->validate([
+            'plan_ids'   => 'nullable|array',
+            'plan_ids.*' => 'exists:work_distribution_plans,id',
+        ]);
+
+        $planIds = $data['plan_ids'] ?? [];
+
+        WorkDistributionPlan::whereIn('id', $planIds)->update(['load_source' => 'teaching']);
+        WorkDistributionPlan::where('load_source', 'teaching')->whereNotIn('id', $planIds)->update(['load_source' => null]);
+
+        return back()->with('success', 'Work Distribution Plans updated for Teaching Load.');
     }
 
     // ── Assign / Revoke direct from Designations catalog page ────────────────

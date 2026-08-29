@@ -58,6 +58,17 @@ class WorkDistributionPlan extends Model
         )->withTimestamps();
     }
 
+    // Individual designations directly tagged with this plan, IN ADDITION
+    // to whatever their category tags — every current/future holder of the
+    // designation inherits it on their IPCR automatically.
+    public function designations()
+    {
+        return $this->belongsToMany(
+            \App\Models\FacultyLoading\Designation::class,
+            'designation_work_distribution_plan'
+        )->withTimestamps();
+    }
+
     // Faculty committee assignments directly linked to this plan
     public function facultyCommitteeAssignments()
     {

@@ -36,6 +36,35 @@
       <!-- Tabbed layout -->
       <AppCard v-else :padded="false">
         <AppTabs :tabs="tabs" v-model="activeTabId">
+          <!-- ── Teaching Load panel ─────────────────────────────────────────── -->
+          <div v-show="activeTabId === 'teaching-load'" class="p-5 space-y-3 max-w-xl">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Work Distribution Plans (IPCR)</label>
+              <p class="text-xs text-slate-400 mb-1">
+                Tag the plan(s) every teaching load contributes to. Every faculty member with any teaching load
+                inherits these automatically on their IPCR — one shared row personalized with every subject they
+                teach, instead of a separate auto-generated row per subject. Teaching loads aren't managed through
+                Designations (they're added directly on the faculty's Load Assignments), so this tab tags them all
+                at once.
+              </p>
+              <AppInput v-model="teachingPlanSearch" type="text" placeholder="Search plans..." />
+              <div class="mt-2 border border-slate-200 rounded-lg p-2 max-h-48 overflow-y-auto space-y-1 text-sm">
+                <label v-for="p in teachingFilteredPlans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+                  <input type="checkbox" :checked="teachingPlanIds.includes(p.id)" @change="toggleTeachingPlan(p.id)"
+                    class="mt-0.5 rounded border-slate-300 text-indigo-600" />
+                  <span class="text-slate-700 leading-snug">{{ p.success_indicator || `Plan #${p.id}` }}
+                    <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+                  </span>
+                </label>
+                <p v-if="!teachingFilteredPlans.length" class="text-slate-400 text-xs px-1">
+                  {{ teachingPlanSearch ? 'No plans match your search.' : 'No plans available.' }}
+                </p>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">{{ teachingPlanIds.length }} plan(s) selected</p>
+            </div>
+            <AppButton :loading="teachingPlansForm.processing" @click="saveTeachingLoadPlans">Save</AppButton>
+          </div>
+
           <template v-for="cat in categories" :key="cat.id">
             <div v-show="activeTabId === String(cat.id)">
 
@@ -273,6 +302,29 @@
             </div>
           </div>
         </div>
+
+        <!-- Work Distribution Plans (edit only — needs a persisted designation id) -->
+        <div v-if="desigForm.id" class="border-t border-slate-100 pt-3">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Work Distribution Plans (IPCR) — this designation only</label>
+          <p class="text-xs text-slate-400 mb-1">
+            Additional to whatever the category above already tags. Use this when this specific designation needs
+            its own plan(s) on top of the category's shared default.
+          </p>
+          <AppInput v-model="desigPlanSearch" type="text" placeholder="Search plans..." />
+          <div class="mt-2 border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+            <label v-for="p in desigFilteredPlans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+              <input type="checkbox" :checked="desigPlanIds.includes(p.id)" @change="toggleDesigPlan(p.id)"
+                class="mt-0.5 rounded border-slate-300 text-indigo-600" />
+              <span class="text-slate-700 leading-snug">{{ p.success_indicator || `Plan #${p.id}` }}
+                <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+              </span>
+            </label>
+            <p v-if="!desigFilteredPlans.length" class="text-slate-400 text-xs px-1">
+              {{ desigPlanSearch ? 'No plans match your search.' : 'No plans available.' }}
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">{{ desigPlanIds.length }} plan(s) selected</p>
+        </div>
       </div>
       <template #footer>
         <AppButton variant="secondary" @click="desigModal = false">Cancel</AppButton>
@@ -374,19 +426,23 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  categories:  { type: Array,  default: () => [] },
-  terms:       { type: Array,  default: () => [] },
-  faculty:     { type: Array,  default: () => [] },
-  plans:       { type: Array,  default: () => [] },
-  currentTerm: { type: Object, default: null },
-  filters:     { type: Object, default: () => ({}) },
+  categories:          { type: Array,  default: () => [] },
+  terms:               { type: Array,  default: () => [] },
+  faculty:             { type: Array,  default: () => [] },
+  plans:               { type: Array,  default: () => [] },
+  teachingLoadPlanIds: { type: Array,  default: () => [] },
+  currentTerm:         { type: Object, default: null },
+  filters:             { type: Object, default: () => ({}) },
 })
 
 // ── Active tab ────────────────────────────────────────────────────────────────
 
 const activeTabId = ref(props.categories[0]?.id != null ? String(props.categories[0].id) : null)
 const activeCategory = computed(() => props.categories.find(c => String(c.id) === activeTabId.value) ?? null)
-const tabs = computed(() => props.categories.map(c => ({ key: String(c.id), label: `${c.name} (${c.designations.length})` })))
+const tabs = computed(() => [
+  ...props.categories.map(c => ({ key: String(c.id), label: `${c.name} (${c.designations.length})` })),
+  { key: 'teaching-load', label: 'Teaching Load' },
+])
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -481,24 +537,69 @@ async function deleteCat(cat) {
   useForm({}).delete(route('faculty-loading.designations.categories.destroy', cat.id))
 }
 
+// ── Teaching Load WDP tagging (applies to every teaching load, no designation) ─
+
+const teachingPlanIds = ref([...props.teachingLoadPlanIds])
+const teachingPlanSearch = ref('')
+const teachingFilteredPlans = computed(() => {
+  if (!teachingPlanSearch.value) return props.plans
+  const q = teachingPlanSearch.value.toLowerCase()
+  return props.plans.filter(p => (p.success_indicator ?? '').toLowerCase().includes(q))
+})
+function toggleTeachingPlan(id) {
+  const idx = teachingPlanIds.value.indexOf(id)
+  if (idx === -1) teachingPlanIds.value.push(id)
+  else teachingPlanIds.value.splice(idx, 1)
+}
+
+const teachingPlansForm = useForm({ plan_ids: [] })
+function saveTeachingLoadPlans() {
+  teachingPlansForm.plan_ids = teachingPlanIds.value
+  teachingPlansForm.put(route('faculty-loading.designations.teaching-load.plans.sync'), { preserveScroll: true })
+}
+
 // ── Designation CRUD ──────────────────────────────────────────────────────────
 
 const desigModal = ref(false)
 const desigForm  = useForm({ id: null, designation_category_id: null, code: '', name: '', description: '', load_units: 0, assignment_type: 'admin', requires_unit: false, max_holders: null, sort_order: 0, is_active: true })
 
+// Work Distribution Plans tagged directly on the designation — additional
+// to whatever its category tags. Editable only once the designation exists.
+const desigPlanIds = ref([])
+const desigPlanSearch = ref('')
+const desigFilteredPlans = computed(() => {
+  if (!desigPlanSearch.value) return props.plans
+  const q = desigPlanSearch.value.toLowerCase()
+  return props.plans.filter(p => (p.success_indicator ?? '').toLowerCase().includes(q))
+})
+function toggleDesigPlan(id) {
+  const idx = desigPlanIds.value.indexOf(id)
+  if (idx === -1) desigPlanIds.value.push(id)
+  else desigPlanIds.value.splice(idx, 1)
+}
+
 function openDesigForm(d = null, cat = null) {
+  desigPlanSearch.value = ''
   if (d) {
     Object.assign(desigForm, { id: d.id, designation_category_id: d.designation_category_id ?? cat?.id, code: d.code, name: d.name, description: d.description ?? '', load_units: d.load_units, assignment_type: d.assignment_type ?? 'admin', requires_unit: d.requires_unit, max_holders: d.max_holders, sort_order: d.sort_order, is_active: d.is_active })
+    desigPlanIds.value = d.plan_ids ? [...d.plan_ids] : []
   } else {
     desigForm.reset(); desigForm.id = null; desigForm.is_active = true; desigForm.load_units = 0; desigForm.assignment_type = 'admin'
     desigForm.designation_category_id = cat?.id ?? null
+    desigPlanIds.value = []
   }
   desigModal.value = true
 }
 
+function saveDesigPlans(designationId) {
+  useForm({ plan_ids: desigPlanIds.value }).put(route('faculty-loading.designations.plans.sync', designationId))
+}
+
 function saveDesig() {
   if (desigForm.id) {
-    desigForm.put(route('faculty-loading.designations.update', desigForm.id), { onSuccess: () => { desigModal.value = false } })
+    desigForm.put(route('faculty-loading.designations.update', desigForm.id), {
+      onSuccess: () => { saveDesigPlans(desigForm.id); desigModal.value = false },
+    })
   } else {
     desigForm.post(route('faculty-loading.designations.store'), { onSuccess: () => { desigModal.value = false } })
   }

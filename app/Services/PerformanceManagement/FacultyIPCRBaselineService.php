@@ -23,14 +23,17 @@ use Illuminate\Support\Facades\DB;
  * sections, units).
  *
  * A LoadAssignment backed by a Designation (e.g. ACIDAA, Prefect of
- * Discipline) inherits whatever WDPs are tagged on that Designation's own
- * Category "mother record" — set once by CID/HR, applies to every
- * designation under that category and every current and future holder of
- * any of them automatically, never per individual designation or
- * assignment. A LoadAssignment with no designation (a raw per-subject
- * teaching load) each gets its own dedicated, auto-classified Core/Support
- * Functions WDP — nothing is merged, so a faculty member teaching two
- * subjects gets two separate rows on their IPCR.
+ * Discipline) inherits the union of whatever WDPs are tagged on that
+ * Designation's own Category "mother record" AND whatever is tagged on the
+ * Designation itself — the category tag is a shared default for every
+ * designation under it, a designation's own tag is additional on top of
+ * that. A LoadAssignment with no designation (a raw per-subject teaching
+ * load) is instead covered by any framework plan explicitly tagged with a
+ * matching `load_source` (e.g. `teaching`) — one shared row, personalized
+ * to list every such assignment as its own bullet in its target. Whatever
+ * isn't covered by either mechanism falls back to its own dedicated,
+ * auto-classified Core/Support Functions WDP — nothing is merged there, so
+ * an untagged faculty member teaching two subjects gets two separate rows.
  */
 class FacultyIPCRBaselineService
 {
@@ -128,19 +131,26 @@ class FacultyIPCRBaselineService
      * and committee assignments.
      *
      * LoadAssignment rows backed by a Designation (admin/committee/etc. via
-     * DesignationService::assign()) inherit whatever WDPs are tagged on that
-     * Designation's Category "mother record" — set once by CID/HR, applies
-     * to every designation under that category and every current and future
-     * holder of any of them automatically.
+     * DesignationService::assign()) inherit the UNION of whatever WDPs are
+     * tagged on that Designation's Category "mother record" AND whatever is
+     * tagged on the Designation itself — the category tag is a shared
+     * default for every designation under it, while a designation's own tag
+     * is additional, for when that specific designation needs its own plan
+     * on top (e.g. a Math Coordinator needing a Math-specific plan beyond
+     * the shared Coordinatorship plan).
      *
-     * Any LoadAssignment that isn't covered by a category tag — either it
-     * has no designation (a raw per-subject teaching load) or its
-     * designation's category has nothing tagged yet — falls back to the
-     * same per-assignment auto-classified Core/Support default: a unit load
-     * (> 0) becomes its own dedicated Core Functions row, no unit load
-     * becomes Support Functions, one row per distinct assignment, never
-     * merged. This guarantees every load assignment shows up somewhere on
-     * the IPCR even before CID/HR tags its category.
+     * A LoadAssignment with no designation (a raw per-subject teaching load)
+     * is instead covered by a "framework" plan — one explicitly tagged with
+     * `load_source` matching its assignment_type (e.g. `teaching`), attached
+     * globally in generate() part (a) and personalized in buildTarget() to
+     * list every such assignment as its own bullet in that one row's target.
+     *
+     * Any assignment covered by NEITHER mechanism falls back to the
+     * per-assignment auto-classified Core/Support default: a unit load (> 0)
+     * becomes its own dedicated Core Functions row, no unit load becomes
+     * Support Functions, one row per distinct assignment, never merged. This
+     * guarantees every load assignment shows up somewhere on the IPCR even
+     * before CID/HR tags its category, designation, or load type.
      *
      * FacultyCommitteeAssignment rows use their own explicit WDP link (set
      * per assignment, since committee membership is individual); with no
@@ -150,17 +160,22 @@ class FacultyIPCRBaselineService
     {
         $planIds = collect();
 
+        $coveredLoadTypes = WorkDistributionPlan::forFiscalYear($fiscalYear)
+            ->whereNotNull('load_source')
+            ->pluck('load_source')
+            ->unique();
+
         foreach ($assignments as $assignment) {
             if ($assignment->designation_id) {
-                $categoryPlanIds = $assignment->designation
-                    ?->category
-                    ?->workDistributionPlans()
-                    ->pluck('work_distribution_plans.id');
+                $explicitPlanIds = ($assignment->designation?->category?->workDistributionPlans()->pluck('work_distribution_plans.id') ?? collect())
+                    ->merge($assignment->designation?->workDistributionPlans()->pluck('work_distribution_plans.id') ?? collect());
 
-                if ($categoryPlanIds && $categoryPlanIds->isNotEmpty()) {
-                    $planIds = $planIds->merge($categoryPlanIds);
+                if ($explicitPlanIds->isNotEmpty()) {
+                    $planIds = $planIds->merge($explicitPlanIds);
                     continue;
                 }
+            } elseif ($coveredLoadTypes->contains($assignment->assignment_type)) {
+                continue; // covered by a load_source-tagged framework plan, attached in generate() part (a)
             }
 
             $planIds->push($this->classifier->defaultPlanForLoadAssignment($assignment, $fiscalYear)->id);

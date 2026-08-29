@@ -4,7 +4,9 @@ namespace App\Models\FacultyLoading;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\WorkDistributionPlan;
 
 class Designation extends Model
 {
@@ -49,6 +51,21 @@ class Designation extends Model
     public function loadAssignments(): HasMany
     {
         return $this->hasMany(LoadAssignment::class);
+    }
+
+    /**
+     * Work Distribution Plans tagged directly on this designation, IN
+     * ADDITION to whatever its DesignationCategory has tagged — the union
+     * of both applies to every current and future faculty member holding
+     * this specific designation. Use this when one designation within a
+     * category needs its own plan(s) beyond the category's shared default
+     * (e.g. a Math Coordinator needing a Math-specific plan on top of the
+     * shared Coordinatorship plan).
+     */
+    public function workDistributionPlans(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkDistributionPlan::class, 'designation_work_distribution_plan')
+            ->withTimestamps();
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────

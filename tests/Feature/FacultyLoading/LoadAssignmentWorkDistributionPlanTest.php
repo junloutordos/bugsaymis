@@ -357,6 +357,107 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
         )->first());
     }
 
+    // ── Designation-level tagging (union with category) ─────────────────────
+
+    public function test_designation_own_plans_attach_in_union_with_its_category_plans(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation();
+        $categoryPlan    = $this->makePlan();
+        $designationPlan = $this->makePlan();
+        $designation->category->workDistributionPlans()->sync([$categoryPlan->id]);
+        $designation->workDistributionPlans()->sync([$designationPlan->id]);
+
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertSame(2, $summary['attached']);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $categoryPlan->id)->exists());
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $designationPlan->id)->exists());
+    }
+
+    public function test_baseline_service_falls_back_only_when_both_category_and_designation_are_untagged(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation(); // category untagged
+        $designationPlan = $this->makePlan();
+        $designation->workDistributionPlans()->sync([$designationPlan->id]); // only the designation itself is tagged
+
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        $summary = app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertSame(1, $summary['attached']);
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $designationPlan->id)->exists());
+        $this->assertNull(WorkDistributionPlan::whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->first());
+    }
+
+    // ── Teaching Load framework-plan tagging (replaces per-subject fallback) ─
+
+    public function test_baseline_service_uses_a_tagged_teaching_load_plan_instead_of_per_subject_fallback_rows(): void
+    {
+        $fx      = $this->makeTerm();
+        $faculty = User::factory()->create();
+
+        $outcome   = AgencyOutcome::create(['outcome' => 'Teaching Outcome', 'function_type' => 'Core Functions']);
+        $indicator = PerformanceIndicator::create(['agency_outcome_id' => $outcome->id, 'description' => 'Teaching Indicator']);
+        $teachingPlan = WorkDistributionPlan::create([
+            'performance_indicator_id' => $indicator->id,
+            'success_indicator' => 'Delivers instruction per DepEd curriculum',
+            'load_source' => 'teaching',
+        ]);
+
+        $facultyLoad = FacultyLoad::create([
+            'user_id' => $faculty->id, 'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'teaching_units' => 6, 'total_units' => 6, 'full_load_threshold' => 18, 'load_status' => 'underload',
+        ]);
+        $math = Subject::create([
+            'school_year_id' => $fx['sy']->id, 'code' => 'MATH1', 'name' => 'Mathematics 1', 'credit_units' => 3,
+            'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture', 'grade_level' => 9,
+            'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        $science = Subject::create([
+            'school_year_id' => $fx['sy']->id, 'code' => 'SCI1', 'name' => 'Science 1', 'credit_units' => 3,
+            'lecture_hours' => 3, 'load_units' => 3, 'subject_type' => 'lecture', 'grade_level' => 9,
+            'sessions_per_week' => 5, 'minutes_per_session' => 60, 'is_active' => true,
+        ]);
+        LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
+            'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'assignment_type' => 'teaching', 'subject_id' => $math->id, 'load_units' => 3,
+        ]);
+        LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $faculty->id,
+            'school_year_id' => $fx['sy']->id, 'academic_term_id' => $fx['term']->id,
+            'assignment_type' => 'teaching', 'subject_id' => $science->id, 'load_units' => 3,
+        ]);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        // Only the tagged Teaching Load plan attaches — no auto-generated
+        // per-subject fallback rows alongside it.
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $teachingPlan->id)->exists());
+        $this->assertNull(WorkDistributionPlan::where('id', '!=', $teachingPlan->id)->whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->first());
+
+        $target = \Illuminate\Support\Facades\DB::table('employee_ipcrs_plan')
+            ->where('ipcr_id', $ipcr->id)->where('plan_id', $teachingPlan->id)
+            ->value('individual_target');
+        $this->assertStringContainsString('Mathematics 1', $target);
+        $this->assertStringContainsString('Science 1', $target);
+    }
+
     public function test_baseline_service_gives_each_subject_taught_its_own_ipcr_row_never_merging(): void
     {
         $fx      = $this->makeTerm();
