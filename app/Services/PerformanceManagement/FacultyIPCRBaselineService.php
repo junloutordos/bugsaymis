@@ -2,6 +2,7 @@
 
 namespace App\Services\PerformanceManagement;
 
+use App\Models\Accomplishment;
 use App\Models\EmployeeIPCR;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
@@ -102,6 +103,7 @@ class FacultyIPCRBaselineService
 
         $before = $ipcr->plans()->pluck('work_distribution_plans.id');
         $ipcr->plans()->syncWithoutDetaching($attachIds);
+        $this->detachSupersededFallbackPlans($ipcr, $assignments, $committeeAssignments, $attachIds);
 
         // Personalize framework rows that don't have a target yet
         $existingTargets = DB::table('employee_ipcrs_plan')
@@ -127,6 +129,49 @@ class FacultyIPCRBaselineService
             'attached'     => count(array_diff($attachIds, $before->all())),
             'personalized' => $personalized,
         ];
+    }
+
+    /**
+     * Detach auto-generated fallback plans that no longer belong.
+     *
+     * `syncWithoutDetaching()` only ever attaches — a plan that was
+     * auto-generated for a LoadAssignment/FacultyCommitteeAssignment (marked
+     * via its AgencyOutcome.sub_outcome, e.g. "LoadAssignment#117") can end
+     * up permanently stuck on the IPCR once a real tag supersedes it, since
+     * nothing else ever removes it. This walks the IPCR's currently attached
+     * plans and detaches any auto-generated one whose source assignment is
+     * still one of this teacher's CURRENT assignments but is no longer part
+     * of this run's resolved $attachIds (i.e. a category/designation/
+     * teaching-load tag now covers it instead).
+     *
+     * Never detaches a plan with real Accomplishment records logged against
+     * it — that's rated work, left for manual review rather than silently
+     * removed.
+     */
+    private function detachSupersededFallbackPlans(EmployeeIPCR $ipcr, Collection $assignments, Collection $committeeAssignments, array $attachIds): void
+    {
+        $currentSourceMarkers = $assignments->pluck('id')->map(fn ($id) => LoadAssignment::class . '#' . $id)
+            ->merge($committeeAssignments->pluck('id')->map(fn ($id) => FacultyCommitteeAssignment::class . '#' . $id));
+
+        if ($currentSourceMarkers->isEmpty()) {
+            return;
+        }
+
+        $staleIds = $ipcr->plans()
+            ->whereNotIn('work_distribution_plans.id', $attachIds)
+            ->whereHas('performanceIndicator.agencyOutcome', fn ($q) => $q->whereIn('sub_outcome', $currentSourceMarkers))
+            ->get()
+            ->filter(function ($plan) use ($ipcr) {
+                $pivotId = DB::table('employee_ipcrs_plan')
+                    ->where('ipcr_id', $ipcr->id)->where('plan_id', $plan->id)->value('id');
+
+                return ! $pivotId || ! Accomplishment::where('ipcr_plan_id', $pivotId)->exists();
+            })
+            ->pluck('id');
+
+        if ($staleIds->isNotEmpty()) {
+            $ipcr->plans()->detach($staleIds);
+        }
     }
 
     /**

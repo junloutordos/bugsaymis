@@ -79,6 +79,13 @@ class WorkDistributionPlanClassifier
      * (function type, source model, source id) so it never collides with
      * another assignment's auto-generated plan or with any manually-tagged
      * outcome/plan elsewhere in the system.
+     *
+     * Evergreen — always stored with a NULL fiscal_year, regardless of which
+     * period `generate()` happened to run under. An assignment's auto-
+     * generated plan must be the exact same row every time it's resolved;
+     * keying it to the caller's fiscal year would create a new duplicate
+     * plan every time the operative year changed, permanently orphaning the
+     * old one on any IPCR it was already attached to.
      */
     private function defaultPlanFor(string $functionType, ?int $fiscalYear, string $sourceType, int $sourceId, string $label): WorkDistributionPlan
     {
@@ -89,14 +96,14 @@ class WorkDistributionPlanClassifier
                 'outcome'       => $functionType,
                 'sub_outcome'   => $subOutcome,
                 'function_type' => $functionType,
-                'fiscal_year'   => $fiscalYear,
+                'fiscal_year'   => null,
             ]
         );
 
         $indicator = PerformanceIndicator::firstOrCreate(
             [
                 'agency_outcome_id' => $outcome->id,
-                'fiscal_year'       => $fiscalYear,
+                'fiscal_year'       => null,
             ],
             [
                 'description' => "Faculty Loading — {$label} (auto-generated)",
@@ -106,7 +113,7 @@ class WorkDistributionPlanClassifier
         return WorkDistributionPlan::firstOrCreate(
             [
                 'performance_indicator_id' => $indicator->id,
-                'fiscal_year'              => $fiscalYear,
+                'fiscal_year'              => null,
             ],
             [
                 'success_indicator' => $label,

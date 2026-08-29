@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\FacultyLoading;
 
+use App\Models\Accomplishment;
 use App\Models\AgencyOutcome;
 use App\Models\EmployeeIPCR;
 use App\Models\FacultyLoading\AcademicTerm;
@@ -19,6 +20,7 @@ use App\Models\WorkDistributionPlan;
 use App\Services\PerformanceManagement\FacultyIPCRBaselineService;
 use App\Services\PerformanceManagement\WorkDistributionPlanClassifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -174,6 +176,19 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
 
         $mathPlanAgain = $classifier->defaultPlanForLoadAssignment($math, 2026);
         $this->assertSame($mathPlan->id, $mathPlanAgain->id);
+    }
+
+    public function test_classifier_resolves_the_same_plan_regardless_of_which_fiscal_year_is_passed(): void
+    {
+        $fx      = $this->makeTerm();
+        $faculty = User::factory()->create();
+        $math    = $this->makeTeachingAssignment($fx, $faculty, 3);
+
+        $classifier = new WorkDistributionPlanClassifier();
+        $planForYearA = $classifier->defaultPlanForLoadAssignment($math, 2027);
+        $planForYearB = $classifier->defaultPlanForLoadAssignment($math, 2026);
+
+        $this->assertSame($planForYearA->id, $planForYearB->id);
     }
 
     public function test_classifier_never_mutates_an_existing_explicitly_tagged_outcome(): void
@@ -610,5 +625,88 @@ class LoadAssignmentWorkDistributionPlanTest extends TestCase
             fn ($q) => $q->where('function_type', 'Core Functions')
         )->first();
         $this->assertNull($corePlan);
+    }
+
+    // ── Regeneration reconciles superseded auto-generated plans ─────────────
+
+    public function test_baseline_service_detaches_the_stale_fallback_plan_once_a_category_tag_supersedes_it(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation();
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $fallbackPlan = WorkDistributionPlan::whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->first();
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $fallbackPlan->id)->exists());
+
+        // CID/HR tags the category AFTER the fallback already generated.
+        $taggedPlan = $this->makePlan();
+        $designation->category->workDistributionPlans()->sync([$taggedPlan->id]);
+
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $taggedPlan->id)->exists());
+        $this->assertFalse($ipcr->plans()->where('work_distribution_plans.id', $fallbackPlan->id)->exists());
+    }
+
+    public function test_baseline_service_never_detaches_a_stale_fallback_plan_with_logged_accomplishments(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation();
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
+
+        $ipcr = $this->makeIpcrFor($faculty);
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $fallbackPlan = WorkDistributionPlan::whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->first();
+
+        $pivotId = DB::table('employee_ipcrs_plan')
+            ->where('ipcr_id', $ipcr->id)->where('plan_id', $fallbackPlan->id)->value('id');
+        Accomplishment::create([
+            'user_id' => $faculty->id, 'ipcr_plan_id' => $pivotId,
+            'accomplishment_date' => now()->toDateString(), 'description' => 'Real logged work.',
+        ]);
+
+        $taggedPlan = $this->makePlan();
+        $designation->category->workDistributionPlans()->sync([$taggedPlan->id]);
+
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        // Tagged plan is added, but the fallback stays — it has real rated
+        // work logged against it, so it's left for manual review instead of
+        // being silently detached.
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $taggedPlan->id)->exists());
+        $this->assertTrue($ipcr->plans()->where('work_distribution_plans.id', $fallbackPlan->id)->exists());
+    }
+
+    public function test_baseline_service_does_not_duplicate_the_fallback_plan_when_regenerated_under_a_different_fiscal_year(): void
+    {
+        $fx          = $this->makeTerm();
+        $faculty     = User::factory()->create();
+        $designation = $this->makeDesignation();
+        $this->makeDesignationAssignment($fx, $faculty, $designation, 3);
+
+        $ipcrYearA = $this->makeIpcrFor($faculty, IPCRRatingPeriod::create(['label' => 'FY 2027', 'year' => 2027]));
+        app(FacultyIPCRBaselineService::class)->generate($ipcrYearA);
+
+        $ipcr = $this->makeIpcrFor($faculty, IPCRRatingPeriod::create(['label' => 'FY 2026', 'year' => 2026]));
+        app(FacultyIPCRBaselineService::class)->generate($ipcr);
+
+        $corePlans = WorkDistributionPlan::whereHas(
+            'performanceIndicator.agencyOutcome',
+            fn ($q) => $q->where('function_type', 'Core Functions')
+        )->get();
+
+        $this->assertCount(1, $corePlans, 'Regenerating under a different fiscal year must reuse the same fallback plan, not create a duplicate.');
     }
 }
