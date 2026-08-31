@@ -38,4 +38,22 @@ class PerformanceIndicatorControllerOutcomeTreeTest extends TestCase
             ->where('indicators.0.agency_outcome.parent.outcome', 'A. STEM')
         );
     }
+
+    public function test_outcomes_tree_excludes_auto_generated_wdp_marker_rows(): void
+    {
+        $admin = $this->admin();
+        $real = AgencyOutcome::create(['outcome' => 'Core Functions', 'function_type' => 'Core Functions']);
+        AgencyOutcome::create([
+            'outcome' => 'Core Functions',
+            'sub_outcome' => 'App\\Models\\FacultyLoading\\LoadAssignment#99',
+            'function_type' => 'Core Functions',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('performanceindicator.index', ['fiscal_year' => 'all']));
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('outcomes', 1)
+            ->where('outcomes.0.id', $real->id)
+        );
+    }
 }

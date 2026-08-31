@@ -80,4 +80,36 @@ class DostStrategicPlanControllerTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_agency_outcomes_picker_excludes_sub_outcome_children(): void
+    {
+        $admin = $this->admin();
+        $parent = AgencyOutcome::create(['outcome' => 'A. STEM', 'function_type' => 'Strategic Functions']);
+        AgencyOutcome::create(['outcome' => 'A. STEM', 'sub_outcome' => 'A.1', 'function_type' => 'Strategic Functions', 'parent_id' => $parent->id]);
+
+        $response = $this->actingAs($admin)->get(route('dost-strategic-plan.index'));
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('agencyOutcomes', 1)
+            ->where('agencyOutcomes.0.id', $parent->id)
+        );
+    }
+
+    public function test_agency_outcomes_picker_excludes_auto_generated_wdp_marker_rows(): void
+    {
+        $admin = $this->admin();
+        $real = AgencyOutcome::create(['outcome' => 'Core Functions', 'function_type' => 'Core Functions']);
+        AgencyOutcome::create([
+            'outcome' => 'Core Functions',
+            'sub_outcome' => 'App\\Models\\FacultyLoading\\LoadAssignment#99',
+            'function_type' => 'Core Functions',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('dost-strategic-plan.index'));
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('agencyOutcomes', 1)
+            ->where('agencyOutcomes.0.id', $real->id)
+        );
+    }
 }
