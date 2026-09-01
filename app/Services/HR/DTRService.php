@@ -578,6 +578,43 @@ class DTRService
     }
 
     /**
+     * Hours worked from biometric/online punches alone, ignoring any
+     * self-declared ("penned") fallback — used by HazardReportService to
+     * classify a day with unreviewed penned data without waiting on HR
+     * review when the verified punches alone already clear the threshold.
+     */
+    public function computeVerifiedHoursWorked(DtrRecord $record): float
+    {
+        $date     = $record->work_date->toDateString();
+        $schedule = $record->schedule;
+
+        if (! $schedule) {
+            $schedule = EmployeeSchedule::where('user_id', $record->user_id)
+                ->activeOnDate($date)
+                ->orderByDesc('effective_date')
+                ->first();
+
+            if (! $schedule) {
+                $schedule = EmployeeSchedule::where('user_id', $record->user_id)
+                    ->where('is_default', true)
+                    ->first();
+            }
+        }
+
+        $isOvernight   = $schedule && $schedule->isOvernightShift($date);
+        $lunchDuration = $this->getLunchDurationMinutes($date, $schedule);
+
+        return $this->computeHoursWorked(
+            $record->time_in_am,
+            $record->time_out_am,
+            $record->time_in_pm,
+            $record->time_out_pm,
+            $isOvernight,
+            $lunchDuration
+        );
+    }
+
+    /**
      * Recompute late/undertime/overtime for all unlocked records of a user
      * in a given month (or date range) after a schedule has been assigned/changed.
      */

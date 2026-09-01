@@ -17,15 +17,25 @@ use Illuminate\Support\Collection;
  *
  * WFH days and official-travel days never count (hazard pay compensates
  * physical on-site exposure, not off-site work). A day involving any
- * self-declared "penned" data only counts once HR has approved it
- * (penned_reviewed_at set) — this is what makes DtrRecordController's
- * approvePenned() action consequential for pay, not just a status marker.
+ * self-declared "penned" data only counts on the strength of its VERIFIED
+ * (biometric/online) punches alone until HR approves the penned entry
+ * (penned_reviewed_at set) — e.g. a punched 07:41-17:00 day with just a
+ * self-declared lunch gap already clears the threshold without the penned
+ * data, so it counts; a day that only reaches the threshold BECAUSE of the
+ * penned data stays at 0 until reviewed. This is what makes
+ * DtrRecordController's approvePenned() action consequential for pay, not
+ * just a status marker, for days that don't already clear the bar on their
+ * own.
  */
 class HazardReportService
 {
     private const FULL_DAY_THRESHOLD = 6.0;
 
     private const HALF_DAY_THRESHOLD = 4.0;
+
+    public function __construct(private DTRService $dtrService)
+    {
+    }
 
     /**
      * @return Collection<int, array{
@@ -85,11 +95,14 @@ class HazardReportService
             || $record->penned_time_in_pm || $record->penned_time_out_pm
             || $record->penned_submitted_at;
 
+        $hoursWorked = (float) $record->hours_worked;
         if ($hasPennedData && ! $record->penned_reviewed_at) {
-            return 0.0;
+            // Don't credit the pending self-declared portion — only the
+            // verified punches count until HR reviews it.
+            $hoursWorked = $this->dtrService->computeVerifiedHoursWorked($record);
         }
 
-        $effectiveHours = max(0, (float) $record->hours_worked - ((float) $record->gatepass_deduction_minutes / 60));
+        $effectiveHours = max(0, $hoursWorked - ((float) $record->gatepass_deduction_minutes / 60));
 
         if ($effectiveHours >= self::FULL_DAY_THRESHOLD) {
             return 1.0;

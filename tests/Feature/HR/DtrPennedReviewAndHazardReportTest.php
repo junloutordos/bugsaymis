@@ -218,6 +218,46 @@ class DtrPennedReviewAndHazardReportTest extends TestCase
         $this->assertEquals(0, $rows->firstWhere('user_id', $user->id)['total_hazard_days']);
     }
 
+    public function test_unreviewed_penned_lunch_gap_still_counts_when_verified_punches_clear_threshold(): void
+    {
+        // Real biometric punches: 07:41 in, 17:00 out (no AM-out/PM-in
+        // punch — self-declared as a 1-minute lunch gap, unreviewed). The
+        // verified span alone (minus the default 60-min lunch deduction)
+        // is well past the full-day threshold, so this must still count.
+        $user = $this->plantillaUser();
+        DtrRecord::create([
+            'user_id' => $user->id, 'work_date' => '2026-07-01',
+            'attendance_status' => 'present',
+            'time_in_am' => '07:41:00', 'time_out_pm' => '17:00:00',
+            'hours_worked' => 9.30,
+            'penned_time_out_am' => '12:01:00', 'penned_time_in_pm' => '12:02:00',
+        ]);
+
+        $rows = app(HazardReportService::class)->generate('2026-07-01', '2026-07-31');
+
+        $this->assertEquals(1.0, $rows->firstWhere('user_id', $user->id)['total_hazard_days']);
+    }
+
+    public function test_unreviewed_penned_day_stays_excluded_when_verified_punches_dont_clear_threshold(): void
+    {
+        // Only a 2-hour verified AM session; the rest of the day is
+        // self-declared and unreviewed — verified-only hours (2h) don't
+        // clear even the half-day threshold, so it must stay excluded.
+        $user = $this->plantillaUser();
+        DtrRecord::create([
+            'user_id' => $user->id, 'work_date' => '2026-07-01',
+            'attendance_status' => 'present',
+            'time_in_am' => '07:41:00', 'time_out_am' => '09:41:00',
+            'hours_worked' => 8.0,
+            'penned_time_in_pm' => '13:00:00', 'penned_time_out_pm' => '17:00:00',
+            'penned_submitted_at' => now(),
+        ]);
+
+        $rows = app(HazardReportService::class)->generate('2026-07-01', '2026-07-31');
+
+        $this->assertEquals(0, $rows->firstWhere('user_id', $user->id)['total_hazard_days']);
+    }
+
     public function test_hr_reviewed_penned_day_counts_normally(): void
     {
         $user = $this->plantillaUser();
