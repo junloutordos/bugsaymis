@@ -251,7 +251,7 @@ class ClassScheduleDayAdjustmentController extends Controller
     {
         $data = $request->validate([
             'academic_term_id' => ['required', 'integer', 'exists:academic_terms,id'],
-            'adjustment_type' => ['nullable', 'in:flag_ceremony,shortened_classes,flag_ceremony_shortened_classes'],
+            'adjustment_type' => ['nullable', 'in:flag_ceremony,shortened_classes,flag_ceremony_shortened_classes,shortened_classes_protect_assessments'],
             'postponed_from_date' => ['nullable', 'date'],
             'effective_date' => ['required', 'date'],
             'activity_title' => ['nullable', 'string', 'max:255'],
@@ -342,7 +342,11 @@ class ClassScheduleDayAdjustmentController extends Controller
 
     private function hasShortenedClasses(string $type): bool
     {
-        return in_array($type, ['shortened_classes', 'flag_ceremony_shortened_classes'], true);
+        return in_array($type, [
+            'shortened_classes',
+            'flag_ceremony_shortened_classes',
+            'shortened_classes_protect_assessments',
+        ], true);
     }
 
     private function validateAffectedMonday(string $date, AcademicTerm $term): void

@@ -2,10 +2,12 @@
 
 namespace App\Services\FacultyLoading;
 
+use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\ClassScheduleDayAdjustment;
 use App\Models\FacultyLoading\Section;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class AdjustedClassScheduleService
@@ -30,6 +32,9 @@ class AdjustedClassScheduleService
         $classDuration = $hasShortenedClasses ? (int) ($adjustment->class_duration_minutes ?: 30) : null;
         $activityStart = $hasShortenedClasses ? substr((string) $adjustment->activity_start_time, 0, 5) : null;
         $activityEnd = $hasShortenedClasses ? substr((string) $adjustment->activity_end_time, 0, 5) : null;
+        $protectedPairs = $adjustment->protectsAssessmentPeriods()
+            ? $this->majorAssessmentPairs((int) $term->school_year_id, $adjustment->effective_date->toDateString())
+            : null;
 
         $overrideColumns = array_merge(
             ...array_values(Section::LUNCH_OVERRIDE_COLUMNS),
@@ -76,20 +81,29 @@ class AdjustedClassScheduleService
                 // compress to the wrong — sometimes zero — duration whenever a
                 // section's actual periods didn't tile it exactly.
                 $sectionSlots = $sectionSchedule
-                    ->map(fn (ClassSchedule $s) => [
-                        'start' => substr((string) $s->start_time, 0, 5),
-                        'end' => substr((string) $s->end_time, 0, 5),
-                    ])
+                    ->map(function (ClassSchedule $s) use ($classDuration, $protectedPairs) {
+                        $isProtected = $protectedPairs && $s->subject_id
+                            && $protectedPairs->has("{$s->section_id}:{$s->subject_id}");
+
+                        return [
+                            'start' => substr((string) $s->start_time, 0, 5),
+                            'end' => substr((string) $s->end_time, 0, 5),
+                            // null = this period keeps its original length (not
+                            // compressed): either the day isn't shortened, or this
+                            // period is protected by a major assessment plotted today.
+                            'target' => $isProtected ? null : $classDuration,
+                        ];
+                    })
                     ->values()
                     ->all();
 
                 $entries = $sectionSchedule
-                    ->map(function (ClassSchedule $schedule) use ($sectionSlots, $classDuration, $shift) {
+                    ->map(function (ClassSchedule $schedule) use ($sectionSlots, $shift) {
                         $entry = $schedule->toCalendarArray();
                         $entry['raw_start_time'] = substr((string) $schedule->start_time, 0, 5);
                         $entry['raw_end_time'] = substr((string) $schedule->end_time, 0, 5);
-                        $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $sectionSlots, $classDuration, $shift);
-                        $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $sectionSlots, $classDuration, $shift);
+                        $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $sectionSlots, $shift);
+                        $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $sectionSlots, $shift);
 
                         return $entry;
                     })
@@ -125,8 +139,8 @@ class AdjustedClassScheduleService
                     ))
                     ->map(fn (array $band) => [
                         ...$band,
-                        'start' => $this->transformTime((string) $band['start'], $sectionSlots, $classDuration, $shift),
-                        'end' => $this->transformTime((string) $band['end'], $sectionSlots, $classDuration, $shift),
+                        'start' => $this->transformTime((string) $band['start'], $sectionSlots, $shift),
+                        'end' => $this->transformTime((string) $band['end'], $sectionSlots, $shift),
                     ])
                     ->when($activityStart, fn ($items) => $items->filter(
                         fn (array $band) => $band['end'] <= $activityStart,
@@ -210,32 +224,63 @@ class AdjustedClassScheduleService
 
     /**
      * Compress each of this section's own already-completed class periods
-     * down to the requested duration, then apply an optional campus-wide
+     * down to its own target duration, then apply an optional campus-wide
      * shift (the transferred flag ceremony).
      *
      * $slots are this section's own actual scheduled class times for the
      * day — not the idealized canonical bell-schedule grid — so the savings
      * reflect what this section's real timetable actually did, regardless of
-     * how it may drift from the campus-wide canonical periods.
+     * how it may drift from the campus-wide canonical periods. Each slot
+     * carries its own 'target' duration (null = not compressed, e.g. an
+     * un-shortened day, or a period protected by a scheduled major
+     * assessment) so a single day can mix compressed and protected periods.
      */
-    private function transformTime(string $time, array $slots, ?int $classDuration, int $shift): string
+    private function transformTime(string $time, array $slots, int $shift): string
     {
         $sourceMinutes = SchedulingConstants::toMinutes(substr($time, 0, 5));
         $minutes = $sourceMinutes;
 
-        if ($classDuration !== null) {
-            foreach ($slots as $slot) {
-                $slotEnd = SchedulingConstants::toMinutes($slot['end']);
-                if ($slotEnd > $sourceMinutes) {
-                    continue;
-                }
-
-                $slotMinutes = $slotEnd - SchedulingConstants::toMinutes($slot['start']);
-                $minutes -= max(0, $slotMinutes - $classDuration);
+        foreach ($slots as $slot) {
+            if ($slot['target'] === null) {
+                continue;
             }
+
+            $slotEnd = SchedulingConstants::toMinutes($slot['end']);
+            if ($slotEnd > $sourceMinutes) {
+                continue;
+            }
+
+            $slotMinutes = $slotEnd - SchedulingConstants::toMinutes($slot['start']);
+            $minutes -= max(0, $slotMinutes - $slot['target']);
         }
 
         return SchedulingConstants::fromMinutes($minutes + $shift);
+    }
+
+    /**
+     * {section_id}:{subject_id} pairs with a MAJOR assessment plotted on
+     * $date this school year — the periods that must keep their original
+     * length under the "protect assessments" adjustment type. Formative/
+     * alternative/ILA assessments do not protect a period, only long tests
+     * (is_major = true). Joins class_record_assessment_dates too, since a
+     * multi-date assessment's activity_date column only mirrors its primary
+     * date. Uses each grading category's own subject override (PEHM-style
+     * co-taught records) falling back to the class record's subject.
+     */
+    private function majorAssessmentPairs(int $schoolYearId, string $date): Collection
+    {
+        return ClassRecordAssessment::schoolYearScopeQuery($schoolYearId)
+            ->leftJoin('class_record_assessment_dates as crad', 'crad.class_record_assessment_id', '=', 'class_record_assessments.id')
+            ->leftJoin('grading_categories as gc', 'gc.id', '=', 'class_record_assessments.grading_category_id')
+            ->where('class_record_assessments.is_major', true)
+            ->where(fn ($query) => $query
+                ->where('class_record_assessments.activity_date', $date)
+                ->orWhere('crad.activity_date', $date))
+            ->selectRaw('cr.section_id as section_id, COALESCE(gc.subject_id, cr.subject_id) as subject_id')
+            ->distinct()
+            ->get()
+            ->filter(fn ($row) => $row->section_id && $row->subject_id)
+            ->mapWithKeys(fn ($row) => ["{$row->section_id}:{$row->subject_id}" => true]);
     }
 
     /**

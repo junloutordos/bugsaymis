@@ -72,7 +72,16 @@ class ClassScheduleDayAdjustment extends Model
 
     public function hasShortenedClasses(): bool
     {
-        return in_array($this->adjustment_type, ['shortened_classes', 'flag_ceremony_shortened_classes'], true);
+        return in_array($this->adjustment_type, [
+            'shortened_classes',
+            'flag_ceremony_shortened_classes',
+            'shortened_classes_protect_assessments',
+        ], true);
+    }
+
+    public function protectsAssessmentPeriods(): bool
+    {
+        return $this->adjustment_type === 'shortened_classes_protect_assessments';
     }
 
     public function scopePublished($query)

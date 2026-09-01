@@ -2,6 +2,11 @@
 
 namespace Tests\Feature\FacultyLoading;
 
+use App\Models\ClassRecord\ClassRecord;
+use App\Models\ClassRecord\ClassRecordAssessment;
+use App\Models\ClassRecord\ClassRecordQuarter;
+use App\Models\ClassRecord\GradingCategory;
+use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\ClassSchedule;
@@ -586,5 +591,163 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         // non-teaching block throwing off the canonical-grid compression.
         $this->assertSame('09:00', $entries[2]['start_time']);
         $this->assertSame('09:30', $entries[2]['end_time']);
+    }
+
+    public function test_protect_assessments_keeps_major_assessment_period_full_length_and_compresses_the_rest(): void
+    {
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+
+        $formativeOnlySubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'EN1-G7',
+            'name' => 'English 1',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'lecture',
+            'grade_level' => 7,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        $noAssessmentSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'AT1-G7',
+            'name' => 'Araling Panlipunan 1',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'lecture',
+            'grade_level' => 7,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+
+        $formativeClass = ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $formativeOnlySubject->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '08:20',
+            'end_time' => '09:10',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $noAssessmentSubject->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '09:10',
+            'end_time' => '10:00',
+            'status' => 'active',
+        ]);
+
+        // MATH7 (07:30-08:20) has a MAJOR assessment today -> must stay 50 min.
+        $this->plotAssessment($this->tuesdayClass, '2026-08-04', isMajor: true);
+        // English (08:20-09:10) only has a FORMATIVE assessment today -> must still compress.
+        $this->plotAssessment($formativeClass, '2026-08-04', isMajor: false);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes_protect_assessments',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->assertSame(30, $adjustment->class_duration_minutes);
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $entries = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'];
+
+        // MATH7: protected by its major assessment, untouched 50-minute period.
+        $this->assertSame('07:30', $entries[0]['start_time']);
+        $this->assertSame('08:20', $entries[0]['end_time']);
+        // English: only a formative assessment, still compresses to 30 minutes.
+        $this->assertSame('08:20', $entries[1]['start_time']);
+        $this->assertSame('08:50', $entries[1]['end_time']);
+        // Araling Panlipunan: no assessment at all, compresses to 30 minutes,
+        // shifted left only by savings banked from the (non-protected) English period.
+        $this->assertSame('08:50', $entries[2]['start_time']);
+        $this->assertSame('09:20', $entries[2]['end_time']);
+    }
+
+    public function test_protect_assessments_ignores_assessments_plotted_on_other_dates(): void
+    {
+        $this->plotAssessment($this->tuesdayClass, '2026-08-11', isMajor: true);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'adjustment_type' => 'shortened_classes_protect_assessments',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $entry = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'][0];
+
+        $this->assertSame('07:30', $entry['start_time']);
+        $this->assertSame('08:00', $entry['end_time']);
+    }
+
+    private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
+    {
+        $classSchedule->loadMissing('subject');
+        $gradingOption = GradingOption::create(['name' => 'Standard '.uniqid(), 'is_active' => true]);
+        $category = GradingCategory::create([
+            'grading_option_id' => $gradingOption->id,
+            'name' => 'Formative Assessment',
+            'code' => 'FA',
+            'weight' => 0.3000,
+            'max_assessments' => 5,
+            'sort_order' => 1,
+        ]);
+        $classRecord = ClassRecord::create([
+            'subject_id' => $classSchedule->subject_id,
+            'section_id' => $classSchedule->section_id,
+            'teacher_id' => $classSchedule->user_id,
+            'grading_option_id' => $gradingOption->id,
+            'school_year_id' => $this->term->school_year_id,
+            'school_year' => '2026-2027',
+            'subject_name' => $classSchedule->subject->name,
+            'year_level_section' => 'G-7 Aquamarine',
+            'status' => 'draft',
+        ]);
+        $quarter = ClassRecordQuarter::create([
+            'class_record_id' => $classRecord->id,
+            'quarter' => 1,
+        ]);
+        ClassRecordAssessment::create([
+            'class_record_quarter_id' => $quarter->id,
+            'grading_category_id' => $category->id,
+            'assessment_number' => 1,
+            'title' => 'Assessment',
+            'activity_date' => $activityDate,
+            'max_score' => 50,
+            'is_major' => $isMajor,
+        ]);
     }
 }

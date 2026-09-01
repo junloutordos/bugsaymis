@@ -67,7 +67,7 @@
                 <td class="px-4 py-3 text-sm text-slate-600">
                   <div v-if="hasFlag(item.adjustment_type)">Flag 7:30–8:00 AM<span v-if="item.postponed_from_date"> · From {{ formatDate(item.postponed_from_date) }}</span></div>
                   <div v-if="hasShortenedClasses(item.adjustment_type)">
-                    30-minute classes · {{ item.activity_title }} · {{ formatTimeRange(item.activity_start_time, item.activity_end_time) }}
+                    30-minute classes<span v-if="protectsAssessments(item.adjustment_type)"> (major assessment periods stay 50 min)</span> · {{ item.activity_title }} · {{ formatTimeRange(item.activity_start_time, item.activity_end_time) }}
                   </div>
                 </td>
                 <td class="max-w-sm px-4 py-3 text-sm text-slate-600">{{ item.reason }}</td>
@@ -115,6 +115,7 @@
             <option value="flag_ceremony">Transferred Flag Ceremony</option>
             <option value="shortened_classes">30-Minute Classes for Official Activity</option>
             <option value="flag_ceremony_shortened_classes">Transferred Flag Ceremony + 30-Minute Classes</option>
+            <option value="shortened_classes_protect_assessments">30-Minute Classes (Protect Assessment Periods)</option>
           </select>
         </div>
 
@@ -167,7 +168,11 @@
 
         <div class="grid gap-3 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-2">
           <div v-if="hasFlag(form.adjustment_type)"><span class="text-slate-500">Flag ceremony:</span> <strong>7:30–8:00 AM</strong></div>
-          <div v-if="hasShortenedClasses(form.adjustment_type)"><span class="text-slate-500">Class periods:</span> <strong>30 minutes each</strong></div>
+          <div v-if="hasShortenedClasses(form.adjustment_type)">
+            <span class="text-slate-500">Class periods:</span>
+            <strong v-if="protectsAssessments(form.adjustment_type)">30 minutes each, except periods with a scheduled major assessment (stay 50 minutes)</strong>
+            <strong v-else>30 minutes each</strong>
+          </div>
         </div>
       </div>
 
@@ -349,7 +354,11 @@ function hasFlag(type) {
 }
 
 function hasShortenedClasses(type) {
-  return ['shortened_classes', 'flag_ceremony_shortened_classes'].includes(type)
+  return ['shortened_classes', 'flag_ceremony_shortened_classes', 'shortened_classes_protect_assessments'].includes(type)
+}
+
+function protectsAssessments(type) {
+  return type === 'shortened_classes_protect_assessments'
 }
 
 function adjustmentTypeLabel(type) {
@@ -357,6 +366,7 @@ function adjustmentTypeLabel(type) {
     flag_ceremony: 'Transferred Flag Ceremony',
     shortened_classes: '30-Minute Classes',
     flag_ceremony_shortened_classes: 'Flag Ceremony + 30-Minute Classes',
+    shortened_classes_protect_assessments: '30-Minute Classes (Protect Assessments)',
   })[type] ?? type
 }
 
