@@ -108,7 +108,7 @@ const total    = computed(() => props.transactions?.total ?? 0)
           </div>
 
           <p :class="['text-4xl font-extrabold mt-3 tabular-nums', balanceColor(card.balance)]">
-            {{ card.balance.toFixed(2) }}
+            {{ card.balance.toFixed(4) }}
             <span class="text-base font-medium text-slate-500 ml-1">days</span>
           </p>
 
