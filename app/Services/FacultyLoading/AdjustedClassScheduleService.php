@@ -28,8 +28,14 @@ class AdjustedClassScheduleService
         $day = Carbon::parse($adjustment->effective_date)->englishDayOfWeek;
         $hasFlag = $adjustment->hasFlagCeremony();
         $hasShortenedClasses = $adjustment->hasShortenedClasses();
+        $stemSplit = $adjustment->isEarlyStartStemSplit();
         $shift = $hasFlag ? (int) $adjustment->shift_minutes : 0;
         $classDuration = $hasShortenedClasses ? (int) ($adjustment->class_duration_minutes ?: 30) : null;
+        $stemMinutes = $stemSplit ? (int) ($adjustment->stem_class_duration_minutes ?: 50) : null;
+        $nonStemMinutes = $stemSplit ? (int) ($adjustment->non_stem_class_duration_minutes ?: 30) : null;
+        $dayStartMinutes = $stemSplit
+            ? SchedulingConstants::toMinutes(substr((string) ($adjustment->day_start_time ?: '07:00'), 0, 5))
+            : null;
         $activityStart = $hasShortenedClasses ? substr((string) $adjustment->activity_start_time, 0, 5) : null;
         $activityEnd = $hasShortenedClasses ? substr((string) $adjustment->activity_end_time, 0, 5) : null;
         $protectedPairs = $adjustment->protectsAssessmentPeriods()
@@ -89,6 +95,20 @@ class AdjustedClassScheduleService
             foreach ($sections->where('levelid', $gradeLevel) as $section) {
                 $sectionSchedule = $scheduleRows->get($section->id) ?? collect();
 
+                // For early-start STEM-split, every section is individually
+                // anchored so its own first class period starts at the same
+                // campus-wide day_start_time — different grades' sections
+                // normally start their first period at different clock
+                // times, so the shift needed to reach the same target start
+                // differs per section.
+                $sectionShift = $shift;
+                if ($stemSplit && $sectionSchedule->isNotEmpty()) {
+                    $firstOriginalStart = SchedulingConstants::toMinutes(
+                        substr((string) $sectionSchedule->first()->start_time, 0, 5)
+                    );
+                    $sectionShift = $dayStartMinutes - $firstOriginalStart;
+                }
+
                 // Compression is measured against this section's OWN actual
                 // scheduled times, not the idealized bell-schedule grid — real
                 // timetables routinely drift from the canonical periods (see
@@ -97,9 +117,13 @@ class AdjustedClassScheduleService
                 // compress to the wrong — sometimes zero — duration whenever a
                 // section's actual periods didn't tile it exactly.
                 $sectionSlots = $sectionSchedule
-                    ->map(function (ClassSchedule $s) use ($classDuration, $protectedPairs) {
+                    ->map(function (ClassSchedule $s) use ($classDuration, $protectedPairs, $stemSplit, $stemMinutes, $nonStemMinutes) {
                         $isProtected = $protectedPairs && $s->subject_id
                             && $protectedPairs->has("{$s->section_id}:{$s->subject_id}");
+
+                        $target = $stemSplit
+                            ? ($s->subject?->is_stem ? $stemMinutes : $nonStemMinutes)
+                            : $classDuration;
 
                         return [
                             'start' => substr((string) $s->start_time, 0, 5),
@@ -107,14 +131,14 @@ class AdjustedClassScheduleService
                             // null = this period keeps its original length (not
                             // compressed): either the day isn't shortened, or this
                             // period is protected by a major assessment plotted today.
-                            'target' => $isProtected ? null : $classDuration,
+                            'target' => $isProtected ? null : $target,
                         ];
                     })
                     ->values()
                     ->all();
 
                 $entries = $sectionSchedule
-                    ->map(function (ClassSchedule $schedule) use ($sectionSlots, $shift, $overridesByScheduleId) {
+                    ->map(function (ClassSchedule $schedule) use ($sectionSlots, $sectionShift, $overridesByScheduleId) {
                         $entry = $schedule->toCalendarArray();
                         $entry['raw_start_time'] = substr((string) $schedule->start_time, 0, 5);
                         $entry['raw_end_time'] = substr((string) $schedule->end_time, 0, 5);
@@ -129,8 +153,8 @@ class AdjustedClassScheduleService
                             $entry['end_time'] = substr((string) $override->override_end_time, 0, 5);
                             $entry['manually_adjusted'] = true;
                         } else {
-                            $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $sectionSlots, $shift);
-                            $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $sectionSlots, $shift);
+                            $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $sectionSlots, $sectionShift);
+                            $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $sectionSlots, $sectionShift);
                             $entry['manually_adjusted'] = false;
                         }
 
@@ -162,14 +186,18 @@ class AdjustedClassScheduleService
                     $bands[] = [...$band, 'type' => 'SCIENCE_CORE'];
                 }
 
+                $rejectedBandTypes = $stemSplit
+                    ? ['CONSULT', 'ACTIVITY', 'FLAG_RETREAT', 'LUNCH']
+                    : ['CONSULT', 'ACTIVITY', 'FLAG_RETREAT'];
+
                 $bands = collect($bands)
                     ->when($hasShortenedClasses, fn ($items) => $items->reject(
-                        fn (array $band) => in_array($band['type'] ?? '', ['CONSULT', 'ACTIVITY', 'FLAG_RETREAT'], true),
+                        fn (array $band) => in_array($band['type'] ?? '', $rejectedBandTypes, true),
                     ))
                     ->map(fn (array $band) => [
                         ...$band,
-                        'start' => $this->transformTime((string) $band['start'], $sectionSlots, $shift),
-                        'end' => $this->transformTime((string) $band['end'], $sectionSlots, $shift),
+                        'start' => $this->transformTime((string) $band['start'], $sectionSlots, $sectionShift),
+                        'end' => $this->transformTime((string) $band['end'], $sectionSlots, $sectionShift),
                     ])
                     ->when($activityStart, fn ($items) => $items->filter(
                         fn (array $band) => $band['end'] <= $activityStart,
@@ -184,6 +212,15 @@ class AdjustedClassScheduleService
                         'end' => $activityEnd,
                         'type' => 'OFFICIAL_ACTIVITY',
                         'label' => $adjustment->activity_title,
+                    ];
+                }
+
+                if ($adjustment->hasHealthBreak()) {
+                    $bands[] = [
+                        'start' => substr((string) $adjustment->health_break_start_time, 0, 5),
+                        'end' => substr((string) $adjustment->health_break_end_time, 0, 5),
+                        'type' => 'HEALTH_BREAK',
+                        'label' => $adjustment->health_break_title,
                     ];
                 }
 
@@ -236,7 +273,7 @@ class AdjustedClassScheduleService
                 'start' => $activityStart,
                 'end' => $activityEnd,
             ] : null,
-            'calendar_start' => '07:30',
+            'calendar_start' => $stemSplit ? substr((string) ($adjustment->day_start_time ?: '07:00'), 0, 5) : '07:30',
             'calendar_end' => '17:00',
             'conflict_warnings' => $conflictWarnings,
             'grades' => $grades,

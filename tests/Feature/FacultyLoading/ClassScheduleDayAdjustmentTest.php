@@ -723,6 +723,133 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame('08:00', $entry['end_time']);
     }
 
+    public function test_early_start_stem_split_anchors_first_period_and_splits_duration_by_subject(): void
+    {
+        Subject::where('code', 'MATH7')->update(['is_stem' => true]);
+
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $filipino = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'FIL1-G7',
+            'name' => 'Filipino 1',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'lecture',
+            'grade_level' => 7,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $filipino->id,
+            'section_id' => $section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '08:20',
+            'end_time' => '09:10',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'health_break_title' => 'Snack Break',
+            'health_break_start_time' => '09:20',
+            'health_break_end_time' => '09:30',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->assertSame('07:00:00', $adjustment->day_start_time);
+        $this->assertSame(50, $adjustment->stem_class_duration_minutes);
+        $this->assertSame(30, $adjustment->non_stem_class_duration_minutes);
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $section = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0];
+
+        // MATH7 is STEM: keeps its full 50-minute length, anchored to 07:00.
+        $this->assertSame('07:00', $section['entries'][0]['start_time']);
+        $this->assertSame('07:50', $section['entries'][0]['end_time']);
+        // Filipino is non-STEM: compresses to 30 minutes, immediately after.
+        $this->assertSame('07:50', $section['entries'][1]['start_time']);
+        $this->assertSame('08:20', $section['entries'][1]['end_time']);
+
+        // Lunch is dropped for this type; Health Break is added.
+        $this->assertNotContains('LUNCH', array_column($section['bands'], 'type'));
+        $this->assertContains('Snack Break', array_column($section['bands'], 'label'));
+
+        $this->assertSame('07:00', $adjustment->fresh()->schedule_snapshot['calendar_start']);
+
+        // The underlying weekly schedule is untouched.
+        $this->assertSame('07:30:00', $this->tuesdayClass->fresh()->start_time);
+    }
+
+    public function test_early_start_stem_split_still_blocks_a_genuine_double_booking_with_no_activity_declared(): void
+    {
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $grade7Section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $grade7Subject = Subject::where('code', 'MATH7')->firstOrFail();
+
+        $otherGrade7Section = Section::create([
+            'levelid' => 7,
+            'sectionname' => 'Citrine',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+
+        // Two sections genuinely double-booked into Room 101 at overlapping
+        // original times — a real conflict unrelated to compression. This
+        // must still block even though early_start_stem_split declares no
+        // Official Activity at all (blocking is based on raw-time overlap,
+        // which is unaffected by each section's own individual anchor shift).
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $grade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $otherGrade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:20',
+            'end_time' => '11:10',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-10',
+            'reason' => 'Heat advisory early start',
+        ])->assertSessionHasErrors('activity_start_time');
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 0);
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');
