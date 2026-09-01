@@ -312,6 +312,48 @@ class ClassScheduleDayAdjustmentController extends Controller
         return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
     }
 
+    /**
+     * Manually correct one Recess or White Space band's displayed time for
+     * one section on this adjusted date only. Draft-only, same lifecycle as
+     * upsertOverride() but keyed by section+band type instead of a
+     * ClassSchedule row (bands have no id of their own).
+     */
+    public function upsertBandOverride(Request $request, ClassScheduleDayAdjustment $adjustment): JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+        abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be manually adjusted.');
+
+        $data = $request->validate([
+            'section_id' => ['required', 'integer'],
+            'band_type' => ['required', 'in:RECESS,WHITE_SPACE'],
+            'override_start_time' => ['required', 'date_format:H:i'],
+            'override_end_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        if ($data['override_end_time'] <= $data['override_start_time']) {
+            throw ValidationException::withMessages([
+                'override_end_time' => 'The override end time must be after its start time.',
+            ]);
+        }
+
+        $adjustment->bandOverrides()->updateOrCreate(
+            ['section_id' => $data['section_id'], 'band_type' => $data['band_type']],
+            ['override_start_time' => $data['override_start_time'], 'override_end_time' => $data['override_end_time']],
+        );
+
+        return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
+    }
+
+    public function removeBandOverride(ClassScheduleDayAdjustment $adjustment, int $sectionId, string $bandType): JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+        abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be manually adjusted.');
+
+        $adjustment->bandOverrides()->where('section_id', $sectionId)->where('band_type', $bandType)->delete();
+
+        return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
+    }
+
     public function cancel(ClassScheduleDayAdjustment $adjustment): RedirectResponse
     {
         $this->authorize('faculty_loading.manage');

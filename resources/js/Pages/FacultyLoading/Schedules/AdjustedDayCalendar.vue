@@ -16,10 +16,20 @@
             <div
               v-for="band in section.bands"
               :key="`${band.type}-${band.start}`"
-              class="absolute inset-x-0 rounded bg-slate-200/60 px-1.5 py-0.5 text-[10px] text-slate-500"
+              :draggable="isDraggableBand(band)"
+              class="absolute inset-x-0 rounded px-1.5 py-0.5 text-[10px]"
+              :class="bandClass(band)"
               :style="bandStyle(band)"
+              @dragstart="onBandDragStart($event, band, section)"
+              @click="isDraggableBand(band) && openBandOverride(section, band)"
             >
+              <div v-if="isDraggableBand(band)" class="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
+                @mousedown.stop.prevent="startResize($event, band, section, 'start')"
+                @dragstart.stop.prevent></div>
               {{ band.label }}
+              <div v-if="isDraggableBand(band)" class="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+                @mousedown.stop.prevent="startResize($event, band, section, 'end')"
+                @dragstart.stop.prevent></div>
             </div>
             <div
               v-for="entry in section.entries"
@@ -45,9 +55,12 @@
   </div>
 
   <AppModal :show="showOverrideModal" title="Adjust class time" size="sm" @close="showOverrideModal = false">
-    <div v-if="editingEntry" class="space-y-4">
-      <p class="text-sm text-slate-600">
+    <div v-if="editingEntry || editingBand" class="space-y-4">
+      <p v-if="editingEntry" class="text-sm text-slate-600">
         {{ editingEntry.subject?.name ?? editingEntry.title }} — currently {{ editingEntry.start_time }}–{{ editingEntry.end_time }}
+      </p>
+      <p v-else class="text-sm text-slate-600">
+        {{ editingBand.band.label }} — currently {{ editingBand.band.start }}–{{ editingBand.band.end }}
       </p>
       <div class="grid grid-cols-2 gap-4">
         <div>
@@ -66,7 +79,7 @@
 
     <template #footer>
       <div class="flex w-full items-center justify-between gap-2">
-        <AppButton v-if="editingEntry?.manually_adjusted" variant="ghost" class="text-rose-600" @click="removeOverride">Remove override</AppButton>
+        <AppButton v-if="editingEntry?.manually_adjusted || editingBand?.band.manually_adjusted" variant="ghost" class="text-rose-600" @click="removeOverride">Remove override</AppButton>
         <div class="ml-auto flex gap-2">
           <AppButton variant="ghost" @click="showOverrideModal = false">Cancel</AppButton>
           <AppButton :loading="savingOverride" @click="saveOverride">Save</AppButton>
@@ -94,9 +107,12 @@ const SNAP_MINUTES = 5
 
 const dragging = ref(null) // { entry, durationMinutes, section }
 const conflictSectionId = ref(null)
+const resizing = ref(null) // { band, section, edge, startY, originalStart, originalEnd }
+const MIN_BAND_MINUTES = 5
 
 const showOverrideModal = ref(false)
 const editingEntry = ref(null)
+const editingBand = ref(null) // { section, band }
 const overrideForm = ref({ override_start_time: '', override_end_time: '' })
 const overrideError = ref('')
 const savingOverride = ref(false)
@@ -138,6 +154,15 @@ function entryClass(entry) {
     : 'border-slate-200 bg-white text-slate-700'
 }
 
+function bandClass(band) {
+  if (!isDraggableBand(band)) {
+    return 'bg-slate-200/60 text-slate-500'
+  }
+  return band.manually_adjusted
+    ? 'cursor-grab border border-indigo-300 bg-indigo-50 text-indigo-800 active:cursor-grabbing'
+    : 'cursor-grab border border-slate-200 bg-slate-200/60 text-slate-600 active:cursor-grabbing'
+}
+
 function allEntries() {
   return gradesWithEntries.value.flatMap(grade => grade.sections).flatMap(section => section.entries)
 }
@@ -157,10 +182,22 @@ function wouldConflict(entry, proposedStartMinutes, proposedEndMinutes) {
   })
 }
 
+function isDraggableBand(band) {
+  return band.type === 'RECESS' || band.type === 'WHITE_SPACE'
+}
+
 function onDragStart(event, entry, section) {
   const durationMinutes = toMinutes(entry.end_time) - toMinutes(entry.start_time)
-  dragging.value = { entry, durationMinutes, section }
+  dragging.value = { kind: 'entry', target: entry, durationMinutes, section }
   event.dataTransfer.setData('text/plain', String(entry.id))
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+function onBandDragStart(event, band, section) {
+  if (!isDraggableBand(band)) return
+  const durationMinutes = toMinutes(band.end) - toMinutes(band.start)
+  dragging.value = { kind: 'band', target: band, durationMinutes, section }
+  event.dataTransfer.setData('text/plain', band.type)
   event.dataTransfer.effectAllowed = 'move'
 }
 
@@ -175,21 +212,78 @@ function onDragOver(event, section) {
   if (!dragging.value) return
   const start = proposedStartMinutes(event, event.currentTarget)
   const end = start + dragging.value.durationMinutes
-  conflictSectionId.value = wouldConflict(dragging.value.entry, start, end) ? section.id : null
+  // Bands are informational overlays — no conflict pre-check for them,
+  // matching the spec's "no new overlap validation for bands" decision.
+  conflictSectionId.value = dragging.value.kind === 'entry' && wouldConflict(dragging.value.target, start, end)
+    ? section.id
+    : null
 }
 
 async function onDrop(event, section) {
   if (!dragging.value) return
-  const { entry, durationMinutes } = dragging.value
+  const { kind, target, durationMinutes } = dragging.value
   const start = proposedStartMinutes(event, event.currentTarget)
   const end = start + durationMinutes
   dragging.value = null
   conflictSectionId.value = null
 
+  const { data } = kind === 'entry'
+    ? await axios.post(route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id), {
+        class_schedule_id: target.id,
+        override_start_time: fromMinutes(start),
+        override_end_time: fromMinutes(end),
+      })
+    : await axios.post(route('faculty-loading.schedules.day-adjustments.band-overrides.store', props.adjustment.id), {
+        section_id: section.id,
+        band_type: target.type,
+        override_start_time: fromMinutes(start),
+        override_end_time: fromMinutes(end),
+      })
+  emit('update:preview', data)
+}
+
+function startResize(event, band, section, edge) {
+  resizing.value = {
+    band,
+    section,
+    edge,
+    startY: event.clientY,
+    originalStart: toMinutes(band.start),
+    originalEnd: toMinutes(band.end),
+  }
+  window.addEventListener('mousemove', onResizeMove)
+  window.addEventListener('mouseup', onResizeEnd)
+}
+
+function onResizeMove(event) {
+  if (!resizing.value) return
+  const rawDelta = (event.clientY - resizing.value.startY) / PX_PER_MINUTE
+  resizing.value.deltaMinutes = Math.round(rawDelta / SNAP_MINUTES) * SNAP_MINUTES
+}
+
+async function onResizeEnd() {
+  window.removeEventListener('mousemove', onResizeMove)
+  window.removeEventListener('mouseup', onResizeEnd)
+  if (!resizing.value) return
+
+  const { band, section, edge, originalStart, originalEnd, deltaMinutes = 0 } = resizing.value
+  resizing.value = null
+
+  let start = originalStart
+  let end = originalEnd
+  if (edge === 'start') {
+    start = Math.min(originalStart + deltaMinutes, originalEnd - MIN_BAND_MINUTES)
+  } else {
+    end = Math.max(originalEnd + deltaMinutes, originalStart + MIN_BAND_MINUTES)
+  }
+
+  if (start === originalStart && end === originalEnd) return
+
   const { data } = await axios.post(
-    route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id),
+    route('faculty-loading.schedules.day-adjustments.band-overrides.store', props.adjustment.id),
     {
-      class_schedule_id: entry.id,
+      section_id: section.id,
+      band_type: band.type,
       override_start_time: fromMinutes(start),
       override_end_time: fromMinutes(end),
     },
@@ -199,7 +293,16 @@ async function onDrop(event, section) {
 
 function openOverride(entry) {
   editingEntry.value = entry
+  editingBand.value = null
   overrideForm.value = { override_start_time: entry.start_time, override_end_time: entry.end_time }
+  overrideError.value = ''
+  showOverrideModal.value = true
+}
+
+function openBandOverride(section, band) {
+  editingBand.value = { section, band }
+  editingEntry.value = null
+  overrideForm.value = { override_start_time: band.start, override_end_time: band.end }
   overrideError.value = ''
   showOverrideModal.value = true
 }
@@ -208,11 +311,18 @@ async function saveOverride() {
   savingOverride.value = true
   overrideError.value = ''
   try {
-    const { data } = await axios.post(route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id), {
-      class_schedule_id: editingEntry.value.id,
-      override_start_time: overrideForm.value.override_start_time,
-      override_end_time: overrideForm.value.override_end_time,
-    })
+    const { data } = editingEntry.value
+      ? await axios.post(route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id), {
+          class_schedule_id: editingEntry.value.id,
+          override_start_time: overrideForm.value.override_start_time,
+          override_end_time: overrideForm.value.override_end_time,
+        })
+      : await axios.post(route('faculty-loading.schedules.day-adjustments.band-overrides.store', props.adjustment.id), {
+          section_id: editingBand.value.section.id,
+          band_type: editingBand.value.band.type,
+          override_start_time: overrideForm.value.override_start_time,
+          override_end_time: overrideForm.value.override_end_time,
+        })
     emit('update:preview', data)
     showOverrideModal.value = false
   } catch (error) {
@@ -224,7 +334,9 @@ async function saveOverride() {
 }
 
 async function removeOverride() {
-  const { data } = await axios.delete(route('faculty-loading.schedules.day-adjustments.overrides.destroy', [props.adjustment.id, editingEntry.value.id]))
+  const { data } = editingEntry.value
+    ? await axios.delete(route('faculty-loading.schedules.day-adjustments.overrides.destroy', [props.adjustment.id, editingEntry.value.id]))
+    : await axios.delete(route('faculty-loading.schedules.day-adjustments.band-overrides.destroy', [props.adjustment.id, editingBand.value.section.id, editingBand.value.band.type]))
   emit('update:preview', data)
   showOverrideModal.value = false
 }

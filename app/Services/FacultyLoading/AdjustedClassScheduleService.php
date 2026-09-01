@@ -45,6 +45,9 @@ class AdjustedClassScheduleService
         $overridesByScheduleId = $adjustment->exists
             ? $adjustment->overrides()->get()->keyBy('class_schedule_id')
             : collect();
+        $bandOverridesBySectionType = $adjustment->exists
+            ? $adjustment->bandOverrides()->get()->keyBy(fn ($o) => "{$o->section_id}:{$o->band_type}")
+            : collect();
 
         $overrideColumns = array_merge(
             ...array_values(Section::LUNCH_OVERRIDE_COLUMNS),
@@ -137,6 +140,15 @@ class AdjustedClassScheduleService
                     ->values()
                     ->all();
 
+                if ($stemSplit) {
+                    // Lunch must actually disappear from the timetable for this
+                    // type, not just from the display — see lunchGapSlots().
+                    $sectionSlots = array_merge(
+                        $sectionSlots,
+                        $this->lunchGapSlots($sectionSchedule, $gradeLevel, $day, $section)
+                    );
+                }
+
                 $entries = $sectionSchedule
                     ->map(function (ClassSchedule $schedule) use ($sectionSlots, $sectionShift, $overridesByScheduleId) {
                         $entry = $schedule->toCalendarArray();
@@ -204,6 +216,23 @@ class AdjustedClassScheduleService
                     ))
                     ->sortBy('start')
                     ->values()
+                    ->map(function (array $band) use ($section, $bandOverridesBySectionType) {
+                        if (! in_array($band['type'] ?? '', ['RECESS', 'WHITE_SPACE'], true)) {
+                            return $band;
+                        }
+
+                        $override = $bandOverridesBySectionType->get("{$section->id}:{$band['type']}");
+                        if (! $override) {
+                            return [...$band, 'manually_adjusted' => false];
+                        }
+
+                        return [
+                            ...$band,
+                            'start' => substr((string) $override->override_start_time, 0, 5),
+                            'end' => substr((string) $override->override_end_time, 0, 5),
+                            'manually_adjusted' => true,
+                        ];
+                    })
                     ->all();
 
                 if ($activityStart && $activityEnd) {
@@ -327,6 +356,47 @@ class AdjustedClassScheduleService
         }
 
         return SchedulingConstants::fromMinutes($minutes + $shift);
+    }
+
+    /**
+     * Synthetic zero-target slots for the portion of the campus Lunch window
+     * that genuinely falls between two of this section's own consecutive
+     * class periods — used only for early_start_stem_split, where Lunch is
+     * meant to disappear from the timetable, not just from the display.
+     * Only the intersection of the real gap and the canonical Lunch window
+     * collapses: a section with no real gap there loses nothing, and a
+     * section whose gap only partially overlaps only loses that portion —
+     * same reasoning as anchoring compression to real data instead of the
+     * idealized bell-schedule grid (see this class's other docblocks).
+     *
+     * @return array<int,array{start:string,end:string,target:int}>
+     */
+    private function lunchGapSlots(Collection $sectionSchedule, int $gradeLevel, string $day, Section $section): array
+    {
+        $lunch = SchedulingConstants::getEffectiveLunch($gradeLevel, $day, $this->trimWindow($section->lunchOverrideFor($day)));
+        $lunchStart = SchedulingConstants::toMinutes($lunch['start']);
+        $lunchEnd = SchedulingConstants::toMinutes($lunch['end']);
+
+        $ordered = $sectionSchedule->values();
+        $slots = [];
+
+        for ($index = 1; $index < $ordered->count(); $index++) {
+            $gapStart = SchedulingConstants::toMinutes(substr((string) $ordered[$index - 1]->end_time, 0, 5));
+            $gapEnd = SchedulingConstants::toMinutes(substr((string) $ordered[$index]->start_time, 0, 5));
+
+            $overlapStart = max($gapStart, $lunchStart);
+            $overlapEnd = min($gapEnd, $lunchEnd);
+
+            if ($overlapEnd > $overlapStart) {
+                $slots[] = [
+                    'start' => SchedulingConstants::fromMinutes($overlapStart),
+                    'end' => SchedulingConstants::fromMinutes($overlapEnd),
+                    'target' => 0,
+                ];
+            }
+        }
+
+        return $slots;
     }
 
     /**

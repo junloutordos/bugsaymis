@@ -850,6 +850,245 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertDatabaseCount('class_schedule_day_adjustments', 0);
     }
 
+    public function test_early_start_stem_split_fully_collapses_a_gap_that_exactly_matches_lunch(): void
+    {
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+
+        // Grade 7 Tuesday-Friday lunch is 10:20-11:20 (SchedulingConstants::SECTION_LUNCH['G7_TueFri']).
+        $periodA = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'AT1-G7', 'name' => 'Araling Panlipunan 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        $periodB = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'FIL1-G7', 'name' => 'Filipino 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $periodA->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '09:30', 'end_time' => '10:20', 'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $periodB->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '11:20', 'end_time' => '12:10', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $entries = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'];
+
+        $this->assertSame('07:00', $entries[0]['start_time']);
+        $this->assertSame('07:30', $entries[0]['end_time']);
+        // The two periods straddling lunch (10:20-11:20) are now back-to-back —
+        // the gap that used to be Lunch has fully collapsed, not just hidden.
+        $this->assertSame('08:40', $entries[1]['start_time']);
+        $this->assertSame('09:10', $entries[1]['end_time']);
+        $this->assertSame('09:10', $entries[2]['start_time']);
+        $this->assertSame('09:40', $entries[2]['end_time']);
+    }
+
+    public function test_early_start_stem_split_does_not_fabricate_a_collapse_when_no_real_gap_overlaps_lunch(): void
+    {
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+
+        $second = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'AT1-G7', 'name' => 'Araling Panlipunan 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        // 09:00-09:50 — a normal 40-minute gap after the 07:30-08:20 period,
+        // nowhere near the 10:20-11:20 lunch window.
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $second->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '09:50', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $entries = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'];
+
+        $this->assertSame('07:00', $entries[0]['start_time']);
+        $this->assertSame('07:30', $entries[0]['end_time']);
+        // Nothing to collapse here — the original 40-minute gap (08:20-09:00,
+        // now 07:30-08:10) survives intact, exactly as it did before the fix.
+        $this->assertSame('08:10', $entries[1]['start_time']);
+        $this->assertSame('08:40', $entries[1]['end_time']);
+    }
+
+    public function test_early_start_stem_split_only_collapses_the_portion_of_a_gap_overlapping_lunch(): void
+    {
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+
+        $periodA = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'AT1-G7', 'name' => 'Araling Panlipunan 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        $periodB = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'FIL1-G7', 'name' => 'Filipino 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        // Gap is wider (09:10-10:00, then 11:40-12:30) than lunch (10:20-11:20)
+        // on both sides — only the lunch-overlapping middle should collapse.
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $periodA->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '09:10', 'end_time' => '10:00', 'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $periodB->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '11:40', 'end_time' => '12:30', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $entries = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'];
+
+        // Only the 60-minute lunch overlap collapses out of the 100-minute
+        // original gap (10:00-11:40) — 40 minutes of genuine gap remain.
+        $this->assertSame('08:50', $entries[1]['end_time']);
+        $this->assertSame('09:30', $entries[2]['start_time']);
+    }
+
+    public function test_band_override_repositions_a_recess_band_and_can_be_removed(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'RECESS',
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:15',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 1);
+
+        $bands = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0]['bands'];
+        $recess = collect($bands)->firstWhere('type', 'RECESS');
+
+        $this->assertSame('09:00', $recess['start']);
+        $this->assertSame('09:15', $recess['end']);
+        $this->assertTrue($recess['manually_adjusted']);
+
+        $this->actingAs($this->manager)
+            ->deleteJson(route('faculty-loading.schedules.day-adjustments.band-overrides.destroy', [$adjustment, $section->id, 'RECESS']))
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 0);
+    }
+
+    public function test_band_override_rejects_an_invalid_band_type(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'LUNCH',
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:15',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('band_type');
+    }
+
+    public function test_band_override_endpoint_is_draft_only(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'RECESS',
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:15',
+            ])
+            ->assertStatus(422);
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');
