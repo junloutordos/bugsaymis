@@ -217,7 +217,7 @@ class AdjustedClassScheduleService
                     ->sortBy('start')
                     ->values()
                     ->map(function (array $band) use ($section, $bandOverridesBySectionType) {
-                        if (! in_array($band['type'] ?? '', ['RECESS', 'WHITE_SPACE'], true)) {
+                        if (! in_array($band['type'] ?? '', ['RECESS', 'WHITE_SPACE', 'WELLNESS'], true)) {
                             return $band;
                         }
 
@@ -250,6 +250,16 @@ class AdjustedClassScheduleService
                         'end' => substr((string) $adjustment->health_break_end_time, 0, 5),
                         'type' => 'HEALTH_BREAK',
                         'label' => $adjustment->health_break_title,
+                        // Unlike Recess/White Space/Wellness there's no
+                        // campus default to fall back to — the band only
+                        // ever exists once deliberately declared, so it's
+                        // always treated as a manual, editable/draggable
+                        // block (see upsertBandOverride()'s HEALTH_BREAK
+                        // special case: it writes straight to the
+                        // adjustment's own health_break_* columns, shared
+                        // across every section, instead of a per-section
+                        // override row).
+                        'manually_adjusted' => true,
                     ];
                 }
 

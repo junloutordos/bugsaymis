@@ -1089,6 +1089,97 @@ class ClassScheduleDayAdjustmentTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_band_override_repositions_a_wellness_band_and_can_be_removed(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-05', // Wednesday — campus Wellness window applies
+            'activity_title' => 'Assembly',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Wednesday assembly',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'WELLNESS',
+                'override_start_time' => '10:30',
+                'override_end_time' => '10:45',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 1);
+
+        $bands = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0]['bands'];
+        $wellness = collect($bands)->firstWhere('type', 'WELLNESS');
+
+        $this->assertSame('10:30', $wellness['start']);
+        $this->assertSame('10:45', $wellness['end']);
+        $this->assertTrue($wellness['manually_adjusted']);
+
+        $this->actingAs($this->manager)
+            ->deleteJson(route('faculty-loading.schedules.day-adjustments.band-overrides.destroy', [$adjustment, $section->id, 'WELLNESS']))
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 0);
+    }
+
+    public function test_health_break_band_override_updates_the_shared_adjustment_fields_and_can_be_removed(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'health_break_title' => 'Snack Break',
+            'health_break_start_time' => '09:20',
+            'health_break_end_time' => '09:30',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        // Health Break is a campus-wide value on the adjustment itself, not
+        // a per-section band — dragging it in one section's column must not
+        // create a row in the per-section override table.
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'HEALTH_BREAK',
+                'override_start_time' => '10:00',
+                'override_end_time' => '10:15',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 0);
+        $this->assertSame('10:00:00', $adjustment->fresh()->health_break_start_time);
+        $this->assertSame('10:15:00', $adjustment->fresh()->health_break_end_time);
+
+        $sectionBands = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0]['bands'];
+        $healthBreak = collect($sectionBands)->firstWhere('type', 'HEALTH_BREAK');
+        $this->assertNotNull($healthBreak);
+        $this->assertSame('10:00', $healthBreak['start']);
+        $this->assertSame('10:15', $healthBreak['end']);
+        $this->assertTrue($healthBreak['manually_adjusted']);
+
+        $this->actingAs($this->manager)
+            ->deleteJson(route('faculty-loading.schedules.day-adjustments.band-overrides.destroy', [$adjustment, $section->id, 'HEALTH_BREAK']))
+            ->assertOk();
+
+        $adjustment->refresh();
+        $this->assertNull($adjustment->health_break_title);
+        $this->assertNull($adjustment->health_break_start_time);
+        $this->assertNull($adjustment->health_break_end_time);
+        $this->assertFalse($adjustment->hasHealthBreak());
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');

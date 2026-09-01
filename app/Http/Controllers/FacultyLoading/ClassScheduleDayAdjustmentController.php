@@ -313,10 +313,11 @@ class ClassScheduleDayAdjustmentController extends Controller
     }
 
     /**
-     * Manually correct one Recess or White Space band's displayed time for
-     * one section on this adjusted date only. Draft-only, same lifecycle as
-     * upsertOverride() but keyed by section+band type instead of a
-     * ClassSchedule row (bands have no id of their own).
+     * Manually correct one Recess, White Space, or Wellness band's displayed
+     * time for one section on this adjusted date only, or the campus-wide
+     * Health Break block. Draft-only, same lifecycle as upsertOverride() but
+     * keyed by section+band type instead of a ClassSchedule row (bands have
+     * no id of their own).
      */
     public function upsertBandOverride(Request $request, ClassScheduleDayAdjustment $adjustment): JsonResponse
     {
@@ -325,7 +326,7 @@ class ClassScheduleDayAdjustmentController extends Controller
 
         $data = $request->validate([
             'section_id' => ['required', 'integer'],
-            'band_type' => ['required', 'in:RECESS,WHITE_SPACE'],
+            'band_type' => ['required', 'in:RECESS,WHITE_SPACE,WELLNESS,HEALTH_BREAK'],
             'override_start_time' => ['required', 'date_format:H:i'],
             'override_end_time' => ['required', 'date_format:H:i'],
         ]);
@@ -336,10 +337,22 @@ class ClassScheduleDayAdjustmentController extends Controller
             ]);
         }
 
-        $adjustment->bandOverrides()->updateOrCreate(
-            ['section_id' => $data['section_id'], 'band_type' => $data['band_type']],
-            ['override_start_time' => $data['override_start_time'], 'override_end_time' => $data['override_end_time']],
-        );
+        if ($data['band_type'] === 'HEALTH_BREAK') {
+            // Health Break is a single campus-wide block declared directly
+            // on the adjustment (health_break_start_time/end_time), not a
+            // per-section band like Recess/White Space/Wellness — dragging
+            // or resizing it in any one section's column updates that one
+            // shared value for every section at once.
+            $adjustment->update([
+                'health_break_start_time' => $data['override_start_time'],
+                'health_break_end_time' => $data['override_end_time'],
+            ]);
+        } else {
+            $adjustment->bandOverrides()->updateOrCreate(
+                ['section_id' => $data['section_id'], 'band_type' => $data['band_type']],
+                ['override_start_time' => $data['override_start_time'], 'override_end_time' => $data['override_end_time']],
+            );
+        }
 
         return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
     }
@@ -349,7 +362,18 @@ class ClassScheduleDayAdjustmentController extends Controller
         $this->authorize('faculty_loading.manage');
         abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be manually adjusted.');
 
-        $adjustment->bandOverrides()->where('section_id', $sectionId)->where('band_type', $bandType)->delete();
+        if ($bandType === 'HEALTH_BREAK') {
+            // No campus default to fall back to — removing it means the
+            // block disappears from the day entirely, same as never having
+            // declared one (see ClassScheduleDayAdjustment::hasHealthBreak()).
+            $adjustment->update([
+                'health_break_title' => null,
+                'health_break_start_time' => null,
+                'health_break_end_time' => null,
+            ]);
+        } else {
+            $adjustment->bandOverrides()->where('section_id', $sectionId)->where('band_type', $bandType)->delete();
+        }
 
         return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
     }

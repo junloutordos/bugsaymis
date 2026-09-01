@@ -182,8 +182,10 @@ function wouldConflict(entry, proposedStartMinutes, proposedEndMinutes) {
   })
 }
 
+const DRAGGABLE_BAND_TYPES = ['RECESS', 'WHITE_SPACE', 'WELLNESS', 'HEALTH_BREAK']
+
 function isDraggableBand(band) {
-  return band.type === 'RECESS' || band.type === 'WHITE_SPACE'
+  return DRAGGABLE_BAND_TYPES.includes(band.type)
 }
 
 function onDragStart(event, entry, section) {
