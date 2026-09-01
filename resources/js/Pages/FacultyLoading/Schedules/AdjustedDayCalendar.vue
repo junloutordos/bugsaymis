@@ -6,10 +6,11 @@
         <div v-for="section in grade.sections" :key="section.id" class="w-56 shrink-0">
           <div class="mb-1 text-center text-xs font-semibold text-slate-500">{{ section.name }}</div>
           <div
-            class="relative rounded-lg border border-slate-100 bg-slate-50"
+            class="relative rounded-lg border bg-slate-50"
+            :class="conflictSectionId === section.id ? 'border-rose-300 ring-2 ring-rose-200' : 'border-slate-100'"
             :style="{ height: `${totalMinutes * PX_PER_MINUTE}px` }"
-            :data-section-id="section.id"
             @dragover.prevent="onDragOver($event, section)"
+            @dragleave="conflictSectionId = null"
             @drop.prevent="onDrop($event, section)"
           >
             <div
@@ -45,15 +46,21 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import axios from 'axios'
 
 const props = defineProps({
   preview: { type: Object, required: true },
+  adjustment: { type: Object, required: true },
 })
 
-defineEmits(['edit-entry', 'move-entry'])
+const emit = defineEmits(['edit-entry', 'update:preview'])
 
 const PX_PER_MINUTE = 1.5
+const SNAP_MINUTES = 5
+
+const dragging = ref(null) // { entry, durationMinutes, section }
+const conflictSectionId = ref(null)
 
 const gradesWithEntries = computed(() => (props.preview.grades ?? []).filter(grade => grade.sections?.length))
 
@@ -64,6 +71,12 @@ const totalMinutes = computed(() => calendarEndMinutes.value - calendarStartMinu
 function toMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number)
   return h * 60 + m
+}
+
+function fromMinutes(total) {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 function offsetStyle(startHHMM, endHHMM) {
@@ -86,11 +99,62 @@ function entryClass(entry) {
     : 'border-slate-200 bg-white text-slate-700'
 }
 
-function onDragStart(event, entry, section) {
-  event.dataTransfer.setData('text/plain', String(entry.id))
+function allEntries() {
+  return gradesWithEntries.value.flatMap(grade => grade.sections).flatMap(section => section.entries)
 }
-function onDragOver(event, section) {}
-function onDrop(event, section) {}
 
-defineExpose({ toMinutes, calendarStartMinutes })
+// Live client-side pre-check only — purely advisory (drives the drop
+// target's highlight color). The server call on drop is authoritative;
+// this never blocks a drop, it only colors it.
+function wouldConflict(entry, proposedStartMinutes, proposedEndMinutes) {
+  return allEntries().some(other => {
+    if (other.id === entry.id) return false
+    const sameRoom = other.classroom?.id && entry.classroom?.id && other.classroom.id === entry.classroom.id
+    const sameFaculty = other.faculty?.id && entry.faculty?.id && other.faculty.id === entry.faculty.id
+    if (!sameRoom && !sameFaculty) return false
+    const otherStart = toMinutes(other.start_time)
+    const otherEnd = toMinutes(other.end_time)
+    return proposedStartMinutes < otherEnd && otherStart < proposedEndMinutes
+  })
+}
+
+function onDragStart(event, entry, section) {
+  const durationMinutes = toMinutes(entry.end_time) - toMinutes(entry.start_time)
+  dragging.value = { entry, durationMinutes, section }
+  event.dataTransfer.setData('text/plain', String(entry.id))
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+function proposedStartMinutes(event, columnEl) {
+  const rect = columnEl.getBoundingClientRect()
+  const offsetY = event.clientY - rect.top
+  const rawMinutes = calendarStartMinutes.value + offsetY / PX_PER_MINUTE
+  return Math.round(rawMinutes / SNAP_MINUTES) * SNAP_MINUTES
+}
+
+function onDragOver(event, section) {
+  if (!dragging.value) return
+  const start = proposedStartMinutes(event, event.currentTarget)
+  const end = start + dragging.value.durationMinutes
+  conflictSectionId.value = wouldConflict(dragging.value.entry, start, end) ? section.id : null
+}
+
+async function onDrop(event, section) {
+  if (!dragging.value) return
+  const { entry, durationMinutes } = dragging.value
+  const start = proposedStartMinutes(event, event.currentTarget)
+  const end = start + durationMinutes
+  dragging.value = null
+  conflictSectionId.value = null
+
+  const { data } = await axios.post(
+    route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id),
+    {
+      class_schedule_id: entry.id,
+      override_start_time: fromMinutes(start),
+      override_end_time: fromMinutes(end),
+    },
+  )
+  emit('update:preview', data)
+}
 </script>
