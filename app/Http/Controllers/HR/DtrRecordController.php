@@ -945,8 +945,9 @@ class DtrRecordController extends Controller
         $validated = $request->validated();
 
         $record->update(array_merge($validated, [
-            'processed_by' => Auth::id(),
-            'processed_at' => now(),
+            'processed_by'          => Auth::id(),
+            'processed_at'          => now(),
+            'time_manually_edited'  => true,
         ]));
 
         if ($record->wfh_attendance_id) {

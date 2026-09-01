@@ -86,9 +86,12 @@ class DTRService
                 continue;
             }
 
-            // Check if locked
+            // Check if locked, or manually protected — an admin-corrected
+            // record (edit() sets time_manually_edited; the WFH-override edit
+            // sets wfh_overridden) must not be silently reverted by the next
+            // resync of the raw punch sources.
             $existing = DtrRecord::where('user_id', $userId)->where('work_date', $dateStr)->first();
-            if ($existing && $existing->is_locked) {
+            if ($existing && ($existing->is_locked || $existing->wfh_overridden || $existing->time_manually_edited)) {
                 continue;
             }
 
@@ -1097,11 +1100,11 @@ class DTRService
             return 0;
         }
 
-        $grace        = max(0, (int) ($schedule->grace_period_minutes ?? 15));
         $breakMinutes = $this->getBreakMinutes($dateStr, $schedule);
         $late         = 0.0;
 
         // ── AM in late ────────────────────────────────────────────────────────
+        // No grace period: any minute past scheduled time-in is counted.
         if ($timeInAm) {
             $scheduledTimeIn = $schedule->getTimeIn($dateStr);
             if ($scheduledTimeIn) {
@@ -1109,10 +1112,7 @@ class DTRService
                 $actualIn    = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeInAm));
 
                 if ($actualIn->gt($scheduledIn)) {
-                    $graceDeadline = $scheduledIn->copy()->addMinutes($grace);
-                    if ($actualIn->gt($graceDeadline)) {
-                        $late += $scheduledIn->diffInMinutes($actualIn);
-                    }
+                    $late += $scheduledIn->diffInMinutes($actualIn, true);
                 }
             }
         }
@@ -1218,7 +1218,7 @@ class DTRService
             return 0;
         }
 
-        return $actualOut->diffInMinutes($scheduledOut);
+        return $actualOut->diffInMinutes($scheduledOut, true);
     }
 
     /**
