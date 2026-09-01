@@ -329,10 +329,10 @@ Add to `tests/Feature/FacultyLoading/ClassScheduleDayAdjustmentTest.php`, right 
         $entries = collect($adjustment->fresh()->schedule_snapshot['grades'])
             ->firstWhere('grade_level', 7)['sections'][0]['entries'];
 
-        // Only the 60-minute lunch overlap collapses out of the 130-minute
-        // original gap (10:00-11:40) — 70 minutes of genuine gap remain.
+        // Only the 60-minute lunch overlap collapses out of the 100-minute
+        // original gap (10:00-11:40) — 40 minutes of genuine gap remain.
         $this->assertSame('08:50', $entries[1]['end_time']);
-        $this->assertSame('10:00', $entries[2]['start_time']);
+        $this->assertSame('09:30', $entries[2]['start_time']);
     }
 ```
 
