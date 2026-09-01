@@ -63,7 +63,10 @@
                 <td class="px-4 py-3 text-sm">
                   <div class="font-semibold text-slate-800">{{ item.weekday }}, {{ formatDate(item.effective_date) }}</div>
                 </td>
-                <td class="px-4 py-3 text-sm font-medium text-slate-700">{{ adjustmentTypeLabel(item.adjustment_type) }}</td>
+                <td class="px-4 py-3 text-sm font-medium text-slate-700">
+                  {{ adjustmentTypeLabel(item.adjustment_type) }}
+                  <div class="mt-0.5 text-xs font-normal text-slate-500">{{ gradeLevelsLabel(item.grade_levels) }}</div>
+                </td>
                 <td class="px-4 py-3 text-sm text-slate-600">
                   <div v-if="hasFlag(item.adjustment_type)">Flag 7:30–8:00 AM<span v-if="item.postponed_from_date"> · From {{ formatDate(item.postponed_from_date) }}</span></div>
                   <div v-if="hasShortenedClasses(item.adjustment_type)">
@@ -82,6 +85,12 @@
                   <div v-if="item.status !== 'cancelled'" class="flex items-center justify-end gap-1">
                     <AppIconButton v-if="canManage && item.status === 'draft'" label="Edit adjustment" @click="openEdit(item)">
                       <PencilSquareIcon class="h-4 w-4" />
+                    </AppIconButton>
+                    <AppIconButton v-if="canManage" label="Edit grade levels" @click="openEditGrades(item)">
+                      <AcademicCapIcon class="h-4 w-4" />
+                    </AppIconButton>
+                    <AppIconButton v-if="canManage && item.status === 'draft'" label="Resolve conflicts" @click="openResolve(item)">
+                      <AdjustmentsHorizontalIcon class="h-4 w-4" />
                     </AppIconButton>
                     <AppIconButton :label="item.status === 'draft' ? 'Preview adjusted schedule' : 'Print adjusted schedule'" variant="primary" @click="choosePrint(item)">
                       <PrinterIcon class="h-4 w-4" />
@@ -117,6 +126,25 @@
             <option value="flag_ceremony_shortened_classes">Transferred Flag Ceremony + 30-Minute Classes</option>
             <option value="shortened_classes_protect_assessments">30-Minute Classes (Protect Assessment Periods)</option>
           </select>
+        </div>
+
+        <div>
+          <div class="mb-1 flex items-center justify-between">
+            <label class="block text-sm font-medium text-slate-700">Grade levels</label>
+            <button type="button" class="text-xs font-medium text-indigo-600 hover:text-indigo-700" @click="toggleAllGrades">
+              {{ allGradesSelected ? 'Clear all' : 'Select all' }}
+            </button>
+          </div>
+          <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <label v-for="grade in ALL_GRADES" :key="grade"
+              class="flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-sm font-medium cursor-pointer"
+              :class="form.grade_levels.includes(grade) ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'">
+              <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                :checked="form.grade_levels.includes(grade)" @change="toggleGrade(grade)" />
+              G{{ grade }}
+            </label>
+          </div>
+          <p v-if="form.errors.grade_levels" class="mt-1 text-xs text-rose-600">{{ form.errors.grade_levels }}</p>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -183,11 +211,44 @@
         </div>
       </template>
     </AppModal>
+
+    <AppModal :show="showEditGrades" title="Edit Grade Levels" size="md" @close="showEditGrades = false">
+      <div class="space-y-4">
+        <p class="text-sm text-slate-600">
+          Grade levels can be changed even after publishing — unselected grades keep their regular weekly schedule on this date.
+        </p>
+        <div>
+          <div class="mb-1 flex items-center justify-between">
+            <label class="block text-sm font-medium text-slate-700">Grade levels</label>
+            <button type="button" class="text-xs font-medium text-indigo-600 hover:text-indigo-700" @click="toggleAllGrades(gradesForm)">
+              {{ gradesForm.grade_levels.length === ALL_GRADES.length ? 'Clear all' : 'Select all' }}
+            </button>
+          </div>
+          <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <label v-for="grade in ALL_GRADES" :key="grade"
+              class="flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-sm font-medium cursor-pointer"
+              :class="gradesForm.grade_levels.includes(grade) ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'">
+              <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                :checked="gradesForm.grade_levels.includes(grade)" @change="toggleGrade(grade, gradesForm)" />
+              G{{ grade }}
+            </label>
+          </div>
+          <p v-if="gradesForm.errors.grade_levels" class="mt-1 text-xs text-rose-600">{{ gradesForm.errors.grade_levels }}</p>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <AppButton variant="ghost" @click="showEditGrades = false">Close</AppButton>
+          <AppButton :loading="gradesForm.processing" @click="saveGrades">Save Grades</AppButton>
+        </div>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import Swal from 'sweetalert2'
@@ -200,6 +261,8 @@ import AppCard from '@/Components/AppCard.vue'
 import AppModal from '@/Components/AppModal.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import {
+  AcademicCapIcon,
+  AdjustmentsHorizontalIcon,
   ArrowLeftIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
@@ -216,6 +279,8 @@ const props = defineProps({
   canManage: { type: Boolean, default: false },
 })
 
+const ALL_GRADES = [7, 8, 9, 10, 11, 12]
+
 const selectedTermId = ref(props.term?.id ?? null)
 const showForm = ref(false)
 const editingId = ref(null)
@@ -223,6 +288,7 @@ const suggesting = ref(false)
 const form = useForm({
   academic_term_id: props.term?.id ?? null,
   adjustment_type: 'flag_ceremony',
+  grade_levels: [...ALL_GRADES],
   postponed_from_date: '',
   effective_date: '',
   activity_title: '',
@@ -230,6 +296,48 @@ const form = useForm({
   activity_end_time: '17:00',
   reason: '',
 })
+
+const showEditGrades = ref(false)
+const gradesForm = useForm({ grade_levels: [...ALL_GRADES] })
+let editingGradesItem = null
+
+const allGradesSelected = computed(() => form.grade_levels.length === ALL_GRADES.length)
+
+function toggleGrade(grade, target = form) {
+  const index = target.grade_levels.indexOf(grade)
+  if (index === -1) {
+    target.grade_levels.push(grade)
+  } else {
+    target.grade_levels.splice(index, 1)
+  }
+}
+
+function toggleAllGrades(target = form) {
+  target.grade_levels = target.grade_levels.length === ALL_GRADES.length ? [] : [...ALL_GRADES]
+}
+
+function gradeLevelsLabel(gradeLevels) {
+  if (!gradeLevels || gradeLevels.length === ALL_GRADES.length) return 'All grades'
+  return gradeLevels.map(grade => `G${grade}`).join(', ')
+}
+
+function openEditGrades(item) {
+  editingGradesItem = item
+  gradesForm.clearErrors()
+  gradesForm.grade_levels = item.grade_levels && item.grade_levels.length ? [...item.grade_levels] : [...ALL_GRADES]
+  showEditGrades.value = true
+}
+
+function saveGrades() {
+  gradesForm.put(route('faculty-loading.schedules.day-adjustments.update-grades', editingGradesItem.id), {
+    preserveScroll: true,
+    onSuccess: () => { showEditGrades.value = false },
+  })
+}
+
+function openResolve(item) {
+  router.visit(route('faculty-loading.schedules.day-adjustments.resolve', item.id))
+}
 
 function changeTerm() {
   router.get(route('faculty-loading.schedules.day-adjustments.index'), { term_id: selectedTermId.value }, { preserveState: false })
@@ -241,6 +349,7 @@ function openCreate() {
   form.clearErrors()
   form.academic_term_id = props.term?.id ?? null
   form.adjustment_type = 'flag_ceremony'
+  form.grade_levels = [...ALL_GRADES]
   form.activity_start_time = '13:00'
   form.activity_end_time = '17:00'
   showForm.value = true
@@ -251,6 +360,7 @@ function openEdit(item) {
   form.clearErrors()
   form.academic_term_id = props.term?.id ?? null
   form.adjustment_type = item.adjustment_type
+  form.grade_levels = item.grade_levels && item.grade_levels.length ? [...item.grade_levels] : [...ALL_GRADES]
   form.postponed_from_date = item.postponed_from_date ?? ''
   form.effective_date = item.effective_date
   form.activity_title = item.activity_title ?? ''

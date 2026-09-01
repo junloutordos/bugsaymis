@@ -5,6 +5,7 @@ namespace App\Models\FacultyLoading;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ClassScheduleDayAdjustment extends Model
 {
@@ -13,6 +14,7 @@ class ClassScheduleDayAdjustment extends Model
         'postponed_from_date',
         'effective_date',
         'adjustment_type',
+        'grade_levels',
         'ceremony_start_time',
         'ceremony_end_time',
         'shift_minutes',
@@ -33,6 +35,7 @@ class ClassScheduleDayAdjustment extends Model
     protected $casts = [
         'postponed_from_date' => 'date:Y-m-d',
         'effective_date' => 'date:Y-m-d',
+        'grade_levels' => 'array',
         'shift_minutes' => 'integer',
         'class_duration_minutes' => 'integer',
         'schedule_snapshot' => 'array',
@@ -40,9 +43,17 @@ class ClassScheduleDayAdjustment extends Model
         'cancelled_at' => 'datetime',
     ];
 
+    /** All campus grade levels this module manages, in order. */
+    public const ALL_GRADES = [7, 8, 9, 10, 11, 12];
+
     public function academicTerm(): BelongsTo
     {
         return $this->belongsTo(AcademicTerm::class);
+    }
+
+    public function overrides(): HasMany
+    {
+        return $this->hasMany(ClassScheduleDayAdjustmentOverride::class, 'adjustment_id');
     }
 
     public function createdBy(): BelongsTo
@@ -63,6 +74,23 @@ class ClassScheduleDayAdjustment extends Model
     public function isPublished(): bool
     {
         return $this->status === 'published';
+    }
+
+    /**
+     * Grades this adjustment actually applies to. A null/empty column means
+     * "all grades" — the pre-existing behavior for every adjustment created
+     * before grade scoping existed, and the default for new ones too.
+     *
+     * @return array<int,int>
+     */
+    public function gradeLevels(): array
+    {
+        return $this->grade_levels ? array_values(array_map('intval', $this->grade_levels)) : self::ALL_GRADES;
+    }
+
+    public function appliesToGrade(int $gradeLevel): bool
+    {
+        return in_array($gradeLevel, $this->gradeLevels(), true);
     }
 
     public function hasFlagCeremony(): bool

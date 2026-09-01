@@ -51,6 +51,7 @@ class ClassScheduleDayAdjustmentController extends Controller
             ->map(fn ($adjustment) => [
                 'id' => $adjustment->id,
                 'adjustment_type' => $adjustment->adjustment_type,
+                'grade_levels' => $adjustment->gradeLevels(),
                 'postponed_from_date' => $adjustment->postponed_from_date?->toDateString(),
                 'effective_date' => $adjustment->effective_date->toDateString(),
                 'weekday' => $adjustment->effective_date->englishDayOfWeek,
@@ -173,6 +174,129 @@ class ClassScheduleDayAdjustmentController extends Controller
         return back()->with('success', 'Adjusted-day schedule published and frozen for official printing.');
     }
 
+    /**
+     * Grade scope may be changed even after publishing (unlike every other
+     * field, which is draft-only) — a published adjustment's frozen
+     * snapshot is regenerated and refrozen against the new grade selection
+     * so print and every other consumer of schedule_snapshot stay correct.
+     */
+    public function updateGrades(Request $request, ClassScheduleDayAdjustment $adjustment): RedirectResponse
+    {
+        $this->authorize('faculty_loading.manage');
+        abort_if($adjustment->status === 'cancelled', 422, 'A cancelled adjustment cannot be edited.');
+
+        $data = $request->validate([
+            'grade_levels' => ['required', 'array', 'min:1'],
+            'grade_levels.*' => ['integer', 'in:7,8,9,10,11,12'],
+        ]);
+
+        $selectedGrades = array_values(array_unique(array_map('intval', $data['grade_levels'])));
+        sort($selectedGrades);
+        $gradeLevels = $selectedGrades === self::GRADES ? null : $selectedGrades;
+
+        $warnings = [];
+
+        DB::transaction(function () use ($adjustment, $gradeLevels, &$warnings) {
+            $locked = ClassScheduleDayAdjustment::whereKey($adjustment->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status === 'cancelled', 422, 'A cancelled adjustment cannot be edited.');
+
+            $locked->update(['grade_levels' => $gradeLevels]);
+            $generated = $this->adjustedSchedules->generate($locked->fresh());
+            $warnings = $generated['conflict_warnings'] ?? [];
+
+            if ($locked->status === 'published') {
+                $locked->update(['schedule_snapshot' => $generated]);
+            }
+        });
+
+        return back()->with([
+            'success' => 'Grade levels updated.',
+            'warning' => $warnings ? implode(' ', $warnings) : null,
+        ]);
+    }
+
+    /**
+     * Live-regenerated preview for the draft's conflict-resolution screen —
+     * always reflects the current grade selection and overrides, never the
+     * frozen snapshot (that only exists once published).
+     */
+    public function preview(ClassScheduleDayAdjustment $adjustment): JsonResponse
+    {
+        abort_unless(request()->user()->hasAnyPermission(['faculty_loading.manage', 'faculty_loading.view_own']), 403);
+
+        return response()->json($this->adjustedSchedules->generate($adjustment));
+    }
+
+    /**
+     * Interactive conflict-resolution screen for a draft — shows the live
+     * generated preview plus any conflict_warnings, and lets a manager
+     * manually correct a specific entry's time to resolve one before
+     * publishing. Draft-only (a published schedule is already frozen).
+     */
+    public function resolve(ClassScheduleDayAdjustment $adjustment): Response
+    {
+        $this->authorize('faculty_loading.manage');
+        abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be manually adjusted.');
+
+        $adjustment->loadMissing('academicTerm.schoolYear');
+
+        return Inertia::render('FacultyLoading/Schedules/ResolveConflicts', [
+            'adjustment' => [
+                'id' => $adjustment->id,
+                'adjustment_type' => $adjustment->adjustment_type,
+                'grade_levels' => $adjustment->gradeLevels(),
+                'effective_date' => $adjustment->effective_date->toDateString(),
+                'reason' => $adjustment->reason,
+            ],
+            'term' => [
+                'label' => $adjustment->academicTerm->full_label,
+                'school_year' => $adjustment->academicTerm->schoolYear?->name,
+            ],
+            'preview' => $this->adjustedSchedules->generate($adjustment),
+        ]);
+    }
+
+    /**
+     * Manually correct one class entry's displayed time on this adjusted
+     * date only, to resolve a flagged conflict before publishing. Draft-only
+     * — a published schedule is frozen and can't take new overrides without
+     * going back to draft first.
+     */
+    public function upsertOverride(Request $request, ClassScheduleDayAdjustment $adjustment): JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+        abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be manually adjusted.');
+
+        $data = $request->validate([
+            'class_schedule_id' => ['required', 'integer', 'exists:class_schedules,id'],
+            'override_start_time' => ['required', 'date_format:H:i'],
+            'override_end_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        if ($data['override_end_time'] <= $data['override_start_time']) {
+            throw ValidationException::withMessages([
+                'override_end_time' => 'The override end time must be after its start time.',
+            ]);
+        }
+
+        $adjustment->overrides()->updateOrCreate(
+            ['class_schedule_id' => $data['class_schedule_id']],
+            ['override_start_time' => $data['override_start_time'], 'override_end_time' => $data['override_end_time']],
+        );
+
+        return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
+    }
+
+    public function removeOverride(ClassScheduleDayAdjustment $adjustment, int $classScheduleId): JsonResponse
+    {
+        $this->authorize('faculty_loading.manage');
+        abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be manually adjusted.');
+
+        $adjustment->overrides()->where('class_schedule_id', $classScheduleId)->delete();
+
+        return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
+    }
+
     public function cancel(ClassScheduleDayAdjustment $adjustment): RedirectResponse
     {
         $this->authorize('faculty_loading.manage');
@@ -218,6 +342,7 @@ class ClassScheduleDayAdjustmentController extends Controller
             'adjustment' => [
                 'id' => $adjustment->id,
                 'adjustment_type' => $adjustment->adjustment_type,
+                'grade_levels' => $adjustment->gradeLevels(),
                 'postponed_from_date' => $adjustment->postponed_from_date?->toDateString(),
                 'effective_date' => $adjustment->effective_date->toDateString(),
                 'reason' => $adjustment->reason,
@@ -252,6 +377,8 @@ class ClassScheduleDayAdjustmentController extends Controller
         $data = $request->validate([
             'academic_term_id' => ['required', 'integer', 'exists:academic_terms,id'],
             'adjustment_type' => ['nullable', 'in:flag_ceremony,shortened_classes,flag_ceremony_shortened_classes,shortened_classes_protect_assessments'],
+            'grade_levels' => ['required', 'array', 'min:1'],
+            'grade_levels.*' => ['integer', 'in:7,8,9,10,11,12'],
             'postponed_from_date' => ['nullable', 'date'],
             'effective_date' => ['required', 'date'],
             'activity_title' => ['nullable', 'string', 'max:255'],
@@ -261,6 +388,12 @@ class ClassScheduleDayAdjustmentController extends Controller
         ]);
 
         $data['adjustment_type'] ??= 'flag_ceremony';
+        $selectedGrades = array_values(array_unique(array_map('intval', $data['grade_levels'])));
+        sort($selectedGrades);
+        // Store null (not the full [7..12] array) when every grade is
+        // selected, so gradeLevels() treats it identically to legacy rows
+        // created before grade scoping existed.
+        $data['grade_levels'] = $selectedGrades === self::GRADES ? null : $selectedGrades;
 
         $term = AcademicTerm::findOrFail($data['academic_term_id']);
         $effectiveDate = Carbon::parse($data['effective_date']);
@@ -308,11 +441,11 @@ class ClassScheduleDayAdjustmentController extends Controller
                 ]);
             }
 
-            $allGradesOpen = collect(self::GRADES)
+            $allGradesOpen = collect($selectedGrades)
                 ->every(fn (int $grade) => $this->calendar->isSchoolDay($data['effective_date'], $grade));
             if (! $allGradesOpen) {
                 throw ValidationException::withMessages([
-                    'effective_date' => 'The shortened-class adjustment must fall on a school day for all grade levels.',
+                    'effective_date' => 'The shortened-class adjustment must fall on a school day for every selected grade level.',
                 ]);
             }
         } else {

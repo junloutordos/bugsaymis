@@ -35,6 +35,10 @@ class AdjustedClassScheduleService
         $protectedPairs = $adjustment->protectsAssessmentPeriods()
             ? $this->majorAssessmentPairs((int) $term->school_year_id, $adjustment->effective_date->toDateString())
             : null;
+        $selectedGrades = $adjustment->gradeLevels();
+        $overridesByScheduleId = $adjustment->exists
+            ? $adjustment->overrides()->get()->keyBy('class_schedule_id')
+            : collect();
 
         $overrideColumns = array_merge(
             ...array_values(Section::LUNCH_OVERRIDE_COLUMNS),
@@ -68,6 +72,18 @@ class AdjustedClassScheduleService
 
         $grades = [];
         foreach (range(7, 12) as $gradeLevel) {
+            if (! in_array($gradeLevel, $selectedGrades, true)) {
+                // Not part of this adjustment — the regular weekly schedule
+                // applies unchanged on this date for this grade.
+                $grades[] = [
+                    'grade_level' => $gradeLevel,
+                    'regular_schedule_applies' => true,
+                    'sections' => [],
+                ];
+
+                continue;
+            }
+
             $gradeSections = [];
 
             foreach ($sections->where('levelid', $gradeLevel) as $section) {
@@ -98,12 +114,25 @@ class AdjustedClassScheduleService
                     ->all();
 
                 $entries = $sectionSchedule
-                    ->map(function (ClassSchedule $schedule) use ($sectionSlots, $shift) {
+                    ->map(function (ClassSchedule $schedule) use ($sectionSlots, $shift, $overridesByScheduleId) {
                         $entry = $schedule->toCalendarArray();
                         $entry['raw_start_time'] = substr((string) $schedule->start_time, 0, 5);
                         $entry['raw_end_time'] = substr((string) $schedule->end_time, 0, 5);
-                        $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $sectionSlots, $shift);
-                        $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $sectionSlots, $shift);
+
+                        $override = $overridesByScheduleId->get($schedule->id);
+                        if ($override) {
+                            // A manual time-only correction takes precedence
+                            // over the computed compression/shift for this
+                            // one entry — used to resolve a flagged conflict
+                            // before publishing. Flagged for audit display.
+                            $entry['start_time'] = substr((string) $override->override_start_time, 0, 5);
+                            $entry['end_time'] = substr((string) $override->override_end_time, 0, 5);
+                            $entry['manually_adjusted'] = true;
+                        } else {
+                            $entry['start_time'] = $this->transformTime((string) $schedule->start_time, $sectionSlots, $shift);
+                            $entry['end_time'] = $this->transformTime((string) $schedule->end_time, $sectionSlots, $shift);
+                            $entry['manually_adjusted'] = false;
+                        }
 
                         return $entry;
                     })

@@ -135,6 +135,11 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::get('/suggest', [ClassScheduleDayAdjustmentController::class, 'suggest'])->name('suggest');
                 Route::post('/', [ClassScheduleDayAdjustmentController::class, 'store'])->name('store');
                 Route::put('/{adjustment}', [ClassScheduleDayAdjustmentController::class, 'update'])->name('update');
+                Route::put('/{adjustment}/grades', [ClassScheduleDayAdjustmentController::class, 'updateGrades'])->name('update-grades');
+                Route::get('/{adjustment}/resolve', [ClassScheduleDayAdjustmentController::class, 'resolve'])->name('resolve');
+                Route::get('/{adjustment}/preview', [ClassScheduleDayAdjustmentController::class, 'preview'])->name('preview');
+                Route::post('/{adjustment}/overrides', [ClassScheduleDayAdjustmentController::class, 'upsertOverride'])->name('overrides.store');
+                Route::delete('/{adjustment}/overrides/{classScheduleId}', [ClassScheduleDayAdjustmentController::class, 'removeOverride'])->name('overrides.destroy');
                 Route::post('/{adjustment}/publish', [ClassScheduleDayAdjustmentController::class, 'publish'])->name('publish');
                 Route::post('/{adjustment}/cancel', [ClassScheduleDayAdjustmentController::class, 'cancel'])->name('cancel');
             });

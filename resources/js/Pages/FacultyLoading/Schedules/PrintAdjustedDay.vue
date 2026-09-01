@@ -39,6 +39,7 @@
                 <div class="entry-main">
                   <strong>{{ entryTitle(entry) }}</strong>
                   <small>{{ formatDisplayRange(entry.start_time, entry.end_time) }}</small>
+                  <span v-if="entry.manually_adjusted" class="adjusted-badge" title="Manually adjusted before publishing">*</span>
                 </div>
                 <span v-if="duration(entry.start_time, entry.end_time) >= 30" class="faculty-name">{{ entry.faculty?.name ?? 'TBA' }}</span>
               </div>
@@ -52,6 +53,10 @@
         <div><span>Prepared by:</span><strong>{{ signatories?.prepared?.name ?? '' }}</strong><small>{{ signatories?.prepared?.position ?? '' }}</small></div>
         <div><span>Approved by:</span><strong>{{ signatories?.approved?.name ?? '' }}</strong><small>{{ signatories?.approved?.position ?? '' }}</small></div>
       </footer>
+
+      <p v-if="hasManualAdjustments(grade)" class="manual-adjustment-note">
+        * Manually adjusted time to resolve a scheduling conflict prior to publishing.
+      </p>
 
       <div v-if="adjustment.status === 'draft'" class="draft-watermark">DRAFT PREVIEW</div>
     </main>
@@ -129,6 +134,9 @@ function bandClass(type) {
   if (type === 'LUNCH' || type === 'RECESS') return 'break'
   return 'fixed'
 }
+function hasManualAdjustments(grade) {
+  return (grade.sections ?? []).some(section => (section.entries ?? []).some(entry => entry.manually_adjusted))
+}
 
 onMounted(async () => {
   await nextTick()
@@ -178,7 +186,7 @@ html, body { margin: 0; padding: 0; background: #d1d5db; }
 .schedule-band.science-core { background: #f5f3ff; border-color: #8b5cf6; color: #5b21b6; }
 .schedule-band.official-activity { background: #ede9fe; border-color: #7c3aed; color: #4c1d95; font-size: 7pt; }
 .class-entry { background: #dbeafe; border: .25mm solid #60a5fa; color: #1e3a8a; font-size: 6.3pt; }
-.entry-main { min-width: 0; }
+.entry-main { position: relative; min-width: 0; }
 .class-entry strong { font-size: 7pt; }
 .class-entry .faculty-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .class-entry small { margin: .3mm 0; white-space: nowrap; font-size: 5.7pt; font-weight: 700; }
@@ -198,6 +206,8 @@ html, body { margin: 0; padding: 0; background: #d1d5db; }
 .signatories span { align-self: flex-start; color: #475569; }
 .signatories strong { border-bottom: .2mm solid #334155; padding-bottom: .6mm; font-size: 8pt; }
 .signatories small { padding-top: .5mm; color: #475569; }
+.adjusted-badge { position: absolute; top: .3mm; right: .6mm; z-index: 3; font-size: 6.5pt; font-weight: 800; color: #4338ca; }
+.manual-adjustment-note { position: absolute; bottom: 15mm; left: 0; margin: 0; font-size: 5.6pt; font-style: italic; color: #4338ca; }
 .draft-watermark { position: absolute; z-index: 20; top: 77mm; left: 55mm; transform: rotate(-28deg); font-size: 38pt; font-weight: 800; letter-spacing: .12em; color: rgba(220, 38, 38, .13); pointer-events: none; }
 @page { size: A4 landscape; margin: 0; }
 @media print {

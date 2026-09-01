@@ -144,6 +144,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'postponed_from_date' => '2026-08-03',
             'effective_date' => '2026-08-04',
             'reason' => 'Monday campus holiday',
@@ -205,6 +206,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes',
             'effective_date' => '2026-08-04',
             'activity_title' => 'Research Congress',
@@ -237,6 +239,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
     {
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes',
             'effective_date' => '2026-08-04',
             'activity_title' => 'Early Assembly',
@@ -252,6 +255,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
     {
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'flag_ceremony_shortened_classes',
             'postponed_from_date' => '2026-08-03',
             'effective_date' => '2026-08-04',
@@ -373,6 +377,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $response = $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes',
             'effective_date' => '2026-08-10',
             'activity_title' => 'Heat Index Early Dismissal',
@@ -419,6 +424,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes',
             'effective_date' => '2026-08-04',
             'activity_title' => 'Heat Index Early Dismissal',
@@ -476,6 +482,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes',
             'effective_date' => '2026-08-10',
             'activity_title' => 'Heat Index Early Dismissal',
@@ -564,6 +571,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes',
             'effective_date' => '2026-08-04',
             'activity_title' => 'Heat Index Early Dismissal',
@@ -657,6 +665,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes_protect_assessments',
             'effective_date' => '2026-08-04',
             'activity_title' => 'Heat Index Early Dismissal',
@@ -693,6 +702,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
             'adjustment_type' => 'shortened_classes_protect_assessments',
             'effective_date' => '2026-08-04',
             'activity_title' => 'Heat Index Early Dismissal',
@@ -749,5 +759,389 @@ class ClassScheduleDayAdjustmentTest extends TestCase
             'max_score' => 50,
             'is_major' => $isMajor,
         ]);
+    }
+
+    // ── Grade-level publish scope ─────────────────────────────────────────────
+
+    public function test_store_requires_at_least_one_grade_level(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertSessionHasErrors('grade_levels');
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 0);
+    }
+
+    public function test_partial_grade_selection_only_generates_selected_grades_others_keep_regular_schedule(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7],
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Grade 7 Only Assembly',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Grade 7 exclusive activity',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->assertSame([7], $adjustment->gradeLevels());
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $grades = collect($adjustment->fresh()->schedule_snapshot['grades'])->keyBy('grade_level');
+
+        $grade7 = $grades->get(7);
+        $this->assertArrayNotHasKey('regular_schedule_applies', $grade7);
+        $this->assertNotEmpty($grade7['sections']);
+        $this->assertSame('07:30', $grade7['sections'][0]['entries'][0]['start_time']);
+        $this->assertSame('08:00', $grade7['sections'][0]['entries'][0]['end_time']);
+
+        foreach ([8, 9, 10, 11, 12] as $unselectedGrade) {
+            $grade = $grades->get($unselectedGrade);
+            $this->assertTrue($grade['regular_schedule_applies']);
+            $this->assertEmpty($grade['sections']);
+        }
+    }
+
+    public function test_grade_levels_stores_null_when_every_grade_is_selected(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->assertNull($adjustment->grade_levels);
+        $this->assertSame([7, 8, 9, 10, 11, 12], $adjustment->gradeLevels());
+    }
+
+    public function test_grades_can_be_edited_after_publishing_and_snapshot_is_refrozen(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $adjustment->refresh();
+        $this->assertSame('published', $adjustment->status);
+        $publishedGrades = collect($adjustment->schedule_snapshot['grades'])->keyBy('grade_level');
+        $this->assertArrayNotHasKey('regular_schedule_applies', $publishedGrades->get(7));
+
+        // Narrow to Grade 7 only, even though the adjustment is already published.
+        $this->actingAs($this->manager)
+            ->put(route('faculty-loading.schedules.day-adjustments.update-grades', $adjustment), [
+                'grade_levels' => [7],
+            ])
+            ->assertRedirect();
+
+        $adjustment->refresh();
+        $this->assertSame('published', $adjustment->status, 'Status must stay published, only grade scope narrows.');
+        $this->assertSame([7], $adjustment->gradeLevels());
+
+        $refrozenGrades = collect($adjustment->schedule_snapshot['grades'])->keyBy('grade_level');
+        $this->assertArrayNotHasKey('regular_schedule_applies', $refrozenGrades->get(7));
+        $this->assertTrue($refrozenGrades->get(8)['regular_schedule_applies']);
+    }
+
+    public function test_update_grades_rejects_empty_selection(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->put(route('faculty-loading.schedules.day-adjustments.update-grades', $adjustment), [
+                'grade_levels' => [],
+            ])
+            ->assertSessionHasErrors('grade_levels');
+
+        $this->assertNull($adjustment->fresh()->grade_levels);
+    }
+
+    // ── Manual time-only conflict resolution (overrides) ──────────────────────
+
+    public function test_override_resolves_a_flagged_cross_grade_warning(): void
+    {
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $otherRoom = Classroom::create([
+            'school_year_id' => $this->term->school_year_id,
+            'name' => 'Room 102',
+            'code' => 'R102',
+            'classroom_type' => 'lecture',
+            'capacity' => 40,
+            'is_available' => true,
+        ]);
+        $grade7Section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $grade7Subject = Subject::where('code', 'MATH7')->firstOrFail();
+
+        $grade8Section = Section::create([
+            'levelid' => 8,
+            'sectionname' => 'Beryl',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+        $grade8Subject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'MATH8',
+            'name' => 'Mathematics 2',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'lecture',
+            'grade_level' => 8,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+
+        $grade7Class = ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $grade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade8Subject->id,
+            'section_id' => $grade8Section->id,
+            'classroom_id' => $otherRoom->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '08:50',
+            'end_time' => '09:40',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade8Subject->id,
+            'section_id' => $grade8Section->id,
+            'classroom_id' => $otherRoom->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade8Subject->id,
+            'section_id' => $grade8Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:50',
+            'end_time' => '11:40',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-10',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ]);
+        $response->assertSessionHas('warning');
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        // Manually push the Grade 7 entry's displayed time later so it no
+        // longer overlaps Grade 8's compressed 10:10-10:40 Room 101 booking.
+        $preview = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $grade7Class->id,
+                'override_start_time' => '10:40',
+                'override_end_time' => '11:10',
+            ])
+            ->assertOk()
+            ->json();
+
+        $this->assertEmpty($preview['conflict_warnings']);
+
+        $overriddenEntry = collect($preview['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'][0];
+        $this->assertSame('10:40', $overriddenEntry['start_time']);
+        $this->assertSame('11:10', $overriddenEntry['end_time']);
+        $this->assertTrue($overriddenEntry['manually_adjusted']);
+
+        // Publishing now freezes the override into the snapshot, with the audit flag intact.
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $frozenEntry = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'][0];
+        $this->assertSame('10:40', $frozenEntry['start_time']);
+        $this->assertTrue($frozenEntry['manually_adjusted']);
+    }
+
+    public function test_override_cannot_hide_a_genuine_same_grade_double_booking(): void
+    {
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $grade7Section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $grade7Subject = Subject::where('code', 'MATH7')->firstOrFail();
+
+        $otherGrade7Section = Section::create([
+            'levelid' => 7,
+            'sectionname' => 'Citrine',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+
+        $firstClass = ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $grade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
+            'status' => 'active',
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $grade7Subject->id,
+            'section_id' => $otherGrade7Section->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Monday',
+            'start_time' => '10:20',
+            'end_time' => '11:10',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-10',
+            'activity_title' => 'Heat Index Early Dismissal',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Due to high heat index',
+        ])->assertSessionHasErrors('activity_start_time');
+
+        // Nothing was persisted (store() throws before creating the row), so
+        // there's no adjustment to attach an override to — the resolution
+        // path is only reachable once a draft exists in the first place.
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 0);
+    }
+
+    public function test_override_requires_end_time_after_start_time(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $this->tuesdayClass->id,
+                'override_start_time' => '09:00',
+                'override_end_time' => '08:00',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('override_end_time');
+    }
+
+    public function test_override_can_be_removed(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $this->tuesdayClass->id,
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:50',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_overrides', 1);
+
+        $this->actingAs($this->manager)
+            ->deleteJson(route('faculty-loading.schedules.day-adjustments.overrides.destroy', [$adjustment, $this->tuesdayClass->id]))
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_overrides', 0);
+    }
+
+    public function test_override_endpoint_is_draft_only(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $this->tuesdayClass->id,
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:50',
+            ])
+            ->assertStatus(422);
     }
 }
