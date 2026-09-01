@@ -222,7 +222,7 @@ function cellStyle(rec, field) {
 
 function tardyMinutes(rec) {
   if (!rec) return 0
-  return (rec.late_minutes || 0) + (rec.undertime_minutes || 0)
+  return (Number(rec.late_minutes) || 0) + (Number(rec.undertime_minutes) || 0)
 }
 function utH(rec) {
   const total = tardyMinutes(rec)
