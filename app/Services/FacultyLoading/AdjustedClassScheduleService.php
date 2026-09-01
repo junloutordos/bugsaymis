@@ -45,6 +45,9 @@ class AdjustedClassScheduleService
         $overridesByScheduleId = $adjustment->exists
             ? $adjustment->overrides()->get()->keyBy('class_schedule_id')
             : collect();
+        $bandOverridesBySectionType = $adjustment->exists
+            ? $adjustment->bandOverrides()->get()->keyBy(fn ($o) => "{$o->section_id}:{$o->band_type}")
+            : collect();
 
         $overrideColumns = array_merge(
             ...array_values(Section::LUNCH_OVERRIDE_COLUMNS),
@@ -213,6 +216,23 @@ class AdjustedClassScheduleService
                     ))
                     ->sortBy('start')
                     ->values()
+                    ->map(function (array $band) use ($section, $bandOverridesBySectionType) {
+                        if (! in_array($band['type'] ?? '', ['RECESS', 'WHITE_SPACE'], true)) {
+                            return $band;
+                        }
+
+                        $override = $bandOverridesBySectionType->get("{$section->id}:{$band['type']}");
+                        if (! $override) {
+                            return [...$band, 'manually_adjusted' => false];
+                        }
+
+                        return [
+                            ...$band,
+                            'start' => substr((string) $override->override_start_time, 0, 5),
+                            'end' => substr((string) $override->override_end_time, 0, 5),
+                            'manually_adjusted' => true,
+                        ];
+                    })
                     ->all();
 
                 if ($activityStart && $activityEnd) {

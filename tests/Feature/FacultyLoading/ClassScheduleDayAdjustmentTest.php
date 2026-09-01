@@ -1000,6 +1000,44 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame('09:30', $entries[2]['start_time']);
     }
 
+    public function test_band_override_repositions_a_recess_band_and_can_be_removed(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'RECESS',
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:15',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 1);
+
+        $bands = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0]['bands'];
+        $recess = collect($bands)->firstWhere('type', 'RECESS');
+
+        $this->assertSame('09:00', $recess['start']);
+        $this->assertSame('09:15', $recess['end']);
+        $this->assertTrue($recess['manually_adjusted']);
+
+        $this->actingAs($this->manager)
+            ->deleteJson(route('faculty-loading.schedules.day-adjustments.band-overrides.destroy', [$adjustment, $section->id, 'RECESS']))
+            ->assertOk();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 0);
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');
