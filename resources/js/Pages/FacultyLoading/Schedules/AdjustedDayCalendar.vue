@@ -21,6 +21,7 @@
               :class="bandClass(band)"
               :style="bandStyle(band)"
               @dragstart="onBandDragStart($event, band, section)"
+              @click="isDraggableBand(band) && openBandOverride(section, band)"
             >
               <div v-if="isDraggableBand(band)" class="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
                 @mousedown.stop.prevent="startResize($event, band, section, 'start')"
@@ -54,9 +55,12 @@
   </div>
 
   <AppModal :show="showOverrideModal" title="Adjust class time" size="sm" @close="showOverrideModal = false">
-    <div v-if="editingEntry" class="space-y-4">
-      <p class="text-sm text-slate-600">
+    <div v-if="editingEntry || editingBand" class="space-y-4">
+      <p v-if="editingEntry" class="text-sm text-slate-600">
         {{ editingEntry.subject?.name ?? editingEntry.title }} — currently {{ editingEntry.start_time }}–{{ editingEntry.end_time }}
+      </p>
+      <p v-else class="text-sm text-slate-600">
+        {{ editingBand.band.label }} — currently {{ editingBand.band.start }}–{{ editingBand.band.end }}
       </p>
       <div class="grid grid-cols-2 gap-4">
         <div>
@@ -75,7 +79,7 @@
 
     <template #footer>
       <div class="flex w-full items-center justify-between gap-2">
-        <AppButton v-if="editingEntry?.manually_adjusted" variant="ghost" class="text-rose-600" @click="removeOverride">Remove override</AppButton>
+        <AppButton v-if="editingEntry?.manually_adjusted || editingBand?.band.manually_adjusted" variant="ghost" class="text-rose-600" @click="removeOverride">Remove override</AppButton>
         <div class="ml-auto flex gap-2">
           <AppButton variant="ghost" @click="showOverrideModal = false">Cancel</AppButton>
           <AppButton :loading="savingOverride" @click="saveOverride">Save</AppButton>
@@ -108,6 +112,7 @@ const MIN_BAND_MINUTES = 5
 
 const showOverrideModal = ref(false)
 const editingEntry = ref(null)
+const editingBand = ref(null) // { section, band }
 const overrideForm = ref({ override_start_time: '', override_end_time: '' })
 const overrideError = ref('')
 const savingOverride = ref(false)
@@ -288,7 +293,16 @@ async function onResizeEnd() {
 
 function openOverride(entry) {
   editingEntry.value = entry
+  editingBand.value = null
   overrideForm.value = { override_start_time: entry.start_time, override_end_time: entry.end_time }
+  overrideError.value = ''
+  showOverrideModal.value = true
+}
+
+function openBandOverride(section, band) {
+  editingBand.value = { section, band }
+  editingEntry.value = null
+  overrideForm.value = { override_start_time: band.start, override_end_time: band.end }
   overrideError.value = ''
   showOverrideModal.value = true
 }
@@ -297,11 +311,18 @@ async function saveOverride() {
   savingOverride.value = true
   overrideError.value = ''
   try {
-    const { data } = await axios.post(route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id), {
-      class_schedule_id: editingEntry.value.id,
-      override_start_time: overrideForm.value.override_start_time,
-      override_end_time: overrideForm.value.override_end_time,
-    })
+    const { data } = editingEntry.value
+      ? await axios.post(route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id), {
+          class_schedule_id: editingEntry.value.id,
+          override_start_time: overrideForm.value.override_start_time,
+          override_end_time: overrideForm.value.override_end_time,
+        })
+      : await axios.post(route('faculty-loading.schedules.day-adjustments.band-overrides.store', props.adjustment.id), {
+          section_id: editingBand.value.section.id,
+          band_type: editingBand.value.band.type,
+          override_start_time: overrideForm.value.override_start_time,
+          override_end_time: overrideForm.value.override_end_time,
+        })
     emit('update:preview', data)
     showOverrideModal.value = false
   } catch (error) {
@@ -313,7 +334,9 @@ async function saveOverride() {
 }
 
 async function removeOverride() {
-  const { data } = await axios.delete(route('faculty-loading.schedules.day-adjustments.overrides.destroy', [props.adjustment.id, editingEntry.value.id]))
+  const { data } = editingEntry.value
+    ? await axios.delete(route('faculty-loading.schedules.day-adjustments.overrides.destroy', [props.adjustment.id, editingEntry.value.id]))
+    : await axios.delete(route('faculty-loading.schedules.day-adjustments.band-overrides.destroy', [props.adjustment.id, editingBand.value.section.id, editingBand.value.band.type]))
   emit('update:preview', data)
   showOverrideModal.value = false
 }
