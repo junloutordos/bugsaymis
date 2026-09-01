@@ -28,8 +28,11 @@ import {
   ArchiveBoxIcon,
   MagnifyingGlassIcon,
   ArrowsRightLeftIcon,
+  CameraIcon,
+  CheckCircleIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
+import BarcodeScannerModal from "@/Components/ICTEquipment/BarcodeScannerModal.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
 import AppButton from "@/Components/AppButton.vue"
 import AppIconButton from "@/Components/AppIconButton.vue"
@@ -84,6 +87,22 @@ const {
   closeMergeModal,
   submitMerge,
 } = useEquipments(props.equipments?.data ?? [], props.users)
+
+const showScannerModal = ref(false)
+const serialJustScanned = ref(false)
+let serialScanFlashTimer = null
+
+function openScanner() {
+  showScannerModal.value = true
+}
+
+function handleSerialScanned(value) {
+  form.serial_no = value
+  showScannerModal.value = false
+  serialJustScanned.value = true
+  clearTimeout(serialScanFlashTimer)
+  serialScanFlashTimer = setTimeout(() => { serialJustScanned.value = false }, 1500)
+}
 
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
@@ -899,7 +918,42 @@ const showAllChecked    = computed({
 
           <!-- Serial No -->
           <div class="col-span-2">
-            <AppInput v-model="form.serial_no" type="text" label="Serial No" required :error="errors.serial_no" />
+            <label class="block text-xs font-medium text-slate-600 mb-1">
+              Serial No <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <input
+                v-model="form.serial_no"
+                type="text"
+                required
+                placeholder="Type, or scan the device's barcode/QR label"
+                :class="[
+                  'w-full rounded-lg border pl-3 pr-11 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25 transition-colors',
+                  errors.serial_no ? 'border-red-400 bg-red-50/30' : 'border-slate-200 bg-white hover:border-slate-300',
+                  serialJustScanned ? 'ring-2 ring-emerald-400/50 border-emerald-400' : '',
+                ]"
+              />
+              <Transition
+                enter-active-class="transition ease-out duration-150"
+                enter-from-class="opacity-0 scale-75"
+                enter-to-class="opacity-100 scale-100"
+                leave-active-class="transition ease-in duration-150"
+                leave-from-class="opacity-100 scale-100"
+                leave-to-class="opacity-0 scale-75"
+              >
+                <CheckCircleIcon v-if="serialJustScanned" class="absolute right-2.5 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-500" />
+                <button
+                  v-else
+                  type="button"
+                  @click="openScanner"
+                  title="Scan barcode / QR"
+                  class="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                >
+                  <CameraIcon class="h-5 w-5" />
+                </button>
+              </Transition>
+            </div>
+            <p v-if="errors.serial_no" class="mt-1 text-xs text-red-500">{{ errors.serial_no }}</p>
           </div>
 
           <!-- Device Description -->
@@ -983,6 +1037,13 @@ const showAllChecked    = computed({
           </template>
         </template>
       </AppModal>
+
+      <!-- BARCODE SCANNER MODAL -->
+      <BarcodeScannerModal
+        :show="showScannerModal"
+        @close="showScannerModal = false"
+        @detected="handleSerialScanned"
+      />
 
       <!-- PMS HISTORY MODAL -->
       <AppModal
