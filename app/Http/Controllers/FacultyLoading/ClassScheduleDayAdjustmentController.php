@@ -456,6 +456,7 @@ class ClassScheduleDayAdjustmentController extends Controller
 
         $duplicate = ClassScheduleDayAdjustment::where('academic_term_id', $term->id)
             ->where('effective_date', $data['effective_date'])
+            ->where('status', '<>', 'cancelled')
             ->when($adjustment, fn ($query) => $query->whereKeyNot($adjustment->id))
             ->exists();
 

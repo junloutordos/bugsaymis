@@ -761,6 +761,73 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         ]);
     }
 
+    // ── Cancellation frees up the date for a new adjustment ───────────────────
+
+    public function test_a_new_adjustment_can_be_created_for_a_date_whose_previous_adjustment_was_cancelled(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $first = ClassScheduleDayAdjustment::firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.cancel', $first))
+            ->assertRedirect();
+
+        $this->assertSame('cancelled', $first->fresh()->status);
+
+        // Same term + same date, previously blocked forever by a DB-level
+        // unique constraint that didn't exclude cancelled rows.
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Rescheduled Assembly',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'New adjustment replacing the cancelled one',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 2);
+        $second = ClassScheduleDayAdjustment::where('id', '<>', $first->id)->firstOrFail();
+        $this->assertSame('draft', $second->status);
+        $this->assertSame('2026-08-04', $second->effective_date->toDateString());
+    }
+
+    public function test_a_second_active_adjustment_for_the_same_date_is_still_rejected(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 1);
+
+        // Still draft (not cancelled) — a second adjustment for the exact
+        // same term/date must still be rejected.
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'shortened_classes',
+            'effective_date' => '2026-08-04',
+            'activity_title' => 'Conflicting Assembly',
+            'activity_start_time' => '13:00',
+            'activity_end_time' => '17:00',
+            'reason' => 'Should be rejected',
+        ])->assertSessionHasErrors('effective_date');
+
+        $this->assertDatabaseCount('class_schedule_day_adjustments', 1);
+    }
+
     // ── Grade-level publish scope ─────────────────────────────────────────────
 
     public function test_store_requires_at_least_one_grade_level(): void
