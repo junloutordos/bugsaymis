@@ -16,8 +16,11 @@
             <div
               v-for="band in section.bands"
               :key="`${band.type}-${band.start}`"
-              class="absolute inset-x-0 rounded bg-slate-200/60 px-1.5 py-0.5 text-[10px] text-slate-500"
+              :draggable="isDraggableBand(band)"
+              class="absolute inset-x-0 rounded px-1.5 py-0.5 text-[10px]"
+              :class="bandClass(band)"
               :style="bandStyle(band)"
+              @dragstart="onBandDragStart($event, band, section)"
             >
               {{ band.label }}
             </div>
@@ -138,6 +141,15 @@ function entryClass(entry) {
     : 'border-slate-200 bg-white text-slate-700'
 }
 
+function bandClass(band) {
+  if (!isDraggableBand(band)) {
+    return 'bg-slate-200/60 text-slate-500'
+  }
+  return band.manually_adjusted
+    ? 'cursor-grab border border-indigo-300 bg-indigo-50 text-indigo-800 active:cursor-grabbing'
+    : 'cursor-grab border border-slate-200 bg-slate-200/60 text-slate-600 active:cursor-grabbing'
+}
+
 function allEntries() {
   return gradesWithEntries.value.flatMap(grade => grade.sections).flatMap(section => section.entries)
 }
@@ -157,10 +169,22 @@ function wouldConflict(entry, proposedStartMinutes, proposedEndMinutes) {
   })
 }
 
+function isDraggableBand(band) {
+  return band.type === 'RECESS' || band.type === 'WHITE_SPACE'
+}
+
 function onDragStart(event, entry, section) {
   const durationMinutes = toMinutes(entry.end_time) - toMinutes(entry.start_time)
-  dragging.value = { entry, durationMinutes, section }
+  dragging.value = { kind: 'entry', target: entry, durationMinutes, section }
   event.dataTransfer.setData('text/plain', String(entry.id))
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+function onBandDragStart(event, band, section) {
+  if (!isDraggableBand(band)) return
+  const durationMinutes = toMinutes(band.end) - toMinutes(band.start)
+  dragging.value = { kind: 'band', target: band, durationMinutes, section }
+  event.dataTransfer.setData('text/plain', band.type)
   event.dataTransfer.effectAllowed = 'move'
 }
 
@@ -175,25 +199,33 @@ function onDragOver(event, section) {
   if (!dragging.value) return
   const start = proposedStartMinutes(event, event.currentTarget)
   const end = start + dragging.value.durationMinutes
-  conflictSectionId.value = wouldConflict(dragging.value.entry, start, end) ? section.id : null
+  // Bands are informational overlays — no conflict pre-check for them,
+  // matching the spec's "no new overlap validation for bands" decision.
+  conflictSectionId.value = dragging.value.kind === 'entry' && wouldConflict(dragging.value.target, start, end)
+    ? section.id
+    : null
 }
 
 async function onDrop(event, section) {
   if (!dragging.value) return
-  const { entry, durationMinutes } = dragging.value
+  const { kind, target, durationMinutes } = dragging.value
   const start = proposedStartMinutes(event, event.currentTarget)
   const end = start + durationMinutes
   dragging.value = null
   conflictSectionId.value = null
 
-  const { data } = await axios.post(
-    route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id),
-    {
-      class_schedule_id: entry.id,
-      override_start_time: fromMinutes(start),
-      override_end_time: fromMinutes(end),
-    },
-  )
+  const { data } = kind === 'entry'
+    ? await axios.post(route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id), {
+        class_schedule_id: target.id,
+        override_start_time: fromMinutes(start),
+        override_end_time: fromMinutes(end),
+      })
+    : await axios.post(route('faculty-loading.schedules.day-adjustments.band-overrides.store', props.adjustment.id), {
+        section_id: section.id,
+        band_type: target.type,
+        override_start_time: fromMinutes(start),
+        override_end_time: fromMinutes(end),
+      })
   emit('update:preview', data)
 }
 
