@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassScheduleDayAdjustment;
+use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\AdjustedClassScheduleService;
 use App\Services\PersonNameFormatter;
@@ -61,6 +62,12 @@ class ClassScheduleDayAdjustmentController extends Controller
                 'activity_start_time' => $adjustment->activity_start_time ? substr((string) $adjustment->activity_start_time, 0, 5) : null,
                 'activity_end_time' => $adjustment->activity_end_time ? substr((string) $adjustment->activity_end_time, 0, 5) : null,
                 'class_duration_minutes' => $adjustment->class_duration_minutes,
+                'day_start_time' => $adjustment->day_start_time ? substr((string) $adjustment->day_start_time, 0, 5) : null,
+                'stem_class_duration_minutes' => $adjustment->stem_class_duration_minutes,
+                'non_stem_class_duration_minutes' => $adjustment->non_stem_class_duration_minutes,
+                'health_break_title' => $adjustment->health_break_title,
+                'health_break_start_time' => $adjustment->health_break_start_time ? substr((string) $adjustment->health_break_start_time, 0, 5) : null,
+                'health_break_end_time' => $adjustment->health_break_end_time ? substr((string) $adjustment->health_break_end_time, 0, 5) : null,
                 'status' => $adjustment->status,
                 'created_by' => $adjustment->createdBy?->name,
                 'published_by' => $adjustment->publishedBy?->name,
@@ -68,6 +75,13 @@ class ClassScheduleDayAdjustmentController extends Controller
                 'cancelled_by' => $adjustment->cancelledBy?->name,
                 'cancelled_at' => $adjustment->cancelled_at?->toIso8601String(),
             ]);
+
+        $stemCoverage = $term
+            ? [
+                'tagged' => Subject::where('school_year_id', $term->school_year_id)->where('is_active', true)->where('is_stem', true)->count(),
+                'total' => Subject::where('school_year_id', $term->school_year_id)->where('is_active', true)->count(),
+            ]
+            : ['tagged' => 0, 'total' => 0];
 
         return Inertia::render('FacultyLoading/Schedules/DayAdjustments', [
             'term' => $term ? [
@@ -79,6 +93,7 @@ class ClassScheduleDayAdjustmentController extends Controller
             'terms' => $terms,
             'adjustments' => $adjustments,
             'canManage' => $request->user()->hasPermission('faculty_loading.manage'),
+            'stemSubjectCoverage' => $stemCoverage,
         ]);
     }
 
@@ -376,7 +391,7 @@ class ClassScheduleDayAdjustmentController extends Controller
     {
         $data = $request->validate([
             'academic_term_id' => ['required', 'integer', 'exists:academic_terms,id'],
-            'adjustment_type' => ['nullable', 'in:flag_ceremony,shortened_classes,flag_ceremony_shortened_classes,shortened_classes_protect_assessments'],
+            'adjustment_type' => ['nullable', 'in:flag_ceremony,shortened_classes,flag_ceremony_shortened_classes,shortened_classes_protect_assessments,early_start_stem_split'],
             'grade_levels' => ['required', 'array', 'min:1'],
             'grade_levels.*' => ['integer', 'in:7,8,9,10,11,12'],
             'postponed_from_date' => ['nullable', 'date'],
@@ -384,10 +399,28 @@ class ClassScheduleDayAdjustmentController extends Controller
             'activity_title' => ['nullable', 'string', 'max:255'],
             'activity_start_time' => ['nullable', 'date_format:H:i'],
             'activity_end_time' => ['nullable', 'date_format:H:i'],
+            'day_start_time' => ['nullable', 'date_format:H:i'],
+            'stem_class_duration_minutes' => ['nullable', 'integer', 'min:10', 'max:60'],
+            'non_stem_class_duration_minutes' => ['nullable', 'integer', 'min:10', 'max:60'],
+            'health_break_title' => ['nullable', 'string', 'max:255'],
+            'health_break_start_time' => ['nullable', 'date_format:H:i'],
+            'health_break_end_time' => ['nullable', 'date_format:H:i'],
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
         $data['adjustment_type'] ??= 'flag_ceremony';
+        if ($data['adjustment_type'] === 'early_start_stem_split') {
+            $data['day_start_time'] ??= '07:00';
+            $data['stem_class_duration_minutes'] ??= 50;
+            $data['non_stem_class_duration_minutes'] ??= 30;
+        } else {
+            $data['day_start_time'] = null;
+            $data['stem_class_duration_minutes'] = null;
+            $data['non_stem_class_duration_minutes'] = null;
+        }
+        $data['health_break_title'] ??= null;
+        $data['health_break_start_time'] ??= null;
+        $data['health_break_end_time'] ??= null;
         $selectedGrades = array_values(array_unique(array_map('intval', $data['grade_levels'])));
         sort($selectedGrades);
         // Store null (not the full [7..12] array) when every grade is
@@ -427,18 +460,23 @@ class ClassScheduleDayAdjustmentController extends Controller
         }
 
         if ($this->hasShortenedClasses($data['adjustment_type'])) {
-            foreach (['activity_title', 'activity_start_time', 'activity_end_time'] as $field) {
-                if (empty($data[$field])) {
+            // The early-start STEM-split day doesn't require a declared
+            // Official Activity — the point of the day is simply an earlier
+            // start, not necessarily freeing time for a campus event.
+            if ($data['adjustment_type'] !== 'early_start_stem_split') {
+                foreach (['activity_title', 'activity_start_time', 'activity_end_time'] as $field) {
+                    if (empty($data[$field])) {
+                        throw ValidationException::withMessages([
+                            $field => 'This field is required for a shortened-class day.',
+                        ]);
+                    }
+                }
+
+                if ($data['activity_end_time'] <= $data['activity_start_time']) {
                     throw ValidationException::withMessages([
-                        $field => 'This field is required for a shortened-class day.',
+                        'activity_end_time' => 'The activity end time must be after its start time.',
                     ]);
                 }
-            }
-
-            if ($data['activity_end_time'] <= $data['activity_start_time']) {
-                throw ValidationException::withMessages([
-                    'activity_end_time' => 'The activity end time must be after its start time.',
-                ]);
             }
 
             $allGradesOpen = collect($selectedGrades)
@@ -452,6 +490,22 @@ class ClassScheduleDayAdjustmentController extends Controller
             $data['activity_title'] = null;
             $data['activity_start_time'] = null;
             $data['activity_end_time'] = null;
+        }
+
+        if ($data['health_break_title'] || $data['health_break_start_time'] || $data['health_break_end_time']) {
+            foreach (['health_break_title', 'health_break_start_time', 'health_break_end_time'] as $field) {
+                if (empty($data[$field])) {
+                    throw ValidationException::withMessages([
+                        $field => 'All three health break fields are required together.',
+                    ]);
+                }
+            }
+
+            if ($data['health_break_end_time'] <= $data['health_break_start_time']) {
+                throw ValidationException::withMessages([
+                    'health_break_end_time' => 'The health break end time must be after its start time.',
+                ]);
+            }
         }
 
         $duplicate = ClassScheduleDayAdjustment::where('academic_term_id', $term->id)
@@ -480,6 +534,7 @@ class ClassScheduleDayAdjustmentController extends Controller
             'shortened_classes',
             'flag_ceremony_shortened_classes',
             'shortened_classes_protect_assessments',
+            'early_start_stem_split',
         ], true);
     }
 
