@@ -433,8 +433,9 @@ function openEdit(item) {
   form.postponed_from_date = item.postponed_from_date ?? ''
   form.effective_date = item.effective_date
   form.activity_title = item.activity_title ?? ''
-  form.activity_start_time = item.activity_start_time ?? '13:00'
-  form.activity_end_time = item.activity_end_time ?? '17:00'
+  const stemSplitDefault = isEarlyStartStemSplit(item.adjustment_type) ? '' : '13:00'
+  form.activity_start_time = item.activity_start_time ?? stemSplitDefault
+  form.activity_end_time = item.activity_end_time ?? (stemSplitDefault ? '17:00' : '')
   form.day_start_time = item.day_start_time ?? '07:00'
   form.stem_class_duration_minutes = item.stem_class_duration_minutes ?? 50
   form.non_stem_class_duration_minutes = item.non_stem_class_duration_minutes ?? 30
@@ -449,6 +450,16 @@ function onTypeChange() {
   form.clearErrors()
   if (!hasFlag(form.adjustment_type)) form.postponed_from_date = ''
   if (hasFlag(form.adjustment_type)) form.effective_date = ''
+  if (isEarlyStartStemSplit(form.adjustment_type)) {
+    // Activity fields are optional for this type — don't let the generic
+    // 1:00-5:00 PM default leak in unless the admin deliberately sets one.
+    form.activity_title = ''
+    form.activity_start_time = ''
+    form.activity_end_time = ''
+  } else if (hasShortenedClasses(form.adjustment_type) && !form.activity_start_time) {
+    form.activity_start_time = '13:00'
+    form.activity_end_time = '17:00'
+  }
 }
 
 async function suggestNextDay() {

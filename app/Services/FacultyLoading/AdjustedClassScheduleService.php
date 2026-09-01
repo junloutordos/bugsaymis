@@ -277,9 +277,26 @@ class AdjustedClassScheduleService
 
             if ($lateEntry) {
                 $label = $lateEntry['subject']['code'] ?? $lateEntry['subject']['name'] ?? 'A class';
-                throw ValidationException::withMessages([
-                    'activity_start_time' => "{$label} still ends at {$lateEntry['end_time']}. Choose a later activity start time.",
-                ]);
+                $message = "{$label} still ends at {$lateEntry['end_time']}. Choose a later activity start time.";
+
+                // For every other shortened-class type the Official Activity
+                // is a required, deliberate reservation of that time slot, so
+                // classes running into it is a real blocking problem. For
+                // early_start_stem_split the Activity fields are optional
+                // (see validatedData()) — treating an overrun as a hard error
+                // here made generate() unconditionally throw, which broke
+                // resolve()/print() (no exception handling on those GET
+                // routes) and made publish() silently no-op, with no way to
+                // even reach the Resolve Conflicts screen meant to fix it.
+                // Downgraded to the same reviewable warning already used for
+                // compression-only overlaps below.
+                if ($stemSplit) {
+                    $conflictWarnings[] = $message;
+                } else {
+                    throw ValidationException::withMessages([
+                        'activity_start_time' => $message,
+                    ]);
+                }
             }
         }
 
@@ -288,7 +305,7 @@ class AdjustedClassScheduleService
         // day with no activity and no health break previously skipped this
         // check entirely.
         if ($hasShortenedClasses) {
-            $conflictWarnings = $this->assertNoGeneratedConflicts($grades);
+            $conflictWarnings = array_merge($conflictWarnings, $this->assertNoGeneratedConflicts($grades));
         }
 
         return [
