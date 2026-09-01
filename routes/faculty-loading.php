@@ -140,6 +140,8 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::get('/{adjustment}/preview', [ClassScheduleDayAdjustmentController::class, 'preview'])->name('preview');
                 Route::post('/{adjustment}/overrides', [ClassScheduleDayAdjustmentController::class, 'upsertOverride'])->name('overrides.store');
                 Route::delete('/{adjustment}/overrides/{classScheduleId}', [ClassScheduleDayAdjustmentController::class, 'removeOverride'])->name('overrides.destroy');
+                Route::post('/{adjustment}/band-overrides', [ClassScheduleDayAdjustmentController::class, 'upsertBandOverride'])->name('band-overrides.store');
+                Route::delete('/{adjustment}/band-overrides/{sectionId}/{bandType}', [ClassScheduleDayAdjustmentController::class, 'removeBandOverride'])->name('band-overrides.destroy');
                 Route::post('/{adjustment}/publish', [ClassScheduleDayAdjustmentController::class, 'publish'])->name('publish');
                 Route::post('/{adjustment}/cancel', [ClassScheduleDayAdjustmentController::class, 'cancel'])->name('cancel');
             });

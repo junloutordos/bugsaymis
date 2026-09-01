@@ -1038,6 +1038,57 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertDatabaseCount('class_schedule_day_adjustment_band_overrides', 0);
     }
 
+    public function test_band_override_rejects_an_invalid_band_type(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'LUNCH',
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:15',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('band_type');
+    }
+
+    public function test_band_override_endpoint_is_draft_only(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'RECESS',
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:15',
+            ])
+            ->assertStatus(422);
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');
