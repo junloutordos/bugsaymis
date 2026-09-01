@@ -69,7 +69,11 @@
                 </td>
                 <td class="px-4 py-3 text-sm text-slate-600">
                   <div v-if="hasFlag(item.adjustment_type)">Flag 7:30–8:00 AM<span v-if="item.postponed_from_date"> · From {{ formatDate(item.postponed_from_date) }}</span></div>
-                  <div v-if="hasShortenedClasses(item.adjustment_type)">
+                  <div v-if="item.adjustment_type === 'early_start_stem_split'">
+                    Starts {{ item.day_start_time }} · STEM {{ item.stem_class_duration_minutes }}min / Non-STEM {{ item.non_stem_class_duration_minutes }}min
+                    <span v-if="item.health_break_title"> · {{ item.health_break_title }} {{ formatTimeRange(item.health_break_start_time, item.health_break_end_time) }}</span>
+                  </div>
+                  <div v-else-if="hasShortenedClasses(item.adjustment_type)">
                     30-minute classes<span v-if="protectsAssessments(item.adjustment_type)"> (major assessment periods stay 50 min)</span> · {{ item.activity_title }} · {{ formatTimeRange(item.activity_start_time, item.activity_end_time) }}
                   </div>
                 </td>
@@ -125,6 +129,7 @@
             <option value="shortened_classes">30-Minute Classes for Official Activity</option>
             <option value="flag_ceremony_shortened_classes">Transferred Flag Ceremony + 30-Minute Classes</option>
             <option value="shortened_classes_protect_assessments">30-Minute Classes (Protect Assessment Periods)</option>
+            <option value="early_start_stem_split">Early Start — STEM/Non-STEM Split (7 AM)</option>
           </select>
         </div>
 
@@ -187,6 +192,53 @@
           </div>
         </div>
 
+        <div v-if="isEarlyStartStemSplit(form.adjustment_type)" class="space-y-4 rounded-xl border border-purple-100 bg-purple-50/50 p-4">
+          <div v-if="stemSubjectCoverage.total > 0" class="rounded-lg border border-purple-200 bg-white px-3 py-2 text-xs text-purple-800">
+            {{ stemSubjectCoverage.tagged }} of {{ stemSubjectCoverage.total }} active subjects are tagged STEM.
+            <span v-if="stemSubjectCoverage.tagged === 0" class="font-semibold">No subjects are tagged yet — every class will compress to the non-STEM duration. Tag subjects in the Subject Catalog first.</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700">Day starts</label>
+              <input v-model="form.day_start_time" type="time"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700">STEM period (min)</label>
+              <input v-model.number="form.stem_class_duration_minutes" type="number" min="10" max="60"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700">Non-STEM period (min)</label>
+              <input v-model.number="form.non_stem_class_duration_minutes" type="number" min="10" max="60"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700">Health break (optional)</label>
+            <input v-model="form.health_break_title" type="text" placeholder="Example: Snack Break"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <p v-if="form.errors.health_break_title" class="mt-1 text-xs text-rose-600">{{ form.errors.health_break_title }}</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700">Break starts</label>
+              <input v-model="form.health_break_start_time" type="time"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p v-if="form.errors.health_break_start_time" class="mt-1 text-xs text-rose-600">{{ form.errors.health_break_start_time }}</p>
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700">Break ends</label>
+              <input v-model="form.health_break_end_time" type="time"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p v-if="form.errors.health_break_end_time" class="mt-1 text-xs text-rose-600">{{ form.errors.health_break_end_time }}</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500">Lunch is not plotted on this type of adjusted day. Leave the break blank to skip it entirely.</p>
+        </div>
+
         <div>
           <label class="mb-1 block text-sm font-medium text-slate-700">Reason</label>
           <textarea v-model="form.reason" rows="3" placeholder="Official activity or schedule adjustment reason"
@@ -196,7 +248,11 @@
 
         <div class="grid gap-3 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-2">
           <div v-if="hasFlag(form.adjustment_type)"><span class="text-slate-500">Flag ceremony:</span> <strong>7:30–8:00 AM</strong></div>
-          <div v-if="hasShortenedClasses(form.adjustment_type)">
+          <div v-if="isEarlyStartStemSplit(form.adjustment_type)">
+            <span class="text-slate-500">Class periods:</span>
+            <strong>STEM {{ form.stem_class_duration_minutes }} minutes, Non-STEM {{ form.non_stem_class_duration_minutes }} minutes, no lunch plotted</strong>
+          </div>
+          <div v-else-if="hasShortenedClasses(form.adjustment_type)">
             <span class="text-slate-500">Class periods:</span>
             <strong v-if="protectsAssessments(form.adjustment_type)">30 minutes each, except periods with a scheduled major assessment (stay 50 minutes)</strong>
             <strong v-else>30 minutes each</strong>
@@ -277,6 +333,7 @@ const props = defineProps({
   terms: { type: Array, default: () => [] },
   adjustments: { type: Array, default: () => [] },
   canManage: { type: Boolean, default: false },
+  stemSubjectCoverage: { type: Object, default: () => ({ tagged: 0, total: 0 }) },
 })
 
 const ALL_GRADES = [7, 8, 9, 10, 11, 12]
@@ -294,6 +351,12 @@ const form = useForm({
   activity_title: '',
   activity_start_time: '13:00',
   activity_end_time: '17:00',
+  day_start_time: '07:00',
+  stem_class_duration_minutes: 50,
+  non_stem_class_duration_minutes: 30,
+  health_break_title: '',
+  health_break_start_time: '',
+  health_break_end_time: '',
   reason: '',
 })
 
@@ -352,6 +415,12 @@ function openCreate() {
   form.grade_levels = [...ALL_GRADES]
   form.activity_start_time = '13:00'
   form.activity_end_time = '17:00'
+  form.day_start_time = '07:00'
+  form.stem_class_duration_minutes = 50
+  form.non_stem_class_duration_minutes = 30
+  form.health_break_title = ''
+  form.health_break_start_time = ''
+  form.health_break_end_time = ''
   showForm.value = true
 }
 
@@ -366,6 +435,12 @@ function openEdit(item) {
   form.activity_title = item.activity_title ?? ''
   form.activity_start_time = item.activity_start_time ?? '13:00'
   form.activity_end_time = item.activity_end_time ?? '17:00'
+  form.day_start_time = item.day_start_time ?? '07:00'
+  form.stem_class_duration_minutes = item.stem_class_duration_minutes ?? 50
+  form.non_stem_class_duration_minutes = item.non_stem_class_duration_minutes ?? 30
+  form.health_break_title = item.health_break_title ?? ''
+  form.health_break_start_time = item.health_break_start_time ?? ''
+  form.health_break_end_time = item.health_break_end_time ?? ''
   form.reason = item.reason
   showForm.value = true
 }
@@ -464,11 +539,15 @@ function hasFlag(type) {
 }
 
 function hasShortenedClasses(type) {
-  return ['shortened_classes', 'flag_ceremony_shortened_classes', 'shortened_classes_protect_assessments'].includes(type)
+  return ['shortened_classes', 'flag_ceremony_shortened_classes', 'shortened_classes_protect_assessments', 'early_start_stem_split'].includes(type)
 }
 
 function protectsAssessments(type) {
   return type === 'shortened_classes_protect_assessments'
+}
+
+function isEarlyStartStemSplit(type) {
+  return type === 'early_start_stem_split'
 }
 
 function adjustmentTypeLabel(type) {
@@ -477,6 +556,7 @@ function adjustmentTypeLabel(type) {
     shortened_classes: '30-Minute Classes',
     flag_ceremony_shortened_classes: 'Flag Ceremony + 30-Minute Classes',
     shortened_classes_protect_assessments: '30-Minute Classes (Protect Assessments)',
+    early_start_stem_split: 'Early Start — STEM/Non-STEM Split',
   })[type] ?? type
 }
 
