@@ -252,7 +252,13 @@ class AdjustedClassScheduleService
                     'activity_start_time' => "{$label} still ends at {$lateEntry['end_time']}. Choose a later activity start time.",
                 ]);
             }
+        }
 
+        // Conflict detection always runs for any shortened-family day, not
+        // just when an Official Activity is declared — a plain early-start
+        // day with no activity and no health break previously skipped this
+        // check entirely.
+        if ($hasShortenedClasses) {
             $conflictWarnings = $this->assertNoGeneratedConflicts($grades);
         }
 
