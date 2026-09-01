@@ -30,7 +30,7 @@
               :style="entryStyle(entry)"
               :data-entry-id="entry.id"
               @dragstart="onDragStart($event, entry, section)"
-              @click="$emit('edit-entry', entry)"
+              @click="openOverride(entry)"
             >
               <div class="flex items-center justify-between gap-1">
                 <span class="truncate font-medium">{{ entry.subject?.name ?? entry.title ?? '—' }}</span>
@@ -43,24 +43,63 @@
       </div>
     </div>
   </div>
+
+  <AppModal :show="showOverrideModal" title="Adjust class time" size="sm" @close="showOverrideModal = false">
+    <div v-if="editingEntry" class="space-y-4">
+      <p class="text-sm text-slate-600">
+        {{ editingEntry.subject?.name ?? editingEntry.title }} — currently {{ editingEntry.start_time }}–{{ editingEntry.end_time }}
+      </p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700">New start time</label>
+          <input v-model="overrideForm.override_start_time" type="time"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700">New end time</label>
+          <input v-model="overrideForm.override_end_time" type="time"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+      </div>
+      <p v-if="overrideError" class="text-xs text-rose-600">{{ overrideError }}</p>
+    </div>
+
+    <template #footer>
+      <div class="flex w-full items-center justify-between gap-2">
+        <AppButton v-if="editingEntry?.manually_adjusted" variant="ghost" class="text-rose-600" @click="removeOverride">Remove override</AppButton>
+        <div class="ml-auto flex gap-2">
+          <AppButton variant="ghost" @click="showOverrideModal = false">Cancel</AppButton>
+          <AppButton :loading="savingOverride" @click="saveOverride">Save</AppButton>
+        </div>
+      </div>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import axios from 'axios'
+import AppModal from '@/Components/AppModal.vue'
+import AppButton from '@/Components/AppButton.vue'
 
 const props = defineProps({
   preview: { type: Object, required: true },
   adjustment: { type: Object, required: true },
 })
 
-const emit = defineEmits(['edit-entry', 'update:preview'])
+const emit = defineEmits(['update:preview'])
 
 const PX_PER_MINUTE = 1.5
 const SNAP_MINUTES = 5
 
 const dragging = ref(null) // { entry, durationMinutes, section }
 const conflictSectionId = ref(null)
+
+const showOverrideModal = ref(false)
+const editingEntry = ref(null)
+const overrideForm = ref({ override_start_time: '', override_end_time: '' })
+const overrideError = ref('')
+const savingOverride = ref(false)
 
 const gradesWithEntries = computed(() => (props.preview.grades ?? []).filter(grade => grade.sections?.length))
 
@@ -156,5 +195,37 @@ async function onDrop(event, section) {
     },
   )
   emit('update:preview', data)
+}
+
+function openOverride(entry) {
+  editingEntry.value = entry
+  overrideForm.value = { override_start_time: entry.start_time, override_end_time: entry.end_time }
+  overrideError.value = ''
+  showOverrideModal.value = true
+}
+
+async function saveOverride() {
+  savingOverride.value = true
+  overrideError.value = ''
+  try {
+    const { data } = await axios.post(route('faculty-loading.schedules.day-adjustments.overrides.store', props.adjustment.id), {
+      class_schedule_id: editingEntry.value.id,
+      override_start_time: overrideForm.value.override_start_time,
+      override_end_time: overrideForm.value.override_end_time,
+    })
+    emit('update:preview', data)
+    showOverrideModal.value = false
+  } catch (error) {
+    const errors = error.response?.data?.errors ?? {}
+    overrideError.value = errors.override_end_time?.[0] ?? errors.override_start_time?.[0] ?? error.response?.data?.message ?? 'Unable to save this adjustment.'
+  } finally {
+    savingOverride.value = false
+  }
+}
+
+async function removeOverride() {
+  const { data } = await axios.delete(route('faculty-loading.schedules.day-adjustments.overrides.destroy', [props.adjustment.id, editingEntry.value.id]))
+  emit('update:preview', data)
+  showOverrideModal.value = false
 }
 </script>
