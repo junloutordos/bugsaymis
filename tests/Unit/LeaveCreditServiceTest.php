@@ -524,8 +524,140 @@ class LeaveCreditServiceTest extends TestCase
 
         $balances = $this->service->getEmployeeLeaveBalance($user->id, 2026);
 
-        $this->assertArrayHasKey('CTO', $balances);
-        $this->assertEquals(3.0, $balances['CTO']['balance']); // 1.0 + 2.0
+        $this->assertArrayHasKey('SC', $balances);
+        $this->assertEquals(3.0, $balances['SC']['balance']); // 1.0 + 2.0
+    }
+
+    // ── Teaching Sick Leave → Service Credits fallback ───────────────────────
+    //
+    // Teaching personnel never accrue SL (CSC Rule XVI carve-out — see
+    // test_teaching_user_excluded_from_vl_sl_accrual), so a Teaching SL
+    // filing always used to become full LWOP even when the employee has
+    // plenty of unused Service Credits. These tests cover the fallback:
+    // deduct real SL first (covers the SSD/CID special division chief
+    // exception, who do accrue SL), then draw any shortfall from Service
+    // Credits — mirroring how CTO already consumes Service Credits.
+
+    private function approvedServiceCredits(User $user, User $hr, float $hours, string $date): ServiceCreditRecord
+    {
+        $record = $this->service->addServiceCredits($user->id, $hours, 'school_activity', $date);
+        $this->service->approveServiceCredits($record->id, $hr->id);
+
+        return $record->fresh();
+    }
+
+    public function test_teaching_sl_deduction_falls_back_fully_to_service_credits_when_sl_balance_is_zero(): void
+    {
+        $user = $this->teachingUser();
+        $hr   = $this->nonTeachingUser();
+        $this->approvedServiceCredits($user, $hr, 24.0, '2026-01-05'); // 3.0 days
+
+        $app = $this->makeApprovedApplication($user, $this->sl, 2.0);
+        $this->service->applyLeaveDeduction($app->id);
+
+        $app->refresh();
+        $this->assertEquals(2.0, (float) $app->days_deducted);
+        $this->assertFalse((bool) $app->is_without_pay);
+
+        $balances = $this->service->getEmployeeLeaveBalance($user->id, now()->year);
+        $this->assertEquals(1.0, $balances['SC']['balance'], 'Service Credits pool must be reduced by the SL draw.');
+    }
+
+    public function test_teaching_sl_deduction_uses_real_sl_balance_before_service_credits(): void
+    {
+        // Special division chief case: this Teaching user genuinely accrues SL.
+        $user = $this->teachingUser();
+        $hr   = $this->nonTeachingUser();
+        $this->service->initializeLeaveCredits($user->id, ['SL' => 1.0], 'Division chief accrual', now()->year);
+        $this->approvedServiceCredits($user, $hr, 32.0, '2026-01-05'); // 4.0 days
+
+        $app = $this->makeApprovedApplication($user, $this->sl, 3.0);
+        $this->service->applyLeaveDeduction($app->id);
+
+        $app->refresh();
+        $this->assertEquals(3.0, (float) $app->days_deducted);
+        $this->assertFalse((bool) $app->is_without_pay);
+
+        $slCredit = LeaveCredit::where('user_id', $user->id)->where('leave_type_id', $this->sl->id)->where('year', now()->year)->first();
+        $this->assertEquals(0.0, (float) $slCredit->balance, 'Real SL balance must be exhausted first.');
+
+        $balances = $this->service->getEmployeeLeaveBalance($user->id, now()->year);
+        $this->assertEquals(2.0, $balances['SC']['balance'], 'Only the 2-day shortfall (3 - 1) must be drawn from Service Credits.');
+    }
+
+    public function test_teaching_sl_deduction_becomes_lwop_when_sl_and_service_credits_both_insufficient(): void
+    {
+        $user = $this->teachingUser();
+        $hr   = $this->nonTeachingUser();
+        $this->approvedServiceCredits($user, $hr, 8.0, '2026-01-05'); // 1.0 day
+
+        $app = $this->makeApprovedApplication($user, $this->sl, 3.0);
+        $this->service->applyLeaveDeduction($app->id);
+
+        $app->refresh();
+        $this->assertEquals(1.0, (float) $app->days_deducted, 'Only the 1 available Service Credit day is deducted.');
+        $this->assertTrue((bool) $app->is_without_pay, 'The remaining 2 days must be LWOP.');
+
+        $balances = $this->service->getEmployeeLeaveBalance($user->id, now()->year);
+        $this->assertEquals(0.0, $balances['SC']['balance']);
+    }
+
+    public function test_restore_teaching_sl_reverses_both_sl_balance_and_service_credits(): void
+    {
+        $user = $this->teachingUser();
+        $hr   = $this->nonTeachingUser();
+        $this->service->initializeLeaveCredits($user->id, ['SL' => 1.0], 'Division chief accrual', now()->year);
+        $this->approvedServiceCredits($user, $hr, 32.0, '2026-01-05'); // 4.0 days
+
+        $app = $this->makeApprovedApplication($user, $this->sl, 3.0);
+        $this->service->applyLeaveDeduction($app->id);
+        $this->service->restoreLeaveCredits($app->id);
+
+        $app->refresh();
+        $this->assertEquals(0.0, (float) $app->days_deducted);
+        $this->assertFalse((bool) $app->is_without_pay);
+
+        $slCredit = LeaveCredit::where('user_id', $user->id)->where('leave_type_id', $this->sl->id)->where('year', now()->year)->first();
+        $this->assertEquals(1.0, (float) $slCredit->balance, 'Real SL balance must be fully restored.');
+
+        $balances = $this->service->getEmployeeLeaveBalance($user->id, now()->year);
+        $this->assertEquals(4.0, $balances['SC']['balance'], 'Service Credits must be fully restored.');
+    }
+
+    // ── Partial Service Credit consumption restoration (bug fix) ─────────────
+    //
+    // Regression test: deductServiceCredits() used to decrement a partially-
+    // consumed record's days_equivalent in place, without linking it to the
+    // application — so restoreServiceCredits() could never find it again on
+    // cancel/reject, permanently losing those days. It must now split into a
+    // restorable "consumed" row (linked to the application) and a leftover
+    // "approved" row.
+
+    public function test_partially_consumed_service_credit_record_is_fully_restorable(): void
+    {
+        $user = $this->teachingUser();
+        $hr   = $this->nonTeachingUser();
+        // One 3-day record — a 1.5-day CTO filing will only partially consume it.
+        $this->approvedServiceCredits($user, $hr, 24.0, '2026-01-05'); // 3.0 days
+
+        $cto = LeaveType::firstOrCreate(
+            ['code' => 'CTO'],
+            ['name' => 'Compensatory Time Off', 'is_deductible' => false, 'is_creditable' => false, 'is_active' => true, 'sort_order' => 8]
+        );
+
+        $app = $this->makeApprovedApplication($user, $cto, 1.5);
+        $this->service->applyLeaveDeduction($app->id);
+
+        $balances = $this->service->getEmployeeLeaveBalance($user->id, now()->year);
+        $this->assertEquals(1.5, $balances['SC']['balance'], 'Precondition: 1.5 days remain after the partial consumption.');
+
+        $this->service->restoreLeaveCredits($app->id);
+
+        $balances = $this->service->getEmployeeLeaveBalance($user->id, now()->year);
+        $this->assertEquals(3.0, $balances['SC']['balance'], 'The consumed 1.5 days must be fully restored, not lost.');
+
+        $app->refresh();
+        $this->assertEquals(0.0, (float) $app->days_deducted);
     }
 
     // ── getEmployeeLeaveBalance ───────────────────────────────────────────────

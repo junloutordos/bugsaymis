@@ -294,6 +294,8 @@ class LeaveCreditService
 
             if ($this->isTeaching($user) && $app->leaveType->code === 'CTO') {
                 $this->deductServiceCredits($user->id, $days, $app, $recordedBy);
+            } elseif ($this->isTeaching($user) && $app->leaveType->code === 'SL') {
+                $this->deductTeachingSickLeave($user->id, $days, $year, $app, $recordedBy);
             } else {
                 $this->deductLeaveCredits($user->id, $app->leave_type_id, $days, $year, $app, $recordedBy);
             }
@@ -323,6 +325,8 @@ class LeaveCreditService
 
             if ($this->isTeaching($user) && $app->leaveType->code === 'CTO') {
                 $this->restoreServiceCredits($app, $recordedBy);
+            } elseif ($this->isTeaching($user) && $app->leaveType->code === 'SL') {
+                $this->restoreTeachingSickLeave($app, $recordedBy);
             } else {
                 $credit = $this->ensureCreditRow($user->id, $app->leave_type_id, $year);
                 $credit->decrement('used', $days);
@@ -532,6 +536,15 @@ class LeaveCreditService
 
     /**
      * Deduct from ServiceCreditRecords (FIFO by service_date) for Teaching CTO leaves.
+     *
+     * A record that is only PARTIALLY consumed is split in two: the consumed
+     * portion becomes its own 'consumed' row linked to $app (so it can be
+     * found and reversed by restoreServiceCredits() on cancel/reject), and
+     * the untouched remainder stays as a separate 'approved' row with its
+     * original service_date/service_type. Previously this decremented
+     * days_equivalent on the original row in place with no application
+     * link — restoreServiceCredits() could never find it again, permanently
+     * losing the consumed days on a later restore.
      */
     private function deductServiceCredits(
         int             $userId,
@@ -550,17 +563,35 @@ class LeaveCreditService
         foreach ($records as $record) {
             if ($remaining <= 0) break;
 
-            $consume = min((float) $record->days_equivalent, $remaining);
+            $available = (float) $record->days_equivalent;
+            $consume   = min($available, $remaining);
             $remaining -= $consume;
 
-            if ($consume >= (float) $record->days_equivalent) {
+            if ($consume >= $available) {
+                // Fully consumed — the existing row becomes the consumed/linked row.
                 $record->update([
                     'status'               => 'consumed',
                     'leave_application_id' => $app->id,
                 ]);
             } else {
-                // Partially consumed — reduce days_equivalent
-                $record->decrement('days_equivalent', $consume);
+                // Partially consumed — split into a consumed row (linked to
+                // this application, restorable) and a leftover approved row
+                // (original record, reduced to the untouched remainder).
+                ServiceCreditRecord::create([
+                    'user_id'              => $record->user_id,
+                    'service_date'         => $record->service_date,
+                    'service_type'         => $record->service_type,
+                    'hours_rendered'       => $record->hours_rendered,
+                    'days_equivalent'      => $consume,
+                    'status'               => 'consumed',
+                    'leave_application_id' => $app->id,
+                    'approved_by'          => $record->approved_by,
+                    'approved_at'          => $record->approved_at,
+                    'expires_at'           => $record->expires_at,
+                    'remarks'              => $record->remarks,
+                ]);
+
+                $record->update(['days_equivalent' => $available - $consume]);
             }
         }
 
@@ -582,5 +613,115 @@ class LeaveCreditService
             ->each(function (ServiceCreditRecord $record) {
                 $record->update(['status' => 'approved', 'leave_application_id' => null]);
             });
+    }
+
+    /**
+     * Deduct a Teaching employee's Sick Leave filing.
+     *
+     * Teaching personnel never accrue SL (CSC Rule XVI carve-out) EXCEPT the
+     * SSD/CID special division chief exception, who do — see
+     * isSpecialDivisionChief(). So a Teaching SL filing must:
+     *   1. Draw from the real leave_credits SL balance first (covers the
+     *      special division chief exception; zero for everyone else).
+     *   2. Draw any shortfall from the Service Credits pool (mirrors how
+     *      CTO already consumes Service Credits) — otherwise every Teaching
+     *      SL filing became full LWOP even with unused Service Credits.
+     *   3. Any remainder still uncovered becomes LWOP, exactly as before.
+     */
+    private function deductTeachingSickLeave(
+        int              $userId,
+        float            $days,
+        int              $year,
+        LeaveApplication $app,
+        ?int             $recordedBy,
+    ): void {
+        $credit    = $this->ensureCreditRow($userId, $app->leave_type_id, $year);
+        $slBalance = (float) $credit->balance;
+
+        $fromSl = min($days, max($slBalance, 0));
+        if ($fromSl > 0) {
+            $credit->increment('used', $fromSl);
+            $credit = $credit->fresh();
+        }
+
+        LeaveCreditTransaction::create([
+            'user_id'            => $userId,
+            'leave_type_id'      => $app->leave_type_id,
+            'year'               => $year,
+            'type'               => 'DEDUCTION',
+            'amount'             => -$fromSl,
+            'balance_after'      => (float) $credit->balance,
+            'referenceable_type' => LeaveApplication::class,
+            'referenceable_id'   => $app->id,
+            'remarks'            => "Approved leave #{$app->control_no} — {$fromSl}d from SL balance",
+            'recorded_by'        => $recordedBy,
+        ]);
+
+        $remaining = round($days - $fromSl, 4);
+
+        if ($remaining > 0) {
+            // Draw the shortfall from Service Credits (same FIFO/split
+            // mechanics as CTO), then whatever's still left is LWOP.
+            $this->deductServiceCredits($userId, $remaining, $app, $recordedBy);
+
+            // deductServiceCredits() overwrites days_deducted/is_without_pay
+            // on $app for the Service-Credits portion only — combine with
+            // the SL portion already drawn above.
+            $app->refresh();
+            $app->update([
+                'days_deducted'  => round($fromSl + (float) $app->days_deducted, 4),
+            ]);
+        } else {
+            $app->update([
+                'days_deducted'  => $fromSl,
+                'is_without_pay' => false,
+            ]);
+        }
+    }
+
+    /**
+     * Reverse a Teaching Sick Leave deduction: restores the real SL balance
+     * draw and re-opens any consumed Service Credit records, mirroring
+     * deductTeachingSickLeave()'s two-source draw.
+     */
+    private function restoreTeachingSickLeave(LeaveApplication $app, ?int $recordedBy): void
+    {
+        $year = $app->date_from->year;
+
+        $slCredit = LeaveCredit::where('user_id', $app->user_id)
+            ->where('leave_type_id', $app->leave_type_id)
+            ->where('year', $year)
+            ->first();
+
+        if ($slCredit) {
+            $slDeduction = LeaveCreditTransaction::where('referenceable_type', LeaveApplication::class)
+                ->where('referenceable_id', $app->id)
+                ->where('leave_type_id', $app->leave_type_id)
+                ->where('type', 'DEDUCTION')
+                ->sum('amount');
+
+            $slDays = abs((float) $slDeduction);
+
+            if ($slDays > 0) {
+                $slCredit->decrement('used', $slDays);
+                $slCredit = $slCredit->fresh();
+
+                LeaveCreditTransaction::create([
+                    'user_id'            => $app->user_id,
+                    'leave_type_id'      => $app->leave_type_id,
+                    'year'               => $year,
+                    'type'               => 'RESTORATION',
+                    'amount'             => $slDays,
+                    'balance_after'      => (float) $slCredit->balance,
+                    'referenceable_type' => LeaveApplication::class,
+                    'referenceable_id'   => $app->id,
+                    'remarks'            => "Restored: application #{$app->control_no} cancelled/rejected — SL balance",
+                    'recorded_by'        => $recordedBy,
+                ]);
+            }
+        }
+
+        // Re-open any Service Credits consumed for the shortfall portion.
+        $this->restoreServiceCredits($app, $recordedBy);
     }
 }
