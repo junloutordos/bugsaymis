@@ -22,7 +22,13 @@
               :style="bandStyle(band)"
               @dragstart="onBandDragStart($event, band, section)"
             >
+              <div v-if="isDraggableBand(band)" class="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
+                @mousedown.stop.prevent="startResize($event, band, section, 'start')"
+                @dragstart.stop.prevent></div>
               {{ band.label }}
+              <div v-if="isDraggableBand(band)" class="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+                @mousedown.stop.prevent="startResize($event, band, section, 'end')"
+                @dragstart.stop.prevent></div>
             </div>
             <div
               v-for="entry in section.entries"
@@ -97,6 +103,8 @@ const SNAP_MINUTES = 5
 
 const dragging = ref(null) // { entry, durationMinutes, section }
 const conflictSectionId = ref(null)
+const resizing = ref(null) // { band, section, edge, startY, originalStart, originalEnd }
+const MIN_BAND_MINUTES = 5
 
 const showOverrideModal = ref(false)
 const editingEntry = ref(null)
@@ -226,6 +234,55 @@ async function onDrop(event, section) {
         override_start_time: fromMinutes(start),
         override_end_time: fromMinutes(end),
       })
+  emit('update:preview', data)
+}
+
+function startResize(event, band, section, edge) {
+  resizing.value = {
+    band,
+    section,
+    edge,
+    startY: event.clientY,
+    originalStart: toMinutes(band.start),
+    originalEnd: toMinutes(band.end),
+  }
+  window.addEventListener('mousemove', onResizeMove)
+  window.addEventListener('mouseup', onResizeEnd)
+}
+
+function onResizeMove(event) {
+  if (!resizing.value) return
+  const rawDelta = (event.clientY - resizing.value.startY) / PX_PER_MINUTE
+  resizing.value.deltaMinutes = Math.round(rawDelta / SNAP_MINUTES) * SNAP_MINUTES
+}
+
+async function onResizeEnd() {
+  window.removeEventListener('mousemove', onResizeMove)
+  window.removeEventListener('mouseup', onResizeEnd)
+  if (!resizing.value) return
+
+  const { band, section, edge, originalStart, originalEnd, deltaMinutes = 0 } = resizing.value
+  resizing.value = null
+
+  let start = originalStart
+  let end = originalEnd
+  if (edge === 'start') {
+    start = Math.min(originalStart + deltaMinutes, originalEnd - MIN_BAND_MINUTES)
+  } else {
+    end = Math.max(originalEnd + deltaMinutes, originalStart + MIN_BAND_MINUTES)
+  }
+
+  if (start === originalStart && end === originalEnd) return
+
+  const { data } = await axios.post(
+    route('faculty-loading.schedules.day-adjustments.band-overrides.store', props.adjustment.id),
+    {
+      section_id: section.id,
+      band_type: band.type,
+      override_start_time: fromMinutes(start),
+      override_end_time: fromMinutes(end),
+    },
+  )
   emit('update:preview', data)
 }
 
