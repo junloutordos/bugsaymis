@@ -60,7 +60,7 @@ const form  = useForm({
   id: null, school_year_id: props.currentSchoolYearId,
   code: '', name: '', description: '', specialization_tags: '',
   credit_units: 3, load_units: 3,
-  lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', grade_level: 7, subject_group: '',
+  lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', is_stem: false, grade_level: 7, subject_group: '',
   semester: 'both', sessions_per_week: 5, minutes_per_session: 60, is_active: true, has_ilp: false,
   requires_computer_lab: false,
 })
@@ -71,7 +71,7 @@ function openForm(s = null) {
       code: s.code, name: s.name, description: s.description ?? '',
       specialization_tags: s.specialization_tags ?? '',
       credit_units: s.credit_units, load_units: s.load_units, lecture_hours: s.lecture_hours,
-      lab_hours: s.lab_hours ?? 0, subject_type: s.subject_type, grade_level: s.grade_level,
+      lab_hours: s.lab_hours ?? 0, subject_type: s.subject_type, is_stem: s.is_stem, grade_level: s.grade_level,
       subject_group: s.subject_group ?? '',
       semester: s.semester, sessions_per_week: s.sessions_per_week,
       minutes_per_session: s.minutes_per_session, is_active: s.is_active, has_ilp: s.has_ilp,
@@ -81,6 +81,7 @@ function openForm(s = null) {
     form.id = null
     form.school_year_id = props.currentSchoolYearId
     form.grade_level = 7; form.subject_type = 'lecture'
+    form.is_stem = false
     form.subject_group = ''
     form.credit_units = 3; form.load_units = 3; form.lecture_hours = 3
     form.sessions_per_week = 5; form.minutes_per_session = 60; form.is_active = true
@@ -224,6 +225,7 @@ function doCopy() {
             <div class="flex flex-col items-center gap-1">
               <AppBadge :color="s.is_active ? 'green' : 'slate'">{{ s.is_active ? 'Active' : 'Inactive' }}</AppBadge>
               <AppBadge v-if="s.requires_computer_lab" color="indigo">ComLab priority</AppBadge>
+              <AppBadge v-if="s.is_stem" color="purple">STEM</AppBadge>
             </div>
           </td>
           <td v-if="can.manage" class="px-4 py-3 text-right">
@@ -246,6 +248,7 @@ function doCopy() {
             <div class="flex items-center gap-2">
               <AppBadge :color="typeBadge(s.subject_type)">{{ s.subject_type }}</AppBadge>
               <AppBadge v-if="s.subject_group" color="purple">{{ s.subject_group }}</AppBadge>
+              <AppBadge v-if="s.is_stem" color="purple">STEM</AppBadge>
               <span class="text-xs text-slate-500">Grade {{ s.grade_level === 0 ? '—' : s.grade_level }}</span>
               <span class="text-xs text-slate-500">{{ s.load_units }} units</span>
             </div>
@@ -323,6 +326,10 @@ function doCopy() {
           <div class="flex items-center gap-2 pt-6">
             <input v-model="form.is_active" type="checkbox" id="sub-active" class="rounded text-indigo-600" />
             <label for="sub-active" class="text-sm text-slate-600">Active</label>
+          </div>
+          <div class="flex items-center gap-2 pt-6">
+            <input v-model="form.is_stem" type="checkbox" id="sub-stem" class="rounded text-indigo-600" />
+            <label for="sub-stem" class="text-sm text-slate-600">STEM Subject</label>
           </div>
           <div class="col-span-2">
             <div class="flex items-center gap-2">

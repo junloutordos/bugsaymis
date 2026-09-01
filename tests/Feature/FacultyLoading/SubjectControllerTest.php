@@ -63,6 +63,24 @@ class SubjectControllerTest extends TestCase
         ], $overrides);
     }
 
+    public function test_is_stem_is_saved_on_create_and_update(): void
+    {
+        $user = $this->userWith('faculty_loading.subjects.manage');
+
+        $this->actingAs($user)
+            ->post(route('faculty-loading.subjects.store'), $this->subjectPayload(['is_stem' => true]))
+            ->assertRedirect();
+
+        $subject = Subject::where('code', 'PE1-G7')->firstOrFail();
+        $this->assertTrue($subject->is_stem);
+
+        $this->actingAs($user)
+            ->put(route('faculty-loading.subjects.update', $subject->id), $this->subjectPayload(['is_stem' => false]))
+            ->assertRedirect();
+
+        $this->assertFalse($subject->fresh()->is_stem);
+    }
+
     public function test_subject_group_is_saved_on_create(): void
     {
         $user = $this->userWith('faculty_loading.subjects.manage');
@@ -88,6 +106,27 @@ class SubjectControllerTest extends TestCase
         $this->assertDatabaseHas('subjects', [
             'id' => $subject->id, 'subject_group' => 'PEHM',
         ]);
+    }
+
+    public function test_copy_from_year_carries_is_stem(): void
+    {
+        $user = $this->userWith('faculty_loading.subjects.manage');
+        Subject::create($this->subjectPayload(['is_stem' => true]));
+
+        $targetYear = SchoolYear::create([
+            'name' => '2026-2027', 'start_date' => '2026-08-01', 'end_date' => '2027-06-30',
+            'is_current' => false, 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('faculty-loading.subjects.copy-from-year'), [
+                'source_school_year_id' => $this->sy->id,
+                'target_school_year_id' => $targetYear->id,
+            ])
+            ->assertRedirect();
+
+        $copied = Subject::where('school_year_id', $targetYear->id)->where('code', 'PE1-G7')->firstOrFail();
+        $this->assertTrue($copied->is_stem);
     }
 
     public function test_view_only_user_can_view_index_but_not_create(): void
