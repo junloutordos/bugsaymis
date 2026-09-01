@@ -97,7 +97,7 @@ function openScanner() {
 }
 
 function handleSerialScanned(value) {
-  form.serial_no = value
+  form.value.serial_no = value
   showScannerModal.value = false
   serialJustScanned.value = true
   clearTimeout(serialScanFlashTimer)
