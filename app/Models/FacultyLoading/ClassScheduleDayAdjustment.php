@@ -22,6 +22,12 @@ class ClassScheduleDayAdjustment extends Model
         'activity_start_time',
         'activity_end_time',
         'class_duration_minutes',
+        'day_start_time',
+        'stem_class_duration_minutes',
+        'non_stem_class_duration_minutes',
+        'health_break_title',
+        'health_break_start_time',
+        'health_break_end_time',
         'reason',
         'status',
         'schedule_snapshot',
@@ -38,6 +44,8 @@ class ClassScheduleDayAdjustment extends Model
         'grade_levels' => 'array',
         'shift_minutes' => 'integer',
         'class_duration_minutes' => 'integer',
+        'stem_class_duration_minutes' => 'integer',
+        'non_stem_class_duration_minutes' => 'integer',
         'schedule_snapshot' => 'array',
         'published_at' => 'datetime',
         'cancelled_at' => 'datetime',
@@ -104,12 +112,25 @@ class ClassScheduleDayAdjustment extends Model
             'shortened_classes',
             'flag_ceremony_shortened_classes',
             'shortened_classes_protect_assessments',
+            'early_start_stem_split',
         ], true);
     }
 
     public function protectsAssessmentPeriods(): bool
     {
         return $this->adjustment_type === 'shortened_classes_protect_assessments';
+    }
+
+    public function isEarlyStartStemSplit(): bool
+    {
+        return $this->adjustment_type === 'early_start_stem_split';
+    }
+
+    public function hasHealthBreak(): bool
+    {
+        return filled($this->health_break_title)
+            && filled($this->health_break_start_time)
+            && filled($this->health_break_end_time);
     }
 
     public function scopePublished($query)
