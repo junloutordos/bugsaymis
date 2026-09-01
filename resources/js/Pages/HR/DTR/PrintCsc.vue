@@ -220,14 +220,20 @@ function cellStyle(rec, field) {
   return {}
 }
 
+function tardyMinutes(rec) {
+  if (!rec) return 0
+  return (rec.late_minutes || 0) + (rec.undertime_minutes || 0)
+}
 function utH(rec) {
-  if (!rec || !rec.undertime_minutes) return ''
-  const h = Math.floor(rec.undertime_minutes / 60)
+  const total = tardyMinutes(rec)
+  if (!total) return ''
+  const h = Math.floor(total / 60)
   return h > 0 ? h : ''
 }
 function utM(rec) {
-  if (!rec || !rec.undertime_minutes) return ''
-  const m = rec.undertime_minutes % 60
+  const total = tardyMinutes(rec)
+  if (!total) return ''
+  const m = total % 60
   return m > 0 ? m : ''
 }
 
