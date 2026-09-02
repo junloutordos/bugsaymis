@@ -1375,7 +1375,10 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         // Both homerooms carry the exact same ELECTIVE and SCIENCE_CORE
         // blocks, at the same times — the shared grade-wide windows, not
         // anything specific to either homeroom. Grade 11/12 Tuesday has two
-        // separate Elective periods (Period 4, and Period 7+8 merged).
+        // separate Elective periods; each is capped to a single clean
+        // stem_class_duration_minutes block on this early_start_stem_split
+        // day (see isStemForSplit()), regardless of the real raw row's own
+        // span.
         $diamondBands = collect($sections)->firstWhere('name', 'Diamond')['bands'];
         $emeraldBands = collect($sections)->firstWhere('name', 'Emerald')['bands'];
 
@@ -1384,7 +1387,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertCount(2, $diamondElectives);
         $this->assertSame($diamondElectives->all(), $emeraldElectives->all());
         $this->assertSame(['10:20', '13:50'], $diamondElectives->pluck('start')->all());
-        $this->assertSame(['11:10', '15:30'], $diamondElectives->pluck('end')->all());
+        $this->assertSame(['11:10', '14:40'], $diamondElectives->pluck('end')->all());
 
         $diamondScienceCore = collect($diamondBands)->firstWhere('type', 'SCIENCE_CORE');
         $emeraldScienceCore = collect($emeraldBands)->firstWhere('type', 'SCIENCE_CORE');
@@ -1576,6 +1579,16 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         // Nothing needed to extend the visible range — the clamp already
         // keeps it from ever rendering before day_start.
         $this->assertSame('07:00', $preview->json('calendar_start'));
+
+        // The homeroom's own real first period (English 6, raw 09:00) must
+        // not land on top of Science Core — a real production symptom:
+        // clamping Science Core's position alone, without correspondingly
+        // moving entries that were shifted assuming the homeroom's own
+        // first period was the true start of the day, put both at 07:00.
+        $delMundoEntries = collect($preview->json('grades'))->firstWhere('grade_level', 12)['sections'][0]['entries'];
+        $englishEntry = collect($delMundoEntries)->firstWhere(fn (array $e) => ($e['subject']['code'] ?? null) === 'EN6-G12');
+        $this->assertNotNull($englishEntry);
+        $this->assertGreaterThanOrEqual($scienceCore['end'], $englishEntry['start_time']);
     }
 
     public function test_early_start_stem_split_treats_science_core_and_elective_subjects_as_stem_even_without_is_stem_flag(): void

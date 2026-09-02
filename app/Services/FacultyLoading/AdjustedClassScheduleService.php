@@ -109,6 +109,36 @@ class AdjustedClassScheduleService
 
             $gradeSections = [];
 
+            // Elective/Science Core are grade-wide (not per-section), so
+            // computed once here rather than redundantly inside the section
+            // loop below — also lets the shift-anchor calculation below see
+            // them.
+            $electiveWindowsRaw = $this->elective->getElectiveWindows(
+                (int) $term->school_year_id,
+                (int) $term->id,
+                $gradeLevel,
+                $day,
+            );
+            $scienceCoreWindowsRaw = $this->scienceCore->getScienceCoreWindows(
+                (int) $term->school_year_id,
+                (int) $term->id,
+                $gradeLevel,
+                $day,
+            );
+            // Elective/Science Core are real occupied class time — merged
+            // into slots (adjacent/overlapping raw windows across both
+            // types collapsed together, same technique as
+            // ElectiveService::getElectiveWindows()) so the compression
+            // math below can treat them as genuinely reserved, exactly like
+            // a real ClassSchedule row, instead of being overlaid
+            // afterward with no awareness of what else occupies that time.
+            $gradeBandSlots = $stemSplit
+                ? $this->mergedProtectedBandSlots([...$electiveWindowsRaw, ...$scienceCoreWindowsRaw], $stemMinutes)
+                : [];
+            $earliestGradeBandMinutes = collect($gradeBandSlots)
+                ->map(fn (array $slot) => SchedulingConstants::toMinutes($slot['start']))
+                ->min();
+
             foreach ($sections->where('levelid', $gradeLevel) as $section) {
                 $sectionSchedule = $scheduleRows->get($section->id) ?? collect();
 
@@ -117,12 +147,21 @@ class AdjustedClassScheduleService
                 // campus-wide day_start_time — different grades' sections
                 // normally start their first period at different clock
                 // times, so the shift needed to reach the same target start
-                // differs per section.
+                // differs per section. Elective/Science Core are cross-
+                // homeroom — not part of $sectionSchedule — but can still be
+                // the true earliest activity of the section's real day (see
+                // test_early_start_stem_split_clamps_science_core_to_day_start_with_a_clean_stem_duration).
+                // Anchoring only on the homeroom's own first period then
+                // produces a shift too large for them, landing them on top
+                // of the homeroom's own (correctly-anchored) later periods.
                 $sectionShift = $shift;
                 if ($stemSplit && $sectionSchedule->isNotEmpty()) {
                     $firstOriginalStart = SchedulingConstants::toMinutes(
                         substr((string) $sectionSchedule->first()->start_time, 0, 5)
                     );
+                    if ($earliestGradeBandMinutes !== null) {
+                        $firstOriginalStart = min($firstOriginalStart, $earliestGradeBandMinutes);
+                    }
                     $sectionShift = $dayStartMinutes - $firstOriginalStart;
                 }
 
@@ -153,6 +192,15 @@ class AdjustedClassScheduleService
                     })
                     ->values()
                     ->all();
+
+                if ($stemSplit && $sectionSchedule->isNotEmpty()) {
+                    // Only for a section that's actually being shifted/
+                    // compressed (see the $sectionShift gate above) — a
+                    // section with zero real periods that day has nothing
+                    // to anchor a shift to, so its bands stay an
+                    // unshifted, uncompressed pass-through, same as before.
+                    $sectionSlots = array_merge($sectionSlots, $gradeBandSlots);
+                }
 
                 if ($stemSplit) {
                     // Lunch must actually disappear from the timetable for this
@@ -225,21 +273,11 @@ class AdjustedClassScheduleService
                     $this->trimWindow($section->consultationOverrideFor($day)),
                 );
 
-                foreach ($this->elective->getElectiveWindows(
-                    (int) $term->school_year_id,
-                    (int) $term->id,
-                    $gradeLevel,
-                    $day,
-                ) as $band) {
+                foreach ($electiveWindowsRaw as $band) {
                     $bands[] = [...$band, 'type' => 'ELECTIVE'];
                 }
 
-                foreach ($this->scienceCore->getScienceCoreWindows(
-                    (int) $term->school_year_id,
-                    (int) $term->id,
-                    $gradeLevel,
-                    $day,
-                ) as $band) {
+                foreach ($scienceCoreWindowsRaw as $band) {
                     $bands[] = [...$band, 'type' => 'SCIENCE_CORE'];
                 }
 
@@ -251,33 +289,30 @@ class AdjustedClassScheduleService
                     ->when($hasShortenedClasses, fn ($items) => $items->reject(
                         fn (array $band) => in_array($band['type'] ?? '', $rejectedBandTypes, true),
                     ))
-                    ->map(function (array $band) use ($sectionSlots, $sectionShift, $stemSplit, $dayStartMinutes, $stemMinutes) {
+                    ->map(function (array $band) use ($sectionSlots, $sectionShift, $stemSplit, $stemMinutes) {
+                        // Elective/Science Core are compressed correctly
+                        // here too: whenever this section has its own real
+                        // periods, they're injected into $sectionSlots above
+                        // as real, stem_class_duration_minutes-target slots,
+                        // so the same mechanism that compresses a real
+                        // ClassSchedule row naturally gives them a clean
+                        // single-STEM-period duration and a position that
+                        // can't collide with anything else.
                         $start = $this->transformTime((string) $band['start'], $sectionSlots, $sectionShift);
                         $end = $this->transformTime((string) $band['end'], $sectionSlots, $sectionShift);
 
-                        if ($stemSplit
-                            && in_array($band['type'] ?? '', ['ELECTIVE', 'SCIENCE_CORE'], true)
-                            && SchedulingConstants::toMinutes($start) < $dayStartMinutes
-                        ) {
-                            // Being cross-homeroom, Elective/Science Core
-                            // aren't necessarily this section's own first
-                            // period — the per-section shift (anchored to
-                            // the section's OWN first period) can carry them
-                            // to a computed time BEFORE day_start_time, which
-                            // is never valid (the compressed day cannot start
-                            // before its own declared start). Only correct
-                            // this genuinely invalid case: clamp to
-                            // day_start_time with a single clean
-                            // stem_class_duration_minutes block (see
-                            // isStemForSplit()) — a safe, real duration,
-                            // since the shifted raw span that produced the
-                            // invalid position isn't a value worth trusting
-                            // either. A band that's already at or after
-                            // day_start (the common case, including
-                            // legitimately merged multi-period windows) is
-                            // left exactly as computed.
-                            $start = SchedulingConstants::fromMinutes($dayStartMinutes);
-                            $end = SchedulingConstants::fromMinutes($dayStartMinutes + $stemMinutes);
+                        if ($stemSplit && in_array($band['type'] ?? '', ['ELECTIVE', 'SCIENCE_CORE'], true)) {
+                            // Re-asserted unconditionally (not just relying
+                            // on the slot injection above) so a section with
+                            // zero real periods of its own that day — which
+                            // skips slot injection entirely, since there's
+                            // nothing to anchor a shift to or collide with —
+                            // still gets the correct clean duration instead
+                            // of an untouched, potentially inflated raw span.
+                            // A no-op when slot injection already ran: that
+                            // mechanism produces this exact same value by
+                            // construction.
+                            $end = SchedulingConstants::fromMinutes(SchedulingConstants::toMinutes($start) + $stemMinutes);
                         }
 
                         return [...$band, 'start' => $start, 'end' => $end];
@@ -476,6 +511,41 @@ class AdjustedClassScheduleService
     {
         return $subject !== null
             && ((bool) $subject->is_stem || in_array($subject->subject_type, ['science_core', 'elective'], true));
+    }
+
+    /**
+     * Elective/Science Core windows (raw, real ClassSchedule-derived —
+     * see ElectiveService/ScienceCoreService) merged into compression
+     * slots the same way transformTime() already treats a real
+     * ClassSchedule row: a real block of occupied time with its own
+     * compression target. Without this, the compression math has no idea
+     * these cross-homeroom bands occupy real time, so a homeroom entry the
+     * shift moves into their slot — or a second band, if both Elective and
+     * Science Core exist the same day — can land directly on top of one.
+     * Adjacent/overlapping raw windows across BOTH types are collapsed
+     * together first (same merge technique as
+     * ElectiveService::getElectiveWindows()) so an identical or partially
+     * overlapping Elective/Science Core pair doesn't double-count savings
+     * for the same real time span.
+     *
+     * @param  array<int,array{start:string,end:string}>  $windows
+     * @return array<int,array{start:string,end:string,target:int}>
+     */
+    private function mergedProtectedBandSlots(array $windows, int $target): array
+    {
+        $sorted = collect($windows)->sortBy('start')->values()->all();
+
+        $merged = [];
+        foreach ($sorted as $window) {
+            $lastIdx = count($merged) - 1;
+            if ($lastIdx >= 0 && $merged[$lastIdx]['end'] >= $window['start']) {
+                $merged[$lastIdx]['end'] = max($merged[$lastIdx]['end'], $window['end']);
+            } else {
+                $merged[] = ['start' => $window['start'], 'end' => $window['end'], 'target' => $target];
+            }
+        }
+
+        return $merged;
     }
 
     /**
