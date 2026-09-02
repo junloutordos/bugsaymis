@@ -27,6 +27,7 @@ use App\Http\Controllers\FacultyLoading\LoadAssignmentVersionController;
 use App\Http\Controllers\FacultyLoading\OverloadComputationController;
 use App\Http\Controllers\FacultyLoading\ReportController;
 use App\Http\Controllers\FacultyLoading\ResearchAdvisoryController;
+use App\Http\Controllers\FacultyLoading\MyResearchRequirementController;
 use App\Http\Controllers\FacultyLoading\ResearchRequirementController;
 use App\Http\Controllers\FacultyLoading\SchoolYearController;
 use App\Http\Controllers\FacultyLoading\SectionController;
@@ -61,6 +62,11 @@ Route::middleware(['web', 'auth', 'verified'])
             ->group(function () {
                 Route::get('/my-load',       [FacultyLoadController::class, 'myLoad'])->name('my-load');
                 Route::get('/my-load/print', [FacultyLoadController::class, 'printMyLoad'])->name('my-load.print');
+
+                Route::prefix('my-research-requirements')->name('my-research-requirements.')->group(function () {
+                    Route::get('/',                          [MyResearchRequirementController::class, 'index'])->name('index');
+                    Route::post('/{assignment}/submissions', [MyResearchRequirementController::class, 'submit'])->name('submit');
+                });
             });
 
         // My Faculty Schedule — everyone's personal calendar, managers included
@@ -333,6 +339,10 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::delete('/{researchAdvisory}',    [ResearchAdvisoryController::class, 'destroy'])->name('destroy');
             });
 
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.research_advisories|faculty_loading.view_own')
+            ->get('/research-requirements/files/{fileId}', [MyResearchRequirementController::class, 'file'])
+            ->name('research-requirements.files.show');
+
         Route::middleware('permission:faculty_loading.manage|faculty_loading.research_advisories')
             ->prefix('research-requirements')->name('research-requirements.')->group(function () {
                 Route::get('/',                     [ResearchRequirementController::class, 'index'])->name('index');
@@ -344,6 +354,7 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/{researchRequirement}/sync', [ResearchRequirementController::class, 'sync'])->name('sync');
                 Route::post('/{researchRequirement}/assignments', [ResearchRequirementController::class, 'addAssignment'])->name('assignments.store');
                 Route::patch('/assignments/{assignment}/toggle-exclude', [ResearchRequirementController::class, 'toggleExcludeAssignment'])->name('assignments.toggle-exclude');
+                Route::post('/submissions/{submission}/review', [ResearchRequirementController::class, 'review'])->name('submissions.review');
             });
 
         // ══════════════════════════════════════════════════════════════════════
