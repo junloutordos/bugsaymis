@@ -1657,6 +1657,15 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::post('/pm2/employee-ipcr/{ipcr}/submit-rating', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'submitForRating'])->name('pm2.employee-ipcr.submitRating')->middleware('permission:ipcr.v2.submit');
     });
 
+    // ── PM V2 — Supervisor IPCR (requires ipcr.v2.approve) ───────────────
+    Route::middleware('permission:ipcr.v2.approve')->group(function () {
+        Route::get('/pm2/supervisor-ipcr', [\App\Http\Controllers\PM2\SupervisorIpcrController::class, 'index'])->name('pm2.supervisor-ipcr.index');
+        Route::get('/pm2/supervisor-ipcr/{ipcr}', [\App\Http\Controllers\PM2\SupervisorIpcrController::class, 'show'])->name('pm2.supervisor-ipcr.show');
+        Route::post('/pm2/supervisor-ipcr/{ipcr}/approve-targets', [\App\Http\Controllers\PM2\SupervisorIpcrController::class, 'approveTargets'])->name('pm2.supervisor-ipcr.approveTargets');
+        Route::put('/pm2/supervisor-ipcr/{ipcr}/rows/{row}/rate', [\App\Http\Controllers\PM2\SupervisorIpcrController::class, 'rateRow'])->name('pm2.supervisor-ipcr.rateRow');
+        Route::post('/pm2/supervisor-ipcr/{ipcr}/mark-rated', [\App\Http\Controllers\PM2\SupervisorIpcrController::class, 'markRated'])->name('pm2.supervisor-ipcr.markRated');
+    });
+
     // ── Admin IPCR Monitoring — read-only view across every stage ──────────
     Route::middleware('role:Administrator')->group(function () {
         Route::get('/admin/ipcrs', [\App\Http\Controllers\AdminIPCRController::class, 'index'])->name('admin-ipcr.index');
