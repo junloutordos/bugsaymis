@@ -17,6 +17,10 @@ class WorkDistributionPlan extends Model
         'rated_by',
         'load_source',
         'fiscal_year',
+        'weight_percent',
+        'rating_scale_quality',
+        'rating_scale_efficiency',
+        'rating_scale_timeliness',
     ];
 
     // NULL fiscal_year = applies to all years (legacy rows)
