@@ -103,6 +103,23 @@
             </div>
           </div>
         </div>
+
+        <!-- Unplaced tray — bumped subject classes for this section,
+             draggable back onto any open slot in the same section. -->
+        <div v-if="grade.sections.some(s => (s.unplaced_entries ?? []).length)"
+          class="flex border-t border-slate-100 bg-slate-50/60">
+          <div class="sticky left-0 z-10 shrink-0 border-r border-slate-100 bg-slate-50/60" :style="{ width: `${GUTTER}px` }" />
+          <div v-for="section in grade.sections" :key="section.id"
+            class="flex w-56 shrink-0 flex-wrap gap-1 border-l border-slate-100 p-1.5 first:border-l-0">
+            <div v-for="entry in section.unplaced_entries ?? []" :key="entry.id"
+              draggable="true"
+              class="cursor-grab overflow-hidden truncate rounded-full border px-2 py-0.5 text-[10px] font-medium shadow-sm active:cursor-grabbing"
+              :style="entryColorStyle(entry)"
+              :title="`${entry.subject?.name ?? '—'} — unplaced, drag onto an open slot to re-place`"
+              @dragstart="onChipDragStart($event, entry, section)"
+            >{{ entry.subject?.name ?? '—' }}</div>
+          </div>
+        </div>
       </div>
 
       <!-- Official Activity / Early Dismissal isn't draggable or editable —
@@ -397,6 +414,16 @@ function isDraggableBand(band) {
 function onDragStart(event, entry, section) {
   const durationMinutes = toMinutes(entry.end_time) - toMinutes(entry.start_time)
   dragging.value = { kind: 'entry', target: entry, durationMinutes, section }
+  event.dataTransfer.setData('text/plain', String(entry.id))
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+// A chip has no current start/end (it's unplaced) — its natural duration
+// is server-provided instead of computed from start_time/end_time. Once
+// dragging starts, this is otherwise identical to moving an on-calendar
+// entry: onDragOver/onDrop need no changes.
+function onChipDragStart(event, entry, section) {
+  dragging.value = { kind: 'entry', target: entry, durationMinutes: entry.duration_minutes, section }
   event.dataTransfer.setData('text/plain', String(entry.id))
   event.dataTransfer.effectAllowed = 'move'
 }

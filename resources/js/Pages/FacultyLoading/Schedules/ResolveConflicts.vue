@@ -108,7 +108,14 @@ async function publish() {
     confirmButtonColor: '#059669',
   })
   if (result.isConfirmed) {
-    router.post(route('faculty-loading.schedules.day-adjustments.publish', props.adjustment.id), {}, { preserveScroll: true })
+    router.post(route('faculty-loading.schedules.day-adjustments.publish', props.adjustment.id), {}, {
+      preserveScroll: true,
+      onError: (errors) => {
+        if (errors.unplaced) {
+          Swal.fire({ icon: 'error', title: 'Cannot publish', text: errors.unplaced })
+        }
+      },
+    })
   }
 }
 </script>

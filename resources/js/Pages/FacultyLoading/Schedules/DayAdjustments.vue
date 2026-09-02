@@ -525,7 +525,16 @@ async function publish(item) {
     confirmButtonText: 'Publish',
     confirmButtonColor: '#059669',
   })
-  if (result.isConfirmed) router.post(route('faculty-loading.schedules.day-adjustments.publish', item.id), {}, { preserveScroll: true })
+  if (result.isConfirmed) {
+    router.post(route('faculty-loading.schedules.day-adjustments.publish', item.id), {}, {
+      preserveScroll: true,
+      onError: (errors) => {
+        if (errors.unplaced) {
+          Swal.fire({ icon: 'error', title: 'Cannot publish', text: errors.unplaced })
+        }
+      },
+    })
+  }
 }
 
 async function cancelAdjustment(item) {
