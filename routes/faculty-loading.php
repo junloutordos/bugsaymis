@@ -27,6 +27,7 @@ use App\Http\Controllers\FacultyLoading\LoadAssignmentVersionController;
 use App\Http\Controllers\FacultyLoading\OverloadComputationController;
 use App\Http\Controllers\FacultyLoading\ReportController;
 use App\Http\Controllers\FacultyLoading\ResearchAdvisoryController;
+use App\Http\Controllers\FacultyLoading\ResearchRequirementController;
 use App\Http\Controllers\FacultyLoading\SchoolYearController;
 use App\Http\Controllers\FacultyLoading\SectionController;
 use App\Http\Controllers\FacultyLoading\SupervisoryController;
@@ -330,6 +331,15 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/',                        [ResearchAdvisoryController::class, 'store'])->name('store');
                 Route::put('/{researchAdvisory}',       [ResearchAdvisoryController::class, 'update'])->name('update');
                 Route::delete('/{researchAdvisory}',    [ResearchAdvisoryController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::middleware('permission:faculty_loading.manage|faculty_loading.research_advisories')
+            ->prefix('research-requirements')->name('research-requirements.')->group(function () {
+                Route::get('/',                     [ResearchRequirementController::class, 'index'])->name('index');
+                Route::post('/',                    [ResearchRequirementController::class, 'store'])->name('store');
+                Route::get('/{researchRequirement}',    [ResearchRequirementController::class, 'show'])->name('show');
+                Route::put('/{researchRequirement}',    [ResearchRequirementController::class, 'update'])->name('update');
+                Route::delete('/{researchRequirement}', [ResearchRequirementController::class, 'archive'])->name('archive');
             });
 
         // ══════════════════════════════════════════════════════════════════════
