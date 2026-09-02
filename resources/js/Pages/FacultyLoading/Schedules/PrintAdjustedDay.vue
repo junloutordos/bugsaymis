@@ -18,24 +18,24 @@
 
         <div class="timeline" :style="{ height: timelineHeight + 'mm' }">
           <div class="time-axis">
-            <span v-for="minute in timeMarks" :key="minute" :style="pointStyle(minute)">{{ formatMinutes(minute) }}</span>
+            <span v-for="minute in timeMarks" :key="minute" :style="pointStyle(minute, grade)">{{ formatMinutes(minute) }}</span>
           </div>
 
           <div class="section-columns">
             <div v-for="minute in gridMarks" :key="'line-' + minute" class="grid-line"
-              :class="{ half: minute % 60 !== 0 }" :style="pointStyle(minute)" />
+              :class="{ half: minute % 60 !== 0 }" :style="pointStyle(minute, grade)" />
 
             <div v-for="section in grade.sections" :key="section.id" class="section-column">
               <div v-if="snapshot.ceremony" class="ceremony-block" :class="durationClass(snapshot.ceremony.start, snapshot.ceremony.end)"
-                :style="rangeStyle(snapshot.ceremony.start, snapshot.ceremony.end)">
+                :style="rangeStyle(snapshot.ceremony.start, snapshot.ceremony.end, grade)">
                 <strong>Flag Ceremony</strong><span class="block-time">{{ formatDisplayRange(snapshot.ceremony.start, snapshot.ceremony.end) }}</span>
               </div>
               <div v-for="band in section.bands" :key="`${band.type}-${band.start}-${band.end}`"
-                class="schedule-band" :class="[bandClass(band.type), durationClass(band.start, band.end)]" :style="rangeStyle(band.start, band.end)">
+                class="schedule-band" :class="[bandClass(band.type), durationClass(band.start, band.end)]" :style="rangeStyle(band.start, band.end, grade)">
                 <strong>{{ band.label }}</strong><span class="block-time">{{ formatDisplayRange(band.start, band.end) }}</span>
               </div>
               <div v-for="entry in section.entries" :key="entry.id" class="class-entry"
-                :class="durationClass(entry.start_time, entry.end_time)" :style="rangeStyle(entry.start_time, entry.end_time)">
+                :class="durationClass(entry.start_time, entry.end_time)" :style="rangeStyle(entry.start_time, entry.end_time, grade)">
                 <div class="entry-main">
                   <strong>{{ entryTitle(entry) }}</strong>
                   <small>{{ formatDisplayRange(entry.start_time, entry.end_time) }}</small>
@@ -111,11 +111,53 @@ function formatDisplayRange(start, end) {
 function minutesToTime(minutes) {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
-function pointStyle(minute) { return { top: `${((minute - startMinutes.value) / spanMinutes.value) * 100}%` } }
-function rangeStyle(start, end) {
+// Two-zone timeline: a purely linear 7:30-17:00 scale gives a 30-minute
+// compressed class only ~6mm on the sheet whenever a multi-hour Early
+// Dismissal / Official Activity tail shares the same page, and overflow:
+// hidden on the entry boxes then silently clips the details. Zone 1 (day
+// start through the last real instructional time) is stretched to occupy
+// most of the sheet; the administrative tail (Official Activity/Consult)
+// is compressed into a small remainder — same continuous timeline, just
+// rebalanced so the busy period is legible.
+const INSTRUCTIONAL_ZONE_SHARE = 0.8
+const MIN_TAIL_MINUTES = 30
+
+function instructionalBoundaryMinutes(grade) {
+  const ends = []
+  if (props.snapshot.ceremony) ends.push(timeToMinutes(props.snapshot.ceremony.end))
+  for (const section of grade.sections ?? []) {
+    for (const entry of section.entries ?? []) ends.push(timeToMinutes(entry.end_time))
+    for (const band of section.bands ?? []) {
+      if (band.type === 'OFFICIAL_ACTIVITY' || band.type === 'CONSULT') continue
+      ends.push(timeToMinutes(band.end))
+    }
+  }
+  if (!ends.length) return endMinutes.value
+  return Math.min(endMinutes.value, Math.max(...ends))
+}
+function scaledPercent(minutes, boundary) {
+  const clamped = Math.min(endMinutes.value, Math.max(startMinutes.value, minutes))
+  const tailMinutes = endMinutes.value - boundary
+  if (tailMinutes < MIN_TAIL_MINUTES) {
+    return ((clamped - startMinutes.value) / spanMinutes.value) * 100
+  }
+  const zone1Span = boundary - startMinutes.value
+  const zone1Percent = INSTRUCTIONAL_ZONE_SHARE * 100
+  if (clamped <= boundary) {
+    return zone1Span > 0 ? ((clamped - startMinutes.value) / zone1Span) * zone1Percent : 0
+  }
+  return zone1Percent + ((clamped - boundary) / tailMinutes) * (100 - zone1Percent)
+}
+function pointStyle(minute, grade) {
+  return { top: `${scaledPercent(minute, instructionalBoundaryMinutes(grade))}%` }
+}
+function rangeStyle(start, end, grade) {
+  const boundary = instructionalBoundaryMinutes(grade)
   const from = Math.max(startMinutes.value, timeToMinutes(start))
   const to = Math.min(endMinutes.value, timeToMinutes(end))
-  return { top: `${((from - startMinutes.value) / spanMinutes.value) * 100}%`, height: `${(Math.max(0, to - from) / spanMinutes.value) * 100}%` }
+  const top = scaledPercent(from, boundary)
+  const bottom = scaledPercent(to, boundary)
+  return { top: `${top}%`, height: `${Math.max(0, bottom - top)}%` }
 }
 function duration(start, end) { return timeToMinutes(end) - timeToMinutes(start) }
 function durationClass(start, end) {

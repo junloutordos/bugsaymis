@@ -1,62 +1,105 @@
 <template>
   <div class="space-y-4">
-    <div v-for="grade in gradesWithEntries" :key="grade.grade_level" class="rounded-xl border border-slate-200 bg-white p-4">
-      <h3 class="mb-3 text-sm font-semibold text-slate-700">Grade {{ grade.grade_level }}</h3>
-      <div class="flex gap-3 overflow-x-auto pb-2">
-        <div v-for="section in grade.sections" :key="section.id" class="w-56 shrink-0">
-          <div class="mb-1 flex items-center justify-center gap-1 text-center text-xs font-semibold text-slate-500">
-            <span class="truncate">{{ section.name }}</span>
+    <div v-for="grade in gradesWithEntries" :key="grade.grade_level"
+      class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm ring-1 ring-slate-200/70">
+      <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-slate-50 px-4 py-2.5">
+        <h3 class="text-sm font-semibold text-slate-800">Grade {{ grade.grade_level }}</h3>
+      </div>
+
+      <div class="overflow-x-auto">
+        <!-- Section header row -->
+        <div class="flex border-b border-slate-100">
+          <div class="sticky left-0 z-10 shrink-0 border-r border-slate-100 bg-white" :style="{ width: `${GUTTER}px` }" />
+          <div v-for="section in grade.sections" :key="section.id"
+            class="flex w-56 shrink-0 items-center justify-center gap-1 border-l border-slate-100 py-2 text-center first:border-l-0">
+            <span class="truncate text-xs font-semibold uppercase tracking-wide text-slate-500">{{ section.name }}</span>
             <button
               v-if="missingBandTypes(section).length"
               type="button"
-              class="shrink-0 rounded-full bg-slate-100 px-1.5 leading-4 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700"
+              class="shrink-0 rounded-full bg-slate-100 px-1.5 text-xs leading-4 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700"
               title="Add a band"
               @click="openAddBand(section)"
             >+</button>
           </div>
-          <div
-            class="relative rounded-lg border bg-slate-50"
-            :class="conflictSectionId === section.id ? 'border-rose-300 ring-2 ring-rose-200' : 'border-slate-100'"
-            :style="{ height: `${totalMinutes * PX_PER_MINUTE}px` }"
-            @dragover.prevent="onDragOver($event, section)"
-            @dragleave="conflictSectionId = null"
-            @drop.prevent="onDrop($event, section)"
-          >
-            <div
-              v-for="band in section.bands"
-              :key="`${band.type}-${band.start}`"
-              :draggable="isDraggableBand(band)"
-              class="absolute inset-x-0 rounded px-1.5 py-0.5 text-[10px]"
-              :class="bandClass(band)"
-              :style="bandStyle(band)"
-              @dragstart="onBandDragStart($event, band, section)"
-              @click="isDraggableBand(band) && openBandOverride(section, band)"
+        </div>
+
+        <!-- Time axis + section columns -->
+        <div class="flex" :style="{ height: `${totalMinutes * PX_PER_MINUTE}px` }">
+          <div class="sticky left-0 z-10 relative shrink-0 border-r border-slate-100 bg-white" :style="{ width: `${GUTTER}px` }">
+            <span v-for="minute in hourMarks" :key="minute"
+              class="absolute right-2 -translate-y-1/2 select-none text-[11px] font-medium text-slate-400"
+              :style="{ top: `${hourTopPx(minute)}px` }">{{ hourLabel(minute) }}</span>
+          </div>
+
+          <div class="relative flex">
+            <div v-for="minute in hourMarks" :key="`hl-${minute}`"
+              class="pointer-events-none absolute inset-x-0 z-0 border-t border-slate-100" :style="{ top: `${hourTopPx(minute)}px` }" />
+            <div v-for="minute in halfHourMarks" :key="`hl30-${minute}`"
+              class="pointer-events-none absolute inset-x-0 z-0 border-t border-dashed border-slate-100" :style="{ top: `${hourTopPx(minute)}px` }" />
+
+            <div v-for="section in grade.sections" :key="section.id"
+              class="relative w-56 shrink-0 border-l border-slate-100 first:border-l-0"
+              :class="conflictSectionId === section.id ? 'bg-rose-50/60 ring-2 ring-inset ring-rose-300' : ''"
+              @dragover.prevent="onDragOver($event, section)"
+              @dragleave="conflictSectionId = null"
+              @drop.prevent="onDrop($event, section)"
             >
-              <div v-if="isDraggableBand(band)" class="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
-                @mousedown.stop.prevent="startResize($event, band, section, 'start')"
-                @dragstart.stop.prevent></div>
-              {{ band.label }}
-              <div v-if="isDraggableBand(band)" class="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
-                @mousedown.stop.prevent="startResize($event, band, section, 'end')"
-                @dragstart.stop.prevent></div>
-            </div>
-            <div
-              v-for="entry in section.entries"
-              :key="entry.id"
-              :draggable="true"
-              class="absolute inset-x-1 cursor-grab rounded-md border px-2 py-1 text-xs shadow-sm active:cursor-grabbing"
-              :class="entryClass(entry)"
-              :style="entryStyle(entry)"
-              :data-entry-id="entry.id"
-              @dragstart="onDragStart($event, entry, section)"
-              @click="openOverride(entry)"
-            >
-              <div class="flex items-center justify-between gap-1">
-                <span class="truncate font-medium">{{ entry.subject?.name ?? entry.title ?? '—' }}</span>
-                <span v-if="isStemEntry(entry)" class="shrink-0 rounded-full bg-purple-100 px-1.5 text-[9px] font-semibold text-purple-700">STEM</span>
+              <div
+                v-for="band in section.bands"
+                :key="`${band.type}-${band.start}`"
+                :draggable="isDraggableBand(band)"
+                class="absolute inset-x-0.5 z-[1] overflow-hidden rounded px-1.5 py-0.5 leading-tight transition-shadow"
+                :class="bandClass(band)"
+                :style="bandStyle(band)"
+                :title="`${band.label} — ${band.start}–${band.end}`"
+                @dragstart="onBandDragStart($event, band, section)"
+                @click="isDraggableBand(band) && openBandOverride(section, band)"
+              >
+                <div v-if="isDraggableBand(band)" class="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
+                  @mousedown.stop.prevent="startResize($event, band, section, 'start')"
+                  @dragstart.stop.prevent></div>
+                <template v-if="isCompactBand(band)">
+                  <span class="block truncate text-[9px] font-medium">{{ band.label }} · {{ band.start }}–{{ band.end }}</span>
+                </template>
+                <template v-else>
+                  <span class="block truncate text-[10px] font-semibold">{{ band.label }}</span>
+                  <span class="block truncate text-[9px] tabular-nums opacity-80">{{ band.start }}–{{ band.end }}</span>
+                </template>
+                <div v-if="isDraggableBand(band)" class="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+                  @mousedown.stop.prevent="startResize($event, band, section, 'end')"
+                  @dragstart.stop.prevent></div>
               </div>
-              <div v-if="entry.faculty?.name" class="truncate text-[10px] text-slate-600">{{ entry.faculty.name }}</div>
-              <div class="text-[10px] text-slate-500">{{ entry.start_time }}–{{ entry.end_time }} · {{ entry.classroom?.name ?? '—' }}</div>
+              <div
+                v-for="entry in section.entries"
+                :key="entry.id"
+                :draggable="true"
+                class="absolute inset-x-1 z-[2] cursor-grab overflow-hidden rounded-md border px-1.5 py-1 shadow-sm transition-all hover:z-20 hover:scale-[1.01] hover:shadow-md active:cursor-grabbing"
+                :class="entryClass(entry)"
+                :style="[entryStyle(entry), entryColorStyle(entry)]"
+                :data-entry-id="entry.id"
+                :title="`${entry.subject?.name ?? entry.title ?? '—'} — ${entry.start_time}–${entry.end_time}${entry.faculty?.name ? ' — ' + entry.faculty.name : ''}`"
+                @dragstart="onDragStart($event, entry, section)"
+                @click="openOverride(entry)"
+              >
+                <span v-if="entry.manually_adjusted" class="absolute right-1 top-0.5 text-[10px] font-bold text-indigo-700" title="Manually adjusted before publishing">*</span>
+
+                <template v-if="entryDisplayMode(entry) === 'minimal'">
+                  <div class="flex items-center gap-1 leading-tight">
+                    <span class="min-w-0 truncate text-[10px] font-semibold">{{ entry.subject?.name ?? entry.title ?? '—' }}</span>
+                    <span class="ml-auto shrink-0 text-[9px] tabular-nums opacity-70">{{ entry.start_time }}–{{ entry.end_time }}</span>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="min-w-0 truncate text-xs font-semibold">{{ entry.subject?.name ?? entry.title ?? '—' }}</span>
+                    <span v-if="isStemEntry(entry)" class="shrink-0 rounded-full bg-white/70 px-1 text-[8px] font-bold">STEM</span>
+                  </div>
+                  <div v-if="entryDisplayMode(entry) === 'full' && entry.faculty?.name" class="truncate text-[10px] leading-tight opacity-80">{{ entry.faculty.name }}</div>
+                  <div class="truncate text-[9px] leading-tight tabular-nums opacity-70">
+                    {{ entry.start_time }}–{{ entry.end_time }}<template v-if="entryDisplayMode(entry) === 'full'"> · {{ entry.classroom?.name ?? '—' }}</template>
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -152,6 +195,39 @@ const emit = defineEmits(['update:preview'])
 
 const PX_PER_MINUTE = 1.5
 const SNAP_MINUTES = 5
+const GUTTER = 44
+const MIN_ENTRY_HEIGHT = 24
+const MIN_BAND_HEIGHT = 22
+const COMPACT_BAND_THRESHOLD_MIN = 15
+
+// Same palette the regular Schedules calendar (ScheduleCalendarCard) uses,
+// so a subject reads the same color whether you're looking at the weekly
+// schedule or an adjusted day.
+const PALETTE = [
+  { bg: '#dbeafe', border: '#93c5fd', color: '#1e40af' },
+  { bg: '#ede9fe', border: '#c4b5fd', color: '#5b21b6' },
+  { bg: '#d1fae5', border: '#6ee7b7', color: '#065f46' },
+  { bg: '#fef3c7', border: '#fcd34d', color: '#92400e' },
+  { bg: '#fee2e2', border: '#fca5a5', color: '#991b1b' },
+  { bg: '#cffafe', border: '#67e8f9', color: '#0e7490' },
+  { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
+  { bg: '#ecfdf5', border: '#34d399', color: '#064e3b' },
+  { bg: '#fff7ed', border: '#fdba74', color: '#9a3412' },
+  { bg: '#f0f9ff', border: '#7dd3fc', color: '#075985' },
+]
+const ELECTIVE_STYLE = { backgroundColor: '#fef3c7', borderColor: '#f59e0b', color: '#92400e' }
+const SCIENCE_CORE_STYLE = { backgroundColor: '#ede9fe', borderColor: '#8b5cf6', color: '#5b21b6' }
+const NON_TEACHING_STYLE = { backgroundColor: '#f1f5f9', borderColor: '#94a3b8', color: '#334155' }
+
+const BAND_COLOR_CLASSES = {
+  WHITE_SPACE: 'border-violet-200 bg-violet-50 text-violet-700',
+  WELLNESS: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  CONSULT: 'border-sky-200 bg-sky-50 text-sky-700',
+  ELECTIVE: 'border-amber-300 bg-amber-50 text-amber-700',
+  SCIENCE_CORE: 'border-violet-300 bg-violet-100 text-violet-800',
+  HEALTH_BREAK: 'border-rose-200 bg-rose-50 text-rose-700',
+  OFFICIAL_ACTIVITY: 'border-purple-300 bg-purple-100 text-purple-800',
+}
 
 const dragging = ref(null) // { entry, durationMinutes, section }
 const conflictSectionId = ref(null)
@@ -195,33 +271,87 @@ function fromMinutes(total) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-function offsetStyle(startHHMM, endHHMM) {
+function offsetStyle(startHHMM, endHHMM, minHeight) {
   const top = (toMinutes(startHHMM) - calendarStartMinutes.value) * PX_PER_MINUTE
-  const height = Math.max(16, (toMinutes(endHHMM) - toMinutes(startHHMM)) * PX_PER_MINUTE)
+  const height = Math.max(minHeight, (toMinutes(endHHMM) - toMinutes(startHHMM)) * PX_PER_MINUTE)
   return { top: `${top}px`, height: `${height}px` }
 }
 
 function entryStyle(entry) {
-  return offsetStyle(entry.start_time, entry.end_time)
+  return offsetStyle(entry.start_time, entry.end_time, MIN_ENTRY_HEIGHT)
 }
 
 function bandStyle(band) {
-  return offsetStyle(band.start, band.end)
+  return offsetStyle(band.start, band.end, MIN_BAND_HEIGHT)
+}
+
+// Hour marks for the shared time gutter/gridlines — derived from the day's
+// own calendar_start/calendar_end (07:00 on an early-start STEM-split day,
+// 07:30 otherwise), same technique as the regular Schedules calendar.
+const hourMarks = computed(() => {
+  const marks = []
+  const firstHour = Math.ceil(calendarStartMinutes.value / 60)
+  const lastHour = Math.floor(calendarEndMinutes.value / 60)
+  for (let h = firstHour; h <= lastHour; h++) marks.push(h * 60)
+  if (marks[0] !== calendarStartMinutes.value) marks.unshift(calendarStartMinutes.value)
+  if (marks[marks.length - 1] !== calendarEndMinutes.value) marks.push(calendarEndMinutes.value)
+  return marks
+})
+const halfHourMarks = computed(() => hourMarks.value
+  .filter(minute => minute % 60 === 0 && minute + 30 < calendarEndMinutes.value)
+  .map(minute => minute + 30))
+
+function hourTopPx(minute) {
+  return (minute - calendarStartMinutes.value) * PX_PER_MINUTE
+}
+function hourLabel(minute) {
+  const h = Math.floor(minute / 60)
+  const m = minute % 60
+  const suffix = h < 12 ? 'AM' : 'PM'
+  const hour12 = h % 12 || 12
+  return m === 0 ? `${hour12}${suffix}` : `${hour12}:${String(m).padStart(2, '0')}${suffix}`
+}
+
+function entryDurationMinutes(entry) {
+  return toMinutes(entry.end_time) - toMinutes(entry.start_time)
+}
+function entryDisplayMode(entry) {
+  const d = entryDurationMinutes(entry)
+  if (d >= 40) return 'full'
+  if (d >= 25) return 'compact'
+  return 'minimal'
+}
+
+function bandDurationMinutes(band) {
+  return toMinutes(band.end) - toMinutes(band.start)
+}
+function isCompactBand(band) {
+  return bandDurationMinutes(band) < COMPACT_BAND_THRESHOLD_MIN
+}
+
+function subjectColorStyle(subjectId) {
+  const p = PALETTE[(subjectId ?? 0) % PALETTE.length]
+  return { backgroundColor: p.bg, borderColor: p.border, color: p.color }
+}
+
+function entryColorStyle(entry) {
+  if (entry.entry_type === 'non_teaching') return NON_TEACHING_STYLE
+  if (entry.subject?.is_elective) return ELECTIVE_STYLE
+  if (entry.subject?.is_science_core) return SCIENCE_CORE_STYLE
+  return subjectColorStyle(entry.subject?.id)
 }
 
 function entryClass(entry) {
-  return entry.manually_adjusted
-    ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
-    : 'border-slate-200 bg-white text-slate-700'
+  return entry.manually_adjusted ? 'ring-2 ring-indigo-400 ring-inset' : ''
 }
 
 function bandClass(band) {
-  if (!isDraggableBand(band)) {
-    return 'bg-slate-200/60 text-slate-500'
-  }
-  return band.manually_adjusted
-    ? 'cursor-grab border border-indigo-300 bg-indigo-50 text-indigo-800 active:cursor-grabbing'
-    : 'cursor-grab border border-slate-200 bg-slate-200/60 text-slate-600 active:cursor-grabbing'
+  const base = BAND_COLOR_CLASSES[band.type] ?? 'border-slate-200 bg-slate-100 text-slate-600'
+  const interactive = isDraggableBand(band)
+    ? 'cursor-grab hover:ring-2 hover:ring-indigo-300 hover:ring-inset active:cursor-grabbing'
+    : ''
+  const manual = band.manually_adjusted ? 'ring-1 ring-indigo-400' : ''
+  return ['border', base, interactive, manual].filter(Boolean).join(' ')
 }
 
 function allEntries() {
