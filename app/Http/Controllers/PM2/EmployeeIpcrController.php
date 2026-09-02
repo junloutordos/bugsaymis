@@ -112,4 +112,11 @@ class EmployeeIpcrController extends Controller
 
         return back()->with('success', 'Submitted for rating.');
     }
+
+    public function pdf(EmployeeIpcrV2 $ipcr, \App\Services\PerformanceManagementV2\IpcrPdfServiceV2 $pdf)
+    {
+        $this->workflow->assertOwner(auth()->user(), $ipcr);
+
+        return $pdf->generate($ipcr);
+    }
 }

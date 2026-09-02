@@ -1655,6 +1655,7 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::put('/pm2/employee-ipcr/{ipcr}/rows/{row}/weight', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'updateRowWeight'])->name('pm2.employee-ipcr.updateRowWeight')->middleware('permission:ipcr.v2.update');
         Route::put('/pm2/employee-ipcr/{ipcr}/rows/{row}/self-rate', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'selfRate'])->name('pm2.employee-ipcr.selfRate')->middleware('permission:ipcr.v2.update');
         Route::post('/pm2/employee-ipcr/{ipcr}/submit-rating', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'submitForRating'])->name('pm2.employee-ipcr.submitRating')->middleware('permission:ipcr.v2.submit');
+        Route::get('/pm2/employee-ipcr/{ipcr}/pdf', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'pdf'])->name('pm2.employee-ipcr.pdf');
     });
 
     // ── PM V2 — Supervisor IPCR (requires ipcr.v2.approve) ───────────────
