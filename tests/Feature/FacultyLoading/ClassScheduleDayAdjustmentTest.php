@@ -1599,6 +1599,89 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertNotContains($filipinoClass->id, collect($aquamarine['unplaced_entries'])->pluck('id'));
     }
 
+    public function test_publish_is_blocked_while_a_subject_class_is_unplaced(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $adjustment->unplacedEntries()->create(['class_schedule_id' => $this->tuesdayClass->id]);
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertSessionHasErrors('unplaced');
+
+        $this->assertSame('draft', $adjustment->fresh()->status);
+    }
+
+    public function test_publish_succeeds_once_the_unplaced_class_is_resolved(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $adjustment->unplacedEntries()->create(['class_schedule_id' => $this->tuesdayClass->id]);
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $this->tuesdayClass->id,
+                'override_start_time' => '09:00',
+                'override_end_time' => '09:50',
+            ])
+            ->assertOk();
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('published', $adjustment->fresh()->status);
+    }
+
+    public function test_publish_succeeds_with_only_a_non_teaching_unplaced_row_present(): void
+    {
+        // Defensive: the publish gate's query must only ever match a real
+        // subject class, even though — per scopeClasses() — a non_teaching
+        // row can never actually become unplaced through the live drag
+        // flow. This directly inserts one to prove the query itself is
+        // correctly scoped, independent of that unreachability.
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $advisory = ClassSchedule::create([
+            'user_id' => $this->manager->id, 'section_id' => $section->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '09:10', 'status' => 'active',
+            'entry_type' => 'non_teaching', 'title' => 'Advisory',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $adjustment->unplacedEntries()->create(['class_schedule_id' => $advisory->id]);
+
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('published', $adjustment->fresh()->status);
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');

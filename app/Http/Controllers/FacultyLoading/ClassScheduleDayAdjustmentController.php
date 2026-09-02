@@ -175,6 +175,15 @@ class ClassScheduleDayAdjustmentController extends Controller
         $this->authorize('faculty_loading.manage');
         abort_if($adjustment->status !== 'draft', 422, 'Only draft adjustments can be published.');
 
+        $hasUnresolvedSubjectClass = $adjustment->unplacedEntries()
+            ->whereHas('classSchedule', fn ($query) => $query->where('entry_type', 'class'))
+            ->exists();
+        if ($hasUnresolvedSubjectClass) {
+            throw ValidationException::withMessages([
+                'unplaced' => 'This adjustment has one or more unplaced classes — resolve them in the Unplaced tray before publishing.',
+            ]);
+        }
+
         DB::transaction(function () use ($adjustment) {
             $locked = ClassScheduleDayAdjustment::whereKey($adjustment->id)->lockForUpdate()->firstOrFail();
             abort_if($locked->status !== 'draft', 422, 'This adjustment is no longer a draft.');
