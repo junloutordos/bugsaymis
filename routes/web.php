@@ -1647,6 +1647,16 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::delete('/pm2/opcr-templates/items/{item}', [\App\Http\Controllers\PM2\OpcrTemplateController::class, 'destroyItem'])->name('pm2.opcr-templates.destroyItem');
     });
 
+    // ── PM V2 — Employee IPCR (requires ipcr.v2.view) ────────────────────
+    Route::middleware('permission:ipcr.v2.view')->group(function () {
+        Route::get('/pm2/employee-ipcr', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'index'])->name('pm2.employee-ipcr.index');
+        Route::post('/pm2/employee-ipcr', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'store'])->name('pm2.employee-ipcr.store')->middleware('permission:ipcr.v2.create');
+        Route::get('/pm2/employee-ipcr/{ipcr}', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'show'])->name('pm2.employee-ipcr.show');
+        Route::put('/pm2/employee-ipcr/{ipcr}/rows/{row}/weight', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'updateRowWeight'])->name('pm2.employee-ipcr.updateRowWeight')->middleware('permission:ipcr.v2.update');
+        Route::put('/pm2/employee-ipcr/{ipcr}/rows/{row}/self-rate', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'selfRate'])->name('pm2.employee-ipcr.selfRate')->middleware('permission:ipcr.v2.update');
+        Route::post('/pm2/employee-ipcr/{ipcr}/submit-rating', [\App\Http\Controllers\PM2\EmployeeIpcrController::class, 'submitForRating'])->name('pm2.employee-ipcr.submitRating')->middleware('permission:ipcr.v2.submit');
+    });
+
     // ── Admin IPCR Monitoring — read-only view across every stage ──────────
     Route::middleware('role:Administrator')->group(function () {
         Route::get('/admin/ipcrs', [\App\Http\Controllers\AdminIPCRController::class, 'index'])->name('admin-ipcr.index');
