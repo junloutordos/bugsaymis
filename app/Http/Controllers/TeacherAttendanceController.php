@@ -134,6 +134,7 @@ class TeacherAttendanceController extends Controller
                 'section' => $result['schedule']->section?->sectionname ?? '—',
                 'startTime' => $result['schedule']->start_time,
                 'endTime' => $result['schedule']->end_time,
+                'isAdjustedDay' => (bool) $result['schedule']->is_adjusted_day,
             ] : null,
             'teacherName' => $teacher->name,
         ];

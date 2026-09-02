@@ -137,6 +137,12 @@ function formatTime(t) {
         <p class="text-sm font-medium text-slate-700">
           {{ formatTime(schedule.startTime) }} – {{ formatTime(schedule.endTime) }}
         </p>
+        <span
+          v-if="schedule.isAdjustedDay"
+          class="inline-flex mt-2 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"
+        >
+          Adjusted Day Schedule
+        </span>
       </div>
     </div>
 

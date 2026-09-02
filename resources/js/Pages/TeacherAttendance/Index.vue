@@ -41,7 +41,7 @@ function clearFilters() {
 
 // ── Today stats ───────────────────────────────────────────────────────────────
 const todayStats = computed(() => {
-  const s = props.todaySchedules ?? []
+  const s = (props.todaySchedules ?? []).filter(r => r.tap_status !== 'not_held')
   return {
     total:    s.length,
     onTime:   s.filter(r => r.tap_status === 'on_time').length,
@@ -54,12 +54,13 @@ const todayStats = computed(() => {
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
-  on_time:  { label: 'On Time',  bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  late:     { label: 'Late',     bg: 'bg-amber-100',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
-  no_tap:   { label: 'No Tap',   bg: 'bg-red-100',     text: 'text-red-700',     dot: 'bg-red-500'     },
-  absent:   { label: 'Absent',   bg: 'bg-red-100',     text: 'text-red-700',     dot: 'bg-red-600'     },
-  upcoming: { label: 'Upcoming', bg: 'bg-slate-100',   text: 'text-slate-600',   dot: 'bg-slate-400'   },
-  no_match: { label: 'No Match', bg: 'bg-slate-100',   text: 'text-slate-600',   dot: 'bg-slate-400'   },
+  on_time:   { label: 'On Time',            bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  late:      { label: 'Late',               bg: 'bg-amber-100',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
+  no_tap:    { label: 'No Tap',             bg: 'bg-red-100',     text: 'text-red-700',     dot: 'bg-red-500'     },
+  absent:    { label: 'Absent',             bg: 'bg-red-100',     text: 'text-red-700',     dot: 'bg-red-600'     },
+  upcoming:  { label: 'Upcoming',           bg: 'bg-slate-100',   text: 'text-slate-600',   dot: 'bg-slate-400'   },
+  no_match:  { label: 'No Match',           bg: 'bg-slate-100',   text: 'text-slate-600',   dot: 'bg-slate-400'   },
+  not_held:  { label: 'Not Held — Adjusted', bg: 'bg-indigo-100', text: 'text-indigo-700',  dot: 'bg-indigo-400'  },
 }
 
 function statusBadge(status) {
@@ -170,6 +171,7 @@ function exportHistory() {
                 <td class="py-3 px-4 whitespace-nowrap text-slate-600 font-mono text-xs">
                   {{ formatTime(row.start_time) }}<br>
                   <span class="text-slate-400">{{ formatTime(row.end_time) }}</span>
+                  <span v-if="row.is_adjusted_day" class="block mt-1 text-indigo-600 font-sans not-italic">Adjusted</span>
                 </td>
                 <td class="py-3 px-4 font-medium text-slate-800">{{ row.faculty.name }}</td>
                 <td class="py-3 px-4">

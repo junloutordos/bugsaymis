@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\FacultyLoading\AcademicUnit;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\ClassScheduleDayAdjustment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\TeacherTapLog;
 use App\Models\User;
+use App\Services\FacultyLoading\AdjustedClassScheduleService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -20,6 +22,10 @@ class TeacherAttendanceService
 
     // Minutes after class start before "on_time" becomes "late"
     const GRACE_PERIOD_MINUTES = 5;
+
+    public function __construct(
+        private readonly AdjustedClassScheduleService $adjustedScheduleService,
+    ) {}
 
     /**
      * Record a tap for the given teacher in the given room.
@@ -98,6 +104,7 @@ class TeacherAttendanceService
             'user_id' => $teacher->id,
             'classroom_id' => $classroom->id,
             'class_schedule_id' => $schedule->id,
+            'class_schedule_day_adjustment_id' => $schedule->day_adjustment_id,
             'tapped_at' => $now,
             'status' => $tapStatus,
             'is_late' => $isLate,
@@ -110,22 +117,110 @@ class TeacherAttendanceService
     /**
      * Return the schedule for a teacher in a classroom that is currently
      * within the valid tap window.
+     *
+     * On a day with a published Adjusted Day schedule, the window is
+     * evaluated against that day's frozen adjusted start/end times — not
+     * the teacher's regular weekly ClassSchedule times — and a class
+     * bumped off the adjusted timetable entirely never matches. The
+     * matched model's start_time/end_time are overwritten in-memory (never
+     * persisted) with the effective times so lateness calc and the tap
+     * confirmation UI both reflect what actually applied today.
      */
     private function findMatchingSchedule(int $userId, int $classroomId, string $dayOfWeek, Carbon $now): ?ClassSchedule
     {
-        $earlyOpen = $now->copy()->addMinutes(self::EARLY_WINDOW_MINUTES)->format('H:i:s');
+        [$adjustedEntries, $unplacedIds] = $this->loadAdjustedScheduleMaps($now->toDateString());
 
-        // start_time starts within the next 15 min (or already started), and class hasn't ended yet
-        return ClassSchedule::with(['subject', 'section', 'academicTerm'])
+        // Candidates are pulled without a DB-level time-window filter since
+        // the effective window may differ (and may not even exist, for an
+        // unplaced entry) from the raw stored times — the window check
+        // below runs in PHP against each candidate's effective times.
+        $candidates = ClassSchedule::with(['subject', 'section', 'academicTerm'])
             ->classes()
             ->where('user_id', $userId)
             ->where('classroom_id', $classroomId)
             ->where('day_of_week', $dayOfWeek)
             ->where('status', 'active')
-            ->where('start_time', '<=', $earlyOpen)     // started or starts within next 15 min
-            ->where('end_time', '>', $now->format('H:i:s')) // class not yet over
-            ->orderBy('start_time')
+            ->get();
+
+        $earlyOpen = $now->copy()->addMinutes(self::EARLY_WINDOW_MINUTES)->format('H:i:s');
+        $nowTime = $now->format('H:i:s');
+
+        return $candidates
+            ->map(fn (ClassSchedule $schedule) => $this->applyEffectiveTimes($schedule, $adjustedEntries, $unplacedIds))
+            ->filter()
+            ->filter(fn (ClassSchedule $schedule) => $schedule->start_time <= $earlyOpen && $schedule->end_time > $nowTime)
+            ->sortBy('start_time')
             ->first();
+    }
+
+    /**
+     * @param  array<int,array{start_time:string,end_time:string,adjustment_id:int}>  $adjustedEntries
+     * @param  array<int,bool>  $unplacedIds
+     */
+    private function applyEffectiveTimes(ClassSchedule $schedule, array $adjustedEntries, array $unplacedIds): ?ClassSchedule
+    {
+        if (isset($unplacedIds[$schedule->id])) {
+            // Bumped off today's published adjusted timetable entirely —
+            // the regular weekly slot does not apply today.
+            return null;
+        }
+
+        if (isset($adjustedEntries[$schedule->id])) {
+            $schedule->start_time = $adjustedEntries[$schedule->id]['start_time'];
+            $schedule->end_time = $adjustedEntries[$schedule->id]['end_time'];
+            $schedule->is_adjusted_day = true;
+            $schedule->day_adjustment_id = $adjustedEntries[$schedule->id]['adjustment_id'];
+
+            return $schedule;
+        }
+
+        // No published adjustment today, or this grade wasn't in its scope
+        // ("regular_schedule_applies") — the regular weekly slot stands.
+        $schedule->is_adjusted_day = false;
+        $schedule->day_adjustment_id = null;
+
+        return $schedule;
+    }
+
+    /**
+     * Flatten every published adjustment's frozen snapshot for the given
+     * date into two lookups keyed by class_schedule_id: adjusted
+     * start/end times, and ids bumped to "unplaced" (not held today).
+     * Matching by class_schedule_id (rather than section+time, as
+     * App\Services\Sos\LocationResolverService does for its analogous
+     * problem) correctly handles the rare case of multiple grade-scoped
+     * adjustments sharing the same effective_date.
+     *
+     * @return array{0:array<int,array{start_time:string,end_time:string,adjustment_id:int}>,1:array<int,bool>}
+     */
+    private function loadAdjustedScheduleMaps(string $dateStr): array
+    {
+        $entries = [];
+        $unplaced = [];
+
+        $adjustments = ClassScheduleDayAdjustment::published()->forDate($dateStr)->get();
+
+        foreach ($adjustments as $adjustment) {
+            $snapshot = $this->adjustedScheduleService->printableSnapshot($adjustment);
+
+            foreach ($snapshot['grades'] ?? [] as $grade) {
+                foreach ($grade['sections'] ?? [] as $section) {
+                    foreach ($section['entries'] ?? [] as $entry) {
+                        $entries[$entry['id']] = [
+                            'start_time' => $entry['start_time'],
+                            'end_time' => $entry['end_time'],
+                            'adjustment_id' => $adjustment->id,
+                        ];
+                    }
+
+                    foreach ($section['unplaced_entries'] ?? [] as $unplacedEntry) {
+                        $unplaced[$unplacedEntry['id']] = true;
+                    }
+                }
+            }
+        }
+
+        return [$entries, $unplaced];
     }
 
     /**
@@ -167,6 +262,8 @@ class TeacherAttendanceService
 
         $schedules = $query->orderBy('start_time')->get();
 
+        [$adjustedEntries, $unplacedIds] = $this->loadAdjustedScheduleMaps($now->toDateString());
+
         // Fetch all tap logs for today for these schedule IDs (single query)
         $scheduleIds = $schedules->pluck('id')->filter();
         $tapLogs = TeacherTapLog::whereIn('class_schedule_id', $scheduleIds)
@@ -175,11 +272,34 @@ class TeacherAttendanceService
             ->get()
             ->keyBy('class_schedule_id');
 
-        return $schedules->map(function (ClassSchedule $cs) use ($tapLogs, $now) {
+        return $schedules->map(function (ClassSchedule $cs) use ($tapLogs, $now, $adjustedEntries, $unplacedIds) {
             $tap = $tapLogs->get($cs->id);
 
-            $startTime = Carbon::parse(today()->toDateString().' '.$cs->start_time);
-            $endTime = Carbon::parse(today()->toDateString().' '.$cs->end_time);
+            if (isset($unplacedIds[$cs->id])) {
+                // Bumped off today's published adjusted timetable — this
+                // class isn't happening today, so it can't be "absent".
+                return [
+                    'id' => $cs->id,
+                    'faculty' => ['id' => $cs->faculty?->id, 'name' => $cs->faculty?->name],
+                    'subject' => ['name' => $cs->subject?->name, 'code' => $cs->subject?->code],
+                    'section' => ['name' => $cs->section?->sectionname ?? '—'],
+                    'classroom' => ['name' => $cs->classroom?->name, 'code' => $cs->classroom?->code],
+                    'start_time' => $cs->start_time,
+                    'end_time' => $cs->end_time,
+                    'tap_status' => 'not_held',
+                    'tapped_at' => null,
+                    'late_minutes' => 0,
+                    'channel' => null,
+                    'is_adjusted_day' => true,
+                ];
+            }
+
+            $isAdjustedDay = isset($adjustedEntries[$cs->id]);
+            $effectiveStart = $isAdjustedDay ? $adjustedEntries[$cs->id]['start_time'] : $cs->start_time;
+            $effectiveEnd = $isAdjustedDay ? $adjustedEntries[$cs->id]['end_time'] : $cs->end_time;
+
+            $startTime = Carbon::parse(today()->toDateString().' '.$effectiveStart);
+            $endTime = Carbon::parse(today()->toDateString().' '.$effectiveEnd);
 
             if ($tap) {
                 $displayStatus = $tap->is_late ? 'late' : 'on_time';
@@ -197,11 +317,12 @@ class TeacherAttendanceService
                 'subject' => ['name' => $cs->subject?->name, 'code' => $cs->subject?->code],
                 'section' => ['name' => $cs->section?->sectionname ?? '—'],
                 'classroom' => ['name' => $cs->classroom?->name, 'code' => $cs->classroom?->code],
-                'start_time' => $cs->start_time,
-                'end_time' => $cs->end_time,
+                'start_time' => $effectiveStart,
+                'end_time' => $effectiveEnd,
                 'tap_status' => $displayStatus,
                 'tapped_at' => $tap?->tapped_at?->format('H:i'),
                 'late_minutes' => $tap?->late_minutes ?? 0,
+                'is_adjusted_day' => $isAdjustedDay,
                 'channel' => $tap?->channel,
             ];
         });

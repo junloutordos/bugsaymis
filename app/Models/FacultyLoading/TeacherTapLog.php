@@ -14,6 +14,7 @@ class TeacherTapLog extends Model
         'user_id',
         'classroom_id',
         'class_schedule_id',
+        'class_schedule_day_adjustment_id',
         'tapped_at',
         'status',
         'is_late',
@@ -49,6 +50,11 @@ class TeacherTapLog extends Model
     public function classSchedule(): BelongsTo
     {
         return $this->belongsTo(ClassSchedule::class);
+    }
+
+    public function dayAdjustment(): BelongsTo
+    {
+        return $this->belongsTo(ClassScheduleDayAdjustment::class, 'class_schedule_day_adjustment_id');
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
