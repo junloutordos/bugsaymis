@@ -49,6 +49,9 @@ class AdjustedClassScheduleService
         $bandOverridesBySectionType = $adjustment->exists
             ? $adjustment->bandOverrides()->get()->keyBy(fn ($o) => "{$o->section_id}:{$o->band_type}")
             : collect();
+        $unplacedScheduleIds = $adjustment->exists
+            ? $adjustment->unplacedEntries()->pluck('class_schedule_id')
+            : collect();
 
         $overrideColumns = array_merge(
             ...array_values(Section::LUNCH_OVERRIDE_COLUMNS),
@@ -176,7 +179,33 @@ class AdjustedClassScheduleService
                         }
 
                         return $entry;
-                    })
+                    });
+
+                // Bumped by a drag-and-drop collision (see
+                // ClassScheduleDayAdjustmentController::upsertOverride()) —
+                // has no slot on this adjusted day. A subject class goes to
+                // the section's unplaced_entries for manual re-placement; a
+                // non_teaching block is just gone (never surfaced).
+                $unplacedForSection = $sectionSchedule
+                    ->filter(fn (ClassSchedule $s) => $unplacedScheduleIds->contains($s->id) && $s->entry_type === 'class')
+                    ->map(fn (ClassSchedule $s) => [
+                        'id' => $s->id,
+                        'subject' => $s->subject ? [
+                            'id' => $s->subject->id,
+                            'code' => $s->subject->code,
+                            'name' => $s->subject->name,
+                            'is_stem' => (bool) $s->subject->is_stem,
+                        ] : null,
+                        'faculty' => $s->faculty ? ['id' => $s->faculty->id, 'name' => $s->faculty->name] : null,
+                        'classroom' => $s->classroom ? ['id' => $s->classroom->id, 'name' => $s->classroom->name] : null,
+                        'duration_minutes' => SchedulingConstants::toMinutes(substr((string) $s->end_time, 0, 5))
+                            - SchedulingConstants::toMinutes(substr((string) $s->start_time, 0, 5)),
+                    ])
+                    ->values()
+                    ->all();
+
+                $entries = $entries
+                    ->reject(fn (array $entry) => $unplacedScheduleIds->contains($entry['id']))
                     ->values()
                     ->all();
 
@@ -300,6 +329,7 @@ class AdjustedClassScheduleService
                     'name' => $section->sectionname,
                     'entries' => $entries,
                     'bands' => $bands,
+                    'unplaced_entries' => $unplacedForSection,
                 ];
             }
 

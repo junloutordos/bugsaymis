@@ -1400,6 +1400,58 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame('07:50', $entries[0]['end_time']);
     }
 
+    public function test_unplaced_class_entry_is_excluded_from_entries_and_appears_in_unplaced_entries(): void
+    {
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $filipino = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'FIL1-G7', 'name' => 'Filipino 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        $filipinoClass = ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $filipino->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '08:20', 'end_time' => '08:50', 'status' => 'active',
+        ]);
+        $advisory = ClassSchedule::create([
+            'user_id' => $this->manager->id, 'section_id' => $section->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '08:50', 'end_time' => '09:00', 'status' => 'active',
+            'entry_type' => 'non_teaching', 'title' => 'Advisory',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $adjustment->unplacedEntries()->create(['class_schedule_id' => $filipinoClass->id]);
+        $adjustment->unplacedEntries()->create(['class_schedule_id' => $advisory->id]);
+
+        $response = $this->actingAs($this->manager)
+            ->getJson(route('faculty-loading.schedules.day-adjustments.preview', $adjustment))
+            ->assertOk();
+
+        $aquamarine = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0];
+        $entryIds = collect($aquamarine['entries'])->pluck('id');
+        $unplacedIds = collect($aquamarine['unplaced_entries'])->pluck('id');
+
+        $this->assertNotContains($filipinoClass->id, $entryIds);
+        $this->assertNotContains($advisory->id, $entryIds);
+        $this->assertContains($filipinoClass->id, $unplacedIds);
+        $this->assertNotContains($advisory->id, $unplacedIds);
+
+        $unplacedFilipino = collect($aquamarine['unplaced_entries'])->firstWhere('id', $filipinoClass->id);
+        $this->assertSame('Filipino 1', $unplacedFilipino['subject']['name']);
+        $this->assertSame(30, $unplacedFilipino['duration_minutes']);
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');
