@@ -4,6 +4,7 @@ namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\ClassScheduleDayAdjustment;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
@@ -299,10 +300,44 @@ class ClassScheduleDayAdjustmentController extends Controller
             ]);
         }
 
-        $adjustment->overrides()->updateOrCreate(
-            ['class_schedule_id' => $data['class_schedule_id']],
-            ['override_start_time' => $data['override_start_time'], 'override_end_time' => $data['override_end_time']],
-        );
+        DB::transaction(function () use ($data, $adjustment) {
+            $movingSchedule = ClassSchedule::findOrFail($data['class_schedule_id']);
+
+            // Bump every other entry in the same section whose current
+            // (already override-aware) time collides with the mover's new
+            // range — a class goes to Unplaced for manual re-placement, a
+            // non_teaching block is just removed (no tray entry for it).
+            $preview = $this->adjustedSchedules->generate($adjustment);
+            $section = collect($preview['grades'])
+                ->flatMap(fn (array $grade) => $grade['sections'])
+                ->firstWhere('id', $movingSchedule->section_id);
+
+            if ($section) {
+                foreach ($section['entries'] as $entry) {
+                    if ($entry['id'] === $movingSchedule->id) {
+                        continue;
+                    }
+                    $collides = $entry['start_time'] < $data['override_end_time']
+                        && $data['override_start_time'] < $entry['end_time'];
+                    if (! $collides) {
+                        continue;
+                    }
+
+                    $adjustment->unplacedEntries()->updateOrCreate(['class_schedule_id' => $entry['id']], []);
+                    $adjustment->overrides()->where('class_schedule_id', $entry['id'])->delete();
+                }
+            }
+
+            // Providing an explicit time inherently means "place me here
+            // now" — clears the mover's own unplaced status, if any (this
+            // is how a chip dragged out of the Unplaced tray gets resolved).
+            $adjustment->unplacedEntries()->where('class_schedule_id', $data['class_schedule_id'])->delete();
+
+            $adjustment->overrides()->updateOrCreate(
+                ['class_schedule_id' => $data['class_schedule_id']],
+                ['override_start_time' => $data['override_start_time'], 'override_end_time' => $data['override_end_time']],
+            );
+        });
 
         return response()->json($this->adjustedSchedules->generate($adjustment->fresh()));
     }

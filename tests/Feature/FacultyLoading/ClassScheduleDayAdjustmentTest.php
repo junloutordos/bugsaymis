@@ -1452,6 +1452,153 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame(30, $unplacedFilipino['duration_minutes']);
     }
 
+    public function test_dropping_a_class_onto_an_occupied_slot_bumps_the_occupant_to_unplaced(): void
+    {
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $filipino = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'FIL1-G7', 'name' => 'Filipino 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        // Immediately after $this->tuesdayClass (MATH7, 07:30-08:20).
+        $filipinoClass = ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $filipino->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '08:20', 'end_time' => '08:50', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        // "Transferred Flag Ceremony" (the default type for postponed_from_date)
+        // shifts the whole day +30min: MATH7 (raw 07:30-08:20) displays at
+        // 08:00-08:50, Filipino (raw 08:20-08:50) displays at 08:50-09:20.
+        // Drag MATH7 onto Filipino's displayed slot.
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $this->tuesdayClass->id,
+                'override_start_time' => '08:50',
+                'override_end_time' => '09:20',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_schedule_day_adjustment_unplaced_entries', [
+            'adjustment_id' => $adjustment->id,
+            'class_schedule_id' => $filipinoClass->id,
+        ]);
+        $this->assertDatabaseHas('class_schedule_day_adjustment_overrides', [
+            'adjustment_id' => $adjustment->id,
+            'class_schedule_id' => $this->tuesdayClass->id,
+            'override_start_time' => '08:50:00',
+            'override_end_time' => '09:20:00',
+        ]);
+
+        $aquamarine = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0];
+        $entryIds = collect($aquamarine['entries'])->pluck('id');
+        $unplacedIds = collect($aquamarine['unplaced_entries'])->pluck('id');
+
+        $this->assertContains($this->tuesdayClass->id, $entryIds);
+        $this->assertNotContains($filipinoClass->id, $entryIds);
+        $this->assertContains($filipinoClass->id, $unplacedIds);
+    }
+
+    public function test_non_teaching_blocks_never_participate_in_bump_detection(): void
+    {
+        // Non-teaching blocks are already excluded upstream by
+        // ClassSchedule::scopeClasses() — they never appear in a section's
+        // entries on this calendar, so a drop whose new time happens to
+        // numerically overlap one has zero effect on it (no unplaced row,
+        // no interaction at all). This guards against a future regression
+        // if that upstream filter is ever loosened.
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $advisory = ClassSchedule::create([
+            'user_id' => $this->manager->id, 'section_id' => $section->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '08:20', 'end_time' => '08:30', 'status' => 'active',
+            'entry_type' => 'non_teaching', 'title' => 'Advisory',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        // Same +30min shift as above: Advisory (raw 08:20-08:30) would
+        // display at 08:50-09:00 if it were shown at all.
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $this->tuesdayClass->id,
+                'override_start_time' => '08:50',
+                'override_end_time' => '09:00',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('class_schedule_day_adjustment_unplaced_entries', [
+            'adjustment_id' => $adjustment->id,
+            'class_schedule_id' => $advisory->id,
+        ]);
+    }
+
+    public function test_re_placing_an_unplaced_class_clears_its_unplaced_status(): void
+    {
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $filipino = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'FIL1-G7', 'name' => 'Filipino 1',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 7, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        $filipinoClass = ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $filipino->id, 'section_id' => $section->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '10:00', 'end_time' => '10:30', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $adjustment->unplacedEntries()->create(['class_schedule_id' => $filipinoClass->id]);
+
+        // Drag the (currently unplaced) Filipino chip onto an open slot.
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.overrides.store', $adjustment), [
+                'class_schedule_id' => $filipinoClass->id,
+                'override_start_time' => '11:00',
+                'override_end_time' => '11:30',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('class_schedule_day_adjustment_unplaced_entries', [
+            'adjustment_id' => $adjustment->id,
+            'class_schedule_id' => $filipinoClass->id,
+        ]);
+
+        $aquamarine = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0];
+        $this->assertContains($filipinoClass->id, collect($aquamarine['entries'])->pluck('id'));
+        $this->assertNotContains($filipinoClass->id, collect($aquamarine['unplaced_entries'])->pluck('id'));
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');

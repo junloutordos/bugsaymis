@@ -6,10 +6,12 @@
 
 CID wants dropping onto an occupied slot to behave like a real scheduling action: the occupant gets displaced instead of silently overlapping.
 
+**Correction found during implementation**: `ClassSchedule::scopeClasses()` (`where('entry_type', 'class')`) is already applied to the query `generate()` uses to build `$sectionSchedule`/`entries` — non-teaching blocks never entered this calendar's `entries` to begin with, pre-dating this feature entirely. "Drop onto a non-teaching block → it's removed" therefore can't occur through the UI (there's nothing to drop onto). Confirmed with CID: drop that behavior — bump-to-unplaced applies only to real subject classes, which is the actual reported problem. The schema/service/controller below still handle a `non_teaching` row gracefully if one were ever unplaced by some other means (it's simply excluded from `unplaced_entries`), but no code path in this feature can produce that state today, and no test asserts removal-on-drop for it.
+
 ## Decisions (confirmed with CID)
 
 1. **Where bumped subjects go**: a small chip tray directly beneath each section's own timeline, showing that section's currently-unplaced subjects. A class can only ever return to its own section (a `ClassSchedule` row's `section_id` is fixed), so the tray is naturally per-section.
-2. **Non-teaching occupants**: bumping a `non_teaching` entry (e.g. an Advisory block) just removes it from the day's view entirely — no tray entry, no resolution needed.
+2. **Non-teaching occupants**: ~~bumping a `non_teaching` entry (e.g. an Advisory block) just removes it from the day's view entirely~~ — moot; see correction above. Non-teaching blocks are already invisible on this calendar and can never be a bump target.
 3. **Publish gate**: publishing is **blocked** while any subject-bearing class is unplaced for the adjustment — CID must re-place or the underlying data would silently vanish from the official printed schedule for that day. Non-teaching removals never block publish.
 
 ## Schema
@@ -65,7 +67,7 @@ New `ClassScheduleDayAdjustmentUnplacedEntry` (mirrors `ClassScheduleDayAdjustme
 
 - **Service**: a section with an unplaced class entry — assert it's absent from `entries` and present in `unplaced_entries` with correct `duration_minutes`; assert a `non_teaching` unplaced row appears in neither array.
 - **Controller — bump on collision**: dragging class A onto class B's slot (same section) — assert B gets an unplaced-entry row and its old time-override (if any) is deleted, A's override is created, and the response reflects both.
-- **Controller — non-teaching removal**: same setup with B being `non_teaching` — assert B gets an unplaced-entry row and never appears in the response's `unplaced_entries`.
+- **Controller — non-teaching blocks stay uninvolved**: a `non_teaching` row at an overlapping raw time gets no unplaced-entry row from a drop — it was never a collision candidate (guards against a future regression if the upstream `->classes()` filter is ever loosened).
 - **Controller — re-placement clears unplaced**: dragging an already-unplaced class onto an open slot — assert its unplaced-entry row is deleted and it now has a normal override/position.
 - **Controller — publish gate**: publish rejected with a validation error while a subject-bearing unplaced entry exists; publish succeeds once it's re-placed; publish succeeds with only a non-teaching removal present.
 - **Migration**: additive only, no changes to existing tables.
