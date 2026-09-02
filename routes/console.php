@@ -40,6 +40,9 @@ Schedule::command('backup:verify')->dailyAt('06:30')->withoutOverlapping();
 // ── PDS: notify employees whose PDS is overdue for its annual update ─────
 Schedule::command('pds:notify-annual-update')->dailyAt('07:00')->withoutOverlapping();
 
+// ── Research Advisory: submission requirement reminders + overdue notices ─
+Schedule::command('research:send-requirement-reminders')->dailyAt('07:30')->withoutOverlapping();
+
 // ── Computer Laboratories: reconcile priority reservations with any class
 //    schedule changes made through bulk imports/restores that bypass model events.
 Schedule::command('computer-labs:sync')->everyThirtyMinutes()->withoutOverlapping();
