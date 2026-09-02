@@ -67,14 +67,6 @@ class PermissionsSeeder extends Seeder
             ['module' => 'IPCR',     'name' => 'ipcr.monitor',     'description' => 'Monitor unit/division IPCR'],
             ['module' => 'IPCR',     'name' => 'ipcr.admin',       'description' => 'Manage IPCR fiscal years and rating periods'],
 
-            // ── Performance Management V2 (isolated rebuild) ────────────────────
-            ['module' => 'PM V2', 'name' => 'ipcr.v2.view',    'description' => 'View own PM V2 IPCR'],
-            ['module' => 'PM V2', 'name' => 'ipcr.v2.create',  'description' => 'Create PM V2 IPCR entries'],
-            ['module' => 'PM V2', 'name' => 'ipcr.v2.update',  'description' => 'Update PM V2 IPCR entries'],
-            ['module' => 'PM V2', 'name' => 'ipcr.v2.submit',  'description' => 'Submit PM V2 IPCR for rating'],
-            ['module' => 'PM V2', 'name' => 'ipcr.v2.approve', 'description' => 'Approve targets and rate PM V2 IPCR as immediate supervisor'],
-            ['module' => 'PM V2', 'name' => 'ipcr.v2.admin',   'description' => 'Manage PM V2 OPCR templates and rating periods'],
-
             // ── Accomplishments ───────────────────────────────────────────────
             ['module' => 'Accomplishments', 'name' => 'accomplishments.view',   'description' => 'View own accomplishments'],
             ['module' => 'Accomplishments', 'name' => 'accomplishments.create', 'description' => 'Add accomplishments'],

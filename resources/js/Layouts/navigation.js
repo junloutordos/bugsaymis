@@ -775,34 +775,6 @@ export const menuItems = [
     ],
   },
   {
-    label: "PM V2",
-    icon: UserGroupIcon,
-    roles: ["Administrator", "Faculty", "DivisionChief", "OCD"],
-    children: [
-      {
-        label: "OPCR Templates",
-        routeName: "pm2.opcr-templates.index",
-        href: route("pm2.opcr-templates.index"),
-        icon: ClipboardDocumentListIcon,
-        permissions: ["ipcr.v2.admin"],
-      },
-      {
-        label: "My IPCR",
-        routeName: "pm2.employee-ipcr.index",
-        href: route("pm2.employee-ipcr.index"),
-        icon: ClipboardDocumentListIcon,
-        permissions: ["ipcr.v2.view"],
-      },
-      {
-        label: "My Unit (PM V2)",
-        routeName: "pm2.supervisor-ipcr.index",
-        href: route("pm2.supervisor-ipcr.index"),
-        icon: ClipboardDocumentListIcon,
-        permissions: ["ipcr.v2.approve"],
-      },
-    ],
-  },
-  {
     label: "Recruitment",
     icon: UserGroupIcon,
     roles: ["Administrator", "HR", "OCD"],
