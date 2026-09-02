@@ -1254,8 +1254,6 @@ class ClassScheduleDayAdjustmentTest extends TestCase
 
     public function test_every_homeroom_section_gets_the_same_elective_and_science_core_block_no_separate_column(): void
     {
-        // Grade 11's canonical Tuesday timetable has a real "Electives"
-        // period (13:50-15:30) — unlike Grade 7, which has none at all.
         $sectionA = Section::create([
             'levelid' => 11,
             'sectionname' => 'Diamond',
@@ -1308,6 +1306,45 @@ class ClassScheduleDayAdjustmentTest extends TestCase
             'status' => 'active',
         ]);
 
+        // Two synthetic Elective sections (cross-homeroom group), one per
+        // real, non-contiguous Elective period Grade 11 has on Tuesdays —
+        // ElectiveService reads these real times back for the window,
+        // mirroring the Science Core fixture above.
+        $electiveSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'EL-ART-G11',
+            'name' => 'Elective Art',
+            'credit_units' => 2,
+            'lecture_hours' => 2,
+            'load_units' => 2,
+            'subject_type' => 'elective',
+            'grade_level' => 11,
+            'sessions_per_week' => 2,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        foreach ([['10:20', '11:10'], ['13:50', '15:30']] as $i => [$start, $end]) {
+            $elecSection = Section::create([
+                'levelid' => 11,
+                'sectionname' => "ELEC-ART-G11-{$i}",
+                'syid' => $this->term->school_year_id,
+                'school_year_id' => $this->term->school_year_id,
+                'is_active' => true,
+            ]);
+            ClassSchedule::create([
+                'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+                'subject_id' => $electiveSubject->id,
+                'section_id' => $elecSection->id,
+                'classroom_id' => $room->id,
+                'school_year_id' => $this->term->school_year_id,
+                'academic_term_id' => $this->term->id,
+                'day_of_week' => 'Tuesday',
+                'start_time' => $start,
+                'end_time' => $end,
+                'status' => 'active',
+            ]);
+        }
+
         // early_start_stem_split with no flag ceremony/shortened-classes
         // component and no periods of their own on these two sections means
         // zero shift and zero compression — bands pass through at their raw
@@ -1355,6 +1392,120 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame($diamondScienceCore, $emeraldScienceCore);
         $this->assertSame('10:00', $diamondScienceCore['start']);
         $this->assertSame('10:50', $diamondScienceCore['end']);
+    }
+
+    public function test_grade_band_override_rejects_science_core_when_the_grade_has_none_plotted_that_day(): void
+    {
+        // Reproduces the real scenario: a grade whose Science Core sections
+        // have no active class_schedules row on this day of week — the
+        // computed band is legitimately empty (see ScienceCoreService).
+        // Unlike Recess/White Space/Wellness, Science Core has no manual
+        // "declare one from nothing" path — it must always be derived from
+        // the actual plotted regular schedule, so the override is rejected
+        // rather than fabricating a band with no basis in real data.
+        $delMundo = Section::create(['levelid' => 12, 'sectionname' => 'Del Mundo', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        $preview = $this->actingAs($this->manager)
+            ->getJson(route('faculty-loading.schedules.day-adjustments.preview', $adjustment))
+            ->assertOk();
+        $grade12 = collect($preview->json('grades'))->firstWhere('grade_level', 12)['sections'];
+        $this->assertNull(collect(collect($grade12)->firstWhere('name', 'Del Mundo')['bands'])->firstWhere('type', 'SCIENCE_CORE'));
+
+        $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $delMundo->id,
+                'band_type' => 'SCIENCE_CORE',
+                'override_start_time' => '09:20',
+                'override_end_time' => '10:10',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('band_type');
+
+        $this->assertDatabaseCount('class_schedule_day_adjustment_grade_band_overrides', 0);
+    }
+
+    public function test_grade_band_override_repositioning_an_existing_elective_band_propagates_to_every_section_in_the_grade(): void
+    {
+        [$diamond, $emerald] = [
+            Section::create(['levelid' => 11, 'sectionname' => 'Diamond', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]),
+            Section::create(['levelid' => 11, 'sectionname' => 'Emerald', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]),
+        ];
+
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+        $electiveSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'EL-ART-G11B',
+            'name' => 'Elective Art',
+            'credit_units' => 2,
+            'lecture_hours' => 2,
+            'load_units' => 2,
+            'subject_type' => 'elective',
+            'grade_level' => 11,
+            'sessions_per_week' => 2,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        $elecSection = Section::create(['levelid' => 11, 'sectionname' => 'ELEC-ART-G11B', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $electiveSubject->id,
+            'section_id' => $elecSection->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '10:20',
+            'end_time' => '11:10',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+
+        // Confirm the computed band is present before overriding it — this
+        // is the "edit an existing band" path, not the "add a missing one"
+        // path covered by the Science Core test above.
+        $preview = $this->actingAs($this->manager)
+            ->getJson(route('faculty-loading.schedules.day-adjustments.preview', $adjustment))
+            ->assertOk();
+        $grade11 = collect($preview->json('grades'))->firstWhere('grade_level', 11)['sections'];
+        $this->assertNotNull(collect(collect($grade11)->firstWhere('name', 'Diamond')['bands'])->firstWhere('type', 'ELECTIVE'));
+
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $diamond->id,
+                'band_type' => 'ELECTIVE',
+                'override_start_time' => '10:30',
+                'override_end_time' => '11:20',
+            ])
+            ->assertOk();
+
+        $grade11After = collect($response->json('grades'))->firstWhere('grade_level', 11)['sections'];
+        $diamondElective = collect(collect($grade11After)->firstWhere('name', 'Diamond')['bands'])->firstWhere('type', 'ELECTIVE');
+        $emeraldElective = collect(collect($grade11After)->firstWhere('name', 'Emerald')['bands'])->firstWhere('type', 'ELECTIVE');
+
+        $this->assertNotNull($diamondElective);
+        $this->assertSame($diamondElective, $emeraldElective);
+        $this->assertSame('10:30', $diamondElective['start']);
+        $this->assertSame('11:20', $diamondElective['end']);
+        $this->assertTrue($diamondElective['manually_adjusted']);
     }
 
     public function test_early_start_stem_split_treats_science_core_and_elective_subjects_as_stem_even_without_is_stem_flag(): void

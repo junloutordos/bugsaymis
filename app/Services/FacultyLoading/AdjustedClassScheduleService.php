@@ -13,7 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class AdjustedClassScheduleService
 {
-    public function __construct(private readonly ScienceCoreService $scienceCore) {}
+    public function __construct(
+        private readonly ScienceCoreService $scienceCore,
+        private readonly ElectiveService $elective,
+    ) {}
 
     /**
      * Build the complete campus schedule for one exceptional date without
@@ -48,6 +51,9 @@ class AdjustedClassScheduleService
             : collect();
         $bandOverridesBySectionType = $adjustment->exists
             ? $adjustment->bandOverrides()->get()->keyBy(fn ($o) => "{$o->section_id}:{$o->band_type}")
+            : collect();
+        $gradeBandOverridesByGradeType = $adjustment->exists
+            ? $adjustment->gradeBandOverrides()->get()->keyBy(fn ($o) => "{$o->grade_level}:{$o->band_type}")
             : collect();
         $unplacedScheduleIds = $adjustment->exists
             ? $adjustment->unplacedEntries()->pluck('class_schedule_id')
@@ -219,7 +225,12 @@ class AdjustedClassScheduleService
                     $this->trimWindow($section->consultationOverrideFor($day)),
                 );
 
-                foreach (SchedulingConstants::getElectiveWindows($gradeLevel, $day) as $band) {
+                foreach ($this->elective->getElectiveWindows(
+                    (int) $term->school_year_id,
+                    (int) $term->id,
+                    $gradeLevel,
+                    $day,
+                ) as $band) {
                     $bands[] = [...$band, 'type' => 'ELECTIVE'];
                 }
 
@@ -250,12 +261,17 @@ class AdjustedClassScheduleService
                     ))
                     ->sortBy('start')
                     ->values()
-                    ->map(function (array $band) use ($section, $bandOverridesBySectionType) {
-                        if (! in_array($band['type'] ?? '', ['RECESS', 'WHITE_SPACE', 'WELLNESS'], true)) {
+                    ->map(function (array $band) use ($section, $gradeLevel, $bandOverridesBySectionType, $gradeBandOverridesByGradeType) {
+                        $type = $band['type'] ?? '';
+                        $isGradeScoped = in_array($type, ['ELECTIVE', 'SCIENCE_CORE'], true);
+
+                        if (! $isGradeScoped && ! in_array($type, ['RECESS', 'WHITE_SPACE', 'WELLNESS'], true)) {
                             return $band;
                         }
 
-                        $override = $bandOverridesBySectionType->get("{$section->id}:{$band['type']}");
+                        $override = $isGradeScoped
+                            ? $gradeBandOverridesByGradeType->get("{$gradeLevel}:{$type}")
+                            : $bandOverridesBySectionType->get("{$section->id}:{$type}");
                         if (! $override) {
                             return [...$band, 'manually_adjusted' => false];
                         }
@@ -275,6 +291,15 @@ class AdjustedClassScheduleService
                 // to specific grade/day combos, so a deliberately-added
                 // override for this section can have nothing to attach to.
                 // Surface it as a real band instead of silently discarding it.
+                // Elective/Science Core deliberately have NO equivalent
+                // addable-when-missing path — unlike Recess/White Space/
+                // Wellness, they must always be derived from the actual
+                // plotted regular schedule (ElectiveService/ScienceCoreService),
+                // never manually declared from nothing. When their real-data
+                // lookup comes back empty for a grade/day, that legitimately
+                // means the grade has no such class that day — the override
+                // merge above still lets an already-present band be
+                // repositioned, but a missing one stays missing.
                 $presentBandTypes = collect($bands)->pluck('type')->all();
                 $addableBandLabels = ['RECESS' => 'Recess', 'WHITE_SPACE' => 'White Space', 'WELLNESS' => 'Wellness Break'];
                 foreach ($addableBandLabels as $bandType => $label) {

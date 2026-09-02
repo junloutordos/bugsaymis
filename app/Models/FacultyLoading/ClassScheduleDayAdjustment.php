@@ -69,6 +69,11 @@ class ClassScheduleDayAdjustment extends Model
         return $this->hasMany(ClassScheduleDayAdjustmentBandOverride::class, 'adjustment_id');
     }
 
+    public function gradeBandOverrides(): HasMany
+    {
+        return $this->hasMany(ClassScheduleDayAdjustmentGradeBandOverride::class, 'adjustment_id');
+    }
+
     public function unplacedEntries(): HasMany
     {
         return $this->hasMany(ClassScheduleDayAdjustmentUnplacedEntry::class, 'adjustment_id');

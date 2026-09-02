@@ -271,7 +271,11 @@ const overrideError = ref('')
 // White Space/Wellness/Health Break are always offered regardless of
 // whether a default is already showing — picking one just repositions
 // or declares that band for the day, same as dragging it, so there's no
-// duplicate-creation risk.
+// duplicate-creation risk. Electives/Science Core are deliberately NOT
+// addable here at all — unlike these, they must always be derived from
+// the actual plotted regular schedule (see AdjustedClassScheduleService),
+// never manually declared from nothing. When one is already showing it's
+// still editable — click or drag it — via isDraggableBand() below.
 const ADD_BAND_TYPES = [
   { value: 'RECESS', label: 'Recess', alwaysOffered: false },
   { value: 'WHITE_SPACE', label: 'White Space', alwaysOffered: true },
@@ -405,7 +409,7 @@ function wouldConflict(entry, proposedStartMinutes, proposedEndMinutes) {
   })
 }
 
-const DRAGGABLE_BAND_TYPES = ['RECESS', 'WHITE_SPACE', 'WELLNESS', 'HEALTH_BREAK']
+const DRAGGABLE_BAND_TYPES = ['RECESS', 'WHITE_SPACE', 'WELLNESS', 'HEALTH_BREAK', 'ELECTIVE', 'SCIENCE_CORE']
 
 function isDraggableBand(band) {
   return DRAGGABLE_BAND_TYPES.includes(band.type)

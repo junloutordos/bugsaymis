@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\ClassScheduleDayAdjustment;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\AdjustedClassScheduleService;
+use App\Services\FacultyLoading\ElectiveService;
+use App\Services\FacultyLoading\ScienceCoreService;
 use App\Services\PersonNameFormatter;
 use App\Services\SchoolCalendarService;
 use Carbon\Carbon;
@@ -29,6 +32,8 @@ class ClassScheduleDayAdjustmentController extends Controller
         private readonly SchoolCalendarService $calendar,
         private readonly AdjustedClassScheduleService $adjustedSchedules,
         private readonly PersonNameFormatter $names,
+        private readonly ElectiveService $elective,
+        private readonly ScienceCoreService $scienceCore,
     ) {}
 
     public function index(Request $request): Response
@@ -375,7 +380,7 @@ class ClassScheduleDayAdjustmentController extends Controller
 
         $data = $request->validate([
             'section_id' => ['required', 'integer'],
-            'band_type' => ['required', 'in:RECESS,WHITE_SPACE,WELLNESS,HEALTH_BREAK'],
+            'band_type' => ['required', 'in:RECESS,WHITE_SPACE,WELLNESS,HEALTH_BREAK,ELECTIVE,SCIENCE_CORE'],
             'override_start_time' => ['required', 'date_format:H:i'],
             'override_end_time' => ['required', 'date_format:H:i'],
             'title' => ['nullable', 'string', 'max:255'],
@@ -398,6 +403,36 @@ class ClassScheduleDayAdjustmentController extends Controller
                 'health_break_start_time' => $data['override_start_time'],
                 'health_break_end_time' => $data['override_end_time'],
             ]);
+        } elseif (in_array($data['band_type'], ['ELECTIVE', 'SCIENCE_CORE'], true)) {
+            // Cross-homeroom groups — every section in the grade must show
+            // the identical window, so the override is keyed by grade_level
+            // (resolved from the section the drag/click originated in), not
+            // section_id like Recess/White Space/Wellness. Unlike those
+            // bands, Elective/Science Core have no manual "declare one from
+            // nothing" path: the window must be derived from the actual
+            // plotted regular schedule (ElectiveService/ScienceCoreService).
+            // This only ever repositions/corrects an already-computed band's
+            // displayed time — it can never fabricate one where the real
+            // schedule has none, so reject the override if the computed
+            // lookup for this grade/day is empty.
+            $gradeLevel = Section::findOrFail($data['section_id'])->levelid;
+            $adjustment->loadMissing('academicTerm');
+            $term = $adjustment->academicTerm;
+            $day = Carbon::parse($adjustment->effective_date)->englishDayOfWeek;
+            $computedWindows = $data['band_type'] === 'ELECTIVE'
+                ? $this->elective->getElectiveWindows((int) $term->school_year_id, (int) $term->id, $gradeLevel, $day)
+                : $this->scienceCore->getScienceCoreWindows((int) $term->school_year_id, (int) $term->id, $gradeLevel, $day);
+
+            if ($computedWindows === []) {
+                throw ValidationException::withMessages([
+                    'band_type' => 'Grade '.$gradeLevel.' has no '.($data['band_type'] === 'ELECTIVE' ? 'Elective' : 'Science Core').' class plotted in the regular schedule for this day — nothing to adjust.',
+                ]);
+            }
+
+            $adjustment->gradeBandOverrides()->updateOrCreate(
+                ['grade_level' => $gradeLevel, 'band_type' => $data['band_type']],
+                ['override_start_time' => $data['override_start_time'], 'override_end_time' => $data['override_end_time']],
+            );
         } else {
             $adjustment->bandOverrides()->updateOrCreate(
                 ['section_id' => $data['section_id'], 'band_type' => $data['band_type']],
@@ -422,6 +457,9 @@ class ClassScheduleDayAdjustmentController extends Controller
                 'health_break_start_time' => null,
                 'health_break_end_time' => null,
             ]);
+        } elseif (in_array($bandType, ['ELECTIVE', 'SCIENCE_CORE'], true)) {
+            $gradeLevel = Section::findOrFail($sectionId)->levelid;
+            $adjustment->gradeBandOverrides()->where('grade_level', $gradeLevel)->where('band_type', $bandType)->delete();
         } else {
             $adjustment->bandOverrides()->where('section_id', $sectionId)->where('band_type', $bandType)->delete();
         }
