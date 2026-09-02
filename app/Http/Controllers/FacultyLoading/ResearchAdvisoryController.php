@@ -10,6 +10,7 @@ use App\Models\FacultyLoading\ResearchAdvisory;
 use App\Models\FacultyLoading\ResearchAdvisoryMember;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
+use App\Services\FacultyLoading\ResearchGroupResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,10 @@ use Inertia\Response;
 
 class ResearchAdvisoryController extends Controller
 {
-    public function __construct(private readonly LoadComputationService $loads) {}
+    public function __construct(
+        private readonly LoadComputationService $loads,
+        private readonly ResearchGroupResolver $groups,
+    ) {}
 
     // ── List research advisories ──────────────────────────────────────────────
 
@@ -158,6 +162,8 @@ class ResearchAdvisoryController extends Controller
 
         $load = $this->loads->findOrCreateFacultyLoad($data['user_id'], $schoolYearId, $data['academic_term_id']);
 
+        $group = $this->groups->resolve($data['academic_term_id'], $data['grade_level'], $data['research_title'], $data['research_type'] ?? null);
+
         $advisory = ResearchAdvisory::create([
             'user_id'          => $data['user_id'],
             'school_year_id'   => $schoolYearId,
@@ -170,6 +176,7 @@ class ResearchAdvisoryController extends Controller
             'remarks'          => $data['remarks'] ?? null,
             'status'           => 'active',
             'load_assignment_id' => null,
+            'research_group_id' => $group->id,
         ]);
 
         $this->syncMembers($advisory, $data['members'] ?? []);
@@ -226,6 +233,8 @@ class ResearchAdvisoryController extends Controller
         }
 
         $oldGradeLevel = $researchAdvisory->grade_level;
+        $group = $this->groups->resolve($researchAdvisory->academic_term_id, (int) $data['grade_level'], $data['research_title'], $data['research_type'] ?? null);
+        $data['research_group_id'] = $group->id;
         $researchAdvisory->update($data);
 
         $this->syncMembers($researchAdvisory, $data['members'] ?? []);
