@@ -337,9 +337,13 @@ Route::middleware(['web', 'auth', 'verified'])
             ->prefix('research-requirements')->name('research-requirements.')->group(function () {
                 Route::get('/',                     [ResearchRequirementController::class, 'index'])->name('index');
                 Route::post('/',                    [ResearchRequirementController::class, 'store'])->name('store');
+                Route::get('/research-groups',      [ResearchRequirementController::class, 'groupsForTerm'])->name('groups');
                 Route::get('/{researchRequirement}',    [ResearchRequirementController::class, 'show'])->name('show');
                 Route::put('/{researchRequirement}',    [ResearchRequirementController::class, 'update'])->name('update');
                 Route::delete('/{researchRequirement}', [ResearchRequirementController::class, 'archive'])->name('archive');
+                Route::post('/{researchRequirement}/sync', [ResearchRequirementController::class, 'sync'])->name('sync');
+                Route::post('/{researchRequirement}/assignments', [ResearchRequirementController::class, 'addAssignment'])->name('assignments.store');
+                Route::patch('/assignments/{assignment}/toggle-exclude', [ResearchRequirementController::class, 'toggleExcludeAssignment'])->name('assignments.toggle-exclude');
             });
 
         // ══════════════════════════════════════════════════════════════════════

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\ResearchGroup;
 use App\Models\FacultyLoading\ResearchRequirement;
 use App\Models\FacultyLoading\ResearchRequirementAssignment;
 use App\Services\FacultyLoading\RequirementFanoutService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -114,6 +116,60 @@ class ResearchRequirementController extends Controller
         $researchRequirement->update(['status' => 'archived']);
 
         return back()->with('success', 'Requirement archived.');
+    }
+
+    public function sync(Request $request, ResearchRequirement $researchRequirement): RedirectResponse
+    {
+        abort_unless($request->user()->hasAnyPermission(self::PERMISSIONS), 403);
+
+        $created = $this->fanout->fanOut($researchRequirement);
+
+        return back()->with('success', "{$created->count()} new research group(s) added.");
+    }
+
+    public function addAssignment(Request $request, ResearchRequirement $researchRequirement): RedirectResponse
+    {
+        abort_unless($request->user()->hasAnyPermission(self::PERMISSIONS), 403);
+
+        $data = $request->validate(['research_group_id' => 'required|exists:research_groups,id']);
+
+        $assignment = ResearchRequirementAssignment::firstOrNew([
+            'research_requirement_id' => $researchRequirement->id,
+            'research_group_id'       => $data['research_group_id'],
+        ]);
+
+        if ($assignment->exists) {
+            $assignment->update(['excluded' => false]);
+        } else {
+            $assignment->status   = 'pending';
+            $assignment->excluded = false;
+            $assignment->save();
+        }
+
+        return back()->with('success', 'Research group added to requirement.');
+    }
+
+    public function toggleExcludeAssignment(Request $request, ResearchRequirementAssignment $assignment): RedirectResponse
+    {
+        abort_unless($request->user()->hasAnyPermission(self::PERMISSIONS), 403);
+
+        $assignment->update(['excluded' => ! $assignment->excluded]);
+
+        return back()->with('success', $assignment->excluded ? 'Group excluded from requirement.' : 'Group re-included.');
+    }
+
+    public function groupsForTerm(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->hasAnyPermission(self::PERMISSIONS), 403);
+
+        $request->validate(['term_id' => 'required|exists:academic_terms,id']);
+
+        $groups = ResearchGroup::where('academic_term_id', $request->term_id)
+            ->active()
+            ->orderBy('title')
+            ->get(['id', 'title', 'grade_level', 'research_type']);
+
+        return response()->json($groups);
     }
 
     private function mapAssignment(ResearchRequirementAssignment $a): array

@@ -159,4 +159,64 @@ class ResearchRequirementHttpTest extends TestCase
 
         $this->assertSame('archived', $requirement->fresh()->status);
     }
+
+    public function test_sync_picks_up_a_group_created_after_the_requirement(): void
+    {
+        $term = $this->makeTerm();
+        $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+        $coordinator = $this->coordinator();
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $requirement = ResearchRequirement::first();
+        $this->makeActiveGroup($term, 10, 'thesis', 'Group B (new)');
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.sync', $requirement->id))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(2, $requirement->assignments()->count());
+    }
+
+    public function test_can_add_an_out_of_scope_group_as_an_exception(): void
+    {
+        $term = $this->makeTerm();
+        $coordinator = $this->coordinator();
+        $outOfScope = $this->makeActiveGroup($term, 12, 'feasibility', 'Exception Group'); // grade 12 + feasibility matches neither the grade_levels:[10] nor research_type:thesis scope below
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $requirement = ResearchRequirement::first();
+        $this->assertSame(0, $requirement->assignments()->count());
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.assignments.store', $requirement->id), [
+            'research_group_id' => $outOfScope->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(1, $requirement->assignments()->count());
+    }
+
+    public function test_can_toggle_exclude_on_an_assignment(): void
+    {
+        $term = $this->makeTerm();
+        $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+        $coordinator = $this->coordinator();
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $assignment = ResearchRequirement::first()->assignments()->first();
+
+        $this->actingAs($coordinator)->patch(route('faculty-loading.research-requirements.assignments.toggle-exclude', $assignment->id))
+            ->assertSessionHasNoErrors();
+        $this->assertTrue($assignment->fresh()->excluded);
+
+        $this->actingAs($coordinator)->patch(route('faculty-loading.research-requirements.assignments.toggle-exclude', $assignment->id))
+            ->assertSessionHasNoErrors();
+        $this->assertFalse($assignment->fresh()->excluded);
+    }
 }
