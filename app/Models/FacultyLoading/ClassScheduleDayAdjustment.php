@@ -69,6 +69,11 @@ class ClassScheduleDayAdjustment extends Model
         return $this->hasMany(ClassScheduleDayAdjustmentBandOverride::class, 'adjustment_id');
     }
 
+    public function unplacedEntries(): HasMany
+    {
+        return $this->hasMany(ClassScheduleDayAdjustmentUnplacedEntry::class, 'adjustment_id');
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
