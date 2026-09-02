@@ -1252,26 +1252,45 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame('Health Break', $healthBreak['label']);
     }
 
-    public function test_science_core_and_elective_sections_are_pooled_into_one_shared_column(): void
+    public function test_every_homeroom_section_gets_the_same_elective_and_science_core_block_no_separate_column(): void
     {
+        // Grade 11's canonical Tuesday timetable has a real "Electives"
+        // period (13:50-15:30) — unlike Grade 7, which has none at all.
+        $sectionA = Section::create([
+            'levelid' => 11,
+            'sectionname' => 'Diamond',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+        $sectionB = Section::create([
+            'levelid' => 11,
+            'sectionname' => 'Emerald',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+
         $room = Classroom::where('code', 'R101')->firstOrFail();
 
+        // Synthetic Science Core section (cross-homeroom group) — its real
+        // class time is what ScienceCoreService reads back for the window.
         $sciSection = Section::create([
-            'levelid' => 7,
-            'sectionname' => 'SCI-G7-BIO',
+            'levelid' => 11,
+            'sectionname' => 'SCI-G11-BIO',
             'syid' => $this->term->school_year_id,
             'school_year_id' => $this->term->school_year_id,
             'is_active' => true,
         ]);
         $sciSubject = Subject::create([
             'school_year_id' => $this->term->school_year_id,
-            'code' => 'BIO3L2-G7',
+            'code' => 'BIO3L2-G11',
             'name' => 'Biology 3 Level 2',
             'credit_units' => 4,
             'lecture_hours' => 4,
             'load_units' => 4,
             'subject_type' => 'science_core',
-            'grade_level' => 7,
+            'grade_level' => 11,
             'sessions_per_week' => 4,
             'minutes_per_session' => 50,
             'is_active' => true,
@@ -1284,71 +1303,58 @@ class ClassScheduleDayAdjustmentTest extends TestCase
             'school_year_id' => $this->term->school_year_id,
             'academic_term_id' => $this->term->id,
             'day_of_week' => 'Tuesday',
-            'start_time' => '07:30',
-            'end_time' => '08:20',
+            'start_time' => '10:00',
+            'end_time' => '10:50',
             'status' => 'active',
         ]);
 
-        $electSection = Section::create([
-            'levelid' => 7,
-            'sectionname' => 'ELEC-G7-ROBOTICS',
-            'syid' => $this->term->school_year_id,
-            'school_year_id' => $this->term->school_year_id,
-            'is_active' => true,
-        ]);
-        $electSubject = Subject::create([
-            'school_year_id' => $this->term->school_year_id,
-            'code' => 'ROBO-G7',
-            'name' => 'Robotics',
-            'credit_units' => 3,
-            'lecture_hours' => 3,
-            'load_units' => 3,
-            'subject_type' => 'elective',
-            'grade_level' => 7,
-            'sessions_per_week' => 3,
-            'minutes_per_session' => 50,
-            'is_active' => true,
-        ]);
-        ClassSchedule::create([
-            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
-            'subject_id' => $electSubject->id,
-            'section_id' => $electSection->id,
-            'classroom_id' => $room->id,
-            'school_year_id' => $this->term->school_year_id,
-            'academic_term_id' => $this->term->id,
-            'day_of_week' => 'Tuesday',
-            'start_time' => '07:30',
-            'end_time' => '08:20',
-            'status' => 'active',
-        ]);
-
+        // early_start_stem_split with no flag ceremony/shortened-classes
+        // component and no periods of their own on these two sections means
+        // zero shift and zero compression — bands pass through at their raw
+        // canonical/actual times, making the assertions below exact.
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
             'grade_levels' => [7, 8, 9, 10, 11, 12],
-            'postponed_from_date' => '2026-08-03',
+            'adjustment_type' => 'early_start_stem_split',
             'effective_date' => '2026-08-04',
-            'reason' => 'Monday campus holiday',
-        ])->assertRedirect();
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $adjustment = ClassScheduleDayAdjustment::firstOrFail();
         $response = $this->actingAs($this->manager)
             ->getJson(route('faculty-loading.schedules.day-adjustments.preview', $adjustment))
             ->assertOk();
 
-        $sections = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'];
+        $sections = collect($response->json('grades'))->firstWhere('grade_level', 11)['sections'];
 
-        // No separate column per synthetic section — both pool into one
-        // shared "Electives / Science Core" column for the grade.
-        $this->assertNull(collect($sections)->firstWhere('name', 'SCI-G7-BIO'));
-        $this->assertNull(collect($sections)->firstWhere('name', 'ELEC-G7-ROBOTICS'));
+        // No separate column for the synthetic Science Core section — only
+        // the two real homeroom sections appear.
+        $sectionNames = collect($sections)->pluck('name');
+        $this->assertCount(2, $sections);
+        $this->assertContains('Diamond', $sectionNames);
+        $this->assertContains('Emerald', $sectionNames);
+        $this->assertNull(collect($sections)->firstWhere('name', 'SCI-G11-BIO'));
 
-        $electivesColumn = collect($sections)->firstWhere('name', 'Electives / Science Core');
-        $this->assertNotNull($electivesColumn);
-        $this->assertTrue($electivesColumn['is_electives_group']);
+        // Both homerooms carry the exact same ELECTIVE and SCIENCE_CORE
+        // blocks, at the same times — the shared grade-wide windows, not
+        // anything specific to either homeroom. Grade 11/12 Tuesday has two
+        // separate Elective periods (Period 4, and Period 7+8 merged).
+        $diamondBands = collect($sections)->firstWhere('name', 'Diamond')['bands'];
+        $emeraldBands = collect($sections)->firstWhere('name', 'Emerald')['bands'];
 
-        $entrySectionNames = collect($electivesColumn['entries'])->pluck('section_name');
-        $this->assertContains('SCI-G7-BIO', $entrySectionNames);
-        $this->assertContains('ELEC-G7-ROBOTICS', $entrySectionNames);
+        $diamondElectives = collect($diamondBands)->where('type', 'ELECTIVE')->values();
+        $emeraldElectives = collect($emeraldBands)->where('type', 'ELECTIVE')->values();
+        $this->assertCount(2, $diamondElectives);
+        $this->assertSame($diamondElectives->all(), $emeraldElectives->all());
+        $this->assertSame(['10:20', '13:50'], $diamondElectives->pluck('start')->all());
+        $this->assertSame(['11:10', '15:30'], $diamondElectives->pluck('end')->all());
+
+        $diamondScienceCore = collect($diamondBands)->firstWhere('type', 'SCIENCE_CORE');
+        $emeraldScienceCore = collect($emeraldBands)->firstWhere('type', 'SCIENCE_CORE');
+        $this->assertNotNull($diamondScienceCore);
+        $this->assertSame($diamondScienceCore, $emeraldScienceCore);
+        $this->assertSame('10:00', $diamondScienceCore['start']);
+        $this->assertSame('10:50', $diamondScienceCore['end']);
     }
 
     public function test_early_start_stem_split_treats_science_core_and_elective_subjects_as_stem_even_without_is_stem_flag(): void

@@ -7,7 +7,7 @@
           <div class="mb-1 flex items-center justify-center gap-1 text-center text-xs font-semibold text-slate-500">
             <span class="truncate">{{ section.name }}</span>
             <button
-              v-if="!section.is_electives_group && missingBandTypes(section).length"
+              v-if="missingBandTypes(section).length"
               type="button"
               class="shrink-0 rounded-full bg-slate-100 px-1.5 leading-4 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700"
               title="Add a band"
@@ -56,7 +56,6 @@
                 <span v-if="isStemEntry(entry)" class="shrink-0 rounded-full bg-purple-100 px-1.5 text-[9px] font-semibold text-purple-700">STEM</span>
               </div>
               <div v-if="entry.faculty?.name" class="truncate text-[10px] text-slate-600">{{ entry.faculty.name }}</div>
-              <div v-if="section.is_electives_group && entry.section_name" class="truncate text-[10px] text-slate-400">{{ entry.section_name }}</div>
               <div class="text-[10px] text-slate-500">{{ entry.start_time }}–{{ entry.end_time }} · {{ entry.classroom?.name ?? '—' }}</div>
             </div>
           </div>
