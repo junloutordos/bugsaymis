@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class IPCRWeightDistribution extends Model
 {
+    protected $table = 'ipcr_weight_distributions';
+
     protected $fillable = ['division_id','strategic','core','support'];
 
     public function division()
