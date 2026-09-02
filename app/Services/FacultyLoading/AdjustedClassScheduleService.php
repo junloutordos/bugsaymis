@@ -97,6 +97,8 @@ class AdjustedClassScheduleService
             }
 
             $gradeSections = [];
+            $electiveEntries = [];
+            $electiveBands = null;
 
             foreach ($sections->where('levelid', $gradeLevel) as $section) {
                 $sectionSchedule = $scheduleRows->get($section->id) ?? collect();
@@ -293,11 +295,41 @@ class AdjustedClassScheduleService
                     ];
                 }
 
+                $isElectiveOrScienceCore = str_starts_with((string) $section->sectionname, 'ELEC-')
+                    || str_starts_with((string) $section->sectionname, ScienceCoreService::SECTION_PREFIX);
+
+                if ($isElectiveOrScienceCore) {
+                    // Pooled into one shared column per grade below, instead
+                    // of a column per synthetic section — a grade can have
+                    // many of these (one per elective/science-core subject
+                    // group), and a column each would multiply the grid
+                    // width unreasonably.
+                    $electiveEntries = array_merge($electiveEntries, $entries);
+                    $electiveBands ??= $bands;
+
+                    continue;
+                }
+
                 $gradeSections[] = [
                     'id' => (int) $section->id,
                     'name' => $section->sectionname,
                     'entries' => $entries,
                     'bands' => $bands,
+                ];
+            }
+
+            if (! empty($electiveEntries)) {
+                usort($electiveEntries, fn (array $a, array $b) => $a['start_time'] <=> $b['start_time']);
+
+                $gradeSections[] = [
+                    // Negative sentinel (unique per grade, never a real
+                    // section id) — avoids colliding with another grade's
+                    // own pooled column for drag/conflict-highlight state.
+                    'id' => -$gradeLevel,
+                    'name' => 'Electives / Science Core',
+                    'entries' => $electiveEntries,
+                    'bands' => $electiveBands ?? [],
+                    'is_electives_group' => true,
                 ];
             }
 

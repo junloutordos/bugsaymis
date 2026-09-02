@@ -1252,7 +1252,7 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertSame('Health Break', $healthBreak['label']);
     }
 
-    public function test_science_core_and_elective_sections_appear_on_the_calendar(): void
+    public function test_science_core_and_elective_sections_are_pooled_into_one_shared_column(): void
     {
         $room = Classroom::where('code', 'R101')->firstOrFail();
 
@@ -1336,10 +1336,19 @@ class ClassScheduleDayAdjustmentTest extends TestCase
             ->assertOk();
 
         $sections = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'];
-        $sectionNames = collect($sections)->pluck('name');
 
-        $this->assertContains('SCI-G7-BIO', $sectionNames);
-        $this->assertContains('ELEC-G7-ROBOTICS', $sectionNames);
+        // No separate column per synthetic section — both pool into one
+        // shared "Electives / Science Core" column for the grade.
+        $this->assertNull(collect($sections)->firstWhere('name', 'SCI-G7-BIO'));
+        $this->assertNull(collect($sections)->firstWhere('name', 'ELEC-G7-ROBOTICS'));
+
+        $electivesColumn = collect($sections)->firstWhere('name', 'Electives / Science Core');
+        $this->assertNotNull($electivesColumn);
+        $this->assertTrue($electivesColumn['is_electives_group']);
+
+        $entrySectionNames = collect($electivesColumn['entries'])->pluck('section_name');
+        $this->assertContains('SCI-G7-BIO', $entrySectionNames);
+        $this->assertContains('ELEC-G7-ROBOTICS', $entrySectionNames);
     }
 
     public function test_early_start_stem_split_treats_science_core_and_elective_subjects_as_stem_even_without_is_stem_flag(): void
