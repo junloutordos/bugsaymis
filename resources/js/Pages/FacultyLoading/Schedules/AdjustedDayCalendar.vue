@@ -45,7 +45,7 @@
               @drop.prevent="onDrop($event, section)"
             >
               <div
-                v-for="band in section.bands"
+                v-for="band in timelineBands(section)"
                 :key="`${band.type}-${band.start}`"
                 :draggable="isDraggableBand(band)"
                 class="absolute inset-x-0.5 z-[1] overflow-hidden rounded px-1.5 py-0.5 leading-tight transition-shadow"
@@ -103,6 +103,15 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Official Activity / Early Dismissal isn't draggable or editable —
+           it's purely informational and campus-wide, so it's shown as a
+           compact banner instead of eating a share of the proportional
+           timeline the way a multi-hour block otherwise would. -->
+      <div v-if="officialActivityBand(grade)" class="flex items-center justify-between gap-2 border-t border-purple-100 bg-purple-50 px-4 py-2 text-sm">
+        <span class="font-semibold text-purple-800">{{ officialActivityBand(grade).label }}</span>
+        <span class="tabular-nums text-purple-700">{{ officialActivityBand(grade).start }}–{{ officialActivityBand(grade).end }}</span>
       </div>
     </div>
   </div>
@@ -240,11 +249,17 @@ const editingBand = ref(null) // { section, band }
 const overrideForm = ref({ override_start_time: '', override_end_time: '' })
 const overrideError = ref('')
 
+// Recess almost always has a real default already showing, so it only
+// makes sense to offer adding it when this section genuinely has none.
+// White Space/Wellness/Health Break are always offered regardless of
+// whether a default is already showing — picking one just repositions
+// or declares that band for the day, same as dragging it, so there's no
+// duplicate-creation risk.
 const ADD_BAND_TYPES = [
-  { value: 'RECESS', label: 'Recess' },
-  { value: 'WHITE_SPACE', label: 'White Space' },
-  { value: 'WELLNESS', label: 'Wellness Break' },
-  { value: 'HEALTH_BREAK', label: 'Health Break' },
+  { value: 'RECESS', label: 'Recess', alwaysOffered: false },
+  { value: 'WHITE_SPACE', label: 'White Space', alwaysOffered: true },
+  { value: 'WELLNESS', label: 'Wellness Break', alwaysOffered: true },
+  { value: 'HEALTH_BREAK', label: 'Health Break', alwaysOffered: true },
 ]
 
 const showAddBandModal = ref(false)
@@ -538,9 +553,25 @@ function isStemEntry(entry) {
   return Boolean(entry.subject?.is_stem || entry.subject?.is_elective || entry.subject?.is_science_core)
 }
 
+// Official Activity is rendered as a footer banner (see officialActivityBand
+// below), not inside the proportional timeline.
+function timelineBands(section) {
+  return (section.bands ?? []).filter(band => band.type !== 'OFFICIAL_ACTIVITY')
+}
+
+// Campus-wide and identical across every section in the grade — read it off
+// the first section that has one rather than duplicating it per section.
+function officialActivityBand(grade) {
+  for (const section of grade.sections ?? []) {
+    const band = (section.bands ?? []).find(b => b.type === 'OFFICIAL_ACTIVITY')
+    if (band) return band
+  }
+  return null
+}
+
 function missingBandTypes(section) {
   const present = new Set((section.bands ?? []).map(b => b.type))
-  return ADD_BAND_TYPES.filter(t => !present.has(t.value))
+  return ADD_BAND_TYPES.filter(t => t.alwaysOffered || !present.has(t.value))
 }
 
 function openAddBand(section) {

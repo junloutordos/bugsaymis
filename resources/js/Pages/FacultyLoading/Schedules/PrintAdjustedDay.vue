@@ -75,8 +75,11 @@ const props = defineProps({
   signatories: { type: Object, default: null },
 })
 
-const startMinutes = computed(() => 7 * 60 + 30)
-const endMinutes = computed(() => 17 * 60)
+// Early-start STEM-split days anchor the calendar to 07:00 instead of the
+// campus-default 07:30 — read the day's own computed start/end instead of
+// hardcoding, so the printed timeline actually starts where the day does.
+const startMinutes = computed(() => timeToMinutes(props.snapshot.calendar_start ?? '07:30'))
+const endMinutes = computed(() => timeToMinutes(props.snapshot.calendar_end ?? '17:00'))
 const spanMinutes = computed(() => Math.max(1, endMinutes.value - startMinutes.value))
 const timelineHeight = 118
 const gridMarks = computed(() => {

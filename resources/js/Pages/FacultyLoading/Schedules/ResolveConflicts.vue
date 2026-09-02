@@ -7,6 +7,12 @@
         subtitle="Manually correct a flagged entry's time before publishing. Regular classroom/faculty assignments are unaffected."
       >
         <template #actions>
+          <AppButton variant="secondary" @click="choosePrint">
+            <PrinterIcon class="h-4 w-4" /> Print
+          </AppButton>
+          <AppButton variant="success" @click="publish">
+            <CheckCircleIcon class="h-4 w-4" /> Publish
+          </AppButton>
           <AppButton variant="secondary" as="link" :href="route('faculty-loading.schedules.day-adjustments.index')">
             <ArrowLeftIcon class="h-4 w-4" /> Back to Adjustments
           </AppButton>
@@ -37,7 +43,8 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { Head, router } from '@inertiajs/vue3'
+import Swal from 'sweetalert2'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
@@ -47,6 +54,7 @@ import {
   ArrowLeftIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  PrinterIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -60,4 +68,47 @@ const currentPreview = ref(props.preview)
 const warnings = computed(() => currentPreview.value.conflict_warnings ?? [])
 const formattedEffectiveDate = computed(() =>
   new Date(`${props.adjustment.effective_date}T00:00:00`).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }))
+
+// This page only ever shows a draft adjustment (resolve() aborts otherwise),
+// so print always opens the live preview, matching the list page's own
+// "Open preview" wording for a draft row.
+async function choosePrint() {
+  const result = await Swal.fire({
+    title: 'Preview adjusted schedule',
+    input: 'select',
+    inputOptions: {
+      all: 'All grade levels',
+      7: 'Grade 7',
+      8: 'Grade 8',
+      9: 'Grade 9',
+      10: 'Grade 10',
+      11: 'Grade 11',
+      12: 'Grade 12',
+    },
+    inputValue: 'all',
+    showCancelButton: true,
+    confirmButtonText: 'Open preview',
+    confirmButtonColor: '#4f46e5',
+  })
+
+  if (!result.isConfirmed) return
+
+  const params = { adjustment: props.adjustment.id }
+  if (result.value !== 'all') params.grade = Number(result.value)
+  window.open(route('faculty-loading.schedules.day-adjustments.print', params), '_blank', 'noopener')
+}
+
+async function publish() {
+  const result = await Swal.fire({
+    icon: 'question',
+    title: 'Publish adjusted schedule?',
+    text: 'This freezes the current generated schedule for official printing.',
+    showCancelButton: true,
+    confirmButtonText: 'Publish',
+    confirmButtonColor: '#059669',
+  })
+  if (result.isConfirmed) {
+    router.post(route('faculty-loading.schedules.day-adjustments.publish', props.adjustment.id), {}, { preserveScroll: true })
+  }
+}
 </script>

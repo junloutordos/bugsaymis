@@ -186,7 +186,12 @@ class ClassScheduleDayAdjustmentController extends Controller
             ]);
         });
 
-        return back()->with('success', 'Adjusted-day schedule published and frozen for official printing.');
+        // Not back() — publishing can now be triggered from the Resolve
+        // Conflicts page too, and that page's own controller action aborts
+        // once the adjustment is no longer a draft, so back() would bounce
+        // the user straight into a 422.
+        return redirect()->route('faculty-loading.schedules.day-adjustments.index')
+            ->with('success', 'Adjusted-day schedule published and frozen for official printing.');
     }
 
     /**
