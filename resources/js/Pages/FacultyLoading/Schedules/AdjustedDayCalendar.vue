@@ -4,7 +4,16 @@
       <h3 class="mb-3 text-sm font-semibold text-slate-700">Grade {{ grade.grade_level }}</h3>
       <div class="flex gap-3 overflow-x-auto pb-2">
         <div v-for="section in grade.sections" :key="section.id" class="w-56 shrink-0">
-          <div class="mb-1 text-center text-xs font-semibold text-slate-500">{{ section.name }}</div>
+          <div class="mb-1 flex items-center justify-center gap-1 text-center text-xs font-semibold text-slate-500">
+            <span class="truncate">{{ section.name }}</span>
+            <button
+              v-if="missingBandTypes(section).length"
+              type="button"
+              class="shrink-0 rounded-full bg-slate-100 px-1.5 leading-4 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700"
+              title="Add a band"
+              @click="openAddBand(section)"
+            >+</button>
+          </div>
           <div
             class="relative rounded-lg border bg-slate-50"
             :class="conflictSectionId === section.id ? 'border-rose-300 ring-2 ring-rose-200' : 'border-slate-100'"
@@ -44,8 +53,9 @@
             >
               <div class="flex items-center justify-between gap-1">
                 <span class="truncate font-medium">{{ entry.subject?.name ?? entry.title ?? '—' }}</span>
-                <span v-if="entry.subject?.is_stem" class="shrink-0 rounded-full bg-purple-100 px-1.5 text-[9px] font-semibold text-purple-700">STEM</span>
+                <span v-if="isStemEntry(entry)" class="shrink-0 rounded-full bg-purple-100 px-1.5 text-[9px] font-semibold text-purple-700">STEM</span>
               </div>
+              <div v-if="entry.faculty?.name" class="truncate text-[10px] text-slate-600">{{ entry.faculty.name }}</div>
               <div class="text-[10px] text-slate-500">{{ entry.start_time }}–{{ entry.end_time }} · {{ entry.classroom?.name ?? '—' }}</div>
             </div>
           </div>
@@ -87,6 +97,44 @@
       </div>
     </template>
   </AppModal>
+
+  <AppModal :show="showAddBandModal" title="Add a band" size="sm" @close="showAddBandModal = false">
+    <div v-if="addBandSection" class="space-y-4">
+      <p class="text-sm text-slate-600">{{ addBandSection.name }}</p>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Band type</label>
+        <select v-model="addBandForm.band_type"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option v-for="t in missingBandTypes(addBandSection)" :key="t.value" :value="t.value">{{ t.label }}</option>
+        </select>
+      </div>
+      <div v-if="addBandForm.band_type === 'HEALTH_BREAK'">
+        <label class="mb-1 block text-sm font-medium text-slate-700">Title</label>
+        <input v-model="addBandForm.title" type="text" placeholder="Health Break"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700">Start time</label>
+          <input v-model="addBandForm.override_start_time" type="time"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700">End time</label>
+          <input v-model="addBandForm.override_end_time" type="time"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+      </div>
+      <p v-if="addBandError" class="text-xs text-rose-600">{{ addBandError }}</p>
+    </div>
+
+    <template #footer>
+      <div class="flex w-full justify-end gap-2">
+        <AppButton variant="ghost" @click="showAddBandModal = false">Cancel</AppButton>
+        <AppButton :loading="savingAddBand" @click="saveAddBand">Add</AppButton>
+      </div>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
@@ -115,6 +163,19 @@ const editingEntry = ref(null)
 const editingBand = ref(null) // { section, band }
 const overrideForm = ref({ override_start_time: '', override_end_time: '' })
 const overrideError = ref('')
+
+const ADD_BAND_TYPES = [
+  { value: 'RECESS', label: 'Recess' },
+  { value: 'WHITE_SPACE', label: 'White Space' },
+  { value: 'WELLNESS', label: 'Wellness Break' },
+  { value: 'HEALTH_BREAK', label: 'Health Break' },
+]
+
+const showAddBandModal = ref(false)
+const addBandSection = ref(null)
+const addBandForm = ref({ band_type: '', override_start_time: '', override_end_time: '', title: '' })
+const addBandError = ref('')
+const savingAddBand = ref(false)
 const savingOverride = ref(false)
 
 const gradesWithEntries = computed(() => (props.preview.grades ?? []).filter(grade => grade.sections?.length))
@@ -341,5 +402,44 @@ async function removeOverride() {
     : await axios.delete(route('faculty-loading.schedules.day-adjustments.band-overrides.destroy', [props.adjustment.id, editingBand.value.section.id, editingBand.value.band.type]))
   emit('update:preview', data)
   showOverrideModal.value = false
+}
+
+function isStemEntry(entry) {
+  return Boolean(entry.subject?.is_stem || entry.subject?.is_elective || entry.subject?.is_science_core)
+}
+
+function missingBandTypes(section) {
+  const present = new Set((section.bands ?? []).map(b => b.type))
+  return ADD_BAND_TYPES.filter(t => !present.has(t.value))
+}
+
+function openAddBand(section) {
+  const missing = missingBandTypes(section)
+  if (!missing.length) return
+  addBandSection.value = section
+  addBandForm.value = { band_type: missing[0].value, override_start_time: '', override_end_time: '', title: '' }
+  addBandError.value = ''
+  showAddBandModal.value = true
+}
+
+async function saveAddBand() {
+  savingAddBand.value = true
+  addBandError.value = ''
+  try {
+    const { data } = await axios.post(route('faculty-loading.schedules.day-adjustments.band-overrides.store', props.adjustment.id), {
+      section_id: addBandSection.value.id,
+      band_type: addBandForm.value.band_type,
+      override_start_time: addBandForm.value.override_start_time,
+      override_end_time: addBandForm.value.override_end_time,
+      ...(addBandForm.value.band_type === 'HEALTH_BREAK' ? { title: addBandForm.value.title || 'Health Break' } : {}),
+    })
+    emit('update:preview', data)
+    showAddBandModal.value = false
+  } catch (error) {
+    const errors = error.response?.data?.errors ?? {}
+    addBandError.value = errors.override_end_time?.[0] ?? errors.override_start_time?.[0] ?? error.response?.data?.message ?? 'Unable to add this band.'
+  } finally {
+    savingAddBand.value = false
+  }
 }
 </script>

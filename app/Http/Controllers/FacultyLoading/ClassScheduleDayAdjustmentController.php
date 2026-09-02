@@ -329,6 +329,7 @@ class ClassScheduleDayAdjustmentController extends Controller
             'band_type' => ['required', 'in:RECESS,WHITE_SPACE,WELLNESS,HEALTH_BREAK'],
             'override_start_time' => ['required', 'date_format:H:i'],
             'override_end_time' => ['required', 'date_format:H:i'],
+            'title' => ['nullable', 'string', 'max:255'],
         ]);
 
         if ($data['override_end_time'] <= $data['override_start_time']) {
@@ -344,6 +345,7 @@ class ClassScheduleDayAdjustmentController extends Controller
             // or resizing it in any one section's column updates that one
             // shared value for every section at once.
             $adjustment->update([
+                'health_break_title' => $data['title'] ?? $adjustment->health_break_title ?? 'Health Break',
                 'health_break_start_time' => $data['override_start_time'],
                 'health_break_end_time' => $data['override_end_time'],
             ]);

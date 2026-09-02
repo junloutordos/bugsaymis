@@ -6,6 +6,7 @@ use App\Models\ClassRecord\ClassRecordAssessment;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\ClassScheduleDayAdjustment;
 use App\Models\FacultyLoading\Section;
+use App\Models\FacultyLoading\Subject;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -56,11 +57,13 @@ class AdjustedClassScheduleService
             ...array_values(Section::WELLNESS_OVERRIDE_COLUMNS),
         );
 
+        // Synthetic elective (ELEC-*) and Science Core (SCI-*) sections are
+        // included here — each carries its own real levelid, so they render
+        // as extra columns under their grade card just like a homeroom
+        // section, using their own actual ClassSchedule rows for compression.
         $sections = Section::where('school_year_id', $term->school_year_id)
             ->where('is_active', true)
             ->whereBetween('levelid', [7, 12])
-            ->where('sectionname', 'not like', 'ELEC-%')
-            ->where('sectionname', 'not like', ScienceCoreService::SECTION_PREFIX.'%')
             ->with('consultationOverrides')
             ->orderBy('levelid')
             ->orderBy('sectionname')
@@ -125,7 +128,7 @@ class AdjustedClassScheduleService
                             && $protectedPairs->has("{$s->section_id}:{$s->subject_id}");
 
                         $target = $stemSplit
-                            ? ($s->subject?->is_stem ? $stemMinutes : $nonStemMinutes)
+                            ? ($this->isStemForSplit($s->subject) ? $stemMinutes : $nonStemMinutes)
                             : $classDuration;
 
                         return [
@@ -234,6 +237,33 @@ class AdjustedClassScheduleService
                         ];
                     })
                     ->all();
+
+                // Recess/White Space/Wellness only get merged onto a band
+                // that already exists in $bands above — but White Space has
+                // no campus/grade default at all, and Wellness only applies
+                // to specific grade/day combos, so a deliberately-added
+                // override for this section can have nothing to attach to.
+                // Surface it as a real band instead of silently discarding it.
+                $presentBandTypes = collect($bands)->pluck('type')->all();
+                $addableBandLabels = ['RECESS' => 'Recess', 'WHITE_SPACE' => 'White Space', 'WELLNESS' => 'Wellness Break'];
+                foreach ($addableBandLabels as $bandType => $label) {
+                    if (in_array($bandType, $presentBandTypes, true)) {
+                        continue;
+                    }
+
+                    $override = $bandOverridesBySectionType->get("{$section->id}:{$bandType}");
+                    if (! $override) {
+                        continue;
+                    }
+
+                    $bands[] = [
+                        'start' => substr((string) $override->override_start_time, 0, 5),
+                        'end' => substr((string) $override->override_end_time, 0, 5),
+                        'type' => $bandType,
+                        'label' => $label,
+                        'manually_adjusted' => true,
+                    ];
+                }
 
                 if ($activityStart && $activityEnd) {
                     $bands[] = [
@@ -348,6 +378,19 @@ class AdjustedClassScheduleService
         return $adjustment->isPublished() && $adjustment->schedule_snapshot
             ? $adjustment->schedule_snapshot
             : $this->generate($adjustment);
+    }
+
+    /**
+     * Science Core and Elective subjects are specialized STEM classes by
+     * nature (Biology/Chemistry/Physics Level 2, Engineering, etc.) — treat
+     * them as STEM for early_start_stem_split compression regardless of the
+     * per-subject is_stem flag, since nobody tags that flag when creating
+     * these subject types.
+     */
+    private function isStemForSplit(?Subject $subject): bool
+    {
+        return $subject !== null
+            && ((bool) $subject->is_stem || in_array($subject->subject_type, ['science_core', 'elective'], true));
     }
 
     /**

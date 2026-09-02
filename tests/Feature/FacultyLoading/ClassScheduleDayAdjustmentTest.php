@@ -1180,6 +1180,211 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertFalse($adjustment->hasHealthBreak());
     }
 
+    public function test_white_space_band_override_creates_a_new_band_when_no_default_exists(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        // White Space has no campus/grade default at all (SchedulingConstants::
+        // WHITE_SPACE_CAMPUS/WHITE_SPACE_BY_GRADE are empty) — confirm this
+        // grade/day genuinely shows none before adding one.
+        $preview = $this->actingAs($this->manager)
+            ->getJson(route('faculty-loading.schedules.day-adjustments.preview', $adjustment))
+            ->assertOk();
+        $bandsBefore = collect($preview->json('grades'))->firstWhere('grade_level', 7)['sections'][0]['bands'];
+        $this->assertNull(collect($bandsBefore)->firstWhere('type', 'WHITE_SPACE'));
+
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'WHITE_SPACE',
+                'override_start_time' => '10:00',
+                'override_end_time' => '10:15',
+            ])
+            ->assertOk();
+
+        $bandsAfter = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0]['bands'];
+        $whiteSpace = collect($bandsAfter)->firstWhere('type', 'WHITE_SPACE');
+
+        $this->assertNotNull($whiteSpace);
+        $this->assertSame('10:00', $whiteSpace['start']);
+        $this->assertSame('10:15', $whiteSpace['end']);
+        $this->assertTrue($whiteSpace['manually_adjusted']);
+        $this->assertSame('White Space', $whiteSpace['label']);
+    }
+
+    public function test_health_break_band_override_defaults_a_title_when_none_declared_yet(): void
+    {
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->assertNull($adjustment->health_break_title);
+
+        $section = Section::where('sectionname', 'Aquamarine')->firstOrFail();
+
+        $response = $this->actingAs($this->manager)
+            ->postJson(route('faculty-loading.schedules.day-adjustments.band-overrides.store', $adjustment), [
+                'section_id' => $section->id,
+                'band_type' => 'HEALTH_BREAK',
+                'override_start_time' => '09:20',
+                'override_end_time' => '09:30',
+            ])
+            ->assertOk();
+
+        $this->assertSame('Health Break', $adjustment->fresh()->health_break_title);
+
+        $bands = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'][0]['bands'];
+        $healthBreak = collect($bands)->firstWhere('type', 'HEALTH_BREAK');
+        $this->assertSame('Health Break', $healthBreak['label']);
+    }
+
+    public function test_science_core_and_elective_sections_appear_on_the_calendar(): void
+    {
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+
+        $sciSection = Section::create([
+            'levelid' => 7,
+            'sectionname' => 'SCI-G7-BIO',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+        $sciSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'BIO3L2-G7',
+            'name' => 'Biology 3 Level 2',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'science_core',
+            'grade_level' => 7,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $sciSubject->id,
+            'section_id' => $sciSection->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '07:30',
+            'end_time' => '08:20',
+            'status' => 'active',
+        ]);
+
+        $electSection = Section::create([
+            'levelid' => 7,
+            'sectionname' => 'ELEC-G7-ROBOTICS',
+            'syid' => $this->term->school_year_id,
+            'school_year_id' => $this->term->school_year_id,
+            'is_active' => true,
+        ]);
+        $electSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'ROBO-G7',
+            'name' => 'Robotics',
+            'credit_units' => 3,
+            'lecture_hours' => 3,
+            'load_units' => 3,
+            'subject_type' => 'elective',
+            'grade_level' => 7,
+            'sessions_per_week' => 3,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $electSubject->id,
+            'section_id' => $electSection->id,
+            'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id,
+            'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday',
+            'start_time' => '07:30',
+            'end_time' => '08:20',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'postponed_from_date' => '2026-08-03',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Monday campus holiday',
+        ])->assertRedirect();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $response = $this->actingAs($this->manager)
+            ->getJson(route('faculty-loading.schedules.day-adjustments.preview', $adjustment))
+            ->assertOk();
+
+        $sections = collect($response->json('grades'))->firstWhere('grade_level', 7)['sections'];
+        $sectionNames = collect($sections)->pluck('name');
+
+        $this->assertContains('SCI-G7-BIO', $sectionNames);
+        $this->assertContains('ELEC-G7-ROBOTICS', $sectionNames);
+    }
+
+    public function test_early_start_stem_split_treats_science_core_and_elective_subjects_as_stem_even_without_is_stem_flag(): void
+    {
+        $sciSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id,
+            'code' => 'BIO3L2-G7',
+            'name' => 'Biology 3 Level 2',
+            'credit_units' => 4,
+            'lecture_hours' => 4,
+            'load_units' => 4,
+            'subject_type' => 'science_core',
+            'grade_level' => 7,
+            'sessions_per_week' => 4,
+            'minutes_per_session' => 50,
+            'is_active' => true,
+        ]);
+        $this->assertFalse((bool) $sciSubject->is_stem);
+
+        // Swap the default MATH7 class for a Science Core one so the
+        // compression-target behavior can be isolated.
+        $this->tuesdayClass->update(['subject_id' => $sciSubject->id]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $this->actingAs($this->manager)
+            ->post(route('faculty-loading.schedules.day-adjustments.publish', $adjustment))
+            ->assertRedirect();
+
+        $entries = collect($adjustment->fresh()->schedule_snapshot['grades'])
+            ->firstWhere('grade_level', 7)['sections'][0]['entries'];
+
+        // Science Core keeps its full 50-minute length despite is_stem=false,
+        // anchored to the 07:00 day start — same treatment as a real STEM subject.
+        $this->assertSame('07:00', $entries[0]['start_time']);
+        $this->assertSame('07:50', $entries[0]['end_time']);
+    }
+
     private function plotAssessment(ClassSchedule $classSchedule, string $activityDate, bool $isMajor): void
     {
         $classSchedule->loadMissing('subject');
