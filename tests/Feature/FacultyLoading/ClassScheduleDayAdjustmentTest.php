@@ -1508,6 +1508,67 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertTrue($diamondElective['manually_adjusted']);
     }
 
+    public function test_early_start_stem_split_extends_calendar_start_to_cover_a_band_shifted_before_day_start(): void
+    {
+        // Reproduces a real production case: a homeroom's own first period
+        // starts late enough (09:00) that anchoring it to day_start (07:00)
+        // requires a large shift — and Science Core's real, earlier-in-the-
+        // day raw time (08:00) then lands BEFORE day_start once that same
+        // shift is applied. calendar_start was hardcoded to day_start_time,
+        // so this band rendered with a negative pixel offset — present in
+        // the data, invisible in the UI.
+        $delMundo = Section::create(['levelid' => 12, 'sectionname' => 'Del Mundo', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]);
+        $room = Classroom::where('code', 'R101')->firstOrFail();
+
+        $homeroomSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'EN6-G12', 'name' => 'English 6',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'lecture',
+            'grade_level' => 12, 'sessions_per_week' => 4, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $homeroomSubject->id, 'section_id' => $delMundo->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '09:50', 'status' => 'active',
+        ]);
+
+        $sciSubject = Subject::create([
+            'school_year_id' => $this->term->school_year_id, 'code' => 'BIO4L2-G12', 'name' => 'Biology 4 Level 2',
+            'credit_units' => 4, 'lecture_hours' => 4, 'load_units' => 4, 'subject_type' => 'science_core',
+            'grade_level' => 12, 'sessions_per_week' => 1, 'minutes_per_session' => 50, 'is_active' => true,
+        ]);
+        $sciSection = Section::create(['levelid' => 12, 'sectionname' => 'SCI-BIO4L2-G12-1', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]);
+        ClassSchedule::create([
+            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+            'subject_id' => $sciSubject->id, 'section_id' => $sciSection->id, 'classroom_id' => $room->id,
+            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+            'day_of_week' => 'Tuesday', 'start_time' => '08:00', 'end_time' => '08:50', 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
+            'academic_term_id' => $this->term->id,
+            'grade_levels' => [7, 8, 9, 10, 11, 12],
+            'adjustment_type' => 'early_start_stem_split',
+            'effective_date' => '2026-08-04',
+            'reason' => 'Heat advisory early start',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $adjustment = ClassScheduleDayAdjustment::firstOrFail();
+        $preview = $this->actingAs($this->manager)
+            ->getJson(route('faculty-loading.schedules.day-adjustments.preview', $adjustment))
+            ->assertOk();
+
+        $delMundoBands = collect($preview->json('grades'))->firstWhere('grade_level', 12)['sections'][0]['bands'];
+        $scienceCore = collect($delMundoBands)->firstWhere('type', 'SCIENCE_CORE');
+
+        $this->assertNotNull($scienceCore);
+        $this->assertSame('06:00', $scienceCore['start']);
+
+        // calendar_start must reach back far enough to include it — anything
+        // later would render this band with a negative, off-screen offset.
+        $this->assertLessThanOrEqual('06:00', $preview->json('calendar_start'));
+    }
+
     public function test_early_start_stem_split_treats_science_core_and_elective_subjects_as_stem_even_without_is_stem_flag(): void
     {
         $sciSubject = Subject::create([

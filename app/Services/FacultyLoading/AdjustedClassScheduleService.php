@@ -422,7 +422,9 @@ class AdjustedClassScheduleService
                 'start' => $activityStart,
                 'end' => $activityEnd,
             ] : null,
-            'calendar_start' => $stemSplit ? substr((string) ($adjustment->day_start_time ?: '07:00'), 0, 5) : '07:30',
+            'calendar_start' => $stemSplit
+                ? $this->earliestCalendarStart($grades, substr((string) ($adjustment->day_start_time ?: '07:00'), 0, 5))
+                : '07:30',
             'calendar_end' => '17:00',
             'conflict_warnings' => $conflictWarnings,
             'grades' => $grades,
@@ -463,6 +465,40 @@ class AdjustedClassScheduleService
      * un-shortened day, or a period protected by a scheduled major
      * assessment) so a single day can mix compressed and protected periods.
      */
+    /**
+     * On an early-start STEM-split day, every section is shifted so its OWN
+     * first period lands on day_start_time — but a cross-homeroom band
+     * (Science Core/Elective) isn't necessarily that section's first period,
+     * so the same shift can carry it to a computed time BEFORE day_start.
+     * The calendar's time axis and every band/entry's pixel offset are
+     * anchored to calendar_start (see AdjustedDayCalendar.vue's
+     * calendarStartMinutes) — a band earlier than it renders with a negative
+     * offset, above the visible timeline, effectively invisible even though
+     * the data is correct. Extending calendar_start back to the earliest
+     * actual computed time keeps everything on-screen.
+     *
+     * @param  array<int,array{grade_level:int,sections?:array<int,array{entries:array,bands:array}>}>  $grades
+     */
+    private function earliestCalendarStart(array $grades, string $dayStartTime): string
+    {
+        $earliest = SchedulingConstants::toMinutes($dayStartTime);
+
+        foreach ($grades as $grade) {
+            foreach ($grade['sections'] ?? [] as $section) {
+                foreach ([...$section['entries'], ...$section['bands']] as $item) {
+                    $start = $item['start_time'] ?? $item['start'] ?? null;
+                    if ($start === null) {
+                        continue;
+                    }
+
+                    $earliest = min($earliest, SchedulingConstants::toMinutes(substr((string) $start, 0, 5)));
+                }
+            }
+        }
+
+        return SchedulingConstants::fromMinutes($earliest);
+    }
+
     private function transformTime(string $time, array $slots, int $shift): string
     {
         $sourceMinutes = SchedulingConstants::toMinutes(substr($time, 0, 5));
