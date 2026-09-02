@@ -8,6 +8,8 @@ use App\Models\FacultyLoading\ResearchGroup;
 use App\Models\FacultyLoading\ResearchRequirement;
 use App\Models\FacultyLoading\ResearchRequirementAssignment;
 use App\Models\FacultyLoading\ResearchRequirementSubmission;
+use App\Jobs\NotifyResearchRequirementCreated;
+use App\Jobs\NotifyResearchSubmissionReviewed;
 use App\Services\FacultyLoading\RequirementFanoutService;
 use App\Services\FacultyLoading\ResearchSubmissionFileService;
 use Illuminate\Http\JsonResponse;
@@ -76,6 +78,10 @@ class ResearchRequirementController extends Controller
 
         $created = $this->fanout->fanOut($requirement);
 
+        if ($created->isNotEmpty()) {
+            NotifyResearchRequirementCreated::dispatch($requirement->id, $created->pluck('id')->all());
+        }
+
         return back()->with('success', "Requirement created and assigned to {$created->count()} research group(s).");
     }
 
@@ -128,6 +134,10 @@ class ResearchRequirementController extends Controller
         abort_unless($request->user()->hasAnyPermission(self::PERMISSIONS), 403);
 
         $created = $this->fanout->fanOut($researchRequirement);
+
+        if ($created->isNotEmpty()) {
+            NotifyResearchRequirementCreated::dispatch($researchRequirement->id, $created->pluck('id')->all());
+        }
 
         return back()->with('success', "{$created->count()} new research group(s) added.");
     }
@@ -195,6 +205,8 @@ class ResearchRequirementController extends Controller
         ]);
 
         $submission->assignment->update(['status' => $data['decision']]);
+
+        NotifyResearchSubmissionReviewed::dispatch($submission->id);
 
         return back()->with('success', $data['decision'] === 'accepted' ? 'Submission accepted.' : 'Submission returned for revision.');
     }

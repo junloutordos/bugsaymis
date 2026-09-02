@@ -7,6 +7,7 @@ use App\Models\FacultyLoading\ResearchAdvisory;
 use App\Models\FacultyLoading\ResearchRequirementAssignment;
 use App\Models\FacultyLoading\ResearchRequirementSubmission;
 use App\Models\FacultyLoading\ResearchRequirementSubmissionFile;
+use App\Jobs\NotifyResearchSubmissionReceived;
 use App\Services\FacultyLoading\ResearchSubmissionFileService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,6 +94,7 @@ class MyResearchRequirementController extends Controller
             }
 
             $assignment->update(['status' => 'submitted']);
+            NotifyResearchSubmissionReceived::dispatch($submission->id);
         });
 
         return back()->with('success', 'Submission uploaded.');

@@ -317,4 +317,39 @@ class ResearchRequirementHttpTest extends TestCase
             'decision' => 'accepted',
         ])->assertForbidden();
     }
+
+    public function test_store_dispatches_created_notification_when_groups_match(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        $term = $this->makeTerm();
+        $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+
+        $this->actingAs($this->coordinator())->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\NotifyResearchRequirementCreated::class);
+    }
+
+    public function test_review_dispatches_reviewed_notification(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        $term = $this->makeTerm();
+        $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+        $coordinator = $this->coordinator();
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $assignment = ResearchRequirement::first()->assignments()->first();
+        $submission = \App\Models\FacultyLoading\ResearchRequirementSubmission::create([
+            'research_requirement_assignment_id' => $assignment->id, 'submitted_by' => User::factory()->create()->id, 'submitted_at' => now(), 'is_late' => false,
+        ]);
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.submissions.review', $submission->id), ['decision' => 'accepted']);
+
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\NotifyResearchSubmissionReviewed::class);
+    }
 }

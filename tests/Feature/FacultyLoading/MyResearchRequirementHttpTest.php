@@ -200,4 +200,18 @@ class MyResearchRequirementHttpTest extends TestCase
         $this->actingAs($stranger)->get(route('faculty-loading.research-requirements.files.show', $fileId))
             ->assertForbidden();
     }
+
+    public function test_submit_dispatches_received_notification(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        $term = $this->makeTerm();
+        $adviser = $this->adviser();
+        $assignment = $this->assignmentFor($adviser, $term);
+
+        $this->actingAs($adviser)->post(route('faculty-loading.my-research-requirements.submit', $assignment->id), [
+            'files' => [['data' => $this->pdfDataUri(), 'name' => 'chapter1.pdf']],
+        ]);
+
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\NotifyResearchSubmissionReceived::class);
+    }
 }
