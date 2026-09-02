@@ -1639,6 +1639,14 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         });
     });
 
+    // ── PM V2 — OPCR Template Admin (requires ipcr.v2.admin) ────────────
+    Route::middleware('permission:ipcr.v2.admin')->group(function () {
+        Route::get('/pm2/opcr-templates', [\App\Http\Controllers\PM2\OpcrTemplateController::class, 'index'])->name('pm2.opcr-templates.index');
+        Route::post('/pm2/opcr-templates/items', [\App\Http\Controllers\PM2\OpcrTemplateController::class, 'storeItem'])->name('pm2.opcr-templates.storeItem');
+        Route::put('/pm2/opcr-templates/items/{item}', [\App\Http\Controllers\PM2\OpcrTemplateController::class, 'updateItem'])->name('pm2.opcr-templates.updateItem');
+        Route::delete('/pm2/opcr-templates/items/{item}', [\App\Http\Controllers\PM2\OpcrTemplateController::class, 'destroyItem'])->name('pm2.opcr-templates.destroyItem');
+    });
+
     // ── Admin IPCR Monitoring — read-only view across every stage ──────────
     Route::middleware('role:Administrator')->group(function () {
         Route::get('/admin/ipcrs', [\App\Http\Controllers\AdminIPCRController::class, 'index'])->name('admin-ipcr.index');
