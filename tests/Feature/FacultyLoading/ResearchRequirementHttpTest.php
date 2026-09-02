@@ -219,4 +219,102 @@ class ResearchRequirementHttpTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertFalse($assignment->fresh()->excluded);
     }
+
+    public function test_show_includes_the_latest_submission_for_an_assignment(): void
+    {
+        $term = $this->makeTerm();
+        $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+        $coordinator = $this->coordinator();
+        $adviser = User::factory()->create();
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $assignment = ResearchRequirement::first()->assignments()->first();
+        \App\Models\FacultyLoading\ResearchRequirementSubmission::create([
+            'research_requirement_assignment_id' => $assignment->id, 'submitted_by' => $adviser->id,
+            'notes' => 'Draft attached.', 'submitted_at' => now(), 'is_late' => false,
+        ]);
+
+        $response = $this->actingAs($coordinator)->get(route('faculty-loading.research-requirements.show', ResearchRequirement::first()->id));
+        $assignments = $response->viewData('page')['props']['assignments'];
+
+        $this->assertNotNull($assignments[0]['latest_submission']);
+        $this->assertSame('Draft attached.', $assignments[0]['latest_submission']['notes']);
+        $this->assertSame($adviser->name, $assignments[0]['latest_submission']['submitted_by']);
+    }
+
+    public function test_coordinator_can_accept_a_submission(): void
+    {
+        $term = $this->makeTerm();
+        $group = $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+        $adviser = User::factory()->create();
+        $coordinator = $this->coordinator();
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $assignment = ResearchRequirement::first()->assignments()->first();
+        $submission = \App\Models\FacultyLoading\ResearchRequirementSubmission::create([
+            'research_requirement_assignment_id' => $assignment->id, 'submitted_by' => $adviser->id, 'submitted_at' => now(), 'is_late' => false,
+        ]);
+        $assignment->update(['status' => 'submitted']);
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.submissions.review', $submission->id), [
+            'decision' => 'accepted',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('accepted', $submission->fresh()->review_status);
+        $this->assertSame('accepted', $assignment->fresh()->status);
+        $this->assertSame($coordinator->id, $submission->fresh()->reviewed_by);
+    }
+
+    public function test_return_for_revision_requires_a_comment(): void
+    {
+        $term = $this->makeTerm();
+        $group = $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+        $coordinator = $this->coordinator();
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $assignment = ResearchRequirement::first()->assignments()->first();
+        $submission = \App\Models\FacultyLoading\ResearchRequirementSubmission::create([
+            'research_requirement_assignment_id' => $assignment->id, 'submitted_by' => User::factory()->create()->id, 'submitted_at' => now(), 'is_late' => false,
+        ]);
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.submissions.review', $submission->id), [
+            'decision' => 'returned',
+        ])->assertSessionHasErrors('comment');
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.submissions.review', $submission->id), [
+            'decision' => 'returned', 'comment' => 'Please expand the literature review.',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('returned', $submission->fresh()->review_status);
+        $this->assertSame('returned', $assignment->fresh()->status);
+    }
+
+    public function test_reviewer_cannot_review_their_own_submission(): void
+    {
+        $term = $this->makeTerm();
+        $group = $this->makeActiveGroup($term, 10, 'thesis', 'Group A');
+        $coordinator = $this->coordinator();
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.store'), [
+            'academic_term_id' => $term->id, 'title' => 'Chapter 1', 'grade_levels' => [10], 'research_type' => 'thesis',
+            'due_at' => now()->addDays(14)->toDateTimeString(),
+        ]);
+        $assignment = ResearchRequirement::first()->assignments()->first();
+        $submission = \App\Models\FacultyLoading\ResearchRequirementSubmission::create([
+            'research_requirement_assignment_id' => $assignment->id, 'submitted_by' => $coordinator->id, 'submitted_at' => now(), 'is_late' => false,
+        ]);
+
+        $this->actingAs($coordinator)->post(route('faculty-loading.research-requirements.submissions.review', $submission->id), [
+            'decision' => 'accepted',
+        ])->assertForbidden();
+    }
 }

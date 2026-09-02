@@ -7,7 +7,9 @@ use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ResearchGroup;
 use App\Models\FacultyLoading\ResearchRequirement;
 use App\Models\FacultyLoading\ResearchRequirementAssignment;
+use App\Models\FacultyLoading\ResearchRequirementSubmission;
 use App\Services\FacultyLoading\RequirementFanoutService;
+use App\Services\FacultyLoading\ResearchSubmissionFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +21,10 @@ class ResearchRequirementController extends Controller
 {
     private const PERMISSIONS = ['faculty_loading.manage', 'faculty_loading.research_advisories'];
 
-    public function __construct(private readonly RequirementFanoutService $fanout) {}
+    public function __construct(
+        private readonly RequirementFanoutService $fanout,
+        private readonly ResearchSubmissionFileService $files,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -81,7 +86,7 @@ class ResearchRequirementController extends Controller
         $researchRequirement->load(['createdBy:id,name', 'academicTerm.schoolYear']);
 
         $assignments = $researchRequirement->assignments()
-            ->with(['researchGroup.advisories.faculty:id,name'])
+            ->with(['researchGroup.advisories.faculty:id,name', 'submissions.submittedBy:id,name', 'submissions.files'])
             ->get()
             ->map(fn ($a) => $this->mapAssignment($a));
 
@@ -172,11 +177,32 @@ class ResearchRequirementController extends Controller
         return response()->json($groups);
     }
 
+    public function review(Request $request, ResearchRequirementSubmission $submission): RedirectResponse
+    {
+        abort_unless($request->user()->hasAnyPermission(self::PERMISSIONS), 403);
+        abort_if($submission->submitted_by === $request->user()->id, 403, 'You cannot review your own submission.');
+
+        $data = $request->validate([
+            'decision' => ['required', Rule::in(['accepted', 'returned'])],
+            'comment'  => 'nullable|string|max:2000|required_if:decision,returned',
+        ]);
+
+        $submission->update([
+            'review_status'  => $data['decision'],
+            'review_comment' => $data['comment'] ?? null,
+            'reviewed_by'    => $request->user()->id,
+            'reviewed_at'    => now(),
+        ]);
+
+        $submission->assignment->update(['status' => $data['decision']]);
+
+        return back()->with('success', $data['decision'] === 'accepted' ? 'Submission accepted.' : 'Submission returned for revision.');
+    }
+
     private function mapAssignment(ResearchRequirementAssignment $a): array
     {
-        // Note: this deliberately does not touch $a->submissions yet — the
-        // ResearchRequirementSubmission model doesn't exist until Task 15.
-        // Task 16b adds the latest-submission fields once it does.
+        $latest = $a->submissions->first();
+
         return [
             'id'             => $a->id,
             'status'         => $a->status,
@@ -189,6 +215,16 @@ class ResearchRequirementController extends Controller
                     'id' => $adv->faculty->id, 'name' => $adv->faculty->name, 'role' => $adv->advisory_role,
                 ])->values()->all(),
             ],
+            'latest_submission' => $latest ? [
+                'id'             => $latest->id,
+                'notes'          => $latest->notes,
+                'submitted_at'   => $latest->submitted_at->toIso8601String(),
+                'is_late'        => $latest->is_late,
+                'review_status'  => $latest->review_status,
+                'review_comment' => $latest->review_comment,
+                'submitted_by'   => $latest->submittedBy?->name,
+                'files'          => $latest->files->map(fn ($f) => ['id' => $this->files->encodeKey($f->s3_key), 'name' => $f->original_filename, 'size' => $f->size_bytes])->values()->all(),
+            ] : null,
         ];
     }
 
