@@ -251,11 +251,37 @@ class AdjustedClassScheduleService
                     ->when($hasShortenedClasses, fn ($items) => $items->reject(
                         fn (array $band) => in_array($band['type'] ?? '', $rejectedBandTypes, true),
                     ))
-                    ->map(fn (array $band) => [
-                        ...$band,
-                        'start' => $this->transformTime((string) $band['start'], $sectionSlots, $sectionShift),
-                        'end' => $this->transformTime((string) $band['end'], $sectionSlots, $sectionShift),
-                    ])
+                    ->map(function (array $band) use ($sectionSlots, $sectionShift, $stemSplit, $dayStartMinutes, $stemMinutes) {
+                        $start = $this->transformTime((string) $band['start'], $sectionSlots, $sectionShift);
+                        $end = $this->transformTime((string) $band['end'], $sectionSlots, $sectionShift);
+
+                        if ($stemSplit
+                            && in_array($band['type'] ?? '', ['ELECTIVE', 'SCIENCE_CORE'], true)
+                            && SchedulingConstants::toMinutes($start) < $dayStartMinutes
+                        ) {
+                            // Being cross-homeroom, Elective/Science Core
+                            // aren't necessarily this section's own first
+                            // period — the per-section shift (anchored to
+                            // the section's OWN first period) can carry them
+                            // to a computed time BEFORE day_start_time, which
+                            // is never valid (the compressed day cannot start
+                            // before its own declared start). Only correct
+                            // this genuinely invalid case: clamp to
+                            // day_start_time with a single clean
+                            // stem_class_duration_minutes block (see
+                            // isStemForSplit()) — a safe, real duration,
+                            // since the shifted raw span that produced the
+                            // invalid position isn't a value worth trusting
+                            // either. A band that's already at or after
+                            // day_start (the common case, including
+                            // legitimately merged multi-period windows) is
+                            // left exactly as computed.
+                            $start = SchedulingConstants::fromMinutes($dayStartMinutes);
+                            $end = SchedulingConstants::fromMinutes($dayStartMinutes + $stemMinutes);
+                        }
+
+                        return [...$band, 'start' => $start, 'end' => $end];
+                    })
                     ->when($activityStart, fn ($items) => $items->filter(
                         fn (array $band) => $band['end'] <= $activityStart,
                     ))

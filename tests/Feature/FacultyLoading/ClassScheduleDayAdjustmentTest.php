@@ -1508,15 +1508,19 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $this->assertTrue($diamondElective['manually_adjusted']);
     }
 
-    public function test_early_start_stem_split_extends_calendar_start_to_cover_a_band_shifted_before_day_start(): void
+    public function test_early_start_stem_split_clamps_science_core_to_day_start_with_a_clean_stem_duration(): void
     {
         // Reproduces a real production case: a homeroom's own first period
         // starts late enough (09:00) that anchoring it to day_start (07:00)
         // requires a large shift — and Science Core's real, earlier-in-the-
-        // day raw time (08:00) then lands BEFORE day_start once that same
-        // shift is applied. calendar_start was hardcoded to day_start_time,
-        // so this band rendered with a negative pixel offset — present in
-        // the data, invisible in the UI.
+        // day raw window (08:00-09:30, itself inflated to 90 minutes by
+        // ScienceCoreService's MIN/MAX merge across two real periods) then
+        // lands BEFORE day_start once that same shift is applied, with the
+        // wrong duration. Science Core (and Elective) are STEM-classified
+        // periods (see isStemForSplit()) that should always read as one
+        // clean stem_class_duration_minutes block anchored no earlier than
+        // day_start — not an inflated span dragged into the early morning
+        // by a shift calculated from an unrelated homeroom period.
         $delMundo = Section::create(['levelid' => 12, 'sectionname' => 'Del Mundo', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]);
         $room = Classroom::where('code', 'R101')->firstOrFail();
 
@@ -1538,12 +1542,16 @@ class ClassScheduleDayAdjustmentTest extends TestCase
             'grade_level' => 12, 'sessions_per_week' => 1, 'minutes_per_session' => 50, 'is_active' => true,
         ]);
         $sciSection = Section::create(['levelid' => 12, 'sectionname' => 'SCI-BIO4L2-G12-1', 'syid' => $this->term->school_year_id, 'school_year_id' => $this->term->school_year_id, 'is_active' => true]);
-        ClassSchedule::create([
-            'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
-            'subject_id' => $sciSubject->id, 'section_id' => $sciSection->id, 'classroom_id' => $room->id,
-            'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
-            'day_of_week' => 'Tuesday', 'start_time' => '08:00', 'end_time' => '08:50', 'status' => 'active',
-        ]);
+        // Two real periods the same day (mirrors the actual prod anomaly
+        // that inflated the aggregated window to 90+ minutes).
+        foreach ([['08:00', '08:50'], ['08:50', '09:30']] as [$start, $end]) {
+            ClassSchedule::create([
+                'user_id' => User::factory()->create(['email_verified_at' => now()])->id,
+                'subject_id' => $sciSubject->id, 'section_id' => $sciSection->id, 'classroom_id' => $room->id,
+                'school_year_id' => $this->term->school_year_id, 'academic_term_id' => $this->term->id,
+                'day_of_week' => 'Tuesday', 'start_time' => $start, 'end_time' => $end, 'status' => 'active',
+            ]);
+        }
 
         $this->actingAs($this->manager)->post(route('faculty-loading.schedules.day-adjustments.store'), [
             'academic_term_id' => $this->term->id,
@@ -1562,11 +1570,12 @@ class ClassScheduleDayAdjustmentTest extends TestCase
         $scienceCore = collect($delMundoBands)->firstWhere('type', 'SCIENCE_CORE');
 
         $this->assertNotNull($scienceCore);
-        $this->assertSame('06:00', $scienceCore['start']);
+        $this->assertSame('07:00', $scienceCore['start']);
+        $this->assertSame('07:50', $scienceCore['end']);
 
-        // calendar_start must reach back far enough to include it — anything
-        // later would render this band with a negative, off-screen offset.
-        $this->assertLessThanOrEqual('06:00', $preview->json('calendar_start'));
+        // Nothing needed to extend the visible range — the clamp already
+        // keeps it from ever rendering before day_start.
+        $this->assertSame('07:00', $preview->json('calendar_start'));
     }
 
     public function test_early_start_stem_split_treats_science_core_and_elective_subjects_as_stem_even_without_is_stem_flag(): void
