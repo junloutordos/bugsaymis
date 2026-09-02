@@ -23,6 +23,7 @@ class ResearchAdvisory extends Model
         'status',
         'remarks',
         'load_assignment_id',
+        'research_group_id',
     ];
 
     protected $casts = [
@@ -48,6 +49,11 @@ class ResearchAdvisory extends Model
     public function loadAssignment(): BelongsTo
     {
         return $this->belongsTo(LoadAssignment::class);
+    }
+
+    public function researchGroup(): BelongsTo
+    {
+        return $this->belongsTo(ResearchGroup::class);
     }
 
     public function members(): HasMany
