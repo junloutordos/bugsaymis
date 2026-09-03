@@ -1348,6 +1348,7 @@ Route::middleware(['auth', 'permission:roles.assign'])
 // HR Employees page
 Route::middleware(['auth','permission:hr.employees.manage'])->get('/hr/employees', [UserController::class, 'employeesIndex'])->name('hr.employees.index');
 Route::middleware(['auth','permission:hr.employees.manage'])->post('/hr/employees', [UserController::class, 'employeesStore'])->name('hr.employees.store');
+Route::middleware(['auth','permission:hr.employees.manage'])->put('/hr/employees/{id}', [UserController::class, 'employeesUpdate'])->name('hr.employees.update');
 Route::middleware(['auth','permission:hr.employees.manage'])->patch('/hr/employees/{user}/salary-grade', [UserController::class, 'assignSalaryGrade'])->name('hr.employees.salary-grade');
 Route::middleware(['auth','permission:hr.employees.manage'])->get('/hr/employees/{user}/id-card', [UserController::class, 'idCard'])->name('hr.employees.id-card');
 

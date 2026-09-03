@@ -186,7 +186,7 @@ export function useUsers(props) {
       const payload = { ...form.value }
       if (Array.isArray(payload.role_id)) payload.role_id = payload.role_id.join(',')
 
-      router.put(`/users/${form.value.id}`, payload, {
+      router.put(isEmployeesPage ? `/hr/employees/${form.value.id}` : `/users/${form.value.id}`, payload, {
         onSuccess: async () => {
           closeModal()
           await Swal.fire("Updated", "The user has been updated successfully", "success")

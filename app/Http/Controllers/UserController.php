@@ -307,6 +307,25 @@ class UserController extends Controller
 
     public function update(Request $request, $id, WorkspaceProvisioningService $provisioning)
     {
+        $this->applyUserUpdate($request, $id, $provisioning);
+
+        return redirect()->route('users.index')->with('success', 'User updated successfully');
+    }
+
+    /**
+     * Same save as update(), but redirects back to the Employees module
+     * instead of the Users module — used when the edit was made from
+     * /hr/employees so the redirect doesn't drop the user into /users.
+     */
+    public function employeesUpdate(Request $request, $id, WorkspaceProvisioningService $provisioning)
+    {
+        $this->applyUserUpdate($request, $id, $provisioning);
+
+        return redirect()->route('hr.employees.index')->with('success', 'User updated successfully');
+    }
+
+    private function applyUserUpdate(Request $request, $id, WorkspaceProvisioningService $provisioning): User
+    {
         $user = User::findOrFail($id);
 
         $data = $request->validate([
@@ -354,7 +373,7 @@ class UserController extends Controller
             }
         }
 
-        return redirect()->route('users.index')->with('success', 'User updated successfully');
+        return $user;
     }
 
     public function destroy($id, WorkspaceProvisioningService $provisioning)
