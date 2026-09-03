@@ -531,17 +531,17 @@ const calendarDaysWithPending = computed(() => {
   return [...byDate.values()]
 })
 
-// Monday of the date's week, minus 3 days = the preceding Friday, cutoff at
-// 12:00 NN (not end of day) so coordinators/CID Chief have the Friday
-// afternoon to review the week's plotted assessments.
+// Monday of the date's week, minus 5 days = the preceding Wednesday, cutoff
+// at 12:00 NN (not end of day) so coordinators/CID Chief have from Wednesday
+// afternoon onward to review the week's plotted assessments.
 function plottingDeadline(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   const monday = new Date(d)
   monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  const friday = new Date(monday)
-  friday.setDate(monday.getDate() - 3)
-  friday.setHours(12, 0, 0, 0)
-  return friday
+  const wednesday = new Date(monday)
+  wednesday.setDate(monday.getDate() - 5)
+  wednesday.setHours(12, 0, 0, 0)
+  return wednesday
 }
 
 // Per-date totals use the server's consolidated WAT counts, with unsaved dates
@@ -613,7 +613,7 @@ function onDateChange(row) {
     row._dateInput = ''
   } else if (!props.isAdmin && new Date() > plottingDeadline(date)) {
     const deadline = plottingDeadline(date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-    row._dateWarning  = `Plotting deadline passed — assessments must be plotted by 12:00 NN of the Friday before their week (${deadline}).`
+    row._dateWarning  = `Plotting deadline passed — assessments must be plotted by 12:00 NN of the Wednesday before their week (${deadline}).`
     row._dateInput = ''
   } else {
     row._dateWarning = null
@@ -693,7 +693,7 @@ function calendarDateFeasibility(dateStr, subjectId = null) {
   }
   if (!props.isAdmin && new Date() > plottingDeadline(dateStr)) {
     const deadline = plottingDeadline(dateStr).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-    return { ok: false, reason: `Plotting deadline passed — must be plotted by 12:00 NN of the Friday before (${deadline}).` }
+    return { ok: false, reason: `Plotting deadline passed — must be plotted by 12:00 NN of the Wednesday before (${deadline}).` }
   }
   return { ok: true, reason: null }
 }
@@ -1416,7 +1416,7 @@ async function saveQuarterOption() {
           <div v-if="!isLocked && !isReadOnly"
             class="mb-4 bg-slate-50 border border-slate-100 text-slate-500 rounded-lg px-3 py-2 text-[11px]">
             <span class="font-semibold text-slate-600">WAT rules:</span>
-            plot assessments no later than the Friday before their week (same-week plotting is not allowed)
+            plot assessments no later than the Wednesday before their week (same-week plotting is not allowed)
             · max {{ WAT.dailyGraded }} graded ({{ WAT.dailyMajor }} major) per section per day
             · max {{ WAT.weeklyGraded }} graded ({{ WAT.weeklyMajor }} major) per section per week.
             <template v-if="scheduledDays.length">

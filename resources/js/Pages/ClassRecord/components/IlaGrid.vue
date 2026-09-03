@@ -185,7 +185,7 @@ function formatDate(d) {
 
 // ── Grading ──────────────────────────────────────────────────────────────────
 // Deciding to grade an ILA date is the same decision as plotting any other
-// WAT assessment — it must be locked in no later than 12:00 NN of the Friday
+// WAT assessment — it must be locked in no later than 12:00 NN of the Wednesday
 // before its week. The server enforces the deadline and the daily/weekly
 // caps; this just surfaces whatever message it returns.
 
@@ -283,7 +283,7 @@ function studentTotals(studentId) {
       <p class="text-xs text-slate-500">
         Dates marked <BoltIcon class="h-3 w-3 inline text-indigo-400" /> are auto-created from the class schedule's ILP period ·
         click a cell to cycle unmarked → <span class="font-semibold">C</span>ompliant → <span class="font-semibold">N</span>on-<span class="font-semibold">C</span>ompliant ·
-        hover a date and click <AcademicCapIcon class="h-3 w-3 inline text-indigo-400" /> to grade it (must be decided by 12:00 NN the Friday before its week)
+        hover a date and click <AcademicCapIcon class="h-3 w-3 inline text-indigo-400" /> to grade it (must be decided by 12:00 NN the Wednesday before its week)
       </p>
       <div class="flex items-center gap-2 shrink-0">
         <template v-if="!isLocked">
@@ -336,7 +336,7 @@ function studentTotals(studentId) {
                 </button>
                 <button v-if="!isLocked && !d.is_graded" @click="gradeDate(d)"
                   class="p-0.5 rounded hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 transition-all"
-                  title="Grade this ILA (locks in like any WAT assessment — no later than 12:00 NN the Friday before its week)">
+                  title="Grade this ILA (locks in like any WAT assessment — no later than 12:00 NN the Wednesday before its week)">
                   <AcademicCapIcon class="h-3 w-3" />
                 </button>
                 <button v-if="!isLocked && d.is_graded" @click="ungradeDate(d)"

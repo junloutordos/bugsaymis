@@ -24,8 +24,8 @@ use Illuminate\Support\Facades\DB;
  * Weekly Assessment Tracker (WAT) rules — single source of truth for the
  * campus assessment-plotting policy:
  *
- *  - Plotting deadline: no later than 12:00 NN Friday preceding the week of
- *    implementation (leaves the Friday afternoon for coordinator/CID Chief review)
+ *  - Plotting deadline: no later than 12:00 NN Wednesday preceding the week of
+ *    implementation (leaves Wednesday afternoon onward for coordinator/CID Chief review)
  *  - Daily:  max 3 graded assessments per section, of which max 2 major
  *  - Weekly: max 15 graded / 6 major per section (Mon–Sun window)
  *  - Major  = Long Test, or any assessment worth >= 10% of the quarterly grade
@@ -130,14 +130,14 @@ class WatRuleService
         return $perAssessmentShare >= self::MAJOR_WEIGHT_SHARE;
     }
 
-    // ── Friday-before plotting deadline ───────────────────────────────────────
+    // ── Wednesday-before plotting deadline ─────────────────────────────────────
 
     public static function plottingDeadline(string $activityDate): Carbon
     {
-        // Monday of the implementation week minus 3 days = preceding Friday,
+        // Monday of the implementation week minus 5 days = preceding Wednesday,
         // cutoff at 12:00 NN (not end of day) so coordinators/CID Chief have
-        // the Friday afternoon to review the week's plotted assessments.
-        return Carbon::parse($activityDate)->startOfWeek(Carbon::MONDAY)->subDays(3)->setTime(12, 0, 0);
+        // from Wednesday afternoon to review the week's plotted assessments.
+        return Carbon::parse($activityDate)->startOfWeek(Carbon::MONDAY)->subDays(5)->setTime(12, 0, 0);
     }
 
     public static function violatesPlottingDeadline(string $activityDate): bool
@@ -172,7 +172,7 @@ class WatRuleService
      * Exam entries are exempt from the daily/weekly caps and the schedule-day
      * rule — every subject legitimately sits its final exam in the same few
      * campus-wide days, which isn't the cramming those rules guard against.
-     * The plotting-deadline rule (Friday before) still applies unchanged.
+     * The plotting-deadline rule (Wednesday before) still applies unchanged.
      */
     public static function isWithinExamWindow(int $schoolYearId, int $quarter, string $date): bool
     {
@@ -962,7 +962,7 @@ class WatRuleService
         $week = $preparedWeek ?? self::weekData($sectionId, $schoolYearId, $monday->toDateString());
 
         // Deadline for the week is judged off Monday (the week's own plotting
-        // cutoff is "Friday before Monday, 12NN") — same anchor violatesPlottingDeadline()
+        // cutoff is "Wednesday before Monday, 12NN") — same anchor violatesPlottingDeadline()
         // uses when called per-item elsewhere.
         $deadlinePassed = now()->greaterThan(self::plottingDeadline($monday->toDateString()));
 

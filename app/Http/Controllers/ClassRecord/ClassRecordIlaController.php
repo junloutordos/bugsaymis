@@ -217,7 +217,7 @@ class ClassRecordIlaController extends Controller
     /**
      * Elects a specific ILA date for grading — the same decision as plotting
      * any other WAT assessment, gated by the same rules: locked in no later
-     * than 12:00 NN the Friday before its week (WatRuleService), and counted
+     * than 12:00 NN the Wednesday before its week (WatRuleService), and counted
      * against the section's daily/weekly graded & major caps. The date's
      * existing compliance marks seed the initial scores (compliant = full
      * credit, non-compliant = 0) so nothing already recorded is lost; the
@@ -240,7 +240,7 @@ class ClassRecordIlaController extends Controller
 
         if (! $isAdmin && WatRuleService::violatesPlottingDeadline($date)) {
             $deadline = WatRuleService::plottingDeadline($date)->format('D, M d, Y \a\t 12:00 NN');
-            abort(422, "Too late to grade this ILA date — the plotting deadline for its week was {$deadline}. The decision to grade an ILA session must be made no later than 12:00 NN of the Friday before its week, same as any other assessment.");
+            abort(422, "Too late to grade this ILA date — the plotting deadline for its week was {$deadline}. The decision to grade an ILA session must be made no later than 12:00 NN of the Wednesday before its week, same as any other assessment.");
         }
 
         $validated = $request->validate([
@@ -360,7 +360,7 @@ class ClassRecordIlaController extends Controller
     /**
      * Reverts an ILA date back to compliance-only — only while its plotting
      * window is still open (same deadline as grading it in the first place).
-     * Once the Friday-noon deadline passes, the decision is locked, same as
+     * Once the Wednesday-noon deadline passes, the decision is locked, same as
      * any other WAT assessment.
      */
     public function ungradeDate(ClassRecord $classRecord, int $q, ClassRecordIlaDate $ilaDate): JsonResponse

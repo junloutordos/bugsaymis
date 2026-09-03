@@ -37,14 +37,14 @@ const weekLabel = computed(() => {
   return `${new Date(props.tracker.week_start + 'T00:00:00').toLocaleDateString('en-PH', opts)} – ${new Date(props.tracker.week_end + 'T00:00:00').toLocaleDateString('en-PH', opts)}`
 })
 
-// Friday-before-the-week 12NN plotting deadline, mirrors WatRuleService::plottingDeadline()
+// Wednesday-before-the-week 12NN plotting deadline, mirrors WatRuleService::plottingDeadline()
 const plottingDeadline = computed(() => {
   if (!props.tracker) return null
   const monday = new Date(props.tracker.week_start + 'T00:00:00')
-  const friday = new Date(monday)
-  friday.setDate(monday.getDate() - 3)
-  friday.setHours(12, 0, 0, 0)
-  return friday
+  const wednesday = new Date(monday)
+  wednesday.setDate(monday.getDate() - 5)
+  wednesday.setHours(12, 0, 0, 0)
+  return wednesday
 })
 const deadlinePassed = computed(() => plottingDeadline.value ? new Date() > plottingDeadline.value : false)
 

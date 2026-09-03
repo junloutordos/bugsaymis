@@ -319,8 +319,8 @@ class ClassRecordAssessmentController extends Controller
             return $item;
         });
 
-        // WAT rule: plot no later than 12:00 NN Friday preceding the week of
-        // implementation — leaves the Friday afternoon for coordinator/CID
+        // WAT rule: plot no later than 12:00 NN Wednesday preceding the week of
+        // implementation — leaves Wednesday afternoon onward for coordinator/CID
         // Chief review (admins may correct entries past the deadline)
         if (! $this->isAdmin()) {
             foreach ($items as $item) {
@@ -330,7 +330,7 @@ class ClassRecordAssessmentController extends Controller
                         $deadline = WatRuleService::plottingDeadline($date)->format('D, M d, Y \a\t 12:00 NN');
 
                         return response()->json([
-                            'message' => "\"{$item['title']}\" includes {$when}, but the plotting deadline for that week was {$deadline}. Assessments must be plotted no later than 12:00 NN of the Friday before their week — same-week plotting is not allowed.",
+                            'message' => "\"{$item['title']}\" includes {$when}, but the plotting deadline for that week was {$deadline}. Assessments must be plotted no later than 12:00 NN of the Wednesday before their week — same-week plotting is not allowed.",
                         ], 422);
                     }
                 }

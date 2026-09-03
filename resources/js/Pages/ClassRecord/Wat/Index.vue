@@ -180,7 +180,7 @@ function remainingColor(remaining) {
         <div>
           <h3 class="text-sm font-semibold text-slate-800">Quarter Final Exam Windows — SY {{ schoolYear?.name }}</h3>
           <p class="text-xs text-slate-500 mt-0.5">
-            Dates set here exempt Long Test/Quarterly Exam entries from the daily/weekly WAT caps and the schedule-day rule for that quarter. The Friday-before plotting deadline still applies.
+            Dates set here exempt Long Test/Quarterly Exam entries from the daily/weekly WAT caps and the schedule-day rule for that quarter. The Wednesday-before plotting deadline still applies.
           </p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
