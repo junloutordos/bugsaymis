@@ -35,7 +35,7 @@ const sizeMap = {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div v-if="show" class="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
         <!-- Backdrop -->
         <div
           class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
@@ -97,6 +97,15 @@ const sizeMap = {
 @media (prefers-reduced-motion: reduce) {
   .app-modal-panel {
     animation: none;
+  }
+}
+
+/* Pages that print via window.print() typically hide #app and reveal a
+   dedicated print-only area. Since modals teleport to <body> (outside
+   #app), they must be hidden here too or they bleed into the print output. */
+@media print {
+  .app-modal-overlay {
+    display: none !important;
   }
 }
 </style>

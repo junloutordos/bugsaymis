@@ -1230,7 +1230,7 @@ const showAllChecked    = computed({
 
         <template #footer>
           <AppButton variant="secondary" @click="showReportModal = false">Cancel</AppButton>
-          <AppButton @click="generateReport(); showReportModal = false">Generate &amp; Print</AppButton>
+          <AppButton @click="generateReport">Generate &amp; Print</AppButton>
         </template>
       </AppModal>
 
