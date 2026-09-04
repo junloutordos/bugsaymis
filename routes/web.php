@@ -1267,6 +1267,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::middleware('permission:opcr.manage')->group(function () {
             Route::post('/opcr-periods', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'store'])->name('opcr-periods.store');
             Route::put('/opcr-periods/{opcrPeriod}', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'update'])->name('opcr-periods.update');
+            Route::post('/opcr-periods/{opcrPeriod}/clone', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'cloneFrom'])->name('opcr-periods.clone');
         });
     });
 

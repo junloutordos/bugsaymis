@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\AgencyOutcome;
 use App\Models\Division;
 use App\Models\DostPillar;
+use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrPeriod;
 use App\Models\PerformanceIndicator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class OpcrPeriodController extends Controller
@@ -82,5 +84,34 @@ class OpcrPeriodController extends Controller
         });
 
         return back()->with('success', 'OPCR period updated.');
+    }
+
+    public function cloneFrom(Request $request, OpcrPeriod $opcrPeriod)
+    {
+        $data = $request->validate([
+            'source_period_id' => 'required|exists:opcr_periods,id|different:opcr_period',
+        ]);
+
+        if ($opcrPeriod->indicators()->exists()) {
+            throw ValidationException::withMessages([
+                'source_period_id' => 'This period already has indicators. Cloning is only allowed into an empty period.',
+            ]);
+        }
+
+        $source = OpcrPeriod::findOrFail($data['source_period_id']);
+
+        DB::transaction(function () use ($source, $opcrPeriod) {
+            $indicators = $source->indicators()->with('divisions')->get();
+            foreach ($indicators as $indicator) {
+                $clone = $indicator->replicate([
+                    'rating_quality', 'rating_efficiency', 'rating_timeliness', 'rating_average',
+                ]);
+                $clone->opcr_period_id = $opcrPeriod->id;
+                $clone->save();
+                $clone->divisions()->sync($indicator->divisions->pluck('id'));
+            }
+        });
+
+        return back()->with('success', "Cloned from \"{$source->period_label}\".");
     }
 }
