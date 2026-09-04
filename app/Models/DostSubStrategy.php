@@ -12,4 +12,9 @@ class DostSubStrategy extends Model
     {
         return $this->belongsTo(DostStrategy::class, 'dost_strategy_id');
     }
+
+    public function opcrIndicators()
+    {
+        return $this->hasMany(\App\Models\OPCR\OpcrIndicator::class, 'dost_sub_strategy_id');
+    }
 }

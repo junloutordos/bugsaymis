@@ -77,6 +77,10 @@ class AgencyOutcomeController extends Controller
             return back()->withErrors(['agencyOutcome' => 'This outcome is still referenced by one or more performance indicators.']);
         }
 
+        if ($agencyOutcome->opcrIndicators()->exists()) {
+            return back()->withErrors(['agencyOutcome' => 'This outcome is still tagged on one or more OPCR indicators.']);
+        }
+
         $agencyOutcome->delete();
 
         return redirect()->back();
