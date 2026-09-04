@@ -1268,6 +1268,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             Route::post('/opcr-periods', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'store'])->name('opcr-periods.store');
             Route::put('/opcr-periods/{opcrPeriod}', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'update'])->name('opcr-periods.update');
             Route::post('/opcr-periods/{opcrPeriod}/clone', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'cloneFrom'])->name('opcr-periods.clone');
+
+            Route::post('/opcr-indicators', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'store'])->name('opcr-indicators.store');
+            Route::put('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'update'])->name('opcr-indicators.update');
+            Route::delete('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'destroy'])->name('opcr-indicators.destroy');
         });
     });
 
