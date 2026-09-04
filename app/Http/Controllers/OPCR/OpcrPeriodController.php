@@ -9,6 +9,8 @@ use App\Models\DostPillar;
 use App\Models\OPCR\OpcrPeriod;
 use App\Models\PerformanceIndicator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class OpcrPeriodController extends Controller
@@ -46,5 +48,39 @@ class OpcrPeriodController extends Controller
             'divisions' => Division::all(),
             'canManage' => $canManage,
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'fiscal_year' => 'required|integer|min:2000|max:2100|unique:opcr_periods,fiscal_year',
+            'period_label' => 'required|string|max:255',
+        ]);
+
+        OpcrPeriod::create($data);
+
+        return back()->with('success', 'OPCR period created.');
+    }
+
+    public function update(Request $request, OpcrPeriod $opcrPeriod)
+    {
+        $data = $request->validate([
+            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100', Rule::unique('opcr_periods', 'fiscal_year')->ignore($opcrPeriod->id)],
+            'period_label' => 'required|string|max:255',
+            'is_current' => 'boolean',
+            'campus_director_name' => 'nullable|string|max:255',
+            'oic_campus_director_name' => 'nullable|string|max:255',
+            'executive_director_name' => 'nullable|string|max:255',
+            'commitment_statement' => 'nullable|string',
+        ]);
+
+        DB::transaction(function () use ($data, $opcrPeriod) {
+            if (! empty($data['is_current'])) {
+                OpcrPeriod::where('id', '!=', $opcrPeriod->id)->update(['is_current' => false]);
+            }
+            $opcrPeriod->update($data);
+        });
+
+        return back()->with('success', 'OPCR period updated.');
     }
 }
