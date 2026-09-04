@@ -67,7 +67,6 @@ class VehicleRequestController extends Controller
                     ->orWhere('destination', 'like', "%{$search}%")
                     ->orWhere('vehicle_type', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
-                    ->orWhere('driver_name', 'like', "%{$search}%")
                     ->when($searchDate, fn ($q2) => $q2->orWhereDate('date_needed', $searchDate))
                     ->orWhereHas('requester', fn ($rq) => $rq->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('driver', fn ($dq) => $dq->where('name', 'like', "%{$search}%"));
