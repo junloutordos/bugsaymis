@@ -9,6 +9,7 @@ use App\Models\DostPillar;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrPeriod;
 use App\Models\PerformanceIndicator;
+use App\Services\OPCR\OpcrPeriodPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -113,5 +114,10 @@ class OpcrPeriodController extends Controller
         });
 
         return back()->with('success', "Cloned from \"{$source->period_label}\".");
+    }
+
+    public function pdf(OpcrPeriod $opcrPeriod, OpcrPeriodPdfService $service)
+    {
+        return $service->stream($opcrPeriod);
     }
 }

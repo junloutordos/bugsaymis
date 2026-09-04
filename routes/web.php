@@ -1263,6 +1263,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // OPCR — Office Performance Commitment and Review (campus-level).
     Route::middleware('permission:opcr.view|opcr.manage')->group(function () {
         Route::get('/opcr', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'index'])->name('opcr.index');
+        Route::get('/opcr-periods/{opcrPeriod}/pdf', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'pdf'])->name('opcr-periods.pdf');
 
         Route::middleware('permission:opcr.manage')->group(function () {
             Route::post('/opcr-periods', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'store'])->name('opcr-periods.store');
