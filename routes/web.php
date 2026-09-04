@@ -1260,6 +1260,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::delete('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'destroy'])->name('dost-sub-strategies.destroy');
     });
 
+    // OPCR — Office Performance Commitment and Review (campus-level).
+    Route::middleware('permission:opcr.view|opcr.manage')->group(function () {
+        Route::get('/opcr', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'index'])->name('opcr.index');
+    });
+
 // Performance Management — Committees & Special Assignments (open to any authenticated user; controller handles auth)
 Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/performance-management/committees', [\App\Http\Controllers\CommitteePerformanceController::class, 'index'])->name('pm-committees.index');
