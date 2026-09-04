@@ -91,4 +91,14 @@ class AgencyOutcome extends Model
     {
         return $this->hasMany(\App\Models\OPCR\OpcrIndicator::class, 'agency_outcome_id');
     }
+
+    public function dostPillars()
+    {
+        return $this->belongsToMany(DostPillar::class, 'dost_pillar_agency_outcomes');
+    }
+
+    public function dostStrategies()
+    {
+        return $this->belongsToMany(DostStrategy::class, 'dost_strategy_agency_outcomes');
+    }
 }

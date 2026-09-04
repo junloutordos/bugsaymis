@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedSmallInteger('fiscal_year')->index();
             $table->foreignId('dost_sub_strategy_id')->nullable()->constrained('dost_sub_strategies')->restrictOnDelete();
-            $table->foreignId('agency_outcome_id')->nullable()->constrained('agency_org_outcomes')->restrictOnDelete();
+            $table->foreignId('agency_outcome_id')->constrained('agency_org_outcomes')->restrictOnDelete();
             $table->foreignId('performance_indicator_id')->nullable()->constrained('performance_indicators')->nullOnDelete();
             $table->text('description');
             $table->string('target')->nullable();

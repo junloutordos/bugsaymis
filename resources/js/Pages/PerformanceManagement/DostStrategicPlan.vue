@@ -6,6 +6,7 @@ import AppButton from "@/Components/AppButton.vue";
 import AppIconButton from "@/Components/AppIconButton.vue";
 import AppBadge from "@/Components/AppBadge.vue";
 import EmptyState from "@/Components/EmptyState.vue";
+import DostChainWizard from "@/Components/DostChainWizard.vue";
 import {
   PlusIcon,
   PencilSquareIcon,
@@ -14,6 +15,8 @@ import {
   ChevronRightIcon,
 } from "@heroicons/vue/24/outline";
 import { useDostStrategicPlan } from "@/Composables/useDostStrategicPlan.js";
+import Multiselect from "vue-multiselect";
+import "vue-multiselect/dist/vue-multiselect.css";
 
 const props = defineProps({
   pillars: { type: Array, default: () => [] },
@@ -46,6 +49,10 @@ const {
   closeSubStrategyModal,
   submitSubStrategy,
   deleteSubStrategy,
+  showChainWizard,
+  openChainWizard,
+  closeChainWizard,
+  onChainCreated,
 } = useDostStrategicPlan();
 
 const inputClass =
@@ -58,11 +65,14 @@ const inputClass =
     <div class="space-y-5">
       <AppPageHeader
         title="DOST Strategic Plan"
-        subtitle="Manage Pillar, Strategy, and Sub-Strategy alignment, linked to PSHS Programs (Agency Org Outcome)."
+        subtitle="Manage Pillar, Strategy, and Sub-Strategy alignment, tagged to PSHS Programs."
       >
         <template #actions>
-          <AppButton @click="openPillarModal('create')">
+          <AppButton variant="secondary" @click="openPillarModal('create')">
             <PlusIcon class="w-4 h-4" /> New Pillar
+          </AppButton>
+          <AppButton @click="openChainWizard">
+            <PlusIcon class="w-4 h-4" /> New Full Entry
           </AppButton>
         </template>
       </AppPageHeader>
@@ -70,7 +80,7 @@ const inputClass =
       <EmptyState
         v-if="pillars.length === 0"
         title="No pillars yet"
-        subtitle="Add a DOST Pillar to get started."
+        subtitle="Add a DOST Pillar to get started, or use New Full Entry to build a whole chain at once."
       />
 
       <div v-else class="space-y-3">
@@ -95,6 +105,9 @@ const inputClass =
                 <p v-if="pillar.outcome_statement" class="text-xs text-slate-500 truncate">
                   {{ pillar.outcome_statement }}
                 </p>
+                <div v-if="pillar.agency_outcomes?.length" class="flex flex-wrap gap-1 mt-1">
+                  <AppBadge v-for="o in pillar.agency_outcomes" :key="o.id" color="indigo">{{ o.outcome }}</AppBadge>
+                </div>
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0" @click.stop>
@@ -123,8 +136,10 @@ const inputClass =
                   />
                   <div class="min-w-0">
                     <p class="text-sm font-medium text-slate-700 truncate">{{ strategy.name }}</p>
-                    <AppBadge v-if="strategy.agency_outcome" color="indigo">{{ strategy.agency_outcome.outcome }}</AppBadge>
-                    <AppBadge v-else color="slate">Unlinked</AppBadge>
+                    <div class="flex flex-wrap gap-1 mt-0.5">
+                      <AppBadge v-for="o in strategy.agency_outcomes" :key="o.id" color="indigo">{{ o.outcome }}</AppBadge>
+                      <AppBadge v-if="!strategy.agency_outcomes?.length" color="slate">Unlinked</AppBadge>
+                    </div>
                   </div>
                 </div>
                 <div class="flex items-center gap-1 shrink-0" @click.stop>
@@ -182,6 +197,18 @@ const inputClass =
                 <label class="block text-xs font-medium text-slate-600 mb-1">Outcome Statement</label>
                 <textarea v-model="pillarForm.outcome_statement" rows="3" :class="inputClass" />
               </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">PSHS Program(s)</label>
+                <Multiselect
+                  v-model="pillarForm.agency_outcomes"
+                  :options="agencyOutcomes"
+                  :multiple="true"
+                  :close-on-select="false"
+                  label="outcome"
+                  track-by="id"
+                  placeholder="Tag one or more Programs (optional)"
+                />
+              </div>
             </div>
             <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
               <AppButton type="button" variant="secondary" @click="closePillarModal">Cancel</AppButton>
@@ -210,11 +237,16 @@ const inputClass =
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">PSHS Program (Agency Org Outcome)</label>
-                <select v-model="strategyForm.agency_outcome_id" :class="inputClass">
-                  <option :value="null">Not yet linked</option>
-                  <option v-for="outcome in agencyOutcomes" :key="outcome.id" :value="outcome.id">{{ outcome.outcome }}</option>
-                </select>
+                <label class="block text-xs font-medium text-slate-600 mb-1">PSHS Program(s)</label>
+                <Multiselect
+                  v-model="strategyForm.agency_outcomes"
+                  :options="agencyOutcomes"
+                  :multiple="true"
+                  :close-on-select="false"
+                  label="outcome"
+                  track-by="id"
+                  placeholder="Tag one or more Programs (optional)"
+                />
               </div>
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">Strategy Name</label>
@@ -250,6 +282,25 @@ const inputClass =
               <AppButton type="submit">Save</AppButton>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- New Full Entry chain wizard -->
+      <div v-if="showChainWizard" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white">
+            <h2 class="text-base font-semibold text-slate-800">New Full Entry</h2>
+            <AppIconButton label="Close" @click="closeChainWizard"><XMarkIcon class="w-4 h-4" /></AppIconButton>
+          </div>
+          <div class="px-6 py-5">
+            <DostChainWizard
+              :pillars="pillars"
+              :agency-outcomes="agencyOutcomes"
+              submit-label="Create Chain"
+              @created="onChainCreated"
+              @cancel="closeChainWizard"
+            />
+          </div>
         </div>
       </div>
     </div>

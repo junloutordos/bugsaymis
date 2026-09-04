@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\OPCR;
 
+use App\Models\AgencyOutcome;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\Permission;
 use App\Models\Role;
@@ -24,10 +25,17 @@ class OpcrIndicatorRatingTest extends TestCase
         return $user;
     }
 
+    private function indicator(): OpcrIndicator
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+
+        return OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
+    }
+
     public function test_rating_saves_exactly_what_is_submitted_without_recomputing_average(): void
     {
         $user = $this->manager();
-        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
+        $indicator = $this->indicator();
 
         $response = $this->actingAs($user)->put(route('opcr-indicators.rating', $indicator), [
             'rating_quality' => 5,
@@ -47,7 +55,7 @@ class OpcrIndicatorRatingTest extends TestCase
     public function test_rating_values_must_be_between_1_and_5(): void
     {
         $user = $this->manager();
-        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
+        $indicator = $this->indicator();
 
         $response = $this->actingAs($user)->put(route('opcr-indicators.rating', $indicator), [
             'rating_quality' => 6,

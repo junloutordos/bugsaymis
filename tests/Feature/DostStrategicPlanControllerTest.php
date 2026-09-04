@@ -40,9 +40,9 @@ class DostStrategicPlanControllerTest extends TestCase
         $pillar = DostPillar::create(['name' => 'DOST Pillar 1: Human Well-Being']);
         $strategy = DostStrategy::create([
             'dost_pillar_id' => $pillar->id,
-            'agency_outcome_id' => $outcome->id,
             'name' => 'Strategy 1: Achieve quality science education',
         ]);
+        $strategy->agencyOutcomes()->sync([$outcome->id]);
         DostSubStrategy::create([
             'dost_strategy_id' => $strategy->id,
             'description' => 'Institutionalize FORWARD Framework',
@@ -55,7 +55,7 @@ class DostStrategicPlanControllerTest extends TestCase
             ->component('PerformanceManagement/DostStrategicPlan')
             ->has('pillars', 1)
             ->where('pillars.0.strategies.0.sub_strategies.0.description', 'Institutionalize FORWARD Framework')
-            ->where('pillars.0.strategies.0.agency_outcome.outcome', 'A. STEM Secondary Education Program')
+            ->where('pillars.0.strategies.0.agency_outcomes.0.outcome', 'A. STEM Secondary Education Program')
         );
     }
 

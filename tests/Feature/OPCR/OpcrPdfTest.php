@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\OPCR;
 
+use App\Models\AgencyOutcome;
 use App\Models\Division;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrIndicatorActual;
@@ -35,8 +36,10 @@ class OpcrPdfTest extends TestCase
             'executive_director_name' => 'RONNALEE N. ORTEZA',
         ]);
         $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
         $indicator = OpcrIndicator::create([
             'fiscal_year' => 2026,
+            'agency_outcome_id' => $outcome->id,
             'description' => 'Cohort survival rate',
             'target' => '0.9',
         ]);

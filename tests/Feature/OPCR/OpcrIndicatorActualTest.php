@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\OPCR;
 
+use App\Models\AgencyOutcome;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrIndicatorActual;
 use App\Models\Permission;
@@ -25,10 +26,17 @@ class OpcrIndicatorActualTest extends TestCase
         return $user;
     }
 
+    private function indicator(): OpcrIndicator
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+
+        return OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
+    }
+
     public function test_setting_q1_then_q2_creates_two_rows(): void
     {
         $user = $this->manager();
-        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
+        $indicator = $this->indicator();
 
         $this->actingAs($user)->put(route('opcr-indicators.actual', $indicator), ['quarter' => 1, 'value' => '0.5'])->assertRedirect();
         $this->actingAs($user)->put(route('opcr-indicators.actual', $indicator), ['quarter' => 2, 'value' => '0.7'])->assertRedirect();
@@ -39,7 +47,7 @@ class OpcrIndicatorActualTest extends TestCase
     public function test_resubmitting_the_same_quarter_updates_in_place(): void
     {
         $user = $this->manager();
-        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
+        $indicator = $this->indicator();
         OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '0.5']);
 
         $this->actingAs($user)->put(route('opcr-indicators.actual', $indicator), ['quarter' => 1, 'value' => '0.6'])->assertRedirect();
@@ -51,7 +59,7 @@ class OpcrIndicatorActualTest extends TestCase
     public function test_quarter_must_be_between_1_and_4(): void
     {
         $user = $this->manager();
-        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
+        $indicator = $this->indicator();
 
         $response = $this->actingAs($user)->put(route('opcr-indicators.actual', $indicator), ['quarter' => 5, 'value' => '0.6']);
 

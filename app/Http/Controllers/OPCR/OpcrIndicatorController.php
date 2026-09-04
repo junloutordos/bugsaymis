@@ -13,7 +13,7 @@ class OpcrIndicatorController extends Controller
         return [
             'fiscal_year' => 'required|integer|min:2000|max:2100',
             'dost_sub_strategy_id' => 'nullable|exists:dost_sub_strategies,id',
-            'agency_outcome_id' => 'nullable|exists:agency_org_outcomes,id',
+            'agency_outcome_id' => 'required|exists:agency_org_outcomes,id',
             'performance_indicator_id' => 'nullable|exists:performance_indicators,id',
             'description' => 'required|string',
             'target' => 'nullable|string|max:255',

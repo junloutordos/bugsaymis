@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\OPCR;
 
+use App\Models\AgencyOutcome;
 use App\Models\Division;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrIndicatorActual;
@@ -30,9 +31,11 @@ class OpcrCloneTest extends TestCase
     {
         $user = $this->manager();
         $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
 
         $source = OpcrIndicator::create([
             'fiscal_year' => 2026,
+            'agency_outcome_id' => $outcome->id,
             'description' => 'Cohort survival rate',
             'target' => '0.9',
             'budget' => 5000,
@@ -53,6 +56,7 @@ class OpcrCloneTest extends TestCase
         $this->assertEquals('Cohort survival rate', $cloned->description);
         $this->assertEquals('0.9', $cloned->target);
         $this->assertEquals(5000, $cloned->budget);
+        $this->assertEquals($outcome->id, $cloned->agency_outcome_id);
         $this->assertTrue($cloned->divisions->contains($division));
         $this->assertNull($cloned->rating_quality);
         $this->assertCount(0, $cloned->actuals);
@@ -61,8 +65,9 @@ class OpcrCloneTest extends TestCase
     public function test_clone_is_rejected_when_target_fiscal_year_already_has_indicators(): void
     {
         $user = $this->manager();
-        OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Source']);
-        OpcrIndicator::create(['fiscal_year' => 2027, 'description' => 'Already here']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Source']);
+        OpcrIndicator::create(['fiscal_year' => 2027, 'agency_outcome_id' => $outcome->id, 'description' => 'Already here']);
 
         $response = $this->actingAs($user)->post(route('opcr.clone'), [
             'source_fiscal_year' => 2026,

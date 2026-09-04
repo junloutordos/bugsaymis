@@ -1,10 +1,10 @@
 import { ref, computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
-import { groupIndicatorsByHierarchy } from "@/Utils/OPCR/opcrGrouping.js"
+import { groupIndicatorsByProgram } from "@/Utils/OPCR/opcrGrouping.js"
 
 export function useOpcr(props) {
-  const groupedIndicators = computed(() => groupIndicatorsByHierarchy(props.indicators || []))
+  const groupedIndicators = computed(() => groupIndicatorsByProgram(props.indicators || []))
 
   // ── Indicator modal ──────────────────────────────────────────────────
   const showIndicatorModal = ref(false)
@@ -111,55 +111,21 @@ export function useOpcr(props) {
     })
   }
 
-  // ── Inline DOST tag creation (no schema of its own — reuses the
-  // existing DostPillar/DostStrategy/DostSubStrategy/AgencyOutcome
-  // store routes so the indicator form never has to leave the page) ───
-  const newPillarName = ref("")
-  const addPillar = () => {
-    if (!newPillarName.value.trim()) return
-    router.post(route("dost-pillars.store"), { name: newPillarName.value }, {
-      preserveScroll: true,
-      onSuccess: () => {
-        newPillarName.value = ""
-        router.reload({ only: ["pillars"] })
-      },
-    })
+  // ── Embedded DOST chain wizard (shared component) — creating a brand
+  // new Pillar/Strategy/Sub-Strategy/Program chain from inside the
+  // indicator modal, without navigating away. On success, auto-fills
+  // this indicator's own tagging fields with the result.
+  const showChainWizardPanel = ref(false)
+
+  const toggleChainWizardPanel = () => {
+    showChainWizardPanel.value = !showChainWizardPanel.value
   }
 
-  const newStrategy = ref({ dost_pillar_id: "", name: "" })
-  const addStrategy = () => {
-    if (!newStrategy.value.dost_pillar_id || !newStrategy.value.name.trim()) return
-    router.post(route("dost-strategies.store"), newStrategy.value, {
-      preserveScroll: true,
-      onSuccess: () => {
-        newStrategy.value = { dost_pillar_id: "", name: "" }
-        router.reload({ only: ["pillars"] })
-      },
-    })
-  }
-
-  const newSubStrategy = ref({ dost_strategy_id: "", description: "" })
-  const addSubStrategy = () => {
-    if (!newSubStrategy.value.dost_strategy_id || !newSubStrategy.value.description.trim()) return
-    router.post(route("dost-sub-strategies.store"), newSubStrategy.value, {
-      preserveScroll: true,
-      onSuccess: () => {
-        newSubStrategy.value = { dost_strategy_id: "", description: "" }
-        router.reload({ only: ["pillars"] })
-      },
-    })
-  }
-
-  const newProgram = ref({ outcome: "", function_type: "" })
-  const addProgram = () => {
-    if (!newProgram.value.outcome.trim() || !newProgram.value.function_type.trim()) return
-    router.post(route("outcome.store"), newProgram.value, {
-      preserveScroll: true,
-      onSuccess: () => {
-        newProgram.value = { outcome: "", function_type: "" }
-        router.reload({ only: ["agencyOutcomes"] })
-      },
-    })
+  const onChainWizardCreated = (result) => {
+    showChainWizardPanel.value = false
+    if (result.sub_strategy_id) indicatorForm.value.dost_sub_strategy_id = result.sub_strategy_id
+    if (result.agency_outcome_id) indicatorForm.value.agency_outcome_id = result.agency_outcome_id
+    router.reload({ only: ["pillars", "agencyOutcomes"] })
   }
 
   // ── Signatories settings modal (Campus Director/OIC/ED names + commitment
@@ -239,14 +205,9 @@ export function useOpcr(props) {
     deleteIndicator,
     updateActual,
     updateRating,
-    newPillarName,
-    addPillar,
-    newStrategy,
-    addStrategy,
-    newSubStrategy,
-    addSubStrategy,
-    newProgram,
-    addProgram,
+    showChainWizardPanel,
+    toggleChainWizardPanel,
+    onChainWizardCreated,
     showSettingsModal,
     settingsForm,
     openSettingsModal,

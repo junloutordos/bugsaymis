@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\OPCR;
 
+use App\Models\AgencyOutcome;
 use App\Models\Division;
 use App\Models\IPCRRatingPeriod;
 use App\Models\OPCR\OpcrIndicator;
@@ -33,8 +34,9 @@ class OpcrIndexTest extends TestCase
         $user = $this->userWithPermission('OCD', ['opcr.view', 'opcr.manage']);
         IPCRRatingPeriod::create(['label' => 'FY2025', 'year' => 2025, 'is_current' => false]);
         IPCRRatingPeriod::create(['label' => 'FY2026', 'year' => 2026, 'is_current' => true]);
-        OpcrIndicator::create(['fiscal_year' => 2025, 'description' => 'FY2025 indicator']);
-        $fy2026 = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'FY2026 indicator']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $outcome->id, 'description' => 'FY2025 indicator']);
+        $fy2026 = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'FY2026 indicator']);
 
         $response = $this->actingAs($user)->get(route('opcr.index'));
 
@@ -54,7 +56,8 @@ class OpcrIndexTest extends TestCase
         $user = $this->userWithPermission('OCD', ['opcr.view', 'opcr.manage']);
         IPCRRatingPeriod::create(['label' => 'FY2025', 'year' => 2025, 'is_current' => false]);
         IPCRRatingPeriod::create(['label' => 'FY2026', 'year' => 2026, 'is_current' => true]);
-        $fy2025 = OpcrIndicator::create(['fiscal_year' => 2025, 'description' => 'FY2025 indicator']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $fy2025 = OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $outcome->id, 'description' => 'FY2025 indicator']);
 
         $response = $this->actingAs($user)->get(route('opcr.index', ['fiscal_year' => 2025]));
 
@@ -73,10 +76,11 @@ class OpcrIndexTest extends TestCase
         $otherDivision = Division::create(['division_name' => 'FAD', 'acronym' => 'FAD']);
         $user->update(['division_id' => $division->id]);
         IPCRRatingPeriod::create(['label' => 'FY2026', 'year' => 2026, 'is_current' => true]);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
 
-        $mine = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Mine']);
+        $mine = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Mine']);
         $mine->divisions()->sync([$division->id]);
-        $notMine = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Not mine']);
+        $notMine = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Not mine']);
         $notMine->divisions()->sync([$otherDivision->id]);
 
         $response = $this->actingAs($user)->get(route('opcr.index'));

@@ -11,7 +11,7 @@ class DostStrategicPlanController extends Controller
     public function index()
     {
         return Inertia::render('PerformanceManagement/DostStrategicPlan', [
-            'pillars' => DostPillar::with(['strategies.subStrategies', 'strategies.agencyOutcome'])
+            'pillars' => DostPillar::with(['agencyOutcomes', 'strategies.subStrategies', 'strategies.agencyOutcomes'])
                 ->orderBy('name')
                 ->get(),
             'agencyOutcomes' => AgencyOutcome::topLevel()

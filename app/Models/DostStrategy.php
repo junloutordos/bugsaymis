@@ -6,16 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class DostStrategy extends Model
 {
-    protected $fillable = ['dost_pillar_id', 'agency_outcome_id', 'name'];
+    protected $fillable = ['dost_pillar_id', 'name'];
 
     public function pillar()
     {
         return $this->belongsTo(DostPillar::class, 'dost_pillar_id');
     }
 
-    public function agencyOutcome()
+    public function agencyOutcomes()
     {
-        return $this->belongsTo(AgencyOutcome::class, 'agency_outcome_id');
+        return $this->belongsToMany(AgencyOutcome::class, 'dost_strategy_agency_outcomes');
     }
 
     public function subStrategies()

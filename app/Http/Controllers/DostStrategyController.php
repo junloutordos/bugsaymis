@@ -11,11 +11,13 @@ class DostStrategyController extends Controller
     {
         $data = $request->validate([
             'dost_pillar_id' => 'required|exists:dost_pillars,id',
-            'agency_outcome_id' => 'nullable|exists:agency_org_outcomes,id',
             'name' => 'required|string|max:255',
+            'agency_outcome_ids' => 'array',
+            'agency_outcome_ids.*' => 'exists:agency_org_outcomes,id',
         ]);
 
-        DostStrategy::create($data);
+        $strategy = DostStrategy::create(collect($data)->except('agency_outcome_ids')->all());
+        $strategy->agencyOutcomes()->sync($data['agency_outcome_ids'] ?? []);
 
         return back()->with('success', 'Strategy created.');
     }
@@ -24,11 +26,13 @@ class DostStrategyController extends Controller
     {
         $data = $request->validate([
             'dost_pillar_id' => 'required|exists:dost_pillars,id',
-            'agency_outcome_id' => 'nullable|exists:agency_org_outcomes,id',
             'name' => 'required|string|max:255',
+            'agency_outcome_ids' => 'array',
+            'agency_outcome_ids.*' => 'exists:agency_org_outcomes,id',
         ]);
 
-        $dostStrategy->update($data);
+        $dostStrategy->update(collect($data)->except('agency_outcome_ids')->all());
+        $dostStrategy->agencyOutcomes()->sync($data['agency_outcome_ids'] ?? []);
 
         return back()->with('success', 'Strategy updated.');
     }

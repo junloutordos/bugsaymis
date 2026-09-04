@@ -53,6 +53,7 @@ class OpcrModelsTest extends TestCase
 
         $indicator = OpcrIndicator::create([
             'fiscal_year' => 2026,
+            'agency_outcome_id' => $outcome->id,
             'performance_indicator_id' => $pi->id,
             'description' => 'OPCR indicator, cross-referenced',
         ]);
@@ -62,19 +63,23 @@ class OpcrModelsTest extends TestCase
 
     public function test_indicator_without_dost_tagging_or_cross_reference_is_still_valid(): void
     {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+
         $indicator = OpcrIndicator::create([
             'fiscal_year' => 2026,
+            'agency_outcome_id' => $outcome->id,
             'description' => 'Untagged indicator',
         ]);
 
         $this->assertNull($indicator->subStrategy);
-        $this->assertNull($indicator->agencyOutcome);
         $this->assertNull($indicator->performanceIndicator);
+        $this->assertEquals($outcome->id, $indicator->agencyOutcome->id);
     }
 
     public function test_actuals_track_one_row_per_quarter(): void
     {
-        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
 
         OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '0.5']);
         OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 2, 'value' => '0.7']);
@@ -85,8 +90,9 @@ class OpcrModelsTest extends TestCase
 
     public function test_scope_for_fiscal_year_filters_correctly(): void
     {
-        OpcrIndicator::create(['fiscal_year' => 2025, 'description' => 'FY2025 indicator']);
-        $fy2026 = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'FY2026 indicator']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $outcome->id, 'description' => 'FY2025 indicator']);
+        $fy2026 = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'FY2026 indicator']);
 
         $result = OpcrIndicator::forFiscalYear(2026)->get();
 

@@ -12,9 +12,12 @@ class DostPillarController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'outcome_statement' => 'nullable|string',
+            'agency_outcome_ids' => 'array',
+            'agency_outcome_ids.*' => 'exists:agency_org_outcomes,id',
         ]);
 
-        DostPillar::create($data);
+        $pillar = DostPillar::create(collect($data)->except('agency_outcome_ids')->all());
+        $pillar->agencyOutcomes()->sync($data['agency_outcome_ids'] ?? []);
 
         return back()->with('success', 'Pillar created.');
     }
@@ -24,9 +27,12 @@ class DostPillarController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'outcome_statement' => 'nullable|string',
+            'agency_outcome_ids' => 'array',
+            'agency_outcome_ids.*' => 'exists:agency_org_outcomes,id',
         ]);
 
-        $dostPillar->update($data);
+        $dostPillar->update(collect($data)->except('agency_outcome_ids')->all());
+        $dostPillar->agencyOutcomes()->sync($data['agency_outcome_ids'] ?? []);
 
         return back()->with('success', 'Pillar updated.');
     }

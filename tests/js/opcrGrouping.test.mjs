@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { groupIndicatorsByHierarchy } from '../../resources/js/Utils/OPCR/opcrGrouping.js'
+import { groupIndicatorsByProgram, dostAlignmentLabel } from '../../resources/js/Utils/OPCR/opcrGrouping.js'
 
-function indicator({ id, pillar = null, strategy = null, subStrategy = null }) {
+function indicator({ id, program = null, pillar = null, strategy = null, subStrategy = null }) {
   return {
     id,
+    agency_outcome: program ? { outcome: program } : null,
     sub_strategy: subStrategy
       ? {
           description: subStrategy,
@@ -18,37 +19,48 @@ function indicator({ id, pillar = null, strategy = null, subStrategy = null }) {
   }
 }
 
-test('groups indicators by pillar -> strategy -> sub-strategy', () => {
+test('groups indicators by Program', () => {
   const indicators = [
-    indicator({ id: 1, pillar: 'Pillar 1', strategy: 'Strategy 1', subStrategy: 'Sub A' }),
-    indicator({ id: 2, pillar: 'Pillar 1', strategy: 'Strategy 1', subStrategy: 'Sub A' }),
-    indicator({ id: 3, pillar: 'Pillar 1', strategy: 'Strategy 2', subStrategy: 'Sub B' }),
+    indicator({ id: 1, program: 'A. STEM Secondary Education' }),
+    indicator({ id: 2, program: 'A. STEM Secondary Education' }),
+    indicator({ id: 3, program: 'B. STEM Promotion Program' }),
   ]
 
-  const grouped = groupIndicatorsByHierarchy(indicators)
+  const grouped = groupIndicatorsByProgram(indicators)
 
-  assert.deepEqual(Object.keys(grouped), ['Pillar 1'])
-  assert.deepEqual(Object.keys(grouped['Pillar 1']).sort(), ['Strategy 1', 'Strategy 2'])
-  assert.equal(grouped['Pillar 1']['Strategy 1']['Sub A'].length, 2)
-  assert.equal(grouped['Pillar 1']['Strategy 2']['Sub B'].length, 1)
+  assert.deepEqual(Object.keys(grouped).sort(), ['A. STEM Secondary Education', 'B. STEM Promotion Program'])
+  assert.equal(grouped['A. STEM Secondary Education'].length, 2)
+  assert.equal(grouped['B. STEM Promotion Program'].length, 1)
 })
 
-test('untagged indicators (no sub_strategy) group under a top-level "Untagged" key', () => {
+test('an indicator missing a program (should not happen now that it is required, but defensively handled) groups under "Untagged"', () => {
   const indicators = [indicator({ id: 1 })]
 
-  const grouped = groupIndicatorsByHierarchy(indicators)
+  const grouped = groupIndicatorsByProgram(indicators)
 
   assert.deepEqual(Object.keys(grouped), ['Untagged'])
-  assert.equal(grouped['Untagged']['Untagged']['Untagged'].length, 1)
 })
 
-test('mixed tagged and untagged indicators both appear', () => {
+test('the same Strategy can appear under two different Programs without breaking grouping', () => {
   const indicators = [
-    indicator({ id: 1, pillar: 'Pillar 1', strategy: 'Strategy 1', subStrategy: 'Sub A' }),
-    indicator({ id: 2 }),
+    indicator({ id: 1, program: 'A. STEM Secondary Education', pillar: 'Pillar 1', strategy: 'Strategy 1', subStrategy: 'Sub A' }),
+    indicator({ id: 2, program: 'B. STEM Promotion Program', pillar: 'Pillar 1', strategy: 'Strategy 1', subStrategy: 'Sub A' }),
   ]
 
-  const grouped = groupIndicatorsByHierarchy(indicators)
+  const grouped = groupIndicatorsByProgram(indicators)
 
-  assert.deepEqual(Object.keys(grouped).sort(), ['Pillar 1', 'Untagged'])
+  assert.equal(grouped['A. STEM Secondary Education'][0].id, 1)
+  assert.equal(grouped['B. STEM Promotion Program'][0].id, 2)
+})
+
+test('dostAlignmentLabel builds a Pillar > Strategy > Sub-Strategy breadcrumb', () => {
+  const withTagging = indicator({ id: 1, program: 'A', pillar: 'Pillar 1', strategy: 'Strategy 1', subStrategy: 'Sub A' })
+
+  assert.equal(dostAlignmentLabel(withTagging), 'Pillar 1 › Strategy 1 › Sub A')
+})
+
+test('dostAlignmentLabel returns null when the indicator has no DOST tagging', () => {
+  const untagged = indicator({ id: 1, program: 'A' })
+
+  assert.equal(dostAlignmentLabel(untagged), null)
 })

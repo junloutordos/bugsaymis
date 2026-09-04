@@ -31,7 +31,8 @@ class OpcrTaggingDeleteGuardTest extends TestCase
         $pillar = DostPillar::create(['name' => 'Pillar 1']);
         $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
         $subStrategy = DostSubStrategy::create(['dost_strategy_id' => $strategy->id, 'description' => 'Sub 1']);
-        OpcrIndicator::create(['fiscal_year' => 2026, 'dost_sub_strategy_id' => $subStrategy->id, 'description' => 'Indicator']);
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        OpcrIndicator::create(['fiscal_year' => 2026, 'dost_sub_strategy_id' => $subStrategy->id, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
 
         $response = $this->actingAs($admin)->delete(route('dost-sub-strategies.destroy', $subStrategy));
 

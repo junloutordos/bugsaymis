@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue"
+import { computed } from "vue"
 import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
@@ -13,8 +13,10 @@ import AppSelect from "@/Components/AppSelect.vue"
 import AppTextarea from "@/Components/AppTextarea.vue"
 import EmptyState from "@/Components/EmptyState.vue"
 import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
+import DostChainWizard from "@/Components/DostChainWizard.vue"
 import { PencilSquareIcon, TrashIcon, PlusIcon, DocumentArrowDownIcon } from "@heroicons/vue/24/outline"
 import { useOpcr } from "@/Composables/useOpcr.js"
+import { dostAlignmentLabel } from "@/Utils/OPCR/opcrGrouping.js"
 import Multiselect from "vue-multiselect"
 import "vue-multiselect/dist/vue-multiselect.css"
 
@@ -42,14 +44,9 @@ const {
   deleteIndicator,
   updateActual,
   updateRating,
-  newPillarName,
-  addPillar,
-  newStrategy,
-  addStrategy,
-  newSubStrategy,
-  addSubStrategy,
-  newProgram,
-  addProgram,
+  showChainWizardPanel,
+  toggleChainWizardPanel,
+  onChainWizardCreated,
   showSettingsModal,
   settingsForm,
   openSettingsModal,
@@ -61,13 +58,6 @@ const {
   closeCloneModal,
   submitClone,
 } = useOpcr(props)
-
-const showAddPillar = ref(false)
-const showAddStrategy = ref(false)
-const showAddSubStrategy = ref(false)
-const showAddProgram = ref(false)
-
-const allStrategies = computed(() => props.pillars.flatMap((p) => p.strategies ?? []))
 
 const isSpecificYear = computed(() => props.selectedFiscalYear !== "all")
 
@@ -111,9 +101,9 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
       <AppTable :is-empty="indicators.length === 0" :skeleton-cols="9">
         <template #head>
           <tr>
-            <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Pillar / Strategy / Sub-Strategy</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Indicator</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Target</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">DOST Alignment</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Division</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q1</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q2</th>
@@ -124,62 +114,55 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
           </tr>
         </template>
 
-        <template v-for="(strategies, pillarName) in groupedIndicators" :key="pillarName">
-          <template v-for="(subStrategies, strategyName) in strategies" :key="strategyName">
-            <template v-for="(rows, subStrategyName) in subStrategies" :key="subStrategyName">
-              <tr v-for="(indicator, idx) in rows" :key="indicator.id" class="hover:bg-indigo-50/40">
-                <td class="px-3 py-2 text-xs text-slate-600 align-top">
-                  <template v-if="idx === 0">
-                    <div class="font-medium text-slate-700">{{ pillarName }}</div>
-                    <div>{{ strategyName }}</div>
-                    <div class="text-slate-400">{{ subStrategyName }}</div>
-                  </template>
-                </td>
-                <td class="px-3 py-2 text-sm text-slate-700 align-top">
-                  {{ indicator.description }}
-                  <span v-if="!isSpecificYear" class="block text-[10px] text-slate-400">FY {{ indicator.fiscal_year }}</span>
-                </td>
-                <td class="px-3 py-2 text-sm text-slate-700 align-top">{{ indicator.target ?? '—' }}</td>
-                <td class="px-3 py-2 text-sm text-slate-700 align-top">
-                  {{ indicator.divisions?.map(d => d.acronym ?? d.division_name).join(', ') || '—' }}
-                </td>
-                <td v-for="q in [1, 2, 3, 4]" :key="q" class="px-3 py-2 align-top">
-                  <input
-                    v-if="canManage"
-                    :value="indicator.actuals?.find(a => a.quarter === q)?.value ?? ''"
-                    class="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs"
-                    @change="updateActual(indicator, q, $event.target.value)"
-                  />
-                  <span v-else class="text-sm text-slate-700">{{ indicator.actuals?.find(a => a.quarter === q)?.value ?? '—' }}</span>
-                </td>
-                <td class="px-3 py-2 align-top">
-                  <div v-if="canManage" class="flex gap-1">
-                    <input
-                      v-for="field in ratingFields"
-                      :key="field"
-                      :value="indicator[field] ?? ''"
-                      type="number" min="1" max="5" step="0.01"
-                      class="w-12 rounded border border-slate-200 px-1 py-0.5 text-xs"
-                      @change="updateRating(indicator, ratingPayload(indicator, field, $event.target.value))"
-                    />
-                  </div>
-                  <span v-else class="text-sm text-slate-700">
-                    {{ [indicator.rating_quality, indicator.rating_efficiency, indicator.rating_timeliness, indicator.rating_average].map(v => v ?? '—').join(' / ') }}
-                  </span>
-                </td>
-                <td v-if="canManage" class="px-3 py-2 text-center align-top">
-                  <div class="flex items-center justify-center gap-1">
-                    <AppIconButton label="Edit" @click="openIndicatorModal('edit', indicator)">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </AppIconButton>
-                    <AppIconButton label="Delete" variant="danger" @click="deleteIndicator(indicator)">
-                      <TrashIcon class="w-4 h-4" />
-                    </AppIconButton>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </template>
+        <template v-for="(rows, programName) in groupedIndicators" :key="programName">
+          <tr class="bg-indigo-50/60">
+            <td :colspan="canManage ? 10 : 9" class="px-3 py-1.5 text-xs font-semibold text-indigo-700">{{ programName }}</td>
+          </tr>
+          <tr v-for="indicator in rows" :key="indicator.id" class="hover:bg-indigo-50/40">
+            <td class="px-3 py-2 text-sm text-slate-700 align-top">
+              {{ indicator.description }}
+              <span v-if="!isSpecificYear" class="block text-[10px] text-slate-400">FY {{ indicator.fiscal_year }}</span>
+            </td>
+            <td class="px-3 py-2 text-sm text-slate-700 align-top">{{ indicator.target ?? '—' }}</td>
+            <td class="px-3 py-2 text-xs text-slate-500 align-top">{{ dostAlignmentLabel(indicator) ?? '—' }}</td>
+            <td class="px-3 py-2 text-sm text-slate-700 align-top">
+              {{ indicator.divisions?.map(d => d.acronym ?? d.division_name).join(', ') || '—' }}
+            </td>
+            <td v-for="q in [1, 2, 3, 4]" :key="q" class="px-3 py-2 align-top">
+              <input
+                v-if="canManage"
+                :value="indicator.actuals?.find(a => a.quarter === q)?.value ?? ''"
+                class="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs"
+                @change="updateActual(indicator, q, $event.target.value)"
+              />
+              <span v-else class="text-sm text-slate-700">{{ indicator.actuals?.find(a => a.quarter === q)?.value ?? '—' }}</span>
+            </td>
+            <td class="px-3 py-2 align-top">
+              <div v-if="canManage" class="flex gap-1">
+                <input
+                  v-for="field in ratingFields"
+                  :key="field"
+                  :value="indicator[field] ?? ''"
+                  type="number" min="1" max="5" step="0.01"
+                  class="w-12 rounded border border-slate-200 px-1 py-0.5 text-xs"
+                  @change="updateRating(indicator, ratingPayload(indicator, field, $event.target.value))"
+                />
+              </div>
+              <span v-else class="text-sm text-slate-700">
+                {{ [indicator.rating_quality, indicator.rating_efficiency, indicator.rating_timeliness, indicator.rating_average].map(v => v ?? '—').join(' / ') }}
+              </span>
+            </td>
+            <td v-if="canManage" class="px-3 py-2 text-center align-top">
+              <div class="flex items-center justify-center gap-1">
+                <AppIconButton label="Edit" @click="openIndicatorModal('edit', indicator)">
+                  <PencilSquareIcon class="w-4 h-4" />
+                </AppIconButton>
+                <AppIconButton label="Delete" variant="danger" @click="deleteIndicator(indicator)">
+                  <TrashIcon class="w-4 h-4" />
+                </AppIconButton>
+              </div>
+            </td>
+          </tr>
         </template>
 
         <template #empty>
@@ -192,66 +175,29 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
         <form id="opcr-indicator-form" @submit.prevent="submitIndicator" class="space-y-4">
           <AppInput v-model="indicatorForm.fiscal_year" label="Fiscal Year" type="number" required />
 
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-medium text-slate-600">Pillar</label>
-              <button type="button" class="text-xs text-indigo-600 hover:underline" @click="showAddPillar = !showAddPillar">+ Add new</button>
-            </div>
-            <div v-if="showAddPillar" class="flex gap-2 mb-2">
-              <AppInput v-model="newPillarName" type="text" placeholder="New Pillar name" class="flex-1" />
-              <AppButton type="button" variant="secondary" @click="addPillar(); showAddPillar = false">Add</AppButton>
-            </div>
+          <AppSelect v-model="indicatorForm.agency_outcome_id" label="PSHS Program" required placeholder="-- Select Program --">
+            <option v-for="outcome in agencyOutcomes" :key="outcome.id" :value="outcome.id">{{ outcome.outcome }}</option>
+          </AppSelect>
 
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-medium text-slate-600">Strategy</label>
-              <button type="button" class="text-xs text-indigo-600 hover:underline" @click="showAddStrategy = !showAddStrategy">+ Add new</button>
-            </div>
-            <div v-if="showAddStrategy" class="flex gap-2 mb-2">
-              <AppSelect v-model="newStrategy.dost_pillar_id" placeholder="Pillar">
-                <option v-for="p in pillars" :key="p.id" :value="p.id">{{ p.name }}</option>
-              </AppSelect>
-              <AppInput v-model="newStrategy.name" type="text" placeholder="New Strategy name" class="flex-1" />
-              <AppButton type="button" variant="secondary" @click="addStrategy(); showAddStrategy = false">Add</AppButton>
-            </div>
-
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-medium text-slate-600">Sub-Strategy (this is what gets tagged)</label>
-              <button type="button" class="text-xs text-indigo-600 hover:underline" @click="showAddSubStrategy = !showAddSubStrategy">+ Add new</button>
-            </div>
-            <div v-if="showAddSubStrategy" class="flex gap-2 mb-2">
-              <AppSelect v-model="newSubStrategy.dost_strategy_id" placeholder="Strategy">
-                <option v-for="s in allStrategies" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </AppSelect>
-              <AppInput v-model="newSubStrategy.description" type="text" placeholder="New Sub-Strategy description" class="flex-1" />
-              <AppButton type="button" variant="secondary" @click="addSubStrategy(); showAddSubStrategy = false">Add</AppButton>
-            </div>
-
-            <AppSelect v-model="indicatorForm.dost_sub_strategy_id" placeholder="-- None --">
-              <optgroup v-for="pillar in pillars" :key="pillar.id" :label="pillar.name">
-                <optgroup v-for="strategy in pillar.strategies" :key="strategy.id" :label="strategy.name">
-                  <option v-for="sub in strategy.sub_strategies" :key="sub.id" :value="sub.id">{{ sub.description }}</option>
-                </optgroup>
+          <AppSelect v-model="indicatorForm.dost_sub_strategy_id" label="Sub-Strategy (optional alignment)" placeholder="-- None --">
+            <optgroup v-for="pillar in pillars" :key="pillar.id" :label="pillar.name">
+              <optgroup v-for="strategy in pillar.strategies" :key="strategy.id" :label="strategy.name">
+                <option v-for="sub in strategy.sub_strategies" :key="sub.id" :value="sub.id">{{ sub.description }}</option>
               </optgroup>
-            </AppSelect>
-          </div>
+            </optgroup>
+          </AppSelect>
 
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-medium text-slate-600">PSHS Program (Agency Outcome)</label>
-              <button type="button" class="text-xs text-indigo-600 hover:underline" @click="showAddProgram = !showAddProgram">+ Add new</button>
-            </div>
-            <div v-if="showAddProgram" class="flex gap-2 mb-2">
-              <AppInput v-model="newProgram.outcome" type="text" placeholder="Program name, e.g. E. New Program" class="flex-1" />
-              <AppSelect v-model="newProgram.function_type" placeholder="Function type">
-                <option value="Strategic Functions">Strategic Functions</option>
-                <option value="Core Functions">Core Functions</option>
-                <option value="Support Functions">Support Functions</option>
-              </AppSelect>
-              <AppButton type="button" variant="secondary" @click="addProgram(); showAddProgram = false">Add</AppButton>
-            </div>
-            <AppSelect v-model="indicatorForm.agency_outcome_id" placeholder="-- None --">
-              <option v-for="outcome in agencyOutcomes" :key="outcome.id" :value="outcome.id">{{ outcome.outcome }}</option>
-            </AppSelect>
+          <button type="button" class="text-xs text-indigo-600 hover:underline" @click="toggleChainWizardPanel">
+            {{ showChainWizardPanel ? '− Hide' : '+ Create new tagging chain' }}
+          </button>
+          <div v-if="showChainWizardPanel" class="rounded-lg bg-slate-50 p-3">
+            <DostChainWizard
+              :pillars="pillars"
+              :agency-outcomes="agencyOutcomes"
+              submit-label="Create & Use"
+              @created="onChainWizardCreated"
+              @cancel="showChainWizardPanel = false"
+            />
           </div>
 
           <AppSelect v-model="indicatorForm.performance_indicator_id" label="Link to an existing IPCR indicator (optional)" placeholder="-- None --">

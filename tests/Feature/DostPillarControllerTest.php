@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AgencyOutcome;
 use App\Models\DostPillar;
 use App\Models\Role;
 use App\Models\User;
@@ -89,5 +90,41 @@ class DostPillarControllerTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors('name');
+    }
+
+    public function test_administrator_can_tag_a_pillar_to_multiple_programs(): void
+    {
+        $admin = $this->admin();
+        $programA = AgencyOutcome::create(['outcome' => 'Program A']);
+        $programB = AgencyOutcome::create(['outcome' => 'Program B']);
+
+        $response = $this->actingAs($admin)->post(route('dost-pillars.store'), [
+            'name' => 'DOST Pillar 1: Human Well-Being',
+            'agency_outcome_ids' => [$programA->id, $programB->id],
+        ]);
+
+        $response->assertRedirect();
+        $pillar = DostPillar::firstWhere('name', 'DOST Pillar 1: Human Well-Being');
+        $this->assertTrue($pillar->agencyOutcomes->contains($programA));
+        $this->assertTrue($pillar->agencyOutcomes->contains($programB));
+    }
+
+    public function test_updating_a_pillar_resyncs_its_program_tags(): void
+    {
+        $admin = $this->admin();
+        $programA = AgencyOutcome::create(['outcome' => 'Program A']);
+        $programB = AgencyOutcome::create(['outcome' => 'Program B']);
+        $pillar = DostPillar::create(['name' => 'Pillar']);
+        $pillar->agencyOutcomes()->sync([$programA->id]);
+
+        $response = $this->actingAs($admin)->put(route('dost-pillars.update', $pillar), [
+            'name' => 'Pillar',
+            'agency_outcome_ids' => [$programB->id],
+        ]);
+
+        $response->assertRedirect();
+        $fresh = $pillar->fresh();
+        $this->assertFalse($fresh->agencyOutcomes->contains($programA));
+        $this->assertTrue($fresh->agencyOutcomes->contains($programB));
     }
 }

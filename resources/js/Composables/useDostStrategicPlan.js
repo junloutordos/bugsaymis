@@ -23,13 +23,18 @@ export function useDostStrategicPlan() {
   // ── Pillar ─────────────────────────────────────────────────────────
   const showPillarModal = ref(false);
   const pillarModalMode = ref("create");
-  const pillarForm = ref({ id: null, name: "", outcome_statement: "" });
+  const pillarForm = ref({ id: null, name: "", outcome_statement: "", agency_outcomes: [] });
 
   function openPillarModal(mode, pillar = null) {
     pillarModalMode.value = mode;
     pillarForm.value = pillar
-      ? { id: pillar.id, name: pillar.name, outcome_statement: pillar.outcome_statement ?? "" }
-      : { id: null, name: "", outcome_statement: "" };
+      ? {
+          id: pillar.id,
+          name: pillar.name,
+          outcome_statement: pillar.outcome_statement ?? "",
+          agency_outcomes: pillar.agency_outcomes ? [...pillar.agency_outcomes] : [],
+        }
+      : { id: null, name: "", outcome_statement: "", agency_outcomes: [] };
     showPillarModal.value = true;
   }
 
@@ -40,7 +45,11 @@ export function useDostStrategicPlan() {
   function submitPillar() {
     const isCreate = pillarModalMode.value === "create";
     const url = isCreate ? "/dost-pillars" : `/dost-pillars/${pillarForm.value.id}`;
-    router[isCreate ? "post" : "put"](url, pillarForm.value, {
+    const payload = {
+      ...pillarForm.value,
+      agency_outcome_ids: pillarForm.value.agency_outcomes.map((o) => o.id),
+    };
+    router[isCreate ? "post" : "put"](url, payload, {
       preserveScroll: true,
       onSuccess: () => {
         closePillarModal();
@@ -69,7 +78,7 @@ export function useDostStrategicPlan() {
   // ── Strategy ───────────────────────────────────────────────────────
   const showStrategyModal = ref(false);
   const strategyModalMode = ref("create");
-  const strategyForm = ref({ id: null, dost_pillar_id: null, agency_outcome_id: null, name: "" });
+  const strategyForm = ref({ id: null, dost_pillar_id: null, agency_outcomes: [], name: "" });
 
   function openStrategyModal(mode, strategy = null, pillar = null) {
     strategyModalMode.value = mode;
@@ -77,10 +86,10 @@ export function useDostStrategicPlan() {
       ? {
           id: strategy.id,
           dost_pillar_id: strategy.dost_pillar_id,
-          agency_outcome_id: strategy.agency_outcome_id,
+          agency_outcomes: strategy.agency_outcomes ? [...strategy.agency_outcomes] : [],
           name: strategy.name,
         }
-      : { id: null, dost_pillar_id: pillar?.id ?? null, agency_outcome_id: null, name: "" };
+      : { id: null, dost_pillar_id: pillar?.id ?? null, agency_outcomes: [], name: "" };
     showStrategyModal.value = true;
   }
 
@@ -91,7 +100,11 @@ export function useDostStrategicPlan() {
   function submitStrategy() {
     const isCreate = strategyModalMode.value === "create";
     const url = isCreate ? "/dost-strategies" : `/dost-strategies/${strategyForm.value.id}`;
-    router[isCreate ? "post" : "put"](url, strategyForm.value, {
+    const payload = {
+      ...strategyForm.value,
+      agency_outcome_ids: strategyForm.value.agency_outcomes.map((o) => o.id),
+    };
+    router[isCreate ? "post" : "put"](url, payload, {
       preserveScroll: true,
       onSuccess: () => {
         closeStrategyModal();
@@ -163,6 +176,22 @@ export function useDostStrategicPlan() {
     });
   }
 
+  // ── "New Full Entry" guided chain wizard (shared with OPCR) ─────────
+  const showChainWizard = ref(false);
+
+  function openChainWizard() {
+    showChainWizard.value = true;
+  }
+
+  function closeChainWizard() {
+    showChainWizard.value = false;
+  }
+
+  function onChainCreated() {
+    closeChainWizard();
+    router.reload({ only: ["pillars", "agencyOutcomes"] });
+  }
+
   return {
     expandedPillars,
     expandedStrategies,
@@ -189,5 +218,9 @@ export function useDostStrategicPlan() {
     closeSubStrategyModal,
     submitSubStrategy,
     deleteSubStrategy,
+    showChainWizard,
+    openChainWizard,
+    closeChainWizard,
+    onChainCreated,
   };
 }

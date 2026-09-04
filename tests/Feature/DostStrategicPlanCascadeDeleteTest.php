@@ -25,23 +25,27 @@ class DostStrategicPlanCascadeDeleteTest extends TestCase
         $this->assertDatabaseMissing('dost_sub_strategies', ['id' => $sub->id]);
     }
 
-    public function test_deleting_an_agency_outcome_cascades_to_linked_strategies_and_sub_strategies(): void
+    public function test_deleting_an_agency_outcome_removes_the_tag_but_leaves_pillar_and_strategy_intact(): void
     {
+        // Pillar <-> AgencyOutcome and Strategy <-> AgencyOutcome are many-to-many —
+        // deleting a Program only cascades its pivot rows, never the Pillar/Strategy itself.
         $outcome = AgencyOutcome::create(['outcome' => 'A. STEM Secondary Education Program']);
         $pillar = DostPillar::create(['name' => 'DOST Pillar 5: Governance']);
+        $pillar->agencyOutcomes()->sync([$outcome->id]);
         $strategy = DostStrategy::create([
             'dost_pillar_id' => $pillar->id,
-            'agency_outcome_id' => $outcome->id,
             'name' => 'Strategy 19: Roll-out enabled systems',
         ]);
+        $strategy->agencyOutcomes()->sync([$outcome->id]);
         $sub = DostSubStrategy::create(['dost_strategy_id' => $strategy->id, 'description' => 'Sub 1']);
 
         $outcome->delete();
 
-        $this->assertDatabaseMissing('dost_strategies', ['id' => $strategy->id]);
-        $this->assertDatabaseMissing('dost_sub_strategies', ['id' => $sub->id]);
-        // The Pillar itself is untouched — only the Strategy/AgencyOutcome edge cascades.
         $this->assertDatabaseHas('dost_pillars', ['id' => $pillar->id]);
+        $this->assertDatabaseHas('dost_strategies', ['id' => $strategy->id]);
+        $this->assertDatabaseHas('dost_sub_strategies', ['id' => $sub->id]);
+        $this->assertDatabaseMissing('dost_pillar_agency_outcomes', ['dost_pillar_id' => $pillar->id]);
+        $this->assertDatabaseMissing('dost_strategy_agency_outcomes', ['dost_strategy_id' => $strategy->id]);
     }
 
     public function test_deleting_a_strategy_cascades_to_its_sub_strategies_but_not_its_pillar(): void

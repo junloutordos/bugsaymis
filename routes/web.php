@@ -81,6 +81,7 @@ use App\Models\User;
 use App\Http\Controllers\PMSController;
 use App\Http\Controllers\AgencyOutcomeController;
 use App\Http\Controllers\PerformanceIndicatorController;
+use App\Http\Controllers\DostChainController;
 use App\Http\Controllers\DostPillarController;
 use App\Http\Controllers\DostStrategyController;
 use App\Http\Controllers\DostSubStrategyController;
@@ -1258,6 +1259,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('dost-sub-strategies', [DostSubStrategyController::class, 'store'])->name('dost-sub-strategies.store');
         Route::put('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'update'])->name('dost-sub-strategies.update');
         Route::delete('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'destroy'])->name('dost-sub-strategies.destroy');
+    });
+
+    // Shared DOST chain-builder — used by both the DOST Strategic Plan page
+    // and OPCR's indicator tagging wizard, so it's gated on either permission.
+    Route::middleware('permission:ipcr.view|opcr.manage')->group(function () {
+        Route::post('dost-chain', [DostChainController::class, 'store'])->name('dost-chain.store');
     });
 
     // OPCR — Office Performance Commitment and Review (campus-level).

@@ -81,6 +81,10 @@ class AgencyOutcomeController extends Controller
             return back()->withErrors(['agencyOutcome' => 'This outcome is still tagged on one or more OPCR indicators.']);
         }
 
+        if ($agencyOutcome->dostPillars()->exists() || $agencyOutcome->dostStrategies()->exists()) {
+            return back()->withErrors(['agencyOutcome' => 'This outcome is still tagged on one or more DOST Pillars or Strategies.']);
+        }
+
         $agencyOutcome->delete();
 
         return redirect()->back();
