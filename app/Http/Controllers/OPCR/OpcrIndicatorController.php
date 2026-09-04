@@ -66,4 +66,18 @@ class OpcrIndicatorController extends Controller
 
         return back()->with('success', "Q{$data['quarter']} actual recorded.");
     }
+
+    public function updateRating(Request $request, OpcrIndicator $opcrIndicator)
+    {
+        $data = $request->validate([
+            'rating_quality' => 'nullable|numeric|between:1,5',
+            'rating_efficiency' => 'nullable|numeric|between:1,5',
+            'rating_timeliness' => 'nullable|numeric|between:1,5',
+            'rating_average' => 'nullable|numeric|between:1,5',
+        ]);
+
+        $opcrIndicator->update($data);
+
+        return back()->with('success', 'Rating recorded.');
+    }
 }
