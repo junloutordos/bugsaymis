@@ -51,4 +51,19 @@ class OpcrIndicatorController extends Controller
 
         return back()->with('success', 'Indicator deleted.');
     }
+
+    public function updateActual(Request $request, OpcrIndicator $opcrIndicator)
+    {
+        $data = $request->validate([
+            'quarter' => 'required|integer|between:1,4',
+            'value' => 'nullable|string|max:255',
+        ]);
+
+        $opcrIndicator->actuals()->updateOrCreate(
+            ['quarter' => $data['quarter']],
+            ['value' => $data['value'] ?? null]
+        );
+
+        return back()->with('success', "Q{$data['quarter']} actual recorded.");
+    }
 }

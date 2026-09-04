@@ -1272,6 +1272,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             Route::post('/opcr-indicators', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'store'])->name('opcr-indicators.store');
             Route::put('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'update'])->name('opcr-indicators.update');
             Route::delete('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'destroy'])->name('opcr-indicators.destroy');
+            Route::put('/opcr-indicators/{opcrIndicator}/actual', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'updateActual'])->name('opcr-indicators.actual');
         });
     });
 
