@@ -156,4 +156,34 @@ class DtrSupervisorSignatoryTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('supervisor.name', 'Dr. CID Chief'));
     }
+
+    public function test_teaching_division_chief_is_verified_by_ocd_not_their_academic_unit_head(): void
+    {
+        $ocdChief = User::factory()->create(['name' => 'Dr. OCD Head', 'position' => 'OIC - Campus Director']);
+        Division::create([
+            'division_name' => 'Office of the Campus Director',
+            'acronym' => 'OCD',
+            'division_chief_id' => $ocdChief->id,
+            'status' => 'active',
+        ]);
+
+        $teacherChief = User::factory()->create([
+            'name' => 'Jasmine Teaching Chief',
+            'emp_category' => 'Plantilla Teaching',
+            'division_id' => $this->cid->id,
+            'academic_unit_id' => $this->unit->id, // would resolve to the AUH if not a division chief
+        ]);
+        Division::create([
+            'division_name' => 'Student Services Division',
+            'acronym' => 'SSD',
+            'division_chief_id' => $teacherChief->id,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->viewer())
+            ->get(route('hr.dtr.print', ['user' => $teacherChief->id, 'month' => '2098-08']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('supervisor.name', 'Dr. OCD Head'));
+    }
 }

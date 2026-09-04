@@ -12,6 +12,7 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\Office;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -491,6 +492,33 @@ class FacultyLoadingHttpTest extends TestCase
                 ->where('loads.0.faculty.name', 'JUAN S. DELA CRUZ'));
 
         $this->assertDatabaseCount('class_schedules', 0);
+    }
+
+    public function test_load_print_signatory_resolves_the_faculty_own_office_head_not_a_stale_override(): void
+    {
+        $unitHead = User::factory()->create(['name' => 'Head, Own Unit', 'position' => 'Academic Unit Head']);
+        $office = Office::create(['name' => 'PEHM-VE Unit', 'unit_head' => $unitHead->id]);
+
+        $faculty = User::factory()->create([
+            'name' => 'Gumapac, Jasmine S.',
+            'email_verified_at' => now(),
+            'office_id' => $office->id,
+        ]);
+        $sy = $this->makeSchoolYear();
+        $term = $this->makeTerm($sy);
+        $load = FacultyLoad::create([
+            'user_id' => $faculty->id,
+            'school_year_id' => $sy->id,
+            'academic_term_id' => $term->id,
+            'total_units' => 0,
+        ]);
+
+        $this->actingAs($this->cidUser())
+            ->get(route('faculty-loading.print', $load))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('FacultyLoading/Print')
+                ->where('loads.0.signatories.auh.name', 'Head, Own Unit'));
     }
 
     public function test_view_own_faculty_receives_current_load_assignments_and_schedule(): void

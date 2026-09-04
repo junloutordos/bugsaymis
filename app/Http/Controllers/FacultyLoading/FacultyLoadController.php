@@ -230,9 +230,14 @@ class FacultyLoadController extends Controller
      * their actual work falls under, not themselves. Keyed by user_id,
      * value is the office_id whose unit head should sign instead.
      * office_id itself is untouched; this only affects this print.
+     *
+     * 9 (Gumapac, Jasmine S. — SSD Chief) removed 2026-09-04: her office_id
+     * now correctly points to PEHM-VE Unit (head: Morales, Shriegley Mae R.),
+     * which is not her — the self-signing problem this map exists for no
+     * longer applies to her, and the override was forcing the wrong AUH
+     * (Social Science Unit / Salang, Keith R.).
      */
     private const PRINT_AUH_OFFICE_OVERRIDE = [
-        9  => 3,  // Gumapac, Jasmine S. (SSD Chief) -> Social Science Unit (Salang, Keith R.)
         25 => 42, // Fernando, Michelle B. (CID Chief) -> Research Unit (Alerta, Gilbert)
     ];
 

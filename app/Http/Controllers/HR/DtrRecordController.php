@@ -631,6 +631,19 @@ class DtrRecordController extends Controller
      */
     private function resolveSupervisor(User $user): ?array
     {
+        // A user who is themselves the chief of any active division (even a
+        // teaching one, e.g. a Division Chief who also carries a teaching
+        // load) is verified by OCD directly — an Academic Unit Head or a
+        // fellow division chief does not outrank a division chief.
+        $isDivisionChief = DB::table('divisions')
+            ->where('division_chief_id', $user->id)
+            ->where('status', '<>', 'inactive')
+            ->exists();
+
+        if ($isDivisionChief) {
+            return $this->resolveOcdSignatory();
+        }
+
         // Teaching staff (Plantilla or COS) are verified as to prescribed
         // office hours by their Academic Unit Head, not the CID Chief /
         // division chief. Reuse the IPCR service's AUH resolver; fall back
