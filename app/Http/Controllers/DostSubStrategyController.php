@@ -33,6 +33,10 @@ class DostSubStrategyController extends Controller
 
     public function destroy(DostSubStrategy $dostSubStrategy)
     {
+        if ($dostSubStrategy->opcrIndicators()->exists()) {
+            return back()->withErrors(['dostSubStrategy' => 'This Sub-Strategy is still tagged on one or more OPCR indicators.']);
+        }
+
         $dostSubStrategy->delete();
 
         return back()->with('success', 'Sub-Strategy deleted.');

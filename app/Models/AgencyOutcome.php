@@ -86,4 +86,9 @@ class AgencyOutcome extends Model
     {
         return $this->hasMany(PerformanceIndicator::class, 'agency_outcome_id');
     }
+
+    public function opcrIndicators()
+    {
+        return $this->hasMany(\App\Models\OPCR\OpcrIndicator::class, 'agency_outcome_id');
+    }
 }

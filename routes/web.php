@@ -1260,6 +1260,24 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::delete('dost-sub-strategies/{dostSubStrategy}', [DostSubStrategyController::class, 'destroy'])->name('dost-sub-strategies.destroy');
     });
 
+    // OPCR — Office Performance Commitment and Review (campus-level).
+    Route::middleware('permission:opcr.view|opcr.manage')->group(function () {
+        Route::get('/opcr', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'index'])->name('opcr.index');
+        Route::get('/opcr-periods/{opcrPeriod}/pdf', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'pdf'])->name('opcr-periods.pdf');
+
+        Route::middleware('permission:opcr.manage')->group(function () {
+            Route::post('/opcr-periods', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'store'])->name('opcr-periods.store');
+            Route::put('/opcr-periods/{opcrPeriod}', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'update'])->name('opcr-periods.update');
+            Route::post('/opcr-periods/{opcrPeriod}/clone', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'cloneFrom'])->name('opcr-periods.clone');
+
+            Route::post('/opcr-indicators', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'store'])->name('opcr-indicators.store');
+            Route::put('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'update'])->name('opcr-indicators.update');
+            Route::delete('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'destroy'])->name('opcr-indicators.destroy');
+            Route::put('/opcr-indicators/{opcrIndicator}/actual', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'updateActual'])->name('opcr-indicators.actual');
+            Route::put('/opcr-indicators/{opcrIndicator}/rating', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'updateRating'])->name('opcr-indicators.rating');
+        });
+    });
+
 // Performance Management — Committees & Special Assignments (open to any authenticated user; controller handles auth)
 Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/performance-management/committees', [\App\Http\Controllers\CommitteePerformanceController::class, 'index'])->name('pm-committees.index');

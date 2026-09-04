@@ -682,6 +682,13 @@ export const menuItems = [
         permissions: ["ipcr.view"],
       },
       {
+        label: "OPCR",
+        routeName: "opcr.index",
+        href: route("opcr.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["opcr.view", "opcr.manage"],
+      },
+      {
         label: "Agency Org Outcome",
         routeName: "outcome.index",
         href: route("outcome.index"),
