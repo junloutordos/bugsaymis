@@ -35,6 +35,7 @@ class ITJobRequest extends Model
         'completed_at',
         'pdf_path',
         'attendedby',
+        'attended_by_id',
         'rating',
         'rating_remarks',
         'rated_at',
@@ -115,6 +116,11 @@ class ITJobRequest extends Model
     public function assignedTo()
     {
         return $this->belongsTo(User::class, 'assignedto', 'id');
+    }
+
+    public function attendedByUser()
+    {
+        return $this->belongsTo(User::class, 'attended_by_id');
     }
 
     public function digitalSignatures()

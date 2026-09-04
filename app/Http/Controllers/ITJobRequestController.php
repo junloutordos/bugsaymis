@@ -547,6 +547,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         $jobRequest->update(array_merge($validated, [
             'status' => $status,
             'attendedby' => $request->user()->name,
+            'attended_by_id' => $request->user()->id,
         ]));
 
         ITJRTrackingLog::create([
@@ -908,10 +909,10 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             ->whereIn('status', ['Acted by MIS', 'Request Completed'])
             ->orderBy('completed_at');
 
-        // Non-admin users see only requests they personally attended (attendedby name match).
+        // Non-admin users see only requests they personally attended (attended_by_id match).
         // Admin/MIS with scope=all see everything.
         if (! $isAdmin || $scope === 'mine') {
-            $query->where('attendedby', $user->name);
+            $query->where('attended_by_id', $user->id);
         }
 
         if ($dateFrom) {

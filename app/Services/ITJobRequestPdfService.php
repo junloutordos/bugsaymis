@@ -158,7 +158,7 @@ class ITJobRequestPdfService
         $prevMemory = ini_get('memory_limit');
         ini_set('memory_limit', '256M');
 
-        $jobRequest->loadMissing(['user.division', 'divisionChief', 'assignedTo']);
+        $jobRequest->loadMissing(['user.division', 'divisionChief', 'assignedTo', 'attendedByUser']);
 
         $director = User::havingRole('OCD')->first();
 
@@ -197,6 +197,8 @@ class ITJobRequestPdfService
                             ? $this->sigDataUri($director?->electronic_signature) : null;
         $assignedSig   = $jobRequest->action_taken
                             ? $this->sigDataUri($jobRequest->assignedTo?->electronic_signature) : null;
+        $servicedSig   = $jobRequest->action_taken
+                            ? $this->sigDataUri($jobRequest->attendedByUser?->electronic_signature) : null;
         $completionSig = $jobRequest->completed_at
                             ? $this->sigDataUri($jobRequest->user?->electronic_signature) : null;
 
@@ -207,6 +209,7 @@ class ITJobRequestPdfService
             'directorSig',
             'dcSig',
             'assignedSig',
+            'servicedSig',
             'requesterSig',
             'completionSig',
             'sigBadges',

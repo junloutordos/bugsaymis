@@ -229,8 +229,8 @@
           <table style="border:none;border-collapse:collapse;margin:0 auto;">
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
-                @if($assignedSig)
-                  <img src="{{ $assignedSig }}" alt="" class="sig-img">
+                @if($servicedSig)
+                  <img src="{{ $servicedSig }}" alt="" class="sig-img">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif
@@ -243,9 +243,9 @@
               @endif
             </tr>
           </table>
-          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($jobRequest->assignedTo?->name ?? '') }}</span></div>
-          @if($jobRequest->assignedTo?->position)
-            <div class="sig-pos">{{ $jobRequest->assignedTo->position }}</div>
+          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($jobRequest->attendedByUser?->name ?? $jobRequest->attendedby ?? '') }}</span></div>
+          @if($jobRequest->attendedByUser?->position)
+            <div class="sig-pos">{{ $jobRequest->attendedByUser->position }}</div>
           @endif
         </div>
       </td>
