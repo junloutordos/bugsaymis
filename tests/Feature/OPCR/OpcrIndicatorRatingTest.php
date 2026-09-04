@@ -3,7 +3,6 @@
 namespace Tests\Feature\OPCR;
 
 use App\Models\OPCR\OpcrIndicator;
-use App\Models\OPCR\OpcrPeriod;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -28,8 +27,7 @@ class OpcrIndicatorRatingTest extends TestCase
     public function test_rating_saves_exactly_what_is_submitted_without_recomputing_average(): void
     {
         $user = $this->manager();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
-        $indicator = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Indicator']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
 
         $response = $this->actingAs($user)->put(route('opcr-indicators.rating', $indicator), [
             'rating_quality' => 5,
@@ -49,8 +47,7 @@ class OpcrIndicatorRatingTest extends TestCase
     public function test_rating_values_must_be_between_1_and_5(): void
     {
         $user = $this->manager();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
-        $indicator = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Indicator']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
 
         $response = $this->actingAs($user)->put(route('opcr-indicators.rating', $indicator), [
             'rating_quality' => 6,

@@ -1262,13 +1262,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // OPCR — Office Performance Commitment and Review (campus-level).
     Route::middleware('permission:opcr.view|opcr.manage')->group(function () {
-        Route::get('/opcr', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'index'])->name('opcr.index');
-        Route::get('/opcr-periods/{opcrPeriod}/pdf', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'pdf'])->name('opcr-periods.pdf');
+        Route::get('/opcr', [\App\Http\Controllers\OPCR\OpcrController::class, 'index'])->name('opcr.index');
+        Route::get('/opcr/{fiscalYear}/pdf', [\App\Http\Controllers\OPCR\OpcrController::class, 'pdf'])->name('opcr.pdf');
 
         Route::middleware('permission:opcr.manage')->group(function () {
-            Route::post('/opcr-periods', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'store'])->name('opcr-periods.store');
-            Route::put('/opcr-periods/{opcrPeriod}', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'update'])->name('opcr-periods.update');
-            Route::post('/opcr-periods/{opcrPeriod}/clone', [\App\Http\Controllers\OPCR\OpcrPeriodController::class, 'cloneFrom'])->name('opcr-periods.clone');
+            Route::put('/opcr-settings', [\App\Http\Controllers\OPCR\OpcrController::class, 'updateSettings'])->name('opcr-settings.update');
+            Route::post('/opcr/clone', [\App\Http\Controllers\OPCR\OpcrController::class, 'clone'])->name('opcr.clone');
 
             Route::post('/opcr-indicators', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'store'])->name('opcr-indicators.store');
             Route::put('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'update'])->name('opcr-indicators.update');

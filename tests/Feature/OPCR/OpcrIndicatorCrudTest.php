@@ -8,7 +8,6 @@ use App\Models\DostPillar;
 use App\Models\DostStrategy;
 use App\Models\DostSubStrategy;
 use App\Models\OPCR\OpcrIndicator;
-use App\Models\OPCR\OpcrPeriod;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -33,7 +32,6 @@ class OpcrIndicatorCrudTest extends TestCase
     public function test_store_creates_an_indicator_with_tagging_and_divisions(): void
     {
         $user = $this->manager();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
         $pillar = DostPillar::create(['name' => 'Pillar 1']);
         $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
         $subStrategy = DostSubStrategy::create(['dost_strategy_id' => $strategy->id, 'description' => 'Sub 1']);
@@ -41,7 +39,7 @@ class OpcrIndicatorCrudTest extends TestCase
         $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
 
         $response = $this->actingAs($user)->post(route('opcr-indicators.store'), [
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'dost_sub_strategy_id' => $subStrategy->id,
             'agency_outcome_id' => $outcome->id,
             'description' => 'Percentage of graduates pursuing STEM',
@@ -53,7 +51,7 @@ class OpcrIndicatorCrudTest extends TestCase
 
         $response->assertRedirect();
         $this->assertDatabaseHas('opcr_indicators', [
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'dost_sub_strategy_id' => $subStrategy->id,
             'description' => 'Percentage of graduates pursuing STEM',
         ]);
@@ -64,10 +62,9 @@ class OpcrIndicatorCrudTest extends TestCase
     public function test_store_allows_no_tagging_at_all(): void
     {
         $user = $this->manager();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
 
         $response = $this->actingAs($user)->post(route('opcr-indicators.store'), [
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'description' => 'Untagged indicator',
         ]);
 
@@ -78,25 +75,35 @@ class OpcrIndicatorCrudTest extends TestCase
     public function test_store_rejects_missing_description(): void
     {
         $user = $this->manager();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
 
         $response = $this->actingAs($user)->post(route('opcr-indicators.store'), [
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
         ]);
 
         $response->assertSessionHasErrors('description');
     }
 
+    public function test_store_rejects_missing_fiscal_year(): void
+    {
+        $user = $this->manager();
+
+        $response = $this->actingAs($user)->post(route('opcr-indicators.store'), [
+            'description' => 'Indicator',
+        ]);
+
+        $response->assertSessionHasErrors('fiscal_year');
+    }
+
     public function test_update_resyncs_divisions(): void
     {
         $user = $this->manager();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
         $divisionA = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
         $divisionB = Division::create(['division_name' => 'FAD', 'acronym' => 'FAD']);
-        $indicator = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Indicator']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
         $indicator->divisions()->sync([$divisionA->id]);
 
         $response = $this->actingAs($user)->put(route('opcr-indicators.update', $indicator), [
+            'fiscal_year' => 2026,
             'description' => 'Indicator updated',
             'division_ids' => [$divisionB->id],
         ]);
@@ -111,8 +118,7 @@ class OpcrIndicatorCrudTest extends TestCase
     public function test_destroy_deletes_the_indicator(): void
     {
         $user = $this->manager();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
-        $indicator = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Indicator']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
 
         $response = $this->actingAs($user)->delete(route('opcr-indicators.destroy', $indicator));
 
@@ -127,10 +133,9 @@ class OpcrIndicatorCrudTest extends TestCase
         $role->permissions()->attach($permission->id);
         $user = User::factory()->create();
         $user->roles()->attach($role->id);
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
 
         $response = $this->actingAs($user)->post(route('opcr-indicators.store'), [
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'description' => 'Indicator',
         ]);
 

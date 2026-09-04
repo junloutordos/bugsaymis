@@ -13,6 +13,7 @@ export function useOpcr(props) {
 
   const blankIndicatorForm = () => ({
     id: null,
+    fiscal_year: props.selectedFiscalYear !== "all" ? props.selectedFiscalYear : props.currentFiscalYear,
     dost_sub_strategy_id: "",
     agency_outcome_id: "",
     performance_indicator_id: "",
@@ -33,6 +34,7 @@ export function useOpcr(props) {
     if ((mode === "edit" || mode === "view") && indicator) {
       indicatorForm.value = {
         id: indicator.id,
+        fiscal_year: indicator.fiscal_year,
         dost_sub_strategy_id: indicator.dost_sub_strategy_id ?? "",
         agency_outcome_id: indicator.agency_outcome_id ?? "",
         performance_indicator_id: indicator.performance_indicator_id ?? "",
@@ -160,52 +162,46 @@ export function useOpcr(props) {
     })
   }
 
-  // ── Period modal (metadata + is_current) ─────────────────────────────
-  const showPeriodModal = ref(false)
-  const periodForm = ref({
-    id: null,
-    fiscal_year: "",
-    period_label: "",
-    is_current: false,
+  // ── Signatories settings modal (Campus Director/OIC/ED names + commitment
+  // statement) — one settings row, not per-FY, used on every PDF export ────
+  const showSettingsModal = ref(false)
+  const settingsForm = ref({
     campus_director_name: "",
     oic_campus_director_name: "",
     executive_director_name: "",
     commitment_statement: "",
   })
 
-  const openPeriodModal = (period = null) => {
-    showPeriodModal.value = true
-    periodForm.value = period
-      ? { ...period }
-      : { id: null, fiscal_year: "", period_label: "", is_current: false, campus_director_name: "", oic_campus_director_name: "", executive_director_name: "", commitment_statement: "" }
+  const openSettingsModal = () => {
+    showSettingsModal.value = true
+    settingsForm.value = {
+      campus_director_name: props.settings?.campus_director_name ?? "",
+      oic_campus_director_name: props.settings?.oic_campus_director_name ?? "",
+      executive_director_name: props.settings?.executive_director_name ?? "",
+      commitment_statement: props.settings?.commitment_statement ?? "",
+    }
   }
 
-  const closePeriodModal = () => {
-    showPeriodModal.value = false
+  const closeSettingsModal = () => {
+    showSettingsModal.value = false
   }
 
-  const submitPeriod = () => {
-    const onDone = {
+  const submitSettings = () => {
+    router.put(route("opcr-settings.update"), settingsForm.value, {
       onSuccess: async () => {
-        closePeriodModal()
-        await Swal.fire("Success", "Period saved.", "success")
-        window.location.reload()
+        closeSettingsModal()
+        await Swal.fire("Success", "Signatories updated.", "success")
+        router.reload({ only: ["settings"] })
       },
       onError: async (errors) => {
         await Swal.fire("Error", Object.values(errors).flat().join(", "), "error")
       },
-    }
-
-    if (periodForm.value.id) {
-      router.put(route("opcr-periods.update", periodForm.value.id), periodForm.value, onDone)
-    } else {
-      router.post(route("opcr-periods.store"), periodForm.value, onDone)
-    }
+    })
   }
 
-  // ── Clone modal ───────────────────────────────────────────────────────
+  // ── Clone modal (copy one FY's indicators into another, empty, FY) ──────
   const showCloneModal = ref(false)
-  const cloneForm = ref({ source_period_id: "" })
+  const cloneForm = ref({ source_fiscal_year: "" })
 
   const openCloneModal = () => {
     showCloneModal.value = true
@@ -215,8 +211,11 @@ export function useOpcr(props) {
     showCloneModal.value = false
   }
 
-  const submitClone = (targetPeriodId) => {
-    router.post(route("opcr-periods.clone", targetPeriodId), cloneForm.value, {
+  const submitClone = (targetFiscalYear) => {
+    router.post(route("opcr.clone"), {
+      source_fiscal_year: cloneForm.value.source_fiscal_year,
+      target_fiscal_year: targetFiscalYear,
+    }, {
       onSuccess: async () => {
         closeCloneModal()
         await Swal.fire("Success", "Cloned successfully.", "success")
@@ -248,11 +247,11 @@ export function useOpcr(props) {
     addSubStrategy,
     newProgram,
     addProgram,
-    showPeriodModal,
-    periodForm,
-    openPeriodModal,
-    closePeriodModal,
-    submitPeriod,
+    showSettingsModal,
+    settingsForm,
+    openSettingsModal,
+    closeSettingsModal,
+    submitSettings,
     showCloneModal,
     cloneForm,
     openCloneModal,

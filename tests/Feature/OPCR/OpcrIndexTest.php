@@ -3,15 +3,15 @@
 namespace Tests\Feature\OPCR;
 
 use App\Models\Division;
+use App\Models\IPCRRatingPeriod;
 use App\Models\OPCR\OpcrIndicator;
-use App\Models\OPCR\OpcrPeriod;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class OpcrPeriodIndexTest extends TestCase
+class OpcrIndexTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -28,25 +28,41 @@ class OpcrPeriodIndexTest extends TestCase
         return $user;
     }
 
-    public function test_manage_user_sees_all_indicators_in_the_current_period(): void
+    public function test_defaults_to_the_current_ipcr_rating_period_year(): void
     {
         $user = $this->userWithPermission('OCD', ['opcr.view', 'opcr.manage']);
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026', 'is_current' => true]);
-        $divisionA = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
-        $divisionB = Division::create(['division_name' => 'FAD', 'acronym' => 'FAD']);
-        $i1 = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Indicator 1']);
-        $i1->divisions()->sync([$divisionA->id]);
-        $i2 = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Indicator 2']);
-        $i2->divisions()->sync([$divisionB->id]);
+        IPCRRatingPeriod::create(['label' => 'FY2025', 'year' => 2025, 'is_current' => false]);
+        IPCRRatingPeriod::create(['label' => 'FY2026', 'year' => 2026, 'is_current' => true]);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'description' => 'FY2025 indicator']);
+        $fy2026 = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'FY2026 indicator']);
 
         $response = $this->actingAs($user)->get(route('opcr.index'));
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->component('PerformanceManagement/Opcr', false)
-            ->where('period.id', $period->id)
-            ->has('indicators', 2)
+            ->where('currentFiscalYear', 2026)
+            ->where('selectedFiscalYear', '2026')
+            ->has('indicators', 1)
+            ->where('indicators.0.id', $fy2026->id)
             ->where('canManage', true)
+        );
+    }
+
+    public function test_fiscal_year_query_param_switches_the_selected_year(): void
+    {
+        $user = $this->userWithPermission('OCD', ['opcr.view', 'opcr.manage']);
+        IPCRRatingPeriod::create(['label' => 'FY2025', 'year' => 2025, 'is_current' => false]);
+        IPCRRatingPeriod::create(['label' => 'FY2026', 'year' => 2026, 'is_current' => true]);
+        $fy2025 = OpcrIndicator::create(['fiscal_year' => 2025, 'description' => 'FY2025 indicator']);
+
+        $response = $this->actingAs($user)->get(route('opcr.index', ['fiscal_year' => 2025]));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('selectedFiscalYear', '2025')
+            ->has('indicators', 1)
+            ->where('indicators.0.id', $fy2025->id)
         );
     }
 
@@ -56,36 +72,31 @@ class OpcrPeriodIndexTest extends TestCase
         $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
         $otherDivision = Division::create(['division_name' => 'FAD', 'acronym' => 'FAD']);
         $user->update(['division_id' => $division->id]);
+        IPCRRatingPeriod::create(['label' => 'FY2026', 'year' => 2026, 'is_current' => true]);
 
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026', 'is_current' => true]);
-        $mine = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Mine']);
+        $mine = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Mine']);
         $mine->divisions()->sync([$division->id]);
-        $notMine = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Not mine']);
+        $notMine = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Not mine']);
         $notMine->divisions()->sync([$otherDivision->id]);
 
         $response = $this->actingAs($user)->get(route('opcr.index'));
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('PerformanceManagement/Opcr', false)
             ->has('indicators', 1)
             ->where('indicators.0.id', $mine->id)
             ->where('canManage', false)
         );
     }
 
-    public function test_index_renders_with_no_current_period(): void
+    public function test_index_renders_with_no_indicators_for_the_year(): void
     {
         $user = $this->userWithPermission('OCD', ['opcr.view', 'opcr.manage']);
 
         $response = $this->actingAs($user)->get(route('opcr.index'));
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('PerformanceManagement/Opcr', false)
-            ->where('period', null)
-            ->has('indicators', 0)
-        );
+        $response->assertInertia(fn ($page) => $page->has('indicators', 0));
     }
 
     public function test_user_without_opcr_permission_gets_403(): void

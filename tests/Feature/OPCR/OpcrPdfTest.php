@@ -5,14 +5,14 @@ namespace Tests\Feature\OPCR;
 use App\Models\Division;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrIndicatorActual;
-use App\Models\OPCR\OpcrPeriod;
+use App\Models\OPCR\OpcrSetting;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class OpcrPeriodPdfTest extends TestCase
+class OpcrPdfTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -27,36 +27,33 @@ class OpcrPeriodPdfTest extends TestCase
         return $user;
     }
 
-    public function test_pdf_renders_for_a_period_with_indicators(): void
+    public function test_pdf_renders_for_a_fiscal_year_with_indicators(): void
     {
         $user = $this->viewer();
-        $period = OpcrPeriod::create([
-            'fiscal_year' => 2026,
-            'period_label' => 'January - December 2026',
+        OpcrSetting::current()->update([
             'campus_director_name' => 'RAMIL A. SANCHEZ',
             'executive_director_name' => 'RONNALEE N. ORTEZA',
         ]);
         $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
         $indicator = OpcrIndicator::create([
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'description' => 'Cohort survival rate',
             'target' => '0.9',
         ]);
         $indicator->divisions()->sync([$division->id]);
         OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '0.8889']);
 
-        $response = $this->actingAs($user)->get(route('opcr-periods.pdf', $period));
+        $response = $this->actingAs($user)->get(route('opcr.pdf', 2026));
 
         $response->assertOk();
         $response->assertHeader('Content-Type', 'application/pdf');
     }
 
-    public function test_pdf_renders_for_an_empty_period(): void
+    public function test_pdf_renders_for_a_fiscal_year_with_no_indicators(): void
     {
         $user = $this->viewer();
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'January - December 2026']);
 
-        $response = $this->actingAs($user)->get(route('opcr-periods.pdf', $period));
+        $response = $this->actingAs($user)->get(route('opcr.pdf', 2026));
 
         $response->assertOk();
         $response->assertHeader('Content-Type', 'application/pdf');

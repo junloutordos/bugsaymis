@@ -8,11 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('opcr_periods', function (Blueprint $table) {
+        Schema::create('opcr_settings', function (Blueprint $table) {
             $table->id();
-            $table->unsignedSmallInteger('fiscal_year')->unique();
-            $table->string('period_label');
-            $table->boolean('is_current')->default(false);
             $table->string('campus_director_name')->nullable();
             $table->string('oic_campus_director_name')->nullable();
             $table->string('executive_director_name')->nullable();
@@ -23,6 +20,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('opcr_periods');
+        Schema::dropIfExists('opcr_settings');
     }
 };

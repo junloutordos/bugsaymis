@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 class OpcrIndicator extends Model
 {
     protected $fillable = [
-        'opcr_period_id',
+        'fiscal_year',
         'dost_sub_strategy_id',
         'agency_outcome_id',
         'performance_indicator_id',
@@ -33,9 +33,9 @@ class OpcrIndicator extends Model
         'rating_average' => 'decimal:2',
     ];
 
-    public function period()
+    public function scopeForFiscalYear($query, int $year)
     {
-        return $this->belongsTo(OpcrPeriod::class, 'opcr_period_id');
+        return $query->where('fiscal_year', $year);
     }
 
     public function subStrategy()

@@ -3,6 +3,7 @@ import { ref, computed } from "vue"
 import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
+import AppFilterBar from "@/Components/AppFilterBar.vue"
 import AppTable from "@/Components/AppTable.vue"
 import AppButton from "@/Components/AppButton.vue"
 import AppIconButton from "@/Components/AppIconButton.vue"
@@ -11,15 +12,18 @@ import AppInput from "@/Components/AppInput.vue"
 import AppSelect from "@/Components/AppSelect.vue"
 import AppTextarea from "@/Components/AppTextarea.vue"
 import EmptyState from "@/Components/EmptyState.vue"
+import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
 import { PencilSquareIcon, TrashIcon, PlusIcon, DocumentArrowDownIcon } from "@heroicons/vue/24/outline"
 import { useOpcr } from "@/Composables/useOpcr.js"
 import Multiselect from "vue-multiselect"
 import "vue-multiselect/dist/vue-multiselect.css"
 
 const props = defineProps({
-  period: Object,
-  periods: { type: Array, default: () => [] },
   indicators: { type: Array, default: () => [] },
+  fiscalYears: { type: Array, default: () => [] },
+  selectedFiscalYear: { type: [String, Number], default: "" },
+  currentFiscalYear: { type: Number, default: null },
+  settings: { type: Object, default: () => ({}) },
   pillars: { type: Array, default: () => [] },
   agencyOutcomes: { type: Array, default: () => [] },
   performanceIndicators: { type: Array, default: () => [] },
@@ -46,11 +50,11 @@ const {
   addSubStrategy,
   newProgram,
   addProgram,
-  showPeriodModal,
-  periodForm,
-  openPeriodModal,
-  closePeriodModal,
-  submitPeriod,
+  showSettingsModal,
+  settingsForm,
+  openSettingsModal,
+  closeSettingsModal,
+  submitSettings,
   showCloneModal,
   cloneForm,
   openCloneModal,
@@ -64,6 +68,8 @@ const showAddSubStrategy = ref(false)
 const showAddProgram = ref(false)
 
 const allStrategies = computed(() => props.pillars.flatMap((p) => p.strategies ?? []))
+
+const isSpecificYear = computed(() => props.selectedFiscalYear !== "all")
 
 const ratingFields = ["rating_quality", "rating_efficiency", "rating_timeliness", "rating_average"]
 
@@ -82,21 +88,25 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
     <div class="space-y-5">
       <AppPageHeader
         title="OPCR"
-        :subtitle="period ? `FY ${period.fiscal_year} — ${period.period_label}` : 'No current OPCR period set up yet.'"
+        :subtitle="isSpecificYear ? `FY ${selectedFiscalYear}` : 'All fiscal years'"
       >
         <template #actions>
-          <AppButton v-if="period" variant="secondary" as="a" :href="route('opcr-periods.pdf', period.id)" target="_blank">
+          <AppButton v-if="isSpecificYear" variant="secondary" as="a" :href="route('opcr.pdf', selectedFiscalYear)" target="_blank">
             <DocumentArrowDownIcon class="w-4 h-4" /> Export PDF
           </AppButton>
           <template v-if="canManage">
-            <AppButton variant="secondary" @click="openCloneModal">Clone from FY —</AppButton>
-            <AppButton variant="secondary" @click="openPeriodModal(period)">{{ period ? 'Edit Period' : 'New FY' }}</AppButton>
-            <AppButton @click="openIndicatorModal('create')" :disabled="!period">
+            <AppButton variant="secondary" @click="openSettingsModal">Edit Signatories</AppButton>
+            <AppButton v-if="isSpecificYear" variant="secondary" @click="openCloneModal">Clone from FY —</AppButton>
+            <AppButton @click="openIndicatorModal('create')">
               <PlusIcon class="w-4 h-4" /> New Indicator
             </AppButton>
           </template>
         </template>
       </AppPageHeader>
+
+      <AppFilterBar>
+        <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="opcr.index" />
+      </AppFilterBar>
 
       <AppTable :is-empty="indicators.length === 0" :skeleton-cols="9">
         <template #head>
@@ -125,7 +135,10 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
                     <div class="text-slate-400">{{ subStrategyName }}</div>
                   </template>
                 </td>
-                <td class="px-3 py-2 text-sm text-slate-700 align-top">{{ indicator.description }}</td>
+                <td class="px-3 py-2 text-sm text-slate-700 align-top">
+                  {{ indicator.description }}
+                  <span v-if="!isSpecificYear" class="block text-[10px] text-slate-400">FY {{ indicator.fiscal_year }}</span>
+                </td>
                 <td class="px-3 py-2 text-sm text-slate-700 align-top">{{ indicator.target ?? '—' }}</td>
                 <td class="px-3 py-2 text-sm text-slate-700 align-top">
                   {{ indicator.divisions?.map(d => d.acronym ?? d.division_name).join(', ') || '—' }}
@@ -170,13 +183,15 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
         </template>
 
         <template #empty>
-          <EmptyState title="No OPCR indicators yet" subtitle="Set up a current FY period, then add indicators." />
+          <EmptyState title="No OPCR indicators yet" subtitle="Add an indicator for this fiscal year, or clone from a previous one." />
         </template>
       </AppTable>
 
       <!-- Indicator create/edit modal -->
       <AppModal :show="showIndicatorModal" :title="indicatorModalMode === 'create' ? 'New Indicator' : 'Edit Indicator'" size="lg" @close="closeIndicatorModal">
         <form id="opcr-indicator-form" @submit.prevent="submitIndicator" class="space-y-4">
+          <AppInput v-model="indicatorForm.fiscal_year" label="Fiscal Year" type="number" required />
+
           <div>
             <div class="flex items-center justify-between mb-1">
               <label class="block text-xs font-medium text-slate-600">Pillar</label>
@@ -269,31 +284,25 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
         </template>
       </AppModal>
 
-      <!-- Period create/edit modal -->
-      <AppModal :show="showPeriodModal" title="OPCR Period" size="md" @close="closePeriodModal">
-        <form id="opcr-period-form" @submit.prevent="submitPeriod" class="space-y-4">
-          <AppInput v-model="periodForm.fiscal_year" label="Fiscal Year" type="number" required />
-          <AppInput v-model="periodForm.period_label" label="Period Label" type="text" placeholder="January - December 2026" required />
-          <AppInput v-model="periodForm.campus_director_name" label="Campus Director Name" type="text" />
-          <AppInput v-model="periodForm.oic_campus_director_name" label="OIC-Campus Director Name" type="text" />
-          <AppInput v-model="periodForm.executive_director_name" label="Executive Director Name" type="text" />
-          <AppTextarea v-model="periodForm.commitment_statement" label="Commitment Statement (optional override)" :rows="3" />
-          <label class="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" v-model="periodForm.is_current" />
-            Make this the current OPCR period
-          </label>
+      <!-- Signatories settings modal -->
+      <AppModal :show="showSettingsModal" title="OPCR Signatories" size="md" @close="closeSettingsModal">
+        <form id="opcr-settings-form" @submit.prevent="submitSettings" class="space-y-4">
+          <AppInput v-model="settingsForm.campus_director_name" label="Campus Director Name" type="text" />
+          <AppInput v-model="settingsForm.oic_campus_director_name" label="OIC-Campus Director Name" type="text" />
+          <AppInput v-model="settingsForm.executive_director_name" label="Executive Director Name" type="text" />
+          <AppTextarea v-model="settingsForm.commitment_statement" label="Commitment Statement (optional override)" :rows="3" />
         </form>
         <template #footer>
-          <AppButton variant="secondary" @click="closePeriodModal">Cancel</AppButton>
-          <AppButton type="submit" form="opcr-period-form">Save</AppButton>
+          <AppButton variant="secondary" @click="closeSettingsModal">Cancel</AppButton>
+          <AppButton type="submit" form="opcr-settings-form">Save</AppButton>
         </template>
       </AppModal>
 
       <!-- Clone modal -->
       <AppModal :show="showCloneModal" title="Clone from a previous FY" size="sm" @close="closeCloneModal">
-        <form id="opcr-clone-form" @submit.prevent="submitClone(period.id)" class="space-y-4">
-          <AppSelect v-model="cloneForm.source_period_id" label="Source Period" required placeholder="-- Select --">
-            <option v-for="p in periods.filter(p => p.id !== period?.id)" :key="p.id" :value="p.id">FY {{ p.fiscal_year }} — {{ p.period_label }}</option>
+        <form id="opcr-clone-form" @submit.prevent="submitClone(selectedFiscalYear)" class="space-y-4">
+          <AppSelect v-model="cloneForm.source_fiscal_year" label="Source Fiscal Year" required placeholder="-- Select --">
+            <option v-for="y in fiscalYears.filter(y => String(y) !== String(selectedFiscalYear))" :key="y" :value="y">FY {{ y }}</option>
           </AppSelect>
         </form>
         <template #footer>

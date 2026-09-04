@@ -17,11 +17,11 @@
 </head>
 <body>
     <h1>OFFICE PERFORMANCE COMMITMENT AND REVIEW (OPCR)</h1>
-    <h2>FY {{ $period->fiscal_year }}</h2>
+    <h2>FY {{ $fiscalYear }}</h2>
 
     <p class="commitment">
-        {{ $period->commitment_statement
-            ?: "I, {$period->campus_director_name}, Campus Director of the PSHS-Caraga Region Campus, commit to deliver and agree to be rated on the attainment of the following targets in accordance with the indicated measures for the period {$period->period_label}." }}
+        {{ $settings->commitment_statement
+            ?: "I, {$settings->campus_director_name}, Campus Director of the PSHS-Caraga Region Campus, commit to deliver and agree to be rated on the attainment of the following targets in accordance with the indicated measures for FY {$fiscalYear}." }}
     </p>
 
     <table>
@@ -75,15 +75,15 @@
     <table class="signatures">
         <tr>
             <td style="width:33%;">
-                <span class="sig-name">{{ $period->campus_director_name ?? '—' }}</span><br>
+                <span class="sig-name">{{ $settings->campus_director_name ?? '—' }}</span><br>
                 Campus Director
             </td>
             <td style="width:33%;">
-                <span class="sig-name">{{ $period->oic_campus_director_name ?? '—' }}</span><br>
+                <span class="sig-name">{{ $settings->oic_campus_director_name ?? '—' }}</span><br>
                 OIC-Campus Director
             </td>
             <td style="width:33%;">
-                <span class="sig-name">{{ $period->executive_director_name ?? '—' }}</span><br>
+                <span class="sig-name">{{ $settings->executive_director_name ?? '—' }}</span><br>
                 Executive Director, PSHS System
             </td>
         </tr>

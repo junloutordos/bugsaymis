@@ -7,7 +7,6 @@ use App\Models\DostPillar;
 use App\Models\DostStrategy;
 use App\Models\DostSubStrategy;
 use App\Models\OPCR\OpcrIndicator;
-use App\Models\OPCR\OpcrPeriod;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,8 +31,7 @@ class OpcrTaggingDeleteGuardTest extends TestCase
         $pillar = DostPillar::create(['name' => 'Pillar 1']);
         $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
         $subStrategy = DostSubStrategy::create(['dost_strategy_id' => $strategy->id, 'description' => 'Sub 1']);
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
-        OpcrIndicator::create(['opcr_period_id' => $period->id, 'dost_sub_strategy_id' => $subStrategy->id, 'description' => 'Indicator']);
+        OpcrIndicator::create(['fiscal_year' => 2026, 'dost_sub_strategy_id' => $subStrategy->id, 'description' => 'Indicator']);
 
         $response = $this->actingAs($admin)->delete(route('dost-sub-strategies.destroy', $subStrategy));
 
@@ -45,8 +43,7 @@ class OpcrTaggingDeleteGuardTest extends TestCase
     {
         $admin = $this->admin();
         $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026']);
-        OpcrIndicator::create(['opcr_period_id' => $period->id, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
+        OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
 
         $response = $this->actingAs($admin)->delete(route('outcome.destroy', $outcome->id));
 

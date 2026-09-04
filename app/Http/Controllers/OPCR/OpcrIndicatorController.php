@@ -11,6 +11,7 @@ class OpcrIndicatorController extends Controller
     private function rules(): array
     {
         return [
+            'fiscal_year' => 'required|integer|min:2000|max:2100',
             'dost_sub_strategy_id' => 'nullable|exists:dost_sub_strategies,id',
             'agency_outcome_id' => 'nullable|exists:agency_org_outcomes,id',
             'performance_indicator_id' => 'nullable|exists:performance_indicators,id',
@@ -25,9 +26,7 @@ class OpcrIndicatorController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate(array_merge($this->rules(), [
-            'opcr_period_id' => 'required|exists:opcr_periods,id',
-        ]));
+        $data = $request->validate($this->rules());
 
         $indicator = OpcrIndicator::create($data);
         $indicator->divisions()->sync($data['division_ids'] ?? []);

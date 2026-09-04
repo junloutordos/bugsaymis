@@ -9,7 +9,7 @@ use App\Models\DostStrategy;
 use App\Models\DostSubStrategy;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrIndicatorActual;
-use App\Models\OPCR\OpcrPeriod;
+use App\Models\OPCR\OpcrSetting;
 use App\Models\PerformanceIndicator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,9 +18,8 @@ class OpcrModelsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_indicator_belongs_to_period_and_walks_up_the_dost_hierarchy(): void
+    public function test_indicator_walks_up_the_dost_hierarchy(): void
     {
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'January - December 2026']);
         $pillar = DostPillar::create(['name' => 'DOST Pillar 1: Human Well-Being']);
         $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
         $subStrategy = DostSubStrategy::create(['dost_strategy_id' => $strategy->id, 'description' => 'Institutionalize FORWARD Framework']);
@@ -28,7 +27,7 @@ class OpcrModelsTest extends TestCase
         $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
 
         $indicator = OpcrIndicator::create([
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'dost_sub_strategy_id' => $subStrategy->id,
             'agency_outcome_id' => $outcome->id,
             'description' => 'Percentage of freshmen with GWA 2.5 or better',
@@ -36,7 +35,6 @@ class OpcrModelsTest extends TestCase
         ]);
         $indicator->divisions()->sync([$division->id]);
 
-        $this->assertTrue($period->indicators->contains($indicator));
         $this->assertEquals($subStrategy->id, $indicator->subStrategy->id);
         $this->assertEquals($strategy->id, $indicator->subStrategy->strategy->id);
         $this->assertEquals($pillar->id, $indicator->subStrategy->strategy->pillar->id);
@@ -46,7 +44,6 @@ class OpcrModelsTest extends TestCase
 
     public function test_indicator_optionally_cross_references_an_existing_performance_indicator(): void
     {
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'January - December 2026']);
         $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
         $pi = PerformanceIndicator::create([
             'agency_outcome_id' => $outcome->id,
@@ -55,7 +52,7 @@ class OpcrModelsTest extends TestCase
         ]);
 
         $indicator = OpcrIndicator::create([
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'performance_indicator_id' => $pi->id,
             'description' => 'OPCR indicator, cross-referenced',
         ]);
@@ -65,10 +62,8 @@ class OpcrModelsTest extends TestCase
 
     public function test_indicator_without_dost_tagging_or_cross_reference_is_still_valid(): void
     {
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'January - December 2026']);
-
         $indicator = OpcrIndicator::create([
-            'opcr_period_id' => $period->id,
+            'fiscal_year' => 2026,
             'description' => 'Untagged indicator',
         ]);
 
@@ -79,8 +74,7 @@ class OpcrModelsTest extends TestCase
 
     public function test_actuals_track_one_row_per_quarter(): void
     {
-        $period = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'January - December 2026']);
-        $indicator = OpcrIndicator::create(['opcr_period_id' => $period->id, 'description' => 'Indicator']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'Indicator']);
 
         OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '0.5']);
         OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 2, 'value' => '0.7']);
@@ -89,14 +83,28 @@ class OpcrModelsTest extends TestCase
         $this->assertEquals('0.5', $indicator->actuals()->where('quarter', 1)->first()->value);
     }
 
-    public function test_scope_current_returns_only_the_current_period(): void
+    public function test_scope_for_fiscal_year_filters_correctly(): void
     {
-        OpcrPeriod::create(['fiscal_year' => 2025, 'period_label' => 'FY2025', 'is_current' => false]);
-        $current = OpcrPeriod::create(['fiscal_year' => 2026, 'period_label' => 'FY2026', 'is_current' => true]);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'description' => 'FY2025 indicator']);
+        $fy2026 = OpcrIndicator::create(['fiscal_year' => 2026, 'description' => 'FY2026 indicator']);
 
-        $result = OpcrPeriod::current()->get();
+        $result = OpcrIndicator::forFiscalYear(2026)->get();
 
         $this->assertCount(1, $result);
-        $this->assertEquals($current->id, $result->first()->id);
+        $this->assertEquals($fy2026->id, $result->first()->id);
+    }
+
+    public function test_setting_is_a_singleton_auto_created_on_first_access(): void
+    {
+        $this->assertEquals(0, OpcrSetting::count());
+
+        $first = OpcrSetting::current();
+        $first->update(['campus_director_name' => 'RAMIL A. SANCHEZ']);
+
+        $second = OpcrSetting::current();
+
+        $this->assertEquals(1, OpcrSetting::count());
+        $this->assertEquals($first->id, $second->id);
+        $this->assertEquals('RAMIL A. SANCHEZ', $second->campus_director_name);
     }
 }
