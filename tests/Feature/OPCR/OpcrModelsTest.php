@@ -100,6 +100,68 @@ class OpcrModelsTest extends TestCase
         $this->assertEquals($fy2026->id, $result->first()->id);
     }
 
+    public function test_accomplishment_summary_joins_present_quarters_and_skips_empty_ones(): void
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
+        OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '80%']);
+        OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 3, 'value' => '90%']);
+
+        $fresh = OpcrIndicator::with('actuals')->find($indicator->id);
+
+        $this->assertSame('Q1: 80%; Q3: 90%', $fresh->accomplishment_summary);
+    }
+
+    public function test_accomplishment_summary_is_null_when_no_quarters_have_a_value(): void
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
+
+        $fresh = OpcrIndicator::with('actuals')->find($indicator->id);
+
+        $this->assertNull($fresh->accomplishment_summary);
+    }
+
+    public function test_accomplishment_summary_includes_all_four_quarters_when_all_are_present(): void
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
+        foreach ([1 => '80%', 2 => '85%', 3 => '90%', 4 => '95%'] as $quarter => $value) {
+            OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => $quarter, 'value' => $value]);
+        }
+
+        $fresh = OpcrIndicator::with('actuals')->find($indicator->id);
+
+        $this->assertSame('Q1: 80%; Q2: 85%; Q3: 90%; Q4: 95%', $fresh->accomplishment_summary);
+    }
+
+    public function test_displayed_accomplishment_falls_back_to_the_auto_summary_when_no_manual_override_is_set(): void
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Indicator']);
+        OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '80%']);
+
+        $fresh = OpcrIndicator::with('actuals')->find($indicator->id);
+
+        $this->assertSame('Q1: 80%', $fresh->displayed_accomplishment);
+    }
+
+    public function test_displayed_accomplishment_prefers_the_manual_override_over_the_auto_summary(): void
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create([
+            'fiscal_year' => 2026,
+            'agency_outcome_id' => $outcome->id,
+            'description' => 'Indicator',
+            'accomplishment' => 'Fully accomplished ahead of schedule',
+        ]);
+        OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '80%']);
+
+        $fresh = OpcrIndicator::with('actuals')->find($indicator->id);
+
+        $this->assertSame('Fully accomplished ahead of schedule', $fresh->displayed_accomplishment);
+    }
+
     public function test_setting_is_a_singleton_auto_created_on_first_access(): void
     {
         $this->assertEquals(0, OpcrSetting::count());

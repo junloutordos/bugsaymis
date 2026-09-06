@@ -151,9 +151,16 @@ class AgencyOutcome extends Model
             return null;
         }
 
-        $names = $strategies->pluck('pillar.name')->filter()->unique()->values();
+        $pillars = $strategies->pluck('pillar')->filter()->unique('id')->values();
+        if ($pillars->isEmpty()) {
+            return null;
+        }
 
-        return $names->isEmpty() ? null : $names->implode('; ');
+        $texts = $pillars->map(fn ($pillar) => $pillar->outcome_statement
+            ? $pillar->name."\n\n".$pillar->outcome_statement
+            : $pillar->name);
+
+        return $texts->implode('; ');
     }
 
     public function getDostStrategyNamesJoinedAttribute(): ?string

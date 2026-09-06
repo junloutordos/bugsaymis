@@ -3,7 +3,10 @@
 namespace Tests\Unit;
 
 use App\Models\AgencyOutcome;
+use App\Models\DostPillar;
+use App\Models\DostStrategy;
 use App\Models\OPCR\OpcrIndicator;
+use App\Models\OPCR\OpcrIndicatorActual;
 use App\Models\OPCR\OpcrSetting;
 use App\Services\OPCR\OpcrPdfRowGrouper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,6 +81,57 @@ class OpcrPdfViewTest extends TestCase
 
         $this->assertStringContainsString('RONNALEE N. ORTEZA', $html);
         $this->assertStringContainsString('Executive Director, PSHS System', $html);
+    }
+
+    public function test_the_pillars_outcome_statement_renders_below_its_name_with_a_line_break(): void
+    {
+        $pillar = DostPillar::create(['name' => 'DOST Pillar 1: Human Well-Being', 'outcome_statement' => 'Outcome 1: Human well-being promoted']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $program->dostStrategies()->attach($strategy->id);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $program->id, 'description' => 'First']);
+        $loaded = OpcrIndicator::with(['agencyOutcome.dostStrategies.pillar', 'agencyOutcome.dostStrategies.subStrategies', 'divisions', 'actuals'])
+            ->whereKey($indicator->id)->get();
+
+        $html = $this->render($loaded);
+
+        $this->assertStringContainsString("DOST Pillar 1: Human Well-Being<br />\n<br />\nOutcome 1: Human well-being promoted", $html);
+    }
+
+    public function test_it_renders_a_single_actual_accomplishment_column_instead_of_separate_quarter_columns(): void
+    {
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $program->id, 'description' => 'First']);
+        OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '80%']);
+        OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 3, 'value' => '90%']);
+        $loaded = OpcrIndicator::with(['agencyOutcome', 'divisions', 'actuals'])->whereKey($indicator->id)->get();
+
+        $html = $this->render($loaded);
+
+        $this->assertStringContainsString('Actual Accomplishment', $html);
+        $this->assertStringContainsString('Q1: 80%; Q3: 90%', $html);
+        $this->assertStringNotContainsString('<th>Q1</th>', $html);
+        $this->assertStringNotContainsString('<th>Q2</th>', $html);
+        $this->assertStringNotContainsString('<th>Q3</th>', $html);
+        $this->assertStringNotContainsString('<th>Q4</th>', $html);
+    }
+
+    public function test_it_prefers_the_manual_accomplishment_override_over_the_auto_summary(): void
+    {
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicator = OpcrIndicator::create([
+            'fiscal_year' => 2026,
+            'agency_outcome_id' => $program->id,
+            'description' => 'First',
+            'accomplishment' => 'Fully accomplished ahead of schedule',
+        ]);
+        OpcrIndicatorActual::create(['opcr_indicator_id' => $indicator->id, 'quarter' => 1, 'value' => '80%']);
+        $loaded = OpcrIndicator::with(['agencyOutcome', 'divisions', 'actuals'])->whereKey($indicator->id)->get();
+
+        $html = $this->render($loaded);
+
+        $this->assertStringContainsString('Fully accomplished ahead of schedule', $html);
+        $this->assertStringNotContainsString('Q1: 80%', $html);
     }
 
     public function test_program_column_rowspans_across_consecutive_matching_indicators(): void

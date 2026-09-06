@@ -67,10 +67,7 @@
                 <th>Target</th>
                 <th>Budget</th>
                 <th>Division</th>
-                <th>Q1</th>
-                <th>Q2</th>
-                <th>Q3</th>
-                <th>Q4</th>
+                <th>Actual Accomplishment</th>
                 <th>Q</th>
                 <th>E</th>
                 <th>T</th>
@@ -83,7 +80,7 @@
                 @php $indicator = $row['indicator']; @endphp
                 <tr>
                     @if ($row['show']['pillar'])
-                        <td rowspan="{{ $row['rowspan']['pillar'] }}">{{ $row['pillar_text'] ?? '—' }}</td>
+                        <td rowspan="{{ $row['rowspan']['pillar'] }}">{!! $row['pillar_text'] ? nl2br(e($row['pillar_text'])) : '—' !!}</td>
                     @endif
                     @if ($row['show']['strategy'])
                         <td rowspan="{{ $row['rowspan']['strategy'] }}">{{ $row['strategy_text'] ?? '—' }}</td>
@@ -98,9 +95,7 @@
                     <td>{{ $indicator->target ?? '—' }}</td>
                     <td>{{ $indicator->budget !== null ? number_format($indicator->budget, 2) : '—' }}</td>
                     <td>{{ $indicator->divisions->pluck('acronym')->implode(', ') ?: '—' }}</td>
-                    @for ($q = 1; $q <= 4; $q++)
-                        <td>{{ $indicator->actuals->firstWhere('quarter', $q)?->value ?? '—' }}</td>
-                    @endfor
+                    <td>{{ $indicator->displayed_accomplishment ?? '—' }}</td>
                     <td>{{ $indicator->rating_quality ?? '—' }}</td>
                     <td>{{ $indicator->rating_efficiency ?? '—' }}</td>
                     <td>{{ $indicator->rating_timeliness ?? '—' }}</td>
@@ -108,7 +103,7 @@
                     <td>{{ $indicator->remarks ?? '—' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="16" style="text-align:center;">No indicators tagged yet.</td></tr>
+                <tr><td colspan="14" style="text-align:center;">No indicators tagged yet.</td></tr>
             @endforelse
         </tbody>
     </table>

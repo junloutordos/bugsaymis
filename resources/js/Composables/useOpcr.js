@@ -89,6 +89,13 @@ export function useOpcr(props) {
     })
   }
 
+  const updateAccomplishment = (indicator, accomplishment) => {
+    router.put(route("opcr-indicators.accomplishment", indicator.id), { accomplishment }, {
+      preserveScroll: true,
+      onSuccess: () => router.reload({ only: ["indicators"] }),
+    })
+  }
+
   // ── Signatories settings modal (Campus Director/OIC/ED names + commitment
   // statement) — one settings row, not per-FY, used on every PDF export ────
   const showSettingsModal = ref(false)
@@ -163,6 +170,7 @@ export function useOpcr(props) {
     submitIndicator,
     updateActual,
     updateRating,
+    updateAccomplishment,
     showSettingsModal,
     settingsForm,
     openSettingsModal,

@@ -61,6 +61,17 @@ class OpcrIndicatorController extends Controller
         return back()->with('success', "Q{$data['quarter']} actual recorded.");
     }
 
+    public function updateAccomplishment(Request $request, OpcrIndicator $opcrIndicator)
+    {
+        $data = $request->validate([
+            'accomplishment' => 'nullable|string',
+        ]);
+
+        $opcrIndicator->update(['accomplishment' => $data['accomplishment'] !== '' ? ($data['accomplishment'] ?? null) : null]);
+
+        return back()->with('success', 'Accomplishment updated.');
+    }
+
     public function updateRating(Request $request, OpcrIndicator $opcrIndicator)
     {
         $data = $request->validate([

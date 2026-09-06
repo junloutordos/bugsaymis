@@ -57,6 +57,44 @@ class AgencyOutcomeDostTagsTest extends TestCase
         $this->assertNull($fresh->dost_sub_strategy_descriptions_joined);
     }
 
+    public function test_a_pillars_outcome_statement_is_appended_below_its_name_with_a_gap(): void
+    {
+        $pillar = DostPillar::create(['name' => 'DOST Pillar 1: Human Well-Being', 'outcome_statement' => 'Outcome 1: Human well-being promoted']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $program->dostStrategies()->attach($strategy->id);
+
+        $fresh = AgencyOutcome::with('dostStrategies.pillar', 'dostStrategies.subStrategies')->find($program->id);
+
+        $this->assertSame("DOST Pillar 1: Human Well-Being\n\nOutcome 1: Human well-being promoted", $fresh->dost_pillar_names_joined);
+    }
+
+    public function test_a_pillar_with_no_outcome_statement_shows_only_its_name(): void
+    {
+        $pillar = DostPillar::create(['name' => 'Pillar 1']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $program->dostStrategies()->attach($strategy->id);
+
+        $fresh = AgencyOutcome::with('dostStrategies.pillar', 'dostStrategies.subStrategies')->find($program->id);
+
+        $this->assertSame('Pillar 1', $fresh->dost_pillar_names_joined);
+    }
+
+    public function test_multiple_tagged_pillars_each_carry_their_own_outcome_statement(): void
+    {
+        $pillarA = DostPillar::create(['name' => 'Pillar A', 'outcome_statement' => 'Outcome A']);
+        $pillarB = DostPillar::create(['name' => 'Pillar B']);
+        $strategyA = DostStrategy::create(['dost_pillar_id' => $pillarA->id, 'name' => 'Strategy A']);
+        $strategyB = DostStrategy::create(['dost_pillar_id' => $pillarB->id, 'name' => 'Strategy B']);
+        $program = AgencyOutcome::create(['outcome' => 'B. Promotion']);
+        $program->dostStrategies()->attach([$strategyA->id, $strategyB->id]);
+
+        $fresh = AgencyOutcome::with('dostStrategies.pillar', 'dostStrategies.subStrategies')->find($program->id);
+
+        $this->assertSame("Pillar A\n\nOutcome A; Pillar B", $fresh->dost_pillar_names_joined);
+    }
+
     public function test_a_child_with_no_tags_of_its_own_inherits_the_parents_tags(): void
     {
         $pillar = DostPillar::create(['name' => 'Pillar 1']);

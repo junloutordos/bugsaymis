@@ -19,6 +19,7 @@ class OpcrIndicator extends Model
         'target',
         'budget',
         'remarks',
+        'accomplishment',
         'rating_quality',
         'rating_efficiency',
         'rating_timeliness',
@@ -32,6 +33,8 @@ class OpcrIndicator extends Model
         'rating_timeliness' => 'decimal:2',
         'rating_average' => 'decimal:2',
     ];
+
+    protected $appends = ['accomplishment_summary', 'displayed_accomplishment'];
 
     public function scopeForFiscalYear($query, int $year)
     {
@@ -61,5 +64,30 @@ class OpcrIndicator extends Model
     public function actuals()
     {
         return $this->hasMany(OpcrIndicatorActual::class);
+    }
+
+    // Actual accomplishment is free text per quarter (percentages, counts, or
+    // narrative notes), so the only universally-safe summary is a labeled
+    // join of the quarters that have a value — never a numeric sum/average.
+    public function getAccomplishmentSummaryAttribute(): ?string
+    {
+        if (! $this->relationLoaded('actuals')) {
+            return null;
+        }
+
+        $parts = collect(range(1, 4))
+            ->map(fn ($quarter) => [$quarter, $this->actuals->firstWhere('quarter', $quarter)?->value])
+            ->filter(fn ($pair) => filled($pair[1]))
+            ->map(fn ($pair) => "Q{$pair[0]}: {$pair[1]}");
+
+        return $parts->isEmpty() ? null : $parts->implode('; ');
+    }
+
+    // A manually-typed `accomplishment` always wins over the auto-joined
+    // Q1-Q4 summary — set once, it stops tracking further Q1-Q4 edits until
+    // cleared back to null (see OpcrIndicatorController::updateAccomplishment).
+    public function getDisplayedAccomplishmentAttribute(): ?string
+    {
+        return filled($this->accomplishment) ? $this->accomplishment : $this->accomplishment_summary;
     }
 }

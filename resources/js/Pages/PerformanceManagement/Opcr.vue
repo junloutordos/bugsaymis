@@ -15,7 +15,6 @@ import EmptyState from "@/Components/EmptyState.vue"
 import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
 import { PencilSquareIcon, DocumentArrowDownIcon, ArrowLeftIcon } from "@heroicons/vue/24/outline"
 import { useOpcr } from "@/Composables/useOpcr.js"
-import { dostAlignmentLabel } from "@/Utils/OPCR/opcrGrouping.js"
 import Multiselect from "vue-multiselect"
 import "vue-multiselect/dist/vue-multiselect.css"
 
@@ -39,6 +38,7 @@ const {
   submitIndicator,
   updateActual,
   updateRating,
+  updateAccomplishment,
   isPropagatedIndicator,
   showSettingsModal,
   settingsForm,
@@ -101,12 +101,12 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Indicator</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Target</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Budget</th>
-            <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">DOST Alignment</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Division</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q1</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q2</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q3</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q4</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Accomplishment</th>
             <th class="px-3 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">Rating (Q/E/T/A)</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Remarks</th>
             <th v-if="canManage" class="px-3 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">Action</th>
@@ -126,7 +126,6 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
             <td class="px-3 py-2 text-sm text-slate-700 align-top">
               {{ indicator.budget !== null && indicator.budget !== undefined ? Number(indicator.budget).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }}
             </td>
-            <td class="px-3 py-2 text-xs text-slate-500 align-top">{{ dostAlignmentLabel(indicator) ?? '—' }}</td>
             <td class="px-3 py-2 text-sm text-slate-700 align-top">
               {{ indicator.divisions?.map(d => d.acronym ?? d.division_name).join(', ') || '—' }}
             </td>
@@ -138,6 +137,16 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
                 @change="updateActual(indicator, q, $event.target.value)"
               />
               <span v-else class="text-sm text-slate-700">{{ indicator.actuals?.find(a => a.quarter === q)?.value ?? '—' }}</span>
+            </td>
+            <td class="px-3 py-2 align-top">
+              <textarea
+                v-if="canManage"
+                :value="indicator.accomplishment ?? indicator.accomplishment_summary ?? ''"
+                rows="1"
+                class="w-40 rounded border border-slate-200 px-1 py-0.5 text-xs"
+                @change="updateAccomplishment(indicator, $event.target.value)"
+              />
+              <span v-else class="text-xs text-slate-500">{{ indicator.displayed_accomplishment ?? '—' }}</span>
             </td>
             <td class="px-3 py-2 align-top">
               <div v-if="canManage" class="flex gap-1">
