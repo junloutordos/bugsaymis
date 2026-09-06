@@ -34,6 +34,24 @@ test('groups indicators by Program', () => {
   assert.equal(grouped['B. STEM Promotion Program'].length, 1)
 })
 
+test('groups are ordered alphabetically by Program regardless of indicator id order, matching the PDF', () => {
+  const indicators = [
+    indicator({ id: 3, program: 'B. STEM Promotion Program' }),
+    indicator({ id: 7, program: 'D. Leadership Role in Secondary STEM Education' }),
+    indicator({ id: 8, program: 'A. STEM Secondary Education on Scholarship Basis Program' }),
+    indicator({ id: 15, program: 'C. General Administration and Support' }),
+  ]
+
+  const grouped = groupIndicatorsByProgram(indicators)
+
+  assert.deepEqual(Object.keys(grouped), [
+    'A. STEM Secondary Education on Scholarship Basis Program',
+    'B. STEM Promotion Program',
+    'C. General Administration and Support',
+    'D. Leadership Role in Secondary STEM Education',
+  ])
+})
+
 test('an indicator missing a program (should not happen now that it is required, but defensively handled) groups under "Untagged"', () => {
   const indicators = [indicator({ id: 1 })]
 

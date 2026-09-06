@@ -16,7 +16,13 @@ export function groupIndicatorsByProgram(indicators) {
     grouped[programName].push(indicator)
   }
 
-  return grouped
+  // Sort Program groups A→Z, matching the PDF's OpcrPdfRowGrouper ordering —
+  // otherwise groups appear in whatever order their rows' ids happen to fall
+  // in (e.g. a Program backfilled later lands at the bottom of a long page
+  // and reads as missing data rather than merely out of order).
+  return Object.fromEntries(
+    Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
+  )
 }
 
 /**
