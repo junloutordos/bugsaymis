@@ -10,6 +10,7 @@ import {
   BanknotesIcon,
   XMarkIcon,
   IdentificationIcon,
+  Cog6ToothIcon,
 } from "@heroicons/vue/24/outline"
 import { useUsers } from "@/Composables/useUsers.js"
 import { storageUrl } from "@/Composables/useStorage.js"
@@ -434,6 +435,9 @@ function formatSg(user) {
                 <AppIconButton v-if="isEmployeesPage && !isInactivePage" label="Assign Salary Grade" variant="success" @click="openSgModal(user)">
                   <BanknotesIcon class="w-4 h-4" />
                 </AppIconButton>
+                <AppIconButton v-if="!isInactivePage" label="Employee Functions" @click="router.get(route('employee-functions.index', user.id))">
+                  <Cog6ToothIcon class="w-4 h-4" />
+                </AppIconButton>
                 <AppIconButton v-if="isInactivePage" label="Activate" variant="success" @click="activateUser(user)">
                   <PlusIcon class="w-4 h-4" />
                 </AppIconButton>
@@ -531,6 +535,10 @@ function formatSg(user) {
                           <ArrowUpOnSquareIcon class="w-4 h-4" />
                         </AppIconButton>
                       </div>
+                      <!-- Employee Functions (Core/Support assignment) -->
+                      <AppIconButton label="Employee Functions" @click="router.get(route('employee-functions.index', user.id))">
+                        <Cog6ToothIcon class="w-4 h-4" />
+                      </AppIconButton>
                     </template>
                     <template v-if="isInactivePage">
                       <AppIconButton label="Activate user" variant="success" @click="activateUser(user)">
