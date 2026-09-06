@@ -165,6 +165,11 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\FacultyLoading\LoadAssignment::class, 'user_id');
     }
 
+    public function employeeFunctions()
+    {
+        return $this->hasMany(\App\Models\EmployeeFunction::class);
+    }
+
     // ─── Permission cache (per-request, cleared on role change) ──────────────
 
     /** @var array<string,bool>|null */

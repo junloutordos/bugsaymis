@@ -75,6 +75,7 @@ use App\Http\Controllers\VehicleRequestController;
 use App\Http\Controllers\WorkRequestController;
 use App\Http\Controllers\BuildingController;
 use App\Http\Controllers\ICTPMSHistoryController;
+use App\Http\Controllers\EmployeeFunctionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RolesController;
 use App\Models\User;
@@ -1217,6 +1218,14 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/users/inactive', [UserController::class, 'inactiveIndex'])->name('users.inactive')->middleware('permission:hr.employees.manage');
         Route::post('/users/{id}/activate', [UserController::class, 'activate'])->name('users.activate')->middleware('permission:hr.employees.manage');
         Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
+    });
+
+    Route::middleware('permission:employee_functions.manage')->group(function () {
+        Route::get('/users/{user}/functions', [EmployeeFunctionController::class, 'index'])->name('employee-functions.index');
+        Route::post('/users/{user}/functions', [EmployeeFunctionController::class, 'store'])->name('employee-functions.store');
+        Route::put('/users/{user}/functions/{employeeFunction}', [EmployeeFunctionController::class, 'update'])->name('employee-functions.update');
+        Route::delete('/users/{user}/functions/{employeeFunction}', [EmployeeFunctionController::class, 'destroy'])->name('employee-functions.destroy');
+        Route::post('/users/{user}/functions/sync', [EmployeeFunctionController::class, 'sync'])->name('employee-functions.sync');
     });
 
     // Roles & Divisions — was nested inside the users.view group above (wrong
