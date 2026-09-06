@@ -117,42 +117,65 @@ class AgencyOutcome extends Model
         return $this->belongsToMany(DostStrategy::class, 'dost_strategy_agency_outcomes');
     }
 
-    // Pillar/Strategy/Sub-Strategy are tagged many-to-many to a Program in the
-    // DOST Strategic Plan module, not per-indicator — so display for a given
-    // Program joins every tagged combination rather than picking just one.
-    // These are $appends'd (for OPCR's on-screen/print use), so each one
-    // guards on relationLoaded() to avoid a lazy-load N+1 anywhere else in
-    // the app that serializes an AgencyOutcome without eager-loading
-    // dostStrategies.pillar / dostStrategies.subStrategies.
-    public function getDostPillarNamesJoinedAttribute(): ?string
+    // Pillar/Strategy/Sub-Strategy are tagged many-to-many to a Program (or a
+    // specific child under it) in the DOST Strategic Plan module. A child
+    // with its own tags uses those (achieving per-indicator specificity);
+    // a child with none inherits its parent's, so Programs that were never
+    // split into children still display correctly. These are $appends'd
+    // (for OPCR's on-screen/print use), so each one guards on
+    // relationLoaded() to avoid a lazy-load N+1 anywhere else in the app
+    // that serializes an AgencyOutcome without eager-loading
+    // dostStrategies.pillar / dostStrategies.subStrategies (and, for the
+    // inheritance fallback, parent.dostStrategies.pillar / .subStrategies).
+    private function effectiveDostStrategies()
     {
         if (! $this->relationLoaded('dostStrategies')) {
             return null;
         }
 
-        $names = $this->dostStrategies->pluck('pillar.name')->filter()->unique()->values();
+        if ($this->dostStrategies->isNotEmpty()) {
+            return $this->dostStrategies;
+        }
+
+        if ($this->parent_id && $this->relationLoaded('parent') && $this->parent?->relationLoaded('dostStrategies')) {
+            return $this->parent->dostStrategies;
+        }
+
+        return $this->dostStrategies;
+    }
+
+    public function getDostPillarNamesJoinedAttribute(): ?string
+    {
+        $strategies = $this->effectiveDostStrategies();
+        if ($strategies === null) {
+            return null;
+        }
+
+        $names = $strategies->pluck('pillar.name')->filter()->unique()->values();
 
         return $names->isEmpty() ? null : $names->implode('; ');
     }
 
     public function getDostStrategyNamesJoinedAttribute(): ?string
     {
-        if (! $this->relationLoaded('dostStrategies')) {
+        $strategies = $this->effectiveDostStrategies();
+        if ($strategies === null) {
             return null;
         }
 
-        $names = $this->dostStrategies->pluck('name')->filter()->values();
+        $names = $strategies->pluck('name')->filter()->values();
 
         return $names->isEmpty() ? null : $names->implode('; ');
     }
 
     public function getDostSubStrategyDescriptionsJoinedAttribute(): ?string
     {
-        if (! $this->relationLoaded('dostStrategies')) {
+        $strategies = $this->effectiveDostStrategies();
+        if ($strategies === null) {
             return null;
         }
 
-        $descriptions = $this->dostStrategies->flatMap->subStrategies->pluck('description')->filter()->values();
+        $descriptions = $strategies->flatMap->subStrategies->pluck('description')->filter()->values();
 
         return $descriptions->isEmpty() ? null : $descriptions->implode('; ');
     }

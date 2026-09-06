@@ -13,8 +13,11 @@ class OpcrPdfService
     {
         $indicators = OpcrIndicator::forFiscalYear($fiscalYear)
             ->with([
-                'agencyOutcome.dostStrategies.pillar',
-                'agencyOutcome.dostStrategies.subStrategies',
+                'agencyOutcome',
+                'performanceIndicator.agencyOutcome.dostStrategies.pillar',
+                'performanceIndicator.agencyOutcome.dostStrategies.subStrategies',
+                'performanceIndicator.agencyOutcome.parent.dostStrategies.pillar',
+                'performanceIndicator.agencyOutcome.parent.dostStrategies.subStrategies',
                 'divisions',
                 'actuals',
             ])

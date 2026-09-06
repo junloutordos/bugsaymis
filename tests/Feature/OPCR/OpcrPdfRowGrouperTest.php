@@ -6,6 +6,7 @@ use App\Models\AgencyOutcome;
 use App\Models\DostPillar;
 use App\Models\DostStrategy;
 use App\Models\OPCR\OpcrIndicator;
+use App\Models\PerformanceIndicator;
 use App\Services\OPCR\OpcrPdfRowGrouper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -14,19 +15,28 @@ class OpcrPdfRowGrouperTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function indicator(AgencyOutcome $program, string $description): OpcrIndicator
+    private function indicator(AgencyOutcome $program, string $description, ?PerformanceIndicator $sourcePi = null): OpcrIndicator
     {
         return OpcrIndicator::create([
             'fiscal_year' => 2026,
             'agency_outcome_id' => $program->id,
+            'performance_indicator_id' => $sourcePi?->id,
             'description' => $description,
         ]);
     }
 
     private function loaded(iterable $ids)
     {
-        return OpcrIndicator::with(['agencyOutcome.dostStrategies.pillar', 'agencyOutcome.dostStrategies.subStrategies', 'divisions', 'actuals'])
-            ->whereIn('id', $ids)->get();
+        return OpcrIndicator::with([
+            'agencyOutcome.dostStrategies.pillar',
+            'agencyOutcome.dostStrategies.subStrategies',
+            'performanceIndicator.agencyOutcome.dostStrategies.pillar',
+            'performanceIndicator.agencyOutcome.dostStrategies.subStrategies',
+            'performanceIndicator.agencyOutcome.parent.dostStrategies.pillar',
+            'performanceIndicator.agencyOutcome.parent.dostStrategies.subStrategies',
+            'divisions',
+            'actuals',
+        ])->whereIn('id', $ids)->get();
     }
 
     public function test_sorts_by_program_outcome_text_ascending(): void
@@ -104,6 +114,54 @@ class OpcrPdfRowGrouperTest extends TestCase
         $this->assertSame(2, $rows[0]['rowspan']['strategy']);
         $this->assertFalse($rows[1]['show']['pillar']);
         $this->assertFalse($rows[1]['show']['strategy']);
+    }
+
+    public function test_uses_the_source_performance_indicators_own_child_outcome_tagging_not_the_shared_parent_programs(): void
+    {
+        $pillar17 = DostPillar::create(['name' => 'DOST Pillar 5: Governance']);
+        $strategy17 = DostStrategy::create(['dost_pillar_id' => $pillar17->id, 'name' => 'Strategy 17']);
+        $pillar1 = DostPillar::create(['name' => 'DOST Pillar 1: Human Well-Being']);
+        $strategy1 = DostStrategy::create(['dost_pillar_id' => $pillar1->id, 'name' => 'Strategy 1']);
+
+        $programB = AgencyOutcome::create(['outcome' => 'B. STEM Promotion Program']);
+        $childNce = AgencyOutcome::create(['outcome' => 'B. STEM Promotion Program', 'sub_outcome' => 'B.1. NCE applicants', 'parent_id' => $programB->id]);
+        $childGwa = AgencyOutcome::create(['outcome' => 'B. STEM Promotion Program', 'sub_outcome' => 'B.2. Freshmen GWA', 'parent_id' => $programB->id]);
+        $childNce->dostStrategies()->attach($strategy17->id);
+        $childGwa->dostStrategies()->attach($strategy1->id);
+
+        $piNce = PerformanceIndicator::create(['agency_outcome_id' => $childNce->id, 'description' => 'NCE indicator', 'target' => '63%']);
+        $piGwa = PerformanceIndicator::create(['agency_outcome_id' => $childGwa->id, 'description' => 'GWA indicator', 'target' => '95%']);
+
+        // Both OpcrIndicators store the shared top-level Program (as today),
+        // but each is linked back to a source PI tagged to a DIFFERENT child.
+        $nceIndicator = $this->indicator($programB, 'NCE indicator', $piNce);
+        $gwaIndicator = $this->indicator($programB, 'GWA indicator', $piGwa);
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$nceIndicator->id, $gwaIndicator->id]));
+
+        $nceRow = collect($rows)->firstWhere(fn ($r) => $r['indicator']->id === $nceIndicator->id);
+        $gwaRow = collect($rows)->firstWhere(fn ($r) => $r['indicator']->id === $gwaIndicator->id);
+
+        $this->assertSame('DOST Pillar 5: Governance', $nceRow['pillar_text']);
+        $this->assertSame('Strategy 17', $nceRow['strategy_text']);
+        $this->assertSame('DOST Pillar 1: Human Well-Being', $gwaRow['pillar_text']);
+        $this->assertSame('Strategy 1', $gwaRow['strategy_text']);
+    }
+
+    public function test_a_child_with_no_tags_of_its_own_inherits_the_parent_programs_tags(): void
+    {
+        $pillar = DostPillar::create(['name' => 'Pillar 1']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $program->dostStrategies()->attach($strategy->id);
+        $child = AgencyOutcome::create(['outcome' => 'A. STEM', 'sub_outcome' => 'A.1', 'parent_id' => $program->id]);
+        $pi = PerformanceIndicator::create(['agency_outcome_id' => $child->id, 'description' => 'A.1 indicator', 'target' => '90%']);
+        $i1 = $this->indicator($program, 'A.1 indicator', $pi);
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$i1->id]));
+
+        $this->assertSame('Pillar 1', $rows[0]['pillar_text']);
+        $this->assertSame('Strategy 1', $rows[0]['strategy_text']);
     }
 
     public function test_a_program_boundary_resets_dost_columns_even_if_their_tagging_repeats(): void

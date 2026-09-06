@@ -3,17 +3,20 @@ import test from 'node:test'
 
 import { groupIndicatorsByProgram, dostAlignmentLabel } from '../../resources/js/Utils/OPCR/opcrGrouping.js'
 
-function indicator({ id, program = null, pillar = null, strategy = null, subStrategy = null }) {
+function outcome(name, { pillar = null, strategy = null, subStrategy = null } = {}) {
+  return {
+    outcome: name,
+    dost_pillar_names_joined: pillar,
+    dost_strategy_names_joined: strategy,
+    dost_sub_strategy_descriptions_joined: subStrategy,
+  }
+}
+
+function indicator({ id, program = null, pillar = null, strategy = null, subStrategy = null, sourceOutcome = null }) {
   return {
     id,
-    agency_outcome: program
-      ? {
-          outcome: program,
-          dost_pillar_names_joined: pillar,
-          dost_strategy_names_joined: strategy,
-          dost_sub_strategy_descriptions_joined: subStrategy,
-        }
-      : null,
+    agency_outcome: program ? outcome(program, { pillar, strategy, subStrategy }) : null,
+    performance_indicator: sourceOutcome ? { agency_outcome: sourceOutcome } : null,
   }
 }
 
@@ -61,6 +64,32 @@ test('dostAlignmentLabel returns null when the indicator has no DOST tagging', (
   const untagged = indicator({ id: 1, program: 'A' })
 
   assert.equal(dostAlignmentLabel(untagged), null)
+})
+
+test('dostAlignmentLabel prefers the source Performance Indicator\'s own child outcome tagging over the shared parent Program\'s', () => {
+  const nce = indicator({
+    id: 1,
+    program: 'B. STEM Promotion Program', // parent's own (misleading, aggregate) tags
+    pillar: 'DOST Pillar 5: Governance; DOST Pillar 1: Human Well-Being',
+    strategy: 'Strategy 17; Strategy 1',
+    sourceOutcome: outcome('B. STEM Promotion Program', { pillar: 'DOST Pillar 5: Governance', strategy: 'Strategy 17' }),
+  })
+  const gwa = indicator({
+    id: 2,
+    program: 'B. STEM Promotion Program',
+    pillar: 'DOST Pillar 5: Governance; DOST Pillar 1: Human Well-Being',
+    strategy: 'Strategy 17; Strategy 1',
+    sourceOutcome: outcome('B. STEM Promotion Program', { pillar: 'DOST Pillar 1: Human Well-Being', strategy: 'Strategy 1' }),
+  })
+
+  assert.equal(dostAlignmentLabel(nce), 'DOST Pillar 5: Governance › Strategy 17')
+  assert.equal(dostAlignmentLabel(gwa), 'DOST Pillar 1: Human Well-Being › Strategy 1')
+})
+
+test('dostAlignmentLabel falls back to the Program\'s own tags when there is no linked Performance Indicator', () => {
+  const noSource = indicator({ id: 1, program: 'A', pillar: 'Pillar 1', strategy: 'Strategy 1' })
+
+  assert.equal(dostAlignmentLabel(noSource), 'Pillar 1 › Strategy 1')
 })
 
 test('dostAlignmentLabel passes through a Program already tagged to multiple Pillars/Strategies', () => {

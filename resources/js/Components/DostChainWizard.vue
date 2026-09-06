@@ -133,7 +133,11 @@ const handleSubmit = async () => {
       </div>
 
       <AppSelect v-if="state.program.mode === 'existing'" v-model="state.program.id" placeholder="-- Select Program --">
-        <option v-for="o in agencyOutcomes" :key="o.id" :value="o.id">{{ o.outcome }}</option>
+        <optgroup v-for="parent in agencyOutcomes" :key="parent.id" :label="parent.outcome">
+          <option v-for="leaf in (parent.children?.length ? parent.children : [parent])" :key="leaf.id" :value="leaf.id">
+            {{ leaf.sub_outcome ?? parent.outcome }}
+          </option>
+        </optgroup>
       </AppSelect>
 
       <div v-else-if="state.program.mode === 'new'" class="space-y-2">

@@ -29,9 +29,11 @@ class OpcrController extends Controller
         $selectedFY = $request->query('fiscal_year');
 
         $indicatorsQuery = OpcrIndicator::with([
-            'agencyOutcome.dostStrategies.pillar',
-            'agencyOutcome.dostStrategies.subStrategies',
-            'performanceIndicator',
+            'agencyOutcome',
+            'performanceIndicator.agencyOutcome.dostStrategies.pillar',
+            'performanceIndicator.agencyOutcome.dostStrategies.subStrategies',
+            'performanceIndicator.agencyOutcome.parent.dostStrategies.pillar',
+            'performanceIndicator.agencyOutcome.parent.dostStrategies.subStrategies',
             'divisions',
             'actuals',
         ])

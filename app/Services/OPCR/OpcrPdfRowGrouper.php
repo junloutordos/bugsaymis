@@ -15,35 +15,49 @@ class OpcrPdfRowGrouper
     // boundary (see OpcrPdfRowGrouperTest's boundary-reset case).
     private const COLUMNS = ['program', 'pillar', 'strategy', 'sub_strategy'];
 
-    // Pillar/Strategy/Sub-Strategy come from the Program's own many-to-many
-    // DOST Strategic Plan tagging (AgencyOutcome::getDost*JoinedAttribute),
-    // not from a per-indicator field — a Program tagged to more than one
-    // Strategy shows all of them joined, rather than guessing which one
-    // applies to this specific indicator.
+    // Pillar/Strategy/Sub-Strategy come from the many-to-many DOST Strategic
+    // Plan tagging (AgencyOutcome::getDost*JoinedAttribute) on the SOURCE
+    // Performance Indicator's own outcome node — which may be a specific
+    // child under the Program, distinct from its siblings — not from the
+    // OpcrIndicator's own agency_outcome_id, which always holds the
+    // top-level Program (walked up in OpcrIndicatorPropagationService) and
+    // would otherwise collapse every indicator under one Program to the
+    // same aggregate tags. Falls back to the Program's own tags only when
+    // there's no linked Performance Indicator.
     public function group(Collection $indicators): array
     {
-        $sorted = $indicators->sortBy(fn (OpcrIndicator $i) => [
-            $i->agencyOutcome?->outcome ?? '',
-            $i->agencyOutcome?->dost_pillar_names_joined ?? '',
-            $i->agencyOutcome?->dost_strategy_names_joined ?? '',
-            $i->agencyOutcome?->dost_sub_strategy_descriptions_joined ?? '',
-            $i->id,
-        ])->values();
+        $dostSource = fn (OpcrIndicator $i) => $i->performanceIndicator?->agencyOutcome ?? $i->agencyOutcome;
 
-        $rows = $sorted->map(fn (OpcrIndicator $i) => [
-            'indicator' => $i,
-            'pillar_text' => $i->agencyOutcome?->dost_pillar_names_joined,
-            'strategy_text' => $i->agencyOutcome?->dost_strategy_names_joined,
-            'sub_strategy_text' => $i->agencyOutcome?->dost_sub_strategy_descriptions_joined,
-            'key' => [
-                'program' => $i->agencyOutcome?->outcome,
-                'pillar' => $i->agencyOutcome?->dost_pillar_names_joined,
-                'strategy' => $i->agencyOutcome?->dost_strategy_names_joined,
-                'sub_strategy' => $i->agencyOutcome?->dost_sub_strategy_descriptions_joined,
-            ],
-            'rowspan' => array_fill_keys(self::COLUMNS, 1),
-            'show' => array_fill_keys(self::COLUMNS, true),
-        ])->all();
+        $sorted = $indicators->sortBy(function (OpcrIndicator $i) use ($dostSource) {
+            $source = $dostSource($i);
+
+            return [
+                $i->agencyOutcome?->outcome ?? '',
+                $source?->dost_pillar_names_joined ?? '',
+                $source?->dost_strategy_names_joined ?? '',
+                $source?->dost_sub_strategy_descriptions_joined ?? '',
+                $i->id,
+            ];
+        })->values();
+
+        $rows = $sorted->map(function (OpcrIndicator $i) use ($dostSource) {
+            $source = $dostSource($i);
+
+            return [
+                'indicator' => $i,
+                'pillar_text' => $source?->dost_pillar_names_joined,
+                'strategy_text' => $source?->dost_strategy_names_joined,
+                'sub_strategy_text' => $source?->dost_sub_strategy_descriptions_joined,
+                'key' => [
+                    'program' => $i->agencyOutcome?->outcome,
+                    'pillar' => $source?->dost_pillar_names_joined,
+                    'strategy' => $source?->dost_strategy_names_joined,
+                    'sub_strategy' => $source?->dost_sub_strategy_descriptions_joined,
+                ],
+                'rowspan' => array_fill_keys(self::COLUMNS, 1),
+                'show' => array_fill_keys(self::COLUMNS, true),
+            ];
+        })->all();
 
         $count = count($rows);
         $isNewGroup = [];

@@ -57,6 +57,39 @@ class AgencyOutcomeDostTagsTest extends TestCase
         $this->assertNull($fresh->dost_sub_strategy_descriptions_joined);
     }
 
+    public function test_a_child_with_no_tags_of_its_own_inherits_the_parents_tags(): void
+    {
+        $pillar = DostPillar::create(['name' => 'Pillar 1']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $parent = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $parent->dostStrategies()->attach($strategy->id);
+        $child = AgencyOutcome::create(['outcome' => 'A. STEM', 'sub_outcome' => 'A.1', 'parent_id' => $parent->id]);
+
+        $fresh = AgencyOutcome::with('parent.dostStrategies.pillar', 'parent.dostStrategies.subStrategies', 'dostStrategies.pillar', 'dostStrategies.subStrategies')
+            ->find($child->id);
+
+        $this->assertSame('Pillar 1', $fresh->dost_pillar_names_joined);
+        $this->assertSame('Strategy 1', $fresh->dost_strategy_names_joined);
+    }
+
+    public function test_a_child_with_its_own_tags_uses_those_instead_of_the_parents(): void
+    {
+        $pillarParent = DostPillar::create(['name' => 'Parent Pillar']);
+        $strategyParent = DostStrategy::create(['dost_pillar_id' => $pillarParent->id, 'name' => 'Parent Strategy']);
+        $pillarChild = DostPillar::create(['name' => 'Child Pillar']);
+        $strategyChild = DostStrategy::create(['dost_pillar_id' => $pillarChild->id, 'name' => 'Child Strategy']);
+        $parent = AgencyOutcome::create(['outcome' => 'B. Promotion']);
+        $parent->dostStrategies()->attach($strategyParent->id);
+        $child = AgencyOutcome::create(['outcome' => 'B. Promotion', 'sub_outcome' => 'B.1', 'parent_id' => $parent->id]);
+        $child->dostStrategies()->attach($strategyChild->id);
+
+        $fresh = AgencyOutcome::with('parent.dostStrategies.pillar', 'parent.dostStrategies.subStrategies', 'dostStrategies.pillar', 'dostStrategies.subStrategies')
+            ->find($child->id);
+
+        $this->assertSame('Child Pillar', $fresh->dost_pillar_names_joined);
+        $this->assertSame('Child Strategy', $fresh->dost_strategy_names_joined);
+    }
+
     public function test_deduplicates_a_pillar_shared_by_two_tagged_strategies(): void
     {
         $pillar = DostPillar::create(['name' => 'Pillar 1']);

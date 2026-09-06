@@ -21,13 +21,17 @@ export function groupIndicatorsByProgram(indicators) {
 
 /**
  * Builds the "Pillar / Strategy / Sub-Strategy" alignment label for one
- * indicator row, or null when its Program has no DOST tagging at all.
- * Sourced from the Program's own many-to-many DOST Strategic Plan tagging
- * (AgencyOutcome::$appends), not a per-indicator field — a Program tagged to
- * more than one Strategy already arrives joined with "; " from the backend.
+ * indicator row, or null when there's no DOST tagging at all. Sourced from
+ * the linked Performance Indicator's own outcome node (which may be a
+ * specific child under the Program, distinct from its siblings) via its
+ * many-to-many DOST Strategic Plan tagging (AgencyOutcome::$appends) — not
+ * from the OPCR indicator's own Program field, which always holds the
+ * top-level Program and would otherwise collapse every indicator under one
+ * Program to the same aggregate tags. Falls back to the Program's own tags
+ * only when there's no linked Performance Indicator.
  */
 export function dostAlignmentLabel(indicator) {
-  const outcome = indicator.agency_outcome
+  const outcome = indicator.performance_indicator?.agency_outcome ?? indicator.agency_outcome
   const pillar = outcome?.dost_pillar_names_joined
   const strategy = outcome?.dost_strategy_names_joined
   const subStrategy = outcome?.dost_sub_strategy_descriptions_joined
