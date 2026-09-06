@@ -45,6 +45,7 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
     Route::post('/student/register',    [RegisterController::class, 'registerStudent'])->name('student.register')->middleware('throttle:5,1');
     Route::post('/verify-email',        [RegisterController::class, 'verifyEmail'])->name('verify-email')->middleware('throttle:5,1');
     Route::post('/resend-verification', [RegisterController::class, 'resendVerification'])->name('resend-verification')->middleware('throttle:3,1');
+    Route::post('/diagnostics/login-failure', [AuthController::class, 'reportLoginFailure'])->name('diagnostics.login-failure')->middleware('throttle:20,1');
 
     // ── Authenticated ─────────────────────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {

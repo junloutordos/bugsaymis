@@ -8,7 +8,9 @@ use App\Models\StudentAttendance\ParentContact;
 use App\Models\StudentCredential;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -43,6 +45,36 @@ class AuthController extends Controller
         throw ValidationException::withMessages([
             'email' => ['The provided credentials are incorrect.'],
         ]);
+    }
+
+    /**
+     * POST /api/mobile/diagnostics/login-failure
+     *
+     * The login screen falls back to a generic "Login failed. Please try
+     * again." message whenever it gets a real HTTP response it can't parse
+     * into our usual JSON shape — a state that never appears in our own
+     * request logs since whatever produced it wasn't our own JSON response.
+     * The client reports what it actually saw here so it lands in
+     * CloudWatch instead of being unattributable after the fact.
+     */
+    public function reportLoginFailure(Request $request): Response
+    {
+        $validated = $request->validate([
+            'status_code'      => ['nullable', 'integer'],
+            'response_snippet' => ['nullable', 'string', 'max:1000'],
+            'platform'         => ['required', 'string', 'max:50'],
+            'app_version'      => ['required', 'string', 'max:20'],
+        ]);
+
+        Log::warning('AtlasGo login failure diagnostic', [
+            'status_code'      => $validated['status_code']      ?? null,
+            'response_snippet' => $validated['response_snippet'] ?? null,
+            'platform'         => $validated['platform'],
+            'app_version'      => $validated['app_version'],
+            'ip'               => $request->ip(),
+        ]);
+
+        return response()->noContent();
     }
 
     private function loginStudent(StudentCredential $credential, string $password, string $deviceName): JsonResponse
