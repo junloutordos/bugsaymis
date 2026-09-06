@@ -1,0 +1,129 @@
+<?php
+
+namespace Tests\Feature\OPCR;
+
+use App\Models\AgencyOutcome;
+use App\Models\DostPillar;
+use App\Models\DostStrategy;
+use App\Models\OPCR\OpcrIndicator;
+use App\Services\OPCR\OpcrPdfRowGrouper;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class OpcrPdfRowGrouperTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function indicator(AgencyOutcome $program, string $description): OpcrIndicator
+    {
+        return OpcrIndicator::create([
+            'fiscal_year' => 2026,
+            'agency_outcome_id' => $program->id,
+            'description' => $description,
+        ]);
+    }
+
+    private function loaded(iterable $ids)
+    {
+        return OpcrIndicator::with(['agencyOutcome.dostStrategies.pillar', 'agencyOutcome.dostStrategies.subStrategies', 'divisions', 'actuals'])
+            ->whereIn('id', $ids)->get();
+    }
+
+    public function test_sorts_by_program_outcome_text_ascending(): void
+    {
+        $programD = AgencyOutcome::create(['outcome' => 'D. Leadership']);
+        $programA = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $indicatorD = $this->indicator($programD, 'D indicator');
+        $indicatorA = $this->indicator($programA, 'A indicator');
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$indicatorD->id, $indicatorA->id]));
+
+        $this->assertSame('A indicator', $rows[0]['indicator']->description);
+        $this->assertSame('D indicator', $rows[1]['indicator']->description);
+    }
+
+    public function test_rowspans_the_program_column_across_consecutive_matching_rows(): void
+    {
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $other = AgencyOutcome::create(['outcome' => 'B. Promotion']);
+        $i1 = $this->indicator($program, 'First');
+        $i2 = $this->indicator($program, 'Second');
+        $i3 = $this->indicator($other, 'Third');
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$i1->id, $i2->id, $i3->id]));
+
+        $this->assertSame(2, $rows[0]['rowspan']['program']);
+        $this->assertTrue($rows[0]['show']['program']);
+        $this->assertFalse($rows[1]['show']['program']);
+        $this->assertSame(1, $rows[2]['rowspan']['program']);
+        $this->assertTrue($rows[2]['show']['program']);
+    }
+
+    public function test_pillar_strategy_and_sub_strategy_text_is_derived_from_the_programs_own_dost_tags(): void
+    {
+        $pillar = DostPillar::create(['name' => 'Pillar 1']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $program->dostStrategies()->attach($strategy->id);
+        $i1 = $this->indicator($program, 'First');
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$i1->id]));
+
+        $this->assertSame('Pillar 1', $rows[0]['pillar_text']);
+        $this->assertSame('Strategy 1', $rows[0]['strategy_text']);
+    }
+
+    public function test_multiple_tagged_pillars_and_strategies_are_joined_with_semicolons(): void
+    {
+        $pillarA = DostPillar::create(['name' => 'Pillar A']);
+        $pillarB = DostPillar::create(['name' => 'Pillar B']);
+        $strategyA = DostStrategy::create(['dost_pillar_id' => $pillarA->id, 'name' => 'Strategy A']);
+        $strategyB = DostStrategy::create(['dost_pillar_id' => $pillarB->id, 'name' => 'Strategy B']);
+        $program = AgencyOutcome::create(['outcome' => 'B. Promotion']);
+        $program->dostStrategies()->attach([$strategyA->id, $strategyB->id]);
+        $i1 = $this->indicator($program, 'First');
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$i1->id]));
+
+        $this->assertSame('Pillar A; Pillar B', $rows[0]['pillar_text']);
+        $this->assertSame('Strategy A; Strategy B', $rows[0]['strategy_text']);
+    }
+
+    public function test_dost_columns_rowspan_across_consecutive_rows_sharing_the_same_program(): void
+    {
+        $pillar = DostPillar::create(['name' => 'Pillar 1']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $program->dostStrategies()->attach($strategy->id);
+        $i1 = $this->indicator($program, 'First');
+        $i2 = $this->indicator($program, 'Second');
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$i1->id, $i2->id]));
+
+        $this->assertSame(2, $rows[0]['rowspan']['pillar']);
+        $this->assertSame(2, $rows[0]['rowspan']['strategy']);
+        $this->assertFalse($rows[1]['show']['pillar']);
+        $this->assertFalse($rows[1]['show']['strategy']);
+    }
+
+    public function test_a_program_boundary_resets_dost_columns_even_if_their_tagging_repeats(): void
+    {
+        $pillar = DostPillar::create(['name' => 'Pillar 1']);
+        $strategy = DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $programA = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $programB = AgencyOutcome::create(['outcome' => 'B. Promotion']);
+        // Same Pillar/Strategy tagged to two DIFFERENT programs — since
+        // Program sorts first and is the outer boundary, these must NOT
+        // merge into one rowspan across the program change.
+        $programA->dostStrategies()->attach($strategy->id);
+        $programB->dostStrategies()->attach($strategy->id);
+        $i1 = $this->indicator($programA, 'A indicator');
+        $i2 = $this->indicator($programB, 'B indicator');
+
+        $rows = (new OpcrPdfRowGrouper)->group($this->loaded([$i1->id, $i2->id]));
+
+        $this->assertSame(1, $rows[0]['rowspan']['pillar']);
+        $this->assertTrue($rows[1]['show']['pillar']);
+        $this->assertSame(1, $rows[1]['rowspan']['pillar']);
+    }
+}

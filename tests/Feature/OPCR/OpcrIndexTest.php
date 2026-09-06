@@ -29,7 +29,7 @@ class OpcrIndexTest extends TestCase
         return $user;
     }
 
-    public function test_defaults_to_the_current_ipcr_rating_period_year(): void
+    public function test_selecting_the_current_year_renders_the_detail_table(): void
     {
         $user = $this->userWithPermission('OCD', ['opcr.view', 'opcr.manage']);
         IPCRRatingPeriod::create(['label' => 'FY2025', 'year' => 2025, 'is_current' => false]);
@@ -38,7 +38,7 @@ class OpcrIndexTest extends TestCase
         OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $outcome->id, 'description' => 'FY2025 indicator']);
         $fy2026 = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'FY2026 indicator']);
 
-        $response = $this->actingAs($user)->get(route('opcr.index'));
+        $response = $this->actingAs($user)->get(route('opcr.index', ['fiscal_year' => 2026]));
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -83,7 +83,7 @@ class OpcrIndexTest extends TestCase
         $notMine = OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'Not mine']);
         $notMine->divisions()->sync([$otherDivision->id]);
 
-        $response = $this->actingAs($user)->get(route('opcr.index'));
+        $response = $this->actingAs($user)->get(route('opcr.index', ['fiscal_year' => 2026]));
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -93,14 +93,17 @@ class OpcrIndexTest extends TestCase
         );
     }
 
-    public function test_index_renders_with_no_indicators_for_the_year(): void
+    public function test_detail_renders_with_no_indicators_for_the_year(): void
     {
         $user = $this->userWithPermission('OCD', ['opcr.view', 'opcr.manage']);
 
-        $response = $this->actingAs($user)->get(route('opcr.index'));
+        $response = $this->actingAs($user)->get(route('opcr.index', ['fiscal_year' => 2026]));
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->has('indicators', 0));
+        $response->assertInertia(fn ($page) => $page
+            ->component('PerformanceManagement/Opcr', false)
+            ->has('indicators', 0)
+        );
     }
 
     public function test_user_without_opcr_permission_gets_403(): void

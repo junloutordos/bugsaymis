@@ -46,7 +46,7 @@ class PerformanceIndicatorController extends Controller
     ]);
 
     $indicator = PerformanceIndicator::create($validated);
-    $indicator->divisions()->sync($validated['division_ids'] ?? []);
+    $indicator->syncDivisions($validated['division_ids'] ?? []);
 
     return redirect()->back();
 }
@@ -64,12 +64,10 @@ public function update(Request $request, PerformanceIndicator $performanceIndica
     ]);
 
     $performanceIndicator->update($validated);
-    $performanceIndicator->divisions()->sync($validated['division_ids'] ?? []);
+    $performanceIndicator->syncDivisions($validated['division_ids'] ?? []);
 
     return redirect()->back();
 }
-
-
 
 
     public function destroy(PerformanceIndicator $performanceIndicator)

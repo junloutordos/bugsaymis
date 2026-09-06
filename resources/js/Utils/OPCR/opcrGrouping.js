@@ -21,13 +21,17 @@ export function groupIndicatorsByProgram(indicators) {
 
 /**
  * Builds the "Pillar / Strategy / Sub-Strategy" alignment label for one
- * indicator row, or null when the indicator has no DOST tagging at all.
+ * indicator row, or null when its Program has no DOST tagging at all.
+ * Sourced from the Program's own many-to-many DOST Strategic Plan tagging
+ * (AgencyOutcome::$appends), not a per-indicator field — a Program tagged to
+ * more than one Strategy already arrives joined with "; " from the backend.
  */
 export function dostAlignmentLabel(indicator) {
-  const sub = indicator.sub_strategy
-  if (!sub) return null
+  const outcome = indicator.agency_outcome
+  const pillar = outcome?.dost_pillar_names_joined
+  const strategy = outcome?.dost_strategy_names_joined
+  const subStrategy = outcome?.dost_sub_strategy_descriptions_joined
+  if (!pillar && !strategy && !subStrategy) return null
 
-  const pillar = sub.strategy?.pillar?.name
-  const strategy = sub.strategy?.name
-  return [pillar, strategy, sub.description].filter(Boolean).join(" › ")
+  return [pillar, strategy, subStrategy].filter(Boolean).join(" › ")
 }

@@ -6,15 +6,18 @@ import { groupIndicatorsByProgram } from "@/Utils/OPCR/opcrGrouping.js"
 export function useOpcr(props) {
   const groupedIndicators = computed(() => groupIndicatorsByProgram(props.indicators || []))
 
-  // ── Indicator modal ──────────────────────────────────────────────────
+  // ── Indicator modal — edit-only. OPCR indicators are only ever created
+  // via OpcrIndicatorPropagationService, sourced from a Performance
+  // Indicator tagged to a PSHS Program; there is no manual creation or
+  // deletion on the OPCR side (remove/reassign at the Performance Indicator
+  // instead). Opening this modal always edits an existing indicator's
+  // DOST tagging and remarks. ─────────────────────────────────────────────
   const showIndicatorModal = ref(false)
-  const indicatorModalMode = ref("create")
   const selectedIndicator = ref(null)
 
   const blankIndicatorForm = () => ({
     id: null,
-    fiscal_year: props.selectedFiscalYear !== "all" ? props.selectedFiscalYear : props.currentFiscalYear,
-    dost_sub_strategy_id: "",
+    fiscal_year: "",
     agency_outcome_id: "",
     performance_indicator_id: "",
     description: "",
@@ -26,26 +29,26 @@ export function useOpcr(props) {
 
   const indicatorForm = ref(blankIndicatorForm())
 
-  const openIndicatorModal = (mode, indicator = null) => {
-    indicatorModalMode.value = mode
+  // True when this indicator was auto-propagated from a Performance
+  // Indicator (see OpcrIndicatorPropagationService) — its fiscal year,
+  // description/target/budget/Program/Divisions are mirrored from that
+  // source and read-only here; only DOST tagging, actuals, ratings, and
+  // remarks stay editable in OPCR.
+  const isPropagatedIndicator = computed(() => Boolean(indicatorForm.value.performance_indicator_id))
+
+  const openIndicatorModal = (indicator) => {
     showIndicatorModal.value = true
     selectedIndicator.value = indicator
-
-    if ((mode === "edit" || mode === "view") && indicator) {
-      indicatorForm.value = {
-        id: indicator.id,
-        fiscal_year: indicator.fiscal_year,
-        dost_sub_strategy_id: indicator.dost_sub_strategy_id ?? "",
-        agency_outcome_id: indicator.agency_outcome_id ?? "",
-        performance_indicator_id: indicator.performance_indicator_id ?? "",
-        description: indicator.description ?? "",
-        target: indicator.target ?? "",
-        budget: indicator.budget ?? "",
-        remarks: indicator.remarks ?? "",
-        divisions: indicator.divisions ? [...indicator.divisions] : [],
-      }
-    } else {
-      indicatorForm.value = blankIndicatorForm()
+    indicatorForm.value = {
+      id: indicator.id,
+      fiscal_year: indicator.fiscal_year,
+      agency_outcome_id: indicator.agency_outcome_id ?? "",
+      performance_indicator_id: indicator.performance_indicator_id ?? "",
+      description: indicator.description ?? "",
+      target: indicator.target ?? "",
+      budget: indicator.budget ?? "",
+      remarks: indicator.remarks ?? "",
+      divisions: indicator.divisions ? [...indicator.divisions] : [],
     }
   }
 
@@ -60,41 +63,16 @@ export function useOpcr(props) {
       division_ids: indicatorForm.value.divisions.map((d) => d.id),
     }
 
-    const onDone = (label) => ({
+    router.put(route("opcr-indicators.update", indicatorForm.value.id), payload, {
       onSuccess: async () => {
         closeIndicatorModal()
-        await Swal.fire("Success", label, "success")
+        await Swal.fire("Success", "Indicator updated.", "success")
         router.reload({ only: ["indicators"] })
       },
       onError: async (errors) => {
         await Swal.fire("Error", Object.values(errors).flat().join(", "), "error")
       },
     })
-
-    if (indicatorModalMode.value === "create") {
-      router.post(route("opcr-indicators.store"), payload, onDone("Indicator created."))
-    } else {
-      router.put(route("opcr-indicators.update", indicatorForm.value.id), payload, onDone("Indicator updated."))
-    }
-  }
-
-  const deleteIndicator = async (indicator) => {
-    const result = await Swal.fire({
-      title: `Delete indicator "${indicator?.description ?? ""}"?`,
-      text: "This action cannot be undone!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, delete",
-    })
-
-    if (result.isConfirmed) {
-      router.delete(route("opcr-indicators.destroy", indicator.id), {
-        onSuccess: async () => {
-          await Swal.fire("Deleted", "Indicator deleted.", "success")
-          router.reload({ only: ["indicators"] })
-        },
-      })
-    }
   }
 
   const updateActual = (indicator, quarter, value) => {
@@ -111,29 +89,11 @@ export function useOpcr(props) {
     })
   }
 
-  // ── Embedded DOST chain wizard (shared component) — creating a brand
-  // new Pillar/Strategy/Sub-Strategy/Program chain from inside the
-  // indicator modal, without navigating away. On success, auto-fills
-  // this indicator's own tagging fields with the result.
-  const showChainWizardPanel = ref(false)
-
-  const toggleChainWizardPanel = () => {
-    showChainWizardPanel.value = !showChainWizardPanel.value
-  }
-
-  const onChainWizardCreated = (result) => {
-    showChainWizardPanel.value = false
-    if (result.sub_strategy_id) indicatorForm.value.dost_sub_strategy_id = result.sub_strategy_id
-    if (result.agency_outcome_id) indicatorForm.value.agency_outcome_id = result.agency_outcome_id
-    router.reload({ only: ["pillars", "agencyOutcomes"] })
-  }
-
   // ── Signatories settings modal (Campus Director/OIC/ED names + commitment
   // statement) — one settings row, not per-FY, used on every PDF export ────
   const showSettingsModal = ref(false)
   const settingsForm = ref({
     campus_director_name: "",
-    oic_campus_director_name: "",
     executive_director_name: "",
     commitment_statement: "",
   })
@@ -142,7 +102,6 @@ export function useOpcr(props) {
     showSettingsModal.value = true
     settingsForm.value = {
       campus_director_name: props.settings?.campus_director_name ?? "",
-      oic_campus_director_name: props.settings?.oic_campus_director_name ?? "",
       executive_director_name: props.settings?.executive_director_name ?? "",
       commitment_statement: props.settings?.commitment_statement ?? "",
     }
@@ -196,18 +155,14 @@ export function useOpcr(props) {
   return {
     groupedIndicators,
     showIndicatorModal,
-    indicatorModalMode,
     selectedIndicator,
     indicatorForm,
+    isPropagatedIndicator,
     openIndicatorModal,
     closeIndicatorModal,
     submitIndicator,
-    deleteIndicator,
     updateActual,
     updateRating,
-    showChainWizardPanel,
-    toggleChainWizardPanel,
-    onChainWizardCreated,
     showSettingsModal,
     settingsForm,
     openSettingsModal,

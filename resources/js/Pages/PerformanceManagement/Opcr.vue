@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue"
-import { Head } from "@inertiajs/vue3"
+import { Head, Link } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
 import AppFilterBar from "@/Components/AppFilterBar.vue"
@@ -13,8 +13,7 @@ import AppSelect from "@/Components/AppSelect.vue"
 import AppTextarea from "@/Components/AppTextarea.vue"
 import EmptyState from "@/Components/EmptyState.vue"
 import FiscalYearFilter from "@/Components/FiscalYearFilter.vue"
-import DostChainWizard from "@/Components/DostChainWizard.vue"
-import { PencilSquareIcon, TrashIcon, PlusIcon, DocumentArrowDownIcon } from "@heroicons/vue/24/outline"
+import { PencilSquareIcon, DocumentArrowDownIcon, ArrowLeftIcon } from "@heroicons/vue/24/outline"
 import { useOpcr } from "@/Composables/useOpcr.js"
 import { dostAlignmentLabel } from "@/Utils/OPCR/opcrGrouping.js"
 import Multiselect from "vue-multiselect"
@@ -26,9 +25,7 @@ const props = defineProps({
   selectedFiscalYear: { type: [String, Number], default: "" },
   currentFiscalYear: { type: Number, default: null },
   settings: { type: Object, default: () => ({}) },
-  pillars: { type: Array, default: () => [] },
   agencyOutcomes: { type: Array, default: () => [] },
-  performanceIndicators: { type: Array, default: () => [] },
   divisions: { type: Array, default: () => [] },
   canManage: { type: Boolean, default: false },
 })
@@ -36,17 +33,13 @@ const props = defineProps({
 const {
   groupedIndicators,
   showIndicatorModal,
-  indicatorModalMode,
   indicatorForm,
   openIndicatorModal,
   closeIndicatorModal,
   submitIndicator,
-  deleteIndicator,
   updateActual,
   updateRating,
-  showChainWizardPanel,
-  toggleChainWizardPanel,
-  onChainWizardCreated,
+  isPropagatedIndicator,
   showSettingsModal,
   settingsForm,
   openSettingsModal,
@@ -87,22 +80,27 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
           <template v-if="canManage">
             <AppButton variant="secondary" @click="openSettingsModal">Edit Signatories</AppButton>
             <AppButton v-if="isSpecificYear" variant="secondary" @click="openCloneModal">Clone from FY —</AppButton>
-            <AppButton @click="openIndicatorModal('create')">
-              <PlusIcon class="w-4 h-4" /> New Indicator
-            </AppButton>
           </template>
         </template>
       </AppPageHeader>
 
       <AppFilterBar>
+        <Link :href="route('opcr.index')" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600">
+          <ArrowLeftIcon class="w-4 h-4" /> All Fiscal Years
+        </Link>
         <FiscalYearFilter :fiscal-years="fiscalYears" :selected="selectedFiscalYear" route-name="opcr.index" />
       </AppFilterBar>
 
-      <AppTable :is-empty="indicators.length === 0" :skeleton-cols="9">
+      <p class="text-xs italic font-semibold text-slate-600">
+        AGENCY ORGANIZATIONAL OUTCOME: Increased Competitiveness of Filipinos in Science and Engineering
+      </p>
+
+      <AppTable :is-empty="indicators.length === 0" :skeleton-cols="11">
         <template #head>
           <tr>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Indicator</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Target</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Budget</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">DOST Alignment</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Division</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q1</th>
@@ -110,13 +108,14 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q3</th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Q4</th>
             <th class="px-3 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">Rating (Q/E/T/A)</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase">Remarks</th>
             <th v-if="canManage" class="px-3 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">Action</th>
           </tr>
         </template>
 
         <template v-for="(rows, programName) in groupedIndicators" :key="programName">
           <tr class="bg-indigo-50/60">
-            <td :colspan="canManage ? 10 : 9" class="px-3 py-1.5 text-xs font-semibold text-indigo-700">{{ programName }}</td>
+            <td :colspan="canManage ? 12 : 11" class="px-3 py-1.5 text-xs font-semibold text-indigo-700">{{ programName }}</td>
           </tr>
           <tr v-for="indicator in rows" :key="indicator.id" class="hover:bg-indigo-50/40">
             <td class="px-3 py-2 text-sm text-slate-700 align-top">
@@ -124,6 +123,9 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
               <span v-if="!isSpecificYear" class="block text-[10px] text-slate-400">FY {{ indicator.fiscal_year }}</span>
             </td>
             <td class="px-3 py-2 text-sm text-slate-700 align-top">{{ indicator.target ?? '—' }}</td>
+            <td class="px-3 py-2 text-sm text-slate-700 align-top">
+              {{ indicator.budget !== null && indicator.budget !== undefined ? Number(indicator.budget).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }}
+            </td>
             <td class="px-3 py-2 text-xs text-slate-500 align-top">{{ dostAlignmentLabel(indicator) ?? '—' }}</td>
             <td class="px-3 py-2 text-sm text-slate-700 align-top">
               {{ indicator.divisions?.map(d => d.acronym ?? d.division_name).join(', ') || '—' }}
@@ -152,61 +154,42 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
                 {{ [indicator.rating_quality, indicator.rating_efficiency, indicator.rating_timeliness, indicator.rating_average].map(v => v ?? '—').join(' / ') }}
               </span>
             </td>
+            <td class="px-3 py-2 text-xs text-slate-500 align-top">{{ indicator.remarks ?? '—' }}</td>
             <td v-if="canManage" class="px-3 py-2 text-center align-top">
-              <div class="flex items-center justify-center gap-1">
-                <AppIconButton label="Edit" @click="openIndicatorModal('edit', indicator)">
-                  <PencilSquareIcon class="w-4 h-4" />
-                </AppIconButton>
-                <AppIconButton label="Delete" variant="danger" @click="deleteIndicator(indicator)">
-                  <TrashIcon class="w-4 h-4" />
-                </AppIconButton>
-              </div>
+              <AppIconButton label="Edit" @click="openIndicatorModal(indicator)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
             </td>
           </tr>
         </template>
 
         <template #empty>
-          <EmptyState title="No OPCR indicators yet" subtitle="Add an indicator for this fiscal year, or clone from a previous one." />
+          <EmptyState title="No OPCR indicators yet" subtitle="Tag a Performance Indicator to a PSHS Program (Strategic Functions) — it will appear here automatically." />
         </template>
       </AppTable>
 
-      <!-- Indicator create/edit modal -->
-      <AppModal :show="showIndicatorModal" :title="indicatorModalMode === 'create' ? 'New Indicator' : 'Edit Indicator'" size="lg" @close="closeIndicatorModal">
+      <!-- Indicator edit modal — DOST tagging + remarks only; Program,
+           Description, Target, Budget, and Divisions are mirrored from the
+           source Performance Indicator and edited there instead. -->
+      <AppModal :show="showIndicatorModal" title="Edit Indicator" size="lg" @close="closeIndicatorModal">
         <form id="opcr-indicator-form" @submit.prevent="submitIndicator" class="space-y-4">
-          <AppInput v-model="indicatorForm.fiscal_year" label="Fiscal Year" type="number" required />
+          <p v-if="isPropagatedIndicator" class="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+            This indicator is synced from a Performance Indicator. Fiscal Year, Program, Description, Target, Budget, and Divisions are read-only here — edit them on the source Performance Indicator instead.
+          </p>
 
-          <AppSelect v-model="indicatorForm.agency_outcome_id" label="PSHS Program" required placeholder="-- Select Program --">
+          <AppInput v-model="indicatorForm.fiscal_year" label="Fiscal Year" type="number" required :disabled="isPropagatedIndicator" />
+
+          <AppSelect v-model="indicatorForm.agency_outcome_id" label="PSHS Program" required placeholder="-- Select Program --" :disabled="isPropagatedIndicator">
             <option v-for="outcome in agencyOutcomes" :key="outcome.id" :value="outcome.id">{{ outcome.outcome }}</option>
           </AppSelect>
 
-          <AppSelect v-model="indicatorForm.dost_sub_strategy_id" label="Sub-Strategy (optional alignment)" placeholder="-- None --">
-            <optgroup v-for="pillar in pillars" :key="pillar.id" :label="pillar.name">
-              <optgroup v-for="strategy in pillar.strategies" :key="strategy.id" :label="strategy.name">
-                <option v-for="sub in strategy.sub_strategies" :key="sub.id" :value="sub.id">{{ sub.description }}</option>
-              </optgroup>
-            </optgroup>
-          </AppSelect>
+          <p class="text-xs text-slate-500">
+            DOST Pillar/Strategy/Sub-Strategy alignment is tagged on the Program itself, in the DOST Strategic Plan module — it's not set per-indicator here.
+          </p>
 
-          <button type="button" class="text-xs text-indigo-600 hover:underline" @click="toggleChainWizardPanel">
-            {{ showChainWizardPanel ? '− Hide' : '+ Create new tagging chain' }}
-          </button>
-          <div v-if="showChainWizardPanel" class="rounded-lg bg-slate-50 p-3">
-            <DostChainWizard
-              :pillars="pillars"
-              :agency-outcomes="agencyOutcomes"
-              submit-label="Create & Use"
-              @created="onChainWizardCreated"
-              @cancel="showChainWizardPanel = false"
-            />
-          </div>
-
-          <AppSelect v-model="indicatorForm.performance_indicator_id" label="Link to an existing IPCR indicator (optional)" placeholder="-- None --">
-            <option v-for="pi in performanceIndicators" :key="pi.id" :value="pi.id">{{ pi.description }}</option>
-          </AppSelect>
-
-          <AppTextarea v-model="indicatorForm.description" label="Indicator Description" :rows="2" required />
-          <AppInput v-model="indicatorForm.target" label="Target" type="text" />
-          <AppInput v-model="indicatorForm.budget" label="Budget" type="number" min="0" step="0.01" />
+          <AppTextarea v-model="indicatorForm.description" label="Indicator Description" :rows="2" required :disabled="isPropagatedIndicator" />
+          <AppInput v-model="indicatorForm.target" label="Target" type="text" :disabled="isPropagatedIndicator" />
+          <AppInput v-model="indicatorForm.budget" label="Budget" type="number" min="0" step="0.01" :disabled="isPropagatedIndicator" />
 
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Division(s) Accountable</label>
@@ -215,6 +198,7 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
               :options="divisions"
               :multiple="true"
               :close-on-select="false"
+              :disabled="isPropagatedIndicator"
               label="division_name"
               track-by="id"
               placeholder="Select one or more divisions"
@@ -234,7 +218,6 @@ const ratingPayload = (indicator, overrideField, overrideValue) => {
       <AppModal :show="showSettingsModal" title="OPCR Signatories" size="md" @close="closeSettingsModal">
         <form id="opcr-settings-form" @submit.prevent="submitSettings" class="space-y-4">
           <AppInput v-model="settingsForm.campus_director_name" label="Campus Director Name" type="text" />
-          <AppInput v-model="settingsForm.oic_campus_director_name" label="OIC-Campus Director Name" type="text" />
           <AppInput v-model="settingsForm.executive_director_name" label="Executive Director Name" type="text" />
           <AppTextarea v-model="settingsForm.commitment_statement" label="Commitment Statement (optional override)" :rows="3" />
         </form>

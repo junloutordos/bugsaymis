@@ -6,6 +6,7 @@ use App\Models\AgencyOutcome;
 use App\Models\Division;
 use App\Models\OPCR\OpcrIndicator;
 use App\Models\OPCR\OpcrIndicatorActual;
+use App\Models\PerformanceIndicator;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -60,6 +61,35 @@ class OpcrCloneTest extends TestCase
         $this->assertTrue($cloned->divisions->contains($division));
         $this->assertNull($cloned->rating_quality);
         $this->assertCount(0, $cloned->actuals);
+    }
+
+    public function test_clone_does_not_carry_the_performance_indicator_link_to_the_new_fiscal_year(): void
+    {
+        $user = $this->manager();
+        $outcome = AgencyOutcome::create(['outcome' => 'A. STEM']);
+        $pi = PerformanceIndicator::create([
+            'agency_outcome_id' => $outcome->id,
+            'description' => 'Linked PI',
+            'target' => '90%',
+        ]);
+        $source = OpcrIndicator::create([
+            'fiscal_year' => 2026,
+            'agency_outcome_id' => $outcome->id,
+            'performance_indicator_id' => $pi->id,
+            'description' => 'Cohort survival rate',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('opcr.clone'), [
+            'source_fiscal_year' => 2026,
+            'target_fiscal_year' => 2027,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionDoesntHaveErrors();
+        $cloned = OpcrIndicator::forFiscalYear(2027)->first();
+        $this->assertNotNull($cloned);
+        $this->assertNull($cloned->performance_indicator_id);
+        $this->assertSame($pi->id, $source->fresh()->performance_indicator_id);
     }
 
     public function test_clone_is_rejected_when_target_fiscal_year_already_has_indicators(): void

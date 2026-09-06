@@ -1276,9 +1276,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             Route::put('/opcr-settings', [\App\Http\Controllers\OPCR\OpcrController::class, 'updateSettings'])->name('opcr-settings.update');
             Route::post('/opcr/clone', [\App\Http\Controllers\OPCR\OpcrController::class, 'clone'])->name('opcr.clone');
 
-            Route::post('/opcr-indicators', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'store'])->name('opcr-indicators.store');
             Route::put('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'update'])->name('opcr-indicators.update');
-            Route::delete('/opcr-indicators/{opcrIndicator}', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'destroy'])->name('opcr-indicators.destroy');
             Route::put('/opcr-indicators/{opcrIndicator}/actual', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'updateActual'])->name('opcr-indicators.actual');
             Route::put('/opcr-indicators/{opcrIndicator}/rating', [\App\Http\Controllers\OPCR\OpcrIndicatorController::class, 'updateRating'])->name('opcr-indicators.rating');
         });

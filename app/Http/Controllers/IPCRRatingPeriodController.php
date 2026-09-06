@@ -210,7 +210,7 @@ class IPCRRatingPeriodController extends Controller
                 $clone->fiscal_year = $target;
                 $clone->agency_outcome_id = $outcomeMap[$indicator->agency_outcome_id] ?? $indicator->agency_outcome_id;
                 $clone->save();
-                $clone->divisions()->sync($indicator->divisions->pluck('id'));
+                $clone->syncDivisions($indicator->divisions->pluck('id')->all());
                 $indicatorMap[$indicator->id] = $clone->id;
             }
 

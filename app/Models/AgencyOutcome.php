@@ -19,6 +19,12 @@ class AgencyOutcome extends Model
         'parent_id',
     ];
 
+    protected $appends = [
+        'dost_pillar_names_joined',
+        'dost_strategy_names_joined',
+        'dost_sub_strategy_descriptions_joined',
+    ];
+
     /**
      * Model classes whose auto-generated per-assignment WDP identity markers
      * (WorkDistributionPlanClassifier's "<Class>#<id>" / "<Class>#<id>@<tagId>"
@@ -72,6 +78,15 @@ class AgencyOutcome extends Model
         return $query->whereNull('parent_id');
     }
 
+    // True only for the campus-level PSHS Program tags (function_type =
+    // "Strategic Functions") — as opposed to the generic Core/Support Function
+    // tags used for individual employee IPCR targets, which share this same
+    // table. Used to gate OPCR auto-propagation from Performance Indicators.
+    public function isStrategicProgram(): bool
+    {
+        return strtolower(trim((string) $this->function_type)) === 'strategic functions';
+    }
+
     public function parent()
     {
         return $this->belongsTo(self::class, 'parent_id');
@@ -100,5 +115,45 @@ class AgencyOutcome extends Model
     public function dostStrategies()
     {
         return $this->belongsToMany(DostStrategy::class, 'dost_strategy_agency_outcomes');
+    }
+
+    // Pillar/Strategy/Sub-Strategy are tagged many-to-many to a Program in the
+    // DOST Strategic Plan module, not per-indicator — so display for a given
+    // Program joins every tagged combination rather than picking just one.
+    // These are $appends'd (for OPCR's on-screen/print use), so each one
+    // guards on relationLoaded() to avoid a lazy-load N+1 anywhere else in
+    // the app that serializes an AgencyOutcome without eager-loading
+    // dostStrategies.pillar / dostStrategies.subStrategies.
+    public function getDostPillarNamesJoinedAttribute(): ?string
+    {
+        if (! $this->relationLoaded('dostStrategies')) {
+            return null;
+        }
+
+        $names = $this->dostStrategies->pluck('pillar.name')->filter()->unique()->values();
+
+        return $names->isEmpty() ? null : $names->implode('; ');
+    }
+
+    public function getDostStrategyNamesJoinedAttribute(): ?string
+    {
+        if (! $this->relationLoaded('dostStrategies')) {
+            return null;
+        }
+
+        $names = $this->dostStrategies->pluck('name')->filter()->values();
+
+        return $names->isEmpty() ? null : $names->implode('; ');
+    }
+
+    public function getDostSubStrategyDescriptionsJoinedAttribute(): ?string
+    {
+        if (! $this->relationLoaded('dostStrategies')) {
+            return null;
+        }
+
+        $descriptions = $this->dostStrategies->flatMap->subStrategies->pluck('description')->filter()->values();
+
+        return $descriptions->isEmpty() ? null : $descriptions->implode('; ');
     }
 }

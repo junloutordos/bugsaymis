@@ -12,7 +12,6 @@ class OpcrIndicatorController extends Controller
     {
         return [
             'fiscal_year' => 'required|integer|min:2000|max:2100',
-            'dost_sub_strategy_id' => 'nullable|exists:dost_sub_strategies,id',
             'agency_outcome_id' => 'required|exists:agency_org_outcomes,id',
             'performance_indicator_id' => 'nullable|exists:performance_indicators,id',
             'description' => 'required|string',
@@ -24,31 +23,27 @@ class OpcrIndicatorController extends Controller
         ];
     }
 
-    public function store(Request $request)
-    {
-        $data = $request->validate($this->rules());
-
-        $indicator = OpcrIndicator::create($data);
-        $indicator->divisions()->sync($data['division_ids'] ?? []);
-
-        return back()->with('success', 'Indicator created.');
-    }
+    // Fields mirrored from a linked Performance Indicator by
+    // OpcrIndicatorPropagationService — never editable from the OPCR side
+    // once propagated, so a manual edit here can't be silently clobbered the
+    // next time the source Performance Indicator is saved.
+    private const SYNCED_FIELDS = ['fiscal_year', 'agency_outcome_id', 'description', 'target', 'budget', 'performance_indicator_id'];
 
     public function update(Request $request, OpcrIndicator $opcrIndicator)
     {
         $data = $request->validate($this->rules());
 
+        if ($opcrIndicator->performance_indicator_id) {
+            foreach (self::SYNCED_FIELDS as $field) {
+                $data[$field] = $opcrIndicator->{$field};
+            }
+            $data['division_ids'] = $opcrIndicator->divisions->pluck('id')->all();
+        }
+
         $opcrIndicator->update($data);
         $opcrIndicator->divisions()->sync($data['division_ids'] ?? []);
 
         return back()->with('success', 'Indicator updated.');
-    }
-
-    public function destroy(OpcrIndicator $opcrIndicator)
-    {
-        $opcrIndicator->delete();
-
-        return back()->with('success', 'Indicator deleted.');
     }
 
     public function updateActual(Request $request, OpcrIndicator $opcrIndicator)

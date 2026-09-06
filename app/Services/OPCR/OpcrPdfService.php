@@ -13,8 +13,8 @@ class OpcrPdfService
     {
         $indicators = OpcrIndicator::forFiscalYear($fiscalYear)
             ->with([
-                'subStrategy.strategy.pillar',
-                'agencyOutcome',
+                'agencyOutcome.dostStrategies.pillar',
+                'agencyOutcome.dostStrategies.subStrategies',
                 'divisions',
                 'actuals',
             ])
@@ -24,7 +24,7 @@ class OpcrPdfService
         $html = view('opcr.pdf', [
             'fiscalYear' => $fiscalYear,
             'settings' => OpcrSetting::current(),
-            'indicators' => $indicators,
+            'rows' => (new OpcrPdfRowGrouper)->group($indicators),
         ])->render();
 
         $mpdf = new Mpdf([

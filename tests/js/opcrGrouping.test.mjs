@@ -6,14 +6,12 @@ import { groupIndicatorsByProgram, dostAlignmentLabel } from '../../resources/js
 function indicator({ id, program = null, pillar = null, strategy = null, subStrategy = null }) {
   return {
     id,
-    agency_outcome: program ? { outcome: program } : null,
-    sub_strategy: subStrategy
+    agency_outcome: program
       ? {
-          description: subStrategy,
-          strategy: {
-            name: strategy,
-            pillar: { name: pillar },
-          },
+          outcome: program,
+          dost_pillar_names_joined: pillar,
+          dost_strategy_names_joined: strategy,
+          dost_sub_strategy_descriptions_joined: subStrategy,
         }
       : null,
   }
@@ -63,4 +61,16 @@ test('dostAlignmentLabel returns null when the indicator has no DOST tagging', (
   const untagged = indicator({ id: 1, program: 'A' })
 
   assert.equal(dostAlignmentLabel(untagged), null)
+})
+
+test('dostAlignmentLabel passes through a Program already tagged to multiple Pillars/Strategies', () => {
+  const multiTagged = indicator({
+    id: 1,
+    program: 'B',
+    pillar: 'Pillar A; Pillar B',
+    strategy: 'Strategy A; Strategy B',
+    subStrategy: 'Sub A; Sub B',
+  })
+
+  assert.equal(dostAlignmentLabel(multiTagged), 'Pillar A; Pillar B › Strategy A; Strategy B › Sub A; Sub B')
 })
