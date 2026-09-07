@@ -167,6 +167,31 @@ class CSMFeedbackController extends Controller
         ]);
     }
 
+    // ── OFFICE QR CODES (read-only) ─────────────────────────────────────────────
+
+    /**
+     * Read-only list of offices with their QR survey status/link, for viewing
+     * and printing only. No office CRUD or QR regenerate/toggle here — those
+     * remain Administrator-only under Data Management > Offices.
+     */
+    public function offices()
+    {
+        abort_unless($this->isAdmin(), 403);
+
+        $offices = \App\Models\Office::with(['division'])
+            ->select('id', 'name', 'division_id', 'qr_survey_token', 'qr_survey_enabled')
+            ->orderBy('name')
+            ->get()
+            ->map(function (\App\Models\Office $office) {
+                $office->survey_url = $office->surveyUrl();
+                return $office;
+            });
+
+        return Inertia::render('CSM/Offices', [
+            'offices' => $offices,
+        ]);
+    }
+
     // ── LIST ──────────────────────────────────────────────────────────────────
 
     public function index(Request $request)
