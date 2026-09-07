@@ -8,6 +8,7 @@ import IpcrV2StrategicSection from "@/Components/IPCRV2/IpcrV2StrategicSection.v
 import IpcrV2CoreItemsTable from "@/Components/IPCRV2/IpcrV2CoreItemsTable.vue"
 import IpcrV2SupportItemsTable from "@/Components/IPCRV2/IpcrV2SupportItemsTable.vue"
 import IpcrV2SummarySection from "@/Components/IPCRV2/IpcrV2SummarySection.vue"
+import IpcrV2StatusTimeline from "@/Components/IPCRV2/IpcrV2StatusTimeline.vue"
 import DigitalSignaturePin from "@/Components/DigitalSignaturePin.vue"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
@@ -92,6 +93,7 @@ function directorSign() {
     </div>
 
     <IpcrV2SummarySection :summary="summary" :rating-date="ipcr.director_signed_at" :comments="ipcr.comments_recommendations" />
+    <IpcrV2StatusTimeline :logs="ipcr.status_logs ?? []" />
 
     <div v-if="isMutable" class="mt-6 flex justify-end gap-2">
       <AppButton v-if="ipcr.status === 'Submitted to PMT'" variant="secondary" :disabled="isSubmitting" @click="returnForRevision">Return</AppButton>

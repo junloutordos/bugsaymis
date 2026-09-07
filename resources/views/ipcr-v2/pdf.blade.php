@@ -160,7 +160,12 @@
         </tbody>
     </table>
 
-    <p style="margin-top: 10px;"><strong>Rating Summary</strong></p>
+    <p style="margin-top: 10px;">
+        <strong>Rating Summary</strong>
+        @if($ipcr->director_signed_at)
+            <span style="float: right; font-size: 9px;">Date: {{ $ipcr->director_signed_at->format('F j, Y') }}</span>
+        @endif
+    </p>
     <table>
         <thead>
             <tr>
@@ -208,6 +213,11 @@
             @endforeach
         </tbody>
     </table>
+
+    @if(!empty($ipcr->comments_recommendations))
+    <p style="margin-top: 10px;"><strong>Comments and Recommendations for Development Purposes</strong></p>
+    <p style="font-size: 9px;">{{ $ipcr->comments_recommendations }}</p>
+    @endif
 
     <table style="margin-top: 14px;">
         <tr>

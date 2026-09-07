@@ -7,15 +7,41 @@ import IpcrV2StrategicSection from "@/Components/IPCRV2/IpcrV2StrategicSection.v
 import IpcrV2CoreItemsTable from "@/Components/IPCRV2/IpcrV2CoreItemsTable.vue"
 import IpcrV2SupportItemsTable from "@/Components/IPCRV2/IpcrV2SupportItemsTable.vue"
 import IpcrV2SummarySection from "@/Components/IPCRV2/IpcrV2SummarySection.vue"
+import IpcrV2StatusTimeline from "@/Components/IPCRV2/IpcrV2StatusTimeline.vue"
+import AppButton from "@/Components/AppButton.vue"
+import DigitalSignaturePin from "@/Components/DigitalSignaturePin.vue"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
+import { useSubmit } from "@/Composables/useSubmit"
+import { usePinConfirm } from "@/Composables/usePinConfirm"
+import { router } from "@inertiajs/vue3"
+import Swal from "sweetalert2"
 
-defineProps({
+const props = defineProps({
   ipcr: Object,
   strategicIndicators: Array,
   ocdUser: Object,
   summary: Object,
+  hasPin: Boolean,
+  signatureUri: String,
 })
+
+const { isSubmitting, submit } = useSubmit()
+const { showPinModal, requestPin, confirmPin, cancelPin } = usePinConfirm()
+
+async function reopen() {
+  const { value: reason, isConfirmed } = await Swal.fire({
+    title: "Reopen this IPCR V2?",
+    input: "textarea",
+    inputLabel: "Reason for reopening",
+    inputPlaceholder: "Explain why this record needs to be reopened...",
+    showCancelButton: true,
+    inputValidator: (value) => (!value ? "A reason is required." : undefined),
+  })
+  if (!isConfirmed || !reason) return
+
+  requestPin((pin) => submit((opts) => router.post(route("admin-ipcr-v2.reopen", props.ipcr.id), { reason, pin }, opts)))
+}
 </script>
 
 <template>
@@ -60,6 +86,21 @@ defineProps({
       </div>
     </div>
 
-    <IpcrV2SummarySection :summary="summary" />
+    <IpcrV2SummarySection :summary="summary" :rating-date="ipcr.director_signed_at" :comments="ipcr.comments_recommendations" />
+    <IpcrV2StatusTimeline :logs="ipcr.status_logs ?? []" />
+
+    <div v-if="ipcr.status === 'Director Signed'" class="mt-6 flex justify-end">
+      <AppButton variant="secondary" :disabled="isSubmitting" @click="reopen">Reopen</AppButton>
+    </div>
+
+    <DigitalSignaturePin
+      :show="showPinModal"
+      :has-pin="hasPin"
+      :signature-uri="signatureUri"
+      :loading="isSubmitting"
+      confirm-label="Reopen"
+      @confirm="confirmPin"
+      @cancel="cancelPin"
+    />
   </AdminLayout>
 </template>
