@@ -8,19 +8,24 @@ use Illuminate\Support\Collection;
 
 /**
  * Strategic Function is read-only, identical for every employee, and
- * inherited live from the current fiscal year's OPCR — no snapshot, ever
- * (spec: "true to all employees," campus-wide, not a per-employee commitment).
+ * inherited from the PRIOR fiscal year's OPCR — a year's own OPCR rating
+ * isn't knowable until that year is essentially over, so an IPCR for
+ * fiscal year N reads fiscal year N-1's OPCR indicators. No snapshot,
+ * ever (spec: "true to all employees," campus-wide, not a per-employee
+ * commitment).
  */
 class StrategicFunctionService
 {
-    public function currentFiscalYear(): ?int
+    public function ratingFiscalYear(): ?int
     {
-        return IPCRRatingPeriod::current()->value('year');
+        $currentYear = IPCRRatingPeriod::current()->value('year');
+
+        return $currentYear ? $currentYear - 1 : null;
     }
 
     public function currentIndicators(): Collection
     {
-        $year = $this->currentFiscalYear();
+        $year = $this->ratingFiscalYear();
         if (! $year) {
             return collect();
         }
