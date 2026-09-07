@@ -18,6 +18,8 @@ class IpcrV2Record extends Model
         'submitted_rating_at', 'submitted_for_pmtreview_at', 'submitted_to_hr_at',
         'director_signed_at', 'director_signature',
         'final_numeric_rating', 'final_adjectival_rating',
+        'remarks', 'locked_at', 'locked_by_id', 'reopened_at', 'reopened_by_id',
+        'reopen_reason', 'comments_recommendations',
     ];
 
     protected $casts = [
@@ -29,6 +31,8 @@ class IpcrV2Record extends Model
         'submitted_to_hr_at' => 'datetime',
         'director_signed_at' => 'datetime',
         'final_numeric_rating' => 'decimal:2',
+        'locked_at' => 'datetime',
+        'reopened_at' => 'datetime',
     ];
 
     public function user()
@@ -54,6 +58,21 @@ class IpcrV2Record extends Model
     public function coachingSessions()
     {
         return $this->hasMany(IpcrV2CoachingSession::class, 'ipcr_v2_id')->orderBy('meeting_date', 'desc');
+    }
+
+    public function statusLogs()
+    {
+        return $this->hasMany(IpcrV2StatusLog::class, 'ipcr_v2_record_id')->orderBy('created_at');
+    }
+
+    public function lockedBy()
+    {
+        return $this->belongsTo(User::class, 'locked_by_id');
+    }
+
+    public function reopenedBy()
+    {
+        return $this->belongsTo(User::class, 'reopened_by_id');
     }
 
     public function isFinalized(): bool

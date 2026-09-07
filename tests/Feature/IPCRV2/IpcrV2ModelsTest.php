@@ -57,4 +57,22 @@ class IpcrV2ModelsTest extends TestCase
 
         $this->assertCount(1, $record->fresh()->supportItems);
     }
+
+    public function test_ipcr_v2_record_has_status_logs_relation(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = IpcrV2Record::create(['user_id' => $user->id, 'rating_period_id' => $period->id]);
+
+        \App\Models\IPCRV2\IpcrV2StatusLog::create([
+            'ipcr_v2_record_id' => $record->id,
+            'from_status' => 'New Target',
+            'to_status' => 'For Review',
+            'action_type' => 'submitted',
+            'actor_id' => $user->id,
+        ]);
+
+        $this->assertCount(1, $record->fresh()->statusLogs);
+        $this->assertSame('submitted', $record->statusLogs->first()->action_type);
+    }
 }
