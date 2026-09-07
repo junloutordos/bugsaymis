@@ -30,9 +30,15 @@ class DivisionChiefIpcrV2Controller extends Controller
         return Inertia::render('IPCRV2/DivisionChiefIpcrV2Index', ['records' => $records]);
     }
 
-    public function show(int $id)
+    public function show(Request $request, int $id)
     {
         $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions'])->findOrFail($id);
+
+        abort_unless(
+            $request->user()->hasRole('OCD') || $record->user?->division_id === $request->user()->division_id,
+            403,
+            'This employee is not in your division.'
+        );
 
         return Inertia::render('IPCRV2/DivisionChiefIpcrV2Show', [
             'ipcr' => $record,

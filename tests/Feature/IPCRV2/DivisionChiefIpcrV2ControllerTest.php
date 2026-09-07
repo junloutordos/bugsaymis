@@ -39,4 +39,23 @@ class DivisionChiefIpcrV2ControllerTest extends TestCase
         $response->assertRedirect();
         $this->assertSame(IpcrV2WorkflowService::STATUS_TARGETS_APPROVED, $record->fresh()->status);
     }
+
+    public function test_division_chief_cannot_view_an_employee_outside_their_division(): void
+    {
+        $role = Role::create(['name' => 'DivisionChief']);
+        $ids = collect(['ipcr.v2.view', 'ipcr.v2.approve', 'ipcr.v2.monitor'])
+            ->map(fn ($name) => Permission::firstOrCreate(['name' => $name], ['module' => 'IPCR V2', 'description' => 'x'])->id);
+        $role->permissions()->attach($ids);
+
+        $chief = User::factory()->create();
+        $chief->roles()->attach($role->id);
+        Division::create(['division_name' => 'CID', 'acronym' => 'CID', 'division_chief_id' => $chief->id]);
+        $otherDivision = Division::create(['division_name' => 'SSD', 'acronym' => 'SSD']);
+
+        $otherEmployee = User::factory()->create(['division_id' => $otherDivision->id]);
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = IpcrV2Record::create(['user_id' => $otherEmployee->id, 'rating_period_id' => $period->id]);
+
+        $this->actingAs($chief)->get(route('division-chief-ipcr-v2.show', $record->id))->assertForbidden();
+    }
 }
