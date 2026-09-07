@@ -163,4 +163,31 @@ class EmployeeIpcrV2ControllerTest extends TestCase
         $response->assertRedirect();
         $this->assertSame('100% compliance with DTR submission deadlines', $supportItem->fresh()->target);
     }
+
+    public function test_submit_for_review_requires_correct_pin_when_pin_is_set(): void
+    {
+        $employee = $this->employee();
+        $employee->update(['signature_pin' => \Illuminate\Support\Facades\Hash::make('123456')]);
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+
+        $wrong = $this->actingAs($employee)->post(route('employee-ipcr-v2.submitReview', $record->id), ['pin' => '000000']);
+        $wrong->assertSessionHasErrors('pin');
+        $this->assertSame('New Target', $record->fresh()->status);
+
+        $right = $this->actingAs($employee)->post(route('employee-ipcr-v2.submitReview', $record->id), ['pin' => '123456']);
+        $right->assertRedirect();
+        $this->assertSame('For Review', $record->fresh()->status);
+    }
+
+    public function test_submit_for_review_succeeds_without_pin_when_no_pin_set(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+
+        $response = $this->actingAs($employee)->post(route('employee-ipcr-v2.submitReview', $record->id));
+        $response->assertRedirect();
+        $this->assertSame('For Review', $record->fresh()->status);
+    }
 }

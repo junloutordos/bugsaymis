@@ -7,6 +7,7 @@ use App\Models\IPCRRatingPeriod;
 use App\Models\IPCRV2\IpcrV2CoreItem;
 use App\Models\IPCRV2\IpcrV2Record;
 use App\Models\IPCRV2\IpcrV2SupportItem;
+use App\Services\DigitalSignatureService;
 use App\Services\IPCRV2\IpcrV2GenerationService;
 use App\Services\IPCRV2\IpcrV2WorkflowService;
 use App\Services\IPCRV2\StrategicFunctionService;
@@ -25,7 +26,8 @@ class EmployeeIpcrV2Controller extends Controller
         private IpcrV2GenerationService $generation,
         private StrategicFunctionService $strategic,
         private \App\Services\PerformanceManagement\IPCRWorkflowService $v1Chain,
-        private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService
+        private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService,
+        private DigitalSignatureService $sigService = new DigitalSignatureService()
     ) {}
 
     public function index(Request $request)
@@ -43,7 +45,7 @@ class EmployeeIpcrV2Controller extends Controller
 
     public function show(Request $request, int $id)
     {
-        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period'])->findOrFail($id);
+        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'statusLogs.actor'])->findOrFail($id);
 
         $isOwner = $record->user_id === $request->user()->id;
         abort_unless(
@@ -64,6 +66,8 @@ class EmployeeIpcrV2Controller extends Controller
             'summary' => $this->summaryService->buildRows($record),
             'isOwner' => $isOwner,
             'isMutable' => $record->isMutable(),
+            'hasPin' => ! empty($request->user()->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($request->user()),
         ]);
     }
 
@@ -94,7 +98,17 @@ class EmployeeIpcrV2Controller extends Controller
     {
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertOwner($request->user(), $record);
-        $this->workflow->transition($record, IpcrV2WorkflowService::STATUS_FOR_REVIEW);
+
+        $data = $request->validate(['pin' => 'nullable|string']);
+        $this->sigService->assertSigningPin($request->user(), $data['pin'] ?? null);
+
+        $this->workflow->transition(
+            $record,
+            IpcrV2WorkflowService::STATUS_FOR_REVIEW,
+            actor: $request->user(),
+            actionType: 'submitted',
+            signedViaPin: ! empty($request->user()->signature_pin),
+        );
 
         return back()->with('success', 'Submitted for review.');
     }
@@ -103,7 +117,18 @@ class EmployeeIpcrV2Controller extends Controller
     {
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertOwner($request->user(), $record);
-        $this->workflow->transition($record, IpcrV2WorkflowService::STATUS_FOR_RATING, ['submitted_for_rating_at' => now()]);
+
+        $data = $request->validate(['pin' => 'nullable|string']);
+        $this->sigService->assertSigningPin($request->user(), $data['pin'] ?? null);
+
+        $this->workflow->transition(
+            $record,
+            IpcrV2WorkflowService::STATUS_FOR_RATING,
+            extra: ['submitted_for_rating_at' => now()],
+            actor: $request->user(),
+            actionType: 'submitted',
+            signedViaPin: ! empty($request->user()->signature_pin),
+        );
 
         return back()->with('success', 'Submitted for rating.');
     }
