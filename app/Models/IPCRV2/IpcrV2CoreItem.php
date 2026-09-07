@@ -13,7 +13,8 @@ class IpcrV2CoreItem extends Model
         'ipcr_v2_id', 'employee_function_id', 'label', 'weight_percent', 'success_indicator',
         'target', 'actual_accomplishment',
         'student_feedback_rating', 'supervisor_feedback_rating',
-        'im_development_rating', 'timeliness_rating', 'row_average', 'remarks',
+        'im_development_rating', 'quality_rating', 'efficiency_rating',
+        'timeliness_rating', 'row_average', 'remarks',
     ];
 
     protected $casts = [

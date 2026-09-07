@@ -76,6 +76,24 @@ class DivisionChiefIpcrV2Controller extends Controller
         $this->workflow->assertCanManage($request->user(), $record);
         abort_if($coreItem->ipcr_v2_id !== $record->id, 404);
 
+        // A WDP-tagged materialized row (success_indicator set) is rated
+        // Quality/Efficiency/Timeliness like a Support item; an untagged
+        // (teaching-load) row keeps the fixed CSC 4-criteria rubric.
+        if ($coreItem->success_indicator !== null) {
+            $data = $request->validate([
+                'quality_rating' => 'required|integer|min:1|max:5',
+                'efficiency_rating' => 'required|integer|min:1|max:5',
+                'timeliness_rating' => 'required|integer|min:1|max:5',
+                'remarks' => 'nullable|string|max:1000',
+            ]);
+
+            $data['row_average'] = round(($data['quality_rating'] + $data['efficiency_rating'] + $data['timeliness_rating']) / 3, 2);
+
+            $coreItem->update($data);
+
+            return back()->with('success', 'Rated.');
+        }
+
         $data = $request->validate([
             'student_feedback_rating' => 'required|integer|min:1|max:5',
             'supervisor_feedback_rating' => 'required|integer|min:1|max:5',

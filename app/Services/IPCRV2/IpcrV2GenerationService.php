@@ -32,20 +32,11 @@ class IpcrV2GenerationService
             ]);
 
             foreach ($coreFunctions as $function) {
-                $record->coreItems()->create([
-                    'employee_function_id' => $function->id,
-                    'label' => $function->label,
-                    'weight_percent' => $function->weight_percent,
-                    'success_indicator' => $this->resolveSuccessIndicator($function),
-                ]);
+                $this->createCoreItemsForFunction($record, $function);
             }
 
             foreach ($supportFunctions as $function) {
-                $record->supportItems()->create([
-                    'employee_function_id' => $function->id,
-                    'label' => $function->label,
-                    'success_indicator' => $this->resolveSuccessIndicator($function),
-                ]);
+                $this->createSupportItemsForFunction($record, $function);
             }
 
             return $record->fresh(['coreItems', 'supportItems']);
@@ -85,31 +76,81 @@ class IpcrV2GenerationService
 
         return DB::transaction(function () use ($record, $newCoreFunctions, $newSupportFunctions) {
             foreach ($newCoreFunctions as $function) {
-                $record->coreItems()->create([
-                    'employee_function_id' => $function->id,
-                    'label' => $function->label,
-                    'weight_percent' => $function->weight_percent,
-                    'success_indicator' => $this->resolveSuccessIndicator($function),
-                ]);
+                $this->createCoreItemsForFunction($record, $function);
             }
 
             foreach ($newSupportFunctions as $function) {
-                $record->supportItems()->create([
-                    'employee_function_id' => $function->id,
-                    'label' => $function->label,
-                    'success_indicator' => $this->resolveSuccessIndicator($function),
-                ]);
+                $this->createSupportItemsForFunction($record, $function);
             }
 
             return $newCoreFunctions->count() + $newSupportFunctions->count();
         });
     }
 
-    private function resolveSuccessIndicator(EmployeeFunction $function): ?string
+    /**
+     * A function tagged to N Work Distribution Plans materializes into N
+     * independently-ratable items — one per plan, each with that plan's own
+     * success_indicator and its own Target/Actual Accomplishment/ratings —
+     * rather than one item with every plan's text joined together. Weight
+     * is split evenly across the N items so the sum of their weights still
+     * equals the function's own weight (IpcrV2RatingService's weighted
+     * average is otherwise skewed — duplicating the full weight on every
+     * materialized row would overweight a multi-tagged function relative
+     * to others). An untagged function still gets exactly one item, which
+     * IpcrV2CoreItemsTable renders with the fixed CSC teaching rubric.
+     */
+    private function createCoreItemsForFunction(IpcrV2Record $record, EmployeeFunction $function): void
     {
-        $indicators = $function->workDistributionPlans->pluck('success_indicator')->filter();
+        $plans = $function->workDistributionPlans;
 
-        return $indicators->isEmpty() ? null : $indicators->implode('; ');
+        if ($plans->isEmpty()) {
+            $record->coreItems()->create([
+                'employee_function_id' => $function->id,
+                'label' => $function->label,
+                'weight_percent' => $function->weight_percent,
+            ]);
+
+            return;
+        }
+
+        $splitWeight = $function->weight_percent !== null
+            ? round((float) $function->weight_percent / $plans->count(), 2)
+            : null;
+
+        foreach ($plans as $plan) {
+            $record->coreItems()->create([
+                'employee_function_id' => $function->id,
+                'label' => $function->label,
+                'weight_percent' => $splitWeight,
+                'success_indicator' => $plan->success_indicator,
+            ]);
+        }
+    }
+
+    /**
+     * Same one-item-per-tagged-plan materialization as core items, minus
+     * weight (Support Functions carry none).
+     */
+    private function createSupportItemsForFunction(IpcrV2Record $record, EmployeeFunction $function): void
+    {
+        $plans = $function->workDistributionPlans;
+
+        if ($plans->isEmpty()) {
+            $record->supportItems()->create([
+                'employee_function_id' => $function->id,
+                'label' => $function->label,
+            ]);
+
+            return;
+        }
+
+        foreach ($plans as $plan) {
+            $record->supportItems()->create([
+                'employee_function_id' => $function->id,
+                'label' => $function->label,
+                'success_indicator' => $plan->success_indicator,
+            ]);
+        }
     }
 
     private function assertCoreWeightsSumTo100($coreFunctions): void

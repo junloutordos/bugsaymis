@@ -133,7 +133,7 @@ class IpcrV2GenerationServiceTest extends TestCase
         $this->assertSame('Deliver IT support within SLA', $record->coreItems->first()->success_indicator);
     }
 
-    public function test_generate_joins_success_indicators_from_multiple_tagged_wdps(): void
+    public function test_generate_materializes_one_support_item_per_tagged_wdp(): void
     {
         $user = User::factory()->create();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
@@ -144,7 +144,28 @@ class IpcrV2GenerationServiceTest extends TestCase
 
         $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
 
-        $this->assertSame('Plan A indicator; Plan B indicator', $record->supportItems->first()->success_indicator);
+        $this->assertCount(2, $record->supportItems);
+        $this->assertEqualsCanonicalizing(
+            ['Plan A indicator', 'Plan B indicator'],
+            $record->supportItems->pluck('success_indicator')->all()
+        );
+        $this->assertTrue($record->supportItems->every(fn ($item) => $item->label === 'Administrative'));
+    }
+
+    public function test_generate_materializes_one_core_item_per_tagged_wdp_with_weight_split_evenly(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $planA = $this->makePlan('Plan A indicator');
+        $planB = $this->makePlan('Plan B indicator');
+        $function = EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'wdp', 'label' => 'IT Management', 'weight_percent' => 100]);
+        $function->workDistributionPlans()->sync([$planA->id, $planB->id]);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+
+        $this->assertCount(2, $record->coreItems);
+        $this->assertEqualsCanonicalizing(['Plan A indicator', 'Plan B indicator'], $record->coreItems->pluck('success_indicator')->all());
+        $this->assertTrue($record->coreItems->every(fn ($item) => (float) $item->weight_percent === 50.0));
     }
 
     public function test_generate_leaves_success_indicator_null_when_no_wdp_tagged(): void

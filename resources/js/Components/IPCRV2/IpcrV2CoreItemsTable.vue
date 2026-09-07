@@ -38,6 +38,15 @@ function rate(item) {
   }, opts))
 }
 
+function rateWdpRow(item) {
+  submit((opts) => router.put(route("division-chief-ipcr-v2.rateCoreItem", [props.ipcrId, item.id]), {
+    quality_rating: item.quality_rating,
+    efficiency_rating: item.efficiency_rating,
+    timeliness_rating: item.timeliness_rating,
+    remarks: item.remarks,
+  }, opts))
+}
+
 function rowAverage(item) {
   const parts = [item.student_feedback_rating, item.supervisor_feedback_rating, item.im_development_rating, item.timeliness_rating]
   if (parts.some(v => v === null || v === undefined)) return "—"
@@ -53,47 +62,88 @@ function rowAverage(item) {
       </td>
     </tr>
     <template v-for="item in items" :key="item.id">
-      <tr v-for="(criterion, idx) in CRITERIA" :key="item.id + '-' + criterion.key">
-        <td v-if="idx === 0" rowspan="5" :class="TD" class="border border-slate-200 align-top font-medium">
+      <!-- WDP-tagged row: one independently-ratable row per tagged plan, mirroring Support Functions -->
+      <tr v-if="item.success_indicator">
+        <td :class="TD" class="border border-slate-200 align-top font-medium">
           {{ item.label }}<br />
           <small class="text-slate-400">Weight: {{ item.weight_percent ?? "—" }}%</small>
-          <div v-if="item.success_indicator" class="text-xs text-slate-500 mt-1 font-normal">{{ item.success_indicator }}</div>
         </td>
-        <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
-        <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
-        <td :class="TD" class="border border-slate-200">{{ criterion.label }}</td>
-        <td v-if="idx === 0" rowspan="4" :class="TD" class="border border-slate-200 align-top">
+        <td class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+        <td class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+        <td :class="TD" class="border border-slate-200 align-top">{{ item.success_indicator }}</td>
+        <td :class="TD" class="border border-slate-200 align-top">
           <AppTextarea v-if="isOwner && isMutable" v-model="item.target" @blur="saveEmployeeFields(item)" />
           <span v-else>{{ item.target ?? "—" }}</span>
         </td>
-        <td v-if="idx === 0" rowspan="4" :class="TD" class="border border-slate-200 align-top">
+        <td :class="TD" class="border border-slate-200 align-top">
           <AppTextarea v-if="isOwner && isMutable" v-model="item.actual_accomplishment" @blur="saveEmployeeFields(item)" />
           <span v-else>{{ item.actual_accomplishment ?? "—" }}</span>
         </td>
-        <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
-        <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
-        <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
         <td class="border border-slate-200 px-4 py-3 text-center text-sm">
-          <select v-if="canRate" v-model.number="item[criterion.key]" class="border rounded text-xs px-1">
-            <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-          </select>
-          <span v-else>{{ item[criterion.key] ?? "—" }}</span>
+          <select v-if="canRate" v-model.number="item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ item.quality_rating ?? "—" }}</span>
         </td>
-        <td v-if="idx === 0" rowspan="5" :class="TD" class="border border-slate-200 align-top">
+        <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+          <select v-if="canRate" v-model.number="item.efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ item.efficiency_rating ?? "—" }}</span>
+        </td>
+        <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+          <select v-if="canRate" v-model.number="item.timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ item.timeliness_rating ?? "—" }}</span>
+        </td>
+        <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
+          {{ item.row_average ?? "—" }}
+          <button v-if="canRate" type="button" class="block mt-1 text-xs text-indigo-600" @click="rateWdpRow(item)">Save</button>
+        </td>
+        <td :class="TD" class="border border-slate-200 align-top">
           <input v-if="canRate" v-model="item.remarks" class="border rounded px-2 py-1 text-xs w-full" />
           <span v-else>{{ item.remarks ?? "—" }}</span>
         </td>
       </tr>
-      <tr>
-        <td :class="TD" class="border border-slate-200 font-semibold" colspan="3">Row Average</td>
-        <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
-        <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
-        <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
-        <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
-          {{ item.row_average ?? rowAverage(item) }}
-          <button v-if="canRate" type="button" class="ml-2 text-xs text-indigo-600" @click="rate(item)">Save Ratings</button>
-        </td>
-      </tr>
+
+      <!-- Untagged (teaching-load) row: fixed CSC 4-criteria rubric -->
+      <template v-else>
+        <tr v-for="(criterion, idx) in CRITERIA" :key="item.id + '-' + criterion.key">
+          <td v-if="idx === 0" rowspan="5" :class="TD" class="border border-slate-200 align-top font-medium">
+            {{ item.label }}<br />
+            <small class="text-slate-400">Weight: {{ item.weight_percent ?? "—" }}%</small>
+          </td>
+          <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+          <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+          <td :class="TD" class="border border-slate-200">{{ criterion.label }}</td>
+          <td v-if="idx === 0" rowspan="4" :class="TD" class="border border-slate-200 align-top">
+            <AppTextarea v-if="isOwner && isMutable" v-model="item.target" @blur="saveEmployeeFields(item)" />
+            <span v-else>{{ item.target ?? "—" }}</span>
+          </td>
+          <td v-if="idx === 0" rowspan="4" :class="TD" class="border border-slate-200 align-top">
+            <AppTextarea v-if="isOwner && isMutable" v-model="item.actual_accomplishment" @blur="saveEmployeeFields(item)" />
+            <span v-else>{{ item.actual_accomplishment ?? "—" }}</span>
+          </td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+            <select v-if="canRate" v-model.number="item[criterion.key]" class="border rounded text-xs px-1">
+              <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+            </select>
+            <span v-else>{{ item[criterion.key] ?? "—" }}</span>
+          </td>
+          <td v-if="idx === 0" rowspan="5" :class="TD" class="border border-slate-200 align-top">
+            <input v-if="canRate" v-model="item.remarks" class="border rounded px-2 py-1 text-xs w-full" />
+            <span v-else>{{ item.remarks ?? "—" }}</span>
+          </td>
+        </tr>
+        <tr>
+          <td :class="TD" class="border border-slate-200 font-semibold" colspan="3">Row Average</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
+            {{ item.row_average ?? rowAverage(item) }}
+            <button v-if="canRate" type="button" class="ml-2 text-xs text-indigo-600" @click="rate(item)">Save Ratings</button>
+          </td>
+        </tr>
+      </template>
     </template>
     <tr v-if="!items.length">
       <td :class="TD" class="border border-slate-200" colspan="11">No Core Function rows yet — generate targets from Employee Functions.</td>

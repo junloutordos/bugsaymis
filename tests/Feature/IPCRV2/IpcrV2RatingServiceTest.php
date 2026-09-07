@@ -54,4 +54,27 @@ class IpcrV2RatingServiceTest extends TestCase
         // 0.20*5.0 + 0.60*4.0 + 0.20*3.0 = 1.0 + 2.4 + 0.6 = 4.0
         $this->assertEqualsWithDelta(4.0, $rating, 0.01);
     }
+
+    public function test_a_multi_tagged_functions_split_weight_across_materialized_items_does_not_skew_core_average(): void
+    {
+        // Function A: 60% weight, one item, rated 4.0.
+        // Function B: 40% weight, tagged to 2 WDPs — materialized into 2
+        // items of 20% each (split evenly), rated 1.0 and 5.0. If the
+        // split weren't even (e.g. full weight duplicated on each item),
+        // Function B would end up counting for more than its true 40%
+        // share and this assertion would fail.
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = IpcrV2Record::create(['user_id' => $user->id, 'rating_period_id' => $period->id]);
+        $record->coreItems()->create(['label' => 'Function A', 'weight_percent' => 60, 'row_average' => 4.0]);
+        $record->coreItems()->create(['label' => 'Function B', 'weight_percent' => 20, 'row_average' => 1.0]);
+        $record->coreItems()->create(['label' => 'Function B', 'weight_percent' => 20, 'row_average' => 5.0]);
+
+        $rating = (new IpcrV2RatingService())->computeFinalRating($record->fresh(['coreItems', 'supportItems']));
+
+        // No strategic or support data, so only Core contributes:
+        // combined core average = (4.0*60 + 1.0*20 + 5.0*20) / 100 = 3.6
+        // 0.50 (default core weight) * 3.6 = 1.8
+        $this->assertEqualsWithDelta(1.8, $rating, 0.01);
+    }
 }
