@@ -34,14 +34,21 @@ class EmployeeIpcrV2Controller extends Controller
         ]);
     }
 
-    public function show(int $id)
+    public function show(Request $request, int $id)
     {
         $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period'])->findOrFail($id);
+
+        $isOwner = $record->user_id === $request->user()->id;
+        abort_unless(
+            $isOwner || $this->workflow->canManage($request->user(), $record),
+            403,
+            "You are not this employee's immediate supervisor and cannot view this IPCR V2."
+        );
 
         return Inertia::render('IPCRV2/EmployeeIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
-            'isOwner' => $record->user_id === request()->user()->id,
+            'isOwner' => $isOwner,
             'isMutable' => $record->isMutable(),
         ]);
     }
