@@ -140,12 +140,43 @@ class EmployeeIpcrV2Controller extends Controller
         $this->workflow->assertMutable($record);
         abort_if($coreItem->ipcr_v2_id !== $record->id, 404);
 
-        $data = $request->validate([
-            'target' => 'nullable|string|max:1000',
-            'actual_accomplishment' => 'nullable|string|max:1000',
-            'mov_link' => 'nullable|string|max:500',
-        ]);
-        $coreItem->update($data);
+        if ($coreItem->success_indicator !== null) {
+            $data = $request->validate([
+                'target' => 'nullable|string|max:1000',
+                'actual_accomplishment' => 'nullable|string|max:1000',
+                'mov_link' => 'nullable|string|max:500',
+                'self_quality_rating' => 'nullable|integer|min:1|max:5',
+                'self_efficiency_rating' => 'nullable|integer|min:1|max:5',
+                'self_timeliness_rating' => 'nullable|integer|min:1|max:5',
+            ]);
+        } else {
+            $data = $request->validate([
+                'target' => 'nullable|string|max:1000',
+                'actual_accomplishment' => 'nullable|string|max:1000',
+                'mov_link' => 'nullable|string|max:500',
+                'self_student_feedback_rating' => 'nullable|integer|min:1|max:5',
+                'self_supervisor_feedback_rating' => 'nullable|integer|min:1|max:5',
+                'self_im_development_rating' => 'nullable|integer|min:1|max:5',
+                'self_timeliness_rating' => 'nullable|integer|min:1|max:5',
+            ]);
+        }
+
+        $coreItem->fill($data);
+
+        if ($coreItem->success_indicator !== null) {
+            $ratings = [$coreItem->self_quality_rating, $coreItem->self_efficiency_rating, $coreItem->self_timeliness_rating];
+            $coreItem->self_row_average = in_array(null, $ratings, true) ? null : round(array_sum($ratings) / 3, 2);
+        } else {
+            $ratings = [
+                $coreItem->self_student_feedback_rating, $coreItem->self_supervisor_feedback_rating,
+                $coreItem->self_im_development_rating, $coreItem->self_timeliness_rating,
+            ];
+            $coreItem->self_row_average = in_array(null, $ratings, true)
+                ? null
+                : round($ratings[0] * 0.30 + $ratings[1] * 0.20 + $ratings[2] * 0.20 + $ratings[3] * 0.30, 2);
+        }
+
+        $coreItem->save();
 
         return back()->with('success', 'Updated.');
     }
@@ -161,8 +192,17 @@ class EmployeeIpcrV2Controller extends Controller
             'target' => 'nullable|string|max:1000',
             'actual_accomplishment' => 'nullable|string|max:1000',
             'mov_link' => 'nullable|string|max:500',
+            'self_quality_rating' => 'nullable|integer|min:1|max:5',
+            'self_efficiency_rating' => 'nullable|integer|min:1|max:5',
+            'self_timeliness_rating' => 'nullable|integer|min:1|max:5',
         ]);
-        $supportItem->update($data);
+
+        $supportItem->fill($data);
+
+        $ratings = [$supportItem->self_quality_rating, $supportItem->self_efficiency_rating, $supportItem->self_timeliness_rating];
+        $supportItem->self_row_average = in_array(null, $ratings, true) ? null : round(array_sum($ratings) / 3, 2);
+
+        $supportItem->save();
 
         return back()->with('success', 'Updated.');
     }

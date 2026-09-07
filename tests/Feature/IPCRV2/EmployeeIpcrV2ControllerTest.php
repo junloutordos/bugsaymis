@@ -190,4 +190,68 @@ class EmployeeIpcrV2ControllerTest extends TestCase
         $response->assertRedirect();
         $this->assertSame('For Review', $record->fresh()->status);
     }
+
+    public function test_owner_can_save_a_self_rating_on_a_wdp_tagged_core_item(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100, 'success_indicator' => 'Systems maintained']);
+
+        $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
+            'self_quality_rating' => 4, 'self_efficiency_rating' => 5, 'self_timeliness_rating' => 3,
+        ]);
+
+        $response->assertRedirect();
+        $fresh = $coreItem->fresh();
+        $this->assertSame(4, $fresh->self_quality_rating);
+        $this->assertSame('4.00', $fresh->self_row_average);
+    }
+
+    public function test_owner_can_save_a_self_rating_on_the_csc_teaching_rubric(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $coreItem = $record->coreItems()->create(['label' => 'Subject 1', 'weight_percent' => 100]);
+
+        $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
+            'self_student_feedback_rating' => 5, 'self_supervisor_feedback_rating' => 4,
+            'self_im_development_rating' => 4, 'self_timeliness_rating' => 5,
+        ]);
+
+        $response->assertRedirect();
+        $fresh = $coreItem->fresh();
+        // 5*0.30 + 4*0.20 + 4*0.20 + 5*0.30 = 1.5 + 0.8 + 0.8 + 1.5 = 4.60
+        $this->assertSame('4.60', $fresh->self_row_average);
+    }
+
+    public function test_self_row_average_stays_null_until_all_criteria_are_present(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100, 'success_indicator' => 'Systems maintained']);
+
+        $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
+            'self_quality_rating' => 4,
+        ]);
+
+        $this->assertNull($coreItem->fresh()->self_row_average);
+    }
+
+    public function test_owner_can_save_a_self_rating_on_a_support_item(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $supportItem = $record->supportItems()->create(['label' => 'Administrative']);
+
+        $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateSupportItem', [$record->id, $supportItem->id]), [
+            'self_quality_rating' => 3, 'self_efficiency_rating' => 3, 'self_timeliness_rating' => 3,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame('3.00', $supportItem->fresh()->self_row_average);
+    }
 }
