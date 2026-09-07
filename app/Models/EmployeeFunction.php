@@ -19,7 +19,7 @@ class EmployeeFunction extends Model
 
     protected $fillable = [
         'user_id', 'function_type', 'source_type',
-        'load_assignment_id',
+        'load_assignment_id', 'sync_source_key',
         'label', 'weight_percent', 'academic_term_id', 'created_by',
     ];
 
@@ -58,6 +58,11 @@ class EmployeeFunction extends Model
     public function ipcrV2CoreItems()
     {
         return $this->hasMany(\App\Models\IPCRV2\IpcrV2CoreItem::class);
+    }
+
+    public function ipcrV2SupportItems()
+    {
+        return $this->hasMany(\App\Models\IPCRV2\IpcrV2SupportItem::class);
     }
 
     public function scopeCore($query)
