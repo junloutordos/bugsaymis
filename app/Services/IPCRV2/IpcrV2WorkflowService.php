@@ -48,9 +48,11 @@ class IpcrV2WorkflowService
     ];
 
     public function __construct(
-        private ?IPCRWorkflowService $chain = null
+        private ?IPCRWorkflowService $chain = null,
+        private ?IpcrV2RatingService $rating = null
     ) {
         $this->chain ??= app(IPCRWorkflowService::class);
+        $this->rating ??= app(IpcrV2RatingService::class);
     }
 
     public function assertMutable(IpcrV2Record $ipcr): void
@@ -140,5 +142,17 @@ class IpcrV2WorkflowService
                 'rating_period_id' => 'This employee already has an IPCR V2 for this rating period.',
             ]);
         }
+    }
+
+    public function finalize(IpcrV2Record $ipcr, User $director): IpcrV2Record
+    {
+        $finalNumeric = $this->rating->computeFinalRating($ipcr);
+
+        return $this->transition($ipcr, self::STATUS_DIRECTOR_SIGNED, [
+            'director_signed_at' => now(),
+            'director_signature' => $director->electronic_signature,
+            'final_numeric_rating' => $finalNumeric,
+            'final_adjectival_rating' => $this->rating->adjectivalRating($finalNumeric),
+        ], 'ipcr_v2_director_signed');
     }
 }

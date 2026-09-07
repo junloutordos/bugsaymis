@@ -63,4 +63,31 @@ class IpcrV2WorkflowServiceTest extends TestCase
         $this->expectException(ValidationException::class);
         $service->assertNoDuplicateForPeriod($user->id, $period->id);
     }
+
+    public function test_finalize_computes_and_freezes_the_final_rating(): void
+    {
+        IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
+        \App\Models\AgencyOutcome::create(['outcome' => 'A']);
+        \App\Models\OPCR\OpcrIndicator::create([
+            'fiscal_year' => 2026,
+            'agency_outcome_id' => \App\Models\AgencyOutcome::first()->id,
+            'description' => 'x', 'rating_average' => 4.0,
+        ]);
+
+        $director = User::factory()->create(['electronic_signature' => 'sig.png']);
+        $user = User::factory()->create();
+        $record = IpcrV2Record::create([
+            'user_id' => $user->id, 'rating_period_id' => IPCRRatingPeriod::first()->id,
+            'status' => IpcrV2WorkflowService::STATUS_PMT_APPROVED,
+        ]);
+        $record->coreItems()->create(['label' => 'x', 'weight_percent' => 100, 'row_average' => 4.0]);
+
+        $service = new IpcrV2WorkflowService();
+        $service->finalize($record, $director);
+
+        $fresh = $record->fresh();
+        $this->assertSame(IpcrV2WorkflowService::STATUS_DIRECTOR_SIGNED, $fresh->status);
+        $this->assertNotNull($fresh->final_numeric_rating);
+        $this->assertNotNull($fresh->final_adjectival_rating);
+    }
 }
