@@ -8,9 +8,12 @@ import IpcrV2StrategicSection from "@/Components/IPCRV2/IpcrV2StrategicSection.v
 import IpcrV2CoreItemsTable from "@/Components/IPCRV2/IpcrV2CoreItemsTable.vue"
 import IpcrV2SupportItemsTable from "@/Components/IPCRV2/IpcrV2SupportItemsTable.vue"
 import IpcrV2SummarySection from "@/Components/IPCRV2/IpcrV2SummarySection.vue"
+import DigitalSignaturePin from "@/Components/DigitalSignaturePin.vue"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 import { useSubmit } from "@/Composables/useSubmit"
+import { usePinConfirm } from "@/Composables/usePinConfirm"
+import Swal from "sweetalert2"
 
 const props = defineProps({
   ipcr: Object,
@@ -18,17 +21,31 @@ const props = defineProps({
   ocdUser: Object,
   summary: Object,
   isMutable: Boolean,
+  hasPin: Boolean,
+  signatureUri: String,
 })
 const { isSubmitting, submit } = useSubmit()
+const { showPinModal, requestPin, confirmPin, cancelPin } = usePinConfirm()
 
 function approve() {
-  submit((opts) => router.post(route("pmt-ipcr-v2.approve", props.ipcr.id), {}, opts))
+  requestPin((pin) => submit((opts) => router.post(route("pmt-ipcr-v2.approve", props.ipcr.id), { pin }, opts)))
 }
-function returnForRevision() {
-  submit((opts) => router.post(route("pmt-ipcr-v2.return", props.ipcr.id), {}, opts))
+
+async function returnForRevision() {
+  const { value: remarks, isConfirmed } = await Swal.fire({
+    title: "Return to Division Chief for revision?",
+    input: "textarea",
+    inputLabel: "Remarks",
+    inputPlaceholder: "Explain what needs to change...",
+    showCancelButton: true,
+    inputValidator: (value) => (!value ? "Remarks are required when returning for revision." : undefined),
+  })
+  if (!isConfirmed || !remarks) return
+  submit((opts) => router.post(route("pmt-ipcr-v2.return", props.ipcr.id), { remarks }, opts))
 }
+
 function directorSign() {
-  submit((opts) => router.post(route("pmt-ipcr-v2.directorSign", props.ipcr.id), {}, opts))
+  requestPin((pin) => submit((opts) => router.post(route("pmt-ipcr-v2.directorSign", props.ipcr.id), { pin }, opts)))
 }
 </script>
 
@@ -74,12 +91,21 @@ function directorSign() {
       </div>
     </div>
 
-    <IpcrV2SummarySection :summary="summary" />
+    <IpcrV2SummarySection :summary="summary" :rating-date="ipcr.director_signed_at" :comments="ipcr.comments_recommendations" />
 
     <div v-if="isMutable" class="mt-6 flex justify-end gap-2">
       <AppButton v-if="ipcr.status === 'Submitted to PMT'" variant="secondary" :disabled="isSubmitting" @click="returnForRevision">Return</AppButton>
       <AppButton v-if="ipcr.status === 'Submitted to PMT'" :disabled="isSubmitting" @click="approve">Approve</AppButton>
       <AppButton v-if="ipcr.status === 'Approved by PMT'" :disabled="isSubmitting" @click="directorSign">Director Sign</AppButton>
     </div>
+
+    <DigitalSignaturePin
+      :show="showPinModal"
+      :has-pin="hasPin"
+      :signature-uri="signatureUri"
+      :loading="isSubmitting"
+      @confirm="confirmPin"
+      @cancel="cancelPin"
+    />
   </AdminLayout>
 </template>
