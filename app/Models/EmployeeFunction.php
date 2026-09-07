@@ -19,7 +19,7 @@ class EmployeeFunction extends Model
 
     protected $fillable = [
         'user_id', 'function_type', 'source_type',
-        'load_assignment_id', 'work_distribution_plan_id',
+        'load_assignment_id',
         'label', 'weight_percent', 'academic_term_id', 'created_by',
     ];
 
@@ -37,9 +37,12 @@ class EmployeeFunction extends Model
         return $this->belongsTo(LoadAssignment::class);
     }
 
-    public function workDistributionPlan()
+    public function workDistributionPlans()
     {
-        return $this->belongsTo(WorkDistributionPlan::class);
+        return $this->belongsToMany(
+            WorkDistributionPlan::class,
+            'employee_function_work_distribution_plan'
+        );
     }
 
     public function academicTerm()

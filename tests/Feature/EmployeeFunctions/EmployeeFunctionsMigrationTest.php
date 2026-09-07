@@ -15,9 +15,18 @@ class EmployeeFunctionsMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('employee_functions'));
         $this->assertTrue(Schema::hasColumns('employee_functions', [
             'id', 'user_id', 'function_type', 'source_type',
-            'load_assignment_id', 'work_distribution_plan_id',
+            'load_assignment_id',
             'label', 'weight_percent', 'academic_term_id', 'created_by',
             'created_at', 'updated_at',
+        ]));
+        $this->assertFalse(Schema::hasColumn('employee_functions', 'work_distribution_plan_id'));
+    }
+
+    public function test_employee_function_work_distribution_plan_pivot_table_exists(): void
+    {
+        $this->assertTrue(Schema::hasTable('employee_function_work_distribution_plan'));
+        $this->assertTrue(Schema::hasColumns('employee_function_work_distribution_plan', [
+            'employee_function_id', 'work_distribution_plan_id',
         ]));
     }
 }

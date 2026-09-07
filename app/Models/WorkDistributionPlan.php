@@ -47,6 +47,11 @@ class WorkDistributionPlan extends Model
         return $this->belongsToMany(\App\Models\SpecialAssignment::class, 'special_assignment_work_distribution_plan');
     }
 
+    public function employeeFunctions()
+    {
+        return $this->belongsToMany(EmployeeFunction::class, 'employee_function_work_distribution_plan');
+    }
+
     // Designation categories directly tagged with this plan — every
     // designation under the category, and therefore every current/future
     // holder of any of them, inherits it on their IPCR automatically.

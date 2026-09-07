@@ -55,22 +55,27 @@ class EmployeeFunctionControllerTest extends TestCase
             );
     }
 
-    public function test_store_creates_a_manual_support_function_tagged_to_a_wdp(): void
+    private function makePlan(string $label, ?int $fiscalYear = null): WorkDistributionPlan
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'Core Functions ' . $label]);
+        $indicator = PerformanceIndicator::create(['agency_outcome_id' => $outcome->id, 'description' => 'x']);
+
+        return WorkDistributionPlan::create([
+            'performance_indicator_id' => $indicator->id,
+            'success_indicator' => $label,
+            'fiscal_year' => $fiscalYear,
+        ]);
+    }
+
+    public function test_store_creates_a_support_function_tagged_to_a_wdp(): void
     {
         $manager = $this->manager();
         $employee = User::factory()->create();
-        $outcome = \App\Models\AgencyOutcome::create(['outcome' => 'Core Functions']);
-        $indicator = \App\Models\PerformanceIndicator::create(['agency_outcome_id' => $outcome->id, 'description' => 'x']);
-        $plan = WorkDistributionPlan::create([
-            'performance_indicator_id' => $indicator->id,
-            'success_indicator' => 'x',
-            'start_date' => now()->toDateString(),
-            'end_date' => now()->addMonths(6)->toDateString(),
-        ]);
+        $plan = $this->makePlan('x');
 
         $response = $this->actingAs($manager)->post(route('employee-functions.store', $employee), [
             'function_type' => 'support',
-            'work_distribution_plan_id' => $plan->id,
+            'work_distribution_plan_ids' => [$plan->id],
             'label' => 'Member, Discipline Committee',
         ]);
 
@@ -79,9 +84,32 @@ class EmployeeFunctionControllerTest extends TestCase
             'user_id' => $employee->id,
             'function_type' => 'support',
             'source_type' => 'wdp',
-            'work_distribution_plan_id' => $plan->id,
             'label' => 'Member, Discipline Committee',
         ]);
+        $function = EmployeeFunction::where('user_id', $employee->id)->first();
+        $this->assertSame([$plan->id], $function->workDistributionPlans()->pluck('work_distribution_plans.id')->all());
+    }
+
+    public function test_store_creates_a_core_function_tagged_to_multiple_wdps(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $planA = $this->makePlan('A');
+        $planB = $this->makePlan('B');
+
+        $response = $this->actingAs($manager)->post(route('employee-functions.store', $employee), [
+            'function_type' => 'core',
+            'work_distribution_plan_ids' => [$planA->id, $planB->id],
+            'label' => 'Multi-tagged Core Function',
+        ]);
+
+        $response->assertRedirect();
+        $function = EmployeeFunction::where('label', 'Multi-tagged Core Function')->firstOrFail();
+        $this->assertSame('wdp', $function->source_type);
+        $this->assertEqualsCanonicalizing(
+            [$planA->id, $planB->id],
+            $function->workDistributionPlans()->pluck('work_distribution_plans.id')->all()
+        );
     }
 
     public function test_store_creates_a_manual_core_function_without_a_wdp(): void
@@ -95,13 +123,52 @@ class EmployeeFunctionControllerTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $this->assertDatabaseHas('employee_functions', [
-            'user_id' => $employee->id,
-            'function_type' => 'core',
-            'source_type' => 'manual',
-            'work_distribution_plan_id' => null,
-            'label' => 'Teaches Grade 11 Physics',
+        $function = EmployeeFunction::where('user_id', $employee->id)->firstOrFail();
+        $this->assertSame('manual', $function->source_type);
+        $this->assertSame('Teaches Grade 11 Physics', $function->label);
+        $this->assertCount(0, $function->workDistributionPlans);
+    }
+
+    public function test_update_replaces_wdp_tags_and_relabels(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $planA = $this->makePlan('A');
+        $planB = $this->makePlan('B');
+        $function = EmployeeFunction::create([
+            'user_id' => $employee->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Old label',
         ]);
+        $function->workDistributionPlans()->sync([$planA->id]);
+
+        $response = $this->actingAs($manager)->put(route('employee-functions.update', [$employee, $function]), [
+            'label' => 'New label',
+            'work_distribution_plan_ids' => [$planB->id],
+        ]);
+
+        $response->assertRedirect();
+        $function->refresh();
+        $this->assertSame('New label', $function->label);
+        $this->assertSame('wdp', $function->source_type);
+        $this->assertSame([$planB->id], $function->workDistributionPlans()->pluck('work_distribution_plans.id')->all());
+    }
+
+    public function test_update_can_clear_wdp_tags_back_to_manual(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $plan = $this->makePlan('x');
+        $function = EmployeeFunction::create([
+            'user_id' => $employee->id, 'function_type' => 'support', 'source_type' => 'wdp', 'label' => 'x',
+        ]);
+        $function->workDistributionPlans()->sync([$plan->id]);
+
+        $this->actingAs($manager)->put(route('employee-functions.update', [$employee, $function]), [
+            'label' => 'x',
+        ])->assertRedirect();
+
+        $function->refresh();
+        $this->assertSame('manual', $function->source_type);
+        $this->assertCount(0, $function->workDistributionPlans);
     }
 
     public function test_destroy_removes_a_function_row(): void

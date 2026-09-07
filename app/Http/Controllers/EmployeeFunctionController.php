@@ -18,7 +18,7 @@ class EmployeeFunctionController extends Controller
 
         return Inertia::render('Users/EmployeeFunctions', [
             'employee' => $user->only('id', 'name', 'position'),
-            'functions' => $user->employeeFunctions()->with('workDistributionPlan')->get(),
+            'functions' => $user->employeeFunctions()->with('workDistributionPlans:id,success_indicator')->get(),
             'isFaculty' => $user->hasRole('Faculty') || (bool) $user->academic_unit_id,
             'workDistributionPlans' => WorkDistributionPlan::forFiscalYear($currentYear)
                 ->select('id', 'success_indicator')
@@ -31,20 +31,24 @@ class EmployeeFunctionController extends Controller
     {
         $data = $request->validate([
             'function_type' => 'required|in:core,support',
-            'work_distribution_plan_id' => 'nullable|exists:work_distribution_plans,id',
+            'work_distribution_plan_ids' => 'nullable|array',
+            'work_distribution_plan_ids.*' => 'exists:work_distribution_plans,id',
             'label' => 'required|string|max:255',
             'weight_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
-        EmployeeFunction::create([
+        $planIds = $data['work_distribution_plan_ids'] ?? [];
+
+        $function = EmployeeFunction::create([
             'user_id' => $user->id,
             'function_type' => $data['function_type'],
-            'source_type' => ($data['work_distribution_plan_id'] ?? null) ? EmployeeFunction::SOURCE_WDP : EmployeeFunction::SOURCE_MANUAL,
-            'work_distribution_plan_id' => $data['work_distribution_plan_id'] ?? null,
+            'source_type' => $planIds ? EmployeeFunction::SOURCE_WDP : EmployeeFunction::SOURCE_MANUAL,
             'label' => $data['label'],
             'weight_percent' => $data['weight_percent'] ?? null,
             'created_by' => $request->user()->id,
         ]);
+
+        $function->workDistributionPlans()->sync($planIds);
 
         return back()->with('success', 'Function added.');
     }
@@ -56,9 +60,23 @@ class EmployeeFunctionController extends Controller
         $data = $request->validate([
             'label' => 'required|string|max:255',
             'weight_percent' => 'nullable|numeric|min:0|max:100',
+            'work_distribution_plan_ids' => 'nullable|array',
+            'work_distribution_plan_ids.*' => 'exists:work_distribution_plans,id',
         ]);
 
-        $employeeFunction->update($data);
+        $planIds = $data['work_distribution_plan_ids'] ?? [];
+
+        $employeeFunction->update([
+            'label' => $data['label'],
+            'weight_percent' => $data['weight_percent'] ?? null,
+            'source_type' => $planIds ? EmployeeFunction::SOURCE_WDP : (
+                $employeeFunction->source_type === EmployeeFunction::SOURCE_LOAD_ASSIGNMENT
+                    ? EmployeeFunction::SOURCE_LOAD_ASSIGNMENT
+                    : EmployeeFunction::SOURCE_MANUAL
+            ),
+        ]);
+
+        $employeeFunction->workDistributionPlans()->sync($planIds);
 
         return back()->with('success', 'Function updated.');
     }

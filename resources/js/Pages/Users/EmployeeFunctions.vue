@@ -7,9 +7,8 @@ import AppButton from "@/Components/AppButton.vue"
 import AppBadge from "@/Components/AppBadge.vue"
 import AppModal from "@/Components/AppModal.vue"
 import AppInput from "@/Components/AppInput.vue"
-import AppSelect from "@/Components/AppSelect.vue"
 import AppIconButton from "@/Components/AppIconButton.vue"
-import { ArrowPathIcon, PlusIcon, TrashIcon } from "@heroicons/vue/24/outline"
+import { ArrowPathIcon, PencilSquareIcon, PlusIcon, TrashIcon } from "@heroicons/vue/24/outline"
 import { computed, ref } from "vue"
 import { useSubmit } from "@/Composables/useSubmit"
 import { TH, TD, TR, TD_END } from "@/Composables/useTableClasses.js"
@@ -34,20 +33,46 @@ function removeFunction(fn) {
   submit((opts) => router.delete(route("employee-functions.destroy", [props.employee.id, fn.id]), opts))
 }
 
-const showAddModal = ref(false)
-const addForm = ref({ function_type: "core", label: "", weight_percent: null, work_distribution_plan_id: null })
+const showFormModal = ref(false)
+const editingFunction = ref(null)
+const form = ref({ function_type: "core", label: "", weight_percent: null, work_distribution_plan_ids: [] })
 
 function openAddModal(type) {
-  addForm.value = { function_type: type, label: "", weight_percent: null, work_distribution_plan_id: null }
-  showAddModal.value = true
+  editingFunction.value = null
+  form.value = { function_type: type, label: "", weight_percent: null, work_distribution_plan_ids: [] }
+  showFormModal.value = true
 }
 
-function saveAddForm() {
-  const payload = { ...addForm.value, work_distribution_plan_id: addForm.value.work_distribution_plan_id || null }
-  submit(
-    (opts) => router.post(route("employee-functions.store", props.employee.id), payload, opts),
-    { onSuccess: () => { showAddModal.value = false } }
-  )
+function openEditModal(fn) {
+  editingFunction.value = fn
+  form.value = {
+    function_type: fn.function_type,
+    label: fn.label,
+    weight_percent: fn.weight_percent,
+    work_distribution_plan_ids: (fn.work_distribution_plans ?? []).map(p => p.id),
+  }
+  showFormModal.value = true
+}
+
+function toggleWdp(id) {
+  const ix = form.value.work_distribution_plan_ids.indexOf(id)
+  ix >= 0 ? form.value.work_distribution_plan_ids.splice(ix, 1) : form.value.work_distribution_plan_ids.push(id)
+}
+
+function saveForm() {
+  const payload = {
+    function_type: form.value.function_type,
+    label: form.value.label,
+    weight_percent: form.value.weight_percent,
+    work_distribution_plan_ids: form.value.work_distribution_plan_ids,
+  }
+  const opts = { onSuccess: () => { showFormModal.value = false } }
+
+  if (editingFunction.value) {
+    submit((o) => router.put(route("employee-functions.update", [props.employee.id, editingFunction.value.id]), payload, o), opts)
+  } else {
+    submit((o) => router.post(route("employee-functions.store", props.employee.id), payload, o), opts)
+  }
 }
 </script>
 
@@ -80,11 +105,16 @@ function saveAddForm() {
             <td :class="TD">{{ fn.label }}</td>
             <td :class="TD">
               <AppBadge>{{ fn.source_type }}</AppBadge>
-              <div v-if="fn.work_distribution_plan" class="text-xs text-slate-500 mt-1">{{ fn.work_distribution_plan.success_indicator }}</div>
+              <div v-if="fn.work_distribution_plans?.length" class="text-xs text-slate-500 mt-1 space-y-0.5">
+                <div v-for="plan in fn.work_distribution_plans" :key="plan.id">{{ plan.success_indicator }}</div>
+              </div>
             </td>
             <td :class="TD">{{ fn.weight_percent ?? "—" }}</td>
             <td :class="TD_END">
-              <AppIconButton label="Remove" variant="danger" @click="removeFunction(fn)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+              <div class="flex justify-end gap-1">
+                <AppIconButton label="Edit" @click="openEditModal(fn)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+                <AppIconButton label="Remove" variant="danger" @click="removeFunction(fn)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+              </div>
             </td>
           </tr>
           <tr v-if="!coreFunctions.length">
@@ -112,10 +142,15 @@ function saveAddForm() {
             <td :class="TD">{{ fn.label }}</td>
             <td :class="TD">
               <AppBadge>{{ fn.source_type }}</AppBadge>
-              <div v-if="fn.work_distribution_plan" class="text-xs text-slate-500 mt-1">{{ fn.work_distribution_plan.success_indicator }}</div>
+              <div v-if="fn.work_distribution_plans?.length" class="text-xs text-slate-500 mt-1 space-y-0.5">
+                <div v-for="plan in fn.work_distribution_plans" :key="plan.id">{{ plan.success_indicator }}</div>
+              </div>
             </td>
             <td :class="TD_END">
-              <AppIconButton label="Remove" variant="danger" @click="removeFunction(fn)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+              <div class="flex justify-end gap-1">
+                <AppIconButton label="Edit" @click="openEditModal(fn)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+                <AppIconButton label="Remove" variant="danger" @click="removeFunction(fn)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+              </div>
             </td>
           </tr>
           <tr v-if="!supportFunctions.length">
@@ -125,17 +160,24 @@ function saveAddForm() {
       </table>
     </AppCard>
 
-    <AppModal :show="showAddModal" title="Add Function" @close="showAddModal = false">
+    <AppModal :show="showFormModal" :title="editingFunction ? 'Edit Function' : 'Add Function'" @close="showFormModal = false">
       <div class="space-y-4">
-        <AppInput v-model="addForm.label" label="Label" placeholder="e.g. Chairperson, Discipline Committee" />
-        <AppInput v-if="addForm.function_type === 'core'" v-model="addForm.weight_percent" type="number" label="Weight %" />
-        <AppSelect v-model="addForm.work_distribution_plan_id" label="Linked Work Distribution Plan (optional)">
-          <option :value="null">— None (manual) —</option>
-          <option v-for="plan in workDistributionPlans" :key="plan.id" :value="plan.id">{{ plan.success_indicator }}</option>
-        </AppSelect>
+        <AppInput v-model="form.label" label="Label" placeholder="e.g. Chairperson, Discipline Committee" />
+        <AppInput v-if="form.function_type === 'core'" v-model="form.weight_percent" type="number" label="Weight %" />
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Linked Work Distribution Plans (optional)</label>
+          <div class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+            <label v-for="plan in workDistributionPlans" :key="plan.id" class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50">
+              <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                :checked="form.work_distribution_plan_ids.includes(plan.id)" @change="toggleWdp(plan.id)" />
+              {{ plan.success_indicator }}
+            </label>
+            <p v-if="!workDistributionPlans.length" class="px-3 py-1.5 text-sm text-slate-400">No plans available for the current fiscal year.</p>
+          </div>
+        </div>
         <div class="flex justify-end gap-2 pt-2">
-          <AppButton variant="secondary" @click="showAddModal = false">Cancel</AppButton>
-          <AppButton :disabled="isSubmitting" @click="saveAddForm">Save</AppButton>
+          <AppButton variant="secondary" @click="showFormModal = false">Cancel</AppButton>
+          <AppButton :disabled="isSubmitting" @click="saveForm">Save</AppButton>
         </div>
       </div>
     </AppModal>
