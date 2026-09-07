@@ -101,15 +101,19 @@ Route::get('/_status', [\App\Http\Controllers\HealthController::class, 'check'])
     ->middleware(['auth', 'throttle:30,1'])
     ->name('system.health');
 
+// Office QR survey — read-only view/print, also accessible to CSM Feedback viewers (Evaluation Committee)
+Route::middleware(['auth','permission:roles.assign|csm.view'])->group(function(){
+    Route::get('/data-management/offices/{office}/qr-survey/pdf', [App\Http\Controllers\OfficeController::class, 'qrSurveyPdf'])->name('offices.qr-survey.pdf');
+    Route::get('/data-management/offices/{office}/qr-survey/preview', [App\Http\Controllers\OfficeController::class, 'qrSurveyPreview'])->name('offices.qr-survey.preview');
+});
+
 // Data Management - Offices
 Route::middleware(['auth','permission:roles.assign'])->group(function(){
     Route::get('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'index'])->name('offices.index');
     Route::post('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'store'])->name('offices.store');
     Route::put('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'update'])->name('offices.update');
     Route::delete('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'destroy'])->name('offices.destroy');
-    // Office QR survey — view/print/regenerate/toggle
-    Route::get('/data-management/offices/{office}/qr-survey/pdf', [App\Http\Controllers\OfficeController::class, 'qrSurveyPdf'])->name('offices.qr-survey.pdf');
-    Route::get('/data-management/offices/{office}/qr-survey/preview', [App\Http\Controllers\OfficeController::class, 'qrSurveyPreview'])->name('offices.qr-survey.preview');
+    // Office QR survey — regenerate/toggle stay Administrator-only (destructive/state-changing)
     Route::post('/data-management/offices/{office}/qr-survey/regenerate', [App\Http\Controllers\OfficeController::class, 'regenerateQrSurveyToken'])->name('offices.qr-survey.regenerate');
     Route::put('/data-management/offices/{office}/qr-survey/toggle', [App\Http\Controllers\OfficeController::class, 'toggleQrSurvey'])->name('offices.qr-survey.toggle');
     // Buildings
@@ -586,6 +590,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/csm/dashboard', [\App\Http\Controllers\CSMFeedbackController::class, 'dashboard'])
         ->middleware('permission:csm.view')
         ->name('csm.dashboard');
+    Route::get('/csm/offices', [\App\Http\Controllers\CSMFeedbackController::class, 'offices'])
+        ->middleware('permission:csm.view')
+        ->name('csm.offices.index');
     Route::get('/csm/list',      [\App\Http\Controllers\CSMFeedbackController::class, 'index'])
         ->middleware('permission:csm.view')
         ->name('csm.list');

@@ -71,6 +71,7 @@ const moduleOptions = Object.entries(props.moduleLabels).map(([value, label]) =>
       <AppPageHeader title="CSM Feedback" subtitle="All client satisfaction survey responses">
         <template #actions>
           <AppButton as="link" variant="secondary" :href="route('csm.dashboard')">Dashboard</AppButton>
+          <AppButton as="link" variant="secondary" :href="route('csm.offices.index')">Office QR Codes</AppButton>
           <AppButton as="a" variant="success" :href="buildExportUrl()">
             <ArrowDownTrayIcon class="h-4 w-4" /> Export Excel
           </AppButton>

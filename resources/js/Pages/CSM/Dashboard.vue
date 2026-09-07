@@ -143,6 +143,7 @@ const { values: kpiValues } = useCountUp(() => [props.total, props.thisMonth, pr
 
       <AppPageHeader hero class="dash-section" style="--stagger: 0" title="Client Satisfaction Dashboard" subtitle="Aggregated feedback from all General Services modules">
         <template #actions>
+          <AppButton as="link" variant="secondary" :href="route('csm.offices.index')">Office QR Codes</AppButton>
           <AppButton as="link" variant="secondary" :href="route('csm.list')">View All Feedback →</AppButton>
         </template>
       </AppPageHeader>

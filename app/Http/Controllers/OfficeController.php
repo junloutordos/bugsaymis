@@ -10,7 +10,13 @@ class OfficeController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['auth', 'role:Administrator']);
+        $this->middleware(['auth']);
+        // Office CRUD + QR regenerate/toggle remain Administrator-only. The two
+        // read-only QR view/print endpoints are opened up to csm.view via
+        // route-level middleware instead (see routes/web.php) so the
+        // Evaluation Committee can view/print office QR codes without gaining
+        // Office CRUD or QR regenerate/toggle rights.
+        $this->middleware('role:Administrator')->except(['qrSurveyPreview', 'qrSurveyPdf']);
     }
 
     public function index()
