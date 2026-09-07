@@ -23,6 +23,12 @@ class IpcrV2GenerationService
         $coreFunctions = EmployeeFunction::where('user_id', $user->id)->core()->with('workDistributionPlans:id,success_indicator')->get();
         $supportFunctions = EmployeeFunction::where('user_id', $user->id)->support()->with('workDistributionPlans:id,success_indicator')->get();
 
+        if ($coreFunctions->isEmpty() && $supportFunctions->isEmpty()) {
+            throw ValidationException::withMessages([
+                'employee_function' => 'No functions are synced for this employee yet — sync Employee Functions first.',
+            ]);
+        }
+
         $this->assertCoreWeightsSumTo100($coreFunctions);
 
         return DB::transaction(function () use ($user, $period, $coreFunctions, $supportFunctions) {

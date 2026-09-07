@@ -71,10 +71,11 @@ class IpcrV2GenerationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Placeholder Support']);
 
         $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
         $this->assertCount(0, $record->coreItems);
-        $this->assertCount(0, $record->supportItems);
+        $this->assertCount(1, $record->supportItems);
 
         EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'Subject 1', 'weight_percent' => 100]);
         EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Discipline Committee']);
@@ -84,7 +85,7 @@ class IpcrV2GenerationServiceTest extends TestCase
         $this->assertSame(2, $added);
         $record->refresh();
         $this->assertCount(1, $record->coreItems);
-        $this->assertCount(1, $record->supportItems);
+        $this->assertCount(2, $record->supportItems);
         $this->assertSame('Subject 1', $record->coreItems->first()->label);
     }
 
@@ -183,6 +184,7 @@ class IpcrV2GenerationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Placeholder Support']);
         $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
 
         $plan = $this->makePlan('Discipline Committee indicator');
@@ -191,6 +193,16 @@ class IpcrV2GenerationServiceTest extends TestCase
 
         (new IpcrV2GenerationService())->syncNewFunctions($record);
 
-        $this->assertSame('Discipline Committee indicator', $record->fresh()->supportItems->first()->success_indicator);
+        $syncedItem = $record->fresh()->supportItems->firstWhere('label', 'Discipline Committee');
+        $this->assertSame('Discipline Committee indicator', $syncedItem->success_indicator);
+    }
+
+    public function test_generate_targets_rejects_an_employee_with_no_synced_functions(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+
+        $this->expectException(ValidationException::class);
+        (new IpcrV2GenerationService())->generateTargets($user, $period);
     }
 }
