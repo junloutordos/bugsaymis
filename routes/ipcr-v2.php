@@ -41,4 +41,11 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
         Route::post('/pmt/ipcr-v2/{id}/return', [\App\Http\Controllers\IPCRV2\PMTIpcrV2Controller::class, 'returnForRevision'])->name('pmt-ipcr-v2.return');
         Route::post('/pmt/ipcr-v2/{id}/director-sign', [\App\Http\Controllers\IPCRV2\PMTIpcrV2Controller::class, 'directorSign'])->name('pmt-ipcr-v2.directorSign');
     });
+
+    Route::middleware('permission:ipcr.v2.monitor')->group(function () {
+        Route::get('/hr/ipcr-v2', [\App\Http\Controllers\IPCRV2\HRIpcrV2Controller::class, 'index'])->name('hr-ipcr-v2.index');
+        Route::get('/hr/ipcr-v2/{id}', [\App\Http\Controllers\IPCRV2\HRIpcrV2Controller::class, 'show'])->name('hr-ipcr-v2.show');
+        Route::post('/hr/ipcr-v2/{id}/submit-to-pmt', [\App\Http\Controllers\IPCRV2\HRIpcrV2Controller::class, 'submitToPMT'])->name('hr-ipcr-v2.submitToPMT');
+        Route::post('/hr/ipcr-v2/batch-submit-to-pmt', [\App\Http\Controllers\IPCRV2\HRIpcrV2Controller::class, 'batchSubmitToPMT'])->name('hr-ipcr-v2.batchSubmitToPMT');
+    });
 });
