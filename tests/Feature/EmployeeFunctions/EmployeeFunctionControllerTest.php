@@ -54,6 +54,26 @@ class EmployeeFunctionControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_creates_a_manual_core_function_without_a_wdp(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+
+        $response = $this->actingAs($manager)->post(route('employee-functions.store', $employee), [
+            'function_type' => 'core',
+            'label' => 'Teaches Grade 11 Physics',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('employee_functions', [
+            'user_id' => $employee->id,
+            'function_type' => 'core',
+            'source_type' => 'manual',
+            'work_distribution_plan_id' => null,
+            'label' => 'Teaches Grade 11 Physics',
+        ]);
+    }
+
     public function test_destroy_removes_a_function_row(): void
     {
         $manager = $this->manager();

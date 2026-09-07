@@ -31,7 +31,7 @@ class EmployeeFunctionController extends Controller
         EmployeeFunction::create([
             'user_id' => $user->id,
             'function_type' => $data['function_type'],
-            'source_type' => $data['work_distribution_plan_id'] ? EmployeeFunction::SOURCE_WDP : EmployeeFunction::SOURCE_MANUAL,
+            'source_type' => ($data['work_distribution_plan_id'] ?? null) ? EmployeeFunction::SOURCE_WDP : EmployeeFunction::SOURCE_MANUAL,
             'work_distribution_plan_id' => $data['work_distribution_plan_id'] ?? null,
             'label' => $data['label'],
             'weight_percent' => $data['weight_percent'] ?? null,
