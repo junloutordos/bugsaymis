@@ -42,6 +42,7 @@ class RolePermissionSeeder extends Seeder
             'documents.view',
             'reports.view', 'reports.export',
             'chat.access',
+            'csm.view',
         ]);
 
         // ── SALN Committee (HRMPSB doubles as committee; also set on HR head) ──
@@ -420,7 +421,7 @@ class RolePermissionSeeder extends Seeder
         // HR also monitors the evaluation analytics dashboard (Administrator bypasses via isSuperAdmin())
         $assign('HR', ['activities.monitor']);
         // Dedicated cross-cutting role for individually-assigned evaluation committee members
-        $assign('Evaluation Committee', ['activities.evaluation_committee']);
+        $assign('Evaluation Committee', ['activities.evaluation_committee', 'csm.view']);
 
         // ── Student / Parent ────────────────────────────────────────────────
         // No permission grants: students/parents never get a `users` row
