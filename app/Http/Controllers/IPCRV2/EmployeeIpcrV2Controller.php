@@ -23,7 +23,9 @@ class EmployeeIpcrV2Controller extends Controller
     public function __construct(
         private IpcrV2WorkflowService $workflow,
         private IpcrV2GenerationService $generation,
-        private StrategicFunctionService $strategic
+        private StrategicFunctionService $strategic,
+        private \App\Services\PerformanceManagement\IPCRWorkflowService $v1Chain,
+        private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService
     ) {}
 
     public function index(Request $request)
@@ -50,9 +52,16 @@ class EmployeeIpcrV2Controller extends Controller
             "You are not this employee's immediate supervisor and cannot view this IPCR V2."
         );
 
+        $supervisor = $this->v1Chain->immediateSupervisorFor($record->user)
+            ?? ($record->user->hasRole('DivisionChief') ? \App\Models\User::havingRole('OCD')->first() : null);
+        $ocdUser = \App\Models\User::havingRole('OCD')->first();
+
         return Inertia::render('IPCRV2/EmployeeIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
+            'supervisor' => $supervisor?->only('name', 'position'),
+            'ocdUser' => $ocdUser?->only('name', 'position'),
+            'summary' => $this->summaryService->buildRows($record),
             'isOwner' => $isOwner,
             'isMutable' => $record->isMutable(),
         ]);

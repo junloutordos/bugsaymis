@@ -10,7 +10,11 @@ use Inertia\Inertia;
 
 class HRIpcrV2Controller extends Controller
 {
-    public function __construct(private IpcrV2WorkflowService $workflow) {}
+    public function __construct(
+        private IpcrV2WorkflowService $workflow,
+        private \App\Services\IPCRV2\StrategicFunctionService $strategic = new \App\Services\IPCRV2\StrategicFunctionService(),
+        private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService = new \App\Services\IPCRV2\IpcrV2SummaryService()
+    ) {}
 
     public function index()
     {
@@ -22,8 +26,14 @@ class HRIpcrV2Controller extends Controller
     public function show(int $id)
     {
         $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions'])->findOrFail($id);
+        $ocdUser = \App\Models\User::havingRole('OCD')->first();
 
-        return Inertia::render('IPCRV2/HRIpcrV2Show', ['ipcr' => $record]);
+        return Inertia::render('IPCRV2/HRIpcrV2Show', [
+            'ipcr' => $record,
+            'strategicIndicators' => $this->strategic->currentIndicators(),
+            'ocdUser' => $ocdUser?->only('name', 'position'),
+            'summary' => $this->summaryService->buildRows($record),
+        ]);
     }
 
     public function submitToPMT(int $id)

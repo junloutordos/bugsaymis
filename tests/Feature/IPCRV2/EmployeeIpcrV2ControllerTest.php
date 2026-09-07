@@ -65,6 +65,23 @@ class EmployeeIpcrV2ControllerTest extends TestCase
         $this->actingAs($employee)->get(route('employee-ipcr-v2.show', $record->id))->assertOk();
     }
 
+    public function test_show_exposes_supervisor_ocd_user_and_summary(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+
+        $response = $this->actingAs($employee)->get(route('employee-ipcr-v2.show', $record->id));
+
+        $response->assertInertia(fn ($page) => $page
+            ->has('ocdUser')
+            ->has('summary')
+            ->has('summary.strategic')
+            ->has('summary.core')
+            ->has('summary.support')
+        );
+    }
+
     public function test_owner_can_delete_a_new_target_record(): void
     {
         $employee = $this->employee();

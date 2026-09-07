@@ -15,7 +15,8 @@ class DivisionChiefIpcrV2Controller extends Controller
 {
     public function __construct(
         private IpcrV2WorkflowService $workflow,
-        private StrategicFunctionService $strategic
+        private StrategicFunctionService $strategic,
+        private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService = new \App\Services\IPCRV2\IpcrV2SummaryService()
     ) {}
 
     public function index(Request $request)
@@ -40,9 +41,13 @@ class DivisionChiefIpcrV2Controller extends Controller
             'This employee is not in your division.'
         );
 
+        $ocdUser = \App\Models\User::havingRole('OCD')->first();
+
         return Inertia::render('IPCRV2/DivisionChiefIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
+            'ocdUser' => $ocdUser?->only('name', 'position'),
+            'summary' => $this->summaryService->buildRows($record),
             'isMutable' => $record->isMutable(),
         ]);
     }
