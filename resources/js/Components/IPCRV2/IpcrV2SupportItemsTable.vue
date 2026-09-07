@@ -1,7 +1,6 @@
 <script setup>
-import AppCard from "@/Components/AppCard.vue"
 import AppTextarea from "@/Components/AppTextarea.vue"
-import { TH, TD } from "@/Composables/useTableClasses.js"
+import { TD } from "@/Composables/useTableClasses.js"
 import { router } from "@inertiajs/vue3"
 import { useSubmit } from "@/Composables/useSubmit"
 
@@ -33,43 +32,36 @@ function rate(item) {
 </script>
 
 <template>
-  <AppCard>
-    <h3 class="text-sm font-semibold text-slate-700 mb-1">Support Function (20%)</h3>
-    <table class="w-full">
-      <thead>
-        <tr>
-          <th :class="TH">Item</th>
-          <th :class="TH">Actual Accomplishment</th>
-          <th :class="TH">MOV</th>
-          <th :class="TH">Row Average</th>
-          <th v-if="canRate" :class="TH">Rate (Quality/Efficiency/Timeliness)</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="item in items" :key="item.id">
-          <td :class="TD">{{ item.label }}</td>
-          <td :class="TD">
-            <AppTextarea v-if="isOwner && isMutable" v-model="item.actual_accomplishment" @blur="saveEmployeeFields(item)" />
-            <span v-else>{{ item.actual_accomplishment ?? "—" }}</span>
-          </td>
-          <td :class="TD">
-            <input v-if="isOwner && isMutable" v-model="item.mov_link" class="border rounded px-2 py-1 text-xs w-full" @blur="saveEmployeeFields(item)" />
-            <span v-else>{{ item.mov_link ?? "—" }}</span>
-          </td>
-          <td :class="TD">{{ item.row_average ?? "—" }}</td>
-          <td v-if="canRate" :class="TD">
-            <div class="flex gap-1 items-center">
-              <select v-model.number="item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
-              <select v-model.number="item.efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
-              <select v-model.number="item.timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
-              <button type="button" class="text-xs text-indigo-600" @click="rate(item)">Save</button>
-            </div>
-          </td>
-        </tr>
-        <tr v-if="!items.length">
-          <td :class="TD" :colspan="canRate ? 5 : 4">No Support Function rows yet.</td>
-        </tr>
-      </tbody>
-    </table>
-  </AppCard>
+  <tbody>
+    <tr class="bg-slate-200">
+      <td colspan="5" class="px-4 py-2 font-bold text-slate-800 border border-slate-300 uppercase">
+        Support Function (20%)
+      </td>
+    </tr>
+    <tr v-for="item in items" :key="item.id">
+      <td :class="TD" class="border border-slate-200 font-medium">{{ item.label }}</td>
+      <td class="border border-slate-200 px-4 py-3 text-sm text-slate-400">—</td>
+      <td class="border border-slate-200 px-4 py-3 text-sm text-slate-400">100% delivered</td>
+      <td :class="TD" class="border border-slate-200">
+        <AppTextarea v-if="isOwner && isMutable" v-model="item.actual_accomplishment" @blur="saveEmployeeFields(item)" />
+        <span v-else>{{ item.actual_accomplishment ?? "—" }}</span>
+        <input v-if="isOwner && isMutable" v-model="item.mov_link" placeholder="MOV link" class="border rounded px-2 py-1 text-xs w-full mt-1" @blur="saveEmployeeFields(item)" />
+        <small v-else-if="item.mov_link" class="block text-slate-400 mt-1">MOV: {{ item.mov_link }}</small>
+      </td>
+      <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+        <template v-if="canRate">
+          <div class="flex gap-1 items-center justify-center mb-1">
+            <select v-model.number="item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+            <select v-model.number="item.efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+            <select v-model.number="item.timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          </div>
+          <button type="button" class="text-xs text-indigo-600" @click="rate(item)">Save</button>
+        </template>
+        <span v-else>{{ item.row_average ?? "—" }}</span>
+      </td>
+    </tr>
+    <tr v-if="!items.length">
+      <td :class="TD" class="border border-slate-200" colspan="5">No Support Function rows yet.</td>
+    </tr>
+  </tbody>
 </template>

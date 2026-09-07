@@ -25,7 +25,7 @@ class AdminIpcrV2Controller extends Controller
         $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions'])->findOrFail($id);
         $ocdUser = \App\Models\User::havingRole('OCD')->first();
 
-        return Inertia::render('IPCRV2/HRIpcrV2Show', [
+        return Inertia::render('IPCRV2/AdminIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
             'ocdUser' => $ocdUser?->only('name', 'position'),
