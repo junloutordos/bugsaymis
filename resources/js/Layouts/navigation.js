@@ -717,6 +717,13 @@ export const menuItems = [
         permissions: ["ipcr.view"],
       },
       {
+        label: "IPCR V2",
+        routeName: "employee-ipcr-v2.index",
+        href: route("employee-ipcr-v2.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["ipcr.v2.view"],
+      },
+      {
         label: "Committees",
         routeName: "pm-committees.index",
         href: route("pm-committees.index"),
@@ -752,6 +759,13 @@ export const menuItems = [
         permissions: ["ipcr.approve"],
       },
       {
+        label: "My Division (V2)",
+        routeName: "division-chief-ipcr-v2.index",
+        href: route("division-chief-ipcr-v2.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["ipcr.v2.approve"],
+      },
+      {
         label: "HR IPCR Review",
         routeName: "hr-ipcr.index",
         href: route("hr-ipcr.index"),
@@ -759,11 +773,25 @@ export const menuItems = [
         permissions: ["ipcr.monitor"],
       },
       {
+        label: "HR IPCR V2 Review",
+        routeName: "hr-ipcr-v2.index",
+        href: route("hr-ipcr-v2.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["ipcr.v2.monitor"],
+      },
+      {
         label: "PMT Review",
         routeName: "pmt-ipcr.index",
         href: route("pmt-ipcr.index"),
         icon: ClipboardDocumentListIcon,
         permissions: ["ipcr.approve"],
+      },
+      {
+        label: "PMT Review (V2)",
+        routeName: "pmt-ipcr-v2.index",
+        href: route("pmt-ipcr-v2.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["ipcr.v2.approve"],
       },
       {
         label: "Rating Periods",
@@ -776,6 +804,13 @@ export const menuItems = [
         label: "IPCR Monitoring (All Stages)",
         routeName: "admin-ipcr.index",
         href: route("admin-ipcr.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator"],
+      },
+      {
+        label: "IPCR V2 Monitoring (All Stages)",
+        routeName: "admin-ipcr-v2.index",
+        href: route("admin-ipcr-v2.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator"],
       },

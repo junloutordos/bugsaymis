@@ -48,4 +48,9 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
         Route::post('/hr/ipcr-v2/{id}/submit-to-pmt', [\App\Http\Controllers\IPCRV2\HRIpcrV2Controller::class, 'submitToPMT'])->name('hr-ipcr-v2.submitToPMT');
         Route::post('/hr/ipcr-v2/batch-submit-to-pmt', [\App\Http\Controllers\IPCRV2\HRIpcrV2Controller::class, 'batchSubmitToPMT'])->name('hr-ipcr-v2.batchSubmitToPMT');
     });
+
+    Route::middleware('role:Administrator')->group(function () {
+        Route::get('/admin/ipcr-v2', [\App\Http\Controllers\IPCRV2\AdminIpcrV2Controller::class, 'index'])->name('admin-ipcr-v2.index');
+        Route::get('/admin/ipcr-v2/{id}', [\App\Http\Controllers\IPCRV2\AdminIpcrV2Controller::class, 'show'])->name('admin-ipcr-v2.show');
+    });
 });
