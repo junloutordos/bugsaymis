@@ -16,9 +16,6 @@ const props = defineProps({
 
 const { submit } = useSubmit()
 
-// Rows sharing the same Core Function (one function tagged to N WDPs
-// materializes into N items) merge into one rowspan'd Function block —
-// isFirst/groupSize drive rendering the label/placeholder cells once.
 const rows = computed(() => groupConsecutiveByFunction(props.items))
 
 const CRITERIA = [
@@ -55,8 +52,31 @@ function rateWdpRow(item) {
   }, opts))
 }
 
+function rateSelfWdpRow(item) {
+  submit((opts) => router.put(route("employee-ipcr-v2.updateCoreItem", [props.ipcrId, item.id]), {
+    self_quality_rating: item.self_quality_rating,
+    self_efficiency_rating: item.self_efficiency_rating,
+    self_timeliness_rating: item.self_timeliness_rating,
+  }, opts))
+}
+
+function rateSelfCsc(item) {
+  submit((opts) => router.put(route("employee-ipcr-v2.updateCoreItem", [props.ipcrId, item.id]), {
+    self_student_feedback_rating: item.self_student_feedback_rating,
+    self_supervisor_feedback_rating: item.self_supervisor_feedback_rating,
+    self_im_development_rating: item.self_im_development_rating,
+    self_timeliness_rating: item.self_timeliness_rating,
+  }, opts))
+}
+
 function rowAverage(item) {
   const parts = [item.student_feedback_rating, item.supervisor_feedback_rating, item.im_development_rating, item.timeliness_rating]
+  if (parts.some(v => v === null || v === undefined)) return "—"
+  return (parts[0] * 0.3 + parts[1] * 0.2 + parts[2] * 0.2 + parts[3] * 0.3).toFixed(2)
+}
+
+function selfRowAverage(item) {
+  const parts = [item.self_student_feedback_rating, item.self_supervisor_feedback_rating, item.self_im_development_rating, item.self_timeliness_rating]
   if (parts.some(v => v === null || v === undefined)) return "—"
   return (parts[0] * 0.3 + parts[1] * 0.2 + parts[2] * 0.2 + parts[3] * 0.3).toFixed(2)
 }
@@ -65,7 +85,7 @@ function rowAverage(item) {
 <template>
   <tbody>
     <tr class="bg-slate-200">
-      <td colspan="11" class="px-4 py-2 font-bold text-slate-800 border border-slate-300 uppercase">
+      <td colspan="15" class="px-4 py-2 font-bold text-slate-800 border border-slate-300 uppercase">
         Core Function (50%)
       </td>
     </tr>
@@ -88,6 +108,22 @@ function rowAverage(item) {
           <span v-else>{{ row.item.actual_accomplishment ?? "—" }}</span>
           <input v-if="isOwner && isMutable" v-model="row.item.mov_link" placeholder="MOV link" class="border rounded px-2 py-1 text-xs w-full mt-1" @blur="saveEmployeeFields(row.item)" />
           <small v-else-if="row.item.mov_link" class="block text-slate-400 mt-1">MOV: {{ row.item.mov_link }}</small>
+        </td>
+        <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+          <select v-if="isOwner && isMutable" v-model.number="row.item.self_quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ row.item.self_quality_rating ?? "—" }}</span>
+        </td>
+        <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+          <select v-if="isOwner && isMutable" v-model.number="row.item.self_efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ row.item.self_efficiency_rating ?? "—" }}</span>
+        </td>
+        <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+          <select v-if="isOwner && isMutable" v-model.number="row.item.self_timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ row.item.self_timeliness_rating ?? "—" }}</span>
+        </td>
+        <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
+          {{ row.item.self_row_average ?? "—" }}
+          <button v-if="isOwner && isMutable" type="button" class="block mt-1 text-xs text-indigo-600" @click="rateSelfWdpRow(row.item)">Save Self-Rating</button>
         </td>
         <td class="border border-slate-200 px-4 py-3 text-center text-sm">
           <select v-if="canRate" v-model.number="row.item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
@@ -135,6 +171,15 @@ function rowAverage(item) {
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+            <select v-if="isOwner && isMutable" v-model.number="row.item['self_' + criterion.key]" class="border rounded text-xs px-1">
+              <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+            </select>
+            <span v-else>{{ row.item['self_' + criterion.key] ?? "—" }}</span>
+          </td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm">
             <select v-if="canRate" v-model.number="row.item[criterion.key]" class="border rounded text-xs px-1">
               <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
             </select>
@@ -151,6 +196,13 @@ function rowAverage(item) {
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
+            {{ row.item.self_row_average ?? selfRowAverage(row.item) }}
+            <button v-if="isOwner && isMutable" type="button" class="ml-2 text-xs text-indigo-600" @click="rateSelfCsc(row.item)">Save Self-Rating</button>
+          </td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
+          <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
             {{ row.item.row_average ?? rowAverage(row.item) }}
             <button v-if="canRate" type="button" class="ml-2 text-xs text-indigo-600" @click="rate(row.item)">Save Ratings</button>
           </td>
@@ -158,7 +210,7 @@ function rowAverage(item) {
       </template>
     </template>
     <tr v-if="!items.length">
-      <td :class="TD" class="border border-slate-200" colspan="11">No Core Function rows yet — generate targets from Employee Functions.</td>
+      <td :class="TD" class="border border-slate-200" colspan="15">No Core Function rows yet — generate targets from Employee Functions.</td>
     </tr>
   </tbody>
 </template>
