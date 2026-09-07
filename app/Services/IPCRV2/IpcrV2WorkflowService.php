@@ -4,9 +4,11 @@ namespace App\Services\IPCRV2;
 
 use App\Models\Division;
 use App\Models\IPCRV2\IpcrV2Record;
+use App\Models\IPCRV2\IpcrV2StatusLog;
 use App\Models\IPCRRatingPeriod;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\DigitalSignatureService;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -49,10 +51,12 @@ class IpcrV2WorkflowService
 
     public function __construct(
         private ?IPCRWorkflowService $chain = null,
-        private ?IpcrV2RatingService $rating = null
+        private ?IpcrV2RatingService $rating = null,
+        private ?DigitalSignatureService $signature = null
     ) {
         $this->chain ??= app(IPCRWorkflowService::class);
         $this->rating ??= app(IpcrV2RatingService::class);
+        $this->signature ??= app(DigitalSignatureService::class);
     }
 
     public function assertMutable(IpcrV2Record $ipcr): void
@@ -96,17 +100,26 @@ class IpcrV2WorkflowService
         abort_unless($this->canEndorse($user, $ipcr), 403, "You are not this employee's Division Chief and cannot endorse this IPCR V2.");
     }
 
-    public function transition(IpcrV2Record $ipcr, string $to, array $extra = [], ?string $auditAction = null): IpcrV2Record
-    {
+    public function transition(
+        IpcrV2Record $ipcr,
+        string $to,
+        array $extra = [],
+        ?string $auditAction = null,
+        ?User $actor = null,
+        ?string $remarks = null,
+        string $actionType = 'status_changed',
+        bool $signedViaPin = false,
+    ): IpcrV2Record {
         $this->assertMutable($ipcr);
 
-        return DB::transaction(function () use ($ipcr, $to, $extra, $auditAction) {
+        $updated = DB::transaction(function () use ($ipcr, $to, $extra, $auditAction, $actor, $remarks, $actionType, $signedViaPin) {
             $fresh = IpcrV2Record::whereKey($ipcr->id)->lockForUpdate()->firstOrFail();
+            $fromStatus = $fresh->status;
 
             $allowed = self::TRANSITIONS[$fresh->status] ?? [];
             abort_unless(in_array($to, $allowed, true), 403, "Invalid IPCR V2 status change: \"{$fresh->status}\" cannot move to \"{$to}\".");
 
-            $fresh->update(array_merge($extra, ['status' => $to]));
+            $fresh->update(array_merge($extra, ['status' => $to, 'remarks' => $remarks]));
 
             AuditLogger::log([
                 'action' => $auditAction ?? 'ipcr_v2_status_changed',
@@ -115,10 +128,43 @@ class IpcrV2WorkflowService
                 'new_values' => array_merge(['status' => $to], $extra),
             ]);
 
+            $this->logAction($fresh, $actor, $actionType, $fromStatus, $to, $remarks, $signedViaPin);
+
             $ipcr->refresh();
 
             return $ipcr;
         });
+
+        $this->notifyOnTransition($updated, $to, $remarks);
+
+        return $updated;
+    }
+
+    /**
+     * Write a timeline row without necessarily changing status — used
+     * internally by transition() and directly by callers logging a
+     * non-status-changing milestone (e.g. Admin's reopen action).
+     */
+    public function logAction(
+        IpcrV2Record $ipcr,
+        ?User $actor,
+        string $actionType,
+        ?string $fromStatus,
+        ?string $toStatus,
+        ?string $remarks = null,
+        bool $signedViaPin = false,
+    ): IpcrV2StatusLog {
+        return IpcrV2StatusLog::create([
+            'ipcr_v2_record_id' => $ipcr->id,
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'action_type' => $actionType,
+            'remarks' => $remarks,
+            'actor_id' => $actor?->id,
+            'actor_role' => $actor?->roles->pluck('name')->implode(', ') ?: null,
+            'signed_via_pin' => $signedViaPin,
+            'signature_snapshot' => $signedViaPin ? $actor?->electronic_signature : null,
+        ]);
     }
 
     public function assertPeriodAcceptsNewTargets(IPCRRatingPeriod $period): void
@@ -144,8 +190,10 @@ class IpcrV2WorkflowService
         }
     }
 
-    public function finalize(IpcrV2Record $ipcr, User $director): IpcrV2Record
+    public function finalize(IpcrV2Record $ipcr, User $director, ?string $pin = null): IpcrV2Record
     {
+        $this->signature->assertSigningPin($director, $pin);
+
         $finalNumeric = $this->rating->computeFinalRating($ipcr);
 
         return $this->transition($ipcr, self::STATUS_DIRECTOR_SIGNED, [
@@ -153,6 +201,57 @@ class IpcrV2WorkflowService
             'director_signature' => $director->electronic_signature,
             'final_numeric_rating' => $finalNumeric,
             'final_adjectival_rating' => $this->rating->adjectivalRating($finalNumeric),
-        ], 'ipcr_v2_director_signed');
+            'locked_at' => now(),
+            'locked_by_id' => $director->id,
+        ], 'ipcr_v2_director_signed', actor: $director, actionType: 'signed', signedViaPin: ! empty($director->signature_pin));
+    }
+
+    /**
+     * Resolve recipient(s) for a transition and fire in-app + email
+     * notifications. Silent (no recipients) for internal milestones that
+     * don't need a separate notice — STATUS_RATED is immediately followed
+     * by a STATUS_SUBMITTED_PMT transition in the same request
+     * (DivisionChiefIpcrV2Controller::submitToPMT), which does notify.
+     */
+    private function notifyOnTransition(IpcrV2Record $ipcr, string $to, ?string $remarks): void
+    {
+        $ipcr->loadMissing('user', 'period');
+        $employee = $ipcr->user;
+        if (! $employee) {
+            return;
+        }
+
+        $recipients = match ($to) {
+            self::STATUS_FOR_REVIEW, self::STATUS_FOR_RATING => array_filter([$this->chain->immediateSupervisorFor($employee)]),
+            self::STATUS_TARGETS_APPROVED, self::STATUS_RETURNED, self::STATUS_PMT_RETURNED,
+            self::STATUS_PMT_APPROVED, self::STATUS_DIRECTOR_SIGNED => [$employee],
+            self::STATUS_SUBMITTED_PMT => User::havingRole('PMT')->get()->all(),
+            default => [],
+        };
+
+        foreach (array_filter($recipients) as $recipient) {
+            \App\Services\NotificationService::notifyUser(
+                $recipient,
+                'IPCR V2',
+                $ipcr->period?->label ?? "IPCR V2 #{$ipcr->id}",
+                $to,
+                $this->urlFor($recipient, $ipcr),
+                $remarks,
+            );
+
+            \Illuminate\Support\Facades\Mail::to($recipient->email)->queue(
+                new \App\Mail\IpcrV2StatusMail($ipcr, $recipient, $to, $remarks)
+            );
+        }
+    }
+
+    private function urlFor(User $recipient, IpcrV2Record $ipcr): string
+    {
+        return match (true) {
+            $recipient->hasAnyRole(['OCD', 'PMT']) => route('pmt-ipcr-v2.show', $ipcr->id),
+            $recipient->hasRole('DivisionChief') => route('division-chief-ipcr-v2.show', $ipcr->id),
+            $recipient->hasRole('HR') => route('hr-ipcr-v2.show', $ipcr->id),
+            default => route('employee-ipcr-v2.show', $ipcr->id),
+        };
     }
 }
