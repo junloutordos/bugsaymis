@@ -15,6 +15,11 @@ use Inertia\Inertia;
 
 class EmployeeIpcrV2Controller extends Controller
 {
+    private const EDITABLE_STATUSES = [
+        IpcrV2WorkflowService::STATUS_NEW_TARGET,
+        IpcrV2WorkflowService::STATUS_RETURNED,
+    ];
+
     public function __construct(
         private IpcrV2WorkflowService $workflow,
         private IpcrV2GenerationService $generation,
@@ -111,5 +116,21 @@ class EmployeeIpcrV2Controller extends Controller
         $supportItem->update($data);
 
         return back()->with('success', 'Updated.');
+    }
+
+    public function destroy(Request $request, int $id)
+    {
+        $record = IpcrV2Record::findOrFail($id);
+        $this->workflow->assertOwner($request->user(), $record);
+        $this->workflow->assertMutable($record);
+        abort_unless(
+            in_array($record->status, self::EDITABLE_STATUSES, true),
+            403,
+            'Only IPCR V2 records that are new or returned for revision can be deleted.'
+        );
+
+        $record->delete();
+
+        return back()->with('success', 'IPCR V2 record deleted.');
     }
 }

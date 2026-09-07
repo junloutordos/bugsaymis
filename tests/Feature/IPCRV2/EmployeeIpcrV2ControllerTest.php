@@ -64,4 +64,31 @@ class EmployeeIpcrV2ControllerTest extends TestCase
 
         $this->actingAs($employee)->get(route('employee-ipcr-v2.show', $record->id))->assertOk();
     }
+
+    public function test_owner_can_delete_a_new_target_record(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+
+        $response = $this->actingAs($employee)->delete(route('employee-ipcr-v2.destroy', $record->id));
+
+        $response->assertRedirect();
+        $this->assertDatabaseMissing('ipcr_v2_records', ['id' => $record->id]);
+    }
+
+    public function test_cannot_delete_a_record_once_submitted_for_review(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_FOR_REVIEW,
+        ]);
+
+        $response = $this->actingAs($employee)->delete(route('employee-ipcr-v2.destroy', $record->id));
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('ipcr_v2_records', ['id' => $record->id]);
+    }
 }

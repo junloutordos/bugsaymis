@@ -16,6 +16,7 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
     Route::middleware('permission:ipcr.v2.submit')->group(function () {
         Route::post('/employee-ipcr-v2/{id}/submit-review', [EmployeeIpcrV2Controller::class, 'submitForReview'])->name('employee-ipcr-v2.submitReview');
         Route::post('/employee-ipcr-v2/{id}/submit-rating', [EmployeeIpcrV2Controller::class, 'submitForRating'])->name('employee-ipcr-v2.submitRating');
+        Route::delete('/employee-ipcr-v2/{id}', [EmployeeIpcrV2Controller::class, 'destroy'])->name('employee-ipcr-v2.destroy');
     });
 
     Route::middleware('permission:ipcr.v2.update')->group(function () {
