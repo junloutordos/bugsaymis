@@ -34,5 +34,11 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
 
         Route::post('/division-chief/ipcr-v2/{ipcrV2}/coaching-sessions', [\App\Http\Controllers\IPCRV2\IpcrV2CoachingSessionController::class, 'store'])->name('ipcr-v2-coaching-sessions.store');
         Route::delete('/division-chief/ipcr-v2/{ipcrV2}/coaching-sessions/{coachingSession}', [\App\Http\Controllers\IPCRV2\IpcrV2CoachingSessionController::class, 'destroy'])->name('ipcr-v2-coaching-sessions.destroy');
+
+        Route::get('/pmt/ipcr-v2', [\App\Http\Controllers\IPCRV2\PMTIpcrV2Controller::class, 'index'])->name('pmt-ipcr-v2.index');
+        Route::get('/pmt/ipcr-v2/{id}', [\App\Http\Controllers\IPCRV2\PMTIpcrV2Controller::class, 'show'])->name('pmt-ipcr-v2.show');
+        Route::post('/pmt/ipcr-v2/{id}/approve', [\App\Http\Controllers\IPCRV2\PMTIpcrV2Controller::class, 'approve'])->name('pmt-ipcr-v2.approve');
+        Route::post('/pmt/ipcr-v2/{id}/return', [\App\Http\Controllers\IPCRV2\PMTIpcrV2Controller::class, 'returnForRevision'])->name('pmt-ipcr-v2.return');
+        Route::post('/pmt/ipcr-v2/{id}/director-sign', [\App\Http\Controllers\IPCRV2\PMTIpcrV2Controller::class, 'directorSign'])->name('pmt-ipcr-v2.directorSign');
     });
 });
