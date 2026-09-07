@@ -18,19 +18,7 @@ class IpcrV2PdfService
 
     public function stream(IpcrV2Record $record): StreamedResponse
     {
-        $record->loadMissing(['user', 'coreItems', 'supportItems', 'period']);
-
-        $supervisor = $this->chain->immediateSupervisorFor($record->user)
-            ?? ($record->user->hasRole('DivisionChief') ? User::havingRole('OCD')->first() : null);
-        $ocdUser = User::havingRole('OCD')->first();
-
-        $html = view('ipcr-v2.pdf', [
-            'ipcr' => $record,
-            'strategicIndicators' => $this->strategic->currentIndicators(),
-            'summary' => $this->summary->buildRows($record),
-            'supervisor' => $supervisor,
-            'ocdUser' => $ocdUser,
-        ])->render();
+        $html = $this->renderHtml($record);
 
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
@@ -55,5 +43,56 @@ class IpcrV2PdfService
             'Content-Disposition' => 'inline; filename="' . $filename . '"',
             'Content-Length' => strlen($pdfBytes),
         ]);
+    }
+
+    public function renderHtml(IpcrV2Record $record): string
+    {
+        $record->loadMissing(['user', 'coreItems', 'supportItems', 'period']);
+
+        $this->annotateFunctionRowspan($record->coreItems);
+        $this->annotateFunctionRowspan($record->supportItems);
+
+        $supervisor = $this->chain->immediateSupervisorFor($record->user)
+            ?? ($record->user->hasRole('DivisionChief') ? User::havingRole('OCD')->first() : null);
+        $ocdUser = User::havingRole('OCD')->first();
+
+        return view('ipcr-v2.pdf', [
+            'ipcr' => $record,
+            'strategicIndicators' => $this->strategic->currentIndicators(),
+            'summary' => $this->summary->buildRows($record),
+            'supervisor' => $supervisor,
+            'ocdUser' => $ocdUser,
+        ])->render();
+    }
+
+    /**
+     * Attaches function_rowspan to each item (mirroring
+     * StrategicFunctionService's strategy_rowspan convention) so consecutive
+     * items sharing the same employee_function_id — one Core/Support
+     * Function tagged to N WDPs materializes into N items — merge into one
+     * Function/label cell in the PDF, the same way the Show page's tables
+     * merge them on screen. The first item of a group gets the span count;
+     * the rest get 0, which the view's @if skips.
+     */
+    private function annotateFunctionRowspan($items): void
+    {
+        $count = $items->count();
+        $i = 0;
+
+        while ($i < $count) {
+            $functionId = $items[$i]->employee_function_id;
+            $groupSize = 1;
+
+            while ($functionId !== null && $i + $groupSize < $count && $items[$i + $groupSize]->employee_function_id === $functionId) {
+                $groupSize++;
+            }
+
+            $items[$i]->setAttribute('function_rowspan', $groupSize);
+            for ($j = 1; $j < $groupSize; $j++) {
+                $items[$i + $j]->setAttribute('function_rowspan', 0);
+            }
+
+            $i += $groupSize;
+        }
     }
 }

@@ -56,9 +56,15 @@
             @foreach ($strategicIndicators as $indicator)
                 @php($source = $indicator->performanceIndicator?->agencyOutcome ?? $indicator->agencyOutcome)
                 <tr>
-                    <td>{{ $source?->dost_strategy_names_joined ?? '&mdash;' }}</td>
-                    <td>{{ $source?->dost_sub_strategy_descriptions_joined ?? '&mdash;' }}</td>
-                    <td>{{ $indicator->agencyOutcome?->outcome ?? '&mdash;' }}</td>
+                    @if ($indicator->strategy_rowspan)
+                        <td rowspan="{{ $indicator->strategy_rowspan }}">{{ $source?->dost_strategy_names_joined ?? '&mdash;' }}</td>
+                    @endif
+                    @if ($indicator->sub_strategy_rowspan)
+                        <td rowspan="{{ $indicator->sub_strategy_rowspan }}">{{ $source?->dost_sub_strategy_descriptions_joined ?? '&mdash;' }}</td>
+                    @endif
+                    @if ($indicator->program_rowspan)
+                        <td rowspan="{{ $indicator->program_rowspan }}">{{ $indicator->agencyOutcome?->outcome ?? '&mdash;' }}</td>
+                    @endif
                     <td>{{ $indicator->description }}</td>
                     <td>{{ $indicator->target }}</td>
                     <td>{{ $indicator->displayed_accomplishment ?? '&mdash;' }}</td>
@@ -72,58 +78,78 @@
 
             <tr><td colspan="11" class="band">Core Function (50%)</td></tr>
             @foreach ($ipcr->coreItems as $item)
-                <tr>
-                    <td rowspan="5">{{ $item->label }}<br><small>Weight: {{ $item->weight_percent ?? '&mdash;' }}%</small></td>
-                    <td rowspan="5">&mdash;</td>
-                    <td rowspan="5">&mdash;</td>
-                    <td>Positive feedback from students (30%)</td>
-                    <td rowspan="4">{{ $item->target }}</td>
-                    <td rowspan="4">{{ $item->actual_accomplishment }}</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">{{ $item->student_feedback_rating ?? '&mdash;' }}</td>
-                    <td rowspan="5">{{ $item->remarks ?? '&mdash;' }}</td>
-                </tr>
-                <tr>
-                    <td>Positive feedback from immediate supervisor (20%)</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">{{ $item->supervisor_feedback_rating ?? '&mdash;' }}</td>
-                </tr>
-                <tr>
-                    <td>Instructional materials development (20%)</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">{{ $item->im_development_rating ?? '&mdash;' }}</td>
-                </tr>
-                <tr>
-                    <td>Timely submission of forms and documents (30%)</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">{{ $item->timeliness_rating ?? '&mdash;' }}</td>
-                </tr>
-                <tr>
-                    <td colspan="3"><strong>Row Average</strong></td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center">&mdash;</td>
-                    <td class="center"><strong>{{ $item->row_average ?? '&mdash;' }}</strong></td>
-                </tr>
+                @if ($item->success_indicator)
+                    <tr>
+                        @if ($item->function_rowspan)
+                            <td rowspan="{{ $item->function_rowspan }}">{{ $item->label }}<br><small>Weight: {{ $item->weight_percent ?? '&mdash;' }}%</small></td>
+                            <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
+                            <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
+                        @endif
+                        <td>{{ $item->success_indicator }}</td>
+                        <td>{{ $item->target ?? '&mdash;' }}</td>
+                        <td>{{ $item->actual_accomplishment ?? '&mdash;' }} @if($item->mov_link) <br><small>MOV: {{ $item->mov_link }}</small> @endif</td>
+                        <td class="center">{{ $item->quality_rating ?? '&mdash;' }}</td>
+                        <td class="center">{{ $item->efficiency_rating ?? '&mdash;' }}</td>
+                        <td class="center">{{ $item->timeliness_rating ?? '&mdash;' }}</td>
+                        <td class="center">{{ $item->row_average ?? '&mdash;' }}</td>
+                        <td>{{ $item->remarks ?? '&mdash;' }}</td>
+                    </tr>
+                @else
+                    <tr>
+                        <td rowspan="5">{{ $item->label }}<br><small>Weight: {{ $item->weight_percent ?? '&mdash;' }}%</small></td>
+                        <td rowspan="5">&mdash;</td>
+                        <td rowspan="5">&mdash;</td>
+                        <td>Positive feedback from students (30%)</td>
+                        <td rowspan="4">{{ $item->target }}</td>
+                        <td rowspan="4">{{ $item->actual_accomplishment }} @if($item->mov_link) <br><small>MOV: {{ $item->mov_link }}</small> @endif</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">{{ $item->student_feedback_rating ?? '&mdash;' }}</td>
+                        <td rowspan="5">{{ $item->remarks ?? '&mdash;' }}</td>
+                    </tr>
+                    <tr>
+                        <td>Positive feedback from immediate supervisor (20%)</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">{{ $item->supervisor_feedback_rating ?? '&mdash;' }}</td>
+                    </tr>
+                    <tr>
+                        <td>Instructional materials development (20%)</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">{{ $item->im_development_rating ?? '&mdash;' }}</td>
+                    </tr>
+                    <tr>
+                        <td>Timely submission of forms and documents (30%)</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">{{ $item->timeliness_rating ?? '&mdash;' }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="3"><strong>Row Average</strong></td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center">&mdash;</td>
+                        <td class="center"><strong>{{ $item->row_average ?? '&mdash;' }}</strong></td>
+                    </tr>
+                @endif
             @endforeach
 
             <tr><td colspan="11" class="band">Support Function (20%)</td></tr>
             @foreach ($ipcr->supportItems as $item)
                 <tr>
-                    <td>{{ $item->label }}</td>
-                    <td>&mdash;</td>
-                    <td>&mdash;</td>
-                    <td>100% delivered</td>
-                    <td>&mdash;</td>
-                    <td>{{ $item->actual_accomplishment }} @if($item->mov_link) <br><small>MOV: {{ $item->mov_link }}</small> @endif</td>
+                    @if ($item->function_rowspan)
+                        <td rowspan="{{ $item->function_rowspan }}">{{ $item->label }}</td>
+                        <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
+                        <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
+                    @endif
+                    <td>{{ $item->success_indicator ?? '&mdash;' }}</td>
+                    <td>{{ $item->target ?? '&mdash;' }}</td>
+                    <td>{{ $item->actual_accomplishment ?? '&mdash;' }} @if($item->mov_link) <br><small>MOV: {{ $item->mov_link }}</small> @endif</td>
                     <td class="center">{{ $item->quality_rating ?? '&mdash;' }}</td>
                     <td class="center">{{ $item->efficiency_rating ?? '&mdash;' }}</td>
                     <td class="center">{{ $item->timeliness_rating ?? '&mdash;' }}</td>
@@ -186,5 +212,18 @@
     <p style="margin-top: 6px; font-size: 8px; font-style: italic;">
         Legend: 5 - Outstanding &nbsp; 4 - Very Satisfactory &nbsp; 3 - Satisfactory &nbsp; 2 - Unsatisfactory &nbsp; 1 - Poor
     </p>
+
+    <table style="margin-top: 14px;">
+        <tr>
+            <td class="center"><strong>Discussed with</strong></td>
+            <td class="center"><strong>Assessed by</strong></td>
+            <td class="center"><strong>Final Rating by</strong></td>
+        </tr>
+        <tr>
+            <td class="center" style="padding-top: 24px;">____________________</td>
+            <td class="center" style="padding-top: 24px;">____________________</td>
+            <td class="center" style="padding-top: 24px;">____________________</td>
+        </tr>
+    </table>
 </body>
 </html>
