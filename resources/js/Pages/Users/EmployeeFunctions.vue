@@ -37,9 +37,17 @@ const showFormModal = ref(false)
 const editingFunction = ref(null)
 const form = ref({ function_type: "core", label: "", weight_percent: null, work_distribution_plan_ids: [] })
 
+const wdpSearch = ref("")
+const filteredWorkDistributionPlans = computed(() => {
+  const q = wdpSearch.value.trim().toLowerCase()
+  if (!q) return props.workDistributionPlans
+  return props.workDistributionPlans.filter(p => p.success_indicator?.toLowerCase().includes(q))
+})
+
 function openAddModal(type) {
   editingFunction.value = null
   form.value = { function_type: type, label: "", weight_percent: null, work_distribution_plan_ids: [] }
+  wdpSearch.value = ""
   showFormModal.value = true
 }
 
@@ -51,6 +59,7 @@ function openEditModal(fn) {
     weight_percent: fn.weight_percent,
     work_distribution_plan_ids: (fn.work_distribution_plans ?? []).map(p => p.id),
   }
+  wdpSearch.value = ""
   showFormModal.value = true
 }
 
@@ -166,13 +175,15 @@ function saveForm() {
         <AppInput v-if="form.function_type === 'core'" v-model="form.weight_percent" type="number" label="Weight %" />
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Linked Work Distribution Plans (optional)</label>
+          <AppInput v-model="wdpSearch" placeholder="Search plans…" class="mb-2" />
           <div class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-            <label v-for="plan in workDistributionPlans" :key="plan.id" class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50">
+            <label v-for="plan in filteredWorkDistributionPlans" :key="plan.id" class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50">
               <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 :checked="form.work_distribution_plan_ids.includes(plan.id)" @change="toggleWdp(plan.id)" />
               {{ plan.success_indicator }}
             </label>
             <p v-if="!workDistributionPlans.length" class="px-3 py-1.5 text-sm text-slate-400">No plans available for the current fiscal year.</p>
+            <p v-else-if="!filteredWorkDistributionPlans.length" class="px-3 py-1.5 text-sm text-slate-400">No plans match your search.</p>
           </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
