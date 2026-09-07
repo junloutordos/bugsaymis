@@ -27,6 +27,10 @@ const searchQuery = ref("")
 const currentPage = ref(1)
 const PER_PAGE = 15
 
+const existingRecordForSelectedPeriod = computed(() =>
+  props.records.find((r) => r.period?.id === selectedPeriod.value)
+)
+
 const DELETABLE_STATUSES = ["New Target", "Returned for Revision"]
 
 const filteredRecords = computed(() => {
@@ -96,7 +100,10 @@ function destroyRecord(record) {
             <AppSelect v-model="selectedPeriod" :show-blank="false" class="w-56">
               <option v-for="p in openPeriods" :key="p.id" :value="p.id">{{ p.label }}</option>
             </AppSelect>
-            <AppButton :disabled="isSubmitting || !selectedPeriod" @click="generateTargets">
+            <AppButton v-if="existingRecordForSelectedPeriod" variant="secondary" @click="viewRecord(existingRecordForSelectedPeriod)">
+              <EyeIcon class="w-4 h-4" /> View Existing Record
+            </AppButton>
+            <AppButton v-else :disabled="isSubmitting || !selectedPeriod" @click="generateTargets">
               <PlusIcon class="w-4 h-4" /> Generate Targets
             </AppButton>
           </template>
@@ -119,7 +126,10 @@ function destroyRecord(record) {
 
         <tr v-for="record in displayedRecords" :key="record.id" class="hover:bg-indigo-50/40">
           <td class="px-4 py-3 text-sm text-slate-700">{{ record.period?.label }}</td>
-          <td class="px-4 py-3"><AppBadge :color="statusBadgeColor(record.status)">{{ record.status }}</AppBadge></td>
+          <td class="px-4 py-3">
+            <AppBadge :color="statusBadgeColor(record.status)">{{ record.status }}</AppBadge>
+            <p v-if="record.remarks" class="text-xs text-slate-500 italic mt-1 max-w-[220px] truncate" :title="record.remarks">{{ record.remarks }}</p>
+          </td>
           <td class="px-4 py-3 text-sm text-slate-700">{{ record.final_numeric_rating ?? "—" }}</td>
           <td class="px-4 py-3">
             <div class="flex items-center justify-center gap-1">
@@ -140,7 +150,10 @@ function destroyRecord(record) {
                 <p class="text-sm font-medium text-slate-800 truncate">{{ record.period?.label }}</p>
                 <p class="text-xs text-slate-500">{{ record.final_numeric_rating ?? "—" }}</p>
               </div>
-              <AppBadge :color="statusBadgeColor(record.status)">{{ record.status }}</AppBadge>
+              <div class="text-right">
+                <AppBadge :color="statusBadgeColor(record.status)">{{ record.status }}</AppBadge>
+                <p v-if="record.remarks" class="text-xs text-slate-500 italic mt-1 max-w-[160px] truncate" :title="record.remarks">{{ record.remarks }}</p>
+              </div>
             </div>
             <div class="flex items-center gap-1 pt-1">
               <AppIconButton label="View" @click="viewRecord(record)">
