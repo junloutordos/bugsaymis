@@ -205,4 +205,17 @@ class IpcrV2GenerationServiceTest extends TestCase
         $this->expectException(ValidationException::class);
         (new IpcrV2GenerationService())->generateTargets($user, $period);
     }
+
+    public function test_generated_items_start_with_no_self_rating(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'Subject 1', 'weight_percent' => 100]);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Discipline Committee']);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+
+        $this->assertNull($record->coreItems->first()->self_row_average);
+        $this->assertNull($record->supportItems->first()->self_row_average);
+    }
 }
