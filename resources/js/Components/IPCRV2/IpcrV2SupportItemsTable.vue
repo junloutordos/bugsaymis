@@ -16,8 +16,6 @@ const props = defineProps({
 
 const { submit } = useSubmit()
 
-// Rows sharing the same Support Function (one function tagged to N WDPs
-// materializes into N items) merge into one rowspan'd Function block.
 const rows = computed(() => groupConsecutiveByFunction(props.items))
 
 function saveEmployeeFields(item) {
@@ -36,12 +34,20 @@ function rate(item) {
     remarks: item.remarks,
   }, opts))
 }
+
+function rateSelf(item) {
+  submit((opts) => router.put(route("employee-ipcr-v2.updateSupportItem", [props.ipcrId, item.id]), {
+    self_quality_rating: item.self_quality_rating,
+    self_efficiency_rating: item.self_efficiency_rating,
+    self_timeliness_rating: item.self_timeliness_rating,
+  }, opts))
+}
 </script>
 
 <template>
   <tbody>
     <tr class="bg-slate-200">
-      <td colspan="11" class="px-4 py-2 font-bold text-slate-800 border border-slate-300 uppercase">
+      <td colspan="15" class="px-4 py-2 font-bold text-slate-800 border border-slate-300 uppercase">
         Support Function (20%)
       </td>
     </tr>
@@ -59,6 +65,22 @@ function rate(item) {
         <span v-else>{{ row.item.actual_accomplishment ?? "—" }}</span>
         <input v-if="isOwner && isMutable" v-model="row.item.mov_link" placeholder="MOV link" class="border rounded px-2 py-1 text-xs w-full mt-1" @blur="saveEmployeeFields(row.item)" />
         <small v-else-if="row.item.mov_link" class="block text-slate-400 mt-1">MOV: {{ row.item.mov_link }}</small>
+      </td>
+      <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+        <select v-if="isOwner && isMutable" v-model.number="row.item.self_quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+        <span v-else>{{ row.item.self_quality_rating ?? "—" }}</span>
+      </td>
+      <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+        <select v-if="isOwner && isMutable" v-model.number="row.item.self_efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+        <span v-else>{{ row.item.self_efficiency_rating ?? "—" }}</span>
+      </td>
+      <td class="border border-slate-200 px-4 py-3 text-center text-sm">
+        <select v-if="isOwner && isMutable" v-model.number="row.item.self_timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+        <span v-else>{{ row.item.self_timeliness_rating ?? "—" }}</span>
+      </td>
+      <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
+        {{ row.item.self_row_average ?? "—" }}
+        <button v-if="isOwner && isMutable" type="button" class="block mt-1 text-xs text-indigo-600" @click="rateSelf(row.item)">Save Self-Rating</button>
       </td>
       <td class="border border-slate-200 px-4 py-3 text-center text-sm">
         <select v-if="canRate" v-model.number="row.item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
@@ -82,7 +104,7 @@ function rate(item) {
       </td>
     </tr>
     <tr v-if="!items.length">
-      <td :class="TD" class="border border-slate-200" colspan="11">No Support Function rows yet.</td>
+      <td :class="TD" class="border border-slate-200" colspan="15">No Support Function rows yet.</td>
     </tr>
   </tbody>
 </template>
