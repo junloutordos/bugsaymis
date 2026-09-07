@@ -34,59 +34,101 @@
     <table style="margin-top: 8px;">
         <thead>
             <tr>
-                <th>Function</th>
-                <th>Success Indicator</th>
-                <th>Target</th>
-                <th>Actual Accomplishment</th>
-                <th class="center">Rating</th>
+                <th rowspan="2">Function</th>
+                <th colspan="2" class="center">Output/Outcomes</th>
+                <th rowspan="2">Success Indicator</th>
+                <th rowspan="2">Target</th>
+                <th rowspan="2">Actual Accomplishment</th>
+                <th colspan="4" class="center">Rating</th>
+                <th rowspan="2">Remarks</th>
+            </tr>
+            <tr>
+                <th class="center">Sub Strategy</th>
+                <th class="center">Program</th>
+                <th class="center">Q</th>
+                <th class="center">E</th>
+                <th class="center">T</th>
+                <th class="center">A</th>
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="5" class="band">Strategic Function (30%)</td></tr>
+            <tr><td colspan="11" class="band">Strategic Function (30%)</td></tr>
             @foreach ($strategicIndicators as $indicator)
+                @php($source = $indicator->performanceIndicator?->agencyOutcome ?? $indicator->agencyOutcome)
                 <tr>
-                    <td>{{ $indicator->agencyOutcome?->outcome }}</td>
+                    <td>{{ $source?->dost_strategy_names_joined ?? '&mdash;' }}</td>
+                    <td>{{ $source?->dost_sub_strategy_descriptions_joined ?? '&mdash;' }}</td>
+                    <td>{{ $indicator->agencyOutcome?->outcome ?? '&mdash;' }}</td>
                     <td>{{ $indicator->description }}</td>
                     <td>{{ $indicator->target }}</td>
                     <td>{{ $indicator->displayed_accomplishment ?? '&mdash;' }}</td>
-                    <td class="center">&mdash;</td>
+                    <td class="center">{{ $indicator->rating_quality ?? '&mdash;' }}</td>
+                    <td class="center">{{ $indicator->rating_efficiency ?? '&mdash;' }}</td>
+                    <td class="center">{{ $indicator->rating_timeliness ?? '&mdash;' }}</td>
+                    <td class="center">{{ $indicator->rating_average ?? '&mdash;' }}</td>
+                    <td>{{ $indicator->remarks ?? '&mdash;' }}</td>
                 </tr>
             @endforeach
 
-            <tr><td colspan="5" class="band">Core Function (50%)</td></tr>
+            <tr><td colspan="11" class="band">Core Function (50%)</td></tr>
             @foreach ($ipcr->coreItems as $item)
                 <tr>
                     <td rowspan="5">{{ $item->label }}<br><small>Weight: {{ $item->weight_percent ?? '&mdash;' }}%</small></td>
+                    <td rowspan="5">&mdash;</td>
+                    <td rowspan="5">&mdash;</td>
                     <td>Positive feedback from students (30%)</td>
                     <td rowspan="4">{{ $item->target }}</td>
                     <td rowspan="4">{{ $item->actual_accomplishment }}</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
                     <td class="center">{{ $item->student_feedback_rating ?? '&mdash;' }}</td>
+                    <td rowspan="5">{{ $item->remarks ?? '&mdash;' }}</td>
                 </tr>
                 <tr>
                     <td>Positive feedback from immediate supervisor (20%)</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
                     <td class="center">{{ $item->supervisor_feedback_rating ?? '&mdash;' }}</td>
                 </tr>
                 <tr>
                     <td>Instructional materials development (20%)</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
                     <td class="center">{{ $item->im_development_rating ?? '&mdash;' }}</td>
                 </tr>
                 <tr>
                     <td>Timely submission of forms and documents (30%)</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
                     <td class="center">{{ $item->timeliness_rating ?? '&mdash;' }}</td>
                 </tr>
                 <tr>
                     <td colspan="3"><strong>Row Average</strong></td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
+                    <td class="center">&mdash;</td>
                     <td class="center"><strong>{{ $item->row_average ?? '&mdash;' }}</strong></td>
                 </tr>
             @endforeach
 
-            <tr><td colspan="5" class="band">Support Function (20%)</td></tr>
+            <tr><td colspan="11" class="band">Support Function (20%)</td></tr>
             @foreach ($ipcr->supportItems as $item)
                 <tr>
                     <td>{{ $item->label }}</td>
-                    <td colspan="2">{{ $item->actual_accomplishment }}</td>
-                    <td>{{ $item->mov_link }}</td>
+                    <td>&mdash;</td>
+                    <td>&mdash;</td>
+                    <td>100% delivered</td>
+                    <td>&mdash;</td>
+                    <td>{{ $item->actual_accomplishment }} @if($item->mov_link) <br><small>MOV: {{ $item->mov_link }}</small> @endif</td>
+                    <td class="center">{{ $item->quality_rating ?? '&mdash;' }}</td>
+                    <td class="center">{{ $item->efficiency_rating ?? '&mdash;' }}</td>
+                    <td class="center">{{ $item->timeliness_rating ?? '&mdash;' }}</td>
                     <td class="center">{{ $item->row_average ?? '&mdash;' }}</td>
+                    <td>{{ $item->remarks ?? '&mdash;' }}</td>
                 </tr>
             @endforeach
         </tbody>
