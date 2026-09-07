@@ -7,6 +7,7 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
     Route::middleware('permission:ipcr.v2.view')->group(function () {
         Route::get('/employee-ipcr-v2', [EmployeeIpcrV2Controller::class, 'index'])->name('employee-ipcr-v2.index');
         Route::get('/employee-ipcr-v2/{id}', [EmployeeIpcrV2Controller::class, 'show'])->name('employee-ipcr-v2.show');
+        Route::get('/ipcr-v2/{id}/pdf', [\App\Http\Controllers\IPCRV2\IpcrV2PdfController::class, 'show'])->name('ipcr-v2-pdf.show');
     });
 
     Route::middleware('permission:ipcr.v2.create')->group(function () {
