@@ -52,6 +52,11 @@ class EmployeeFunction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function ipcrV2CoreItems()
+    {
+        return $this->hasMany(\App\Models\IPCRV2\IpcrV2CoreItem::class);
+    }
+
     public function scopeCore($query)
     {
         return $query->where('function_type', self::TYPE_CORE);

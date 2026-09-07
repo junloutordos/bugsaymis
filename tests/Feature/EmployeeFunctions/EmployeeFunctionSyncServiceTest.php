@@ -99,4 +99,33 @@ class EmployeeFunctionSyncServiceTest extends TestCase
 
         $this->assertCount(0, EmployeeFunction::where('user_id', $teacher->id)->get());
     }
+
+    public function test_re_sync_never_deletes_a_row_with_real_accomplishment_data(): void
+    {
+        $term = $this->currentTerm();
+        $teacher = User::factory()->create();
+        $facultyLoad = $this->facultyLoad($teacher, $term);
+        $subject = $this->subject($term, 'BIO1', 'Biology 1', 4);
+
+        $assignment = LoadAssignment::create([
+            'faculty_load_id' => $facultyLoad->id, 'user_id' => $teacher->id,
+            'school_year_id' => $term->school_year_id, 'academic_term_id' => $term->id,
+            'assignment_type' => 'teaching', 'subject_id' => $subject->id, 'load_units' => 4,
+        ]);
+
+        (new EmployeeFunctionSyncService())->syncFromFacultyLoading($teacher);
+        $function = EmployeeFunction::where('user_id', $teacher->id)->first();
+
+        $period = \App\Models\IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $teacher->id, 'rating_period_id' => $period->id]);
+        $record->coreItems()->create([
+            'employee_function_id' => $function->id, 'label' => 'Biology 1',
+            'actual_accomplishment' => 'Taught 30 students, submitted all grades on time.',
+        ]);
+
+        $assignment->delete();
+        (new EmployeeFunctionSyncService())->syncFromFacultyLoading($teacher);
+
+        $this->assertDatabaseHas('employee_functions', ['id' => $function->id]);
+    }
 }

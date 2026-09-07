@@ -55,13 +55,15 @@ class EmployeeFunctionSyncService
                 $keptIds[] = $row->id;
             }
 
-            // Detach (hard-delete — no ipcr_v2 data exists yet to protect)
-            // any prior auto-synced row for this user/term no longer
-            // represented.
+            // Detach any prior auto-synced row for this user/term no longer
+            // represented — UNLESS it has real IPCR V2 accomplishment data
+            // logged against it, in which case it's left for manual review
+            // (never silently drop rated/logged work).
             EmployeeFunction::where('user_id', $user->id)
                 ->where('academic_term_id', $term->id)
                 ->autoSynced()
                 ->whereNotIn('id', $keptIds)
+                ->whereDoesntHave('ipcrV2CoreItems', fn ($q) => $q->whereNotNull('actual_accomplishment')->where('actual_accomplishment', '!=', ''))
                 ->delete();
         });
     }
