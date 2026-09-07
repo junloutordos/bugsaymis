@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\IPCRV2\IpcrV2CoreItem;
 use App\Models\IPCRV2\IpcrV2Record;
 use App\Models\IPCRV2\IpcrV2SupportItem;
+use App\Services\DigitalSignatureService;
 use App\Services\IPCRV2\IpcrV2WorkflowService;
 use App\Services\IPCRV2\StrategicFunctionService;
 use Illuminate\Http\Request;
@@ -16,7 +17,8 @@ class DivisionChiefIpcrV2Controller extends Controller
     public function __construct(
         private IpcrV2WorkflowService $workflow,
         private StrategicFunctionService $strategic,
-        private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService = new \App\Services\IPCRV2\IpcrV2SummaryService()
+        private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService = new \App\Services\IPCRV2\IpcrV2SummaryService(),
+        private DigitalSignatureService $sigService = new DigitalSignatureService()
     ) {}
 
     public function index(Request $request)
@@ -33,7 +35,7 @@ class DivisionChiefIpcrV2Controller extends Controller
 
     public function show(Request $request, int $id)
     {
-        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions'])->findOrFail($id);
+        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions', 'statusLogs.actor'])->findOrFail($id);
 
         abort_unless(
             $request->user()->hasRole('OCD') || $record->user?->division_id === $request->user()->division_id,
@@ -49,6 +51,8 @@ class DivisionChiefIpcrV2Controller extends Controller
             'ocdUser' => $ocdUser?->only('name', 'position'),
             'summary' => $this->summaryService->buildRows($record),
             'isMutable' => $record->isMutable(),
+            'hasPin' => ! empty($request->user()->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($request->user()),
         ]);
     }
 
@@ -56,7 +60,18 @@ class DivisionChiefIpcrV2Controller extends Controller
     {
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertCanManage($request->user(), $record);
-        $this->workflow->transition($record, IpcrV2WorkflowService::STATUS_TARGETS_APPROVED, ['target_approved_at' => now()]);
+
+        $data = $request->validate(['pin' => 'nullable|string']);
+        $this->sigService->assertSigningPin($request->user(), $data['pin'] ?? null);
+
+        $this->workflow->transition(
+            $record,
+            IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+            extra: ['target_approved_at' => now()],
+            actor: $request->user(),
+            actionType: 'approved',
+            signedViaPin: ! empty($request->user()->signature_pin),
+        );
 
         return back()->with('success', 'Targets approved.');
     }
@@ -65,7 +80,16 @@ class DivisionChiefIpcrV2Controller extends Controller
     {
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertCanManage($request->user(), $record);
-        $this->workflow->transition($record, IpcrV2WorkflowService::STATUS_RETURNED);
+
+        $data = $request->validate(['remarks' => 'required|string|max:1000']);
+
+        $this->workflow->transition(
+            $record,
+            IpcrV2WorkflowService::STATUS_RETURNED,
+            actor: $request->user(),
+            remarks: $data['remarks'],
+            actionType: 'returned',
+        );
 
         return back()->with('success', 'Returned for revision.');
     }
@@ -135,12 +159,49 @@ class DivisionChiefIpcrV2Controller extends Controller
         return back()->with('success', 'Rated.');
     }
 
+    /**
+     * Moves the record to PMT. A record still sitting in "Submitted for
+     * Rating" has no explicit "mark as rated" action in the UI — this
+     * bridges STATUS_FOR_RATING -> STATUS_RATED -> STATUS_SUBMITTED_PMT as
+     * two audited transitions in one request, rather than adding a new
+     * button/route/permission for a milestone with no independent meaning
+     * to the Division Chief.
+     */
     public function submitToPMT(Request $request, int $id)
     {
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertCanEndorse($request->user(), $record);
-        $this->workflow->transition($record, IpcrV2WorkflowService::STATUS_SUBMITTED_PMT, ['submitted_for_pmtreview_at' => now()]);
+
+        if ($record->status === IpcrV2WorkflowService::STATUS_FOR_RATING) {
+            $this->workflow->transition(
+                $record,
+                IpcrV2WorkflowService::STATUS_RATED,
+                actor: $request->user(),
+                actionType: 'rated',
+            );
+            $record = $record->fresh();
+        }
+
+        $this->workflow->transition(
+            $record,
+            IpcrV2WorkflowService::STATUS_SUBMITTED_PMT,
+            extra: ['submitted_for_pmtreview_at' => now()],
+            actor: $request->user(),
+            actionType: 'submitted',
+        );
 
         return back()->with('success', 'Submitted to PMT.');
+    }
+
+    public function updateComments(Request $request, int $id)
+    {
+        $record = IpcrV2Record::findOrFail($id);
+        $this->workflow->assertCanManage($request->user(), $record);
+        $this->workflow->assertMutable($record);
+
+        $data = $request->validate(['comments_recommendations' => 'nullable|string|max:2000']);
+        $record->update($data);
+
+        return back()->with('success', 'Comments saved.');
     }
 }
