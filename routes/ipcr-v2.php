@@ -56,5 +56,6 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
     Route::middleware('role:Administrator')->group(function () {
         Route::get('/admin/ipcr-v2', [\App\Http\Controllers\IPCRV2\AdminIpcrV2Controller::class, 'index'])->name('admin-ipcr-v2.index');
         Route::get('/admin/ipcr-v2/{id}', [\App\Http\Controllers\IPCRV2\AdminIpcrV2Controller::class, 'show'])->name('admin-ipcr-v2.show');
+        Route::post('/admin/ipcr-v2/{id}/reopen', [\App\Http\Controllers\IPCRV2\AdminIpcrV2Controller::class, 'reopen'])->name('admin-ipcr-v2.reopen');
     });
 });
