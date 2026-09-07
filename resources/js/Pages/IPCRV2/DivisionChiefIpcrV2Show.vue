@@ -47,11 +47,21 @@ function submitToPMT() {
         <table class="min-w-full border-collapse border border-slate-200 text-sm">
           <thead class="bg-slate-50/80">
             <tr>
-              <th class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase">Function</th>
-              <th class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase">Success Indicator</th>
-              <th class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase">Target</th>
-              <th class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase">Actual Accomplishment</th>
-              <th class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase">Rating</th>
+              <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase align-bottom">Function</th>
+              <th colspan="2" class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase">Output/Outcomes</th>
+              <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase align-bottom">Success Indicator</th>
+              <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase align-bottom">Target</th>
+              <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase align-bottom">Actual Accomplishment</th>
+              <th colspan="4" class="border border-slate-200 px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase">Rating</th>
+              <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase align-bottom">Remarks</th>
+            </tr>
+            <tr>
+              <th class="border border-slate-200 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">Sub Strategy</th>
+              <th class="border border-slate-200 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">Program</th>
+              <th class="border border-slate-200 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">Q</th>
+              <th class="border border-slate-200 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">E</th>
+              <th class="border border-slate-200 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">T</th>
+              <th class="border border-slate-200 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase">A</th>
             </tr>
           </thead>
           <IpcrV2StrategicSection :indicators="strategicIndicators" />
