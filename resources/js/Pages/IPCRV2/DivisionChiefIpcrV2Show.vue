@@ -8,8 +8,11 @@ import IpcrV2StrategicSection from "@/Components/IPCRV2/IpcrV2StrategicSection.v
 import IpcrV2CoreItemsTable from "@/Components/IPCRV2/IpcrV2CoreItemsTable.vue"
 import IpcrV2SupportItemsTable from "@/Components/IPCRV2/IpcrV2SupportItemsTable.vue"
 import IpcrV2SummarySection from "@/Components/IPCRV2/IpcrV2SummarySection.vue"
+import DigitalSignaturePin from "@/Components/DigitalSignaturePin.vue"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { useSubmit } from "@/Composables/useSubmit"
+import { usePinConfirm } from "@/Composables/usePinConfirm"
+import Swal from "sweetalert2"
 
 const props = defineProps({
   ipcr: Object,
@@ -17,18 +20,36 @@ const props = defineProps({
   ocdUser: Object,
   summary: Object,
   isMutable: Boolean,
+  hasPin: Boolean,
+  signatureUri: String,
 })
 
 const { isSubmitting, submit } = useSubmit()
+const { showPinModal, requestPin, confirmPin, cancelPin } = usePinConfirm()
 
 function approveTargets() {
-  submit((opts) => router.post(route("division-chief-ipcr-v2.approveTargets", props.ipcr.id), {}, opts))
+  requestPin((pin) => submit((opts) => router.post(route("division-chief-ipcr-v2.approveTargets", props.ipcr.id), { pin }, opts)))
 }
-function disapproveTargets() {
-  submit((opts) => router.post(route("division-chief-ipcr-v2.disapproveTargets", props.ipcr.id), {}, opts))
+
+async function disapproveTargets() {
+  const { value: remarks, isConfirmed } = await Swal.fire({
+    title: "Return targets for revision?",
+    input: "textarea",
+    inputLabel: "Remarks",
+    inputPlaceholder: "Explain what needs to change...",
+    showCancelButton: true,
+    inputValidator: (value) => (!value ? "Remarks are required when returning for revision." : undefined),
+  })
+  if (!isConfirmed || !remarks) return
+  submit((opts) => router.post(route("division-chief-ipcr-v2.disapproveTargets", props.ipcr.id), { remarks }, opts))
 }
+
 function submitToPMT() {
   submit((opts) => router.post(route("division-chief-ipcr-v2.submitToPMT", props.ipcr.id), {}, opts))
+}
+
+function saveComments(text) {
+  submit((opts) => router.put(route("division-chief-ipcr-v2.updateComments", props.ipcr.id), { comments_recommendations: text }, opts))
 }
 </script>
 
@@ -71,12 +92,27 @@ function submitToPMT() {
       </div>
     </div>
 
-    <IpcrV2SummarySection :summary="summary" />
+    <IpcrV2SummarySection
+      :summary="summary"
+      :rating-date="ipcr.director_signed_at"
+      :comments="ipcr.comments_recommendations"
+      :editable="isMutable"
+      @save-comments="saveComments"
+    />
 
     <div v-if="isMutable" class="mt-6 flex justify-end gap-2">
       <AppButton v-if="ipcr.status === 'For Review'" variant="secondary" :disabled="isSubmitting" @click="disapproveTargets">Return for Revision</AppButton>
       <AppButton v-if="ipcr.status === 'For Review'" :disabled="isSubmitting" @click="approveTargets">Approve Targets</AppButton>
-      <AppButton v-if="ipcr.status === 'Rated & For PMT Review'" :disabled="isSubmitting" @click="submitToPMT">Submit to PMT</AppButton>
+      <AppButton v-if="['Submitted for Rating', 'Rated & For PMT Review'].includes(ipcr.status)" :disabled="isSubmitting" @click="submitToPMT">Submit to PMT</AppButton>
     </div>
+
+    <DigitalSignaturePin
+      :show="showPinModal"
+      :has-pin="hasPin"
+      :signature-uri="signatureUri"
+      :loading="isSubmitting"
+      @confirm="confirmPin"
+      @cancel="cancelPin"
+    />
   </AdminLayout>
 </template>
