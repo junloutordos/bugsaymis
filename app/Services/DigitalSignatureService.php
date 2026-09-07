@@ -8,6 +8,7 @@ use Aws\Kms\KmsClient;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class DigitalSignatureService
@@ -22,6 +23,24 @@ class DigitalSignatureService
         }
 
         return Hash::check($pin, $user->signature_pin);
+    }
+
+    /**
+     * Enforce PIN verification for a signing action. No-op if the user has
+     * never set a signature PIN (PIN signing is opt-in — matches the pattern
+     * already live in IssuanceController::assertSigningPin()).
+     */
+    public function assertSigningPin(User $user, ?string $pin): void
+    {
+        if (empty($user->signature_pin)) {
+            return;
+        }
+
+        if (empty($pin) || ! $this->verifyPin($user, $pin)) {
+            throw ValidationException::withMessages([
+                'pin' => 'The digital signature PIN is incorrect.',
+            ]);
+        }
     }
 
     /**
