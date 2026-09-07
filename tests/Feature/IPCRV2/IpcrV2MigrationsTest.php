@@ -21,6 +21,14 @@ class IpcrV2MigrationsTest extends TestCase
         ]));
     }
 
+    public function test_ipcr_v2_records_has_workflow_polish_columns(): void
+    {
+        $this->assertTrue(Schema::hasColumns('ipcr_v2_records', [
+            'remarks', 'locked_at', 'locked_by_id', 'reopened_at', 'reopened_by_id',
+            'reopen_reason', 'comments_recommendations',
+        ]));
+    }
+
     public function test_ipcr_v2_core_items_table_has_expected_columns(): void
     {
         $this->assertTrue(Schema::hasColumns('ipcr_v2_core_items', [
