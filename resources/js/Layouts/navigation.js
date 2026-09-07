@@ -238,7 +238,7 @@ export const menuItems = [
         routeName: "csm.dashboard",
         href: route("csm.dashboard"),
         icon: StarIcon,
-        permissions: ["it.requests.manage"],
+        permissions: ["csm.view"],
       },
       {
         label: "Error Reports",

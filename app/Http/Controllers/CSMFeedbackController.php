@@ -31,7 +31,7 @@ class CSMFeedbackController extends Controller
 
     private function isAdmin(): bool
     {
-        return Auth::user()->hasAnyRole(['Administrator', 'MIS']);
+        return Auth::user()->hasPermission('csm.view');
     }
 
     // ── SQD average (excludes N/A = 6) ───────────────────────────────────────

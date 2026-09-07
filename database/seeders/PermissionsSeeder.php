@@ -286,6 +286,9 @@ class PermissionsSeeder extends Seeder
             // ── PDS (Personal Data Sheet) ─────────────────────────────────────
             ['module' => 'PDS', 'name' => 'pds.view_all', 'description' => 'View all employee Personal Data Sheets (HR Office)'],
 
+            // ── CSM (Client Satisfaction Measurement) ─────────────────────────
+            ['module' => 'CSM', 'name' => 'csm.view', 'description' => 'View CSM Feedback dashboard, response list, and export reports'],
+
             // ── Student Gate Attendance ───────────────────────────────────────
             ['module' => 'Student Attendance', 'name' => 'students.attendance.view',   'description' => 'View gate attendance logs and parent contacts'],
             ['module' => 'Student Attendance', 'name' => 'students.attendance.scan',   'description' => 'Operate the gate kiosk scanner'],
