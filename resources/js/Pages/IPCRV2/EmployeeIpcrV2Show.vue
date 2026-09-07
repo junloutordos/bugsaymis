@@ -9,9 +9,11 @@ import IpcrV2StrategicSection from "@/Components/IPCRV2/IpcrV2StrategicSection.v
 import IpcrV2CoreItemsTable from "@/Components/IPCRV2/IpcrV2CoreItemsTable.vue"
 import IpcrV2SupportItemsTable from "@/Components/IPCRV2/IpcrV2SupportItemsTable.vue"
 import IpcrV2SummarySection from "@/Components/IPCRV2/IpcrV2SummarySection.vue"
+import DigitalSignaturePin from "@/Components/DigitalSignaturePin.vue"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 import { useSubmit } from "@/Composables/useSubmit"
+import { usePinConfirm } from "@/Composables/usePinConfirm"
 
 const props = defineProps({
   ipcr: Object,
@@ -21,15 +23,18 @@ const props = defineProps({
   summary: Object,
   isOwner: Boolean,
   isMutable: Boolean,
+  hasPin: Boolean,
+  signatureUri: String,
 })
 
 const { isSubmitting, submit } = useSubmit()
+const { showPinModal, requestPin, confirmPin, cancelPin } = usePinConfirm()
 
 function submitForReview() {
-  submit((opts) => router.post(route("employee-ipcr-v2.submitReview", props.ipcr.id), {}, opts))
+  requestPin((pin) => submit((opts) => router.post(route("employee-ipcr-v2.submitReview", props.ipcr.id), { pin }, opts)))
 }
 function submitForRating() {
-  submit((opts) => router.post(route("employee-ipcr-v2.submitRating", props.ipcr.id), {}, opts))
+  requestPin((pin) => submit((opts) => router.post(route("employee-ipcr-v2.submitRating", props.ipcr.id), { pin }, opts)))
 }
 function syncFunctions() {
   submit((opts) => router.post(route("employee-ipcr-v2.syncFunctions", props.ipcr.id), {}, opts))
@@ -81,7 +86,7 @@ function syncFunctions() {
       </div>
     </div>
 
-    <IpcrV2SummarySection :summary="summary" />
+    <IpcrV2SummarySection :summary="summary" :rating-date="ipcr.director_signed_at" :comments="ipcr.comments_recommendations" />
 
     <div v-if="isOwner && isMutable" class="mt-6 flex justify-end gap-2">
       <AppButton variant="secondary" :disabled="isSubmitting" @click="syncFunctions">
@@ -90,5 +95,14 @@ function syncFunctions() {
       <AppButton v-if="ipcr.status === 'New Target'" :disabled="isSubmitting" @click="submitForReview">Submit for Review</AppButton>
       <AppButton v-if="ipcr.status === 'Targets Approved'" :disabled="isSubmitting" @click="submitForRating">Submit for Rating</AppButton>
     </div>
+
+    <DigitalSignaturePin
+      :show="showPinModal"
+      :has-pin="hasPin"
+      :signature-uri="signatureUri"
+      :loading="isSubmitting"
+      @confirm="confirmPin"
+      @cancel="cancelPin"
+    />
   </AdminLayout>
 </template>
