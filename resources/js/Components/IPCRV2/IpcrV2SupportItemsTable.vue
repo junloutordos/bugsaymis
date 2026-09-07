@@ -21,6 +21,15 @@ function saveEmployeeFields(item) {
     mov_link: item.mov_link,
   }, opts))
 }
+
+function rate(item) {
+  submit((opts) => router.put(route("division-chief-ipcr-v2.rateSupportItem", [props.ipcrId, item.id]), {
+    quality_rating: item.quality_rating,
+    efficiency_rating: item.efficiency_rating,
+    timeliness_rating: item.timeliness_rating,
+    remarks: item.remarks,
+  }, opts))
+}
 </script>
 
 <template>
@@ -33,6 +42,7 @@ function saveEmployeeFields(item) {
           <th :class="TH">Actual Accomplishment</th>
           <th :class="TH">MOV</th>
           <th :class="TH">Row Average</th>
+          <th v-if="canRate" :class="TH">Rate (Quality/Efficiency/Timeliness)</th>
         </tr>
       </thead>
       <tbody>
@@ -47,9 +57,17 @@ function saveEmployeeFields(item) {
             <span v-else>{{ item.mov_link ?? "—" }}</span>
           </td>
           <td :class="TD">{{ item.row_average ?? "—" }}</td>
+          <td v-if="canRate" :class="TD">
+            <div class="flex gap-1 items-center">
+              <select v-model.number="item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-model.number="item.efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-model.number="item.timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <button type="button" class="text-xs text-indigo-600" @click="rate(item)">Save</button>
+            </div>
+          </td>
         </tr>
         <tr v-if="!items.length">
-          <td :class="TD" colspan="4">No Support Function rows yet.</td>
+          <td :class="TD" :colspan="canRate ? 5 : 4">No Support Function rows yet.</td>
         </tr>
       </tbody>
     </table>

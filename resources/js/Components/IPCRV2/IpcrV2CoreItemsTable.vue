@@ -28,6 +28,16 @@ function rowAverage(item) {
   const weighted = parts[0] * 0.3 + parts[1] * 0.2 + parts[2] * 0.2 + parts[3] * 0.3
   return weighted.toFixed(2)
 }
+
+function rate(item) {
+  submit((opts) => router.put(route("division-chief-ipcr-v2.rateCoreItem", [props.ipcrId, item.id]), {
+    student_feedback_rating: item.student_feedback_rating,
+    supervisor_feedback_rating: item.supervisor_feedback_rating,
+    im_development_rating: item.im_development_rating,
+    timeliness_rating: item.timeliness_rating,
+    remarks: item.remarks,
+  }, opts))
+}
 </script>
 
 <template>
@@ -44,6 +54,7 @@ function rowAverage(item) {
           <th :class="TH">Target</th>
           <th :class="TH">Actual Accomplishment</th>
           <th :class="TH">Row Average</th>
+          <th v-if="canRate" :class="TH">Rate (Student/Supervisor/IM/Timeliness)</th>
         </tr>
       </thead>
       <tbody>
@@ -59,9 +70,18 @@ function rowAverage(item) {
             <span v-else>{{ item.actual_accomplishment ?? "—" }}</span>
           </td>
           <td :class="TD">{{ item.row_average ?? rowAverage(item) }}</td>
+          <td v-if="canRate" :class="TD">
+            <div class="flex gap-1 items-center">
+              <select v-model.number="item.student_feedback_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-model.number="item.supervisor_feedback_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-model.number="item.im_development_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-model.number="item.timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <button type="button" class="text-xs text-indigo-600" @click="rate(item)">Save</button>
+            </div>
+          </td>
         </tr>
         <tr v-if="!items.length">
-          <td :class="TD" colspan="5">No Core Function rows yet — generate targets from Employee Functions.</td>
+          <td :class="TD" :colspan="canRate ? 6 : 5">No Core Function rows yet — generate targets from Employee Functions.</td>
         </tr>
       </tbody>
     </table>

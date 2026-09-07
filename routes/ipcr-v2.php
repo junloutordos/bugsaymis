@@ -22,4 +22,17 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
         Route::put('/employee-ipcr-v2/{id}/core-items/{coreItem}', [EmployeeIpcrV2Controller::class, 'updateCoreItem'])->name('employee-ipcr-v2.updateCoreItem');
         Route::put('/employee-ipcr-v2/{id}/support-items/{supportItem}', [EmployeeIpcrV2Controller::class, 'updateSupportItem'])->name('employee-ipcr-v2.updateSupportItem');
     });
+
+    Route::middleware('permission:ipcr.v2.approve')->group(function () {
+        Route::get('/division-chief/ipcr-v2', [\App\Http\Controllers\IPCRV2\DivisionChiefIpcrV2Controller::class, 'index'])->name('division-chief-ipcr-v2.index');
+        Route::get('/division-chief/ipcr-v2/{id}', [\App\Http\Controllers\IPCRV2\DivisionChiefIpcrV2Controller::class, 'show'])->name('division-chief-ipcr-v2.show');
+        Route::post('/division-chief/ipcr-v2/{id}/approve-targets', [\App\Http\Controllers\IPCRV2\DivisionChiefIpcrV2Controller::class, 'approveTargets'])->name('division-chief-ipcr-v2.approveTargets');
+        Route::post('/division-chief/ipcr-v2/{id}/disapprove-targets', [\App\Http\Controllers\IPCRV2\DivisionChiefIpcrV2Controller::class, 'disapproveTargets'])->name('division-chief-ipcr-v2.disapproveTargets');
+        Route::put('/division-chief/ipcr-v2/{id}/core-items/{coreItem}/rate', [\App\Http\Controllers\IPCRV2\DivisionChiefIpcrV2Controller::class, 'rateCoreItem'])->name('division-chief-ipcr-v2.rateCoreItem');
+        Route::put('/division-chief/ipcr-v2/{id}/support-items/{supportItem}/rate', [\App\Http\Controllers\IPCRV2\DivisionChiefIpcrV2Controller::class, 'rateSupportItem'])->name('division-chief-ipcr-v2.rateSupportItem');
+        Route::post('/division-chief/ipcr-v2/{id}/submit-to-pmt', [\App\Http\Controllers\IPCRV2\DivisionChiefIpcrV2Controller::class, 'submitToPMT'])->name('division-chief-ipcr-v2.submitToPMT');
+
+        Route::post('/division-chief/ipcr-v2/{ipcrV2}/coaching-sessions', [\App\Http\Controllers\IPCRV2\IpcrV2CoachingSessionController::class, 'store'])->name('ipcr-v2-coaching-sessions.store');
+        Route::delete('/division-chief/ipcr-v2/{ipcrV2}/coaching-sessions/{coachingSession}', [\App\Http\Controllers\IPCRV2\IpcrV2CoachingSessionController::class, 'destroy'])->name('ipcr-v2-coaching-sessions.destroy');
+    });
 });
