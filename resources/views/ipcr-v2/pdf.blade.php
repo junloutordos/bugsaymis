@@ -209,10 +209,6 @@
         </tbody>
     </table>
 
-    <p style="margin-top: 6px; font-size: 8px; font-style: italic;">
-        Legend: 5 - Outstanding &nbsp; 4 - Very Satisfactory &nbsp; 3 - Satisfactory &nbsp; 2 - Unsatisfactory &nbsp; 1 - Poor
-    </p>
-
     <table style="margin-top: 14px;">
         <tr>
             <td class="center"><strong>Discussed with</strong></td>
@@ -220,10 +216,24 @@
             <td class="center"><strong>Final Rating by</strong></td>
         </tr>
         <tr>
-            <td class="center" style="padding-top: 24px;">____________________</td>
-            <td class="center" style="padding-top: 24px;">____________________</td>
-            <td class="center" style="padding-top: 24px;">____________________</td>
+            <td class="center" style="padding-top: 20px;">&nbsp;</td>
+            <td class="center" style="padding-top: 20px;">&nbsp;</td>
+            <td class="center" style="padding-top: 20px;">&nbsp;</td>
+        </tr>
+        <tr>
+            <td class="center"><strong>{{ strtoupper($ipcr->user->name) }}</strong></td>
+            <td class="center"><strong>{{ $supervisor ? strtoupper($supervisor->name) : '&mdash;' }}</strong></td>
+            <td class="center"><strong>{{ $ocdUser ? strtoupper($ocdUser->name) : '&mdash;' }}</strong></td>
+        </tr>
+        <tr>
+            <td class="center">{{ $ipcr->user->position }}</td>
+            <td class="center">{{ $supervisor->position ?? 'Division Chief' }}</td>
+            <td class="center">{{ $ocdUser->position ?? 'Campus Director' }}</td>
         </tr>
     </table>
+
+    <p style="margin-top: 10px; font-size: 8px; font-style: italic;">
+        Legend: 5 - Outstanding &nbsp; 4 - Very Satisfactory &nbsp; 3 - Satisfactory &nbsp; 2 - Unsatisfactory &nbsp; 1 - Poor
+    </p>
 </body>
 </html>

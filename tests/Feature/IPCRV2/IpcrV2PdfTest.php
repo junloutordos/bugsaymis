@@ -80,4 +80,22 @@ class IpcrV2PdfTest extends TestCase
         $this->assertStringContainsString('Assessed by', $html);
         $this->assertStringContainsString('Final Rating by', $html);
     }
+
+    public function test_signature_block_shows_employee_supervisor_and_ocd_names_with_legend_last(): void
+    {
+        $employee = User::factory()->create(['name' => 'Junlou Tordos', 'position' => 'MIS Head']);
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+
+        $html = (new IpcrV2PdfService())->renderHtml($record->fresh(['coreItems', 'supportItems', 'user', 'period']));
+
+        $this->assertStringContainsString(strtoupper('Junlou Tordos'), $html);
+        $this->assertStringContainsString('MIS Head', $html);
+
+        $signaturePos = strpos($html, 'Discussed with');
+        $legendPos = strpos($html, 'Legend:');
+        $this->assertNotFalse($signaturePos);
+        $this->assertNotFalse($legendPos);
+        $this->assertGreaterThan($signaturePos, $legendPos, 'Legend must come after the signature block, as the last thing in the document.');
+    }
 }
