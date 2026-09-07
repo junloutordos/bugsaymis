@@ -29,4 +29,31 @@ class StrategicFunctionServiceTest extends TestCase
         $this->assertCount(2, $result);
         $this->assertSame('Indicator A1', $result->first()->description);
     }
+
+    public function test_current_indicators_resolve_dost_strategy_and_sub_strategy_text(): void
+    {
+        IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
+
+        $pillar = \App\Models\DostPillar::create(['name' => 'Pillar 1']);
+        $strategy = \App\Models\DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1: Achieve quality science education']);
+        \App\Models\DostSubStrategy::create(['dost_strategy_id' => $strategy->id, 'description' => 'Institutionalized FORWARD program']);
+
+        $program = AgencyOutcome::create(['outcome' => 'A. STEM Secondary Education']);
+        $program->dostStrategies()->attach($strategy->id);
+
+        $performanceIndicator = \App\Models\PerformanceIndicator::create(['agency_outcome_id' => $program->id, 'description' => 'PI 1']);
+
+        OpcrIndicator::create([
+            'fiscal_year' => 2026,
+            'agency_outcome_id' => $program->id,
+            'performance_indicator_id' => $performanceIndicator->id,
+            'description' => 'Indicator 1',
+        ]);
+
+        $result = (new StrategicFunctionService())->currentIndicators();
+
+        $source = $result->first()->performanceIndicator?->agencyOutcome ?? $result->first()->agencyOutcome;
+        $this->assertSame('Strategy 1: Achieve quality science education', $source->dost_strategy_names_joined);
+        $this->assertSame('Institutionalized FORWARD program', $source->dost_sub_strategy_descriptions_joined);
+    }
 }

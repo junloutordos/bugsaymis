@@ -26,7 +26,14 @@ class StrategicFunctionService
         }
 
         return OpcrIndicator::forFiscalYear($year)
-            ->with(['agencyOutcome', 'actuals'])
+            ->with([
+                'agencyOutcome',
+                'performanceIndicator.agencyOutcome.dostStrategies.pillar',
+                'performanceIndicator.agencyOutcome.dostStrategies.subStrategies',
+                'performanceIndicator.agencyOutcome.parent.dostStrategies.pillar',
+                'performanceIndicator.agencyOutcome.parent.dostStrategies.subStrategies',
+                'actuals',
+            ])
             ->get()
             ->sortBy(fn ($i) => $i->agencyOutcome?->outcome ?? '')
             ->values();
