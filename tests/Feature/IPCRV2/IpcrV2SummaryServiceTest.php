@@ -28,6 +28,10 @@ class IpcrV2SummaryServiceTest extends TestCase
         $period = IPCRRatingPeriod::first();
         $record = IpcrV2Record::create(['user_id' => $user->id, 'rating_period_id' => $period->id]);
         $record->coreItems()->create(['label' => 'Subject 1', 'weight_percent' => 100, 'row_average' => 4.0]);
+        $record->coreItems()->create([
+            'label' => 'IT Management', 'weight_percent' => 50, 'success_indicator' => 'x',
+            'quality_rating' => 5, 'efficiency_rating' => 4, 'timeliness_rating' => 3, 'row_average' => 4.0,
+        ]);
         $record->supportItems()->create([
             'label' => 'Committee', 'quality_rating' => 5, 'efficiency_rating' => 4, 'timeliness_rating' => 3, 'row_average' => 4.0,
         ]);
@@ -40,9 +44,12 @@ class IpcrV2SummaryServiceTest extends TestCase
         $this->assertSame('Outstanding', $rows['strategic'][0]['equivalent']);
 
         $this->assertSame('Subject 1', $rows['core'][0]['label']);
-        $this->assertNull($rows['core'][0]['quality']);
+        $this->assertNull($rows['core'][0]['quality']); // untagged/legacy row never carries quality_rating
         $this->assertEquals(4.0, $rows['core'][0]['average']);
         $this->assertSame('Very Satisfactory', $rows['core'][0]['equivalent']);
+
+        $this->assertSame('IT Management', $rows['core'][1]['label']);
+        $this->assertEquals(5, $rows['core'][1]['quality']); // WDP-tagged row's own rating now surfaces (previously hardcoded null)
 
         $this->assertSame('Committee', $rows['support'][0]['label']);
         $this->assertEquals(5, $rows['support'][0]['quality']);

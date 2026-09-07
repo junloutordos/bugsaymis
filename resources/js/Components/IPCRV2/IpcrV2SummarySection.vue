@@ -1,10 +1,18 @@
 <script setup>
 import AppCard from "@/Components/AppCard.vue"
 import { TH, TD } from "@/Composables/useTableClasses.js"
+import { computed } from "vue"
+import { groupConsecutiveByFunction } from "@/Composables/ipcrV2FunctionGrouping.js"
 
-defineProps({
+const props = defineProps({
   summary: { type: Object, default: () => ({ strategic: [], core: [], support: [] }) },
 })
+
+// Rows sharing the same Core/Support Function (one function tagged to N
+// WDPs produces N rows) merge into one rowspan'd label block, matching the
+// item tables above.
+const coreRows = computed(() => groupConsecutiveByFunction(props.summary.core ?? []))
+const supportRows = computed(() => groupConsecutiveByFunction(props.summary.support ?? []))
 
 function fmt(v) {
   return v === null || v === undefined ? "—" : (typeof v === "number" ? v.toFixed(2) : v)
@@ -42,25 +50,25 @@ function fmt(v) {
           <tr>
             <td colspan="6" class="border border-slate-200 px-3 py-1.5 font-semibold bg-slate-100">Core Functions (50%)</td>
           </tr>
-          <tr v-for="row in summary.core" :key="'c-' + row.label">
-            <td :class="TD" class="border border-slate-200">{{ row.label }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.quality) }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.efficiency) }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.timeliness) }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center font-semibold">{{ fmt(row.average) }}</td>
-            <td :class="TD" class="border border-slate-200">{{ row.equivalent ?? "—" }}</td>
+          <tr v-for="(row, idx) in coreRows" :key="'c-' + idx">
+            <td v-if="row.isFirst" :rowspan="row.groupSize" :class="TD" class="border border-slate-200 align-top">{{ row.item.label }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.item.quality) }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.item.efficiency) }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.item.timeliness) }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center font-semibold">{{ fmt(row.item.average) }}</td>
+            <td :class="TD" class="border border-slate-200">{{ row.item.equivalent ?? "—" }}</td>
           </tr>
 
           <tr>
             <td colspan="6" class="border border-slate-200 px-3 py-1.5 font-semibold bg-slate-100">Support Functions (20%)</td>
           </tr>
-          <tr v-for="row in summary.support" :key="'sup-' + row.label">
-            <td :class="TD" class="border border-slate-200">{{ row.label }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.quality) }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.efficiency) }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.timeliness) }}</td>
-            <td class="border border-slate-200 px-3 py-2 text-center font-semibold">{{ fmt(row.average) }}</td>
-            <td :class="TD" class="border border-slate-200">{{ row.equivalent ?? "—" }}</td>
+          <tr v-for="(row, idx) in supportRows" :key="'sup-' + idx">
+            <td v-if="row.isFirst" :rowspan="row.groupSize" :class="TD" class="border border-slate-200 align-top">{{ row.item.label }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.item.quality) }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.item.efficiency) }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center">{{ fmt(row.item.timeliness) }}</td>
+            <td class="border border-slate-200 px-3 py-2 text-center font-semibold">{{ fmt(row.item.average) }}</td>
+            <td :class="TD" class="border border-slate-200">{{ row.item.equivalent ?? "—" }}</td>
           </tr>
         </tbody>
       </table>

@@ -18,14 +18,16 @@ class IpcrV2SummaryService
         return [
             'strategic' => $this->strategicRows(),
             'core' => $record->coreItems->map(fn ($item) => [
+                'employee_function_id' => $item->employee_function_id,
                 'label' => $item->label,
-                'quality' => null,
-                'efficiency' => null,
-                'timeliness' => null,
+                'quality' => $item->quality_rating,
+                'efficiency' => $item->efficiency_rating,
+                'timeliness' => $item->timeliness_rating,
                 'average' => $item->row_average,
                 'equivalent' => $this->rating->adjectivalRating($item->row_average ? (float) $item->row_average : null),
             ])->all(),
             'support' => $record->supportItems->map(fn ($item) => [
+                'employee_function_id' => $item->employee_function_id,
                 'label' => $item->label,
                 'quality' => $item->quality_rating,
                 'efficiency' => $item->efficiency_rating,
