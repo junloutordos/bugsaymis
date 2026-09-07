@@ -3,6 +3,7 @@ import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
 import AppButton from "@/Components/AppButton.vue"
+import { ArrowPathIcon } from "@heroicons/vue/24/outline"
 import IpcrV2DocumentHeader from "@/Components/IPCRV2/IpcrV2DocumentHeader.vue"
 import IpcrV2StrategicSection from "@/Components/IPCRV2/IpcrV2StrategicSection.vue"
 import IpcrV2CoreItemsTable from "@/Components/IPCRV2/IpcrV2CoreItemsTable.vue"
@@ -29,6 +30,9 @@ function submitForReview() {
 }
 function submitForRating() {
   submit((opts) => router.post(route("employee-ipcr-v2.submitRating", props.ipcr.id), {}, opts))
+}
+function syncFunctions() {
+  submit((opts) => router.post(route("employee-ipcr-v2.syncFunctions", props.ipcr.id), {}, opts))
 }
 </script>
 
@@ -80,6 +84,9 @@ function submitForRating() {
     <IpcrV2SummarySection :summary="summary" />
 
     <div v-if="isOwner && isMutable" class="mt-6 flex justify-end gap-2">
+      <AppButton variant="secondary" :disabled="isSubmitting" @click="syncFunctions">
+        <ArrowPathIcon class="w-4 h-4 mr-1" /> Sync from Employee Functions
+      </AppButton>
       <AppButton v-if="ipcr.status === 'New Target'" :disabled="isSubmitting" @click="submitForReview">Submit for Review</AppButton>
       <AppButton v-if="ipcr.status === 'Targets Approved'" :disabled="isSubmitting" @click="submitForRating">Submit for Rating</AppButton>
     </div>

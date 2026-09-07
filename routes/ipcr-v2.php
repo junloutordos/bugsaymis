@@ -12,6 +12,7 @@ Route::middleware(['web', 'auth', 'pshs.email'])->group(function () {
 
     Route::middleware('permission:ipcr.v2.create')->group(function () {
         Route::post('/employee-ipcr-v2/generate-targets', [EmployeeIpcrV2Controller::class, 'generateTargets'])->name('employee-ipcr-v2.generateTargets');
+        Route::post('/employee-ipcr-v2/{id}/sync-functions', [EmployeeIpcrV2Controller::class, 'syncFunctions'])->name('employee-ipcr-v2.syncFunctions');
     });
 
     Route::middleware('permission:ipcr.v2.submit')->group(function () {

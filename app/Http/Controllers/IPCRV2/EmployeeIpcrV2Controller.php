@@ -77,6 +77,19 @@ class EmployeeIpcrV2Controller extends Controller
         return redirect()->route('employee-ipcr-v2.show', $record->id)->with('success', 'IPCR V2 targets generated.');
     }
 
+    public function syncFunctions(Request $request, int $id)
+    {
+        $record = IpcrV2Record::findOrFail($id);
+        $this->workflow->assertOwner($request->user(), $record);
+        $this->workflow->assertMutable($record);
+
+        $added = $this->generation->syncNewFunctions($record);
+
+        return back()->with('success', $added > 0
+            ? "Synced {$added} new function(s) from Employee Functions."
+            : 'No new functions to sync.');
+    }
+
     public function submitForReview(Request $request, int $id)
     {
         $record = IpcrV2Record::findOrFail($id);

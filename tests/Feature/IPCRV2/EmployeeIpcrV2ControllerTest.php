@@ -108,4 +108,29 @@ class EmployeeIpcrV2ControllerTest extends TestCase
         $response->assertForbidden();
         $this->assertDatabaseHas('ipcr_v2_records', ['id' => $record->id]);
     }
+
+    public function test_owner_can_sync_functions_added_after_generation(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        EmployeeFunction::create(['user_id' => $employee->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Discipline Committee']);
+
+        $response = $this->actingAs($employee)->post(route('employee-ipcr-v2.syncFunctions', $record->id));
+
+        $response->assertRedirect();
+        $this->assertCount(1, $record->fresh()->supportItems);
+    }
+
+    public function test_cannot_sync_functions_on_someone_elses_ipcr_v2(): void
+    {
+        $employee = $this->employee();
+        $other = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $other->id, 'rating_period_id' => $period->id]);
+
+        $response = $this->actingAs($employee)->post(route('employee-ipcr-v2.syncFunctions', $record->id));
+
+        $response->assertForbidden();
+    }
 }

@@ -52,4 +52,57 @@ class IpcrV2GenerationServiceTest extends TestCase
 
         $this->assertSame('Subject 1', $record->fresh()->coreItems->first()->label);
     }
+
+    public function test_sync_adds_functions_created_after_generation(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+        $this->assertCount(0, $record->coreItems);
+        $this->assertCount(0, $record->supportItems);
+
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'Subject 1', 'weight_percent' => 100]);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Discipline Committee']);
+
+        $added = (new IpcrV2GenerationService())->syncNewFunctions($record);
+
+        $this->assertSame(2, $added);
+        $record->refresh();
+        $this->assertCount(1, $record->coreItems);
+        $this->assertCount(1, $record->supportItems);
+        $this->assertSame('Subject 1', $record->coreItems->first()->label);
+    }
+
+    public function test_sync_never_touches_already_snapshotted_items(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $function = EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'Subject 1', 'weight_percent' => 100]);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+        $record->coreItems->first()->update(['target' => 'Existing target text']);
+        $function->update(['label' => 'Renamed Subject']);
+
+        $added = (new IpcrV2GenerationService())->syncNewFunctions($record);
+
+        $this->assertSame(0, $added);
+        $record->refresh();
+        $this->assertCount(1, $record->coreItems);
+        $this->assertSame('Subject 1', $record->coreItems->first()->label);
+        $this->assertSame('Existing target text', $record->coreItems->first()->target);
+    }
+
+    public function test_sync_throws_when_adding_a_core_function_breaks_the_100_percent_total(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'Subject 1', 'weight_percent' => 100]);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'Subject 2', 'weight_percent' => 40]);
+
+        $this->expectException(ValidationException::class);
+        (new IpcrV2GenerationService())->syncNewFunctions($record);
+    }
 }
