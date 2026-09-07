@@ -25,7 +25,7 @@ class HRIpcrV2Controller extends Controller
 
     public function show(int $id)
     {
-        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions'])->findOrFail($id);
+        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions', 'statusLogs.actor'])->findOrFail($id);
         $ocdUser = \App\Models\User::havingRole('OCD')->first();
 
         return Inertia::render('IPCRV2/HRIpcrV2Show', [
@@ -36,10 +36,15 @@ class HRIpcrV2Controller extends Controller
         ]);
     }
 
-    public function submitToPMT(int $id)
+    public function submitToPMT(Request $request, int $id)
     {
         $record = IpcrV2Record::findOrFail($id);
-        $this->workflow->transition($record, IpcrV2WorkflowService::STATUS_SUBMITTED_PMT);
+        $this->workflow->transition(
+            $record,
+            IpcrV2WorkflowService::STATUS_SUBMITTED_PMT,
+            actor: $request->user(),
+            actionType: 'submitted',
+        );
 
         return back()->with('success', 'Submitted to PMT.');
     }
@@ -50,7 +55,12 @@ class HRIpcrV2Controller extends Controller
 
         foreach (IpcrV2Record::whereIn('id', $data['ids'])->get() as $record) {
             if ($record->status === IpcrV2WorkflowService::STATUS_SUBMITTED_HR) {
-                $this->workflow->transition($record, IpcrV2WorkflowService::STATUS_SUBMITTED_PMT);
+                $this->workflow->transition(
+                    $record,
+                    IpcrV2WorkflowService::STATUS_SUBMITTED_PMT,
+                    actor: $request->user(),
+                    actionType: 'submitted',
+                );
             }
         }
 

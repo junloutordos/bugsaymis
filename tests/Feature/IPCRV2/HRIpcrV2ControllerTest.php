@@ -44,4 +44,21 @@ class HRIpcrV2ControllerTest extends TestCase
         $this->assertSame(IpcrV2WorkflowService::STATUS_SUBMITTED_PMT, $recordA->fresh()->status);
         $this->assertSame(IpcrV2WorkflowService::STATUS_SUBMITTED_PMT, $recordB->fresh()->status);
     }
+
+    public function test_submit_to_pmt_writes_a_status_log(): void
+    {
+        $hr = $this->hrUser();
+        $employee = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => IpcrV2WorkflowService::STATUS_SUBMITTED_HR,
+        ]);
+
+        $response = $this->actingAs($hr)->post(route('hr-ipcr-v2.submitToPMT', $record->id));
+
+        $response->assertRedirect();
+        $this->assertSame('submitted', $record->fresh()->statusLogs->last()->action_type);
+        $this->assertSame($hr->id, $record->fresh()->statusLogs->last()->actor_id);
+    }
 }
