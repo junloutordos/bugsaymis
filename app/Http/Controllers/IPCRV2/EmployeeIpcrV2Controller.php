@@ -118,6 +118,7 @@ class EmployeeIpcrV2Controller extends Controller
         $data = $request->validate([
             'target' => 'nullable|string|max:1000',
             'actual_accomplishment' => 'nullable|string|max:1000',
+            'mov_link' => 'nullable|string|max:500',
         ]);
         $coreItem->update($data);
 
@@ -132,6 +133,7 @@ class EmployeeIpcrV2Controller extends Controller
         abort_if($supportItem->ipcr_v2_id !== $record->id, 404);
 
         $data = $request->validate([
+            'target' => 'nullable|string|max:1000',
             'actual_accomplishment' => 'nullable|string|max:1000',
             'mov_link' => 'nullable|string|max:500',
         ]);

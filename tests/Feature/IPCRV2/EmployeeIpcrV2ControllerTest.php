@@ -133,4 +133,34 @@ class EmployeeIpcrV2ControllerTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_owner_can_set_a_mov_link_on_a_core_item(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100]);
+
+        $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
+            'target' => 'x', 'actual_accomplishment' => 'x', 'mov_link' => 'https://drive.example/report.pdf',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame('https://drive.example/report.pdf', $coreItem->fresh()->mov_link);
+    }
+
+    public function test_owner_can_set_a_target_on_a_support_item(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $supportItem = $record->supportItems()->create(['label' => 'Administrative']);
+
+        $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateSupportItem', [$record->id, $supportItem->id]), [
+            'target' => '100% compliance with DTR submission deadlines',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame('100% compliance with DTR submission deadlines', $supportItem->fresh()->target);
+    }
 }

@@ -2,7 +2,9 @@
 import AppTextarea from "@/Components/AppTextarea.vue"
 import { TD } from "@/Composables/useTableClasses.js"
 import { router } from "@inertiajs/vue3"
+import { computed } from "vue"
 import { useSubmit } from "@/Composables/useSubmit"
+import { groupConsecutiveByFunction } from "@/Composables/ipcrV2FunctionGrouping.js"
 
 const props = defineProps({
   ipcrId: [Number, String],
@@ -13,6 +15,11 @@ const props = defineProps({
 })
 
 const { submit } = useSubmit()
+
+// Rows sharing the same Core Function (one function tagged to N WDPs
+// materializes into N items) merge into one rowspan'd Function block —
+// isFirst/groupSize drive rendering the label/placeholder cells once.
+const rows = computed(() => groupConsecutiveByFunction(props.items))
 
 const CRITERIA = [
   { key: "student_feedback_rating", label: "Positive feedback from students (30%)" },
@@ -25,6 +32,7 @@ function saveEmployeeFields(item) {
   submit((opts) => router.put(route("employee-ipcr-v2.updateCoreItem", [props.ipcrId, item.id]), {
     target: item.target,
     actual_accomplishment: item.actual_accomplishment,
+    mov_link: item.mov_link,
   }, opts))
 }
 
@@ -61,76 +69,80 @@ function rowAverage(item) {
         Core Function (50%)
       </td>
     </tr>
-    <template v-for="item in items" :key="item.id">
+    <template v-for="row in rows" :key="row.item.id">
       <!-- WDP-tagged row: one independently-ratable row per tagged plan, mirroring Support Functions -->
-      <tr v-if="item.success_indicator">
-        <td :class="TD" class="border border-slate-200 align-top font-medium">
-          {{ item.label }}<br />
-          <small class="text-slate-400">Weight: {{ item.weight_percent ?? "—" }}%</small>
+      <tr v-if="row.item.success_indicator">
+        <td v-if="row.isFirst" :rowspan="row.groupSize" :class="TD" class="border border-slate-200 align-top font-medium">
+          {{ row.item.label }}<br />
+          <small class="text-slate-400">Weight: {{ row.item.weight_percent ?? "—" }}%</small>
         </td>
-        <td class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
-        <td class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
-        <td :class="TD" class="border border-slate-200 align-top">{{ item.success_indicator }}</td>
+        <td v-if="row.isFirst" :rowspan="row.groupSize" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+        <td v-if="row.isFirst" :rowspan="row.groupSize" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+        <td :class="TD" class="border border-slate-200 align-top">{{ row.item.success_indicator }}</td>
         <td :class="TD" class="border border-slate-200 align-top">
-          <AppTextarea v-if="isOwner && isMutable" v-model="item.target" @blur="saveEmployeeFields(item)" />
-          <span v-else>{{ item.target ?? "—" }}</span>
+          <AppTextarea v-if="isOwner && isMutable" v-model="row.item.target" @blur="saveEmployeeFields(row.item)" />
+          <span v-else>{{ row.item.target ?? "—" }}</span>
         </td>
         <td :class="TD" class="border border-slate-200 align-top">
-          <AppTextarea v-if="isOwner && isMutable" v-model="item.actual_accomplishment" @blur="saveEmployeeFields(item)" />
-          <span v-else>{{ item.actual_accomplishment ?? "—" }}</span>
+          <AppTextarea v-if="isOwner && isMutable" v-model="row.item.actual_accomplishment" @blur="saveEmployeeFields(row.item)" />
+          <span v-else>{{ row.item.actual_accomplishment ?? "—" }}</span>
+          <input v-if="isOwner && isMutable" v-model="row.item.mov_link" placeholder="MOV link" class="border rounded px-2 py-1 text-xs w-full mt-1" @blur="saveEmployeeFields(row.item)" />
+          <small v-else-if="row.item.mov_link" class="block text-slate-400 mt-1">MOV: {{ row.item.mov_link }}</small>
         </td>
         <td class="border border-slate-200 px-4 py-3 text-center text-sm">
-          <select v-if="canRate" v-model.number="item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
-          <span v-else>{{ item.quality_rating ?? "—" }}</span>
+          <select v-if="canRate" v-model.number="row.item.quality_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ row.item.quality_rating ?? "—" }}</span>
         </td>
         <td class="border border-slate-200 px-4 py-3 text-center text-sm">
-          <select v-if="canRate" v-model.number="item.efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
-          <span v-else>{{ item.efficiency_rating ?? "—" }}</span>
+          <select v-if="canRate" v-model.number="row.item.efficiency_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ row.item.efficiency_rating ?? "—" }}</span>
         </td>
         <td class="border border-slate-200 px-4 py-3 text-center text-sm">
-          <select v-if="canRate" v-model.number="item.timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
-          <span v-else>{{ item.timeliness_rating ?? "—" }}</span>
+          <select v-if="canRate" v-model.number="row.item.timeliness_rating" class="border rounded text-xs px-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+          <span v-else>{{ row.item.timeliness_rating ?? "—" }}</span>
         </td>
         <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
-          {{ item.row_average ?? "—" }}
-          <button v-if="canRate" type="button" class="block mt-1 text-xs text-indigo-600" @click="rateWdpRow(item)">Save</button>
+          {{ row.item.row_average ?? "—" }}
+          <button v-if="canRate" type="button" class="block mt-1 text-xs text-indigo-600" @click="rateWdpRow(row.item)">Save</button>
         </td>
         <td :class="TD" class="border border-slate-200 align-top">
-          <input v-if="canRate" v-model="item.remarks" class="border rounded px-2 py-1 text-xs w-full" />
-          <span v-else>{{ item.remarks ?? "—" }}</span>
+          <input v-if="canRate" v-model="row.item.remarks" class="border rounded px-2 py-1 text-xs w-full" />
+          <span v-else>{{ row.item.remarks ?? "—" }}</span>
         </td>
       </tr>
 
       <!-- Untagged (teaching-load) row: fixed CSC 4-criteria rubric -->
       <template v-else>
-        <tr v-for="(criterion, idx) in CRITERIA" :key="item.id + '-' + criterion.key">
+        <tr v-for="(criterion, idx) in CRITERIA" :key="row.item.id + '-' + criterion.key">
           <td v-if="idx === 0" rowspan="5" :class="TD" class="border border-slate-200 align-top font-medium">
-            {{ item.label }}<br />
-            <small class="text-slate-400">Weight: {{ item.weight_percent ?? "—" }}%</small>
+            {{ row.item.label }}<br />
+            <small class="text-slate-400">Weight: {{ row.item.weight_percent ?? "—" }}%</small>
           </td>
           <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
           <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
           <td :class="TD" class="border border-slate-200">{{ criterion.label }}</td>
           <td v-if="idx === 0" rowspan="4" :class="TD" class="border border-slate-200 align-top">
-            <AppTextarea v-if="isOwner && isMutable" v-model="item.target" @blur="saveEmployeeFields(item)" />
-            <span v-else>{{ item.target ?? "—" }}</span>
+            <AppTextarea v-if="isOwner && isMutable" v-model="row.item.target" @blur="saveEmployeeFields(row.item)" />
+            <span v-else>{{ row.item.target ?? "—" }}</span>
           </td>
           <td v-if="idx === 0" rowspan="4" :class="TD" class="border border-slate-200 align-top">
-            <AppTextarea v-if="isOwner && isMutable" v-model="item.actual_accomplishment" @blur="saveEmployeeFields(item)" />
-            <span v-else>{{ item.actual_accomplishment ?? "—" }}</span>
+            <AppTextarea v-if="isOwner && isMutable" v-model="row.item.actual_accomplishment" @blur="saveEmployeeFields(row.item)" />
+            <span v-else>{{ row.item.actual_accomplishment ?? "—" }}</span>
+            <input v-if="isOwner && isMutable" v-model="row.item.mov_link" placeholder="MOV link" class="border rounded px-2 py-1 text-xs w-full mt-1" @blur="saveEmployeeFields(row.item)" />
+            <small v-else-if="row.item.mov_link" class="block text-slate-400 mt-1">MOV: {{ row.item.mov_link }}</small>
           </td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm">
-            <select v-if="canRate" v-model.number="item[criterion.key]" class="border rounded text-xs px-1">
+            <select v-if="canRate" v-model.number="row.item[criterion.key]" class="border rounded text-xs px-1">
               <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
             </select>
-            <span v-else>{{ item[criterion.key] ?? "—" }}</span>
+            <span v-else>{{ row.item[criterion.key] ?? "—" }}</span>
           </td>
           <td v-if="idx === 0" rowspan="5" :class="TD" class="border border-slate-200 align-top">
-            <input v-if="canRate" v-model="item.remarks" class="border rounded px-2 py-1 text-xs w-full" />
-            <span v-else>{{ item.remarks ?? "—" }}</span>
+            <input v-if="canRate" v-model="row.item.remarks" class="border rounded px-2 py-1 text-xs w-full" />
+            <span v-else>{{ row.item.remarks ?? "—" }}</span>
           </td>
         </tr>
         <tr>
@@ -139,8 +151,8 @@ function rowAverage(item) {
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm text-slate-300">—</td>
           <td class="border border-slate-200 px-4 py-3 text-center text-sm font-semibold">
-            {{ item.row_average ?? rowAverage(item) }}
-            <button v-if="canRate" type="button" class="ml-2 text-xs text-indigo-600" @click="rate(item)">Save Ratings</button>
+            {{ row.item.row_average ?? rowAverage(row.item) }}
+            <button v-if="canRate" type="button" class="ml-2 text-xs text-indigo-600" @click="rate(row.item)">Save Ratings</button>
           </td>
         </tr>
       </template>
