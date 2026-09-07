@@ -10,7 +10,7 @@ class IpcrV2CoreItem extends Model
     protected $table = 'ipcr_v2_core_items';
 
     protected $fillable = [
-        'ipcr_v2_id', 'employee_function_id', 'label', 'weight_percent',
+        'ipcr_v2_id', 'employee_function_id', 'label', 'weight_percent', 'success_indicator',
         'target', 'actual_accomplishment',
         'student_feedback_rating', 'supervisor_feedback_rating',
         'im_development_rating', 'timeliness_rating', 'row_average', 'remarks',

@@ -42,7 +42,7 @@ function rate(item) {
       <td :class="TD" class="border border-slate-200 font-medium">{{ item.label }}</td>
       <td class="border border-slate-200 px-4 py-3 text-sm text-slate-300">—</td>
       <td class="border border-slate-200 px-4 py-3 text-sm text-slate-300">—</td>
-      <td class="border border-slate-200 px-4 py-3 text-sm text-slate-400">100% delivered</td>
+      <td class="border border-slate-200 px-4 py-3 text-sm text-slate-500">{{ item.success_indicator ?? "—" }}</td>
       <td class="border border-slate-200 px-4 py-3 text-sm text-slate-300">—</td>
       <td :class="TD" class="border border-slate-200">
         <AppTextarea v-if="isOwner && isMutable" v-model="item.actual_accomplishment" @blur="saveEmployeeFields(item)" />

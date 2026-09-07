@@ -20,8 +20,8 @@ class IpcrV2GenerationService
         $this->workflow->assertPeriodAcceptsNewTargets($period);
         $this->workflow->assertNoDuplicateForPeriod($user->id, $period->id);
 
-        $coreFunctions = EmployeeFunction::where('user_id', $user->id)->core()->get();
-        $supportFunctions = EmployeeFunction::where('user_id', $user->id)->support()->get();
+        $coreFunctions = EmployeeFunction::where('user_id', $user->id)->core()->with('workDistributionPlans:id,success_indicator')->get();
+        $supportFunctions = EmployeeFunction::where('user_id', $user->id)->support()->with('workDistributionPlans:id,success_indicator')->get();
 
         $this->assertCoreWeightsSumTo100($coreFunctions);
 
@@ -36,6 +36,7 @@ class IpcrV2GenerationService
                     'employee_function_id' => $function->id,
                     'label' => $function->label,
                     'weight_percent' => $function->weight_percent,
+                    'success_indicator' => $this->resolveSuccessIndicator($function),
                 ]);
             }
 
@@ -43,6 +44,7 @@ class IpcrV2GenerationService
                 $record->supportItems()->create([
                     'employee_function_id' => $function->id,
                     'label' => $function->label,
+                    'success_indicator' => $this->resolveSuccessIndicator($function),
                 ]);
             }
 
@@ -64,9 +66,9 @@ class IpcrV2GenerationService
         $existingSupportFunctionIds = $record->supportItems->pluck('employee_function_id')->all();
 
         $newCoreFunctions = EmployeeFunction::where('user_id', $record->user_id)->core()
-            ->whereNotIn('id', $existingCoreFunctionIds)->get();
+            ->whereNotIn('id', $existingCoreFunctionIds)->with('workDistributionPlans:id,success_indicator')->get();
         $newSupportFunctions = EmployeeFunction::where('user_id', $record->user_id)->support()
-            ->whereNotIn('id', $existingSupportFunctionIds)->get();
+            ->whereNotIn('id', $existingSupportFunctionIds)->with('workDistributionPlans:id,success_indicator')->get();
 
         if ($newCoreFunctions->isEmpty() && $newSupportFunctions->isEmpty()) {
             return 0;
@@ -87,6 +89,7 @@ class IpcrV2GenerationService
                     'employee_function_id' => $function->id,
                     'label' => $function->label,
                     'weight_percent' => $function->weight_percent,
+                    'success_indicator' => $this->resolveSuccessIndicator($function),
                 ]);
             }
 
@@ -94,11 +97,19 @@ class IpcrV2GenerationService
                 $record->supportItems()->create([
                     'employee_function_id' => $function->id,
                     'label' => $function->label,
+                    'success_indicator' => $this->resolveSuccessIndicator($function),
                 ]);
             }
 
             return $newCoreFunctions->count() + $newSupportFunctions->count();
         });
+    }
+
+    private function resolveSuccessIndicator(EmployeeFunction $function): ?string
+    {
+        $indicators = $function->workDistributionPlans->pluck('success_indicator')->filter();
+
+        return $indicators->isEmpty() ? null : $indicators->implode('; ');
     }
 
     private function assertCoreWeightsSumTo100($coreFunctions): void

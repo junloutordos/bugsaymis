@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\IPCRV2;
 
+use App\Models\AgencyOutcome;
 use App\Models\EmployeeFunction;
 use App\Models\IPCRRatingPeriod;
+use App\Models\PerformanceIndicator;
 use App\Models\User;
+use App\Models\WorkDistributionPlan;
 use App\Services\IPCRV2\IpcrV2GenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -13,6 +16,17 @@ use Tests\TestCase;
 class IpcrV2GenerationServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    private function makePlan(string $successIndicator): WorkDistributionPlan
+    {
+        $outcome = AgencyOutcome::create(['outcome' => 'x ' . $successIndicator]);
+        $indicator = PerformanceIndicator::create(['agency_outcome_id' => $outcome->id, 'description' => 'x']);
+
+        return WorkDistributionPlan::create([
+            'performance_indicator_id' => $indicator->id,
+            'success_indicator' => $successIndicator,
+        ]);
+    }
 
     public function test_generates_record_and_snapshots_core_and_support_items(): void
     {
@@ -104,5 +118,58 @@ class IpcrV2GenerationServiceTest extends TestCase
 
         $this->expectException(ValidationException::class);
         (new IpcrV2GenerationService())->syncNewFunctions($record);
+    }
+
+    public function test_generate_snapshots_success_indicator_from_a_single_tagged_wdp(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $plan = $this->makePlan('Deliver IT support within SLA');
+        $function = EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'core', 'source_type' => 'wdp', 'label' => 'IT Management', 'weight_percent' => 100]);
+        $function->workDistributionPlans()->sync([$plan->id]);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+
+        $this->assertSame('Deliver IT support within SLA', $record->coreItems->first()->success_indicator);
+    }
+
+    public function test_generate_joins_success_indicators_from_multiple_tagged_wdps(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $planA = $this->makePlan('Plan A indicator');
+        $planB = $this->makePlan('Plan B indicator');
+        $function = EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'wdp', 'label' => 'Administrative']);
+        $function->workDistributionPlans()->sync([$planA->id, $planB->id]);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+
+        $this->assertSame('Plan A indicator; Plan B indicator', $record->supportItems->first()->success_indicator);
+    }
+
+    public function test_generate_leaves_success_indicator_null_when_no_wdp_tagged(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'manual', 'label' => 'Discipline Committee']);
+
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+
+        $this->assertNull($record->supportItems->first()->success_indicator);
+    }
+
+    public function test_sync_also_snapshots_success_indicator_for_newly_added_items(): void
+    {
+        $user = User::factory()->create();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = (new IpcrV2GenerationService())->generateTargets($user, $period);
+
+        $plan = $this->makePlan('Discipline Committee indicator');
+        $function = EmployeeFunction::create(['user_id' => $user->id, 'function_type' => 'support', 'source_type' => 'wdp', 'label' => 'Discipline Committee']);
+        $function->workDistributionPlans()->sync([$plan->id]);
+
+        (new IpcrV2GenerationService())->syncNewFunctions($record);
+
+        $this->assertSame('Discipline Committee indicator', $record->fresh()->supportItems->first()->success_indicator);
     }
 }

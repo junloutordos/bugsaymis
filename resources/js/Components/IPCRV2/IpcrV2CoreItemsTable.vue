@@ -57,6 +57,7 @@ function rowAverage(item) {
         <td v-if="idx === 0" rowspan="5" :class="TD" class="border border-slate-200 align-top font-medium">
           {{ item.label }}<br />
           <small class="text-slate-400">Weight: {{ item.weight_percent ?? "—" }}%</small>
+          <div v-if="item.success_indicator" class="text-xs text-slate-500 mt-1 font-normal">{{ item.success_indicator }}</div>
         </td>
         <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
         <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
