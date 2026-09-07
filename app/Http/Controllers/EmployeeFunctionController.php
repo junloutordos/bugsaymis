@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmployeeFunction;
+use App\Models\IPCRRatingPeriod;
 use App\Models\User;
+use App\Models\WorkDistributionPlan;
 use App\Services\EmployeeFunctionSyncService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,10 +14,16 @@ class EmployeeFunctionController extends Controller
 {
     public function index(User $user)
     {
+        $currentYear = IPCRRatingPeriod::current()->value('year') ?? (int) now()->format('Y');
+
         return Inertia::render('Users/EmployeeFunctions', [
             'employee' => $user->only('id', 'name', 'position'),
             'functions' => $user->employeeFunctions()->with('workDistributionPlan')->get(),
             'isFaculty' => $user->hasRole('Faculty') || (bool) $user->academic_unit_id,
+            'workDistributionPlans' => WorkDistributionPlan::forFiscalYear($currentYear)
+                ->select('id', 'success_indicator')
+                ->orderBy('success_indicator')
+                ->get(),
         ]);
     }
 

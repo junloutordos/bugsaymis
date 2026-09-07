@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\EmployeeFunctions;
 
+use App\Models\AgencyOutcome;
 use App\Models\EmployeeFunction;
 use App\Models\Permission;
+use App\Models\PerformanceIndicator;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class EmployeeFunctionControllerTest extends TestCase
@@ -23,6 +26,33 @@ class EmployeeFunctionControllerTest extends TestCase
         $user->roles()->attach($role->id);
 
         return $user;
+    }
+
+    public function test_index_exposes_current_year_work_distribution_plans_for_tagging(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $currentYear = (int) now()->format('Y');
+
+        $outcome = AgencyOutcome::create(['outcome' => 'Core Functions']);
+        $indicator = PerformanceIndicator::create(['agency_outcome_id' => $outcome->id, 'description' => 'x']);
+        $currentPlan = WorkDistributionPlan::create([
+            'performance_indicator_id' => $indicator->id,
+            'success_indicator' => 'Current Year Plan',
+            'fiscal_year' => $currentYear,
+        ]);
+        WorkDistributionPlan::create([
+            'performance_indicator_id' => $indicator->id,
+            'success_indicator' => 'Old Year Plan',
+            'fiscal_year' => $currentYear - 5,
+        ]);
+
+        $this->actingAs($manager)->get(route('employee-functions.index', $employee))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Users/EmployeeFunctions')
+                ->has('workDistributionPlans', 1)
+                ->where('workDistributionPlans.0.id', $currentPlan->id)
+            );
     }
 
     public function test_store_creates_a_manual_support_function_tagged_to_a_wdp(): void

@@ -7,6 +7,7 @@ import AppButton from "@/Components/AppButton.vue"
 import AppBadge from "@/Components/AppBadge.vue"
 import AppModal from "@/Components/AppModal.vue"
 import AppInput from "@/Components/AppInput.vue"
+import AppSelect from "@/Components/AppSelect.vue"
 import AppIconButton from "@/Components/AppIconButton.vue"
 import { ArrowPathIcon, PlusIcon, TrashIcon } from "@heroicons/vue/24/outline"
 import { computed, ref } from "vue"
@@ -14,9 +15,10 @@ import { useSubmit } from "@/Composables/useSubmit"
 import { TH, TD, TR, TD_END } from "@/Composables/useTableClasses.js"
 
 const props = defineProps({
-  employee:  Object,
-  functions: Array,
-  isFaculty: Boolean,
+  employee:               Object,
+  functions:              Array,
+  isFaculty:              Boolean,
+  workDistributionPlans:  { type: Array, default: () => [] },
 })
 
 const { isSubmitting, submit } = useSubmit()
@@ -33,16 +35,17 @@ function removeFunction(fn) {
 }
 
 const showAddModal = ref(false)
-const addForm = ref({ function_type: "core", label: "", weight_percent: null })
+const addForm = ref({ function_type: "core", label: "", weight_percent: null, work_distribution_plan_id: null })
 
 function openAddModal(type) {
-  addForm.value = { function_type: type, label: "", weight_percent: null }
+  addForm.value = { function_type: type, label: "", weight_percent: null, work_distribution_plan_id: null }
   showAddModal.value = true
 }
 
 function saveAddForm() {
+  const payload = { ...addForm.value, work_distribution_plan_id: addForm.value.work_distribution_plan_id || null }
   submit(
-    (opts) => router.post(route("employee-functions.store", props.employee.id), addForm.value, opts),
+    (opts) => router.post(route("employee-functions.store", props.employee.id), payload, opts),
     { onSuccess: () => { showAddModal.value = false } }
   )
 }
@@ -75,7 +78,10 @@ function saveAddForm() {
         <tbody>
           <tr v-for="fn in coreFunctions" :key="fn.id" :class="TR">
             <td :class="TD">{{ fn.label }}</td>
-            <td :class="TD"><AppBadge>{{ fn.source_type }}</AppBadge></td>
+            <td :class="TD">
+              <AppBadge>{{ fn.source_type }}</AppBadge>
+              <div v-if="fn.work_distribution_plan" class="text-xs text-slate-500 mt-1">{{ fn.work_distribution_plan.success_indicator }}</div>
+            </td>
             <td :class="TD">{{ fn.weight_percent ?? "—" }}</td>
             <td :class="TD_END">
               <AppIconButton label="Remove" variant="danger" @click="removeFunction(fn)"><TrashIcon class="w-4 h-4" /></AppIconButton>
@@ -104,7 +110,10 @@ function saveAddForm() {
         <tbody>
           <tr v-for="fn in supportFunctions" :key="fn.id" :class="TR">
             <td :class="TD">{{ fn.label }}</td>
-            <td :class="TD"><AppBadge>{{ fn.source_type }}</AppBadge></td>
+            <td :class="TD">
+              <AppBadge>{{ fn.source_type }}</AppBadge>
+              <div v-if="fn.work_distribution_plan" class="text-xs text-slate-500 mt-1">{{ fn.work_distribution_plan.success_indicator }}</div>
+            </td>
             <td :class="TD_END">
               <AppIconButton label="Remove" variant="danger" @click="removeFunction(fn)"><TrashIcon class="w-4 h-4" /></AppIconButton>
             </td>
@@ -120,6 +129,10 @@ function saveAddForm() {
       <div class="space-y-4">
         <AppInput v-model="addForm.label" label="Label" placeholder="e.g. Chairperson, Discipline Committee" />
         <AppInput v-if="addForm.function_type === 'core'" v-model="addForm.weight_percent" type="number" label="Weight %" />
+        <AppSelect v-model="addForm.work_distribution_plan_id" label="Linked Work Distribution Plan (optional)">
+          <option :value="null">— None (manual) —</option>
+          <option v-for="plan in workDistributionPlans" :key="plan.id" :value="plan.id">{{ plan.success_indicator }}</option>
+        </AppSelect>
         <div class="flex justify-end gap-2 pt-2">
           <AppButton variant="secondary" @click="showAddModal = false">Cancel</AppButton>
           <AppButton :disabled="isSubmitting" @click="saveAddForm">Save</AppButton>
