@@ -254,4 +254,39 @@ class EmployeeIpcrV2ControllerTest extends TestCase
         $response->assertRedirect();
         $this->assertSame('3.00', $supportItem->fresh()->self_row_average);
     }
+
+    public function test_submit_for_rating_rejects_when_an_item_is_missing_a_self_rating(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
+        $record->coreItems()->create(['label' => 'Subject 1', 'weight_percent' => 100]);
+
+        $response = $this->actingAs($employee)->post(route('employee-ipcr-v2.submitRating', $record->id));
+
+        $response->assertSessionHasErrors('self_rating');
+        $this->assertSame('Targets Approved', $record->fresh()->status);
+    }
+
+    public function test_submit_for_rating_succeeds_once_all_items_have_a_self_rating(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
+        $record->coreItems()->create([
+            'label' => 'IT Management', 'weight_percent' => 100, 'success_indicator' => 'x',
+            'self_quality_rating' => 4, 'self_efficiency_rating' => 4, 'self_timeliness_rating' => 4, 'self_row_average' => 4.00,
+        ]);
+
+        $response = $this->actingAs($employee)->post(route('employee-ipcr-v2.submitRating', $record->id));
+
+        $response->assertRedirect();
+        $this->assertSame('Submitted for Rating', $record->fresh()->status);
+    }
 }

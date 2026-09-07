@@ -12,6 +12,7 @@ use App\Services\IPCRV2\IpcrV2GenerationService;
 use App\Services\IPCRV2\IpcrV2WorkflowService;
 use App\Services\IPCRV2\StrategicFunctionService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class EmployeeIpcrV2Controller extends Controller
@@ -117,6 +118,16 @@ class EmployeeIpcrV2Controller extends Controller
     {
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertOwner($request->user(), $record);
+
+        $record->loadMissing('coreItems', 'supportItems');
+        $missing = $record->coreItems->whereNull('self_row_average')->count()
+            + $record->supportItems->whereNull('self_row_average')->count();
+
+        if ($missing > 0) {
+            throw ValidationException::withMessages([
+                'self_rating' => "{$missing} Core/Support item(s) still need a self-rating before you can submit for rating.",
+            ]);
+        }
 
         $data = $request->validate(['pin' => 'nullable|string']);
         $this->sigService->assertSigningPin($request->user(), $data['pin'] ?? null);
