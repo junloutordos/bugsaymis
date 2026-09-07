@@ -15,11 +15,15 @@ class IpcrV2CoreItem extends Model
         'student_feedback_rating', 'supervisor_feedback_rating',
         'im_development_rating', 'quality_rating', 'efficiency_rating',
         'timeliness_rating', 'row_average', 'remarks',
+        'self_quality_rating', 'self_efficiency_rating', 'self_student_feedback_rating',
+        'self_supervisor_feedback_rating', 'self_im_development_rating',
+        'self_timeliness_rating', 'self_row_average',
     ];
 
     protected $casts = [
         'weight_percent' => 'decimal:2',
         'row_average' => 'decimal:2',
+        'self_row_average' => 'decimal:2',
     ];
 
     public function ipcr()

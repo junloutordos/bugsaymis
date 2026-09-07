@@ -48,6 +48,18 @@ class IpcrV2MigrationsTest extends TestCase
         ]));
     }
 
+    public function test_ipcr_v2_items_have_self_rating_columns(): void
+    {
+        $this->assertTrue(Schema::hasColumns('ipcr_v2_core_items', [
+            'self_quality_rating', 'self_efficiency_rating', 'self_student_feedback_rating',
+            'self_supervisor_feedback_rating', 'self_im_development_rating',
+            'self_timeliness_rating', 'self_row_average',
+        ]));
+        $this->assertTrue(Schema::hasColumns('ipcr_v2_support_items', [
+            'self_quality_rating', 'self_efficiency_rating', 'self_timeliness_rating', 'self_row_average',
+        ]));
+    }
+
     public function test_ipcr_v2_coaching_sessions_table_has_expected_columns(): void
     {
         $this->assertTrue(Schema::hasColumns('ipcr_v2_coaching_sessions', [
