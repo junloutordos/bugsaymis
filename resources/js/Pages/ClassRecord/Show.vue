@@ -99,6 +99,14 @@ const currentGradingOption = computed(() =>
   currentQuarterData.value?.grading_option ?? props.classRecord.grading_option
 )
 
+// Compliance-mode categories (e.g. Values Education) have no "non-graded"
+// concept — every assessment IS the checkbox being tracked. The backend
+// forces is_graded=true/max_score=1 regardless of what's submitted (see
+// ClassRecordAssessmentController::upsert()); the Setup tab mirrors that
+// here so the toggle a teacher would otherwise reach for — reading "no
+// numeric grade" as "Non-graded" — never appears for this grading mode.
+const isSetupComplianceMode = computed(() => currentGradingOption.value?.grading_mode === 'compliance')
+
 // ── Shared (PEHM) record co-teacher scoping ───────────────────────────────────
 // Which subject_id(s), if any, the CURRENT user owns on this record — empty
 // for a normal (non-shared) record, or for an admin/monitor who isn't
@@ -191,14 +199,15 @@ function buildDraft(quarter) {
       const foundDates = found
         ? [...new Set((found.activity_dates?.length ? found.activity_dates : [found.activity_date]).filter(Boolean))].sort()
         : []
+      const isCompliance = option?.grading_mode === 'compliance'
       draft[cat.id].push({
         grading_category_id: cat.id,
         assessment_number:   n,
         title:               found?.title ?? '',
-        is_graded:           found ? !!found.is_graded : true,
+        is_graded:           isCompliance ? true : (found ? !!found.is_graded : true),
         activity_date:       foundDates[0] ?? '',
         activity_dates:      foundDates,
-        max_score:           found?.max_score ?? '',
+        max_score:           isCompliance ? 1 : (found?.max_score ?? ''),
         _saved:              !!found,
         _db_id:              found?.id ?? null,  // track DB id for delete validation
         _dateInput:          '',
@@ -241,7 +250,7 @@ function addAssessmentRow(catId) {
     is_graded:           true,
     activity_date:       '',
     activity_dates:      [],
-    max_score:           '',
+    max_score:           isSetupComplianceMode.value ? 1 : '',
     _saved:              false,
     _db_id:              null,
     _dateInput:          '',
@@ -1448,9 +1457,12 @@ async function saveQuarterOption() {
                     <tr>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-16">#</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description <span class="text-danger-500">*</span></th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-32">Category</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-32">{{ isSetupComplianceMode ? 'Scoring' : 'Category' }}</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 min-w-56">Activity Dates <span class="text-danger-500">*</span></th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score <span class="text-slate-400">(graded only)</span></th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">
+                        <template v-if="isSetupComplianceMode">Compliance</template>
+                        <template v-else>Max Score <span class="text-slate-400">(graded only)</span></template>
+                      </th>
                       <th v-if="!isLocked && !isReadOnly && canEditCategory(cat)" class="px-2 py-2 w-8"></th>
                     </tr>
                   </thead>
@@ -1467,7 +1479,8 @@ async function saveQuarterOption() {
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
                       <td class="px-4 py-2">
-                        <select v-model="row.is_graded"
+                        <span v-if="isSetupComplianceMode" class="text-xs italic text-slate-400">Checkbox item</span>
+                        <select v-else v-model="row.is_graded"
                           :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           @change="onAssessmentGradingChange(row)"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
@@ -1497,7 +1510,8 @@ async function saveQuarterOption() {
                         <p v-if="row._dateWarning" class="text-red-500 text-[11px] mt-1">{{ row._dateWarning }}</p>
                       </td>
                       <td class="px-4 py-2">
-                        <input v-if="row.is_graded" v-model.number="row.max_score" type="number" min="0.01" step="0.5"
+                        <span v-if="isSetupComplianceMode" class="text-xs italic text-slate-400">Complied / not complied</span>
+                        <input v-else-if="row.is_graded" v-model.number="row.max_score" type="number" min="0.01" step="0.5"
                           :disabled="isLocked || isReadOnly || !canEditCategory(cat)"
                           placeholder="e.g. 30"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
@@ -1891,6 +1905,7 @@ async function saveQuarterOption() {
     :pending-rows="pendingAssessmentCategories"
     :same-subject-records="applyEligibleRecords"
     :disabled-dates="calendarCellFeasibility"
+    :is-compliance-mode="isSetupComplianceMode"
     @close="showSectionCalendar = false"
     @schedule="onCalendarSchedule"
     @clear-pending="onCalendarClearPending"

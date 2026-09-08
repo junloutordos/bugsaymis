@@ -22,6 +22,12 @@ const props = defineProps({
   pendingRows:   { type: Array, default: () => [] }, // [{ key, label, catId, openRow }]
   sameSubjectRecords: { type: Array, default: () => [] },
   disabledDates: { type: Function, default: null },  // (dateStr) => { ok: boolean, reason: ?string } — schedule-day / deadline check
+
+  // Compliance-mode grading options (e.g. Values Education) have no
+  // "non-graded" concept — every plotted item IS the checkbox being
+  // tracked, so the picker below never offers the Graded/Non-graded choice
+  // for one. See the matching note in Show.vue's Setup tab.
+  isComplianceMode: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close', 'schedule', 'clear-pending'])
@@ -130,8 +136,8 @@ function selectDay(cell) {
     pickerAdditionalDate.value = ''
     pickerCatKey.value  = props.pendingRows[0]?.key ?? null
     pickerTitle.value   = props.pendingRows[0]?.openRow?.title ?? ''
-    pickerIsGraded.value = props.pendingRows[0]?.openRow?.is_graded ?? true
-    pickerMaxScore.value = props.pendingRows[0]?.openRow?.max_score ?? ''
+    pickerIsGraded.value = props.isComplianceMode ? true : (props.pendingRows[0]?.openRow?.is_graded ?? true)
+    pickerMaxScore.value = props.isComplianceMode ? 1 : (props.pendingRows[0]?.openRow?.max_score ?? '')
     pickerTargetIds.value = []
     pickerWarning.value = null
     showPicker.value    = true
@@ -142,11 +148,12 @@ const pickerCategory = computed(() => props.pendingRows.find(r => r.key === pick
 
 watch(pickerCatKey, () => {
   pickerTitle.value = pickerCategory.value?.openRow?.title ?? ''
-  pickerIsGraded.value = pickerCategory.value?.openRow?.is_graded ?? true
-  pickerMaxScore.value = pickerCategory.value?.openRow?.max_score ?? ''
+  pickerIsGraded.value = props.isComplianceMode ? true : (pickerCategory.value?.openRow?.is_graded ?? true)
+  pickerMaxScore.value = props.isComplianceMode ? 1 : (pickerCategory.value?.openRow?.max_score ?? '')
 })
 
 watch(pickerIsGraded, (isGraded) => {
+  if (props.isComplianceMode) return
   if (!isGraded) pickerMaxScore.value = ''
 })
 
@@ -364,7 +371,7 @@ function close() {
           <input v-model="pickerTitle" type="text" placeholder="e.g. Quiz 1 — Fractions"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
-        <div>
+        <div v-if="!isComplianceMode">
           <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Grading</label>
           <select v-model="pickerIsGraded"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -372,7 +379,7 @@ function close() {
             <option :value="false">Non-graded</option>
           </select>
         </div>
-        <div v-if="pickerIsGraded">
+        <div v-if="!isComplianceMode && pickerIsGraded">
           <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Maximum Score</label>
           <input v-model="pickerMaxScore" type="number" min="0.01" step="0.01"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />

@@ -290,13 +290,28 @@ class ClassRecordAssessmentController extends Controller
         $items = $assessmentsInput->map(function ($item) use ($categories, $existingById, $countsByCategory) {
             $category = $categories[$item['grading_category_id']];
 
-            $item['is_graded'] = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
-            if ($item['is_graded'] && (! isset($item['max_score']) || (float) $item['max_score'] <= 0)) {
-                throw ValidationException::withMessages([
-                    'assessments' => "\"{$item['title']}\" requires a Max Score greater than zero because it is graded.",
-                ]);
+            // Compliance-mode categories (e.g. Values Education) have no
+            // "non-graded" concept — every assessment IS the checkbox being
+            // tracked. is_graded/max_score are therefore never taken from the
+            // client here: leaving this to client input let every VE
+            // assessment ever created get saved as is_graded=false (the
+            // Setup tab's generic "Graded/Non-graded" toggle reads as "no
+            // numeric grade" to a teacher, which is true but not the same
+            // thing), which zeroes max_score and makes ScoreGrid.vue's
+            // is_graded!==false filter drop the assessment from the score
+            // grid entirely — the checkbox never rendered.
+            if ($category->gradingOption?->isComplianceMode()) {
+                $item['is_graded'] = true;
+                $item['max_score'] = 1.0;
+            } else {
+                $item['is_graded'] = array_key_exists('is_graded', $item) ? (bool) $item['is_graded'] : true;
+                if ($item['is_graded'] && (! isset($item['max_score']) || (float) $item['max_score'] <= 0)) {
+                    throw ValidationException::withMessages([
+                        'assessments' => "\"{$item['title']}\" requires a Max Score greater than zero because it is graded.",
+                    ]);
+                }
+                $item['max_score'] = $item['is_graded'] ? (float) $item['max_score'] : 0;
             }
-            $item['max_score'] = $item['is_graded'] ? (float) $item['max_score'] : 0;
             $item['assessment_type'] = WatRuleService::deriveType($category->code, (int) $item['assessment_number']);
             $item['is_major'] = WatRuleService::isMajor(
                 $item['assessment_type'],
@@ -635,11 +650,20 @@ class ClassRecordAssessmentController extends Controller
             'target_class_record_ids.*' => 'integer|distinct|exists:class_records,id',
         ]);
 
-        $isGraded = (bool) ($validated['is_graded'] ?? true);
-        if ($isGraded && (! isset($validated['max_score']) || (float) $validated['max_score'] <= 0)) {
-            throw ValidationException::withMessages([
-                'max_score' => 'Max Score must be greater than zero for a graded assessment.',
-            ]);
+        // Compliance-mode categories (e.g. Values Education) have no
+        // "non-graded" concept — see the matching note in upsert() above.
+        $category = GradingCategory::with('gradingOption')->find($validated['grading_category_id']);
+        if ($category?->gradingOption?->isComplianceMode()) {
+            $isGraded = true;
+            $maxScore = 1.0;
+        } else {
+            $isGraded = (bool) ($validated['is_graded'] ?? true);
+            if ($isGraded && (! isset($validated['max_score']) || (float) $validated['max_score'] <= 0)) {
+                throw ValidationException::withMessages([
+                    'max_score' => 'Max Score must be greater than zero for a graded assessment.',
+                ]);
+            }
+            $maxScore = $isGraded ? (float) $validated['max_score'] : 0;
         }
 
         $result = $this->plottingService->plot(
@@ -651,7 +675,7 @@ class ClassRecordAssessmentController extends Controller
                 'is_graded' => $isGraded,
                 'activity_date' => $validated['activity_date'],
                 'activity_dates' => $validated['activity_dates'] ?? [$validated['activity_date']],
-                'max_score' => $isGraded ? (float) $validated['max_score'] : 0,
+                'max_score' => $maxScore,
             ],
             $validated['target_class_record_ids'] ?? [],
             Auth::user(),

@@ -363,6 +363,81 @@ class ClassRecordComplianceGradingTest extends TestCase
         $this->assertEquals('Completed', $row['remark']);
     }
 
+    // ── Assessment creation forces is_graded=true / max_score=1 ────────────────
+    //
+    // Regression coverage for a real production bug: every Values Education
+    // assessment ever created had is_graded=false because the Setup tab's
+    // generic "Graded/Non-graded" toggle reads as "no numeric grade" to a
+    // teacher — which zeroed max_score and made ScoreGrid.vue's
+    // is_graded!==false filter silently drop the assessment from the score
+    // grid, so the checkbox never rendered at all. Compliance-mode
+    // assessments must always be graded regardless of what the client sends.
+
+    public function test_upsert_forces_is_graded_and_max_score_for_compliance_category_even_when_client_sends_non_graded(): void
+    {
+        // Admin: the WAT same-week plotting deadline (irrelevant to this
+        // test) only applies to non-admin users, so this isolates the
+        // assertion under test — the compliance-mode override.
+        $admin = $this->adminUser();
+        $option = $this->makeComplianceOption();
+        $category = GradingCategory::create([
+            'grading_option_id' => $option->id, 'subject_id' => null,
+            'name' => 'Activities', 'code' => 'ACT', 'weight' => 1.0, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+        $record = $this->makeRecord($admin, $option);
+        $quarter = $this->makeQuarter($record, 1, $option);
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $record->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $category->id,
+                    'assessment_number' => 1,
+                    'title' => 'My Self-Care Plan',
+                    'is_graded' => false,
+                    'max_score' => null,
+                    'activity_date' => now()->addDay()->toDateString(),
+                ]],
+            ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('class_record_assessments', [
+            'grading_category_id' => $category->id,
+            'title' => 'My Self-Care Plan',
+            'is_graded' => true,
+            'max_score' => 1,
+        ]);
+    }
+
+    public function test_plot_forces_is_graded_and_max_score_for_compliance_category_even_when_client_sends_non_graded(): void
+    {
+        // Admin: see the same note in the upsert() test above.
+        $admin = $this->adminUser();
+        $option = $this->makeComplianceOption();
+        $category = GradingCategory::create([
+            'grading_option_id' => $option->id, 'subject_id' => null,
+            'name' => 'Activities', 'code' => 'ACT', 'weight' => 1.0, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+        $record = $this->makeRecord($admin, $option);
+        $this->makeQuarter($record, 1, $option);
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.plot', ['classRecord' => $record->id, 'q' => 1]), [
+                'grading_category_id' => $category->id,
+                'title' => 'How to be Orderly and Diligent 101',
+                'is_graded' => false,
+                'max_score' => null,
+                'activity_date' => now()->addDay()->toDateString(),
+            ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('class_record_assessments', [
+            'grading_category_id' => $category->id,
+            'title' => 'How to be Orderly and Diligent 101',
+            'is_graded' => true,
+            'max_score' => 1,
+        ]);
+    }
+
     // ── Backward compatibility: numeric options are unaffected ─────────────────
 
     public function test_numeric_grading_option_still_returns_numeric_shape(): void
