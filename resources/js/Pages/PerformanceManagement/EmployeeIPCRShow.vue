@@ -756,7 +756,6 @@ const pullFLAccomplishments = () => {
             </AppButton>
 
             <AppButton
-              v-if="isAtPMTStage || ipcr.status === 'Targets Approved'"
               variant="secondary"
               @click="printIPCR"
             >
