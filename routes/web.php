@@ -1241,6 +1241,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::put('/users/{user}/functions/{employeeFunction}', [EmployeeFunctionController::class, 'update'])->name('employee-functions.update');
         Route::delete('/users/{user}/functions/{employeeFunction}', [EmployeeFunctionController::class, 'destroy'])->name('employee-functions.destroy');
         Route::post('/users/{user}/functions/sync', [EmployeeFunctionController::class, 'sync'])->name('employee-functions.sync');
+        Route::post('/employee-functions/preview-scope', [EmployeeFunctionController::class, 'previewScope'])->name('employee-functions.preview-scope');
+        Route::post('/employee-functions/bulk', [EmployeeFunctionController::class, 'bulkStore'])->name('employee-functions.bulk-store');
     });
 
     // Roles & Divisions — was nested inside the users.view group above (wrong

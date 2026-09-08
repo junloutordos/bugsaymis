@@ -4,6 +4,7 @@ namespace Tests\Feature\EmployeeFunctions;
 
 use App\Models\AgencyOutcome;
 use App\Models\EmployeeFunction;
+use App\Models\Office;
 use App\Models\Permission;
 use App\Models\PerformanceIndicator;
 use App\Models\Role;
@@ -52,6 +53,24 @@ class EmployeeFunctionControllerTest extends TestCase
                 ->component('Users/EmployeeFunctions')
                 ->has('workDistributionPlans', 1)
                 ->where('workDistributionPlans.0.id', $currentPlan->id)
+            );
+    }
+
+    public function test_index_exposes_scope_options_for_bulk_assign(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create(['position' => 'Teacher III']);
+        Office::create(['name' => 'GSU']);
+
+        $this->actingAs($manager)->get(route('employee-functions.index', $employee))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Users/EmployeeFunctions')
+                ->has('scopeOptions.roles')
+                ->has('scopeOptions.offices')
+                ->has('scopeOptions.divisions')
+                ->has('scopeOptions.empCategories')
+                ->where('scopeOptions.positions', fn ($positions) => collect($positions)->contains('Teacher III'))
+                ->where('scopeOptions.allEmployees', fn ($employees) => collect($employees)->contains('id', $employee->id))
             );
     }
 
