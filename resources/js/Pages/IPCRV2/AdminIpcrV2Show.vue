@@ -57,7 +57,7 @@ async function reopen() {
     </AppPageHeader>
 
     <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
-      <IpcrV2DocumentHeader :employee="ipcr.user" :period="ipcr.period" :supervisor="null" :ocd-user="ocdUser" />
+      <IpcrV2DocumentHeader :employee="ipcr.user" :period="ipcr.period" :supervisor="null" :ocd-user="ocdUser" :submitted-for-review-at="ipcr.submitted_for_review_at" :target-approved-at="ipcr.target_approved_at" />
       <div class="overflow-x-auto">
         <table class="min-w-full border-collapse border border-slate-200 text-sm">
           <thead class="bg-slate-50/80">
@@ -86,7 +86,19 @@ async function reopen() {
       </div>
     </div>
 
-    <IpcrV2SummarySection :summary="summary" :rating-date="ipcr.director_signed_at" :comments="ipcr.comments_recommendations" />
+    <IpcrV2SummarySection
+      :summary="summary"
+      :rating-date="ipcr.director_signed_at"
+      :comments="ipcr.comments_recommendations"
+      :employee="ipcr.user"
+      :supervisor="null"
+      :ocd-user="ocdUser"
+      :final-numeric-rating="ipcr.final_numeric_rating"
+      :final-adjectival-rating="ipcr.final_adjectival_rating"
+      :submitted-for-review-at="ipcr.submitted_for_review_at"
+      :submitted-rating-at="ipcr.submitted_rating_at"
+      :director-signed-at="ipcr.director_signed_at"
+    />
     <IpcrV2StatusTimeline :logs="ipcr.status_logs ?? []" />
 
     <div v-if="ipcr.status === 'Director Signed'" class="mt-6 flex justify-end">

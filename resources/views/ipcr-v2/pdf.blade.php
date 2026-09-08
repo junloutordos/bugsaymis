@@ -11,7 +11,7 @@
         .title { text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 8px; }
         .preamble { text-align: center; font-size: 9px; margin-bottom: 2px; }
         .sig-block { padding-top: 24px !important; }
-        .sig-name { border-top: 1px solid #000; display: inline-block; padding-top: 2px; }
+        .no-border, .no-border th, .no-border td { border: none; }
     </style>
 </head>
 <body>
@@ -25,11 +25,23 @@
         <strong>{{ strtoupper($ipcr->period->label) }}</strong>.
     </p>
 
-    <table>
+    <table class="no-border">
         <tr>
-            <td class="center sig-block"><span class="sig-name"><strong>{{ strtoupper($ipcr->user->name) }}</strong></span><br>{{ $ipcr->user->position }}</td>
-            <td class="center sig-block"><span class="sig-name"><strong>{{ $supervisor ? strtoupper($supervisor->name) : '—' }}</strong></span><br>{{ $supervisor->position ?? 'Division Chief' }}</td>
-            <td class="center sig-block"><span class="sig-name"><strong>{{ $ocdUser ? strtoupper($ocdUser->name) : '—' }}</strong></span><br>{{ $ocdUser->position ?? 'Campus Director' }}</td>
+            <td class="center sig-block">
+                <strong>{{ strtoupper($ipcr->user->name) }}</strong><br>
+                Ratee<br>
+                Date: {{ $ipcr->submitted_for_review_at?->format('F j, Y') ?? '—' }}
+            </td>
+            <td class="center sig-block">
+                <strong>{{ $supervisor ? strtoupper($supervisor->name) : '—' }}</strong><br>
+                {{ $supervisor->position ?? 'Division Chief' }}<br>
+                Date: {{ $ipcr->target_approved_at?->format('F j, Y') ?? '—' }}
+            </td>
+            <td class="center sig-block">
+                <strong>{{ $ocdUser ? strtoupper($ocdUser->name) : '—' }}</strong><br>
+                {{ $ocdUser->position ?? 'Campus Director' }}<br>
+                Date: {{ $ipcr->target_approved_at?->format('F j, Y') ?? '—' }}
+            </td>
         </tr>
     </table>
 
@@ -213,6 +225,14 @@
                     <td>{{ $row['equivalent'] ?? '—' }}</td>
                 </tr>
             @endforeach
+            <tr>
+                <td colspan="5" class="band" style="background:#e5e7eb;">TOTAL</td>
+                <td class="center" style="font-weight:bold;">{{ $ipcr->final_numeric_rating ?? '—' }}</td>
+            </tr>
+            <tr>
+                <td colspan="5" class="band" style="background:#e5e7eb;">Adjectival Rating</td>
+                <td class="center" style="font-weight:bold;">{{ $ipcr->final_adjectival_rating ?? '—' }}</td>
+            </tr>
         </tbody>
     </table>
 
@@ -223,24 +243,30 @@
 
     <table style="margin-top: 14px;">
         <tr>
-            <td class="center"><strong>Discussed with</strong></td>
-            <td class="center"><strong>Assessed by</strong></td>
-            <td class="center"><strong>Final Rating by</strong></td>
+            <td colspan="2" class="center"><strong>Discussed with</strong></td>
+            <td class="center"><strong>Date</strong></td>
+            <td colspan="2" class="center"><strong>Assessed by</strong></td>
+            <td class="center"><strong>Date</strong></td>
+            <td colspan="2" class="center"><strong>Final Rating by</strong></td>
+            <td class="center"><strong>Date</strong></td>
         </tr>
         <tr>
-            <td class="center" style="padding-top: 20px;">&nbsp;</td>
-            <td class="center" style="padding-top: 20px;">&nbsp;</td>
-            <td class="center" style="padding-top: 20px;">&nbsp;</td>
+            <td colspan="2" class="center" style="padding-top: 20px;">&nbsp;</td>
+            <td rowspan="3" class="center">{{ $ipcr->submitted_for_review_at?->format('M j, Y') ?? '—' }}</td>
+            <td colspan="2" class="center" style="padding-top: 20px;">&nbsp;</td>
+            <td rowspan="3" class="center">{{ $ipcr->submitted_rating_at?->format('M j, Y') ?? '—' }}</td>
+            <td colspan="2" class="center" style="padding-top: 20px;">&nbsp;</td>
+            <td rowspan="3" class="center">{{ $ipcr->director_signed_at?->format('M j, Y') ?? '—' }}</td>
         </tr>
         <tr>
-            <td class="center"><strong>{{ strtoupper($ipcr->user->name) }}</strong></td>
-            <td class="center"><strong>{{ $supervisor ? strtoupper($supervisor->name) : '—' }}</strong></td>
-            <td class="center"><strong>{{ $ocdUser ? strtoupper($ocdUser->name) : '—' }}</strong></td>
+            <td colspan="2" class="center"><strong>{{ strtoupper($ipcr->user->name) }}</strong></td>
+            <td colspan="2" class="center"><strong>{{ $supervisor ? strtoupper($supervisor->name) : '—' }}</strong></td>
+            <td colspan="2" class="center"><strong>{{ $ocdUser ? strtoupper($ocdUser->name) : '—' }}</strong></td>
         </tr>
         <tr>
-            <td class="center">{{ $ipcr->user->position }}</td>
-            <td class="center">{{ $supervisor->position ?? 'Division Chief' }}</td>
-            <td class="center">{{ $ocdUser->position ?? 'Campus Director' }}</td>
+            <td colspan="2" class="center">{{ $ipcr->user->position }}</td>
+            <td colspan="2" class="center">{{ $supervisor->position ?? 'Division Chief' }}</td>
+            <td colspan="2" class="center">{{ $ocdUser->position ?? 'Campus Director' }}</td>
         </tr>
     </table>
 

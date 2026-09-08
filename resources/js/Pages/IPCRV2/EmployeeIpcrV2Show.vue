@@ -50,6 +50,9 @@ function syncFunctions() {
         <a :href="route('ipcr-v2-pdf.show', ipcr.id)" target="_blank" rel="noopener">
           <AppButton variant="secondary">Print PDF</AppButton>
         </a>
+        <AppButton v-if="isOwner && isMutable" variant="secondary" :disabled="isSubmitting" @click="syncFunctions">
+          <ArrowPathIcon class="w-4 h-4 mr-1" /> Sync from Employee Functions
+        </AppButton>
         <span class="text-xs px-2 py-1 rounded-full ml-2" :class="ipcrStatusClass(ipcr.status)">{{ ipcr.status }}</span>
         <span v-if="ipcr.final_numeric_rating" class="text-xs text-slate-500 ml-2">
           {{ ipcr.final_numeric_rating }} — {{ ipcrAdjectivalRating(ipcr.final_numeric_rating) }}
@@ -58,7 +61,7 @@ function syncFunctions() {
     </AppPageHeader>
 
     <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
-      <IpcrV2DocumentHeader :employee="ipcr.user" :period="ipcr.period" :supervisor="supervisor" :ocd-user="ocdUser" />
+      <IpcrV2DocumentHeader :employee="ipcr.user" :period="ipcr.period" :supervisor="supervisor" :ocd-user="ocdUser" :submitted-for-review-at="ipcr.submitted_for_review_at" :target-approved-at="ipcr.target_approved_at" />
       <div class="overflow-x-auto">
         <table class="min-w-full border-collapse border border-slate-200 text-sm">
           <thead class="bg-slate-50/80">
@@ -87,13 +90,22 @@ function syncFunctions() {
       </div>
     </div>
 
-    <IpcrV2SummarySection :summary="summary" :rating-date="ipcr.director_signed_at" :comments="ipcr.comments_recommendations" />
+    <IpcrV2SummarySection
+      :summary="summary"
+      :rating-date="ipcr.director_signed_at"
+      :comments="ipcr.comments_recommendations"
+      :employee="ipcr.user"
+      :supervisor="supervisor"
+      :ocd-user="ocdUser"
+      :final-numeric-rating="ipcr.final_numeric_rating"
+      :final-adjectival-rating="ipcr.final_adjectival_rating"
+      :submitted-for-review-at="ipcr.submitted_for_review_at"
+      :submitted-rating-at="ipcr.submitted_rating_at"
+      :director-signed-at="ipcr.director_signed_at"
+    />
     <IpcrV2StatusTimeline :logs="ipcr.status_logs ?? []" />
 
-    <div v-if="isOwner && isMutable" class="mt-6 flex justify-end gap-2">
-      <AppButton variant="secondary" :disabled="isSubmitting" @click="syncFunctions">
-        <ArrowPathIcon class="w-4 h-4 mr-1" /> Sync from Employee Functions
-      </AppButton>
+    <div v-if="isOwner && isMutable && (ipcr.status === 'New Target' || ipcr.status === 'Targets Approved')" class="mt-6 flex justify-end gap-2">
       <AppButton v-if="ipcr.status === 'New Target'" :disabled="isSubmitting" @click="submitForReview">Submit for Review</AppButton>
       <AppButton v-if="ipcr.status === 'Targets Approved'" :disabled="isSubmitting" @click="submitForRating">Submit for Rating</AppButton>
     </div>

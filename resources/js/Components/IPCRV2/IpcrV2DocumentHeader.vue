@@ -1,10 +1,21 @@
 <script setup>
-defineProps({
+import { computed } from "vue"
+
+const props = defineProps({
   employee: Object,
   period: Object,
   supervisor: Object,
   ocdUser: Object,
+  submittedForReviewAt: String,
+  targetApprovedAt: String,
 })
+
+function fmt(v) {
+  return v ? new Date(v).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) : "—"
+}
+
+const submittedForReviewLabel = computed(() => fmt(props.submittedForReviewAt))
+const targetApprovedLabel = computed(() => fmt(props.targetApprovedAt))
 </script>
 
 <template>
@@ -22,24 +33,27 @@ defineProps({
     </p>
 
     <div class="overflow-x-auto">
-      <table class="min-w-full text-sm border-collapse border border-slate-200">
+      <table class="min-w-full text-sm">
         <tr class="font-semibold text-slate-700">
-          <td class="border border-slate-200 px-3 py-2 text-left w-1/3">Ratee</td>
-          <td class="border border-slate-200 px-3 py-2 text-left w-1/3">Reviewed by</td>
-          <td class="border border-slate-200 px-3 py-2 text-left w-1/3">Approved by</td>
+          <td class="px-3 py-2 text-left w-1/3">Ratee</td>
+          <td class="px-3 py-2 text-left w-1/3">Reviewed by</td>
+          <td class="px-3 py-2 text-left w-1/3">Approved by</td>
         </tr>
         <tr>
-          <td class="border border-slate-200 px-3 py-6 text-center">
+          <td class="px-3 py-6 text-center">
             <b class="uppercase text-slate-800">{{ employee?.name ?? "—" }}</b><br />
-            <small class="text-slate-500">{{ employee?.position }}</small>
+            <small class="text-slate-500">Ratee</small><br />
+            <small class="text-slate-500">Date: {{ submittedForReviewLabel }}</small>
           </td>
-          <td class="border border-slate-200 px-3 py-6 text-center">
+          <td class="px-3 py-6 text-center">
             <b class="uppercase text-slate-800">{{ supervisor?.name ?? "—" }}</b><br />
-            <small class="text-slate-500">{{ supervisor?.position ?? "Division Chief" }}</small>
+            <small class="text-slate-500">{{ supervisor?.position ?? "Division Chief" }}</small><br />
+            <small class="text-slate-500">Date: {{ targetApprovedLabel }}</small>
           </td>
-          <td class="border border-slate-200 px-3 py-6 text-center">
+          <td class="px-3 py-6 text-center">
             <b class="uppercase text-slate-800">{{ ocdUser?.name ?? "—" }}</b><br />
-            <small class="text-slate-500">{{ ocdUser?.position ?? "Campus Director" }}</small>
+            <small class="text-slate-500">{{ ocdUser?.position ?? "Campus Director" }}</small><br />
+            <small class="text-slate-500">Date: {{ targetApprovedLabel }}</small>
           </td>
         </tr>
       </table>
