@@ -30,9 +30,12 @@ class StrategicFunctionService
             return collect();
         }
 
-        return OpcrIndicator::forFiscalYear($year)
+        $indicators = OpcrIndicator::forFiscalYear($year)
             ->with([
-                'agencyOutcome',
+                'agencyOutcome.dostStrategies.pillar',
+                'agencyOutcome.dostStrategies.subStrategies',
+                'agencyOutcome.parent.dostStrategies.pillar',
+                'agencyOutcome.parent.dostStrategies.subStrategies',
                 'performanceIndicator.agencyOutcome.dostStrategies.pillar',
                 'performanceIndicator.agencyOutcome.dostStrategies.subStrategies',
                 'performanceIndicator.agencyOutcome.parent.dostStrategies.pillar',
@@ -42,5 +45,60 @@ class StrategicFunctionService
             ->get()
             ->sortBy(fn ($i) => $i->agencyOutcome?->outcome ?? '')
             ->values();
+
+        $this->attachRowspans($indicators);
+
+        return $indicators;
+    }
+
+    /**
+     * Attaches strategy_rowspan / sub_strategy_rowspan / program_rowspan to each
+     * indicator so the Strategy, Sub Strategy, and PSHS Program cells can be
+     * merged (screen and print) without re-sorting the list — sort order stays
+     * Program-first, per spec. Grouping is nested: a change at an outer level
+     * (Strategy) always restarts the inner levels (Sub Strategy, Program) too,
+     * even if their text happens to repeat.
+     */
+    private function attachRowspans(Collection $indicators): void
+    {
+        $keys = $indicators->map(fn ($i) => [
+            'strategy' => $this->dostSource($i)?->dost_strategy_names_joined ?? '',
+            'sub_strategy' => $this->dostSource($i)?->dost_sub_strategy_descriptions_joined ?? '',
+            'program' => $i->agencyOutcome?->outcome ?? '',
+        ])->values();
+
+        $count = $keys->count();
+        $starts = [];
+        $prev = null;
+
+        for ($i = 0; $i < $count; $i++) {
+            $newStrategy = $prev === null || $keys[$i]['strategy'] !== $prev['strategy'];
+            $newSubStrategy = $newStrategy || $keys[$i]['sub_strategy'] !== $prev['sub_strategy'];
+            $newProgram = $newSubStrategy || $keys[$i]['program'] !== $prev['program'];
+
+            $starts[$i] = ['strategy' => $newStrategy, 'sub_strategy' => $newSubStrategy, 'program' => $newProgram];
+            $prev = $keys[$i];
+        }
+
+        foreach (['strategy', 'sub_strategy', 'program'] as $level) {
+            for ($i = 0; $i < $count; $i++) {
+                if (! $starts[$i][$level]) {
+                    $indicators[$i]->setAttribute("{$level}_rowspan", 0);
+
+                    continue;
+                }
+
+                $span = 1;
+                for ($j = $i + 1; $j < $count && ! $starts[$j][$level]; $j++) {
+                    $span++;
+                }
+                $indicators[$i]->setAttribute("{$level}_rowspan", $span);
+            }
+        }
+    }
+
+    private function dostSource(OpcrIndicator $indicator): ?\App\Models\AgencyOutcome
+    {
+        return $indicator->performanceIndicator?->agencyOutcome ?? $indicator->agencyOutcome;
     }
 }

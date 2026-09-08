@@ -18,9 +18,9 @@ function dostSource(indicator) {
       </td>
     </tr>
     <tr v-for="indicator in indicators" :key="indicator.id">
-      <td :class="TD" class="border border-slate-200">{{ dostSource(indicator)?.dost_strategy_names_joined ?? "—" }}</td>
-      <td :class="TD" class="border border-slate-200">{{ dostSource(indicator)?.dost_sub_strategy_descriptions_joined ?? "—" }}</td>
-      <td :class="TD" class="border border-slate-200">{{ indicator.agency_outcome?.outcome ?? "—" }}</td>
+      <td v-if="indicator.strategy_rowspan" :rowspan="indicator.strategy_rowspan" :class="TD" class="border border-slate-200 align-top">{{ dostSource(indicator)?.dost_strategy_names_joined ?? "—" }}</td>
+      <td v-if="indicator.sub_strategy_rowspan" :rowspan="indicator.sub_strategy_rowspan" :class="TD" class="border border-slate-200 align-top">{{ dostSource(indicator)?.dost_sub_strategy_descriptions_joined ?? "—" }}</td>
+      <td v-if="indicator.program_rowspan" :rowspan="indicator.program_rowspan" :class="TD" class="border border-slate-200 align-top">{{ indicator.agency_outcome?.outcome ?? "—" }}</td>
       <td :class="TD" class="border border-slate-200">{{ indicator.description }}</td>
       <td :class="TD" class="border border-slate-200">{{ indicator.target }}</td>
       <td :class="TD" class="border border-slate-200">{{ indicator.displayed_accomplishment ?? "—" }}</td>

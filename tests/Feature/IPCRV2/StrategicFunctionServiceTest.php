@@ -79,4 +79,51 @@ class StrategicFunctionServiceTest extends TestCase
         $this->assertSame('Strategy 1: Achieve quality science education', $source->dost_strategy_names_joined);
         $this->assertSame('Institutionalized FORWARD program', $source->dost_sub_strategy_descriptions_joined);
     }
+
+    public function test_current_indicators_carry_nested_rowspan_metadata_without_changing_program_order(): void
+    {
+        IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
+
+        $pillar = \App\Models\DostPillar::create(['name' => 'Pillar 1']);
+        $strategy1 = \App\Models\DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $strategy2 = \App\Models\DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 2']);
+
+        // A and B share Strategy 1 (so their Strategy/Sub-Strategy cells should merge
+        // even though their Program names — the sort key — differ). C is under a
+        // different strategy, so it must start its own group on every column.
+        $programA = AgencyOutcome::create(['outcome' => 'A. First Program']);
+        $programA->dostStrategies()->attach($strategy1->id);
+
+        $programB = AgencyOutcome::create(['outcome' => 'B. Second Program']);
+        $programB->dostStrategies()->attach($strategy1->id);
+
+        $programC = AgencyOutcome::create(['outcome' => 'C. Third Program']);
+        $programC->dostStrategies()->attach($strategy2->id);
+
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $programA->id, 'description' => 'Indicator A']);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $programB->id, 'description' => 'Indicator B']);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $programC->id, 'description' => 'Indicator C']);
+
+        $result = (new StrategicFunctionService())->currentIndicators();
+
+        // Sort order is unchanged: still A, B, C by Program name.
+        $this->assertSame(['Indicator A', 'Indicator B', 'Indicator C'], $result->pluck('description')->all());
+
+        [$rowA, $rowB, $rowC] = $result->all();
+
+        // A opens a 2-row Strategy/Sub-Strategy group (shared with B) but a 1-row Program group.
+        $this->assertSame(2, $rowA->strategy_rowspan);
+        $this->assertSame(2, $rowA->sub_strategy_rowspan);
+        $this->assertSame(1, $rowA->program_rowspan);
+
+        // B continues A's Strategy/Sub-Strategy group (hidden cells) but starts its own Program group.
+        $this->assertSame(0, $rowB->strategy_rowspan);
+        $this->assertSame(0, $rowB->sub_strategy_rowspan);
+        $this->assertSame(1, $rowB->program_rowspan);
+
+        // C is under a different strategy, so every column restarts.
+        $this->assertSame(1, $rowC->strategy_rowspan);
+        $this->assertSame(1, $rowC->sub_strategy_rowspan);
+        $this->assertSame(1, $rowC->program_rowspan);
+    }
 }
