@@ -21,7 +21,7 @@ class IpcrV2SummaryServiceTest extends TestCase
         IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
         $program = AgencyOutcome::create(['outcome' => 'A. STEM Secondary Education']);
         OpcrIndicator::create([
-            'fiscal_year' => 2026, 'agency_outcome_id' => $program->id, 'description' => 'x',
+            'fiscal_year' => 2025, 'agency_outcome_id' => $program->id, 'description' => 'x',
             'rating_quality' => 5, 'rating_efficiency' => 4, 'rating_timeliness' => 5, 'rating_average' => 4.67,
         ]);
 

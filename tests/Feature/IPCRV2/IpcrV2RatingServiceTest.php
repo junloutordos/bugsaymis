@@ -20,7 +20,7 @@ class IpcrV2RatingServiceTest extends TestCase
     {
         IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
         $outcome = AgencyOutcome::create(['outcome' => 'A. Program']);
-        OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'x', 'rating_average' => 5.0]);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $outcome->id, 'description' => 'x', 'rating_average' => 5.0]);
 
         $user = User::factory()->create();
         $period = IPCRRatingPeriod::first();
@@ -38,7 +38,7 @@ class IpcrV2RatingServiceTest extends TestCase
     {
         IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
         $outcome = AgencyOutcome::create(['outcome' => 'A. Program']);
-        OpcrIndicator::create(['fiscal_year' => 2026, 'agency_outcome_id' => $outcome->id, 'description' => 'x', 'rating_average' => 5.0]);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $outcome->id, 'description' => 'x', 'rating_average' => 5.0]);
 
         $division = \App\Models\Division::create(['division_name' => 'CID', 'acronym' => 'CID']);
         IPCRWeightDistribution::create(['division_id' => $division->id, 'strategic' => 20, 'core' => 60, 'support' => 20]);
