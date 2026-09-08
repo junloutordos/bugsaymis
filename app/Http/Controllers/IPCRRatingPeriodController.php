@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AgencyOutcome;
 use App\Models\IPCRRatingPeriod;
+use App\Models\OPCR\OpcrIndicator;
 use App\Models\PerformanceIndicator;
 use App\Models\WorkDistributionPlan;
 use App\Services\AuditLogger;
@@ -184,13 +185,18 @@ class IPCRRatingPeriodController extends Controller
         }
 
         $counts = DB::transaction(function () use ($source, $target) {
-            $outcomes = AgencyOutcome::forFiscalYear($source)->get();
+            $outcomes = AgencyOutcome::with(['dostPillars', 'dostStrategies'])->forFiscalYear($source)->get();
             $outcomeMap = [];   // old id => new id
             foreach ($outcomes as $outcome) {
                 $clone = $outcome->replicate(['fiscal_year']);
                 $clone->fiscal_year = $target;
                 $clone->save();
                 $outcomeMap[$outcome->id] = $clone->id;
+
+                // replicate() only copies the model's own columns — DOST Pillar/Strategy
+                // tagging lives in pivot tables and needs an explicit re-sync onto the clone.
+                $clone->dostPillars()->sync($outcome->dostPillars->pluck('id'));
+                $clone->dostStrategies()->sync($outcome->dostStrategies->pluck('id'));
             }
 
             foreach ($outcomes as $outcome) {
@@ -212,6 +218,15 @@ class IPCRRatingPeriodController extends Controller
                 $clone->save();
                 $clone->syncDivisions($indicator->divisions->pluck('id')->all());
                 $indicatorMap[$indicator->id] = $clone->id;
+
+                // Sub-Strategy is tagged directly on the OpcrIndicator row (not the PI), so the
+                // auto-propagation this save() just triggered can't carry it — copy it explicitly.
+                $sourceSubStrategyId = OpcrIndicator::where('performance_indicator_id', $indicator->id)
+                    ->value('dost_sub_strategy_id');
+                if ($sourceSubStrategyId) {
+                    OpcrIndicator::where('performance_indicator_id', $clone->id)
+                        ->update(['dost_sub_strategy_id' => $sourceSubStrategyId]);
+                }
             }
 
             $plans = WorkDistributionPlan::with(['offices', 'committees', 'specialAssignments', 'personnel'])

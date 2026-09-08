@@ -126,4 +126,46 @@ class StrategicFunctionServiceTest extends TestCase
         $this->assertSame(1, $rowC->sub_strategy_rowspan);
         $this->assertSame(1, $rowC->program_rowspan);
     }
+
+    public function test_program_rowspan_merges_across_rows_even_when_their_own_strategy_differs(): void
+    {
+        IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
+
+        $pillar = \App\Models\DostPillar::create(['name' => 'Pillar 1']);
+        $strategy1 = \App\Models\DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 1']);
+        $strategy2 = \App\Models\DostStrategy::create(['dost_pillar_id' => $pillar->id, 'name' => 'Strategy 2']);
+
+        // One Program (B) whose own indicator rows resolve to two different
+        // Strategies via their linked Performance Indicator's own (more granular)
+        // Agency Outcome — a real scenario: the Program cell must still merge
+        // across all 3 rows even though Strategy/Sub-Strategy don't.
+        $programB = AgencyOutcome::create(['outcome' => 'B. Program']);
+
+        $subOutcome1 = AgencyOutcome::create(['outcome' => 'B.1', 'parent_id' => $programB->id]);
+        $subOutcome1->dostStrategies()->attach($strategy1->id);
+        $subOutcome2 = AgencyOutcome::create(['outcome' => 'B.2', 'parent_id' => $programB->id]);
+        $subOutcome2->dostStrategies()->attach($strategy2->id);
+
+        $pi1 = \App\Models\PerformanceIndicator::create(['agency_outcome_id' => $subOutcome1->id, 'description' => 'PI 1']);
+        $pi2 = \App\Models\PerformanceIndicator::create(['agency_outcome_id' => $subOutcome1->id, 'description' => 'PI 2']);
+        $pi3 = \App\Models\PerformanceIndicator::create(['agency_outcome_id' => $subOutcome2->id, 'description' => 'PI 3']);
+
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $programB->id, 'performance_indicator_id' => $pi1->id, 'description' => 'Indicator B1']);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $programB->id, 'performance_indicator_id' => $pi2->id, 'description' => 'Indicator B2']);
+        OpcrIndicator::create(['fiscal_year' => 2025, 'agency_outcome_id' => $programB->id, 'performance_indicator_id' => $pi3->id, 'description' => 'Indicator B3']);
+
+        $result = (new StrategicFunctionService())->currentIndicators();
+
+        [$row1, $row2, $row3] = $result->all();
+
+        // Program merges across all 3 rows — it never changed.
+        $this->assertSame(3, $row1->program_rowspan);
+        $this->assertSame(0, $row2->program_rowspan);
+        $this->assertSame(0, $row3->program_rowspan);
+
+        // Strategy correctly still splits 2 + 1, independent of the Program merge.
+        $this->assertSame(2, $row1->strategy_rowspan);
+        $this->assertSame(0, $row2->strategy_rowspan);
+        $this->assertSame(1, $row3->strategy_rowspan);
+    }
 }

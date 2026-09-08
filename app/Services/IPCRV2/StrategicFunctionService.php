@@ -55,9 +55,20 @@ class StrategicFunctionService
      * Attaches strategy_rowspan / sub_strategy_rowspan / program_rowspan to each
      * indicator so the Strategy, Sub Strategy, and PSHS Program cells can be
      * merged (screen and print) without re-sorting the list — sort order stays
-     * Program-first, per spec. Grouping is nested: a change at an outer level
-     * (Strategy) always restarts the inner levels (Sub Strategy, Program) too,
-     * even if their text happens to repeat.
+     * Program-first, per spec.
+     *
+     * Strategy and Sub Strategy are computed as a genuine nested pair (a Sub
+     * Strategy belongs to exactly one Strategy): a Strategy change always
+     * restarts Sub Strategy too, even if the sub-strategy text happens to
+     * coincide (e.g. both blank), because two different Strategies must never
+     * visually share one merged Sub Strategy cell.
+     *
+     * Program is independent of both — it's a separate, cross-cutting
+     * classification, not a child of Strategy/Sub Strategy. It resolves
+     * through the indicator's own (coarser) Agency Outcome, while Strategy/Sub
+     * Strategy resolve through the more granular linked Performance
+     * Indicator's own Agency Outcome — the two can legitimately vary
+     * independently of each other row-to-row.
      */
     private function attachRowspans(Collection $indicators): void
     {
@@ -74,7 +85,7 @@ class StrategicFunctionService
         for ($i = 0; $i < $count; $i++) {
             $newStrategy = $prev === null || $keys[$i]['strategy'] !== $prev['strategy'];
             $newSubStrategy = $newStrategy || $keys[$i]['sub_strategy'] !== $prev['sub_strategy'];
-            $newProgram = $newSubStrategy || $keys[$i]['program'] !== $prev['program'];
+            $newProgram = $prev === null || $keys[$i]['program'] !== $prev['program'];
 
             $starts[$i] = ['strategy' => $newStrategy, 'sub_strategy' => $newSubStrategy, 'program' => $newProgram];
             $prev = $keys[$i];
