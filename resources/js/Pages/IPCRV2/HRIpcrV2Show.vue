@@ -55,8 +55,8 @@ defineProps({
             </tr>
           </thead>
           <IpcrV2StrategicSection :indicators="strategicIndicators" />
-          <IpcrV2CoreItemsTable :ipcr-id="ipcr.id" :items="ipcr.core_items" :is-owner="false" :is-mutable="false" />
-          <IpcrV2SupportItemsTable :ipcr-id="ipcr.id" :items="ipcr.support_items" :is-owner="false" :is-mutable="false" />
+          <IpcrV2CoreItemsTable :ipcr-id="ipcr.id" :items="ipcr.core_items" :is-owner="false" :is-mutable="false" :ipcr-status="ipcr.status" />
+          <IpcrV2SupportItemsTable :ipcr-id="ipcr.id" :items="ipcr.support_items" :is-owner="false" :is-mutable="false" :ipcr-status="ipcr.status" />
         </table>
       </div>
     </div>

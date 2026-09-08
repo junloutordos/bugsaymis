@@ -100,6 +100,17 @@ class EmployeeIpcrV2Controller extends Controller
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertOwner($request->user(), $record);
 
+        $record->loadMissing('coreItems', 'supportItems');
+        $missing = $record->coreItems->concat($record->supportItems)
+            ->filter(fn ($item) => ! filled($item->target))
+            ->count();
+
+        if ($missing > 0) {
+            throw ValidationException::withMessages([
+                'target' => "{$missing} Core/Support item(s) still need a target before you can submit for review.",
+            ]);
+        }
+
         $data = $request->validate(['pin' => 'nullable|string']);
         $this->sigService->assertSigningPin($request->user(), $data['pin'] ?? null);
 
@@ -151,9 +162,15 @@ class EmployeeIpcrV2Controller extends Controller
         $this->workflow->assertMutable($record);
         abort_if($coreItem->ipcr_v2_id !== $record->id, 404);
 
+        if (in_array($record->status, self::EDITABLE_STATUSES, true)) {
+            $data = $request->validate(['target' => 'nullable|string|max:1000']);
+            $coreItem->fill($data)->save();
+
+            return back()->with('success', 'Target saved.');
+        }
+
         if ($coreItem->success_indicator !== null) {
             $data = $request->validate([
-                'target' => 'nullable|string|max:1000',
                 'actual_accomplishment' => 'nullable|string|max:1000',
                 'mov_link' => 'nullable|string|max:500',
                 'self_quality_rating' => 'nullable|integer|min:1|max:5',
@@ -162,7 +179,6 @@ class EmployeeIpcrV2Controller extends Controller
             ]);
         } else {
             $data = $request->validate([
-                'target' => 'nullable|string|max:1000',
                 'actual_accomplishment' => 'nullable|string|max:1000',
                 'mov_link' => 'nullable|string|max:500',
                 'self_student_feedback_rating' => 'nullable|integer|min:1|max:5',
@@ -199,8 +215,14 @@ class EmployeeIpcrV2Controller extends Controller
         $this->workflow->assertMutable($record);
         abort_if($supportItem->ipcr_v2_id !== $record->id, 404);
 
+        if (in_array($record->status, self::EDITABLE_STATUSES, true)) {
+            $data = $request->validate(['target' => 'nullable|string|max:1000']);
+            $supportItem->fill($data)->save();
+
+            return back()->with('success', 'Target saved.');
+        }
+
         $data = $request->validate([
-            'target' => 'nullable|string|max:1000',
             'actual_accomplishment' => 'nullable|string|max:1000',
             'mov_link' => 'nullable|string|max:500',
             'self_quality_rating' => 'nullable|integer|min:1|max:5',

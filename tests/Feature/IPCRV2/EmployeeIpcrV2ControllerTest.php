@@ -138,15 +138,55 @@ class EmployeeIpcrV2ControllerTest extends TestCase
     {
         $employee = $this->employee();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
-        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
         $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100]);
 
         $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
-            'target' => 'x', 'actual_accomplishment' => 'x', 'mov_link' => 'https://drive.example/report.pdf',
+            'actual_accomplishment' => 'x', 'mov_link' => 'https://drive.example/report.pdf',
         ]);
 
         $response->assertRedirect();
         $this->assertSame('https://drive.example/report.pdf', $coreItem->fresh()->mov_link);
+    }
+
+    public function test_target_only_fields_are_accepted_while_targets_are_still_editable(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100]);
+
+        $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
+            'target' => 'Maintain uptime', 'actual_accomplishment' => 'x', 'mov_link' => 'https://drive.example/report.pdf',
+        ]);
+
+        $response->assertRedirect();
+        $fresh = $coreItem->fresh();
+        $this->assertSame('Maintain uptime', $fresh->target);
+        $this->assertNull($fresh->actual_accomplishment);
+        $this->assertNull($fresh->mov_link);
+    }
+
+    public function test_target_is_locked_once_targets_are_approved(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
+        $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100, 'target' => 'Original target']);
+
+        $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
+            'target' => 'Changed target', 'actual_accomplishment' => 'Did the thing',
+        ]);
+
+        $fresh = $coreItem->fresh();
+        $this->assertSame('Original target', $fresh->target);
+        $this->assertSame('Did the thing', $fresh->actual_accomplishment);
     }
 
     public function test_owner_can_set_a_target_on_a_support_item(): void
@@ -191,11 +231,41 @@ class EmployeeIpcrV2ControllerTest extends TestCase
         $this->assertSame('For Review', $record->fresh()->status);
     }
 
-    public function test_owner_can_save_a_self_rating_on_a_wdp_tagged_core_item(): void
+    public function test_submit_for_review_rejects_when_a_core_item_is_missing_a_target(): void
     {
         $employee = $this->employee();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
         $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100]);
+
+        $response = $this->actingAs($employee)->post(route('employee-ipcr-v2.submitReview', $record->id));
+
+        $response->assertSessionHasErrors('target');
+        $this->assertSame('New Target', $record->fresh()->status);
+    }
+
+    public function test_submit_for_review_succeeds_once_all_items_have_a_target(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100, 'target' => 'Maintain uptime']);
+        $record->supportItems()->create(['label' => 'Administrative', 'target' => '100% compliance']);
+
+        $response = $this->actingAs($employee)->post(route('employee-ipcr-v2.submitReview', $record->id));
+
+        $response->assertRedirect();
+        $this->assertSame('For Review', $record->fresh()->status);
+    }
+
+    public function test_owner_can_save_a_self_rating_on_a_wdp_tagged_core_item(): void
+    {
+        $employee = $this->employee();
+        $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
         $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100, 'success_indicator' => 'Systems maintained']);
 
         $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
@@ -212,7 +282,10 @@ class EmployeeIpcrV2ControllerTest extends TestCase
     {
         $employee = $this->employee();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
-        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
         $coreItem = $record->coreItems()->create(['label' => 'Subject 1', 'weight_percent' => 100]);
 
         $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
@@ -230,7 +303,10 @@ class EmployeeIpcrV2ControllerTest extends TestCase
     {
         $employee = $this->employee();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
-        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
         $coreItem = $record->coreItems()->create(['label' => 'IT Management', 'weight_percent' => 100, 'success_indicator' => 'Systems maintained']);
 
         $this->actingAs($employee)->put(route('employee-ipcr-v2.updateCoreItem', [$record->id, $coreItem->id]), [
@@ -244,7 +320,10 @@ class EmployeeIpcrV2ControllerTest extends TestCase
     {
         $employee = $this->employee();
         $period = IPCRRatingPeriod::create(['label' => 'x', 'year' => 2026, 'semester' => 1, 'status' => 'open']);
-        $record = \App\Models\IPCRV2\IpcrV2Record::create(['user_id' => $employee->id, 'rating_period_id' => $period->id]);
+        $record = \App\Models\IPCRV2\IpcrV2Record::create([
+            'user_id' => $employee->id, 'rating_period_id' => $period->id,
+            'status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_TARGETS_APPROVED,
+        ]);
         $supportItem = $record->supportItems()->create(['label' => 'Administrative']);
 
         $response = $this->actingAs($employee)->put(route('employee-ipcr-v2.updateSupportItem', [$record->id, $supportItem->id]), [
