@@ -65,6 +65,7 @@ import {
   PresentationChartLineIcon,
   FlagIcon,
   ArrowsRightLeftIcon,
+  BoltIcon,
 } from "@heroicons/vue/24/outline";
 import LighthouseIcon from '@/Components/Icons/LighthouseIcon.vue';
 
@@ -962,6 +963,13 @@ export const menuItems = [
         href: route("rewards.approvals.index"),
         icon: DocumentTextIcon,
         permissions: ["rewards.approve"],
+      },
+      {
+        label: "Gantimpala Agad",
+        routeName: "rewards.gantimpala.index",
+        href: route("rewards.gantimpala.index"),
+        icon: BoltIcon,
+        permissions: ["rewards.gantimpala.view"],
       },
       {
         label: "Award Types",

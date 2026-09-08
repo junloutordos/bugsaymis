@@ -92,6 +92,7 @@ class RolePermissionSeeder extends Seeder
             // Rewards — HR manages full PRAISE cycle
             'rewards.view', 'rewards.nominate', 'rewards.evaluate',
             'rewards.approve', 'rewards.manage',
+            'rewards.gantimpala.view', 'rewards.gantimpala.manage',
             // Payroll & DTR module
             'payroll.view', 'payroll.process',
             'hr.dtr.view', 'hr.dtr.manage',

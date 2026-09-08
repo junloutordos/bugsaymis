@@ -247,6 +247,10 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Rewards', 'name' => 'rewards.approve',  'description' => 'Approve or reject nominations (committee / head of office)'],
             ['module' => 'Rewards', 'name' => 'rewards.manage',   'description' => 'Manage reward types and record awards (HR/Admin)'],
 
+            // ── Gantimpala Agad Award (instant recognition, PRAISE Form 4) ────
+            ['module' => 'Rewards', 'name' => 'rewards.gantimpala.view',   'description' => 'View Gantimpala Agad nominations and their status'],
+            ['module' => 'Rewards', 'name' => 'rewards.gantimpala.manage', 'description' => 'Review, endorse, decide, and archive Gantimpala Agad nominations (HR/Admin)'],
+
             // ── Payroll ───────────────────────────────────────────────────────
             ['module' => 'Payroll', 'name' => 'payroll.view',           'description' => 'View payroll runs and employee payslips'],
             ['module' => 'Payroll', 'name' => 'payroll.process',        'description' => 'Compute/process payroll runs'],

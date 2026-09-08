@@ -2062,6 +2062,41 @@ Route::middleware(['auth'])->prefix('rewards')->name('rewards.')->group(function
         ->name('awards.store');
     Route::patch('/awards/{reward}', [\App\Http\Controllers\Rewards\RewardController::class, 'update'])
         ->name('awards.update');
+
+    // ── Gantimpala Agad Award (PRAISE Form 4 — instant/spot recognition) ──────
+    Route::prefix('gantimpala')->name('gantimpala.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'index'])
+            ->name('index');
+        Route::get('/create', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'create'])
+            ->name('create');
+        Route::post('/', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'store'])
+            ->name('store');
+        Route::get('/{gantimpalaNomination}', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'show'])
+            ->name('show');
+        Route::post('/{gantimpalaNomination}/under-review', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'markUnderReview'])
+            ->name('under-review');
+        Route::post('/{gantimpalaNomination}/endorse', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'endorse'])
+            ->name('endorse');
+        Route::post('/{gantimpalaNomination}/decide', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'decide'])
+            ->name('decide');
+        Route::post('/{gantimpalaNomination}/archive', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'archive'])
+            ->name('archive');
+        Route::get('/{gantimpalaNomination}/pdf', [\App\Http\Controllers\Rewards\GantimpalaNominationController::class, 'downloadPdf'])
+            ->name('pdf');
+    });
+});
+
+// ── Public Gantimpala Agad Kiosk (no auth — external party nominations) ───────
+Route::prefix('kiosk/gantimpala-agad')->name('kiosk.gantimpala.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Public\GantimpalaKioskController::class, 'index'])
+        ->middleware('throttle:30,1')
+        ->name('index');
+    Route::get('/employees/search', [\App\Http\Controllers\Public\GantimpalaKioskController::class, 'searchEmployees'])
+        ->middleware('throttle:30,1')
+        ->name('employees.search');
+    Route::post('/', [\App\Http\Controllers\Public\GantimpalaKioskController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('store');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
