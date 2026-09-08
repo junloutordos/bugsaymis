@@ -9,6 +9,7 @@ use App\Models\IPCRV2\IpcrV2SupportItem;
 use App\Services\DigitalSignatureService;
 use App\Services\IPCRV2\IpcrV2WorkflowService;
 use App\Services\IPCRV2\StrategicFunctionService;
+use App\Services\PersonNameFormatter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -18,24 +19,26 @@ class DivisionChiefIpcrV2Controller extends Controller
         private IpcrV2WorkflowService $workflow,
         private StrategicFunctionService $strategic,
         private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService = new \App\Services\IPCRV2\IpcrV2SummaryService(),
-        private DigitalSignatureService $sigService = new DigitalSignatureService()
+        private DigitalSignatureService $sigService = new DigitalSignatureService(),
+        private PersonNameFormatter $nameFormatter = new PersonNameFormatter()
     ) {}
 
     public function index(Request $request)
     {
-        $records = IpcrV2Record::with('user', 'period')
+        $records = IpcrV2Record::with('user.pds.personalInfo', 'period')
             ->whereHas('user', function ($q) use ($request) {
                 $q->where('division_id', $request->user()->division_id);
             })
             ->latest('id')
             ->get();
+        $records->each(fn ($record) => $record->user->setAttribute('formatted_name', $this->nameFormatter->formal($record->user)));
 
         return Inertia::render('IPCRV2/DivisionChiefIpcrV2Index', ['records' => $records]);
     }
 
     public function show(Request $request, int $id)
     {
-        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'coachingSessions', 'statusLogs.actor'])->findOrFail($id);
+        $record = IpcrV2Record::with(['user.pds.personalInfo', 'coreItems', 'supportItems', 'period', 'coachingSessions', 'statusLogs.actor'])->findOrFail($id);
 
         abort_unless(
             $request->user()->hasRole('OCD') || $record->user?->division_id === $request->user()->division_id,
@@ -43,12 +46,13 @@ class DivisionChiefIpcrV2Controller extends Controller
             'This employee is not in your division.'
         );
 
+        $record->user->setAttribute('formatted_name', $this->nameFormatter->formal($record->user));
         $ocdUser = \App\Models\User::havingRole('OCD')->first();
 
         return Inertia::render('IPCRV2/DivisionChiefIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
-            'ocdUser' => $ocdUser?->only('name', 'position'),
+            'ocdUser' => $ocdUser ? [...$ocdUser->only('name', 'position'), 'formatted_name' => $this->nameFormatter->formal($ocdUser)] : null,
             'summary' => $this->summaryService->buildRows($record),
             'isMutable' => $record->isMutable(),
             'hasPin' => ! empty($request->user()->signature_pin),

@@ -44,7 +44,7 @@ function batchSubmit() {
             <td class="px-4 py-3">
               <input v-if="record.status === 'Submitted to HR'" type="checkbox" :value="record.id" v-model="selected" />
             </td>
-            <td class="px-4 py-3 text-sm">{{ record.user?.name }}</td>
+            <td class="px-4 py-3 text-sm">{{ record.user?.formatted_name }}</td>
             <td class="px-4 py-3 text-sm">{{ record.period?.label }}</td>
             <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full" :class="ipcrStatusClass(record.status)">{{ record.status }}</span></td>
             <td class="px-4 py-3 text-right">

@@ -5,6 +5,7 @@ namespace App\Services\IPCRV2;
 use App\Models\IPCRV2\IpcrV2Record;
 use App\Models\User;
 use App\Services\PerformanceManagement\IPCRWorkflowService;
+use App\Services\PersonNameFormatter;
 use Mpdf\Mpdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -13,12 +14,14 @@ class IpcrV2PdfService
     public function __construct(
         private StrategicFunctionService $strategic = new StrategicFunctionService(),
         private IpcrV2SummaryService $summary = new IpcrV2SummaryService(),
-        private IPCRWorkflowService $chain = new IPCRWorkflowService()
+        private IPCRWorkflowService $chain = new IPCRWorkflowService(),
+        private PersonNameFormatter $nameFormatter = new PersonNameFormatter()
     ) {}
 
     public function stream(IpcrV2Record $record): StreamedResponse
     {
         $html = $this->renderHtml($record);
+        $employeeName = $this->nameFormatter->formal($record->user);
 
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
@@ -30,11 +33,11 @@ class IpcrV2PdfService
             'tempDir' => sys_get_temp_dir(),
         ]);
 
-        $mpdf->SetTitle('IPCR V2 — ' . $record->user->name . ' — ' . $record->period->label);
+        $mpdf->SetTitle('IPCR V2 — ' . $employeeName . ' — ' . $record->period->label);
         $mpdf->WriteHTML($html);
 
         $pdfBytes = $mpdf->Output('', 'S');
-        $filename = 'IPCRV2_' . str_replace(' ', '_', $record->user->name) . '.pdf';
+        $filename = 'IPCRV2_' . str_replace(' ', '_', $employeeName) . '.pdf';
 
         return new StreamedResponse(function () use ($pdfBytes) {
             echo $pdfBytes;
@@ -47,7 +50,7 @@ class IpcrV2PdfService
 
     public function renderHtml(IpcrV2Record $record): string
     {
-        $record->loadMissing(['user', 'coreItems', 'supportItems', 'period']);
+        $record->loadMissing(['user.pds.personalInfo', 'coreItems', 'supportItems', 'period']);
 
         $this->annotateFunctionRowspan($record->coreItems);
         $this->annotateFunctionRowspan($record->supportItems);
@@ -62,6 +65,9 @@ class IpcrV2PdfService
             'summary' => $this->summary->buildRows($record),
             'supervisor' => $supervisor,
             'ocdUser' => $ocdUser,
+            'employeeName' => $this->nameFormatter->formal($record->user),
+            'supervisorName' => $supervisor ? $this->nameFormatter->formal($supervisor) : null,
+            'ocdUserName' => $ocdUser ? $this->nameFormatter->formal($ocdUser) : null,
         ])->render();
     }
 

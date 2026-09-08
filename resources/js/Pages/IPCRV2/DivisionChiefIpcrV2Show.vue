@@ -55,9 +55,9 @@ function saveComments(text) {
 </script>
 
 <template>
-  <Head :title="`IPCR V2 — ${ipcr.user?.name}`" />
+  <Head :title="`IPCR V2 — ${ipcr.user?.formatted_name}`" />
   <AdminLayout title="IPCR V2 Review">
-    <AppPageHeader :title="ipcr.user?.name" :subtitle="ipcr.period?.label">
+    <AppPageHeader :title="ipcr.user?.formatted_name" :subtitle="ipcr.period?.label">
       <template #actions>
         <span class="text-xs px-2 py-1 rounded-full" :class="ipcrStatusClass(ipcr.status)">{{ ipcr.status }}</span>
       </template>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\IPCRV2\IpcrV2Record;
 use App\Services\DigitalSignatureService;
 use App\Services\IPCRV2\IpcrV2WorkflowService;
+use App\Services\PersonNameFormatter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -15,12 +16,13 @@ class PMTIpcrV2Controller extends Controller
         private IpcrV2WorkflowService $workflow,
         private \App\Services\IPCRV2\StrategicFunctionService $strategic = new \App\Services\IPCRV2\StrategicFunctionService(),
         private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService = new \App\Services\IPCRV2\IpcrV2SummaryService(),
-        private DigitalSignatureService $sigService = new DigitalSignatureService()
+        private DigitalSignatureService $sigService = new DigitalSignatureService(),
+        private PersonNameFormatter $nameFormatter = new PersonNameFormatter()
     ) {}
 
     public function index()
     {
-        $records = IpcrV2Record::with('user', 'period')
+        $records = IpcrV2Record::with('user.pds.personalInfo', 'period')
             ->whereIn('status', [
                 IpcrV2WorkflowService::STATUS_SUBMITTED_PMT,
                 IpcrV2WorkflowService::STATUS_PMT_APPROVED,
@@ -28,19 +30,21 @@ class PMTIpcrV2Controller extends Controller
             ])
             ->latest('id')
             ->get();
+        $records->each(fn ($record) => $record->user->setAttribute('formatted_name', $this->nameFormatter->formal($record->user)));
 
         return Inertia::render('IPCRV2/PMTIpcrV2Index', ['records' => $records]);
     }
 
     public function show(Request $request, int $id)
     {
-        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'statusLogs.actor'])->findOrFail($id);
+        $record = IpcrV2Record::with(['user.pds.personalInfo', 'coreItems', 'supportItems', 'period', 'statusLogs.actor'])->findOrFail($id);
+        $record->user->setAttribute('formatted_name', $this->nameFormatter->formal($record->user));
         $ocdUser = \App\Models\User::havingRole('OCD')->first();
 
         return Inertia::render('IPCRV2/PMTIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
-            'ocdUser' => $ocdUser?->only('name', 'position'),
+            'ocdUser' => $ocdUser ? [...$ocdUser->only('name', 'position'), 'formatted_name' => $this->nameFormatter->formal($ocdUser)] : null,
             'summary' => $this->summaryService->buildRows($record),
             'isMutable' => $record->isMutable(),
             'hasPin' => ! empty($request->user()->signature_pin),

@@ -19,7 +19,7 @@
     <p class="preamble">Department of Science and Technology</p>
     <p class="title">Individual Performance Commitment and Review (IPCR)</p>
     <p>
-        I, <strong>{{ strtoupper($ipcr->user->name) }}</strong>, <strong>{{ strtoupper($ipcr->user->position ?? '') }}</strong>,
+        I, <strong>{{ $employeeName }}</strong>, <strong>{{ strtoupper($ipcr->user->position ?? '') }}</strong>,
         of Philippine Science High School &ndash; Caraga Region Campus, commit to deliver and agree to be rated on the
         attainment of the following targets in accordance with the indicated measures for the period of
         <strong>{{ strtoupper($ipcr->period->label) }}</strong>.
@@ -28,17 +28,17 @@
     <table class="no-border">
         <tr>
             <td class="center sig-block">
-                <strong>{{ strtoupper($ipcr->user->name) }}</strong><br>
+                <strong>{{ $employeeName }}</strong><br>
                 Ratee<br>
                 Date: {{ $ipcr->submitted_for_review_at?->format('F j, Y') ?? '—' }}
             </td>
             <td class="center sig-block">
-                <strong>{{ $supervisor ? strtoupper($supervisor->name) : '—' }}</strong><br>
+                <strong>{{ $supervisorName ?? '—' }}</strong><br>
                 {{ $supervisor->position ?? 'Division Chief' }}<br>
                 Date: {{ $ipcr->target_approved_at?->format('F j, Y') ?? '—' }}
             </td>
             <td class="center sig-block">
-                <strong>{{ $ocdUser ? strtoupper($ocdUser->name) : '—' }}</strong><br>
+                <strong>{{ $ocdUserName ?? '—' }}</strong><br>
                 {{ $ocdUser->position ?? 'Campus Director' }}<br>
                 Date: {{ $ipcr->target_approved_at?->format('F j, Y') ?? '—' }}
             </td>
@@ -259,9 +259,9 @@
             <td rowspan="3" class="center">{{ $ipcr->director_signed_at?->format('M j, Y') ?? '—' }}</td>
         </tr>
         <tr>
-            <td colspan="2" class="center"><strong>{{ strtoupper($ipcr->user->name) }}</strong></td>
-            <td colspan="2" class="center"><strong>{{ $supervisor ? strtoupper($supervisor->name) : '—' }}</strong></td>
-            <td colspan="2" class="center"><strong>{{ $ocdUser ? strtoupper($ocdUser->name) : '—' }}</strong></td>
+            <td colspan="2" class="center"><strong>{{ $employeeName }}</strong></td>
+            <td colspan="2" class="center"><strong>{{ $supervisorName ?? '—' }}</strong></td>
+            <td colspan="2" class="center"><strong>{{ $ocdUserName ?? '—' }}</strong></td>
         </tr>
         <tr>
             <td colspan="2" class="center">{{ $ipcr->user->position }}</td>

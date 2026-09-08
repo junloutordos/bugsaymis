@@ -45,7 +45,7 @@ function syncFunctions() {
 <template>
   <Head :title="`IPCR V2 — ${ipcr.period?.label}`" />
   <AdminLayout title="IPCR V2">
-    <AppPageHeader :title="ipcr.user?.name" :subtitle="ipcr.period?.label">
+    <AppPageHeader :title="ipcr.user?.formatted_name" :subtitle="ipcr.period?.label">
       <template #actions>
         <a :href="route('ipcr-v2-pdf.show', ipcr.id)" target="_blank" rel="noopener">
           <AppButton variant="secondary">Print PDF</AppButton>

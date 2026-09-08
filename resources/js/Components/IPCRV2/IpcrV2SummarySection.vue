@@ -138,15 +138,15 @@ function fmt(v) {
         </tr>
         <tr>
           <td class="border border-slate-200 px-3 py-6 text-center">
-            <b class="uppercase text-slate-800">{{ employee?.name ?? "—" }}</b>
+            <b class="text-slate-800">{{ employee?.formatted_name ?? "—" }}</b>
           </td>
           <td rowspan="2" class="border border-slate-200 px-3 py-6 text-center text-slate-600">{{ discussedWithDate }}</td>
           <td class="border border-slate-200 px-3 py-6 text-center">
-            <b class="uppercase text-slate-800">{{ supervisor?.name ?? "—" }}</b>
+            <b class="text-slate-800">{{ supervisor?.formatted_name ?? "—" }}</b>
           </td>
           <td rowspan="2" class="border border-slate-200 px-3 py-6 text-center text-slate-600">{{ assessedByDate }}</td>
           <td class="border border-slate-200 px-3 py-6 text-center">
-            <b class="uppercase text-slate-800">{{ ocdUser?.name ?? "—" }}</b>
+            <b class="text-slate-800">{{ ocdUser?.formatted_name ?? "—" }}</b>
           </td>
           <td rowspan="2" class="border border-slate-200 px-3 py-6 text-center text-slate-600">{{ finalRatingByDate }}</td>
         </tr>

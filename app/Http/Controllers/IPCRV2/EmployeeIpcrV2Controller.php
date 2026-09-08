@@ -11,6 +11,7 @@ use App\Services\DigitalSignatureService;
 use App\Services\IPCRV2\IpcrV2GenerationService;
 use App\Services\IPCRV2\IpcrV2WorkflowService;
 use App\Services\IPCRV2\StrategicFunctionService;
+use App\Services\PersonNameFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -28,7 +29,8 @@ class EmployeeIpcrV2Controller extends Controller
         private StrategicFunctionService $strategic,
         private \App\Services\PerformanceManagement\IPCRWorkflowService $v1Chain,
         private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService,
-        private DigitalSignatureService $sigService = new DigitalSignatureService()
+        private DigitalSignatureService $sigService = new DigitalSignatureService(),
+        private PersonNameFormatter $nameFormatter = new PersonNameFormatter()
     ) {}
 
     public function index(Request $request)
@@ -46,7 +48,7 @@ class EmployeeIpcrV2Controller extends Controller
 
     public function show(Request $request, int $id)
     {
-        $record = IpcrV2Record::with(['user', 'coreItems', 'supportItems', 'period', 'statusLogs.actor'])->findOrFail($id);
+        $record = IpcrV2Record::with(['user.pds.personalInfo', 'coreItems', 'supportItems', 'period', 'statusLogs.actor'])->findOrFail($id);
 
         $isOwner = $record->user_id === $request->user()->id;
         abort_unless(
@@ -55,6 +57,8 @@ class EmployeeIpcrV2Controller extends Controller
             "You are not this employee's immediate supervisor and cannot view this IPCR V2."
         );
 
+        $record->user->setAttribute('formatted_name', $this->nameFormatter->formal($record->user));
+
         $supervisor = $this->v1Chain->immediateSupervisorFor($record->user)
             ?? ($record->user->hasRole('DivisionChief') ? \App\Models\User::havingRole('OCD')->first() : null);
         $ocdUser = \App\Models\User::havingRole('OCD')->first();
@@ -62,8 +66,8 @@ class EmployeeIpcrV2Controller extends Controller
         return Inertia::render('IPCRV2/EmployeeIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
-            'supervisor' => $supervisor?->only('name', 'position'),
-            'ocdUser' => $ocdUser?->only('name', 'position'),
+            'supervisor' => $supervisor ? [...$supervisor->only('name', 'position'), 'formatted_name' => $this->nameFormatter->formal($supervisor)] : null,
+            'ocdUser' => $ocdUser ? [...$ocdUser->only('name', 'position'), 'formatted_name' => $this->nameFormatter->formal($ocdUser)] : null,
             'summary' => $this->summaryService->buildRows($record),
             'isOwner' => $isOwner,
             'isMutable' => $record->isMutable(),

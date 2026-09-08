@@ -51,9 +51,9 @@ function directorSign() {
 </script>
 
 <template>
-  <Head :title="`PMT Review — ${ipcr.user?.name}`" />
+  <Head :title="`PMT Review — ${ipcr.user?.formatted_name}`" />
   <AdminLayout title="PMT Review">
-    <AppPageHeader :title="ipcr.user?.name" :subtitle="ipcr.period?.label">
+    <AppPageHeader :title="ipcr.user?.formatted_name" :subtitle="ipcr.period?.label">
       <template #actions>
         <span class="text-xs px-2 py-1 rounded-full" :class="ipcrStatusClass(ipcr.status)">{{ ipcr.status }}</span>
         <span v-if="ipcr.final_numeric_rating" class="text-xs text-slate-500 ml-2">

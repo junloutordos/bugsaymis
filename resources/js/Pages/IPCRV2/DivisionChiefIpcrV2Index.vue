@@ -25,7 +25,7 @@ defineProps({ records: Array })
         </thead>
         <tbody>
           <tr v-for="record in records" :key="record.id">
-            <td class="px-4 py-3 text-sm">{{ record.user?.name }}</td>
+            <td class="px-4 py-3 text-sm">{{ record.user?.formatted_name }}</td>
             <td class="px-4 py-3 text-sm">{{ record.period?.label }}</td>
             <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full" :class="ipcrStatusClass(record.status)">{{ record.status }}</span></td>
             <td class="px-4 py-3 text-right">

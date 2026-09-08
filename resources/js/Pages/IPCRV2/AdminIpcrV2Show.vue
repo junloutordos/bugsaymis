@@ -45,9 +45,9 @@ async function reopen() {
 </script>
 
 <template>
-  <Head :title="`IPCR V2 — ${ipcr.user?.name}`" />
+  <Head :title="`IPCR V2 — ${ipcr.user?.formatted_name}`" />
   <AdminLayout title="IPCR V2 Monitoring (All Stages)">
-    <AppPageHeader :title="ipcr.user?.name" :subtitle="ipcr.period?.label">
+    <AppPageHeader :title="ipcr.user?.formatted_name" :subtitle="ipcr.period?.label">
       <template #actions>
         <span class="text-xs px-2 py-1 rounded-full" :class="ipcrStatusClass(ipcr.status)">{{ ipcr.status }}</span>
         <span v-if="ipcr.final_numeric_rating" class="text-xs text-slate-500 ml-2">

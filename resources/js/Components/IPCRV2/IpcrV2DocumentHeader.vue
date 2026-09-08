@@ -26,7 +26,7 @@ const targetApprovedLabel = computed(() => fmt(props.targetApprovedAt))
       Individual Performance Commitment and Review (IPCR)
     </p>
     <p class="text-sm text-slate-700 mb-6">
-      I, <b class="uppercase">{{ employee?.name }}</b>, <b class="uppercase">{{ employee?.position }}</b>,
+      I, <b>{{ employee?.formatted_name }}</b>, <b class="uppercase">{{ employee?.position }}</b>,
       of Philippine Science High School – Caraga Region Campus, commit to deliver and agree to be rated on the
       attainment of the following targets in accordance with the indicated measures for the period of
       <b class="uppercase">{{ period?.label }}</b>.
@@ -41,17 +41,17 @@ const targetApprovedLabel = computed(() => fmt(props.targetApprovedAt))
         </tr>
         <tr>
           <td class="px-3 py-6 text-center">
-            <b class="uppercase text-slate-800">{{ employee?.name ?? "—" }}</b><br />
+            <b class="text-slate-800">{{ employee?.formatted_name ?? "—" }}</b><br />
             <small class="text-slate-500">Ratee</small><br />
             <small class="text-slate-500">Date: {{ submittedForReviewLabel }}</small>
           </td>
           <td class="px-3 py-6 text-center">
-            <b class="uppercase text-slate-800">{{ supervisor?.name ?? "—" }}</b><br />
+            <b class="text-slate-800">{{ supervisor?.formatted_name ?? "—" }}</b><br />
             <small class="text-slate-500">{{ supervisor?.position ?? "Division Chief" }}</small><br />
             <small class="text-slate-500">Date: {{ targetApprovedLabel }}</small>
           </td>
           <td class="px-3 py-6 text-center">
-            <b class="uppercase text-slate-800">{{ ocdUser?.name ?? "—" }}</b><br />
+            <b class="text-slate-800">{{ ocdUser?.formatted_name ?? "—" }}</b><br />
             <small class="text-slate-500">{{ ocdUser?.position ?? "Campus Director" }}</small><br />
             <small class="text-slate-500">Date: {{ targetApprovedLabel }}</small>
           </td>
