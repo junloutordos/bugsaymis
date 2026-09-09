@@ -19,7 +19,7 @@
 
       <!-- Quick nav pills -->
       <div class="flex flex-wrap gap-2">
-        <Link :href="route('faculty-loading.committee-assignments.index')"
+        <Link :href="route('pm-committees.index')"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-full font-medium transition-colors">
           <UserGroupIcon class="h-3.5 w-3.5" /> Committee Assignments
         </Link>
