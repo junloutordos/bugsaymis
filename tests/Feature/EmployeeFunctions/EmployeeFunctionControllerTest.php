@@ -120,6 +120,7 @@ class EmployeeFunctionControllerTest extends TestCase
             'function_type' => 'core',
             'work_distribution_plan_ids' => [$planA->id, $planB->id],
             'label' => 'Multi-tagged Core Function',
+            'weight_percent' => 100,
         ]);
 
         $response->assertRedirect();
@@ -139,6 +140,7 @@ class EmployeeFunctionControllerTest extends TestCase
         $response = $this->actingAs($manager)->post(route('employee-functions.store', $employee), [
             'function_type' => 'core',
             'label' => 'Teaches Grade 11 Physics',
+            'weight_percent' => 100,
         ]);
 
         $response->assertRedirect();
@@ -146,6 +148,50 @@ class EmployeeFunctionControllerTest extends TestCase
         $this->assertSame('manual', $function->source_type);
         $this->assertSame('Teaches Grade 11 Physics', $function->label);
         $this->assertCount(0, $function->workDistributionPlans);
+    }
+
+    public function test_store_rejects_a_core_function_without_a_weight(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+
+        $response = $this->actingAs($manager)->post(route('employee-functions.store', $employee), [
+            'function_type' => 'core',
+            'label' => 'Teaches Grade 11 Physics',
+        ]);
+
+        $response->assertSessionHasErrors('weight_percent');
+        $this->assertDatabaseMissing('employee_functions', ['label' => 'Teaches Grade 11 Physics']);
+    }
+
+    public function test_store_allows_a_support_function_without_a_weight(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+
+        $response = $this->actingAs($manager)->post(route('employee-functions.store', $employee), [
+            'function_type' => 'support',
+            'label' => 'Member, Discipline Committee',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('employee_functions', ['label' => 'Member, Discipline Committee', 'weight_percent' => null]);
+    }
+
+    public function test_update_rejects_clearing_a_core_functions_weight(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $function = EmployeeFunction::create([
+            'user_id' => $employee->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'x', 'weight_percent' => 100,
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('employee-functions.update', [$employee, $function]), [
+            'label' => 'x',
+        ]);
+
+        $response->assertSessionHasErrors('weight_percent');
+        $this->assertSame('100.00', $function->fresh()->weight_percent);
     }
 
     public function test_update_replaces_wdp_tags_and_relabels(): void

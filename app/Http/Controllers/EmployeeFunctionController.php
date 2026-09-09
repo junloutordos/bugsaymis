@@ -50,7 +50,7 @@ class EmployeeFunctionController extends Controller
             'work_distribution_plan_ids' => 'nullable|array',
             'work_distribution_plan_ids.*' => 'exists:work_distribution_plans,id',
             'label' => 'required|string|max:255',
-            'weight_percent' => 'nullable|numeric|min:0|max:100',
+            'weight_percent' => 'required_if:function_type,core|nullable|numeric|min:0.01|max:100',
         ]);
 
         $planIds = $data['work_distribution_plan_ids'] ?? [];
@@ -75,7 +75,9 @@ class EmployeeFunctionController extends Controller
 
         $data = $request->validate([
             'label' => 'required|string|max:255',
-            'weight_percent' => 'nullable|numeric|min:0|max:100',
+            'weight_percent' => $employeeFunction->function_type === EmployeeFunction::TYPE_CORE
+                ? 'required|numeric|min:0.01|max:100'
+                : 'nullable|numeric|min:0|max:100',
             'work_distribution_plan_ids' => 'nullable|array',
             'work_distribution_plan_ids.*' => 'exists:work_distribution_plans,id',
         ]);

@@ -1,8 +1,10 @@
 <script setup>
-import { Head, router } from "@inertiajs/vue3"
+import { Head, router, usePage } from "@inertiajs/vue3"
+import { computed, ref } from "vue"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
 import AppButton from "@/Components/AppButton.vue"
+import FlashMessage from "@/Components/FlashMessage.vue"
 import { ArrowPathIcon } from "@heroicons/vue/24/outline"
 import IpcrV2DocumentHeader from "@/Components/IPCRV2/IpcrV2DocumentHeader.vue"
 import IpcrV2StrategicSection from "@/Components/IPCRV2/IpcrV2StrategicSection.vue"
@@ -31,6 +33,10 @@ const props = defineProps({
 const { isSubmitting, submit } = useSubmit()
 const { showPinModal, requestPin, confirmPin, cancelPin } = usePinConfirm()
 
+const page = usePage()
+const flash = computed(() => page.props.flash ?? {})
+const syncError = ref(null)
+
 function submitForReview() {
   requestPin((pin) => submit((opts) => router.post(route("employee-ipcr-v2.submitReview", props.ipcr.id), { pin }, opts)))
 }
@@ -38,7 +44,10 @@ function submitForRating() {
   requestPin((pin) => submit((opts) => router.post(route("employee-ipcr-v2.submitRating", props.ipcr.id), { pin }, opts)))
 }
 function syncFunctions() {
-  submit((opts) => router.post(route("employee-ipcr-v2.syncFunctions", props.ipcr.id), {}, opts))
+  syncError.value = null
+  submit((opts) => router.post(route("employee-ipcr-v2.syncFunctions", props.ipcr.id), {}, opts), {
+    onError: (errors) => { syncError.value = Object.values(errors)[0] ?? "Sync failed." },
+  })
 }
 </script>
 
@@ -59,6 +68,8 @@ function syncFunctions() {
         </span>
       </template>
     </AppPageHeader>
+
+    <FlashMessage :success="flash.success" :error="syncError || flash.error" />
 
     <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
       <IpcrV2DocumentHeader :employee="ipcr.user" :period="ipcr.period" :supervisor="supervisor" :ocd-user="ocdUser" :submitted-for-review-at="ipcr.submitted_for_review_at" :target-approved-at="ipcr.target_approved_at" />

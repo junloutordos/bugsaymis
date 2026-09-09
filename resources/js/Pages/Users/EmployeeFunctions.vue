@@ -1,5 +1,5 @@
 <script setup>
-import { Head, router } from "@inertiajs/vue3"
+import { Head, router, usePage } from "@inertiajs/vue3"
 import axios from "axios"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import AppPageHeader from "@/Components/AppPageHeader.vue"
@@ -23,6 +23,7 @@ const props = defineProps({
 })
 
 const { isSubmitting, submit } = useSubmit()
+const formErrors = computed(() => usePage().props.errors ?? {})
 
 const coreFunctions = computed(() => props.functions.filter(f => f.function_type === "core"))
 const supportFunctions = computed(() => props.functions.filter(f => f.function_type === "support"))
@@ -236,7 +237,14 @@ function saveForm() {
     <AppModal :show="showFormModal" :title="editingFunction ? 'Edit Function' : 'Add Function'" @close="showFormModal = false">
       <div class="space-y-4">
         <AppInput v-model="form.label" label="Label" placeholder="e.g. Chairperson, Discipline Committee" />
-        <AppInput v-if="form.function_type === 'core'" v-model="form.weight_percent" type="number" label="Weight %" />
+        <AppInput
+          v-if="form.function_type === 'core'"
+          v-model="form.weight_percent"
+          type="number"
+          label="Weight %"
+          required
+          :error="formErrors.weight_percent"
+        />
 
         <div v-if="!editingFunction && form.function_type === 'support'" class="space-y-3 rounded-lg border border-slate-200 p-3">
           <div>
