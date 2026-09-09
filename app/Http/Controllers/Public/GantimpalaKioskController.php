@@ -32,19 +32,20 @@ class GantimpalaKioskController extends Controller
     public function searchEmployees(Request $request)
     {
         $term = trim((string) $request->get('q', ''));
-        if (mb_strlen($term) < 2) {
+        if (mb_strlen($term) < 3) {
             return response()->json(['employees' => []]);
         }
 
+        // Public, unauthenticated endpoint — name-prefix match only (never
+        // email, and never a mid-string substring) so it can't be used to
+        // bulk-enumerate the employee directory. The kiosk UI only ever
+        // shows/uses name + id; email was never rendered.
         $employees = User::employees()
             ->where('status', '<>', 'inactive')
-            ->where(function ($q) use ($term) {
-                $q->where('name', 'like', "%{$term}%")
-                  ->orWhere('email', 'like', "%{$term}%");
-            })
+            ->where('name', 'like', "{$term}%")
             ->orderBy('name')
             ->limit(10)
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name']);
 
         return response()->json(['employees' => $employees]);
     }
