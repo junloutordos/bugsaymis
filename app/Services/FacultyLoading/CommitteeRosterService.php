@@ -18,7 +18,10 @@ use Illuminate\Support\Facades\Auth;
  */
 class CommitteeRosterService
 {
-    public function __construct(private readonly LoadComputationService $loads) {}
+    public function __construct(
+        private readonly LoadComputationService $loads,
+        private readonly \App\Services\PerformanceManagement\CommitteeIpcrSyncService $ipcrSync = new \App\Services\PerformanceManagement\CommitteeIpcrSyncService(),
+    ) {}
 
     /**
      * Reconcile one committee (and its sub-committees) for a given term:
@@ -151,6 +154,7 @@ class CommitteeRosterService
         ]);
 
         $this->loads->syncLoad($load);
+        $this->ipcrSync->syncForUser(\App\Models\User::findOrFail($userId));
         $result['created']++;
     }
 
@@ -177,6 +181,7 @@ class CommitteeRosterService
         if ($load) {
             $this->loads->syncLoad($load);
         }
+        $this->ipcrSync->syncForUser(\App\Models\User::findOrFail($assignment->user_id));
 
         $result['role_updated']++;
     }
@@ -197,6 +202,7 @@ class CommitteeRosterService
         if ($load) {
             $this->loads->syncLoad($load);
         }
+        $this->ipcrSync->syncForUser(\App\Models\User::findOrFail($userId));
     }
 
     private function isLocked(int $userId, int $termId): bool
