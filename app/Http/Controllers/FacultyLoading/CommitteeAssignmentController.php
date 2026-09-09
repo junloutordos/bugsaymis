@@ -26,6 +26,7 @@ class CommitteeAssignmentController extends Controller
         private readonly LoadComputationService $loads,
         private readonly CommitteeRatingService $rating,
         private readonly \App\Services\PerformanceManagement\CommitteeIpcrSyncService $ipcrSync,
+        private readonly \App\Services\PerformanceManagement\CommitteeIpcrRatingService $ipcrRating,
     ) {}
 
     // ── List committee assignments ────────────────────────────────────────────
@@ -436,17 +437,19 @@ class CommitteeAssignmentController extends Controller
         }
 
         $data = $request->validate([
-            'ipcr_id'                   => 'nullable|exists:employee_ipcrs,id',
-            'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
-            'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
-            'accomplishment'            => 'nullable|string|max:1000',
-            'mov_link'                  => 'nullable|string|max:500',
-            'sup_quality'               => 'nullable|numeric|min:1|max:5',
-            'sup_efficiency'            => 'nullable|numeric|min:1|max:5',
-            'sup_timeliness'            => 'nullable|numeric|min:1|max:5',
+            'support_item_id'   => 'required|integer|exists:ipcr_v2_support_items,id',
+            'accomplishment'    => 'nullable|string|max:1000',
+            'mov_link'          => 'nullable|string|max:500',
+            'quality_rating'    => 'required|integer|min:1|max:5',
+            'efficiency_rating' => 'required|integer|min:1|max:5',
+            'timeliness_rating' => 'required|integer|min:1|max:5',
         ]);
 
-        $this->rating->rate($committeeAssignment, $data);
+        $validItemIds = $this->ipcrRating->resolveSupportItems($committeeAssignment)->pluck('id');
+        abort_unless($validItemIds->contains((int) $data['support_item_id']), 404, 'This item does not belong to this committee assignment.');
+
+        $item = \App\Models\IPCRV2\IpcrV2SupportItem::findOrFail($data['support_item_id']);
+        $this->ipcrRating->rate($item, $data);
 
         return back()->with('success', 'Rating saved.');
     }
