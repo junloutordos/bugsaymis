@@ -38,6 +38,7 @@ class DivisionChiefIpcrV2ControllerCommitteeGuardTest extends TestCase
         $dc = User::factory()->create();
         $dc->roles()->attach($role->id);
         $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID', 'division_chief_id' => $dc->id]);
+        $dc->update(['division_id' => $division->id]);
         $member = User::factory()->create(['division_id' => $division->id]);
         $committee = Committee::create(['name' => 'Grievance Committee']);
         FacultyCommitteeAssignment::create([
@@ -54,5 +55,31 @@ class DivisionChiefIpcrV2ControllerCommitteeGuardTest extends TestCase
         ]);
 
         $response->assertForbidden();
+    }
+
+    public function test_show_flags_the_committee_sourced_item_for_the_frontend(): void
+    {
+        $sy = SchoolYear::create(['name' => '2026-2027', 'is_current' => true, 'start_date' => '2026-06-01', 'end_date' => '2027-03-31']);
+        $term = AcademicTerm::create(['school_year_id' => $sy->id, 'name' => 'Full Term', 'term_type' => 'full_term', 'is_current' => true]);
+        $role = $this->divisionChiefRole();
+        $dc = User::factory()->create();
+        $dc->roles()->attach($role->id);
+        $division = Division::create(['division_name' => 'CID', 'acronym' => 'CID', 'division_chief_id' => $dc->id]);
+        $dc->update(['division_id' => $division->id]);
+        $member = User::factory()->create(['division_id' => $division->id]);
+        $committee = Committee::create(['name' => 'Grievance Committee']);
+        FacultyCommitteeAssignment::create([
+            'user_id' => $member->id, 'school_year_id' => $term->school_year_id, 'academic_term_id' => $term->id,
+            'committee_id' => $committee->id, 'committee_name' => $committee->name, 'role' => 'member', 'status' => 'active',
+        ]);
+        $period = IPCRRatingPeriod::create(['label' => 'FY2026-1', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
+        $record = IpcrV2Record::create(['user_id' => $member->id, 'rating_period_id' => $period->id]);
+        (new CommitteeIpcrSyncService())->syncForUser($member);
+
+        $response = $this->actingAs($dc)->get(route('division-chief-ipcr-v2.show', $record->id));
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('ipcr.support_items.0.is_committee_sourced', true)
+        );
     }
 }

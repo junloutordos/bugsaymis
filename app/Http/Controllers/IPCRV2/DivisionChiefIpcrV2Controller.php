@@ -50,6 +50,10 @@ class DivisionChiefIpcrV2Controller extends Controller
         $record->user->setAttribute('formatted_name', $this->nameFormatter->formal($record->user));
         $ocdUser = \App\Models\User::havingRole('OCD')->first();
 
+        $record->supportItems->each(
+            fn ($item) => $item->setAttribute('is_committee_sourced', $this->committeeRating->isCommitteeSourced($item))
+        );
+
         return Inertia::render('IPCRV2/DivisionChiefIpcrV2Show', [
             'ipcr' => $record,
             'strategicIndicators' => $this->strategic->currentIndicators(),
