@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\GantimpalaLog;
 use App\Models\GantimpalaNomination;
 use App\Models\User;
+use App\Services\DigitalSignatureService;
 use App\Services\Rewards\GantimpalaPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,10 @@ use Inertia\Inertia;
 
 class GantimpalaNominationController extends Controller
 {
-    public function __construct(private GantimpalaPdfService $pdf) {}
+    public function __construct(
+        private GantimpalaPdfService $pdf,
+        private DigitalSignatureService $sigService,
+    ) {}
 
     public function index(Request $request)
     {
@@ -61,9 +65,13 @@ class GantimpalaNominationController extends Controller
     {
         $this->authorize('rewards.nominate');
 
+        $user = auth()->user();
+
         return Inertia::render('Rewards/Gantimpala/Create', [
-            'employees' => User::employees()->where('status', '<>', 'inactive')
+            'employees'    => User::employees()->where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'email']),
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -83,6 +91,8 @@ class GantimpalaNominationController extends Controller
         $this->authorize('rewards.nominate');
 
         $data = $this->validateNomination($request);
+
+        $this->sigService->assertSigningPin(auth()->user(), $data['pin'] ?? null);
 
         $nomination = $this->persist($data, 'atlas', $request);
 
@@ -242,7 +252,8 @@ class GantimpalaNominationController extends Controller
             'venue_location'            => 'nullable|string|max:255',
             'other_information'         => 'nullable|string',
 
-            'nominator_signature_path'  => 'nullable|string', // base64 data URI
+            'nominator_signature_path'  => 'nullable|string', // base64 data URI (kiosk / freehand only)
+            'pin'                       => 'nullable|string', // signing PIN (in-app Atlas nomination only)
         ]);
     }
 
@@ -251,7 +262,13 @@ class GantimpalaNominationController extends Controller
         return DB::transaction(function () use ($data, $source, $request) {
             $sigPath = null;
             if (! empty($data['nominator_signature_path'])) {
+                // Freehand capture — kiosk, or an in-app user with no signature on file.
                 $sigPath = $this->storeSignature($data['nominator_signature_path'], 'nominator');
+            } elseif ($source === 'atlas') {
+                // Atlas in-app nomination — reuse the nominator's existing Digital
+                // Signature on file (Profile → Digital Signature) instead of asking
+                // them to redraw it every time.
+                $sigPath = $this->copyOnFileSignature(auth()->user(), 'nominator');
             }
 
             $nomination = GantimpalaNomination::create([
@@ -303,6 +320,35 @@ class GantimpalaNominationController extends Controller
         $binary = base64_decode($m[2], true);
         if ($binary === false) {
             throw ValidationException::withMessages(['signature' => 'Invalid signature data.']);
+        }
+
+        $path = "rewards/gantimpala/signatures/{$who}_" . uniqid() . ".{$ext}";
+        Storage::disk('s3')->put($path, $binary);
+
+        return $path;
+    }
+
+    /**
+     * Copy a user's existing Digital Signature (users.electronic_signature)
+     * into this module's own signatures/ prefix, so the nomination's stored
+     * path is self-contained and unaffected if the user later replaces their
+     * signature on file. Returns null if the user has no signature on file.
+     */
+    private function copyOnFileSignature(User $user, string $who): ?string
+    {
+        $dataUri = $this->sigService->getSignatureDataUri($user);
+        if (! $dataUri) {
+            return null;
+        }
+
+        if (! preg_match('/^data:image\/(png|jpeg);base64,(.+)$/', $dataUri, $m)) {
+            return null;
+        }
+
+        $ext = $m[1] === 'jpeg' ? 'jpg' : 'png';
+        $binary = base64_decode($m[2], true);
+        if ($binary === false) {
+            return null;
         }
 
         $path = "rewards/gantimpala/signatures/{$who}_" . uniqid() . ".{$ext}";

@@ -11,7 +11,7 @@
           <p class="text-sm text-slate-500">Fill in the details below exactly as you would on the printed Form 4.</p>
         </div>
         <div class="p-5">
-          <form @submit.prevent="submit" class="space-y-6">
+          <form @submit.prevent="openPinModal" class="space-y-6">
             <!-- Employee/Unit Commended -->
             <div class="space-y-3">
               <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Employee / Unit Commended</p>
@@ -68,21 +68,41 @@
                 placeholder="Briefly state the commendable action provided by the person/unit…" :error="form.errors.other_information" />
             </div>
 
-            <!-- Signature -->
+            <!-- Certification -->
             <div class="space-y-3 border-t border-slate-100 pt-4">
               <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Certification</p>
               <p class="text-sm text-slate-600">I certify to the correctness of the information provided herewith.</p>
-              <SignaturePad ref="sigPad" label="Nominator Signature" />
+
+              <div v-if="signatureUri" class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 flex items-center gap-4">
+                <img :src="signatureUri" alt="Your signature on file" class="max-h-14 max-w-[180px] object-contain" />
+                <p class="text-xs text-slate-500">Your Digital Signature on file will be applied to this nomination.</p>
+              </div>
+              <div v-else class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                You have not set up a signature image yet. You can still submit — set one up anytime in
+                <strong>Profile → Digital Signature</strong> for future nominations.
+              </div>
             </div>
 
             <div class="flex justify-end gap-3 pt-2">
               <AppButton as="link" variant="secondary" :href="route('rewards.gantimpala.index')">Cancel</AppButton>
-              <AppButton type="submit" :loading="form.processing">Submit Nomination</AppButton>
+              <AppButton type="button" @click="openPinModal" :disabled="form.processing" :loading="form.processing">
+                {{ form.processing ? 'Submitting…' : 'Submit Nomination' }}
+              </AppButton>
             </div>
           </form>
         </div>
       </AppCard>
     </div>
+
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="form.processing"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
   </AdminLayout>
 </template>
 
@@ -95,10 +115,12 @@ import AppCard from '@/Components/AppCard.vue'
 import AppInput from '@/Components/AppInput.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import AppButton from '@/Components/AppButton.vue'
-import SignaturePad from '@/Components/SignaturePad.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
   employees: Array,
+  hasPin: { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 })
 
 const form = useForm({
@@ -120,7 +142,7 @@ const form = useForm({
   venue_location: '',
   other_information: '',
 
-  nominator_signature_path: '',
+  pin: null,
 })
 
 // ── Employee search-and-select (client-side over the preloaded active roster) ──
@@ -148,10 +170,13 @@ function clearEmployee() {
   employeeQuery.value = ''
 }
 
-const sigPad = ref(null)
+const showSubmitPin = ref(false)
 
-function submit() {
-  form.nominator_signature_path = sigPad.value?.getDataUrl() ?? ''
+const openPinModal = () => { showSubmitPin.value = true }
+const handlePinCancel = () => { showSubmitPin.value = false }
+const handlePinConfirm = (pin) => {
+  form.pin = pin || null
+  showSubmitPin.value = false
   form.post(route('rewards.gantimpala.store'))
 }
 </script>
