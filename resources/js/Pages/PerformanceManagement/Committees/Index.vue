@@ -244,16 +244,24 @@
           </div>
         </template>
 
-        <!-- Level 1: Top-level committee picker -->
+        <!-- Level 1: Top-level committee picker. Committees themselves are
+             created exclusively via the Catalog tab's "New Committee" form
+             (the original Performance Management creation flow) — this
+             modal only assigns people to a committee that already exists
+             in the catalog, so there is no "custom / not in catalog"
+             escape hatch here. -->
         <div class="col-span-2">
-          <label class="block text-xs font-medium text-slate-600 mb-1">Committee</label>
-          <select v-model="selectedParentId" @change="onParentCommitteeChange"
+          <label class="block text-xs font-medium text-slate-600 mb-1">Committee *</label>
+          <select v-model="selectedParentId" @change="onParentCommitteeChange" required
             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option :value="null">— Custom / not in catalog —</option>
+            <option :value="null" disabled>— Select a committee —</option>
             <option v-for="c in committees" :key="c.id" :value="c.id">
               {{ c.name }}{{ c.sub_committees?.length ? ' (Main)' : '' }}{{ c.code ? ' (' + c.code + ')' : '' }}
             </option>
           </select>
+          <p v-if="!committees.length" class="text-xs text-slate-400 mt-1">
+            No committees in the catalog yet — create one first from the Committee Catalog tab.
+          </p>
         </div>
 
         <!-- Level 2: Sub-committee picker (only when parent has sub-committees) -->
@@ -267,7 +275,7 @@
         </div>
 
         <div class="col-span-2">
-          <AppInput v-model="form.committee_name" label="Committee Name" required />
+          <AppInput v-model="form.committee_name" label="Committee Name" disabled />
         </div>
 
         <AppSelect :model-value="form.role" label="Role" required :show-blank="false"
@@ -335,7 +343,7 @@
 
       <template #footer>
         <AppButton variant="secondary" @click="modal = false">Cancel</AppButton>
-        <AppButton :loading="form.processing" @click="save">{{ form.id ? 'Update' : 'Save' }}</AppButton>
+        <AppButton :loading="form.processing" :disabled="!canSaveAssignment" @click="save">{{ form.id ? 'Update' : 'Save' }}</AppButton>
       </template>
     </AppModal>
 
@@ -671,7 +679,15 @@ function saveOwnPlans(assignmentId) {
   useForm({ plan_ids: ownPlanIds.value }).put(route('pm-committees.plans.sync', assignmentId))
 }
 
+// New assignments must reference a real catalog committee (creation
+// happens exclusively via the Catalog tab's "New Committee" form) — edits
+// of a pre-existing assignment are left alone even if it predates this
+// rule and has no committee_id.
+const canSaveAssignment = computed(() => !!form.id || !!form.committee_id)
+
 function save() {
+  if (!canSaveAssignment.value) return
+
   if (form.id) {
     form.put(route('pm-committees.update', form.id), {
       onSuccess: () => { saveOwnPlans(form.id); modal.value = false },
