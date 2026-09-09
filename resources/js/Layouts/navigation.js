@@ -729,7 +729,7 @@ export const menuItems = [
         routeName: "pm-committees.index",
         href: route("pm-committees.index"),
         icon: UserGroupIcon,
-        permissions: ["accomplishments.view"],
+        permissions: ["accomplishments.view", "faculty_loading.manage"],
       },
       {
         label: "Special Assignments",
@@ -1684,14 +1684,6 @@ export const menuItems = [
         icon: ClipboardDocumentCheckIcon,
         roles: [],
         permissions: ["faculty_loading.manage", "faculty_loading.research_advisories"],
-      },
-      {
-        label: "Committee Assignments",
-        routeName: "faculty-loading.committee-assignments.index",
-        href: route("faculty-loading.committee-assignments.index"),
-        icon: QueueListIcon,
-        roles: [],
-        permissions: ["faculty_loading.manage"],
       },
       {
         label: "Schedules",
