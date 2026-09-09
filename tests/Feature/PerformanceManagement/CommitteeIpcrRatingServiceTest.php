@@ -73,4 +73,38 @@ class CommitteeIpcrRatingServiceTest extends TestCase
 
         $this->assertFalse((new CommitteeIpcrRatingService())->isCommitteeSourced($item));
     }
+
+    public function test_rate_writes_quality_efficiency_timeliness_and_computes_row_average(): void
+    {
+        [$assignment, $record] = $this->setUpAssignmentWithRecord();
+        $record->update(['status' => \App\Services\IPCRV2\IpcrV2WorkflowService::STATUS_FOR_RATING]);
+        (new CommitteeIpcrSyncService())->syncForUser($assignment->faculty);
+        $item = (new CommitteeIpcrRatingService())->resolveSupportItems($assignment)->first();
+
+        $rated = (new CommitteeIpcrRatingService())->rate($item, [
+            'quality_rating' => 5, 'efficiency_rating' => 4, 'timeliness_rating' => 3,
+            'accomplishment' => 'Organized the annual meet.', 'mov_link' => 'https://example.com/photos',
+        ]);
+
+        $this->assertSame(5, $rated->quality_rating);
+        $this->assertSame(4, $rated->efficiency_rating);
+        $this->assertSame(3, $rated->timeliness_rating);
+        $this->assertEqualsWithDelta(4.0, (float) $rated->row_average, 0.01);
+        $this->assertSame('Organized the annual meet.', $rated->actual_accomplishment);
+        $this->assertSame('https://example.com/photos', $rated->mov_link);
+    }
+
+    public function test_rate_rejects_when_targets_not_yet_approved(): void
+    {
+        [$assignment, $record] = $this->setUpAssignmentWithRecord();
+        // status defaults to STATUS_NEW_TARGET
+        (new CommitteeIpcrSyncService())->syncForUser($assignment->faculty);
+        $item = (new CommitteeIpcrRatingService())->resolveSupportItems($assignment)->first();
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        (new CommitteeIpcrRatingService())->rate($item, [
+            'quality_rating' => 5, 'efficiency_rating' => 4, 'timeliness_rating' => 3,
+        ]);
+    }
 }
