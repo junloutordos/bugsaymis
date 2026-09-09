@@ -25,6 +25,7 @@ class CommitteeAssignmentController extends Controller
     public function __construct(
         private readonly LoadComputationService $loads,
         private readonly CommitteeRatingService $rating,
+        private readonly \App\Services\PerformanceManagement\CommitteeIpcrSyncService $ipcrSync,
     ) {}
 
     // ── List committee assignments ────────────────────────────────────────────
@@ -266,7 +267,7 @@ class CommitteeAssignmentController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
         }
 
-        if ($data['committee_id']) {
+        if ($data['committee_id'] ?? null) {
             $committee = Committee::find($data['committee_id']);
             if ($committee) {
                 if ($request->missing('load_units')) {
@@ -274,6 +275,7 @@ class CommitteeAssignmentController extends Controller
                 }
                 // Sync tagged WDP plans
                 $committee->workDistributionPlans()->sync($data['plan_ids'] ?? []);
+                $this->ipcrSync->syncForCommittee($committee->id);
                 // Promote to committee head when chairperson
                 if (in_array($data['role'], ['chairperson', 'co_chair'])) {
                     $committee->update(['head_id' => $data['user_id']]);
@@ -299,6 +301,7 @@ class CommitteeAssignmentController extends Controller
         ));
 
         $this->loads->syncLoad($load);
+        $this->ipcrSync->syncForUser(User::find($data['user_id']));
 
         return back()->with('success', 'Committee assignment added.');
     }
@@ -331,6 +334,7 @@ class CommitteeAssignmentController extends Controller
             $committee = Committee::find($committeeAssignment->committee_id);
             if ($committee) {
                 $committee->workDistributionPlans()->sync($data['plan_ids'] ?? []);
+                $this->ipcrSync->syncForCommittee($committee->id);
                 if (in_array($data['role'], ['chairperson', 'co_chair'])) {
                     $committee->update(['head_id' => $committeeAssignment->user_id]);
                 }
@@ -348,6 +352,7 @@ class CommitteeAssignmentController extends Controller
             ->where('academic_term_id', $committeeAssignment->academic_term_id)
             ->first();
         if ($load) $this->loads->syncLoad($load);
+        $this->ipcrSync->syncForUser($committeeAssignment->faculty);
 
         return back()->with('success', 'Committee assignment updated.');
     }
@@ -375,6 +380,7 @@ class CommitteeAssignmentController extends Controller
 
         $load = FacultyLoad::where('user_id', $userId)->where('academic_term_id', $termId)->first();
         if ($load) $this->loads->syncLoad($load);
+        $this->ipcrSync->syncForUser(User::find($userId));
 
         return back()->with('success', 'Committee assignment removed.');
     }
