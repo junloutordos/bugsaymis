@@ -1,214 +1,198 @@
 <script setup>
-import { ref, computed } from "vue"
-import { Head, Link, router } from "@inertiajs/vue3"
-import AdminLayout from "@/Layouts/AdminLayout.vue"
-import AppButton from "@/Components/AppButton.vue"
-import AppCard from "@/Components/AppCard.vue"
-import AppBadge from "@/Components/AppBadge.vue"
-import AppInput from "@/Components/AppInput.vue"
-import AppSelect from "@/Components/AppSelect.vue"
-import AppTextarea from "@/Components/AppTextarea.vue"
-import AppModal from "@/Components/AppModal.vue"
-import AppTabs from "@/Components/AppTabs.vue"
-import EmptyState from "@/Components/EmptyState.vue"
-import TaskBoard from "@/Components/Committee/TaskBoard.vue"
-import { ArrowLeftIcon, ClipboardDocumentListIcon, StarIcon } from "@heroicons/vue/24/outline"
-import Swal from "sweetalert2"
-import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
-import { useSubmit } from "@/Composables/useSubmit"
+import { ref, computed } from 'vue'
+import { Head, Link, router } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import AppTabs from '@/Components/AppTabs.vue'
+import TaskBoard from '@/Components/Committee/TaskBoard.vue'
+import { ArrowLeftIcon, ClipboardDocumentListIcon, StarIcon } from '@heroicons/vue/24/outline'
+import { ipcrAdjectivalRating } from '@/Composables/ipcrAdjectivalRating'
+import { useSubmit } from '@/Composables/useSubmit'
+import Swal from 'sweetalert2'
 
 const props = defineProps({
-  committee: Object,
-  activeMemberCount: { type: Number, default: 0 },
-  planMemberData: Array,
-  terms: { type: Array, default: () => [] },
-  selectedTermId: { type: Number, default: null },
-  authUser: Object,
-  isHead: Boolean,
-  canManage: Boolean,
-  tasks: { type: Array, default: () => [] },
-  boardMembers: { type: Array, default: () => [] },
-  ratingPeriods: { type: Array, default: () => [] },
+  committee:      Object,
+  members:        Array,
+  terms:          Array,
+  selectedTermId: Number,
+  authUser:       Object,
+  isChairperson:  Boolean,
+  canManage:      Boolean,
+  tasks:            { type: Array, default: () => [] },
+  boardMembers:     { type: Array, default: () => [] },
+  ratingPeriods:    { type: Array, default: () => [] },
   selectedPeriodId: { type: Number, default: null },
-  canManageBoard: { type: Boolean, default: false },
+  canManageBoard:   { type: Boolean, default: false },
 })
 
-// ── Term switching (roster is now term-scoped, same as Faculty Loading) ─────
+const activeTab = ref('board')
+const boardTabs = [
+  { key: 'board',   label: 'Task Board',                icon: ClipboardDocumentListIcon },
+  { key: 'ratings', label: 'Accomplishments & Ratings', icon: StarIcon },
+]
+const boardPlans = computed(() => (props.members ?? [])
+  .flatMap(m => m.items)
+  .filter(i => i.success_indicator)
+  .map(i => ({ id: i.id, success_indicator: i.success_indicator })))
+
+const { isSubmitting, submit } = useSubmit()
+
+// Statuses before which an IPCR V2 item cannot be rated yet — mirrors
+// CommitteeIpcrRatingService::NOT_YET_RATABLE_STATUSES on the backend.
+const NOT_YET_RATABLE_STATUSES = ['New Target', 'For Review', 'Returned for Revision']
+
+// ── Term switching ─────────────────────────────────────────────────────────
 function switchTerm(termId) {
   router.get(
-    route("pm-committees.show", props.committee.id),
-    { term_id: termId, rating_period_id: props.selectedPeriodId ?? undefined },
+    route('pm-committees.show', props.committee.id),
+    { term_id: termId },
     { preserveState: false }
   )
 }
 
-const activeTab = ref("board")
-const boardTabs = [
-  { key: "board",   label: "Task Board",                icon: ClipboardDocumentListIcon },
-  { key: "ratings", label: "Accomplishments & Ratings", icon: StarIcon },
-]
-const boardPlans = computed(() => (props.planMemberData ?? []).map(e => ({ id: e.plan.id, success_indicator: e.plan.success_indicator })))
+// ── Rate modal (chairperson / admin only — writes IPCR V2 directly) ───────
+const showModal  = ref(false)
+const modalEntry = ref(null) // { member, item }
 
-const { isSubmitting, submit } = useSubmit()
-
-const showModal = ref(false)
-const modalEntry = ref(null) // { planId, member, period, isOwn, canRate }
-
-const editForm = ref({
-  ipcr_id:          null,
-  rating_period_id: null,
-  plan_id:          null,
-  accomplishment:   "",
-  mov_link:         "",
-  sup_quality:      null,
-  sup_efficiency:   null,
-  sup_timeliness:   null,
+const rateForm = ref({
+  support_item_id: null,
+  accomplishment: '',
+  mov_link: '',
+  quality_rating: null,
+  efficiency_rating: null,
+  timeliness_rating: null,
 })
 
-const openEditModal = (entry, member, period) => {
-  const isOwn   = props.authUser?.id == member.user_id
-  const canRate = (props.isHead || props.canManage) && period.can_rate
-
-  if (!isOwn && !canRate) return
-
-  modalEntry.value = { planId: entry.plan.id, member, period, isOwn, canRate }
-  editForm.value = {
-    ipcr_id:          period.ipcr_id,
-    rating_period_id: period.rating_period_id,
-    plan_id:          entry.plan.id,
-    accomplishment:   period.accomplishment ?? "",
-    mov_link:         period.mov_link ?? "",
-    sup_quality:      period.sup_quality ?? null,
-    sup_efficiency:   period.sup_efficiency ?? null,
-    sup_timeliness:   period.sup_timeliness ?? null,
+function openRateModal(member, item) {
+  modalEntry.value = { member, item }
+  rateForm.value = {
+    support_item_id: item.id,
+    accomplishment: item.actual_accomplishment ?? '',
+    mov_link: item.mov_link ?? '',
+    quality_rating: item.quality_rating,
+    efficiency_rating: item.efficiency_rating,
+    timeliness_rating: item.timeliness_rating,
   }
   showModal.value = true
 }
 
-const closeModal = () => { showModal.value = false; modalEntry.value = null }
+function closeModal() { showModal.value = false; modalEntry.value = null }
 
-const submitEdit = () => {
+function submitModal() {
   const entry = modalEntry.value
   if (!entry) return
 
-  const onSuccess = () => {
-    closeModal()
-    Swal.fire({ icon: "success", title: "Saved", timer: 1200, showConfirmButton: false })
-  }
-  const onError = (err) => {
-    Swal.fire("Error", Object.values(err).flat().join("\n") || "Failed to save.", "error")
-  }
-
-  if (entry.isOwn && !entry.canRate) {
-    submit.post(
-      route("pm-committees.member-accomplishment", [props.committee.id, entry.member.user_id]),
-      {
-        ipcr_id:                    editForm.value.ipcr_id,
-        rating_period_id:           editForm.value.rating_period_id,
-        work_distribution_plan_id:  entry.planId,
-        term_id:                    props.selectedTermId,
-        accomplishment:             editForm.value.accomplishment,
-        mov_link:                   editForm.value.mov_link,
-      },
-      { onSuccess, onError }
-    )
-  } else {
-    submit.post(
-      route("pm-committees.rate-member", [props.committee.id, entry.member.user_id]),
-      {
-        ipcr_id:                    editForm.value.ipcr_id,
-        rating_period_id:           editForm.value.rating_period_id,
-        work_distribution_plan_id:  editForm.value.plan_id,
-        term_id:                    props.selectedTermId,
-        accomplishment:             editForm.value.accomplishment,
-        mov_link:                   editForm.value.mov_link,
-        sup_quality:                editForm.value.sup_quality,
-        sup_efficiency:             editForm.value.sup_efficiency,
-        sup_timeliness:             editForm.value.sup_timeliness,
-      },
-      { onSuccess, onError }
-    )
-  }
+  submit.post(
+    route('pm-committees.rate', entry.member.assignment_id),
+    rateForm.value,
+    {
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Saved', timer: 1200, showConfirmButton: false }) },
+      onError: (err) => Swal.fire('Error', Object.values(err).flat().join('\n') || 'Failed to save.', 'error'),
+    }
+  )
 }
 
-const adjectival = ipcrAdjectivalRating
-
-// monday-style rollup: pull the member's Done board tasks into the
+// monday-style rollup: pull the member's Done tasks (current period) into the
 // accomplishment text as evidence lines.
 const doneTasksFor = (userId) => props.tasks.filter(t =>
-  t.status === "done" && (t.assignees ?? []).some(a => a.id === userId)
+  t.status === 'done' && (t.assignees ?? []).some(a => a.id === userId)
 )
-const compileDoneTasks = () => {
+function compileDoneTasks() {
   const member = modalEntry.value?.member
   if (!member) return
   const lines = doneTasksFor(member.user_id).map(t => `• ${t.title}`)
   if (!lines.length) return
-  const existing = editForm.value.accomplishment?.trim()
-  editForm.value.accomplishment = (existing ? existing + "\n" : "") + lines.join("\n")
+  const existing = rateForm.value.accomplishment?.trim()
+  rateForm.value.accomplishment = (existing ? existing + '\n' : '') + lines.join('\n')
 }
 
-const computeAvg = (q, e, t) => {
-  const vals = [q, e, t].filter(v => v !== null && v !== "" && !isNaN(v)).map(Number)
-  if (!vals.length) return null
-  return vals.reduce((a, b) => a + b, 0) / vals.length
-}
+// ── Helpers ────────────────────────────────────────────────────────────────
+const adjectival = ipcrAdjectivalRating
 
 const liveAvg = computed(() => {
-  const v = computeAvg(editForm.value.sup_quality, editForm.value.sup_efficiency, editForm.value.sup_timeliness)
-  return v !== null ? v.toFixed(2) : "—"
+  const vals = [rateForm.value.quality_rating, rateForm.value.efficiency_rating, rateForm.value.timeliness_rating]
+    .filter(v => v !== null && v !== '' && !isNaN(v))
+    .map(Number)
+  if (!vals.length) return null
+  return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)
 })
 
-const roleLabels = { chairperson: 'Chairperson', co_chair: 'Co-Chair', secretary: 'Secretary', member: 'Member' }
-const roleLabel = (role) => roleLabels[role] ?? role ?? '—'
+function roleBadge(role) {
+  return {
+    chairperson: 'amber',
+    co_chair:    'amber',
+    secretary:   'blue',
+    member:      'slate',
+  }[role] ?? 'slate'
+}
 
-const statusColor = (status) => {
-  if (status === 'Submitted for Rating') return 'blue'
-  if (status === 'Rated & For PMT Review' || status === 'Submitted to PMT') return 'green'
-  if (status === 'PMT Returned for Revision') return 'red'
-  if (status === 'Approved by PMT') return 'purple'
-  return 'slate'
+function roleLabel(role) {
+  return { chairperson: 'Chairperson', co_chair: 'Co-Chair', secretary: 'Secretary', member: 'Member' }[role] ?? role
+}
+
+function canRateItem(item) {
+  return (props.isChairperson || props.canManage) && !NOT_YET_RATABLE_STATUSES.includes(item.ipcr_status)
 }
 </script>
 
 <template>
-  <Head :title="`Committee — ${committee.name}`" />
+  <Head :title="`${committee.name} — Committee`" />
   <AdminLayout :title="committee.name">
     <div class="space-y-5">
+
       <!-- Header -->
       <div class="flex items-center gap-3">
         <Link :href="route('pm-committees.index')"
           class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 transition-colors">
-          <ArrowLeftIcon class="w-4 h-4" /> Back
+          <ArrowLeftIcon class="w-4 h-4" /> Back to Committees
         </Link>
-        <h1 class="font-heading text-xl font-semibold text-slate-800">{{ committee.name }}</h1>
       </div>
 
-      <!-- Committee Info -->
+      <!-- Committee Info Card -->
       <AppCard>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
-            <span class="text-slate-500 font-medium">Committee Head:</span>
-            <p class="font-semibold text-slate-800 mt-0.5">{{ committee.head?.name ?? "—" }}</p>
+            <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Committee</p>
+            <p class="font-semibold text-slate-800 mt-0.5">{{ committee.name }}</p>
+            <span v-if="committee.code" class="font-mono text-xs text-indigo-600">{{ committee.code }}</span>
           </div>
           <div>
-            <span class="text-slate-500 font-medium">Active Members (this term):</span>
-            <p class="font-semibold text-slate-800 mt-0.5">{{ activeMemberCount }}</p>
+            <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Chairperson</p>
+            <p class="font-semibold text-slate-800 mt-0.5">{{ committee.head?.name ?? '—' }}</p>
+            <p v-if="committee.head?.position" class="text-xs text-slate-400">{{ committee.head.position }}</p>
           </div>
           <div>
-            <span class="text-slate-500 font-medium">Description:</span>
-            <p class="text-slate-700 mt-0.5">{{ committee.description ?? "—" }}</p>
+            <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Load Rates</p>
+            <p class="text-slate-700 mt-0.5">Chair: <strong>{{ committee.chairperson_load_units }}</strong> units</p>
+            <p class="text-slate-700">Member: <strong>{{ committee.member_load_units }}</strong> units</p>
           </div>
-          <div>
-            <span class="text-slate-500 font-medium">Term:</span>
-            <AppSelect :model-value="selectedTermId" :show-blank="false" class="mt-0.5"
-              @update:model-value="v => switchTerm(Number(v))">
-              <option v-for="t in terms" :key="t.id" :value="t.id">
-                {{ t.label }}{{ t.is_current ? ' (Current)' : '' }}
-              </option>
-            </AppSelect>
+          <div v-if="committee.description">
+            <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Description</p>
+            <p class="text-slate-700 mt-0.5 text-xs leading-relaxed">{{ committee.description }}</p>
           </div>
         </div>
       </AppCard>
+
+      <!-- Term selector -->
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-sm font-medium text-slate-600">Term:</span>
+        <div class="w-64">
+          <AppSelect :model-value="selectedTermId" :show-blank="false"
+            @update:model-value="v => switchTerm(Number(v))">
+            <option v-for="t in terms" :key="t.id" :value="t.id">
+              {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
+            </option>
+          </AppSelect>
+        </div>
+      </div>
 
       <AppTabs v-model="activeTab" :tabs="boardTabs">
         <template #tab-board>
@@ -225,133 +209,115 @@ const statusColor = (status) => {
         </template>
 
         <template #tab-ratings>
-          <div class="space-y-5">
-
-      <!-- No tagged plans -->
-      <AppCard v-if="!planMemberData?.length">
-        <EmptyState title="No WDP plans tagged to this committee yet." :subtitle="canManage ? 'Edit the committee to tag plans.' : null" />
-      </AppCard>
-
-      <!-- Plan sections -->
-      <AppCard v-for="entry in planMemberData" :key="entry.plan.id" :padded="false"
-        :title="entry.plan.success_indicator" :subtitle="`Rated by: ${entry.plan.rated_by || 'Division Chief'}`">
-        <div v-if="!entry.members?.length" class="p-5 text-sm text-slate-400 italic">
-          No members in this committee.
-        </div>
-
-        <AppTable v-else :card="false">
-          <template #head>
-            <tr>
-              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Member</th>
-              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Role</th>
-              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Rating Period</th>
-              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">IPCR Status</th>
-              <th class="px-3 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Accomplishment</th>
-              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Q</th>
-              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">E</th>
-              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">T</th>
-              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Avg</th>
-              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Rating</th>
-              <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Action</th>
-            </tr>
-          </template>
-
-          <template v-for="member in entry.members" :key="member.user_id">
-            <template v-if="member.periods.length">
-              <tr
-                    v-for="(period, pIdx) in member.periods"
-                    :key="`${member.user_id}-${period.ipcr_id}`"
-                    :class="pIdx === 0 ? 'border-t-2 border-slate-200 hover:bg-indigo-50/40' : 'hover:bg-indigo-50/40'"
-                  >
-                    <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top border-r border-slate-100">
-                      <p class="font-medium text-slate-800">{{ member.user_name }}</p>
-                      <p class="text-xs text-slate-400">{{ member.user_position }}</p>
-                    </td>
-                    <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top text-slate-600 border-r border-slate-100 text-sm">
-                      {{ roleLabel(member.role) }}
-                    </td>
-                    <td class="px-3 py-2 text-sm text-indigo-700 font-medium whitespace-nowrap">{{ period.rating_period }}</td>
-                    <td class="px-3 py-2">
-                      <AppBadge :color="statusColor(period.ipcr_status)">{{ period.ipcr_status ?? "—" }}</AppBadge>
-                    </td>
-                    <td class="px-3 py-2 max-w-xs text-sm text-slate-700">
-                      <p class="truncate">{{ period.accomplishment || "—" }}</p>
-                      <a v-if="period.mov_link" :href="period.mov_link" target="_blank"
-                        class="text-indigo-600 text-xs hover:underline">MOV Link</a>
-                    </td>
-                    <td class="px-3 py-2 text-center text-sm text-slate-700">{{ period.sup_quality ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center text-sm text-slate-700">{{ period.sup_efficiency ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center text-sm text-slate-700">{{ period.sup_timeliness ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center text-sm font-semibold text-slate-800">{{ period.sup_average ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center text-xs text-slate-600">{{ adjectival(period.sup_average) }}</td>
-                    <td class="px-3 py-2 text-center">
-                      <AppButton
-                        v-if="authUser?.id == member.user_id && !(isHead || canManage)"
-                        size="sm" variant="secondary" @click="openEditModal(entry, member, period)">
-                        Edit
-                      </AppButton>
-                      <template v-else-if="isHead || canManage">
-                        <AppButton
-                          v-if="period.can_rate"
-                          size="sm" @click="openEditModal(entry, member, period)">
-                          Rate
-                        </AppButton>
-                        <span v-else class="text-xs text-warning-600 italic" title="IPCR is no longer open for rating">
-                          Locked
-                        </span>
-                      </template>
-                    </td>
-                  </tr>
-                </template>
-
-                <tr v-else :key="`${member.user_id}-no-ipcr`" class="border-t-2 border-slate-200 hover:bg-indigo-50/40">
-                  <td class="px-3 py-2 text-sm">
-                    <p class="font-medium text-slate-800">{{ member.user_name }}</p>
-                    <p class="text-xs text-slate-400">{{ member.user_position }}</p>
-                  </td>
-                  <td class="px-3 py-2 text-sm text-slate-600">{{ roleLabel(member.role) }}</td>
-                  <td colspan="9" class="px-3 py-2 text-center text-xs text-slate-400">No IPCR linked to this plan</td>
+          <AppCard :padded="false">
+            <AppTable :is-empty="!members?.length">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Member</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Role</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider max-w-xs">Accomplishment / MOV</th>
+                  <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-10">Q</th>
+                  <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-10">E</th>
+                  <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-10">T</th>
+                  <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-14">Avg</th>
+                  <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-40">Action</th>
                 </tr>
               </template>
-        </AppTable>
-      </AppCard>
-          </div>
+
+              <template v-for="member in members" :key="member.assignment_id">
+                <tr v-if="!member.items.length" class="hover:bg-indigo-50/40">
+                  <td class="px-4 py-3">
+                    <p class="font-medium text-slate-800">{{ member.user_name }}</p>
+                    <p v-if="member.user_position" class="text-xs text-slate-400">{{ member.user_position }}</p>
+                  </td>
+                  <td class="px-4 py-3"><AppBadge :color="roleBadge(member.role)">{{ roleLabel(member.role) }}</AppBadge></td>
+                  <td class="px-4 py-3 text-xs text-slate-400 italic" colspan="6">No IPCR V2 targets generated yet for this rating period.</td>
+                </tr>
+                <tr v-for="item in member.items" :key="item.id" class="hover:bg-indigo-50/40">
+                  <td class="px-4 py-3">
+                    <p class="font-medium text-slate-800">{{ member.user_name }}</p>
+                    <p v-if="member.user_position" class="text-xs text-slate-400">{{ member.user_position }}</p>
+                  </td>
+                  <td class="px-4 py-3"><AppBadge :color="roleBadge(member.role)">{{ roleLabel(member.role) }}</AppBadge></td>
+                  <td class="px-4 py-3 max-w-xs">
+                    <p class="text-slate-700 text-xs truncate">{{ item.actual_accomplishment || '—' }}</p>
+                    <a v-if="item.mov_link" :href="item.mov_link" target="_blank"
+                      class="text-indigo-600 text-xs hover:underline">MOV Link ↗</a>
+                  </td>
+                  <td class="px-3 py-3 text-center text-sm text-slate-700">{{ item.quality_rating ?? '—' }}</td>
+                  <td class="px-3 py-3 text-center text-sm text-slate-700">{{ item.efficiency_rating ?? '—' }}</td>
+                  <td class="px-3 py-3 text-center text-sm text-slate-700">{{ item.timeliness_rating ?? '—' }}</td>
+                  <td class="px-3 py-3 text-center text-sm font-semibold text-slate-800">{{ item.row_average ?? '—' }}</td>
+                  <td class="px-3 py-3 text-center">
+                    <AppButton v-if="canRateItem(item)" size="sm" @click="openRateModal(member, item)">Rate</AppButton>
+                    <span v-else-if="isChairperson || canManage" class="text-xs text-slate-400 italic">Targets not yet approved</span>
+                  </td>
+                </tr>
+              </template>
+
+              <template #mobileCard>
+                <template v-for="member in members" :key="member.assignment_id">
+                  <div v-for="item in (member.items.length ? member.items : [null])" :key="item?.id ?? 'none'" class="p-4 space-y-2">
+                    <div class="flex items-start justify-between gap-2">
+                      <div>
+                        <p class="font-medium text-slate-800">{{ member.user_name }}</p>
+                        <p v-if="member.user_position" class="text-xs text-slate-400">{{ member.user_position }}</p>
+                      </div>
+                      <AppBadge :color="roleBadge(member.role)">{{ roleLabel(member.role) }}</AppBadge>
+                    </div>
+                    <template v-if="item">
+                      <p class="text-xs text-slate-700">{{ item.actual_accomplishment || '—' }}</p>
+                      <a v-if="item.mov_link" :href="item.mov_link" target="_blank"
+                        class="text-indigo-600 text-xs hover:underline">MOV Link ↗</a>
+                      <div class="flex justify-between text-xs text-slate-500">
+                        <span>Q {{ item.quality_rating ?? '—' }} · E {{ item.efficiency_rating ?? '—' }} · T {{ item.timeliness_rating ?? '—' }}</span>
+                        <span class="font-semibold text-slate-800">Avg {{ item.row_average ?? '—' }}</span>
+                      </div>
+                      <div class="pt-1">
+                        <AppButton v-if="canRateItem(item)" size="sm" @click="openRateModal(member, item)">Rate</AppButton>
+                        <span v-else-if="isChairperson || canManage" class="text-xs text-slate-400 italic">Targets not yet approved</span>
+                      </div>
+                    </template>
+                    <p v-else class="text-xs text-slate-400 italic">No IPCR V2 targets generated yet for this rating period.</p>
+                  </div>
+                </template>
+              </template>
+
+              <template #empty>
+                <EmptyState title="No active members for this committee this term." />
+              </template>
+            </AppTable>
+          </AppCard>
         </template>
       </AppTabs>
     </div>
 
-    <!-- Edit / Rate Modal -->
-    <AppModal :show="showModal" :title="(modalEntry?.isOwn && !modalEntry?.canRate) ? 'Edit Accomplishment' : 'Rate Member'"
-      :subtitle="modalEntry ? `${modalEntry.member?.user_name} — Period: ${modalEntry.period?.rating_period}` : null"
-      size="lg" @close="closeModal">
-      <form @submit.prevent="submitEdit" class="space-y-4">
-        <AppTextarea
-          v-model="editForm.accomplishment" label="Accomplishment" :rows="3"
-          :readonly="!modalEntry?.isOwn && !modalEntry?.canRate" />
-        <button v-if="modalEntry && (modalEntry.isOwn || modalEntry.canRate) && doneTasksFor(modalEntry.member.user_id).length" type="button"
-          class="text-xs text-indigo-600 hover:underline -mt-2 block"
+    <!-- Rate Modal -->
+    <AppModal :show="showModal"
+      :title="'Rate Member — ' + (modalEntry?.member?.user_name ?? '')"
+      :subtitle="committee.name" size="lg" @close="closeModal">
+      <form @submit.prevent="submitModal" class="space-y-4">
+        <AppTextarea v-model="rateForm.accomplishment" label="Accomplishment" :rows="3" />
+        <button v-if="modalEntry && doneTasksFor(modalEntry.member.user_id).length" type="button"
+          class="text-xs text-indigo-600 hover:underline -mt-2"
           @click="compileDoneTasks">
           + Compile {{ doneTasksFor(modalEntry.member.user_id).length }} done task(s) from the board into the accomplishment
         </button>
-        <AppInput
-          v-model="editForm.mov_link" type="url" label="MOV Link" placeholder="https://..."
-          :readonly="!modalEntry?.isOwn && !modalEntry?.canRate" />
+        <AppInput v-model="rateForm.mov_link" type="url" label="MOV Link" placeholder="https://…" />
 
-        <template v-if="modalEntry?.canRate">
-          <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
-            <p class="font-semibold text-slate-700 mb-1">Rating Scale:</p>
-            <p>5 — Outstanding &nbsp; 4 — Very Satisfactory &nbsp; 3 — Satisfactory &nbsp; 2 — Unsatisfactory &nbsp; 1 — Poor</p>
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <AppInput v-model.number="editForm.sup_quality" type="number" min="1" max="5" step="0.01" label="Quality (1–5)" />
-            <AppInput v-model.number="editForm.sup_efficiency" type="number" min="1" max="5" step="0.01" label="Efficiency (1–5)" />
-            <AppInput v-model.number="editForm.sup_timeliness" type="number" min="1" max="5" step="0.01" label="Timeliness (1–5)" />
-          </div>
-          <div class="text-sm text-slate-700">
-            Live Average: <strong class="text-indigo-700">{{ liveAvg }}</strong>
-            <span v-if="liveAvg !== '—'" class="ml-2 text-slate-500">— {{ adjectival(liveAvg) }}</span>
-          </div>
-        </template>
+        <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+          <p class="font-semibold text-slate-700 mb-1">Rating Scale:</p>
+          <p>5 — Outstanding &nbsp; 4 — Very Satisfactory &nbsp; 3 — Satisfactory &nbsp; 2 — Unsatisfactory &nbsp; 1 — Poor</p>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <AppInput v-model.number="rateForm.quality_rating" type="number" min="1" max="5" label="Quality (1–5)" />
+          <AppInput v-model.number="rateForm.efficiency_rating" type="number" min="1" max="5" label="Efficiency (1–5)" />
+          <AppInput v-model.number="rateForm.timeliness_rating" type="number" min="1" max="5" label="Timeliness (1–5)" />
+        </div>
+        <div class="text-sm text-slate-700">
+          Live Average: <strong class="text-indigo-700">{{ liveAvg ?? '—' }}</strong>
+          <span v-if="liveAvg" class="ml-2 text-slate-500">— {{ adjectival(liveAvg) }}</span>
+        </div>
 
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
           <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>

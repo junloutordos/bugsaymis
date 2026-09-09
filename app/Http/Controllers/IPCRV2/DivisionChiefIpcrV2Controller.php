@@ -20,7 +20,8 @@ class DivisionChiefIpcrV2Controller extends Controller
         private StrategicFunctionService $strategic,
         private \App\Services\IPCRV2\IpcrV2SummaryService $summaryService = new \App\Services\IPCRV2\IpcrV2SummaryService(),
         private DigitalSignatureService $sigService = new DigitalSignatureService(),
-        private PersonNameFormatter $nameFormatter = new PersonNameFormatter()
+        private PersonNameFormatter $nameFormatter = new PersonNameFormatter(),
+        private \App\Services\PerformanceManagement\CommitteeIpcrRatingService $committeeRating = new \App\Services\PerformanceManagement\CommitteeIpcrRatingService(),
     ) {}
 
     public function index(Request $request)
@@ -48,6 +49,10 @@ class DivisionChiefIpcrV2Controller extends Controller
 
         $record->user->setAttribute('formatted_name', $this->nameFormatter->formal($record->user));
         $ocdUser = \App\Models\User::havingRole('OCD')->first();
+
+        $record->supportItems->each(
+            fn ($item) => $item->setAttribute('is_committee_sourced', $this->committeeRating->isCommitteeSourced($item))
+        );
 
         return Inertia::render('IPCRV2/DivisionChiefIpcrV2Show', [
             'ipcr' => $record,
@@ -148,6 +153,11 @@ class DivisionChiefIpcrV2Controller extends Controller
         $record = IpcrV2Record::findOrFail($id);
         $this->workflow->assertCanManage($request->user(), $record);
         abort_if($supportItem->ipcr_v2_id !== $record->id, 404);
+        abort_if(
+            $this->committeeRating->isCommitteeSourced($supportItem),
+            403,
+            'This item is rated via its Committee Assignment, not here.'
+        );
 
         $data = $request->validate([
             'quality_rating' => 'required|integer|min:1|max:5',

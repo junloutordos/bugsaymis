@@ -1,72 +1,741 @@
+<template>
+  <Head title="Committees" />
+  <AdminLayout title="Committees">
+    <div class="space-y-5">
+
+      <AppPageHeader title="Committees" subtitle="Committee catalog, per-term assignments, and ratings.">
+        <template #actions>
+          <AppButton v-if="canManage && activeTab === 'assignments'" @click="openForm()">
+            <PlusIcon class="h-4 w-4" /> Assign Committee
+          </AppButton>
+          <AppButton v-if="activeTab === 'catalog'" @click="openCatalogModal('create')">
+            <PlusIcon class="w-4 h-4" /> New Committee
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
+      <!-- Flash -->
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
+      </div>
+      <div v-if="Object.keys($page.props.errors ?? {}).length" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm space-y-1">
+        <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
+      </div>
+
+      <AppTabs v-model="activeTab" :tabs="pageTabs">
+        <template #tab-assignments>
+          <div class="space-y-5">
+            <!-- Filters + Search -->
+            <AppFilterBar>
+              <div class="w-56">
+                <AppInput v-model="search" type="text" placeholder="Search faculty or committee…" />
+              </div>
+              <select v-model="filters.term_id" @change="applyFilters"
+                class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <option v-for="t in terms" :key="t.id" :value="t.id">
+                  {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
+                </option>
+              </select>
+              <select v-model="filters.faculty_id" @change="applyFilters"
+                class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <option :value="null">All Faculty</option>
+                <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+            </AppFilterBar>
+
+            <!-- Table -->
+            <AppTable :is-empty="displayed.length === 0" :skeleton-cols="6">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Faculty</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Committee</th>
+                  <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Role</th>
+                  <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Units</th>
+                  <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                  <th class="px-4 py-3"></th>
+                </tr>
+              </template>
+
+              <tr v-for="a in displayed" :key="a.id" class="hover:bg-slate-50/50">
+                <td class="px-4 py-3 font-medium text-slate-800">{{ a.faculty?.name ?? '—' }}</td>
+                <td class="px-4 py-3">
+                  <p v-if="getParentName(a)" class="text-xs text-indigo-500 font-medium">
+                    {{ getParentName(a) }} ›
+                  </p>
+                  <p class="text-slate-800">{{ a.committee_name }}</p>
+                  <p v-if="a.committee?.code" class="text-xs text-slate-400 font-mono">{{ a.committee.code }}</p>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <AppBadge :color="roleBadge(a.role)">
+                    <StarIcon v-if="a.is_chairperson" class="h-3 w-3" />
+                    {{ roleLabel(a.role) }}
+                  </AppBadge>
+                </td>
+                <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ a.load_units }}</td>
+                <td class="px-4 py-3 text-center">
+                  <AppBadge :color="statusBadge(a.status)">{{ a.status }}</AppBadge>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <div class="flex items-center justify-end gap-1">
+                    <AppButton v-if="a.committee_id" as="link" variant="ghost" size="sm" title="View detail"
+                      :href="route('pm-committees.show', a.committee_id)">
+                      <ArrowRightIcon class="h-4 w-4" />
+                    </AppButton>
+                    <AppIconButton label="Edit" @click="openForm(a)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+                    <AppIconButton label="Remove" variant="danger" @click="remove(a)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                  </div>
+                </td>
+              </tr>
+
+              <template #mobileCard>
+                <div v-for="a in displayed" :key="a.id" class="p-4 space-y-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p class="font-medium text-slate-800">{{ a.faculty?.name ?? '—' }}</p>
+                      <p v-if="getParentName(a)" class="text-xs text-indigo-500 font-medium">{{ getParentName(a) }} ›</p>
+                      <p class="text-sm text-slate-700">{{ a.committee_name }}</p>
+                    </div>
+                    <AppBadge :color="statusBadge(a.status)">{{ a.status }}</AppBadge>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <AppBadge :color="roleBadge(a.role)">
+                      <StarIcon v-if="a.is_chairperson" class="h-3 w-3" />
+                      {{ roleLabel(a.role) }}
+                    </AppBadge>
+                    <span class="text-xs text-slate-500">{{ a.load_units }} unit(s)</span>
+                  </div>
+                  <div class="flex items-center gap-1 pt-1">
+                    <AppButton v-if="a.committee_id" as="link" size="sm"
+                      :href="route('pm-committees.show', a.committee_id)">View</AppButton>
+                    <AppIconButton label="Edit" @click="openForm(a)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+                    <AppIconButton label="Remove" variant="danger" @click="remove(a)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                  </div>
+                </div>
+              </template>
+
+              <template #empty>
+                <EmptyState title="No committee assignments found" :icon="UserGroupIcon" />
+              </template>
+
+              <template #footer>
+                <PaginationControl
+                  :current-page="page"
+                  :total-pages="totalPages"
+                  :total="filtered.length"
+                  @prev="page--"
+                  @next="page++"
+                  @page="page = $event"
+                />
+              </template>
+            </AppTable>
+          </div>
+        </template>
+
+        <template #tab-catalog>
+          <div class="space-y-5">
+            <AppFilterBar>
+              <AppInput v-model="catalogSearch" placeholder="Search committees..." class="w-full sm:w-72" />
+              <select v-model="fyFilter" @change="applyCatalogFilters"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option v-for="y in fiscalYears" :key="y" :value="String(y)">FY {{ y }}</option>
+                <option value="all">All years</option>
+              </select>
+            </AppFilterBar>
+
+            <AppTable :is-empty="paginatedCatalog.length === 0" :skeleton-cols="6">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Structure</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Head</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active This Term</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Plans</th>
+                  <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                </tr>
+              </template>
+
+              <template v-for="committee in paginatedCatalog" :key="committee.id">
+                <tr class="hover:bg-indigo-50/40">
+                  <td class="px-4 py-3 font-medium text-slate-800">{{ committee.name }}</td>
+                  <td class="px-4 py-3">
+                    <AppBadge :color="structureBadge(committee)">
+                      {{ committee.sub_committees?.length ? `Main (${committee.sub_committees.length} sub)` : 'Simple' }}
+                    </AppBadge>
+                  </td>
+                  <td class="px-4 py-3 text-slate-700">{{ committee.head?.name ?? "—" }}</td>
+                  <td class="px-4 py-3 text-slate-700">{{ committee.active_assignment_count ?? 0 }}</td>
+                  <td class="px-4 py-3 text-slate-700">{{ committee.work_distribution_plans?.length ?? 0 }}</td>
+                  <td class="px-4 py-3 text-center">
+                    <div class="flex items-center justify-center gap-1">
+                      <Link :href="route('pm-committees.show', committee.id)" title="View Performance"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                        <ArrowRightIcon class="w-4 h-4" />
+                      </Link>
+                      <AppIconButton v-if="canManage" label="Edit" @click="openCatalogModal('edit', committee)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+                      <AppIconButton v-if="canManage" label="Delete" variant="danger" @click="deleteCatalogCommittee(committee)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-for="sub in committee.sub_committees" :key="'sub-' + sub.id"
+                  class="bg-slate-50/40 hover:bg-slate-50">
+                  <td class="px-4 py-2 pl-10 text-slate-600">
+                    <span class="text-slate-400 mr-1">└</span>
+                    {{ sub.name }}
+                    <span class="ml-1 text-xs italic text-slate-400">Sub-committee</span>
+                  </td>
+                  <td class="px-4 py-2"></td>
+                  <td class="px-4 py-2 text-slate-600 text-xs">{{ sub.head?.name ?? "—" }}</td>
+                  <td class="px-4 py-2 text-slate-600 text-xs">{{ sub.active_assignment_count ?? 0 }}</td>
+                  <td class="px-4 py-2 text-slate-400 text-xs">—</td>
+                  <td class="px-4 py-2 text-center">
+                    <Link :href="route('pm-committees.show', sub.id)"
+                      class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors mx-auto" title="View Performance">
+                      <ArrowRightIcon class="w-4 h-4" />
+                    </Link>
+                  </td>
+                </tr>
+              </template>
+
+              <template #empty>
+                <EmptyState title="No committees found" />
+              </template>
+
+              <template #footer>
+                <PaginationControl
+                  :current-page="catalogPage"
+                  :total-pages="totalCatalogPages"
+                  @prev="catalogPage--"
+                  @next="catalogPage++"
+                  @page="catalogPage = $event"
+                />
+              </template>
+            </AppTable>
+          </div>
+        </template>
+      </AppTabs>
+
+    </div>
+
+    <!-- Create / Edit Assignment Modal -->
+    <AppModal :show="modal" :title="`${form.id ? 'Edit' : 'Assign'} Committee`" size="lg" @close="modal = false">
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Faculty + term (create only) -->
+        <template v-if="!form.id">
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
+            <select v-model="form.user_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">Select faculty...</option>
+              <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
+            <select v-model="form.academic_term_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">Select term...</option>
+              <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">School Year *</label>
+            <select v-model="form.school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">Select SY...</option>
+              <option v-for="t in terms" :key="'sy-' + t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+          </div>
+        </template>
+
+        <!-- Level 1: Top-level committee picker -->
+        <div class="col-span-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Committee</label>
+          <select v-model="selectedParentId" @change="onParentCommitteeChange"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">— Custom / not in catalog —</option>
+            <option v-for="c in committees" :key="c.id" :value="c.id">
+              {{ c.name }}{{ c.sub_committees?.length ? ' (Main)' : '' }}{{ c.code ? ' (' + c.code + ')' : '' }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Level 2: Sub-committee picker (only when parent has sub-committees) -->
+        <div v-if="selectedParent?.sub_committees?.length" class="col-span-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Sub-committee *</label>
+          <select v-model="form.committee_id" @change="onSubCommitteeChange"
+            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">— Select sub-committee —</option>
+            <option v-for="s in selectedParent.sub_committees" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+
+        <div class="col-span-2">
+          <AppInput v-model="form.committee_name" label="Committee Name" required />
+        </div>
+
+        <AppSelect :model-value="form.role" label="Role" required :show-blank="false"
+          @update:model-value="v => { form.role = v; onRoleChange() }">
+          <option v-for="r in roles" :key="r.value" :value="r.value">{{ r.label }}</option>
+        </AppSelect>
+
+        <AppInput v-model.number="form.load_units" type="number" step="0.25" min="0" max="5" label="Load Units" required />
+
+        <div v-if="form.id" class="col-span-2">
+          <AppSelect v-model="form.status" label="Status" :show-blank="false">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </AppSelect>
+        </div>
+
+        <div class="col-span-2">
+          <AppTextarea v-model="form.remarks" label="Remarks" :rows="2" />
+        </div>
+
+        <!-- Tagged WDP Plans with search -->
+        <div class="col-span-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
+          <AppInput v-model="planSearch" type="text" placeholder="Search plans..." />
+          <div class="mt-2 border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+            <label v-for="p in filteredPlans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+              <input type="checkbox" :checked="form.plan_ids.includes(p.id)" @change="togglePlan(p.id)"
+                class="mt-0.5 rounded border-slate-300 text-indigo-600" />
+              <span class="text-slate-700 leading-snug">{{ p.success_indicator }}
+                <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+              </span>
+            </label>
+            <p v-if="!filteredPlans.length" class="text-slate-400 text-xs px-1">
+              {{ planSearch ? 'No plans match your search.' : 'No plans available.' }}
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">{{ form.plan_ids.length }} plan(s) selected</p>
+        </div>
+
+        <!-- This member's own linked WDPs (edit only — needs a persisted assignment id) -->
+        <div v-if="form.id" class="col-span-2 border-t border-slate-100 pt-3">
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            This Member's Own Linked Work Distribution Plans (IPCR)
+          </label>
+          <p class="text-xs text-slate-400 mb-1">
+            {{ form.load_units > 0 ? 'This assignment carries units and defaults to a Core Function on IPCR.' : 'This assignment has no load and defaults to a Support Function on IPCR.' }}
+            Select specific plans to link explicitly to this member; leave blank to use the automatic default.
+          </p>
+          <AppInput v-model="ownPlanSearch" type="text" placeholder="Search plans..." />
+          <div class="mt-2 border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+            <label v-for="p in filteredOwnPlans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+              <input type="checkbox" :checked="ownPlanIds.includes(p.id)" @change="toggleOwnPlan(p.id)"
+                class="mt-0.5 rounded border-slate-300 text-indigo-600" />
+              <span class="text-slate-700 leading-snug">{{ p.success_indicator }}
+                <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+              </span>
+            </label>
+            <p v-if="!filteredOwnPlans.length" class="text-slate-400 text-xs px-1">
+              {{ ownPlanSearch ? 'No plans match your search.' : 'No plans available.' }}
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">{{ ownPlanIds.length }} plan(s) selected for this member</p>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="modal = false">Cancel</AppButton>
+        <AppButton :loading="form.processing" @click="save">{{ form.id ? 'Update' : 'Save' }}</AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Create / Edit Catalog Committee Modal -->
+    <AppModal :show="showCatalogModal" :title="catalogModalMode === 'create' ? 'New Committee' : 'Edit Committee'" size="2xl" @close="closeCatalogModal">
+      <form @submit.prevent="submitCatalogCommittee" class="space-y-4">
+        <AppInput v-model="catalogForm.name" label="Name" required />
+
+        <AppSelect v-model="catalogForm.head_id" :label="catalogForm.has_subcommittees ? 'Main Chairperson' : 'Committee Head'" placeholder="— None —">
+          <option v-for="u in users" :key="u.id" :value="u.id">
+            {{ u.name }}<span v-if="u.position"> ({{ u.position }})</span>
+          </option>
+        </AppSelect>
+
+        <AppTextarea v-model="catalogForm.description" label="Description" :rows="2" />
+
+        <AppSelect v-model="catalogForm.fiscal_year" label="Fiscal Year">
+          <option :value="null">All years (unscoped)</option>
+          <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+        </AppSelect>
+
+        <!-- Structure Toggle -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Committee Structure</label>
+          <div class="flex gap-2">
+            <AppButton type="button" size="sm" :variant="!catalogForm.has_subcommittees ? 'primary' : 'secondary'" @click="catalogForm.has_subcommittees = false">Simple Committee</AppButton>
+            <AppButton type="button" size="sm" :variant="catalogForm.has_subcommittees ? 'primary' : 'secondary'" @click="catalogForm.has_subcommittees = true">Main Committee (with Sub-committees)</AppButton>
+          </div>
+        </div>
+
+        <!-- WDP Plans (always at main committee level) -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
+          <AppInput v-model="catalogPlanSearch" placeholder="Search plans..." class="mb-2" />
+          <div class="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+            <div v-for="p in filteredCatalogPlans" :key="p.id" class="flex items-start gap-2">
+              <input type="checkbox" :value="p.id" :checked="catalogForm.plan_ids.includes(p.id)"
+                @change="toggleCatalogPlan(p.id)" class="mt-0.5 rounded border-slate-300" />
+              <span class="text-slate-700">{{ p.success_indicator }}
+                <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+              </span>
+            </div>
+            <p v-if="!filteredCatalogPlans.length" class="text-slate-400 text-xs px-1">
+              {{ catalogPlanSearch ? 'No plans match your search.' : 'No plans available.' }}
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">{{ catalogForm.plan_ids.length }} plan(s) selected</p>
+        </div>
+
+        <!-- Simple: Members -->
+        <div v-if="!catalogForm.has_subcommittees">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Members</label>
+          <AppInput v-model="catalogMemberSearch" placeholder="Search members..." class="mb-2" />
+          <div class="border border-slate-200 rounded-lg p-2 max-h-52 overflow-y-auto space-y-2 text-sm">
+            <div v-for="u in filteredCatalogUsers" :key="u.id" class="flex items-start gap-2">
+              <input type="checkbox" :value="u.id" :checked="catalogForm.member_ids.includes(u.id)"
+                @change="toggleCatalogMember(u.id)" class="mt-1 rounded border-slate-300" />
+              <div class="flex-1">
+                <span class="text-slate-700">{{ u.name }}<span v-if="u.position" class="text-slate-400"> ({{ u.position }})</span></span>
+                <input v-if="catalogForm.member_ids.includes(u.id)" v-model="catalogForm.member_tasks[u.id]"
+                  type="text" placeholder="Task / Role..."
+                  class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+            </div>
+            <p v-if="!filteredCatalogUsers.length" class="text-slate-400 text-xs px-1">No members match.</p>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">{{ catalogForm.member_ids.length }} member(s) selected</p>
+        </div>
+
+        <!-- Main: Sub-committees -->
+        <div v-else>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-xs font-medium text-slate-600">Sub-committees</label>
+            <button type="button" @click="addCatalogSubCommittee"
+              class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+              <PlusIcon class="w-3 h-3" /> Add Sub-committee
+            </button>
+          </div>
+          <p v-if="catalogForm.sub_committees.length === 0" class="text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg p-4 text-center">
+            No sub-committees yet. Click "Add Sub-committee" to create one.
+          </p>
+          <div v-for="(sub, idx) in catalogForm.sub_committees" :key="idx"
+            class="border border-slate-200 rounded-lg p-4 space-y-3 mb-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-600">Sub-committee {{ idx + 1 }}</span>
+              <button type="button" @click="removeCatalogSubCommittee(idx)"
+                class="text-xs text-danger-600 hover:text-danger-700">Remove</button>
+            </div>
+            <AppInput v-model="sub.name" label="Name" required />
+            <AppSelect v-model="sub.head_id" label="Head" placeholder="— None —">
+              <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </AppSelect>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Members</label>
+              <AppInput v-model="sub.memberSearch" placeholder="Search members..." class="mb-2" />
+              <div class="border border-slate-100 rounded-lg p-2 max-h-36 overflow-y-auto space-y-1 text-sm">
+                <div v-for="u in filteredCatalogSubUsers(sub)" :key="u.id" class="flex items-start gap-2">
+                  <input type="checkbox" :checked="sub.member_ids.includes(u.id)"
+                    @change="toggleCatalogSubMember(idx, u.id)" class="mt-1 rounded border-slate-300" />
+                  <div class="flex-1">
+                    <span class="text-slate-700 text-xs">{{ u.name }}</span>
+                    <input v-if="sub.member_ids.includes(u.id)" v-model="sub.member_tasks[u.id]"
+                      type="text" placeholder="Task..."
+                      class="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                  </div>
+                </div>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">{{ sub.member_ids.length }} member(s)</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <AppButton type="button" variant="secondary" @click="closeCatalogModal">Cancel</AppButton>
+          <AppButton type="submit" :loading="catalogIsSubmitting" :disabled="catalogIsSubmitting">{{ catalogIsSubmitting ? 'Saving…' : 'Save' }}</AppButton>
+        </div>
+      </form>
+    </AppModal>
+
+  </AdminLayout>
+</template>
+
 <script setup>
-import { ref, computed } from "vue"
-import { Head, Link, router } from "@inertiajs/vue3"
-import AdminLayout from "@/Layouts/AdminLayout.vue"
-import AppPageHeader from "@/Components/AppPageHeader.vue"
-import AppButton from "@/Components/AppButton.vue"
-import AppFilterBar from "@/Components/AppFilterBar.vue"
-import AppInput from "@/Components/AppInput.vue"
-import AppSelect from "@/Components/AppSelect.vue"
-import AppTextarea from "@/Components/AppTextarea.vue"
-import AppTable from "@/Components/AppTable.vue"
-import AppBadge from "@/Components/AppBadge.vue"
-import AppIconButton from "@/Components/AppIconButton.vue"
-import AppModal from "@/Components/AppModal.vue"
-import EmptyState from "@/Components/EmptyState.vue"
-import PaginationControl from "@/Components/PaginationControl.vue"
-import { PencilSquareIcon, TrashIcon, PlusIcon, ArrowRightIcon } from "@heroicons/vue/24/outline"
-import { useSubmit } from "@/Composables/useSubmit"
-import { confirmDelete as confirmDeleteDialog } from "@/Composables/useConfirm.js"
+import { computed, reactive, ref, watch } from 'vue'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppTabs from '@/Components/AppTabs.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
+import { useSubmit } from '@/Composables/useSubmit'
+import {
+  ArrowRightIcon, CheckCircleIcon, PencilSquareIcon,
+  PencilIcon, PlusIcon, StarIcon, TrashIcon, UserGroupIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  committees: Array,
-  users: Array,
-  plans: Array,
-  authUser: Object,
+  assignments: { type: Array,  default: () => [] },
+  terms:       { type: Array,  default: () => [] },
+  faculty:     { type: Array,  default: () => [] },
+  committees:  { type: Array,  default: () => [] },
+  catalog:     { type: Array,  default: () => [] },
+  plans:       { type: Array,  default: () => [] },
+  currentTerm: { type: Object, default: null },
+  filters:     { type: Object, default: () => ({}) },
+  users:       { type: Array,  default: () => [] },
+  authUser:    { type: Object, default: null },
+  canManage:   { type: Boolean, default: false },
   fiscalYears: { type: Array, default: () => [] },
   selectedFiscalYear: { type: [String, Number], default: "" },
   currentFiscalYear: { type: Number, default: null },
-  terms: { type: Array, default: () => [] },
-  selectedTermId: { type: Number, default: null },
 })
 
-const { isSubmitting, submit } = useSubmit()
+// ── Tabs ─────────────────────────────────────────────────────────────────
+// Non-managers never see the campus-wide Assignments admin table (the
+// backend sends it empty for them) — only the Catalog tab, scoped to their
+// own committees, is relevant.
+const activeTab = ref(props.canManage ? 'assignments' : 'catalog')
+const pageTabs = computed(() => props.canManage
+  ? [{ key: 'assignments', label: 'Assignments' }, { key: 'catalog', label: 'Committee Catalog' }]
+  : [{ key: 'catalog', label: 'Committee Catalog' }])
 
-// Term + fiscal-year filters are sent together so changing one never drops the other.
-const fyFilter   = ref(String(props.selectedFiscalYear ?? ""))
-const termFilter = ref(props.selectedTermId ?? null)
+const PER_PAGE = 15
+const roles = [
+  { value: 'member',      label: 'Member' },
+  { value: 'secretary',   label: 'Secretary' },
+  { value: 'co_chair',    label: 'Co-Chairperson' },
+  { value: 'chairperson', label: 'Chairperson' },
+]
 
-const applyRosterFilters = () => {
-  router.get(route("pm-committees.index"), {
-    fiscal_year: fyFilter.value,
-    term_id: termFilter.value,
-  }, { preserveState: true, preserveScroll: true })
+// ── Assignments tab: filters + search + pagination ────────────────────────
+const search = ref('')
+const page   = ref(1)
+
+const filters = reactive({
+  term_id:    props.filters.term_id    ?? props.currentTerm?.id ?? null,
+  faculty_id: props.filters.faculty_id ?? null,
+})
+
+watch(search, () => { page.value = 1 })
+
+function applyFilters() {
+  router.get(route('pm-committees.index'), filters, { preserveState: true })
 }
 
-// --- List ---
-const searchQuery = ref("")
-const currentPage = ref(1)
-const perPage = 10
-
 const filtered = computed(() => {
-  const q = searchQuery.value.toLowerCase()
-  return props.committees.filter(c => c.name?.toLowerCase().includes(q))
+  const q = search.value.toLowerCase()
+  if (!q) return props.assignments
+  return props.assignments.filter(a =>
+    a.faculty?.name?.toLowerCase().includes(q) ||
+    a.committee_name?.toLowerCase().includes(q)
+  )
 })
-const paginated = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filtered.value.slice(start, start + perPage)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PER_PAGE)))
+const displayed  = computed(() => {
+  const s = (page.value - 1) * PER_PAGE
+  return filtered.value.slice(s, s + PER_PAGE)
 })
-const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage)))
 
-// --- Modal ---
-const showModal = ref(false)
-const modalMode = ref("create")
-const memberSearch = ref("")
-const planSearch = ref("")
+function getParentName(assignment) {
+  const parentId = assignment.committee?.parent_committee_id
+  if (!parentId) return null
+  return props.committees.find(c => c.id === parentId)?.name ?? null
+}
 
-const emptySubCommittee = () => ({ id: null, name: '', head_id: '', member_ids: [], member_tasks: {}, memberSearch: '' })
+// ── Assignments tab: WDP plan search ──────────────────────────────────────
+const planSearch = ref('')
+const filteredPlans = computed(() => {
+  if (!planSearch.value) return props.plans
+  const q = planSearch.value.toLowerCase()
+  return props.plans.filter(p => p.success_indicator.toLowerCase().includes(q))
+})
 
-const emptyForm = () => ({
+// ── Assignments tab: committee cascading picker ───────────────────────────
+const selectedParentId = ref(null)
+const selectedParent = computed(() => props.committees.find(c => c.id === selectedParentId.value) ?? null)
+
+function findCommitteeById(id) {
+  if (!id) return null
+  const top = props.committees.find(c => c.id === id)
+  if (top) return top
+  for (const parent of props.committees) {
+    const sub = parent.sub_committees?.find(s => s.id === id)
+    if (sub) return sub
+  }
+  return null
+}
+
+// ── Assignments tab: modal form ────────────────────────────────────────────
+const modal = ref(false)
+const form  = useForm({
+  id: null, user_id: null, school_year_id: null, academic_term_id: null,
+  committee_id: null, committee_name: '', role: 'member',
+  load_units: 0.5, status: 'active', remarks: '', plan_ids: [],
+})
+
+const ownPlanIds = ref([])
+const ownPlanSearch = ref('')
+const filteredOwnPlans = computed(() => {
+  if (!ownPlanSearch.value) return props.plans
+  const q = ownPlanSearch.value.toLowerCase()
+  return props.plans.filter(p => p.success_indicator.toLowerCase().includes(q))
+})
+function toggleOwnPlan(id) {
+  const idx = ownPlanIds.value.indexOf(id)
+  if (idx === -1) ownPlanIds.value.push(id)
+  else ownPlanIds.value.splice(idx, 1)
+}
+
+function openForm(a = null) {
+  planSearch.value = ''
+  ownPlanSearch.value = ''
+  if (a) {
+    const parentId = a.committee?.parent_committee_id ?? a.committee?.id ?? null
+    selectedParentId.value = parentId
+
+    const committee = findCommitteeById(a.committee_id)
+    Object.assign(form, {
+      id: a.id, user_id: null, school_year_id: null, academic_term_id: null,
+      committee_id: a.committee_id, committee_name: a.committee_name,
+      role: a.role, load_units: a.load_units, status: a.status,
+      remarks: a.remarks ?? '', plan_ids: committee?.plan_ids ? [...committee.plan_ids] : [],
+    })
+    ownPlanIds.value = a.plan_ids ? [...a.plan_ids] : []
+  } else {
+    selectedParentId.value = null
+    form.reset()
+    form.id = null
+    form.role = 'member'
+    form.load_units = 0.5
+    form.status = 'active'
+    form.plan_ids = []
+    form.academic_term_id = filters.term_id ?? null
+    ownPlanIds.value = []
+  }
+  modal.value = true
+}
+
+function onParentCommitteeChange() {
+  const parent = selectedParent.value
+  if (!parent) {
+    form.committee_id   = null
+    form.committee_name = ''
+    form.plan_ids       = []
+    return
+  }
+  if (!parent.sub_committees?.length) {
+    form.committee_id   = parent.id
+    form.committee_name = parent.name
+    form.plan_ids       = [...(parent.plan_ids ?? [])]
+    onRoleChange()
+  } else {
+    form.committee_id   = null
+    form.committee_name = ''
+    form.plan_ids       = []
+  }
+}
+
+function onSubCommitteeChange() {
+  const sub = selectedParent.value?.sub_committees?.find(s => s.id === form.committee_id)
+  if (sub) {
+    form.committee_name = sub.name
+    form.plan_ids       = []
+    onRoleChange()
+  }
+}
+
+function onRoleChange() {
+  const c = findCommitteeById(form.committee_id)
+  if (!c) return
+  const isChair = ['chairperson', 'co_chair'].includes(form.role)
+  form.load_units = isChair ? c.chairperson_load_units : c.member_load_units
+}
+
+function togglePlan(id) {
+  const idx = form.plan_ids.indexOf(id)
+  if (idx === -1) form.plan_ids.push(id)
+  else form.plan_ids.splice(idx, 1)
+}
+
+function saveOwnPlans(assignmentId) {
+  useForm({ plan_ids: ownPlanIds.value }).put(route('pm-committees.plans.sync', assignmentId))
+}
+
+function save() {
+  if (form.id) {
+    form.put(route('pm-committees.update', form.id), {
+      onSuccess: () => { saveOwnPlans(form.id); modal.value = false },
+    })
+  } else {
+    form.post(route('pm-committees.store'), {
+      onSuccess: () => { modal.value = false },
+    })
+  }
+}
+
+async function remove(a) {
+  if (! await confirmDelete(`Remove "${a.committee_name}" assignment for ${a.faculty?.name}?`)) return
+  useForm({}).delete(route('pm-committees.destroy', a.id))
+}
+
+function roleBadge(role) {
+  return {
+    chairperson: 'amber',
+    co_chair:    'amber',
+    secretary:   'blue',
+    member:      'slate',
+  }[role] ?? 'slate'
+}
+
+function roleLabel(role) { return roles.find(r => r.value === role)?.label ?? role }
+
+function statusBadge(status) {
+  return {
+    active:   'green',
+    inactive: 'slate',
+  }[status] ?? 'slate'
+}
+
+// ── Catalog tab (ported from the retired PMS Committees/Index.vue) ───────
+const { isSubmitting: catalogIsSubmitting, submit: catalogSubmit } = useSubmit()
+
+const fyFilter = ref(String(props.selectedFiscalYear ?? ""))
+const applyCatalogFilters = () => {
+  router.get(route("pm-committees.index"), { fiscal_year: fyFilter.value }, { preserveState: true, preserveScroll: true })
+}
+
+const catalogSearch = ref("")
+const catalogPage = ref(1)
+const CATALOG_PER_PAGE = 10
+
+const filteredCatalog = computed(() => {
+  const q = catalogSearch.value.toLowerCase()
+  return props.catalog.filter(c => c.name?.toLowerCase().includes(q))
+})
+const paginatedCatalog = computed(() => {
+  const start = (catalogPage.value - 1) * CATALOG_PER_PAGE
+  return filteredCatalog.value.slice(start, start + CATALOG_PER_PAGE)
+})
+const totalCatalogPages = computed(() => Math.max(1, Math.ceil(filteredCatalog.value.length / CATALOG_PER_PAGE)))
+
+const showCatalogModal = ref(false)
+const catalogModalMode = ref("create")
+const catalogMemberSearch = ref("")
+const catalogPlanSearch = ref("")
+
+const emptyCatalogSubCommittee = () => ({ id: null, name: '', head_id: '', member_ids: [], member_tasks: {}, memberSearch: '' })
+
+const emptyCatalogForm = () => ({
   id: null,
   name: "",
   head_id: "",
@@ -79,36 +748,36 @@ const emptyForm = () => ({
   sub_committees: [],
 })
 
-const form = ref(emptyForm())
+const catalogForm = ref(emptyCatalogForm())
 
-const filteredUsers = computed(() => {
-  const q = memberSearch.value.toLowerCase()
+const filteredCatalogUsers = computed(() => {
+  const q = catalogMemberSearch.value.toLowerCase()
   if (!q) return props.users
   return props.users.filter(u => u.name.toLowerCase().includes(q))
 })
 
-const filteredSubUsers = (sub) => {
+const filteredCatalogSubUsers = (sub) => {
   const q = (sub.memberSearch || '').toLowerCase()
   if (!q) return props.users
   return props.users.filter(u => u.name.toLowerCase().includes(q))
 }
 
-const filteredPlans = computed(() => {
-  const q = planSearch.value.toLowerCase()
+const filteredCatalogPlans = computed(() => {
+  const q = catalogPlanSearch.value.toLowerCase()
   if (!q) return props.plans
   return props.plans.filter(p => p.success_indicator.toLowerCase().includes(q))
 })
 
-const openModal = (mode, committee = null) => {
-  modalMode.value = mode
-  showModal.value = true
-  memberSearch.value = ''
-  planSearch.value = ''
+const openCatalogModal = (mode, committee = null) => {
+  catalogModalMode.value = mode
+  showCatalogModal.value = true
+  catalogMemberSearch.value = ''
+  catalogPlanSearch.value = ''
   if ((mode === "edit" || mode === "view") && committee) {
     const memberTasks = {}
     committee.members?.forEach(m => { memberTasks[m.id] = m.pivot?.task ?? "" })
     const hasSubs = (committee.sub_committees?.length ?? 0) > 0
-    form.value = {
+    catalogForm.value = {
       id: committee.id,
       name: committee.name ?? "",
       head_id: committee.head_id ?? "",
@@ -132,24 +801,24 @@ const openModal = (mode, committee = null) => {
       }) : [],
     }
   } else {
-    form.value = emptyForm()
+    catalogForm.value = emptyCatalogForm()
   }
 }
 
-const closeModal = () => { showModal.value = false }
+const closeCatalogModal = () => { showCatalogModal.value = false }
 
-const toggleMember = (userId) => {
-  const idx = form.value.member_ids.indexOf(userId)
+const toggleCatalogMember = (userId) => {
+  const idx = catalogForm.value.member_ids.indexOf(userId)
   if (idx === -1) {
-    form.value.member_ids.push(userId)
+    catalogForm.value.member_ids.push(userId)
   } else {
-    form.value.member_ids.splice(idx, 1)
-    delete form.value.member_tasks[userId]
+    catalogForm.value.member_ids.splice(idx, 1)
+    delete catalogForm.value.member_tasks[userId]
   }
 }
 
-const toggleSubMember = (subIdx, userId) => {
-  const sub = form.value.sub_committees[subIdx]
+const toggleCatalogSubMember = (subIdx, userId) => {
+  const sub = catalogForm.value.sub_committees[subIdx]
   const idx = sub.member_ids.indexOf(userId)
   if (idx === -1) {
     sub.member_ids.push(userId)
@@ -159,27 +828,27 @@ const toggleSubMember = (subIdx, userId) => {
   }
 }
 
-const togglePlan = (planId) => {
-  const idx = form.value.plan_ids.indexOf(planId)
-  if (idx === -1) form.value.plan_ids.push(planId)
-  else form.value.plan_ids.splice(idx, 1)
+const toggleCatalogPlan = (planId) => {
+  const idx = catalogForm.value.plan_ids.indexOf(planId)
+  if (idx === -1) catalogForm.value.plan_ids.push(planId)
+  else catalogForm.value.plan_ids.splice(idx, 1)
 }
 
-const addSubCommittee = () => form.value.sub_committees.push(emptySubCommittee())
-const removeSubCommittee = (idx) => form.value.sub_committees.splice(idx, 1)
+const addCatalogSubCommittee = () => catalogForm.value.sub_committees.push(emptyCatalogSubCommittee())
+const removeCatalogSubCommittee = (idx) => catalogForm.value.sub_committees.splice(idx, 1)
 
-const submitCommittee = () => {
+const submitCatalogCommittee = () => {
   const payload = {
-    name: form.value.name,
-    head_id: form.value.head_id || null,
-    description: form.value.description,
-    fiscal_year: form.value.fiscal_year ? Number(form.value.fiscal_year) : null,
-    has_subcommittees: form.value.has_subcommittees,
-    plan_ids: form.value.plan_ids,
+    name: catalogForm.value.name,
+    head_id: catalogForm.value.head_id || null,
+    description: catalogForm.value.description,
+    fiscal_year: catalogForm.value.fiscal_year ? Number(catalogForm.value.fiscal_year) : null,
+    has_subcommittees: catalogForm.value.has_subcommittees,
+    plan_ids: catalogForm.value.plan_ids,
   }
 
-  if (form.value.has_subcommittees) {
-    payload.sub_committees = form.value.sub_committees.map(sub => ({
+  if (catalogForm.value.has_subcommittees) {
+    payload.sub_committees = catalogForm.value.sub_committees.map(sub => ({
       id: sub.id || undefined,
       name: sub.name,
       head_id: sub.head_id || null,
@@ -187,244 +856,26 @@ const submitCommittee = () => {
       member_tasks: sub.member_tasks,
     }))
   } else {
-    payload.member_ids = form.value.member_ids
-    payload.member_tasks = form.value.member_tasks
+    payload.member_ids = catalogForm.value.member_ids
+    payload.member_tasks = catalogForm.value.member_tasks
   }
 
-  if (modalMode.value === "create") {
-    submit.post(route("pm-committees.store"), payload, {
-      onSuccess: () => closeModal(),
+  if (catalogModalMode.value === "create") {
+    catalogSubmit.post(route("pm-committees.catalog.store"), payload, {
+      onSuccess: () => closeCatalogModal(),
     })
   } else {
-    submit.put(route("pm-committees.update", form.value.id), payload, {
-      onSuccess: () => closeModal(),
+    catalogSubmit.put(route("pm-committees.catalog.update", catalogForm.value.id), payload, {
+      onSuccess: () => closeCatalogModal(),
     })
   }
 }
 
-const deleteCommittee = async (committee) => {
-  const ok = await confirmDeleteDialog(`Delete "${committee.name}"? This cannot be undone.`)
+const deleteCatalogCommittee = async (committee) => {
+  const ok = await confirmDelete(`Delete "${committee.name}"? This cannot be undone.`)
   if (!ok) return
-  submit.delete(route("pm-committees.destroy", committee.id))
+  catalogSubmit.delete(route("pm-committees.catalog.destroy", committee.id))
 }
 
 const structureBadge = (committee) => committee.sub_committees?.length ? 'indigo' : 'slate'
 </script>
-
-<template>
-  <Head title="Committees" />
-  <AdminLayout title="Committees">
-    <div class="space-y-5">
-
-      <div v-if="$page.props.flash?.success" class="rounded-lg bg-success-50 border border-success-100 px-4 py-3 text-sm text-success-700">
-        {{ $page.props.flash.success }}
-      </div>
-
-      <AppPageHeader title="Committees" subtitle="Manage performance committees and members.">
-        <template #actions>
-          <AppButton @click="openModal('create')">
-            <PlusIcon class="w-4 h-4" /> New Committee
-          </AppButton>
-        </template>
-      </AppPageHeader>
-
-      <AppFilterBar>
-        <AppInput v-model="searchQuery" placeholder="Search committees..." class="w-full sm:w-72" />
-        <select v-model="fyFilter" @change="applyRosterFilters"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-          <option v-for="y in fiscalYears" :key="y" :value="String(y)">FY {{ y }}</option>
-          <option value="all">All years</option>
-        </select>
-        <select v-model="termFilter" @change="applyRosterFilters"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-          <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}{{ t.is_current ? ' (Current)' : '' }}</option>
-        </select>
-      </AppFilterBar>
-
-      <AppTable :is-empty="paginated.length === 0" :skeleton-cols="6">
-        <template #head>
-          <tr>
-            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
-            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Structure</th>
-            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Head</th>
-            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active This Term</th>
-            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Plans</th>
-            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
-          </tr>
-        </template>
-
-        <template v-for="committee in paginated" :key="committee.id">
-          <tr class="hover:bg-indigo-50/40">
-            <td class="px-4 py-3 font-medium text-slate-800">{{ committee.name }}</td>
-            <td class="px-4 py-3">
-              <AppBadge :color="structureBadge(committee)">
-                {{ committee.sub_committees?.length ? `Main (${committee.sub_committees.length} sub)` : 'Simple' }}
-              </AppBadge>
-            </td>
-            <td class="px-4 py-3 text-slate-700">{{ committee.head?.name ?? "—" }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ committee.active_assignment_count ?? 0 }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ committee.work_distribution_plans?.length ?? 0 }}</td>
-            <td class="px-4 py-3 text-center">
-              <div class="flex items-center justify-center gap-1">
-                <Link :href="route('pm-committees.show', committee.id)" title="View Performance"
-                  class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-                  <ArrowRightIcon class="w-4 h-4" />
-                </Link>
-                <AppIconButton label="Edit" @click="openModal('edit', committee)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
-                <AppIconButton label="Delete" variant="danger" @click="deleteCommittee(committee)"><TrashIcon class="w-4 h-4" /></AppIconButton>
-              </div>
-            </td>
-          </tr>
-          <tr v-for="sub in committee.sub_committees" :key="'sub-' + sub.id"
-            class="bg-slate-50/40 hover:bg-slate-50">
-            <td class="px-4 py-2 pl-10 text-slate-600">
-              <span class="text-slate-400 mr-1">└</span>
-              {{ sub.name }}
-              <span class="ml-1 text-xs italic text-slate-400">Sub-committee</span>
-            </td>
-            <td class="px-4 py-2"></td>
-            <td class="px-4 py-2 text-slate-600 text-xs">{{ sub.head?.name ?? "—" }}</td>
-            <td class="px-4 py-2 text-slate-600 text-xs">{{ sub.active_assignment_count ?? 0 }}</td>
-            <td class="px-4 py-2 text-slate-400 text-xs">—</td>
-            <td class="px-4 py-2 text-center">
-              <Link :href="route('pm-committees.show', sub.id)"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors mx-auto" title="View Performance">
-                <ArrowRightIcon class="w-4 h-4" />
-              </Link>
-            </td>
-          </tr>
-        </template>
-
-        <template #empty>
-          <EmptyState title="No committees found" />
-        </template>
-
-        <template #footer>
-          <PaginationControl
-            :current-page="currentPage"
-            :total-pages="totalPages"
-            @prev="currentPage--"
-            @next="currentPage++"
-            @page="currentPage = $event"
-          />
-        </template>
-      </AppTable>
-
-      <!-- MODAL -->
-      <AppModal :show="showModal" :title="modalMode === 'create' ? 'New Committee' : 'Edit Committee'" size="2xl" @close="closeModal">
-        <form @submit.prevent="submitCommittee" class="space-y-4">
-          <AppInput v-model="form.name" label="Name" required />
-
-          <AppSelect v-model="form.head_id" :label="form.has_subcommittees ? 'Main Chairperson' : 'Committee Head'" placeholder="— None —">
-            <option v-for="u in props.users" :key="u.id" :value="u.id">
-              {{ u.name }}<span v-if="u.position"> ({{ u.position }})</span>
-            </option>
-          </AppSelect>
-
-          <AppTextarea v-model="form.description" label="Description" :rows="2" />
-
-          <AppSelect v-model="form.fiscal_year" label="Fiscal Year">
-            <option :value="null">All years (unscoped)</option>
-            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
-          </AppSelect>
-
-          <!-- Structure Toggle -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Committee Structure</label>
-            <div class="flex gap-2">
-              <AppButton type="button" size="sm" :variant="!form.has_subcommittees ? 'primary' : 'secondary'" @click="form.has_subcommittees = false">Simple Committee</AppButton>
-              <AppButton type="button" size="sm" :variant="form.has_subcommittees ? 'primary' : 'secondary'" @click="form.has_subcommittees = true">Main Committee (with Sub-committees)</AppButton>
-            </div>
-          </div>
-
-          <!-- WDP Plans (always at main committee level) -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
-            <AppInput v-model="planSearch" placeholder="Search plans..." class="mb-2" />
-            <div class="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
-              <div v-for="p in filteredPlans" :key="p.id" class="flex items-start gap-2">
-                <input type="checkbox" :value="p.id" :checked="form.plan_ids.includes(p.id)"
-                  @change="togglePlan(p.id)" class="mt-0.5 rounded border-slate-300" />
-                <span class="text-slate-700">{{ p.success_indicator }}
-                  <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
-                </span>
-              </div>
-              <p v-if="!filteredPlans.length" class="text-slate-400 text-xs px-1">
-                {{ planSearch ? 'No plans match your search.' : 'No plans available.' }}
-              </p>
-            </div>
-            <p class="text-xs text-slate-400 mt-1">{{ form.plan_ids.length }} plan(s) selected</p>
-          </div>
-
-          <!-- Simple: Members -->
-          <div v-if="!form.has_subcommittees">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Members</label>
-            <AppInput v-model="memberSearch" placeholder="Search members..." class="mb-2" />
-            <div class="border border-slate-200 rounded-lg p-2 max-h-52 overflow-y-auto space-y-2 text-sm">
-              <div v-for="u in filteredUsers" :key="u.id" class="flex items-start gap-2">
-                <input type="checkbox" :value="u.id" :checked="form.member_ids.includes(u.id)"
-                  @change="toggleMember(u.id)" class="mt-1 rounded border-slate-300" />
-                <div class="flex-1">
-                  <span class="text-slate-700">{{ u.name }}<span v-if="u.position" class="text-slate-400"> ({{ u.position }})</span></span>
-                  <input v-if="form.member_ids.includes(u.id)" v-model="form.member_tasks[u.id]"
-                    type="text" placeholder="Task / Role..."
-                    class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-              </div>
-              <p v-if="!filteredUsers.length" class="text-slate-400 text-xs px-1">No members match.</p>
-            </div>
-            <p class="text-xs text-slate-400 mt-1">{{ form.member_ids.length }} member(s) selected</p>
-          </div>
-
-          <!-- Main: Sub-committees -->
-          <div v-else>
-            <div class="flex items-center justify-between mb-2">
-              <label class="block text-xs font-medium text-slate-600">Sub-committees</label>
-              <button type="button" @click="addSubCommittee"
-                class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                <PlusIcon class="w-3 h-3" /> Add Sub-committee
-              </button>
-            </div>
-            <p v-if="form.sub_committees.length === 0" class="text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg p-4 text-center">
-              No sub-committees yet. Click "Add Sub-committee" to create one.
-            </p>
-            <div v-for="(sub, idx) in form.sub_committees" :key="idx"
-              class="border border-slate-200 rounded-lg p-4 space-y-3 mb-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-slate-600">Sub-committee {{ idx + 1 }}</span>
-                <button type="button" @click="removeSubCommittee(idx)"
-                  class="text-xs text-danger-600 hover:text-danger-700">Remove</button>
-              </div>
-              <AppInput v-model="sub.name" label="Name" required />
-              <AppSelect v-model="sub.head_id" label="Head" placeholder="— None —">
-                <option v-for="u in props.users" :key="u.id" :value="u.id">{{ u.name }}</option>
-              </AppSelect>
-              <div>
-                <label class="block text-xs font-medium text-slate-500 mb-1">Members</label>
-                <AppInput v-model="sub.memberSearch" placeholder="Search members..." class="mb-2" />
-                <div class="border border-slate-100 rounded-lg p-2 max-h-36 overflow-y-auto space-y-1 text-sm">
-                  <div v-for="u in filteredSubUsers(sub)" :key="u.id" class="flex items-start gap-2">
-                    <input type="checkbox" :checked="sub.member_ids.includes(u.id)"
-                      @change="toggleSubMember(idx, u.id)" class="mt-1 rounded border-slate-300" />
-                    <div class="flex-1">
-                      <span class="text-slate-700 text-xs">{{ u.name }}</span>
-                      <input v-if="sub.member_ids.includes(u.id)" v-model="sub.member_tasks[u.id]"
-                        type="text" placeholder="Task..."
-                        class="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-                    </div>
-                  </div>
-                </div>
-                <p class="text-xs text-slate-400 mt-1">{{ sub.member_ids.length }} member(s)</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-            <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
-            <AppButton type="submit" :loading="isSubmitting" :disabled="isSubmitting">{{ isSubmitting ? 'Saving…' : 'Save' }}</AppButton>
-          </div>
-        </form>
-      </AppModal>
-    </div>
-  </AdminLayout>
-</template>

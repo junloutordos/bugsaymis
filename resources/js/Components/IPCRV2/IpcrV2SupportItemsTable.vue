@@ -2,6 +2,7 @@
 import AppTextarea from "@/Components/AppTextarea.vue"
 import AppModal from "@/Components/AppModal.vue"
 import AppButton from "@/Components/AppButton.vue"
+import AppBadge from "@/Components/AppBadge.vue"
 import { TD } from "@/Composables/useTableClasses.js"
 import { router } from "@inertiajs/vue3"
 import { computed, ref } from "vue"
@@ -33,6 +34,12 @@ const showAccomplishment = computed(() => !PRE_APPROVAL_STATUSES.includes(props.
 // ---------- Modal state ----------
 const isModalOpen = ref(false)
 const activeItem = ref(null)
+
+// Committee-sourced items are rated exclusively via the Committee page
+// (PerformanceManagement/Committees/Show.vue) — the Division Chief's own
+// rating form here is read-only for them, matching the backend guard in
+// DivisionChiefIpcrV2Controller::rateSupportItem().
+const canRateActiveItem = computed(() => props.canRate && !activeItem.value?.is_committee_sourced)
 
 function openModal(item) {
   if (!canOpenModal.value) return
@@ -181,21 +188,24 @@ function rateSelf(item) {
 
         <!-- Division Chief Rating -->
         <div class="border-t border-slate-100 pt-5">
-          <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Division Chief Rating</h4>
+          <div class="flex items-center gap-2 mb-2">
+            <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Division Chief Rating</h4>
+            <AppBadge v-if="activeItem.is_committee_sourced" color="slate">Rated via Committee Assignment</AppBadge>
+          </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
               <label class="text-xs font-medium text-slate-500">Quality</label>
-              <select v-if="canRate" v-model.number="activeItem.quality_rating" class="border rounded-lg text-sm px-2 py-1.5 w-full mt-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-if="canRateActiveItem" v-model.number="activeItem.quality_rating" class="border rounded-lg text-sm px-2 py-1.5 w-full mt-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
               <p v-else class="text-sm mt-1">{{ activeItem.quality_rating ?? "—" }}</p>
             </div>
             <div>
               <label class="text-xs font-medium text-slate-500">Efficiency</label>
-              <select v-if="canRate" v-model.number="activeItem.efficiency_rating" class="border rounded-lg text-sm px-2 py-1.5 w-full mt-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-if="canRateActiveItem" v-model.number="activeItem.efficiency_rating" class="border rounded-lg text-sm px-2 py-1.5 w-full mt-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
               <p v-else class="text-sm mt-1">{{ activeItem.efficiency_rating ?? "—" }}</p>
             </div>
             <div>
               <label class="text-xs font-medium text-slate-500">Timeliness</label>
-              <select v-if="canRate" v-model.number="activeItem.timeliness_rating" class="border rounded-lg text-sm px-2 py-1.5 w-full mt-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
+              <select v-if="canRateActiveItem" v-model.number="activeItem.timeliness_rating" class="border rounded-lg text-sm px-2 py-1.5 w-full mt-1"><option v-for="n in 5" :key="n" :value="n">{{ n }}</option></select>
               <p v-else class="text-sm mt-1">{{ activeItem.timeliness_rating ?? "—" }}</p>
             </div>
           </div>
@@ -203,11 +213,11 @@ function rateSelf(item) {
 
           <div class="mt-3">
             <label class="text-xs font-medium text-slate-500">Remarks</label>
-            <input v-if="canRate" v-model="activeItem.remarks" class="border rounded-lg px-3 py-2 text-sm w-full mt-1" />
+            <input v-if="canRateActiveItem" v-model="activeItem.remarks" class="border rounded-lg px-3 py-2 text-sm w-full mt-1" />
             <p v-else class="text-sm text-slate-700 mt-1">{{ activeItem.remarks ?? "—" }}</p>
           </div>
 
-          <AppButton v-if="canRate" size="sm" class="mt-3" @click="rate(activeItem)">Save Rating</AppButton>
+          <AppButton v-if="canRateActiveItem" size="sm" class="mt-3" @click="rate(activeItem)">Save Rating</AppButton>
         </div>
         </template>
       </div>

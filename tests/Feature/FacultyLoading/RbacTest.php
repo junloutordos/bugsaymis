@@ -183,8 +183,11 @@ class RbacTest extends TestCase
         $this->seedTerm();
         $user = $this->userWith('faculty_loading.manage');
 
+        // Committee Assignments moved to Performance Management
+        // (pm-committees.*) as part of the harmonization with the old PMS
+        // Committees page — see App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController.
         $this->actingAs($user)
-            ->get(route('faculty-loading.committee-assignments.index'))
+            ->get(route('pm-committees.index'))
             ->assertOk();
     }
 

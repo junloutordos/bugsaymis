@@ -1311,13 +1311,33 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
 // Performance Management — Committees & Special Assignments (open to any authenticated user; controller handles auth)
 Route::middleware(['auth', 'pshs.email'])->group(function () {
-    Route::get('/performance-management/committees', [\App\Http\Controllers\CommitteePerformanceController::class, 'index'])->name('pm-committees.index');
-    Route::post('/performance-management/committees', [\App\Http\Controllers\CommitteePerformanceController::class, 'store'])->name('pm-committees.store');
-    Route::put('/performance-management/committees/{committee}', [\App\Http\Controllers\CommitteePerformanceController::class, 'update'])->name('pm-committees.update');
-    Route::delete('/performance-management/committees/{committee}', [\App\Http\Controllers\CommitteePerformanceController::class, 'destroy'])->name('pm-committees.destroy');
-    Route::get('/performance-management/committees/{committee}', [\App\Http\Controllers\CommitteePerformanceController::class, 'show'])->name('pm-committees.show');
-    Route::post('/performance-management/committees/{committee}/members/{member}/accomplishment', [\App\Http\Controllers\CommitteePerformanceController::class, 'saveMemberAccomplishment'])->name('pm-committees.member-accomplishment');
-    Route::post('/performance-management/committees/{committee}/members/{member}/rate', [\App\Http\Controllers\CommitteePerformanceController::class, 'rateMember'])->name('pm-committees.rate-member');
+    Route::prefix('performance-management/committees')->name('pm-committees.')->group(function () {
+        // Read + rate: broader audience by design — index()/show() self-scope
+        // internally (canManage vs. own-committee visibility), and rate()
+        // must be reachable by a committee chairperson who typically does
+        // NOT hold faculty_loading.manage.
+        Route::middleware('permission:accomplishments.view|faculty_loading.manage')->group(function () {
+            Route::get('/',                             [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'index'])->name('index');
+            Route::post('/{committeeAssignment}/rate',  [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'rateAssignment'])->name('rate');
+            Route::get('/{committee}',                  [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'show'])->name('show');
+        });
+
+        // Catalog + assignment CRUD + compliance: every one of these methods
+        // already unconditionally calls $this->authorize('faculty_loading.manage')
+        // or an equivalent hasAnyRole admin check internally — this route-level
+        // gate matches that exactly, so a misconfigured/future controller
+        // change can't accidentally rely on the route alone.
+        Route::middleware('permission:faculty_loading.manage')->group(function () {
+            Route::post('/catalog',                     [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'storeCommittee'])->name('catalog.store');
+            Route::put('/catalog/{committee}',          [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'updateCommittee'])->name('catalog.update');
+            Route::delete('/catalog/{committee}',       [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'destroyCommittee'])->name('catalog.destroy');
+            Route::get('/compliance',                   [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'compliance'])->name('compliance');
+            Route::post('/',                            [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'store'])->name('store');
+            Route::put('/{committeeAssignment}',        [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'update'])->name('update');
+            Route::delete('/{committeeAssignment}',     [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'destroy'])->name('destroy');
+            Route::put('/{committeeAssignment}/plans',  [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'syncPlans'])->name('plans.sync');
+        });
+    });
 
     // Committee task board (shared by the PM and Faculty Loading committee pages)
     Route::post('/committees/{committee}/tasks', [\App\Http\Controllers\CommitteeTaskController::class, 'store'])->name('committee-tasks.store');
