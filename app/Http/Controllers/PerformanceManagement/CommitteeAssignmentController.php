@@ -34,24 +34,37 @@ class CommitteeAssignmentController extends Controller
 
     public function index(Request $request): Response
     {
-        $this->authorize('faculty_loading.manage');
+        // Open to any authenticated user with accomplishments.view OR
+        // faculty_loading.manage (route middleware) — unlike FL's own former
+        // index(), this is NOT faculty_loading.manage-only: PMS's original
+        // CommitteePerformanceController::index() had no authorize() call at
+        // all, scoping the catalog to each viewer's own committees instead.
+        // That scoped-visibility behavior is preserved below for `catalog`;
+        // the campus-wide `assignments`/`faculty` admin data stays
+        // manage-only, gated by $canManage rather than a hard abort so a
+        // non-admin viewer still gets the rest of the page.
+        $user      = auth()->user();
+        $canManage = $user->hasPermission('faculty_loading.manage');
 
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId      = $request->input('term_id', $currentTerm?->id);
         $facultyId   = $request->input('faculty_id');
 
-        $assignments = FacultyCommitteeAssignment::with(['faculty:id,name', 'committee:id,name,code,parent_committee_id', 'academicTerm.schoolYear'])
-            ->when($termId,    fn ($q) => $q->where('academic_term_id', $termId))
-            ->when($facultyId, fn ($q) => $q->where('user_id', $facultyId))
-            ->orderBy('user_id')
-            ->get()
-            ->map(fn ($a) => $this->mapAssignment($a));
+        $assignments = $canManage
+            ? FacultyCommitteeAssignment::with(['faculty:id,name', 'committee:id,name,code,parent_committee_id', 'academicTerm.schoolYear'])
+                ->when($termId,    fn ($q) => $q->where('academic_term_id', $termId))
+                ->when($facultyId, fn ($q) => $q->where('user_id', $facultyId))
+                ->orderBy('user_id')
+                ->get()
+                ->map(fn ($a) => $this->mapAssignment($a))
+            : collect();
 
         $terms = AcademicTerm::with('schoolYear')->orderByDesc('start_date')->get()
             ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
 
-        $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
-            ->orderBy('name')->get(['id', 'name', 'position']);
+        $faculty = $canManage
+            ? User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))->orderBy('name')->get(['id', 'name', 'position'])
+            : collect();
 
         $currentYear = \App\Models\IPCRRatingPeriod::current()->value('year') ?? (int) now()->format('Y');
         $selectedFY  = $request->query('fiscal_year', (string) $currentYear);
@@ -61,6 +74,17 @@ class CommitteeAssignmentController extends Controller
         $catalogQuery = GlobalCommittee::with(['head', 'members', 'workDistributionPlans', 'subCommittees.head', 'subCommittees.members'])
             ->whereNull('parent_committee_id')
             ->when($selectedFY !== 'all', fn ($q) => $q->forFiscalYear((int) $selectedFY));
+
+        if (! $user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR'])) {
+            $catalogQuery->where(function ($q) use ($user) {
+                $q->where('head_id', $user->id)
+                  ->orWhereHas('members', fn ($mq) => $mq->where('users.id', $user->id))
+                  ->orWhereHas('subCommittees', function ($sq) use ($user) {
+                      $sq->where('head_id', $user->id)
+                         ->orWhereHas('members', fn ($mq) => $mq->where('users.id', $user->id));
+                  });
+            });
+        }
 
         $catalogRaw = $catalogQuery->orderBy('name')->get();
         $allCatalogIds = $catalogRaw->flatMap(fn ($c) => collect([$c->id])->merge($c->subCommittees->pluck('id')));
@@ -120,7 +144,8 @@ class CommitteeAssignmentController extends Controller
             'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
             'filters'     => $request->only(['term_id', 'faculty_id']),
             'users'       => User::employees()->select('id', 'name', 'position')->orderBy('name')->get(),
-            'authUser'    => auth()->user()->only('id', 'name'),
+            'authUser'    => $user->only('id', 'name'),
+            'canManage'   => $canManage,
             'fiscalYears' => \App\Models\IPCRRatingPeriod::query()->distinct()->orderByDesc('year')->pluck('year'),
             'selectedFiscalYear' => $selectedFY,
             'currentFiscalYear'  => $currentYear,
