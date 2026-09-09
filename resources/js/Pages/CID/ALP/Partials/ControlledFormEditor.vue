@@ -4,8 +4,20 @@ import AppIconButton from '@/Components/AppIconButton.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import { PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps({ modelValue: { type: Object, default: () => ({}) }, disabled: Boolean })
+const props = defineProps({
+  modelValue: { type: Object, default: () => ({}) },
+  disabled: Boolean,
+  // Maps a top-level key (e.g. "hazards") to a fixed list of option labels —
+  // renders that array field as a real checkbox grid instead of the generic
+  // add/remove-textarea list, for form fields that are a fixed checklist on
+  // the official document (e.g. PSHS-00-F-DSA-32's 15-item hazard list).
+  checklists: { type: Object, default: () => ({}) },
+})
 const emit = defineEmits(['update:modelValue'])
+const toggleChecklistItem = (key, item, checked) => {
+  const current = props.modelValue[key] || []
+  update(key, checked ? [...current, item] : current.filter((existing) => existing !== item))
+}
 
 const title = (key) => String(key).replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
 const update = (key, value) => emit('update:modelValue', { ...props.modelValue, [key]: value })
@@ -38,6 +50,25 @@ const removeArrayItem = (key, items, index) => update(key, items.filter((_, item
         />
         {{ value ? 'Yes / Included' : 'No / Not completed' }}
       </label>
+      <div v-else-if="Array.isArray(value) && checklists[key]" class="grid gap-1.5 sm:grid-cols-2">
+        <label
+          v-for="item in checklists[key]"
+          :key="item"
+          :class="[
+            'flex items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 transition-colors',
+            disabled ? 'cursor-not-allowed bg-slate-50 text-slate-400' : 'cursor-pointer bg-white hover:border-slate-300',
+          ]"
+        >
+          <input
+            type="checkbox"
+            :checked="value.includes(item)"
+            :disabled="disabled"
+            class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            @change="toggleChecklistItem(key, item, $event.target.checked)"
+          />
+          {{ item }}
+        </label>
+      </div>
       <div v-else-if="Array.isArray(value)" class="space-y-2">
         <div v-for="(item, index) in value" :key="index" class="flex gap-2 rounded-xl bg-slate-50/80 p-3 ring-1 ring-slate-200/70">
           <div v-if="item && typeof item === 'object'" class="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">

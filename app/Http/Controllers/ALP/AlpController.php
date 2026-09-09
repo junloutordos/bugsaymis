@@ -139,6 +139,7 @@ class AlpController extends Controller
             'yearEndDeficiencies' => $this->compliance->yearEndDeficiencies($cycle),
             'financialSummary' => $balances,
             'attendanceSummary' => $attendanceSummary,
+            'riskChecklistItems' => AlpComplianceService::RISK_CHECKLIST_ITEMS,
             'abilities' => [
                 'manage' => $this->access->canManage($request->user(), $cycle),
                 'coordinate' => $request->user()->isSuperAdmin() || $request->user()->hasAnyPermission(['alp.manage', 'alp.coordinate']) || (int) $cycle->coordinator_id === (int) $request->user()->id,
@@ -448,10 +449,18 @@ class AlpController extends Controller
     public function storeFinance(Request $request, AlpProgramCycle $cycle)
     {
         $this->access->authorizeManage($request->user(), $cycle);
+        $request->merge(['category' => $request->input('category') ?: null]);
         $data = $request->validate([
             'activity_id' => ['nullable', Rule::exists('alp_activities', 'id')->where('alp_program_cycle_id', $cycle->id)],
             'transaction_date' => 'required|date', 'entry_type' => 'required|in:opening_balance,income,expense,turnover',
-            'category' => 'nullable|string|max:80', 'description' => 'required|string|max:255', 'amount' => 'required|numeric|min:0|max:999999999.99',
+            // Controlled buckets the Financial Report (PSHS-00-F-DSA-34) is built from — only
+            // required for income/expense, where the form has named sub-sections to total.
+            'category' => ['nullable', 'string', 'max:80', Rule::in(match ($request->input('entry_type')) {
+                'income' => ['membership_fees', 'income_generating', 'other_sources'],
+                'expense' => ['sponsored_activity', 'administrative', 'other'],
+                default => [],
+            })],
+            'description' => 'required|string|max:255', 'amount' => 'required|numeric|min:0|max:999999999.99',
             'source' => 'nullable|string|max:255', 'receipt_base64' => 'nullable|string|max:15000000',
         ]);
         if (! empty($data['receipt_base64'])) {
@@ -480,8 +489,28 @@ class AlpController extends Controller
         $this->access->authorizeManage($request->user(), $cycle);
         $data = $request->validate([
             'report_type' => 'required|in:accomplishment,attendance_summary,financial,coordinator,adviser_evaluation',
-            'period' => 'required|string|max:40', 'data' => 'required|array', 'status' => 'required|in:draft,submitted',
+            'period' => 'required|string|max:40', 'status' => 'required|in:draft,submitted',
+            'data' => 'nullable|array',
+            'data.assessment' => 'nullable|array',
+            'data.assessment.*.strength' => 'nullable|string|max:2000',
+            'data.assessment.*.weakness' => 'nullable|string|max:2000',
+            'data.assessment.*.gap' => 'nullable|string|max:2000',
+            'data.assessment.*.recommendation' => 'nullable|string|max:2000',
+            'data.narrative' => 'nullable|string|max:5000',
         ]);
+
+        // Financial/attendance-summary/activities figures are always
+        // server-computed from the ledger and roster — never accepted from
+        // the client — so a submitted/approved report is an immutable,
+        // trustworthy snapshot of what actually happened, matching how the
+        // rest of the system treats approval snapshots.
+        $reportData = match ($data['report_type']) {
+            'financial' => $this->financialReportData($cycle),
+            'attendance_summary' => ['rows' => $this->attendanceSummary($cycle)],
+            'accomplishment', 'coordinator' => $this->activitiesReportData($cycle) + ['assessment' => $data['data']['assessment'] ?? []],
+            default => $data['data'] ?? [],
+        };
+
         $report = AlpReport::updateOrCreate(
             ['alp_program_cycle_id' => $cycle->id, 'report_type' => $data['report_type'], 'period' => $data['period']],
             [
@@ -493,7 +522,7 @@ class AlpController extends Controller
                     default => null,
                 },
                 'version_no' => 2, 'revision_no' => 0,
-                'data' => $data['data'], 'status' => $data['status'], 'prepared_by' => $request->user()->id,
+                'data' => $reportData, 'status' => $data['status'], 'prepared_by' => $request->user()->id,
                 'submitted_at' => $data['status'] === 'submitted' ? now() : null,
             ]
         );
@@ -559,5 +588,57 @@ class AlpController extends Controller
                 'cutting' => $records->where('status', 'cutting')->count(), 'excused' => $records->where('status', 'excused')->count(),
             ];
         })->values()->all();
+    }
+
+    /**
+     * PSHS-00-F-DSA-34's three income buckets and three expense buckets,
+     * populated straight from AlpFinancialEntry.category (constrained by the
+     * Show.vue finance form to exactly these controlled values per
+     * entry_type). Each bucket's "Description" is a semicolon-joined list of
+     * every entry's own description — the real form has one description
+     * line per bucket, not per transaction.
+     */
+    private function financialReportData(AlpProgramCycle $cycle): array
+    {
+        $cycle->loadMissing('financialEntries');
+        $entries = $cycle->financialEntries;
+        $bucket = fn (string $entryType, array $categories) => collect($categories)->mapWithKeys(function ($category) use ($entries, $entryType) {
+            $rows = $entries->where('entry_type', $entryType)->where('category', $category);
+
+            return [$category => ['description' => $rows->pluck('description')->filter()->implode('; '), 'amount' => (float) $rows->sum('amount')]];
+        })->all();
+
+        $opening = (float) $entries->where('entry_type', 'opening_balance')->sum('amount');
+        $income = $bucket('income', ['membership_fees', 'income_generating', 'other_sources']);
+        $expenses = $bucket('expense', ['sponsored_activity', 'administrative', 'other']);
+        $totalIncome = array_sum(array_column($income, 'amount'));
+        $totalExpenses = array_sum(array_column($expenses, 'amount'));
+
+        return [
+            'opening_balance' => $opening,
+            'income' => $income, 'total_income' => $totalIncome,
+            'expenses' => $expenses, 'total_expenses' => $totalExpenses,
+            'ending_balance' => $opening + $totalIncome - $totalExpenses,
+        ];
+    }
+
+    /**
+     * The "Implemented activities" table shared by the Accomplishment (35)
+     * and Coordinator Accomplishment (37) reports — Remark/s prefers the
+     * activity's own accomplishments note, falling back to its completion
+     * highlights.
+     */
+    private function activitiesReportData(AlpProgramCycle $cycle): array
+    {
+        $cycle->loadMissing('activities');
+
+        return ['activities' => $cycle->activities->where('status', 'completed')->sortBy('start_date')->map(fn ($activity) => [
+            'date' => $activity->start_date?->format('M j, Y'),
+            'title' => $activity->title,
+            'learning_outcomes' => $activity->learning_outcomes,
+            'participants' => $activity->target_participants,
+            'venue' => $activity->venue,
+            'remarks' => $activity->accomplishments ?: $activity->completion_highlights,
+        ])->values()->all()];
     }
 }

@@ -17,12 +17,12 @@ import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import ControlledFormEditor from './Partials/ControlledFormEditor.vue'
 import AlpAttendanceGrid from './components/AlpAttendanceGrid.vue'
-import { ArrowTopRightOnSquareIcon, CheckCircleIcon, DocumentArrowDownIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ArrowTopRightOnSquareIcon, CheckCircleIcon, DocumentArrowDownIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   cycle: Object, checklist: Array, yearEndDeficiencies: Array,
   financialSummary: Object, attendanceSummary: Array, abilities: Object,
-  hasPin: Boolean, integrationLinks: Array,
+  hasPin: Boolean, integrationLinks: Array, riskChecklistItems: Array,
 })
 
 const tabs = [
@@ -36,6 +36,20 @@ const tabs = [
   { key: 'audit', label: 'Audit Trail' },
 ]
 const activeTab = ref('overview')
+const attendanceMonth = ref(new Date().toISOString().slice(0, 7))
+const attendanceGridPdfUrl = computed(() => route('alp.attendance.grid.pdf', [props.cycle.id]) + '?month=' + attendanceMonth.value)
+const FINANCE_CATEGORIES = {
+  income: [
+    { value: 'membership_fees', label: 'Membership Fees' },
+    { value: 'income_generating', label: 'Income Generating Activities' },
+    { value: 'other_sources', label: 'Other Sources of Income' },
+  ],
+  expense: [
+    { value: 'sponsored_activity', label: 'Sponsored Activity Expenses' },
+    { value: 'administrative', label: 'Administrative/Operational Expenses' },
+    { value: 'other', label: 'Other Expenses' },
+  ],
+}
 const label = (value) => String(value || '').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
 const money = (value) => Number(value || 0).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })
 const date = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
@@ -81,10 +95,21 @@ const saveActivity = () => activityForm.post(route('alp.activities.store', props
 const activityAction = (activity, action) => postAction(route('alp.activities.action', [props.cycle.id, activity.id]), { action, remarks: action === 'return' || action === 'complete' ? window.prompt('Remarks / completion highlights:') : null, pin: transitionForm.pin })
 
 const financeForm = useForm({ activity_id: '', transaction_date: '', entry_type: 'expense', category: '', description: '', amount: '', source: '', receipt_base64: null })
+const financeCategoryOptions = computed(() => FINANCE_CATEGORIES[financeForm.entry_type] || [])
 const setReceipt = async (event) => { const file = event.target.files?.[0]; if (file) financeForm.receipt_base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }) }
 const saveFinance = () => financeForm.post(route('alp.finances.store', props.cycle.id), { preserveScroll: true, onSuccess: () => financeForm.reset() })
 
-const reportForm = useForm({ report_type: 'accomplishment', period: 'Year-end', data: { narrative: '', highlights: [], challenges: [], recommendations: [] }, status: 'draft' })
+const emptyAssessmentRow = () => ({ strength: '', weakness: '', gap: '', recommendation: '' })
+const reportForm = useForm({ report_type: 'accomplishment', period: 'Year-end', data: { assessment: [emptyAssessmentRow()] }, status: 'draft' })
+const isAssessmentReport = computed(() => ['accomplishment', 'coordinator'].includes(reportForm.report_type))
+const isAutoComputedReport = computed(() => ['financial', 'attendance_summary'].includes(reportForm.report_type))
+const onReportTypeChange = () => {
+  if (isAssessmentReport.value) reportForm.data = { assessment: [emptyAssessmentRow()] }
+  else if (isAutoComputedReport.value) reportForm.data = {}
+  else reportForm.data = { narrative: '' }
+}
+const addAssessmentRow = () => reportForm.data.assessment.push(emptyAssessmentRow())
+const removeAssessmentRow = (index) => reportForm.data.assessment.splice(index, 1)
 const saveReport = (status) => { reportForm.status = status; reportForm.post(route('alp.reports.store', props.cycle.id), { preserveScroll: true }) }
 const activeMembers = computed(() => props.cycle.memberships.filter(item => item.status === 'active'))
 const workflowActions = computed(() => {
@@ -228,13 +253,13 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
                 </div>
               </td>
               <td :class="TD"><span :class="member.accountability ? 'text-danger-600' : 'text-success-600'">{{ member.accountability || 'Clear' }}</span></td>
-              <td :class="TD"><div class="flex flex-wrap gap-1.5"><AppButton v-if="abilities.manage" size="sm" variant="ghost" @click="setAccountability(member)">Accountability</AppButton><AppButton v-if="member.completed_at" as="a" :href="route('alp.members.certificate', [cycle.id, member.id])" target="_blank" size="sm" variant="secondary">Certificate</AppButton><AppIconButton v-if="abilities.manage && ['draft', 'returned'].includes(cycle.status)" label="Remove member" variant="danger" @click="removeMember(member)"><TrashIcon class="h-4 w-4" /></AppIconButton></div></td>
+              <td :class="TD"><div class="flex flex-wrap gap-1.5"><AppButton v-if="abilities.manage" size="sm" variant="ghost" @click="setAccountability(member)">Accountability</AppButton><AppButton as="a" :href="route('alp.members.consent-form.pdf', [cycle.id, member.id])" target="_blank" size="sm" variant="secondary">Consent Form</AppButton><AppButton v-if="member.completed_at" as="a" :href="route('alp.members.certificate', [cycle.id, member.id])" target="_blank" size="sm" variant="secondary">Certificate</AppButton><AppIconButton v-if="abilities.manage && ['draft', 'returned'].includes(cycle.status)" label="Remove member" variant="danger" @click="removeMember(member)"><TrashIcon class="h-4 w-4" /></AppIconButton></div></td>
             </tr>
             <template #mobileCard>
               <div v-for="member in cycle.memberships" :key="member.id" class="space-y-2 p-4">
                 <div class="flex items-start justify-between gap-2"><div><p class="text-sm font-semibold text-slate-800">{{ member.student?.full_name }}</p><p class="text-xs text-slate-500">Grade {{ member.enrollment?.grade_level }} {{ member.enrollment?.section?.sectionname }}</p></div><AppBadge :color="statusColor(member.consent_status)">{{ label(member.consent_status) }}</AppBadge></div>
                 <p class="text-xs" :class="member.accountability ? 'text-danger-600' : 'text-success-600'">Accountability: {{ member.accountability || 'Clear' }}</p>
-                <div class="flex flex-wrap gap-1.5 pt-1"><AppButton v-if="abilities.manage" size="sm" variant="ghost" @click="setAccountability(member)">Accountability</AppButton><AppButton v-if="member.completed_at" as="a" :href="route('alp.members.certificate', [cycle.id, member.id])" target="_blank" size="sm" variant="secondary">Certificate</AppButton><AppButton v-if="abilities.manage && ['draft', 'returned'].includes(cycle.status)" size="sm" variant="danger" @click="removeMember(member)">Remove</AppButton></div>
+                <div class="flex flex-wrap gap-1.5 pt-1"><AppButton v-if="abilities.manage" size="sm" variant="ghost" @click="setAccountability(member)">Accountability</AppButton><AppButton as="a" :href="route('alp.members.consent-form.pdf', [cycle.id, member.id])" target="_blank" size="sm" variant="secondary">Consent Form</AppButton><AppButton v-if="member.completed_at" as="a" :href="route('alp.members.certificate', [cycle.id, member.id])" target="_blank" size="sm" variant="secondary">Certificate</AppButton><AppButton v-if="abilities.manage && ['draft', 'returned'].includes(cycle.status)" size="sm" variant="danger" @click="removeMember(member)">Remove</AppButton></div>
               </div>
             </template>
             <template #empty><EmptyState title="No members assigned" /></template>
@@ -266,8 +291,13 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
               <div><p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">{{ doc.form_code }}</p><h2 class="font-heading text-sm font-semibold text-slate-900">{{ label(doc.document_type) }}</h2><p class="text-xs text-slate-500">Version {{ doc.version_no }} · Revision {{ doc.revision_no }}</p></div>
               <AppBadge :color="statusColor(doc.status)">{{ label(doc.status) }}</AppBadge>
             </div>
-            <div class="mt-4"><ControlledFormEditor v-model="documentDrafts[doc.id]" :disabled="!abilities.manage || !['draft', 'returned'].includes(cycle.status)" /></div>
-            <div class="mt-4 flex flex-wrap gap-2"><AppButton as="a" :href="route('alp.documents.pdf', [cycle.id, doc.id])" target="_blank" variant="secondary" size="sm">Preview PDF</AppButton><template v-if="abilities.manage && ['draft', 'returned'].includes(cycle.status)"><AppButton variant="secondary" size="sm" @click="saveDocument(doc, 'draft')">Save draft</AppButton><AppButton size="sm" @click="saveDocument(doc, 'submitted')">Mark submitted</AppButton></template></div>
+            <div class="mt-4"><ControlledFormEditor v-model="documentDrafts[doc.id]" :disabled="!abilities.manage || !['draft', 'returned'].includes(cycle.status)" :checklists="doc.document_type === 'risk_plan' ? { hazards: riskChecklistItems } : {}" /></div>
+            <p v-if="doc.document_type === 'parent_consent'" class="mt-3 text-xs text-slate-500">The Parent Consent Form is printed per member with their name pre-filled. Generate it from the Members &amp; Officers tab.</p>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <AppButton v-if="doc.document_type === 'parent_consent'" size="sm" variant="secondary" @click="activeTab = 'members'">Go to Members tab</AppButton>
+              <AppButton v-else as="a" :href="route('alp.documents.pdf', [cycle.id, doc.id])" target="_blank" variant="secondary" size="sm">Preview PDF</AppButton>
+              <template v-if="abilities.manage && ['draft', 'returned'].includes(cycle.status)"><AppButton variant="secondary" size="sm" @click="saveDocument(doc, 'draft')">Save draft</AppButton><AppButton size="sm" @click="saveDocument(doc, 'submitted')">Mark submitted</AppButton></template>
+            </div>
           </AppCard>
         </div>
         <AppCard v-else><EmptyState title="No QMS forms generated" /></AppCard>
@@ -304,6 +334,12 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
 
       <template v-else-if="activeTab === 'attendance'">
         <div class="space-y-5">
+        <AppCard title="Print monthly attendance form (PSHS-00-F-DSA-33)">
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="block"><span class="mb-1 block text-xs font-medium text-slate-600">Month</span><input v-model="attendanceMonth" type="month" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" /></label>
+            <AppButton as="a" :href="attendanceGridPdfUrl" target="_blank" variant="secondary">Preview PDF</AppButton>
+          </div>
+        </AppCard>
         <AppCard>
           <AlpAttendanceGrid :cycle-id="cycle.id" :can-edit="abilities.manage" />
         </AppCard>
@@ -321,7 +357,7 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
         <div class="space-y-5">
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><AppCard v-for="item in financeStats" :key="item[0]"><p class="text-xs font-medium text-slate-500">{{ item[0] }}</p><p class="mt-1 font-heading text-xl font-semibold text-slate-900">{{ money(item[1]) }}</p></AppCard></div>
         <AppCard v-if="abilities.manage" title="Record transaction">
-          <form class="grid gap-3 md:grid-cols-3" @submit.prevent="saveFinance"><AppInput v-model="financeForm.transaction_date" label="Transaction date" required type="date" /><AppSelect v-model="financeForm.entry_type" label="Entry type" :show-blank="false"><option value="opening_balance">Opening balance</option><option value="income">Income</option><option value="expense">Expense</option><option value="turnover">Turnover</option></AppSelect><AppInput v-model="financeForm.amount" label="Amount" required type="number" step="0.01" min="0" /><AppInput v-model="financeForm.description" label="Description" required class="md:col-span-2" /><div><label class="mb-1 block text-xs font-medium text-slate-600">Receipt</label><input type="file" accept="application/pdf,image/jpeg,image/png" class="block w-full rounded-lg border border-slate-200 bg-white text-sm text-slate-600 file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200" @change="setReceipt" /></div><AppButton type="submit" :loading="financeForm.processing" class="md:col-start-3 md:justify-self-end">Post entry</AppButton></form>
+          <form class="grid gap-3 md:grid-cols-3" @submit.prevent="saveFinance"><AppInput v-model="financeForm.transaction_date" label="Transaction date" required type="date" /><AppSelect v-model="financeForm.entry_type" label="Entry type" :show-blank="false" @update:model-value="financeForm.category = ''"><option value="opening_balance">Opening balance</option><option value="income">Income</option><option value="expense">Expense</option><option value="turnover">Turnover</option></AppSelect><AppSelect v-if="financeCategoryOptions.length" v-model="financeForm.category" label="Financial Report bucket" placeholder="Select bucket"><option v-for="opt in financeCategoryOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option></AppSelect><AppInput v-model="financeForm.amount" label="Amount" required type="number" step="0.01" min="0" /><AppInput v-model="financeForm.description" label="Description" required class="md:col-span-2" /><div><label class="mb-1 block text-xs font-medium text-slate-600">Receipt</label><input type="file" accept="application/pdf,image/jpeg,image/png" class="block w-full rounded-lg border border-slate-200 bg-white text-sm text-slate-600 file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200" @change="setReceipt" /></div><AppButton type="submit" :loading="financeForm.processing" class="md:col-start-3 md:justify-self-end">Post entry</AppButton></form>
         </AppCard>
         <AppCard :padded="false" title="Financial entries">
           <AppTable :is-empty="cycle.financial_entries.length === 0" :skeleton-cols="5" :card="false">
@@ -336,7 +372,36 @@ const TD = 'px-4 py-3 text-sm text-slate-600 align-top'
       <template v-else-if="activeTab === 'reports'">
         <div class="space-y-5">
         <AppCard v-if="abilities.manage" title="Prepare report">
-          <div class="grid gap-3 md:grid-cols-2"><AppSelect v-model="reportForm.report_type" label="Report type" :show-blank="false"><option value="accomplishment">Accomplishment</option><option value="attendance_summary">Attendance summary</option><option value="financial">Financial</option><option value="coordinator">Coordinator</option><option value="adviser_evaluation">Adviser evaluation</option></AppSelect><AppInput v-model="reportForm.period" label="Period" /><AppTextarea v-model="reportForm.data.narrative" label="Narrative / summary" :rows="6" class="md:col-span-2" /></div><div class="mt-3 flex gap-2"><AppButton variant="secondary" :loading="reportForm.processing" @click="saveReport('draft')">Save draft</AppButton><AppButton :loading="reportForm.processing" @click="saveReport('submitted')">Submit report</AppButton></div>
+          <div class="grid gap-3 md:grid-cols-2">
+            <AppSelect v-model="reportForm.report_type" label="Report type" :show-blank="false" @update:model-value="onReportTypeChange">
+              <option value="accomplishment">Accomplishment</option>
+              <option value="attendance_summary">Attendance summary</option>
+              <option value="financial">Financial</option>
+              <option value="coordinator">Coordinator</option>
+              <option value="adviser_evaluation">Adviser evaluation</option>
+            </AppSelect>
+            <AppInput v-model="reportForm.period" label="Period" />
+          </div>
+
+          <p v-if="isAutoComputedReport" class="mt-3 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-700">This report is generated automatically from this ALP's Finance/Attendance records — no manual entry needed. Save it, then use Preview PDF to see the computed figures.</p>
+
+          <div v-else-if="isAssessmentReport" class="mt-3 space-y-2">
+            <p class="text-xs font-medium text-slate-600">Assessment of ALP implementation</p>
+            <div v-for="(row, index) in reportForm.data.assessment" :key="index" class="grid gap-2 rounded-xl bg-slate-50/80 p-3 ring-1 ring-slate-200/70 sm:grid-cols-2">
+              <AppTextarea v-model="row.strength" label="Strength" :rows="2" />
+              <AppTextarea v-model="row.weakness" label="Weakness" :rows="2" />
+              <AppTextarea v-model="row.gap" label="Gap" :rows="2" />
+              <div class="flex gap-2">
+                <AppTextarea v-model="row.recommendation" label="Recommendation" :rows="2" class="flex-1" />
+                <AppIconButton v-if="reportForm.data.assessment.length > 1" label="Remove row" variant="danger" class="self-end" @click="removeAssessmentRow(index)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+              </div>
+            </div>
+            <AppButton type="button" variant="ghost" size="sm" @click="addAssessmentRow"><PlusIcon class="h-4 w-4" /> Add row</AppButton>
+          </div>
+
+          <AppTextarea v-else v-model="reportForm.data.narrative" label="Narrative / summary" :rows="6" class="mt-3" />
+
+          <div class="mt-3 flex gap-2"><AppButton variant="secondary" :loading="reportForm.processing" @click="saveReport('draft')">Save draft</AppButton><AppButton :loading="reportForm.processing" @click="saveReport('submitted')">Submit report</AppButton></div>
         </AppCard>
         <div v-if="cycle.reports.length" class="grid gap-4 lg:grid-cols-2"><AppCard v-for="report in cycle.reports" :key="report.id"><div class="flex justify-between gap-3"><div><h2 class="font-heading text-sm font-semibold text-slate-800">{{ label(report.report_type) }}</h2><p class="text-sm text-slate-500">{{ report.period }}</p></div><AppBadge :color="statusColor(report.status)">{{ label(report.status) }}</AppBadge></div><div class="mt-4 flex gap-2"><AppButton as="a" :href="route('alp.reports.pdf', [cycle.id, report.id])" target="_blank" size="sm" variant="secondary">PDF</AppButton><AppButton v-if="(abilities.coordinate || abilities.approve) && report.status === 'submitted'" size="sm" variant="success" @click="postAction(route('alp.reports.approve', [cycle.id, report.id]), { pin: transitionForm.pin })">Approve</AppButton></div></AppCard></div>
         <AppCard v-else><EmptyState title="No reports prepared" /></AppCard>

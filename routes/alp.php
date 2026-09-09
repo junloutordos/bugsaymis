@@ -25,6 +25,7 @@ Route::middleware(['auth', 'permission:alp.view|alp.manage|alp.advise|alp.coordi
         Route::put('/cycles/{cycle}/members/{membership}/consent', [AlpController::class, 'updateConsent'])->name('members.consent');
         Route::put('/cycles/{cycle}/members/{membership}/accountability', [AlpController::class, 'updateAccountability'])->name('members.accountability');
         Route::get('/cycles/{cycle}/members/{membership}/certificate.pdf', [AlpPdfController::class, 'certificate'])->name('members.certificate');
+        Route::get('/cycles/{cycle}/members/{membership}/consent-form.pdf', [AlpPdfController::class, 'consentForm'])->name('members.consent-form.pdf');
         Route::post('/cycles/{cycle}/officers', [AlpController::class, 'storeOfficer'])->name('officers.store');
         Route::delete('/cycles/{cycle}/officers/{officer}', [AlpController::class, 'destroyOfficer'])->name('officers.destroy');
         Route::post('/cycles/{cycle}/officers/{officer}/certify', [AlpController::class, 'certifyOfficer'])->name('officers.certify');
@@ -34,6 +35,7 @@ Route::middleware(['auth', 'permission:alp.view|alp.manage|alp.advise|alp.coordi
         Route::put('/cycles/{cycle}/activities/{activity}', [AlpController::class, 'updateActivity'])->name('activities.update');
         Route::post('/cycles/{cycle}/activities/{activity}/action', [AlpController::class, 'activityAction'])->name('activities.action');
         Route::get('/cycles/{cycle}/sessions/{session}/attendance.pdf', [AlpPdfController::class, 'attendance'])->name('attendance.pdf');
+        Route::get('/cycles/{cycle}/attendance/grid.pdf', [AlpPdfController::class, 'attendanceGrid'])->name('attendance.grid.pdf');
         Route::get('/cycles/{cycle}/attendance', [AlpAttendanceController::class, 'index'])->name('attendance.index');
         Route::post('/cycles/{cycle}/attendance/dates', [AlpAttendanceController::class, 'storeDate'])->name('attendance.dates.store');
         Route::delete('/cycles/{cycle}/attendance/dates/{session}', [AlpAttendanceController::class, 'destroyDate'])->name('attendance.dates.destroy');

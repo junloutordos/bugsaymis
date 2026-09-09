@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ALP;
 
 use App\Http\Controllers\Controller;
+use App\Models\ALP\AlpActivity;
 use App\Models\ALP\AlpDocument;
 use App\Models\ALP\AlpMembership;
 use App\Models\ALP\AlpProgramCycle;
@@ -120,7 +121,27 @@ class AlpPdfController extends Controller
         $this->access->authorizeView($request->user(), $cycle);
         abort_unless($session->alp_program_cycle_id === $cycle->id, 404);
 
-        return $this->response($this->pdf->attendance($session), 'PSHS-00-F-DSA-33-'.$cycle->program->code.'-'.$session->session_date->format('Y-m-d').'.pdf');
+        return $this->response($this->pdf->attendance($session), 'ALP-Daily-Attendance-'.$cycle->program->code.'-'.$session->session_date->format('Y-m-d').'.pdf');
+    }
+
+    public function attendanceGrid(Request $request, AlpProgramCycle $cycle)
+    {
+        $this->access->authorizeView($request->user(), $cycle);
+        $month = $request->validate(['month' => 'required|date_format:Y-m'])['month'];
+
+        return $this->response($this->pdf->attendanceGrid($cycle, $month), 'PSHS-00-F-DSA-33-'.$cycle->program->code.'-'.$month.'.pdf');
+    }
+
+    public function consentForm(Request $request, AlpProgramCycle $cycle, AlpMembership $membership)
+    {
+        $this->access->authorizeView($request->user(), $cycle);
+        abort_unless($membership->alp_program_cycle_id === $cycle->id, 404);
+        $activity = null;
+        if ($activityId = $request->integer('activity_id')) {
+            $activity = AlpActivity::where('alp_program_cycle_id', $cycle->id)->find($activityId);
+        }
+
+        return $this->response($this->pdf->consentForm($membership, $activity), 'PSHS-00-F-DSA-31-'.$membership->student->pisaysystemID.'.pdf');
     }
 
     private function response(string $bytes, string $filename)
