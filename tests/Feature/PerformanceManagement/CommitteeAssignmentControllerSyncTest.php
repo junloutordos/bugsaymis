@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\FacultyLoading;
+namespace Tests\Feature\PerformanceManagement;
 
 use App\Models\EmployeeFunction;
 use App\Models\FacultyLoading\AcademicTerm;
@@ -47,7 +47,7 @@ class CommitteeAssignmentControllerSyncTest extends TestCase
         $admin = $this->admin();
         $member = User::factory()->create();
 
-        $this->actingAs($admin)->post(route('faculty-loading.committee-assignments.store'), [
+        $this->actingAs($admin)->post(route('pm-committees.store'), [
             'user_id' => $member->id,
             'school_year_id' => $term->school_year_id,
             'academic_term_id' => $term->id,
@@ -68,7 +68,7 @@ class CommitteeAssignmentControllerSyncTest extends TestCase
         $admin = $this->admin();
         $member = User::factory()->create();
 
-        $this->actingAs($admin)->post(route('faculty-loading.committee-assignments.store'), [
+        $this->actingAs($admin)->post(route('pm-committees.store'), [
             'user_id' => $member->id,
             'school_year_id' => $term->school_year_id,
             'academic_term_id' => $term->id,
@@ -79,7 +79,7 @@ class CommitteeAssignmentControllerSyncTest extends TestCase
         ]);
         $assignment = FacultyCommitteeAssignment::where('user_id', $member->id)->firstOrFail();
 
-        $this->actingAs($admin)->delete(route('faculty-loading.committee-assignments.destroy', $assignment->id))
+        $this->actingAs($admin)->delete(route('pm-committees.destroy', $assignment->id))
             ->assertRedirect();
 
         $this->assertDatabaseCount('employee_functions', 0);
@@ -98,7 +98,7 @@ class CommitteeAssignmentControllerSyncTest extends TestCase
         ]);
         $assignmentId = FacultyCommitteeAssignment::where('user_id', $member->id)->value('id');
 
-        $this->actingAs($admin)->put(route('faculty-loading.committee-assignments.update', $assignmentId), [
+        $this->actingAs($admin)->put(route('pm-committees.update', $assignmentId), [
             'role' => 'chairperson', 'load_units' => 1,
         ])->assertRedirect();
 

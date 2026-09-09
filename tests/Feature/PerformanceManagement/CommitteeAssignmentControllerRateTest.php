@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\FacultyLoading;
+namespace Tests\Feature\PerformanceManagement;
 
 use App\Models\Committee;
 use App\Models\FacultyLoading\AcademicTerm;
@@ -24,7 +24,7 @@ class CommitteeAssignmentControllerRateTest extends TestCase
     private function withViewOwn(User $user): User
     {
         $role = Role::create(['name' => 'TestRole_' . uniqid()]);
-        $perm = Permission::firstOrCreate(['name' => 'faculty_loading.view_own'], ['module' => 'FacultyLoading', 'description' => 'faculty_loading.view_own']);
+        $perm = Permission::firstOrCreate(['name' => 'accomplishments.view'], ['module' => 'Accomplishments', 'description' => 'accomplishments.view']);
         $role->permissions()->attach($perm->id);
         $user->roles()->attach($role->id);
 
@@ -58,7 +58,7 @@ class CommitteeAssignmentControllerRateTest extends TestCase
     {
         [$chair, $assignment, $item] = $this->setUpChairAndMember();
 
-        $this->actingAs($chair)->post(route('faculty-loading.committee-assignments.rate', $assignment->id), [
+        $this->actingAs($chair)->post(route('pm-committees.rate', $assignment->id), [
             'support_item_id' => $item->id,
             'quality_rating' => 5, 'efficiency_rating' => 5, 'timeliness_rating' => 4,
         ])->assertRedirect();
@@ -73,7 +73,7 @@ class CommitteeAssignmentControllerRateTest extends TestCase
         [, $assignment, $item] = $this->setUpChairAndMember();
         $outsider = User::factory()->create();
 
-        $this->actingAs($outsider)->post(route('faculty-loading.committee-assignments.rate', $assignment->id), [
+        $this->actingAs($outsider)->post(route('pm-committees.rate', $assignment->id), [
             'support_item_id' => $item->id,
             'quality_rating' => 5, 'efficiency_rating' => 5, 'timeliness_rating' => 4,
         ])->assertForbidden();
@@ -84,7 +84,7 @@ class CommitteeAssignmentControllerRateTest extends TestCase
         [$chair, $assignment] = $this->setUpChairAndMember();
         $otherItem = IpcrV2Record::first()->supportItems()->create(['label' => 'Unrelated manual item']);
 
-        $this->actingAs($chair)->post(route('faculty-loading.committee-assignments.rate', $assignment->id), [
+        $this->actingAs($chair)->post(route('pm-committees.rate', $assignment->id), [
             'support_item_id' => $otherItem->id,
             'quality_rating' => 5, 'efficiency_rating' => 5, 'timeliness_rating' => 4,
         ])->assertNotFound();

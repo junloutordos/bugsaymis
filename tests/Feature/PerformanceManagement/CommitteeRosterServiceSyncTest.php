@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\FacultyLoading;
+namespace Tests\Feature\PerformanceManagement;
 
 use App\Models\Committee;
 use App\Models\FacultyLoading\AcademicTerm;
