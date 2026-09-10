@@ -120,11 +120,15 @@ class CommitteeAssignmentController extends Controller
             'revoked_by' => $c->revokedBy?->only('id', 'name'), 'revocation_reason' => $c->revocation_reason,
             'amended_from_committee_id' => $c->amended_from_committee_id,
             'amended_into' => $c->amendedInto ? ['id' => $c->amendedInto->id, 'name' => $c->amendedInto->name] : null,
+            'chairperson_load_units' => (float) $c->chairperson_load_units,
+            'member_load_units' => (float) $c->member_load_units,
             'members' => $c->members->map($mapMember),
             'active_assignment_count' => $assignmentCounts->get($c->id, 0),
             'work_distribution_plans' => $c->workDistributionPlans->map(fn ($p) => ['id' => $p->id])->values(),
             'sub_committees' => $c->subCommittees->map(fn ($sub) => [
                 'id' => $sub->id, 'name' => $sub->name, 'head_id' => $sub->head_id, 'head' => $sub->head?->only('id', 'name'),
+                'chairperson_load_units' => (float) $sub->chairperson_load_units,
+                'member_load_units' => (float) $sub->member_load_units,
                 'active_assignment_count' => $assignmentCounts->get($sub->id, 0),
                 'members' => $sub->members->map($mapMember),
             ])->values(),
@@ -198,6 +202,8 @@ class CommitteeAssignmentController extends Controller
             'season_ends_at'    => $validated['season_ends_at'] ?? null,
             'so_number'         => $validated['so_number'] ?? null,
             'issuance_id'       => $validated['issuance_id'] ?? null,
+            'chairperson_load_units' => $validated['chairperson_load_units'] ?? 0,
+            'member_load_units'      => $validated['member_load_units'] ?? 0,
         ]);
 
         $committee->workDistributionPlans()->sync($validated['plan_ids'] ?? []);
@@ -208,6 +214,12 @@ class CommitteeAssignmentController extends Controller
                     'name'                => $subData['name'],
                     'head_id'             => $subData['head_id'] ?? null,
                     'parent_committee_id' => $committee->id,
+                    // Sub-committees never carry their own load-unit rate —
+                    // they always inherit the parent's, resolved at create
+                    // time (a real stored value, so loadUnitsFor() and the
+                    // roster/assignment sync code work unchanged).
+                    'chairperson_load_units' => $committee->chairperson_load_units,
+                    'member_load_units'      => $committee->member_load_units,
                 ]);
                 $this->syncCatalogMembers($sub, $subData['member_ids'] ?? [], $subData['member_tasks'] ?? [], $subData['member_roles'] ?? [], $subData['member_load_overrides'] ?? []);
             }
@@ -244,6 +256,8 @@ class CommitteeAssignmentController extends Controller
             'season_ends_at'    => $validated['season_ends_at'] ?? null,
             'so_number'         => $validated['so_number'] ?? null,
             'issuance_id'       => $validated['issuance_id'] ?? null,
+            'chairperson_load_units' => $validated['chairperson_load_units'] ?? 0,
+            'member_load_units'      => $validated['member_load_units'] ?? 0,
         ]);
         \App\Services\AuditLogger::logModelEvent($committee, 'updated');
 
@@ -254,7 +268,12 @@ class CommitteeAssignmentController extends Controller
                 if (!empty($subData['id'])) {
                     $sub = GlobalCommittee::find($subData['id']);
                     if ($sub && $sub->parent_committee_id === $committee->id) {
-                        $sub->update(['name' => $subData['name'], 'head_id' => $subData['head_id'] ?? null]);
+                        $sub->update([
+                            'name' => $subData['name'],
+                            'head_id' => $subData['head_id'] ?? null,
+                            'chairperson_load_units' => $committee->chairperson_load_units,
+                            'member_load_units'      => $committee->member_load_units,
+                        ]);
                         $this->syncCatalogMembers($sub, $subData['member_ids'] ?? [], $subData['member_tasks'] ?? [], $subData['member_roles'] ?? [], $subData['member_load_overrides'] ?? []);
                     }
                 } else {
@@ -262,10 +281,22 @@ class CommitteeAssignmentController extends Controller
                         'name'                => $subData['name'],
                         'head_id'             => $subData['head_id'] ?? null,
                         'parent_committee_id' => $committee->id,
+                        'chairperson_load_units' => $committee->chairperson_load_units,
+                        'member_load_units'      => $committee->member_load_units,
                     ]);
                     $this->syncCatalogMembers($sub, $subData['member_ids'] ?? [], $subData['member_tasks'] ?? [], $subData['member_roles'] ?? [], $subData['member_load_overrides'] ?? []);
                 }
             }
+
+            // Cascade the parent's (possibly just-changed) load-unit rate to
+            // every sub-committee, including any not present in this
+            // request's sub_committees payload — a rate change on the
+            // parent must propagate to the whole family, not only to the
+            // rows this particular save happened to touch.
+            $committee->subCommittees()->update([
+                'chairperson_load_units' => $committee->chairperson_load_units,
+                'member_load_units'      => $committee->member_load_units,
+            ]);
         } else {
             $newMemberIds = $validated['member_ids'] ?? [];
             $this->syncCatalogMembers($committee, $newMemberIds, $request->input('member_tasks', []), $request->input('member_roles', []), $request->input('member_load_overrides', []));
@@ -311,6 +342,8 @@ class CommitteeAssignmentController extends Controller
             'season_ends_at'                      => 'nullable|required_if:scope_type,' . GlobalCommittee::SCOPE_SEASONAL . '|date|after_or_equal:season_starts_at',
             'so_number'                          => 'nullable|string|max:100',
             'issuance_id'                        => 'nullable|exists:issuances,id',
+            'chairperson_load_units'              => 'nullable|numeric|min:0|max:5',
+            'member_load_units'                  => 'nullable|numeric|min:0|max:5',
             'sub_committees'                     => 'nullable|array',
             'sub_committees.*.id'                => 'nullable|exists:committees,id',
             'sub_committees.*.name'               => 'required_with:sub_committees|string|max:255',
@@ -412,6 +445,8 @@ class CommitteeAssignmentController extends Controller
             'season_ends_at'             => $validated['season_ends_at'] ?? null,
             'so_number'                  => $validated['so_number'] ?? null,
             'issuance_id'                => $validated['issuance_id'] ?? null,
+            'chairperson_load_units'     => $validated['chairperson_load_units'] ?? 0,
+            'member_load_units'          => $validated['member_load_units'] ?? 0,
             'amended_from_committee_id'  => $committee->id,
         ]);
 
@@ -443,6 +478,50 @@ class CommitteeAssignmentController extends Controller
     {
         $user = auth()->user();
         if (!$user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR'])) abort(403);
+
+        // faculty_committee_assignments.committee_id has no FK — deleting
+        // the committee alone leaves every assignment dangling, which in
+        // turn leaves its synced EmployeeFunction row (and anything IPCR
+        // V2 already materialized from it) stuck forever, since nothing
+        // else ever re-checks whether committee_id still resolves to a
+        // real committee. Clean up explicitly, in the same order the
+        // single-assignment destroy() endpoint already uses, for every
+        // affected assignment across this committee AND its sub-committees
+        // (a sub-committee's own delete path already does this per-row via
+        // this same method — deleting the parent must reach the same rows).
+        $committeeIds = collect([$committee->id])
+            ->merge(GlobalCommittee::where('parent_committee_id', $committee->id)->pluck('id'));
+
+        $assignments = FacultyCommitteeAssignment::whereIn('committee_id', $committeeIds)->get();
+        $affectedUserIds = $assignments->pluck('user_id')->unique();
+
+        foreach ($assignments as $assignment) {
+            $userId = $assignment->user_id;
+            $termId = $assignment->academic_term_id;
+            $laId   = $assignment->load_assignment_id;
+
+            $assignment->delete();
+
+            if ($laId) {
+                LoadAssignment::destroy($laId);
+            }
+
+            $load = FacultyLoad::where('user_id', $userId)->where('academic_term_id', $termId)->first();
+            if ($load) {
+                $this->loads->syncLoad($load);
+            }
+        }
+
+        // Re-sync each affected user's Employee Functions AFTER the
+        // assignments are gone — EmployeeFunctionSyncService's own
+        // "detach rows no longer represented" cleanup then correctly
+        // drops the now-stale committee-sourced EmployeeFunction row
+        // (still preserving it if any IPCR V2 item on it already has real
+        // accomplishment data, per that service's existing rule).
+        $functionSync = new \App\Services\EmployeeFunctionSyncService();
+        foreach (User::whereIn('id', $affectedUserIds)->get() as $affectedUser) {
+            $functionSync->syncFromFacultyLoading($affectedUser);
+        }
 
         $committee->delete();
         return redirect()->back()->with('success', 'Committee deleted.');
@@ -507,6 +586,115 @@ class CommitteeAssignmentController extends Controller
             ];
         }
         $committee->members()->sync($syncData);
+    }
+
+    /**
+     * True when the given user may manage (add/remove/edit) this
+     * committee's roster — same hierarchical rule already used by
+     * rateAssignment(): faculty_loading.manage always passes; otherwise
+     * the user must be an active chairperson/co-chair of THIS committee,
+     * or (when this is a sub-committee) of its parent.
+     */
+    private function canManageCommitteeRoster(Committee $committee, int $userId, int $termId): bool
+    {
+        if (auth()->user()->hasPermission('faculty_loading.manage')) {
+            return true;
+        }
+
+        $isChair = FacultyCommitteeAssignment::where('committee_id', $committee->id)
+            ->where('academic_term_id', $termId)
+            ->where('user_id', $userId)
+            ->whereIn('role', ['chairperson', 'co_chair'])
+            ->where('status', 'active')
+            ->exists();
+
+        if (! $isChair && $committee->parent_committee_id) {
+            $isChair = FacultyCommitteeAssignment::where('committee_id', $committee->parent_committee_id)
+                ->where('academic_term_id', $termId)
+                ->where('user_id', $userId)
+                ->whereIn('role', ['chairperson', 'co_chair'])
+                ->where('status', 'active')
+                ->exists();
+        }
+
+        return $isChair;
+    }
+
+    // ── Add a single member to a committee's roster (from the Show page) ─────
+    // Appends to the existing committee_user pivot (unlike the catalog
+    // modal's syncCatalogMembers(), which replaces the WHOLE roster) —
+    // Show page must never be able to accidentally drop every other member
+    // by only knowing about the one it's adding.
+
+    public function addMember(Request $request, Committee $committee): RedirectResponse
+    {
+        $currentTerm = AcademicTerm::where('is_current', true)->first();
+        abort_if(! $currentTerm, 422, 'No current academic term is configured.');
+
+        abort_unless(
+            $this->canManageCommitteeRoster($committee, auth()->id(), $currentTerm->id),
+            403,
+            'Only the committee chairperson or an administrator can manage members.'
+        );
+
+        $data = $request->validate([
+            'user_id'            => 'required|integer|exists:users,id',
+            'role'               => ['required', Rule::in(['member', 'secretary', 'co_chair'])],
+            'task'               => 'nullable|string|max:255',
+            'load_units_override' => 'nullable|numeric|min:0|max:5',
+        ]);
+
+        $globalCommittee = GlobalCommittee::findOrFail($committee->id);
+
+        $alreadyMember = $globalCommittee->members()->where('users.id', $data['user_id'])->exists();
+        abort_if($alreadyMember, 422, 'This user is already a member of this committee.');
+
+        $globalCommittee->members()->attach($data['user_id'], [
+            'task'                => $data['task'] ?? null,
+            'role'                => $data['role'],
+            'load_units_override' => $data['load_units_override'] ?? null,
+        ]);
+
+        $this->roster->reconcileCurrentTerm($globalCommittee);
+        $this->ipcrSync->syncForCommittee($committee->id);
+
+        $member = User::find($data['user_id']);
+        if ($member) {
+            $loadUnits = (float) ($data['load_units_override'] ?? $committee->loadUnitsFor($data['role']));
+            $this->notifications->assignmentAdded($globalCommittee, $member, $data['role'], $loadUnits);
+        }
+
+        \App\Services\AuditLogger::logModelEvent($globalCommittee, 'committee_member_added');
+
+        return back()->with('success', 'Member added.');
+    }
+
+    // ── Remove a single member from a committee's roster (from the Show page) ──
+
+    public function removeMember(Committee $committee, User $user): RedirectResponse
+    {
+        $currentTerm = AcademicTerm::where('is_current', true)->first();
+        abort_if(! $currentTerm, 422, 'No current academic term is configured.');
+
+        abort_unless(
+            $this->canManageCommitteeRoster($committee, auth()->id(), $currentTerm->id),
+            403,
+            'Only the committee chairperson or an administrator can manage members.'
+        );
+
+        $globalCommittee = GlobalCommittee::findOrFail($committee->id);
+
+        abort_if($globalCommittee->head_id === $user->id, 422, 'This user is the committee head — change the Head field on the committee catalog first.');
+
+        $globalCommittee->members()->detach($user->id);
+
+        $this->roster->reconcileCurrentTerm($globalCommittee);
+        $this->ipcrSync->syncForCommittee($committee->id);
+        $this->notifications->assignmentRemoved($globalCommittee, $user, 'member');
+
+        \App\Services\AuditLogger::logModelEvent($globalCommittee, 'committee_member_removed');
+
+        return back()->with('success', 'Member removed.');
     }
 
     // ── Committee detail / performance view ───────────────────────────────────
@@ -592,8 +780,30 @@ class CommitteeAssignmentController extends Controller
             ];
         });
 
-        $globalCommittee = GlobalCommittee::with(['revokedBy:id,name', 'amendedFrom:id,name', 'amendedInto:id,name', 'issuance:id,title,control_number,reference_number'])
+        $globalCommittee = GlobalCommittee::with(['revokedBy:id,name', 'amendedFrom:id,name', 'amendedInto:id,name', 'issuance:id,title,control_number,reference_number', 'members'])
             ->find($committee->id);
+
+        // Roster tab: the authoritative catalog membership
+        // (committee_user pivot — name/role/task/load override), merged
+        // with each member's current-term FacultyCommitteeAssignment
+        // status. This is intentionally NOT the same list as $members
+        // above — $members is assignment-centric (built off
+        // FacultyCommitteeAssignment, for IPCR V2 rating); a member can
+        // exist in the catalog pivot before CommitteeRosterService has
+        // materialized/synced their term assignment, and the roster tab
+        // must still show them.
+        $assignmentStatusByUserId = $assignments->pluck('status', 'user_id');
+        $roster = ($globalCommittee?->members ?? collect())->map(fn ($m) => [
+            'user_id'              => $m->id,
+            'name'                 => $m->name,
+            'position'             => $m->position,
+            'role'                 => $m->pivot->role ?? 'member',
+            'task'                 => $m->pivot->task,
+            'load_units_override'  => $m->pivot->load_units_override !== null ? (float) $m->pivot->load_units_override : null,
+            'effective_load_units' => (float) ($m->pivot->load_units_override ?? $committee->loadUnitsFor($m->pivot->role ?? 'member')),
+            'is_head'               => $globalCommittee->head_id === $m->id,
+            'term_status'          => $assignmentStatusByUserId->get($m->id, 'inactive'),
+        ])->values();
 
         $auditTrail = \App\Models\AuditLog::where('auditable_type', GlobalCommittee::class)
             ->where('auditable_id', $committee->id)
@@ -641,6 +851,13 @@ class CommitteeAssignmentController extends Controller
                 'amended_into'           => $globalCommittee?->amendedInto ? ['id' => $globalCommittee->amendedInto->id, 'name' => $globalCommittee->amendedInto->name] : null,
             ],
             'members'        => $members,
+            'roster'         => $roster,
+            'canManageRoster' => $canManage || $isChairperson,
+            'availableUsers' => User::employees()
+                ->whereNotIn('id', $roster->pluck('user_id'))
+                ->select('id', 'name', 'position')
+                ->orderBy('name')
+                ->get(),
             'terms'          => $terms,
             'selectedTermId' => (int) $termId,
             'authUser'       => $authUser->only('id', 'name'),
@@ -806,21 +1023,32 @@ class CommitteeAssignmentController extends Controller
             }
         }
 
-        $load       = $this->loads->findOrCreateFacultyLoad($data['user_id'], $data['school_year_id'], $data['academic_term_id']);
-        $assignment = LoadAssignment::create([
-            'faculty_load_id'  => $load->id,
-            'user_id'          => $data['user_id'],
-            'school_year_id'   => $data['school_year_id'],
-            'academic_term_id' => $data['academic_term_id'],
-            'assignment_type'  => 'committee',
-            'load_units'       => $data['load_units'],
-            'description'      => "{$data['committee_name']} ({$data['role']})",
-            'created_by'       => Auth::id(),
-        ]);
+        $load = $this->loads->findOrCreateFacultyLoad($data['user_id'], $data['school_year_id'], $data['academic_term_id']);
+
+        // Only create a LoadAssignment row when this assignment actually
+        // carries a unit load — a zero-unit committee assignment (e.g. a
+        // plain "member" role with no configured load_units) has nothing
+        // to reflect on the Faculty Load sheet. Creating one anyway gave
+        // EmployeeFunctionSyncService a permanent load_assignment source
+        // to re-derive from, so a manually deleted Employee Function for
+        // this committee would silently reappear the next time anything
+        // (roster edit, another member's change) re-triggered the sync.
+        $assignment = (float) $data['load_units'] > 0
+            ? LoadAssignment::create([
+                'faculty_load_id'  => $load->id,
+                'user_id'          => $data['user_id'],
+                'school_year_id'   => $data['school_year_id'],
+                'academic_term_id' => $data['academic_term_id'],
+                'assignment_type'  => 'committee',
+                'load_units'       => $data['load_units'],
+                'description'      => "{$data['committee_name']} ({$data['role']})",
+                'created_by'       => Auth::id(),
+            ])
+            : null;
 
         FacultyCommitteeAssignment::create(array_merge(
             $data,
-            ['load_assignment_id' => $assignment->id, 'status' => 'active']
+            ['load_assignment_id' => $assignment?->id, 'status' => 'active']
         ));
 
         $this->loads->syncLoad($load);
@@ -864,11 +1092,33 @@ class CommitteeAssignmentController extends Controller
             }
         }
 
-        if ($committeeAssignment->load_assignment_id) {
+        // Keep the LoadAssignment row's existence symmetric with load_units:
+        // create one if units just became > 0 and none exists yet; drop it
+        // if units just became 0 (mirrors store()'s creation gate, and the
+        // deactivate()/destroy() cleanup elsewhere in this file/CommitteeRosterService).
+        $hasUnits = (float) $data['load_units'] > 0;
+
+        if ($committeeAssignment->load_assignment_id && ! $hasUnits) {
+            LoadAssignment::destroy($committeeAssignment->load_assignment_id);
+            $committeeAssignment->update(['load_assignment_id' => null]);
+        } elseif ($committeeAssignment->load_assignment_id && $hasUnits) {
             LoadAssignment::where('id', $committeeAssignment->load_assignment_id)->update([
                 'load_units'  => $data['load_units'],
                 'description' => $committeeAssignment->committee_name . ' (' . $data['role'] . ')',
             ]);
+        } elseif (! $committeeAssignment->load_assignment_id && $hasUnits) {
+            $load = $load ?: $this->loads->findOrCreateFacultyLoad($committeeAssignment->user_id, $committeeAssignment->school_year_id, $committeeAssignment->academic_term_id);
+            $newLa = LoadAssignment::create([
+                'faculty_load_id'  => $load->id,
+                'user_id'          => $committeeAssignment->user_id,
+                'school_year_id'   => $committeeAssignment->school_year_id,
+                'academic_term_id' => $committeeAssignment->academic_term_id,
+                'assignment_type'  => 'committee',
+                'load_units'       => $data['load_units'],
+                'description'      => $committeeAssignment->committee_name . ' (' . $data['role'] . ')',
+                'created_by'       => Auth::id(),
+            ]);
+            $committeeAssignment->update(['load_assignment_id' => $newLa->id]);
         }
 
         $load = FacultyLoad::where('user_id', $committeeAssignment->user_id)

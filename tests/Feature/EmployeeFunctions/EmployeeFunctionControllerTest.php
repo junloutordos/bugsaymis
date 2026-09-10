@@ -250,6 +250,70 @@ class EmployeeFunctionControllerTest extends TestCase
         $this->assertDatabaseMissing('employee_functions', ['id' => $function->id]);
     }
 
+    public function test_destroy_records_a_dismissal_for_an_auto_synced_function(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $function = EmployeeFunction::create([
+            'user_id' => $employee->id, 'function_type' => 'support', 'source_type' => EmployeeFunction::SOURCE_LOAD_ASSIGNMENT,
+            'sync_source_key' => 'committee_assignment:99', 'label' => 'Some Committee',
+        ]);
+
+        $this->actingAs($manager)->delete(route('employee-functions.destroy', [$employee, $function]))->assertRedirect();
+
+        $this->assertDatabaseHas('employee_function_sync_dismissals', [
+            'user_id' => $employee->id, 'sync_source_key' => 'committee_assignment:99',
+        ]);
+        $this->assertDatabaseMissing('employee_functions', ['id' => $function->id]);
+    }
+
+    public function test_destroy_does_not_record_a_dismissal_for_a_manual_function(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $function = EmployeeFunction::create([
+            'user_id' => $employee->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'x',
+        ]);
+
+        $this->actingAs($manager)->delete(route('employee-functions.destroy', [$employee, $function]))->assertRedirect();
+
+        $this->assertDatabaseCount('employee_function_sync_dismissals', 0);
+    }
+
+    public function test_destroy_prunes_its_unrated_materialized_ipcr_v2_item(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $function = EmployeeFunction::create([
+            'user_id' => $employee->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'IT Management', 'weight_percent' => 100,
+        ]);
+        $period = \App\Models\IPCRRatingPeriod::create(['label' => 'FY2026-1', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
+        $record = (new \App\Services\IPCRV2\IpcrV2GenerationService())->generateTargets($employee, $period);
+        $itemId = $record->coreItems->first()->id;
+
+        $this->actingAs($manager)->delete(route('employee-functions.destroy', [$employee, $function]))->assertRedirect();
+
+        $this->assertDatabaseMissing('ipcr_v2_core_items', ['id' => $itemId]);
+    }
+
+    public function test_destroy_preserves_a_materialized_item_that_already_has_an_accomplishment(): void
+    {
+        $manager = $this->manager();
+        $employee = User::factory()->create();
+        $function = EmployeeFunction::create([
+            'user_id' => $employee->id, 'function_type' => 'core', 'source_type' => 'manual', 'label' => 'IT Management', 'weight_percent' => 100,
+        ]);
+        $period = \App\Models\IPCRRatingPeriod::create(['label' => 'FY2026-1', 'year' => 2026, 'semester' => 1, 'status' => 'open', 'is_current' => true]);
+        $record = (new \App\Services\IPCRV2\IpcrV2GenerationService())->generateTargets($employee, $period);
+        $item = $record->coreItems->first();
+        $item->update(['actual_accomplishment' => 'Implemented the new network.']);
+
+        $this->actingAs($manager)->delete(route('employee-functions.destroy', [$employee, $function]))->assertRedirect();
+
+        $this->assertDatabaseHas('ipcr_v2_core_items', ['id' => $item->id, 'actual_accomplishment' => 'Implemented the new network.']);
+        $this->assertDatabaseMissing('employee_functions', ['id' => $function->id]);
+    }
+
     public function test_non_manager_cannot_access(): void
     {
         $employee = User::factory()->create();

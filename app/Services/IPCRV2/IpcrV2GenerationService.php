@@ -57,6 +57,8 @@ class IpcrV2GenerationService
      */
     public function syncNewFunctions(IpcrV2Record $record): int
     {
+        $pruned = $this->pruneOrphanedItems($record);
+
         $record->loadMissing(['coreItems', 'supportItems']);
 
         $existingCoreFunctionIds = $record->coreItems->pluck('employee_function_id')->all();
@@ -68,7 +70,45 @@ class IpcrV2GenerationService
             ->whereNotIn('id', $existingSupportFunctionIds)->with('workDistributionPlans:id,success_indicator')->get();
 
         if ($newCoreFunctions->isEmpty() && $newSupportFunctions->isEmpty()) {
-            return 0;
+            return $pruned;
+        }
+
+        // Existing core items' weight_percent is a snapshot taken at
+        // generation/last-sync time — EmployeeFunctionSyncService
+        // re-normalizes EVERY core EmployeeFunction's weight against the
+        // user's current total unit pool whenever it runs (e.g. adding a
+        // new load-bearing committee assignment shrinks teaching load's
+        // share to make room), but that re-normalization never propagates
+        // to already-materialized ipcr_v2_core_items rows on its own.
+        // Refresh them from their live EmployeeFunction here, BEFORE
+        // summing for the 100% check below — otherwise this check compares
+        // stale pre-resync weights against the freshly-computed new
+        // function(s) and false-positives well past 100%.
+        if ($newCoreFunctions->isNotEmpty() && $record->coreItems->isNotEmpty()) {
+            $liveWeightByFunctionId = EmployeeFunction::whereIn('id', $record->coreItems->pluck('employee_function_id'))
+                ->pluck('weight_percent', 'id');
+
+            // A function tagged to N plans materialized into N items with
+            // the function's weight split evenly (createCoreItemsForFunction)
+            // — mirror that same split here, keyed by how many of THIS
+            // function's items already exist on the record, not the
+            // function's raw weight_percent alone.
+            foreach ($record->coreItems->groupBy('employee_function_id') as $functionId => $items) {
+                $liveWeight = $liveWeightByFunctionId->get($functionId);
+                if ($liveWeight === null) {
+                    continue;
+                }
+
+                $splitWeight = round((float) $liveWeight / $items->count(), 2);
+                foreach ($items as $item) {
+                    if ((float) $splitWeight !== (float) $item->weight_percent) {
+                        $item->update(['weight_percent' => $splitWeight]);
+                    }
+                }
+            }
+
+            $record->unsetRelation('coreItems');
+            $record->load('coreItems');
         }
 
         if ($newCoreFunctions->isNotEmpty()) {
@@ -80,7 +120,7 @@ class IpcrV2GenerationService
             }
         }
 
-        return DB::transaction(function () use ($record, $newCoreFunctions, $newSupportFunctions) {
+        return DB::transaction(function () use ($record, $newCoreFunctions, $newSupportFunctions, $pruned) {
             foreach ($newCoreFunctions as $function) {
                 $this->createCoreItemsForFunction($record, $function);
             }
@@ -89,8 +129,40 @@ class IpcrV2GenerationService
                 $this->createSupportItemsForFunction($record, $function);
             }
 
-            return $newCoreFunctions->count() + $newSupportFunctions->count();
+            return $pruned + $newCoreFunctions->count() + $newSupportFunctions->count();
         });
+    }
+
+    /**
+     * Removes core/support items whose backing EmployeeFunction was
+     * deleted (employee_function_id nulled by the FK's nullOnDelete —
+     * EmployeeFunctionController::destroy() and committee-cascade cleanup
+     * both leave the item itself in place, on purpose, for anything
+     * already rated). Only prunes when the record is still mutable AND
+     * the item has no real accomplishment data logged yet — never
+     * silently drops rated/logged work, matching the same rule
+     * EmployeeFunctionSyncService's own cleanup already follows. Called
+     * at the start of every syncNewFunctions() run so "Sync from Employee
+     * Functions" both adds new functions and removes stale orphans in one
+     * action, instead of only ever adding.
+     */
+    private function pruneOrphanedItems(IpcrV2Record $record): int
+    {
+        if (! $record->isMutable()) {
+            return 0;
+        }
+
+        $prunedCore = $record->coreItems()
+            ->whereNull('employee_function_id')
+            ->where(fn ($q) => $q->whereNull('actual_accomplishment')->orWhere('actual_accomplishment', ''))
+            ->delete();
+
+        $prunedSupport = $record->supportItems()
+            ->whereNull('employee_function_id')
+            ->where(fn ($q) => $q->whereNull('actual_accomplishment')->orWhere('actual_accomplishment', ''))
+            ->delete();
+
+        return $prunedCore + $prunedSupport;
     }
 
     /**
@@ -113,6 +185,7 @@ class IpcrV2GenerationService
             $record->coreItems()->create([
                 'employee_function_id' => $function->id,
                 'label' => $function->label,
+                'output_outcome' => $function->output_outcome,
                 'weight_percent' => $function->weight_percent,
             ]);
 
@@ -127,6 +200,7 @@ class IpcrV2GenerationService
             $record->coreItems()->create([
                 'employee_function_id' => $function->id,
                 'label' => $function->label,
+                'output_outcome' => $function->output_outcome,
                 'weight_percent' => $splitWeight,
                 'success_indicator' => $plan->success_indicator,
             ]);
@@ -145,6 +219,7 @@ class IpcrV2GenerationService
             $record->supportItems()->create([
                 'employee_function_id' => $function->id,
                 'label' => $function->label,
+                'output_outcome' => $function->output_outcome,
             ]);
 
             return;
@@ -154,6 +229,7 @@ class IpcrV2GenerationService
             $record->supportItems()->create([
                 'employee_function_id' => $function->id,
                 'label' => $function->label,
+                'output_outcome' => $function->output_outcome,
                 'success_indicator' => $plan->success_indicator,
             ]);
         }

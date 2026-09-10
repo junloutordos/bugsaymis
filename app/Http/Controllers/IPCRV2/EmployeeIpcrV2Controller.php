@@ -170,7 +170,7 @@ class EmployeeIpcrV2Controller extends Controller
             $data = $request->validate(['target' => 'nullable|string|max:1000']);
             $coreItem->fill($data)->save();
 
-            return back()->with('success', 'Target saved.');
+            return back();
         }
 
         if ($coreItem->success_indicator !== null) {
@@ -223,7 +223,7 @@ class EmployeeIpcrV2Controller extends Controller
             $data = $request->validate(['target' => 'nullable|string|max:1000']);
             $supportItem->fill($data)->save();
 
-            return back()->with('success', 'Target saved.');
+            return back();
         }
 
         $data = $request->validate([

@@ -1347,6 +1347,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             Route::get('/',                             [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'index'])->name('index');
             Route::get('/my',                           [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'myCommittees'])->name('my');
             Route::post('/{committeeAssignment}/rate',  [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'rateAssignment'])->name('rate');
+            // Members tab actions (Show page) — reachable by the committee's
+            // own chairperson too, not just faculty_loading.manage (the
+            // controller's own canManageCommitteeRoster() enforces that
+            // narrower rule); declared before the '/{committee}' wildcard
+            // show() route per the ordering note above.
+            Route::post('/{committee}/members',            [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'addMember'])->name('members.store');
+            Route::delete('/{committee}/members/{user}',   [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'removeMember'])->name('members.destroy');
             Route::get('/{committee}',                  [\App\Http\Controllers\PerformanceManagement\CommitteeAssignmentController::class, 'show'])->name('show');
         });
     });

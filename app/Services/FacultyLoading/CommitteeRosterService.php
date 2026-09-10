@@ -151,18 +151,29 @@ class CommitteeRosterService
         }
 
         $loadUnits = $loadUnitsOverride ?? $committee->loadUnitsFor($role);
-        $load      = $this->loads->findOrCreateFacultyLoad($userId, $schoolYearId, $termId);
 
-        $la = LoadAssignment::create([
-            'faculty_load_id'  => $load->id,
-            'user_id'          => $userId,
-            'school_year_id'   => $schoolYearId,
-            'academic_term_id' => $termId,
-            'assignment_type'  => 'committee',
-            'load_units'       => $loadUnits,
-            'description'      => "{$committee->name} ({$role})",
-            'created_by'       => Auth::id(),
-        ]);
+        // Only create a LoadAssignment row when this assignment actually
+        // carries a unit load. A zero-unit committee role has nothing to
+        // reflect on the Faculty Load sheet, and leaving it out here keeps
+        // EmployeeFunctionSyncService from having a permanent source to
+        // re-derive from — otherwise a manually deleted Employee Function
+        // for this committee silently reappears the next time the roster
+        // is touched (see updateRole()/deactivate() for the symmetric case).
+        $la = null;
+        if ($loadUnits > 0) {
+            $load = $this->loads->findOrCreateFacultyLoad($userId, $schoolYearId, $termId);
+            $la = LoadAssignment::create([
+                'faculty_load_id'  => $load->id,
+                'user_id'          => $userId,
+                'school_year_id'   => $schoolYearId,
+                'academic_term_id' => $termId,
+                'assignment_type'  => 'committee',
+                'load_units'       => $loadUnits,
+                'description'      => "{$committee->name} ({$role})",
+                'created_by'       => Auth::id(),
+            ]);
+            $this->loads->syncLoad($load);
+        }
 
         FacultyCommitteeAssignment::create([
             'user_id'            => $userId,
@@ -173,10 +184,9 @@ class CommitteeRosterService
             'role'               => $role,
             'load_units'         => $loadUnits,
             'status'             => 'active',
-            'load_assignment_id' => $la->id,
+            'load_assignment_id' => $la?->id,
         ]);
 
-        $this->loads->syncLoad($load);
         $this->ipcrSync->syncForUser(\App\Models\User::findOrFail($userId));
         $result['created']++;
     }
@@ -191,11 +201,31 @@ class CommitteeRosterService
         $loadUnits = $loadUnitsOverride ?? $committee->loadUnitsFor($newRole);
         $assignment->update(['role' => $newRole, 'load_units' => $loadUnits]);
 
-        if ($assignment->load_assignment_id) {
+        // Keep the LoadAssignment row's existence symmetric with load_units
+        // — mirrors createIfMissing()'s creation gate above.
+        $hasUnits = $loadUnits > 0;
+
+        if ($assignment->load_assignment_id && ! $hasUnits) {
+            LoadAssignment::destroy($assignment->load_assignment_id);
+            $assignment->update(['load_assignment_id' => null]);
+        } elseif ($assignment->load_assignment_id && $hasUnits) {
             LoadAssignment::where('id', $assignment->load_assignment_id)->update([
                 'load_units'  => $loadUnits,
                 'description' => "{$committee->name} ({$newRole})",
             ]);
+        } elseif (! $assignment->load_assignment_id && $hasUnits) {
+            $load = $this->loads->findOrCreateFacultyLoad($assignment->user_id, $assignment->school_year_id, $assignment->academic_term_id);
+            $newLa = LoadAssignment::create([
+                'faculty_load_id'  => $load->id,
+                'user_id'          => $assignment->user_id,
+                'school_year_id'   => $assignment->school_year_id,
+                'academic_term_id' => $assignment->academic_term_id,
+                'assignment_type'  => 'committee',
+                'load_units'       => $loadUnits,
+                'description'      => "{$committee->name} ({$newRole})",
+                'created_by'       => Auth::id(),
+            ]);
+            $assignment->update(['load_assignment_id' => $newLa->id]);
         }
 
         $load = FacultyLoad::where('user_id', $assignment->user_id)

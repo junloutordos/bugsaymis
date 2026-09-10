@@ -34,8 +34,8 @@ PhpMyAdmin: http://localhost:8081
 ### Production (AWS ECS Fargate)
 ```
 Cluster:       crcmis-prod
-Service:       crcmis-prod-service
-Container:     nginx (single container — nginx + PHP-FPM + cron + queue worker)
+Service:       crcmis-prod-service (web: nginx + PHP-FPM, behind ALB, blue/green)
+Worker svc:    crcmis-prod-worker (dedicated task — cron + queue workers, NOT behind ALB, NOT blue/green)
 ECR repo:      971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/app
 App URL:       https://mis.crc.pshs.edu.ph
 Cloudflare:    Proxied (orange-cloud) — WAF active
@@ -44,6 +44,16 @@ RDS:           crcmis-db-encrypted.c5i2kaqa8hyl.ap-southeast-1.rds.amazonaws.com
 Redis:         crcmis-redis.d8qigv.0001.apse1.cache.amazonaws.com:6379
 S3 bucket:     crcmis-mis-storage (ap-southeast-1, Block Public Access ON)
 ```
+
+### Queue Workers (crcmis-prod-worker service)
+- Two separate `queue:work redis` processes managed by `supervisord-worker.conf`, each `numprocs=1`:
+  - `queue-worker-default` — fast, single-unit jobs (`--queue=default`, 120s timeout)
+  - `queue-worker-bulk` — jobs that loop over many recipients/records (`--queue=bulk`, 700s timeout)
+- **Tag any new job that loops over many recipients/records with `->onQueue('bulk')` in its constructor** (call `$this->onQueue('bulk')`), or it lands on `default` and can head-of-line-block fast jobs (bell notifications, etc.) behind it. Existing bulk jobs: `ProcessIssuanceRelease`, `NotifyAddedIssuanceRecipients`, `ResendIssuanceEmails`, `ProcessCoaIssue`, `NotifyAnnouncementJob`, `NotifyOedIssuanceUpload`, `ProcessBiometricImport`, `GenerateActivityCertificates`, `SendActivityEvaluationLinks`.
+- **Any endpoint that loops over many participants/recipients doing PDF/S3/SMTP work per iteration must dispatch a queued job, not run synchronously** — it will exceed the 120s `fastcgi_read_timeout`/`max_execution_time` and Gateway Timeout with no flash message, even though the work finishes server-side. Follow the `ProcessIssuanceRelease`/`GenerateActivityCertificates` pattern: primitive IDs (not models), single `tries`, timeout under `REDIS_QUEUE_RETRY_AFTER` (900s), `failed()` handler, notify the requester via `NotificationService::notifyUser()` on completion.
+- **ECS exec is NOT enabled on the worker task** (`enableExecuteCommand: false`) — can't shell into it directly. Debug indirectly via Redis (`Redis::llen('queues:default')` / `'queues:bulk'`) or DB (`failed_jobs`, `notifications`) from the web container instead.
+- **CloudWatch `/ecs/crcmis` log streams (`app/nginx/<task-id>`) are nginx access logs only** — no PHP/Laravel exceptions or `\Log::`/`logger()` calls surface there. For real app-level errors, reproduce directly via `artisan tinker` inside an ECS-exec session on the web container.
+- **Deploy pipeline preserves the live task definition's CPU/memory/etc. on redeploy** — `.github/workflows/deploy.yml`'s worker-roll step does `describe-task-definition` on the *currently running* task def and only swaps the image tag. A manual `register-task-definition` + `update-service` change (e.g., bumping CPU/memory) made ahead of a push carries forward automatically on the next deploy — no workflow file edit needed.
 
 ### Secrets — AWS Secrets Manager & SSM
 Sensitive config is in **SSM Parameter Store** (`/crcmis/prod/*`) injected as env vars by ECS at startup.
@@ -73,6 +83,8 @@ aws ecs execute-command --cluster crcmis-prod --task $TASK --container nginx --i
 ```
 **Note:** `artisan tinker` in production is blocked by `open_basedir` for psysh history. Workaround: `env HOME=/tmp php /var/www/artisan tinker --execute='...'`
 
+**Note:** for anything beyond a one-liner, the AWS CLI's `--command` mangles `$`, backslashes, and nested quotes in inline PHP. Reliable pattern: write the script to a local file, `base64 < script.php | tr -d '\n'`, then run `bash -c "echo <b64> | base64 -d > /tmp/x.php && env HOME=/tmp php /var/www/artisan tinker --execute=\"require '/tmp/x.php';\""` — redirect to a file and `cat` it if output is long, since the session sometimes prints `Cannot perform start session: EOF` right after real output (harmless — output is already captured).
+
 ---
 
 ## Critical Rules
@@ -86,6 +98,7 @@ aws ecs execute-command --cluster crcmis-prod --task $TASK --container nginx --i
 
 ### S3 Storage
 - Always use `Storage::disk('s3')` — never `disk('public')` (sets ACL=public-read → blocked by S3 Block Public Access → silent failure)
+- **Never call `Storage::disk('s3')->makeDirectory()`** — S3 has no real directories (a slashed key is sufficient); this call tries to set an ACL on a placeholder object, which fails with `AccessControlListNotSupported` on this bucket (ACLs disabled) and throws before any subsequent `put()` even runs
 - S3 bucket is **private** — serve files through a proxy route, never via direct S3 URL
 - WFH photos use the proxy: `/hr/wfh/photo/{fileId}` where `fileId = 's3.' + base64url(s3Key)`
 - S3 key encoding: `'s3.' . rtrim(strtr(base64_encode($s3Key), '+/', '-_'), '=')`

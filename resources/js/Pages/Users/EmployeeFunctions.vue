@@ -8,6 +8,7 @@ import AppButton from "@/Components/AppButton.vue"
 import AppBadge from "@/Components/AppBadge.vue"
 import AppModal from "@/Components/AppModal.vue"
 import AppInput from "@/Components/AppInput.vue"
+import AppTextarea from "@/Components/AppTextarea.vue"
 import AppIconButton from "@/Components/AppIconButton.vue"
 import { ArrowPathIcon, PencilSquareIcon, PlusIcon, TrashIcon } from "@heroicons/vue/24/outline"
 import { computed, ref } from "vue"
@@ -38,7 +39,7 @@ function removeFunction(fn) {
 
 const showFormModal = ref(false)
 const editingFunction = ref(null)
-const form = ref({ function_type: "core", label: "", weight_percent: null, work_distribution_plan_ids: [] })
+const form = ref({ function_type: "core", label: "", output_outcome: "", weight_percent: null, work_distribution_plan_ids: [] })
 
 const wdpSearch = ref("")
 const filteredWorkDistributionPlans = computed(() => {
@@ -101,7 +102,7 @@ async function loadPreview() {
 
 function openAddModal(type) {
   editingFunction.value = null
-  form.value = { function_type: type, label: "", weight_percent: null, work_distribution_plan_ids: [] }
+  form.value = { function_type: type, label: "", output_outcome: "", weight_percent: null, work_distribution_plan_ids: [] }
   wdpSearch.value = ""
   resetScope()
   showFormModal.value = true
@@ -112,6 +113,7 @@ function openEditModal(fn) {
   form.value = {
     function_type: fn.function_type,
     label: fn.label,
+    output_outcome: fn.output_outcome ?? "",
     weight_percent: fn.weight_percent,
     work_distribution_plan_ids: (fn.work_distribution_plans ?? []).map(p => p.id),
   }
@@ -130,7 +132,7 @@ function saveForm() {
 
   const isBulk = !editingFunction.value && form.value.function_type === "support" && scope.value !== "this_only"
   if (isBulk) {
-    const payload = { ...scopePayload(), label: form.value.label, work_distribution_plan_ids: form.value.work_distribution_plan_ids }
+    const payload = { ...scopePayload(), label: form.value.label, output_outcome: form.value.output_outcome, work_distribution_plan_ids: form.value.work_distribution_plan_ids }
     submit((o) => router.post(route("employee-functions.bulk-store"), payload, o), opts)
     return
   }
@@ -138,6 +140,7 @@ function saveForm() {
   const payload = {
     function_type: form.value.function_type,
     label: form.value.label,
+    output_outcome: form.value.output_outcome,
     weight_percent: form.value.weight_percent,
     work_distribution_plan_ids: form.value.work_distribution_plan_ids,
   }
@@ -176,9 +179,12 @@ function saveForm() {
         </thead>
         <tbody>
           <tr v-for="fn in coreFunctions" :key="fn.id" :class="TR">
-            <td :class="TD">{{ fn.label }}</td>
             <td :class="TD">
-              <AppBadge>{{ fn.source_type }}</AppBadge>
+              {{ fn.label }}
+              <div v-if="fn.output_outcome" class="text-xs text-slate-400 mt-0.5">{{ fn.output_outcome }}</div>
+            </td>
+            <td :class="TD">
+              <AppBadge>{{ fn.source_label }}</AppBadge>
               <div v-if="fn.work_distribution_plans?.length" class="text-xs text-slate-500 mt-1 space-y-0.5">
                 <div v-for="plan in fn.work_distribution_plans" :key="plan.id">{{ plan.success_indicator }}</div>
               </div>
@@ -213,9 +219,12 @@ function saveForm() {
         </thead>
         <tbody>
           <tr v-for="fn in supportFunctions" :key="fn.id" :class="TR">
-            <td :class="TD">{{ fn.label }}</td>
             <td :class="TD">
-              <AppBadge>{{ fn.source_type }}</AppBadge>
+              {{ fn.label }}
+              <div v-if="fn.output_outcome" class="text-xs text-slate-400 mt-0.5">{{ fn.output_outcome }}</div>
+            </td>
+            <td :class="TD">
+              <AppBadge>{{ fn.source_label }}</AppBadge>
               <div v-if="fn.work_distribution_plans?.length" class="text-xs text-slate-500 mt-1 space-y-0.5">
                 <div v-for="plan in fn.work_distribution_plans" :key="plan.id">{{ plan.success_indicator }}</div>
               </div>
@@ -237,6 +246,12 @@ function saveForm() {
     <AppModal :show="showFormModal" :title="editingFunction ? 'Edit Function' : 'Add Function'" @close="showFormModal = false">
       <div class="space-y-4">
         <AppInput v-model="form.label" label="Label" placeholder="e.g. Chairperson, Discipline Committee" />
+        <AppTextarea
+          v-model="form.output_outcome"
+          label="Output/Outcome Statement"
+          placeholder="A short statement of the output/outcome this function produces"
+          rows="2"
+        />
         <AppInput
           v-if="form.function_type === 'core'"
           v-model="form.weight_percent"

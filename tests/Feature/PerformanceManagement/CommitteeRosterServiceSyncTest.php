@@ -41,6 +41,48 @@ class CommitteeRosterServiceSyncTest extends TestCase
         ]);
     }
 
+    public function test_reconcile_with_zero_load_units_does_not_create_a_load_assignment(): void
+    {
+        $term = $this->currentTerm();
+        $member = User::factory()->create();
+        // member_load_units left unset (null -> 0), matching a committee
+        // role that carries no unit load.
+        $committee = Committee::create(['name' => 'Grievance Committee']);
+        $committee->members()->attach($member->id);
+
+        app(CommitteeRosterService::class)->reconcileCommitteeRoster($committee, $term->school_year_id, $term->id);
+
+        $assignment = \App\Models\FacultyLoading\FacultyCommitteeAssignment::where('user_id', $member->id)->firstOrFail();
+        $this->assertNull($assignment->load_assignment_id);
+        $this->assertDatabaseCount('load_assignments', 0);
+
+        $this->assertDatabaseHas('employee_functions', [
+            'user_id' => $member->id,
+            'label' => 'Grievance Committee',
+            'function_type' => \App\Models\EmployeeFunction::TYPE_SUPPORT,
+        ]);
+    }
+
+    public function test_reconcile_with_positive_load_units_creates_a_load_assignment(): void
+    {
+        $term = $this->currentTerm();
+        $member = User::factory()->create();
+        $committee = Committee::create(['name' => 'Grievance Committee', 'member_load_units' => 1]);
+        $committee->members()->attach($member->id);
+
+        app(CommitteeRosterService::class)->reconcileCommitteeRoster($committee, $term->school_year_id, $term->id);
+
+        $assignment = \App\Models\FacultyLoading\FacultyCommitteeAssignment::where('user_id', $member->id)->firstOrFail();
+        $this->assertNotNull($assignment->load_assignment_id);
+        $this->assertDatabaseCount('load_assignments', 1);
+
+        $this->assertDatabaseHas('employee_functions', [
+            'user_id' => $member->id,
+            'label' => 'Grievance Committee',
+            'function_type' => \App\Models\EmployeeFunction::TYPE_CORE,
+        ]);
+    }
+
     public function test_reconcile_re_syncs_a_deactivated_member_so_the_row_is_removed(): void
     {
         $term = $this->currentTerm();

@@ -44,7 +44,14 @@
         </label>
       </AppFilterBar>
 
-      <AppTable :is-empty="paginatedCatalog.length === 0" :skeleton-cols="7">
+      <!-- card=false + manual shell: AppTable's own card wrapper is
+           overflow-hidden (for the rounded-corner scroll clip), which
+           clips this table's absolutely-positioned "More" action menu at
+           the card boundary — it MOUNTS FINE but is rendered invisible
+           past the edge. Managing the shell here instead keeps the same
+           visual card while leaving overflow visible for the dropdown. -->
+      <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70">
+        <AppTable :card="false" :is-empty="paginatedCatalog.length === 0" :skeleton-cols="7">
         <template #head>
           <tr>
             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
@@ -84,16 +91,7 @@
                   <ArrowRightIcon class="w-4 h-4" />
                 </Link>
                 <AppIconButton v-if="canManage && !committee.is_revoked" label="Edit" @click="openCatalogModal('edit', committee)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
-                <div v-if="canManage && !committee.is_revoked" class="relative">
-                  <AppIconButton label="More" @click="toggleMenu(committee.id)"><EllipsisVerticalIcon class="w-4 h-4" /></AppIconButton>
-                  <div v-if="openMenuId === committee.id" v-click-outside="() => (openMenuId = null)"
-                    class="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1 text-sm">
-                    <button class="w-full text-left px-3 py-2 hover:bg-slate-50" @click="openExportMenu(committee)">Export Roster</button>
-                    <button class="w-full text-left px-3 py-2 hover:bg-slate-50 text-amber-600" @click="openAmendModal(committee)">Amend</button>
-                    <button class="w-full text-left px-3 py-2 hover:bg-slate-50 text-danger-600" @click="openRevokeModal(committee)">Revoke</button>
-                    <button class="w-full text-left px-3 py-2 hover:bg-slate-50 text-danger-600" @click="deleteCatalogCommittee(committee)">Delete</button>
-                  </div>
-                </div>
+                <AppIconButton v-if="canManage && !committee.is_revoked" label="More" @click="toggleMenu($event, committee)"><EllipsisVerticalIcon class="w-4 h-4" /></AppIconButton>
               </div>
             </td>
           </tr>
@@ -131,7 +129,25 @@
             @page="catalogPage = $event"
           />
         </template>
-      </AppTable>
+        </AppTable>
+      </div>
+
+      <!-- Single Teleported "More" menu for the catalog table — rendered
+           into <body> instead of inside the table cell so no scroll/card
+           overflow ancestor can ever clip it, and positioned per-click from
+           the triggering button's own bounding rect (a proper datatable
+           row-menu pattern; the previous absolute-inside-<td> version was
+           clipped by AppTable's overflow-x-auto scroll container). -->
+      <Teleport to="body">
+        <div v-if="openMenuCommittee" v-click-outside="closeMenu"
+          class="fixed z-50 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1 text-sm"
+          :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }">
+          <button class="w-full text-left px-3 py-2 hover:bg-slate-50" @click="openExportMenu(openMenuCommittee); closeMenu()">Export Roster</button>
+          <button class="w-full text-left px-3 py-2 hover:bg-slate-50 text-amber-600" @click="openAmendModal(openMenuCommittee); closeMenu()">Amend</button>
+          <button class="w-full text-left px-3 py-2 hover:bg-slate-50 text-danger-600" @click="openRevokeModal(openMenuCommittee); closeMenu()">Revoke</button>
+          <button class="w-full text-left px-3 py-2 hover:bg-slate-50 text-danger-600" @click="deleteCatalogCommittee(openMenuCommittee); closeMenu()">Delete</button>
+        </div>
+      </Teleport>
 
       <!-- ── Cross-committee assignments (read-only, filterable — admin
            visibility across every committee/term at a glance; editing a
@@ -275,6 +291,18 @@
           </div>
         </div>
 
+        <!-- Default Load Units — the rate a member's load_units is pre-filled
+             with when assigned to this committee via Faculty Loading (a
+             member's own load can still be overridden individually above).
+             A value of 0 (default) means this committee carries no unit
+             load and its members surface as Support Functions on IPCR. -->
+        <div class="grid grid-cols-2 gap-3">
+          <AppInput v-model.number="catalogForm.chairperson_load_units" type="number" step="0.25" min="0" max="5"
+            label="Chairperson Load Units" placeholder="0" />
+          <AppInput v-model.number="catalogForm.member_load_units" type="number" step="0.25" min="0" max="5"
+            label="Member Load Units" placeholder="0" />
+        </div>
+
         <!-- WDP Plans (always at main committee level) -->
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
@@ -337,6 +365,9 @@
               <PlusIcon class="w-3 h-3" /> Add Sub-committee
             </button>
           </div>
+          <p class="text-xs text-slate-400 mb-2">
+            Sub-committees inherit this committee's load units — Chairperson {{ catalogForm.chairperson_load_units || 0 }}, Member {{ catalogForm.member_load_units || 0 }}. Set them above; no separate load-unit entry per sub-committee.
+          </p>
           <p v-if="catalogForm.sub_committees.length === 0" class="text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg p-4 text-center">
             No sub-committees yet. Click "Add Sub-committee" to create one.
           </p>
@@ -471,8 +502,25 @@ const roles = [
 ]
 
 const showAssignmentsPanel = ref(false)
-const openMenuId = ref(null)
-function toggleMenu(id) { openMenuId.value = openMenuId.value === id ? null : id }
+const openMenuCommittee = ref(null)
+const menuPosition = ref({ top: 0, left: 0 })
+function toggleMenu(event, committee) {
+  if (openMenuCommittee.value?.id === committee.id) {
+    openMenuCommittee.value = null
+    return
+  }
+  const rect = event.currentTarget.getBoundingClientRect()
+  // Menu is 176px wide (w-44); right-align it under the button, same as
+  // the previous absolute right-0 positioning, but clamp so it never
+  // renders off the left edge of the viewport.
+  const menuWidth = 176
+  menuPosition.value = {
+    top: rect.bottom + 4,
+    left: Math.max(8, rect.right - menuWidth),
+  }
+  openMenuCommittee.value = committee
+}
+function closeMenu() { openMenuCommittee.value = null }
 
 // ── Assignments panel: filters + search + pagination ──────────────────────
 const search = ref('')
@@ -576,6 +624,8 @@ const emptyCatalogForm = () => ({
   season_ends_at: '',
   so_number: '',
   issuance_id: null,
+  chairperson_load_units: 0,
+  member_load_units: 0,
   has_subcommittees: false,
   member_ids: [],
   member_tasks: {},
@@ -639,6 +689,8 @@ const openCatalogModal = (mode, committee = null) => {
       season_ends_at: committee.season_ends_at ?? '',
       so_number: committee.so_number ?? '',
       issuance_id: committee.issuance_id ?? null,
+      chairperson_load_units: committee.chairperson_load_units ?? 0,
+      member_load_units: committee.member_load_units ?? 0,
       has_subcommittees: hasSubs,
       member_ids: hasSubs ? [] : (committee.members?.map(m => m.id) ?? []),
       member_tasks: hasSubs ? {} : memberTasks,
@@ -763,6 +815,8 @@ const submitCatalogCommittee = () => {
     season_ends_at: catalogForm.value.scope_type === 'seasonal' ? catalogForm.value.season_ends_at : null,
     so_number: catalogForm.value.so_number || null,
     issuance_id: catalogForm.value.issuance_id,
+    chairperson_load_units: catalogForm.value.chairperson_load_units || 0,
+    member_load_units: catalogForm.value.member_load_units || 0,
     has_subcommittees: catalogForm.value.has_subcommittees,
     plan_ids: catalogForm.value.plan_ids,
   }
@@ -797,7 +851,6 @@ const deleteCatalogCommittee = async (committee) => {
   const ok = await confirmDelete(`Delete "${committee.name}"? This cannot be undone.`)
   if (!ok) return
   catalogSubmit.delete(route("pm-committees.catalog.destroy", committee.id))
-  openMenuId.value = null
 }
 
 // ── Revoke ───────────────────────────────────────────────────────────────
@@ -809,7 +862,6 @@ function openRevokeModal(committee) {
   revokeTarget.value = committee
   revokeReason.value = ''
   showRevokeModal.value = true
-  openMenuId.value = null
 }
 function submitRevoke() {
   revokeSubmitting.value = true
@@ -821,7 +873,6 @@ function submitRevoke() {
 // ── Amend ──────────────────────────────────────────────────────────────
 function openAmendModal(committee) {
   openCatalogModal('amend', committee)
-  openMenuId.value = null
 }
 
 // ── Export ───────────────────────────────────────────────────────────────
@@ -830,15 +881,24 @@ const exportTarget = ref(null)
 function openExportMenu(committee) {
   exportTarget.value = committee
   showExportModal.value = true
-  openMenuId.value = null
 }
 
 // simple click-outside directive for the row action menu
+// Deferring the listener attachment with setTimeout is required: the menu
+// mounts synchronously during the same click that opens it (toggleMenu),
+// and that click event is still bubbling up to `document` when `mounted()`
+// runs. Attaching the listener immediately would let it catch that same
+// in-flight click and close the menu the instant it opens.
 const vClickOutside = {
   mounted(el, binding) {
     el._clickOutside = (e) => { if (!el.contains(e.target)) binding.value(e) }
-    document.addEventListener('click', el._clickOutside)
+    el._clickOutsideTimer = setTimeout(() => {
+      document.addEventListener('click', el._clickOutside)
+    }, 0)
   },
-  unmounted(el) { document.removeEventListener('click', el._clickOutside) },
+  unmounted(el) {
+    clearTimeout(el._clickOutsideTimer)
+    document.removeEventListener('click', el._clickOutside)
+  },
 }
 </script>

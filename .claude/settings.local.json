@@ -1,8 +1,4 @@
 {
-  "skillOverrides": {
-    "process-audit": "off",
-    "make-controller": "off"
-  },
   "permissions": {
     "allow": [
       "Bash(npm --version)",
@@ -70,7 +66,26 @@
       "Bash(sed -n '155,175p' app/Http/Controllers/Payroll/PayrollRunController.php)",
       "Bash(sed -n '145,215p' app/Http/Controllers/HR/EmployeeScheduleController.php)",
       "mcp__claude_ai_Google_Drive__search_files",
-      "mcp__claude-in-chrome__tabs_context_mcp"
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "Bash(xargs -I{} grep -l \"Schema::create\" {})",
+      "Bash(echo \"exit: $?\")",
+      "Bash(./scripts/build-dyna-dmg.sh)",
+      "Bash(./scripts/build-dyna-dmg.sh)",
+      "Skill(update-config)",
+      "Bash(aws ecs run-task --cluster crcmis-prod *)",
+      "Bash(aws ecs describe-tasks --cluster crcmis-prod *)",
+      "Bash(aws rds modify-db-instance --db-instance-identifier crcmis-db-validation-84 *)",
+      "Bash(aws rds describe-db-instances --db-instance-identifier crcmis-db-validation-84 *)",
+      "Bash(aws logs get-log-events --log-group-name /ecs/crcmis *)",
+      "Bash(aws rds describe-blue-green-deployments *)",
+      "Skill(update-config)"
     ]
+  },
+  "skillOverrides": {
+    "process-audit": "off",
+    "make-controller": "off"
+  },
+  "enabledPlugins": {
+    "aws-dev-toolkit@claude-plugins-official": false
   }
 }

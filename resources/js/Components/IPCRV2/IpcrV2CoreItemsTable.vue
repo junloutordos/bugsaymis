@@ -5,6 +5,7 @@ import AppButton from "@/Components/AppButton.vue"
 import { TD } from "@/Composables/useTableClasses.js"
 import { router } from "@inertiajs/vue3"
 import { computed, ref } from "vue"
+import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
 import { groupConsecutiveByFunction } from "@/Composables/ipcrV2FunctionGrouping.js"
 
@@ -55,7 +56,19 @@ function closeModal() {
 function saveTarget(item) {
   submit((opts) => router.put(route("employee-ipcr-v2.updateCoreItem", [props.ipcrId, item.id]), {
     target: item.target,
-  }, opts))
+  }, {
+    ...opts,
+    preserveScroll: true,
+  }), {
+    resetOnSuccess: true,
+    onSuccess: () => {
+      closeModal()
+      Swal.fire({ icon: "success", title: "Target saved.", timer: 1200, showConfirmButton: false })
+    },
+    onError: (errors) => {
+      Swal.fire({ icon: "error", title: "Error", text: Object.values(errors)[0] ?? "Failed to save target." })
+    },
+  })
 }
 
 function saveEmployeeFields(item) {
@@ -125,11 +138,9 @@ function selfRowAverage(item) {
       <!-- WDP-tagged row: one independently-ratable row per tagged plan, mirroring Support Functions -->
       <tr v-if="row.item.success_indicator" :class="canOpenModal ? 'hover:bg-indigo-50/40 cursor-pointer' : ''" @click="openModal(row.item)">
         <td v-if="row.isFirst" :rowspan="row.groupSize" :class="TD" class="border border-slate-200 align-top font-medium">
-          {{ row.item.label }}<br />
-          <small class="text-slate-400">Weight: {{ row.item.weight_percent ?? "—" }}%</small>
+          {{ row.item.label }}
         </td>
-        <td v-if="row.isFirst" :rowspan="row.groupSize" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
-        <td v-if="row.isFirst" :rowspan="row.groupSize" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+        <td v-if="row.isFirst" :rowspan="row.groupSize" colspan="2" class="border border-slate-200 px-4 py-3 text-sm text-slate-500 align-top">{{ row.item.output_outcome ?? "—" }}</td>
         <td :class="TD" class="border border-slate-200 align-top">{{ row.item.success_indicator }}</td>
         <td :class="TD" class="border border-slate-200 align-top">
           <span :class="isTargetEditable ? 'text-indigo-600 hover:underline' : ''">{{ row.item.target ?? "—" }}</span>
@@ -166,8 +177,7 @@ function selfRowAverage(item) {
             {{ row.item.label }}<br />
             <small class="text-slate-400">Weight: {{ row.item.weight_percent ?? "—" }}%</small>
           </td>
-          <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
-          <td v-if="idx === 0" rowspan="5" class="border border-slate-200 px-4 py-3 text-sm text-slate-400 align-top">—</td>
+          <td v-if="idx === 0" rowspan="5" colspan="2" class="border border-slate-200 px-4 py-3 text-sm text-slate-500 align-top">{{ row.item.output_outcome ?? "—" }}</td>
           <td :class="TD" class="border border-slate-200">{{ criterion.label }}</td>
           <td v-if="idx === 0" rowspan="4" :class="TD" class="border border-slate-200 align-top">
             <span :class="isTargetEditable ? 'text-indigo-600 hover:underline' : ''">{{ row.item.target ?? "—" }}</span>

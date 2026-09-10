@@ -50,6 +50,7 @@ class EmployeeFunctionController extends Controller
             'work_distribution_plan_ids' => 'nullable|array',
             'work_distribution_plan_ids.*' => 'exists:work_distribution_plans,id',
             'label' => 'required|string|max:255',
+            'output_outcome' => 'nullable|string|max:1000',
             'weight_percent' => 'required_if:function_type,core|nullable|numeric|min:0.01|max:100',
         ]);
 
@@ -60,6 +61,7 @@ class EmployeeFunctionController extends Controller
             'function_type' => $data['function_type'],
             'source_type' => $planIds ? EmployeeFunction::SOURCE_WDP : EmployeeFunction::SOURCE_MANUAL,
             'label' => $data['label'],
+            'output_outcome' => $data['output_outcome'] ?? null,
             'weight_percent' => $data['weight_percent'] ?? null,
             'created_by' => $request->user()->id,
         ]);
@@ -75,6 +77,7 @@ class EmployeeFunctionController extends Controller
 
         $data = $request->validate([
             'label' => 'required|string|max:255',
+            'output_outcome' => 'nullable|string|max:1000',
             'weight_percent' => $employeeFunction->function_type === EmployeeFunction::TYPE_CORE
                 ? 'required|numeric|min:0.01|max:100'
                 : 'nullable|numeric|min:0|max:100',
@@ -86,6 +89,7 @@ class EmployeeFunctionController extends Controller
 
         $employeeFunction->update([
             'label' => $data['label'],
+            'output_outcome' => $data['output_outcome'] ?? null,
             'weight_percent' => $data['weight_percent'] ?? null,
             'source_type' => $planIds ? EmployeeFunction::SOURCE_WDP : (
                 $employeeFunction->source_type === EmployeeFunction::SOURCE_LOAD_ASSIGNMENT
@@ -103,6 +107,24 @@ class EmployeeFunctionController extends Controller
     {
         abort_if($employeeFunction->user_id !== $user->id, 404);
 
+        // If this row was auto-synced from Faculty Loading, remember that
+        // its specific source is dismissed BEFORE deleting it — otherwise
+        // the very next re-sync (which runs automatically on committee
+        // create/update, not just the manual "Sync from Faculty Loading"
+        // button) recreates an identical row via upsertRow()'s
+        // updateOrCreate() the moment the underlying assignment is
+        // touched again, and the delete never actually sticks. A manual
+        // row (no sync_source_key) has nothing to dismiss.
+        if ($employeeFunction->source_type === EmployeeFunction::SOURCE_LOAD_ASSIGNMENT && $employeeFunction->sync_source_key) {
+            \App\Models\EmployeeFunctionSyncDismissal::firstOrCreate([
+                'user_id' => $user->id,
+                'sync_source_key' => $employeeFunction->sync_source_key,
+            ]);
+        }
+
+        // Pruning any orphaned IPCR V2 item this function had already
+        // materialized is handled centrally by EmployeeFunction's own
+        // `deleted` model event — see EmployeeFunction::booted().
         $employeeFunction->delete();
 
         return back()->with('success', 'Function removed.');
@@ -145,6 +167,7 @@ class EmployeeFunctionController extends Controller
 
         $data = $request->validate([
             'label' => 'required|string|max:255',
+            'output_outcome' => 'nullable|string|max:1000',
             'work_distribution_plan_ids' => 'nullable|array',
             'work_distribution_plan_ids.*' => 'exists:work_distribution_plans,id',
         ]);
@@ -172,6 +195,7 @@ class EmployeeFunctionController extends Controller
                     'function_type' => EmployeeFunction::TYPE_SUPPORT,
                     'source_type' => $planIds ? EmployeeFunction::SOURCE_WDP : EmployeeFunction::SOURCE_MANUAL,
                     'label' => $data['label'],
+                    'output_outcome' => $data['output_outcome'] ?? null,
                     'created_by' => $request->user()->id,
                 ]);
                 $function->workDistributionPlans()->sync($planIds);

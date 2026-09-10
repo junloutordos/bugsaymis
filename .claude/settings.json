@@ -45,5 +45,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "aws-dev-toolkit@claude-plugins-official": true
   }
 }

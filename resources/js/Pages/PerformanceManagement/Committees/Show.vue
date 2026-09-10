@@ -5,6 +5,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AppTable from '@/Components/AppTable.vue'
 import AppModal from '@/Components/AppModal.vue'
@@ -13,14 +14,18 @@ import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import AppTabs from '@/Components/AppTabs.vue'
 import TaskBoard from '@/Components/Committee/TaskBoard.vue'
-import { ArrowLeftIcon, ClipboardDocumentListIcon, ClockIcon, StarIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, ClipboardDocumentListIcon, ClockIcon, StarIcon, UsersIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { ipcrAdjectivalRating } from '@/Composables/ipcrAdjectivalRating'
 import { useSubmit } from '@/Composables/useSubmit'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
   committee:      Object,
   members:        Array,
+  roster:          { type: Array, default: () => [] },
+  canManageRoster: { type: Boolean, default: false },
+  availableUsers:  { type: Array, default: () => [] },
   terms:          Array,
   selectedTermId: Number,
   authUser:       Object,
@@ -34,8 +39,9 @@ const props = defineProps({
   auditTrail:       { type: Array, default: () => [] },
 })
 
-const activeTab = ref('board')
+const activeTab = ref('members')
 const boardTabs = [
+  { key: 'members', label: 'Members',                   icon: UsersIcon },
   { key: 'board',   label: 'Task Board',                icon: ClipboardDocumentListIcon },
   { key: 'ratings', label: 'Accomplishments & Ratings', icon: StarIcon },
   { key: 'history', label: 'History',                   icon: ClockIcon },
@@ -114,6 +120,41 @@ function compileDoneTasks() {
   if (!lines.length) return
   const existing = rateForm.value.accomplishment?.trim()
   rateForm.value.accomplishment = (existing ? existing + '\n' : '') + lines.join('\n')
+}
+
+// ── Add / Remove Member (Members tab) ──────────────────────────────────────
+const { isSubmitting: isSubmittingMember, submit: submitMember } = useSubmit()
+
+const showAddMemberModal = ref(false)
+const memberSearch = ref('')
+const addMemberForm = ref({ user_id: '', role: 'member', task: '', load_units_override: '' })
+
+const filteredAvailableUsers = computed(() => {
+  const q = memberSearch.value.toLowerCase()
+  if (!q) return props.availableUsers
+  return props.availableUsers.filter(u => u.name.toLowerCase().includes(q))
+})
+
+function openAddMemberModal() {
+  addMemberForm.value = { user_id: '', role: 'member', task: '', load_units_override: '' }
+  memberSearch.value = ''
+  showAddMemberModal.value = true
+}
+function closeAddMemberModal() { showAddMemberModal.value = false }
+
+function submitAddMember() {
+  submitMember.post(route('pm-committees.members.store', props.committee.id), addMemberForm.value, {
+    onSuccess: () => { closeAddMemberModal(); Swal.fire({ icon: 'success', title: 'Member added', timer: 1200, showConfirmButton: false }) },
+    onError: (err) => Swal.fire('Error', Object.values(err).flat().join('\n') || 'Failed to add member.', 'error'),
+  })
+}
+
+async function removeMember(member) {
+  const ok = await confirmDelete(`Remove ${member.name} from this committee?`)
+  if (!ok) return
+  router.delete(route('pm-committees.members.destroy', [props.committee.id, member.user_id]), {
+    onSuccess: () => Swal.fire({ icon: 'success', title: 'Member removed', timer: 1200, showConfirmButton: false }),
+  })
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -242,6 +283,57 @@ function auditLabel(log) { return AUDIT_ACTION_LABELS[log.action] ?? log.action 
       </div>
 
       <AppTabs v-model="activeTab" :tabs="boardTabs">
+        <template #tab-members>
+          <AppCard :padded="false">
+            <div class="flex items-center justify-end p-3 border-b border-slate-100" v-if="canManageRoster">
+              <AppButton size="sm" @click="openAddMemberModal">
+                <PlusIcon class="w-4 h-4" /> Add Member
+              </AppButton>
+            </div>
+            <AppTable :is-empty="!roster?.length">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Role</th>
+                  <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Task</th>
+                  <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Load Units</th>
+                  <th class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">This Term</th>
+                  <th v-if="canManageRoster" class="px-3 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-16">Action</th>
+                </tr>
+              </template>
+
+              <tr v-for="member in roster" :key="member.user_id" class="hover:bg-indigo-50/40">
+                <td class="px-4 py-3">
+                  <p class="font-medium text-slate-800">{{ member.name }}</p>
+                  <p v-if="member.position" class="text-xs text-slate-400">{{ member.position }}</p>
+                </td>
+                <td class="px-4 py-3">
+                  <AppBadge :color="roleBadge(member.is_head ? 'chairperson' : member.role)">
+                    {{ member.is_head ? 'Chairperson' : roleLabel(member.role) }}
+                  </AppBadge>
+                </td>
+                <td class="px-4 py-3 text-slate-700 text-xs">{{ member.task || '—' }}</td>
+                <td class="px-3 py-3 text-center text-sm text-slate-700">
+                  {{ member.effective_load_units }}
+                  <span v-if="member.load_units_override !== null" class="ml-1 text-xs text-indigo-500" title="Override">*</span>
+                </td>
+                <td class="px-3 py-3 text-center">
+                  <AppBadge :color="member.term_status === 'active' ? 'green' : 'slate'">{{ member.term_status }}</AppBadge>
+                </td>
+                <td v-if="canManageRoster" class="px-3 py-3 text-center">
+                  <AppIconButton v-if="!member.is_head" label="Remove" variant="danger" @click="removeMember(member)">
+                    <TrashIcon class="w-4 h-4" />
+                  </AppIconButton>
+                </td>
+              </tr>
+
+              <template #empty>
+                <EmptyState title="No members in this committee yet." :icon="UsersIcon" />
+              </template>
+            </AppTable>
+          </AppCard>
+        </template>
+
         <template #tab-board>
           <TaskBoard
             :committee="committee"
@@ -387,6 +479,44 @@ function auditLabel(log) { return AUDIT_ACTION_LABELS[log.action] ?? log.action 
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
           <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
           <AppButton type="submit" :loading="isSubmitting" :disabled="isSubmitting">{{ isSubmitting ? 'Saving…' : 'Save' }}</AppButton>
+        </div>
+      </form>
+    </AppModal>
+
+    <!-- Add Member Modal -->
+    <AppModal :show="showAddMemberModal" title="Add Member" :subtitle="committee.name" size="md" @close="closeAddMemberModal">
+      <form @submit.prevent="submitAddMember" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Member <span class="text-red-500">*</span></label>
+          <AppInput v-model="memberSearch" placeholder="Search users…" class="mb-2" />
+          <div class="border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
+            <button v-for="u in filteredAvailableUsers" :key="u.id" type="button"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between"
+              :class="{ 'bg-indigo-50': addMemberForm.user_id === u.id }"
+              @click="addMemberForm.user_id = u.id">
+              <span>{{ u.name }}<span v-if="u.position" class="text-slate-400"> ({{ u.position }})</span></span>
+              <span v-if="addMemberForm.user_id === u.id" class="text-indigo-600 text-xs font-medium">Selected</span>
+            </button>
+            <p v-if="!filteredAvailableUsers.length" class="text-slate-400 text-xs px-3 py-3">No users match.</p>
+          </div>
+        </div>
+
+        <AppSelect v-model="addMemberForm.role" label="Role">
+          <option value="member">Member</option>
+          <option value="secretary">Secretary</option>
+          <option value="co_chair">Co-Chairperson</option>
+        </AppSelect>
+
+        <AppInput v-model="addMemberForm.task" label="Task" placeholder="e.g. Documentation, Logistics…" />
+
+        <AppInput v-model.number="addMemberForm.load_units_override" type="number" step="0.25" min="0" max="5"
+          label="Load Units Override (optional)" placeholder="Uses committee default if left blank" />
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <AppButton type="button" variant="secondary" @click="closeAddMemberModal">Cancel</AppButton>
+          <AppButton type="submit" :loading="isSubmittingMember" :disabled="isSubmittingMember || !addMemberForm.user_id">
+            {{ isSubmittingMember ? 'Saving…' : 'Add Member' }}
+          </AppButton>
         </div>
       </form>
     </AppModal>

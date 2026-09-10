@@ -548,11 +548,15 @@ body{font-family:DejaVu Sans,sans-serif;font-size:9pt}h1{text-align:center;font-
 
 - [ ] **Step 5: Wire `AlpPdfController::membersList()`**
 
-In `app/Http/Controllers/ALP/AlpPdfController.php`, add imports (after `use App\Models\ALP\AlpReport;`):
+In `app/Http/Controllers/ALP/AlpPdfController.php`, add imports. `App\Models\ALP\AlpSession` is already imported (line 10) — do not duplicate it. Add these two, after the existing `use App\Models\ALP\AlpSession;` line:
 
 ```php
-use App\Models\ALP\AlpSession;
 use App\Models\FacultyLoading\SchoolYear;
+```
+
+and after `use App\Services\ALP\AlpPdfService;`:
+
+```php
 use App\Services\ALP\AlpRosterService;
 ```
 

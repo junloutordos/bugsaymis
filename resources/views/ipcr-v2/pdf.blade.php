@@ -95,9 +95,8 @@
                 @if ($item->success_indicator)
                     <tr>
                         @if ($item->function_rowspan)
-                            <td rowspan="{{ $item->function_rowspan }}">{{ $item->label }}<br><small>Weight: {{ $item->weight_percent ?? '—' }}%</small></td>
-                            <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
-                            <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
+                            <td rowspan="{{ $item->function_rowspan }}">{{ $item->label }}</td>
+                            <td rowspan="{{ $item->function_rowspan }}" colspan="2">{{ $item->output_outcome ?? '—' }}</td>
                         @endif
                         <td>{{ $item->success_indicator }}</td>
                         <td>{{ $item->target ?? '—' }}</td>
@@ -111,8 +110,7 @@
                 @else
                     <tr>
                         <td rowspan="5">{{ $item->label }}<br><small>Weight: {{ $item->weight_percent ?? '—' }}%</small></td>
-                        <td rowspan="5">&mdash;</td>
-                        <td rowspan="5">&mdash;</td>
+                        <td rowspan="5" colspan="2">{{ $item->output_outcome ?? '—' }}</td>
                         <td>Positive feedback from students (30%)</td>
                         <td rowspan="4">{{ $item->target }}</td>
                         <td rowspan="4">{{ $item->actual_accomplishment }} @if($item->mov_link) <br><small>MOV: {{ $item->mov_link }}</small> @endif</td>
@@ -158,8 +156,7 @@
                 <tr>
                     @if ($item->function_rowspan)
                         <td rowspan="{{ $item->function_rowspan }}">{{ $item->label }}</td>
-                        <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
-                        <td rowspan="{{ $item->function_rowspan }}">&mdash;</td>
+                        <td rowspan="{{ $item->function_rowspan }}" colspan="2">{{ $item->output_outcome ?? '—' }}</td>
                     @endif
                     <td>{{ $item->success_indicator ?? '—' }}</td>
                     <td>{{ $item->target ?? '—' }}</td>

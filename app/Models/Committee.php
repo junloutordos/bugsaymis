@@ -14,12 +14,15 @@ class Committee extends Model
         'scope_type', 'school_year_id', 'season_starts_at', 'season_ends_at',
         'revoked_at', 'revoked_by', 'revocation_reason', 'amended_from_committee_id',
         'so_number', 'issuance_id', 'max_members',
+        'chairperson_load_units', 'member_load_units',
     ];
 
     protected $casts = [
         'season_starts_at' => 'date',
         'season_ends_at'   => 'date',
         'revoked_at'       => 'datetime',
+        'chairperson_load_units' => 'decimal:2',
+        'member_load_units'      => 'decimal:2',
     ];
 
     public const SCOPE_PERPETUAL   = 'perpetual';

@@ -102,6 +102,7 @@
                   <td class="px-5 py-3 font-mono text-xs text-slate-600">{{ d.code }}</td>
                   <td class="px-5 py-3">
                     <div class="font-medium text-slate-800">{{ d.name }}</div>
+                    <div v-if="d.description" class="text-xs text-slate-400 mt-0.5">{{ d.description }}</div>
                     <div v-if="d.requires_unit" class="text-[10px] text-amber-600 font-medium mt-0.5">Unit-scoped</div>
                   </td>
                   <td class="px-5 py-3 text-center">
@@ -177,6 +178,7 @@
                       <div>
                         <p class="font-medium text-slate-800">{{ d.name }}</p>
                         <p class="font-mono text-xs text-slate-500">{{ d.code }}</p>
+                        <p v-if="d.description" class="text-xs text-slate-400 mt-0.5">{{ d.description }}</p>
                         <p v-if="d.requires_unit" class="text-[10px] text-amber-600 font-medium mt-0.5">Unit-scoped</p>
                       </div>
                       <AppBadge :color="d.is_active ? 'green' : 'slate'">{{ d.is_active ? 'Active' : 'Inactive' }}</AppBadge>
@@ -288,7 +290,12 @@
           <p class="text-[11px] text-slate-400 mt-1">Determines which column this load counts toward in faculty totals.</p>
         </div>
         <AppInput v-model="desigForm.name" label="Name" required placeholder="e.g. Department Head – Science" />
-        <AppTextarea v-model="desigForm.description" rows="2" label="Description" />
+        <AppTextarea
+          v-model="desigForm.description"
+          rows="2"
+          label="Output/Outcome Statement"
+          placeholder="A short statement of the output/outcome this designation produces"
+        />
         <div class="grid grid-cols-2 gap-3">
           <AppInput v-model.number="desigForm.max_holders" type="number" min="1" placeholder="Unlimited" label="Max Holders" />
           <div class="space-y-1 pt-1">
