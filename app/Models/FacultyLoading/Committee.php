@@ -33,6 +33,16 @@ class Committee extends Model
         'chairperson_load_units',
         'member_load_units',
         'is_active',
+        'scope_type',
+        'school_year_id',
+        'season_starts_at',
+        'season_ends_at',
+        'revoked_at',
+        'revoked_by',
+        'revocation_reason',
+        'amended_from_committee_id',
+        'so_number',
+        'issuance_id',
     ];
 
     protected $casts = [
@@ -40,7 +50,14 @@ class Committee extends Model
         'chairperson_load_units' => 'decimal:2',
         'member_load_units'      => 'decimal:2',
         'is_active'              => 'boolean',
+        'season_starts_at'       => 'date',
+        'season_ends_at'         => 'date',
+        'revoked_at'             => 'datetime',
     ];
+
+    public const SCOPE_PERPETUAL   = 'perpetual';
+    public const SCOPE_SCHOOL_YEAR = 'school_year';
+    public const SCOPE_SEASONAL    = 'seasonal';
 
     // ── Relationships ──────────────────────────────────────────────────────────
 
@@ -83,6 +100,31 @@ class Committee extends Model
         return $this->hasMany(\App\Models\CommitteeTask::class, 'committee_id');
     }
 
+    public function schoolYear(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\FacultyLoading\SchoolYear::class);
+    }
+
+    public function issuance(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Issuance::class);
+    }
+
+    public function revokedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revoked_by');
+    }
+
+    public function amendedFrom(): BelongsTo
+    {
+        return $this->belongsTo(Committee::class, 'amended_from_committee_id');
+    }
+
+    public function amendedInto(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Committee::class, 'amended_from_committee_id');
+    }
+
     // ── Scopes ─────────────────────────────────────────────────────────────────
 
     public function scopeActive($query)
@@ -95,11 +137,30 @@ class Committee extends Model
         return $query->where('committee_type', $type);
     }
 
+    /** Not-yet-revoked committees (default listing scope). */
+    public function scopeNotRevoked($query)
+    {
+        return $query->whereNull('revoked_at');
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     public function isSubCommittee(): bool
     {
         return $this->parent_committee_id !== null;
+    }
+
+    public function isRevoked(): bool
+    {
+        return $this->revoked_at !== null;
+    }
+
+    /** True when a seasonal committee's window has fully elapsed. */
+    public function isSeasonEnded(): bool
+    {
+        return $this->scope_type === self::SCOPE_SEASONAL
+            && $this->season_ends_at !== null
+            && $this->season_ends_at->isPast();
     }
 
     public function isMain(): bool

@@ -60,6 +60,9 @@ Schedule::command('atlas-sentinel:auto-release-containments')->everyFiveMinutes(
 //    subject has a scheduled ILP period today ────────────────────────────
 Schedule::command('class-record:generate-ila-dates')->dailyAt('05:30')->withoutOverlapping();
 
+// ── Committees: notify admins of committees below max_members capacity ───
+Schedule::command('committees:vacancy-alerts')->dailyAt('07:45')->withoutOverlapping();
+
 // Atlas Sentinel stale-device bell notifications removed 2026-07-17 (offline /
 // not-reporting devices were spamming IT staff). The command still exists for
 // manual runs: php artisan atlas-sentinel:notify-stale-devices

@@ -13,7 +13,7 @@ import AppTextarea from '@/Components/AppTextarea.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import AppTabs from '@/Components/AppTabs.vue'
 import TaskBoard from '@/Components/Committee/TaskBoard.vue'
-import { ArrowLeftIcon, ClipboardDocumentListIcon, StarIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, ClipboardDocumentListIcon, ClockIcon, StarIcon } from '@heroicons/vue/24/outline'
 import { ipcrAdjectivalRating } from '@/Composables/ipcrAdjectivalRating'
 import { useSubmit } from '@/Composables/useSubmit'
 import Swal from 'sweetalert2'
@@ -31,12 +31,14 @@ const props = defineProps({
   ratingPeriods:    { type: Array, default: () => [] },
   selectedPeriodId: { type: Number, default: null },
   canManageBoard:   { type: Boolean, default: false },
+  auditTrail:       { type: Array, default: () => [] },
 })
 
 const activeTab = ref('board')
 const boardTabs = [
   { key: 'board',   label: 'Task Board',                icon: ClipboardDocumentListIcon },
   { key: 'ratings', label: 'Accomplishments & Ratings', icon: StarIcon },
+  { key: 'history', label: 'History',                   icon: ClockIcon },
 ]
 const boardPlans = computed(() => (props.members ?? [])
   .flatMap(m => m.items)
@@ -141,6 +143,31 @@ function roleLabel(role) {
 function canRateItem(item) {
   return (props.isChairperson || props.canManage) && !NOT_YET_RATABLE_STATUSES.includes(item.ipcr_status)
 }
+
+const lifecycleBadge = computed(() => {
+  if (props.committee.is_revoked) return 'red'
+  return { perpetual: 'green', school_year: 'blue', seasonal: 'amber' }[props.committee.scope_type] ?? 'slate'
+})
+const lifecycleLabel = computed(() => {
+  if (props.committee.is_revoked) return props.committee.amended_into ? 'Amended' : 'Revoked'
+  return { perpetual: 'Perpetual', school_year: 'School Year', seasonal: 'Seasonal' }[props.committee.scope_type] ?? props.committee.scope_type
+})
+
+function formatDate(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+const AUDIT_ACTION_LABELS = {
+  created: 'Committee created',
+  updated: 'Committee edited',
+  committee_member_added: 'Member added',
+  committee_member_removed: 'Member removed',
+  committee_role_changed: 'Role changed',
+  committee_revoked: 'Committee revoked',
+  committee_amended: 'Committee amended',
+}
+function auditLabel(log) { return AUDIT_ACTION_LABELS[log.action] ?? log.action }
 </script>
 
 <template>
@@ -163,6 +190,10 @@ function canRateItem(item) {
             <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Committee</p>
             <p class="font-semibold text-slate-800 mt-0.5">{{ committee.name }}</p>
             <span v-if="committee.code" class="font-mono text-xs text-indigo-600">{{ committee.code }}</span>
+            <div class="mt-1 flex flex-wrap gap-1">
+              <AppBadge :color="lifecycleBadge">{{ lifecycleLabel }}</AppBadge>
+              <AppBadge v-if="committee.is_revoked" color="red">Revoked</AppBadge>
+            </div>
           </div>
           <div>
             <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Chairperson</p>
@@ -174,9 +205,25 @@ function canRateItem(item) {
             <p class="text-slate-700 mt-0.5">Chair: <strong>{{ committee.chairperson_load_units }}</strong> units</p>
             <p class="text-slate-700">Member: <strong>{{ committee.member_load_units }}</strong> units</p>
           </div>
-          <div v-if="committee.description">
+          <div>
+            <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">SO / Issuance</p>
+            <p v-if="committee.issuance" class="text-slate-700 mt-0.5 text-xs">{{ committee.issuance.label }}</p>
+            <p v-else-if="committee.so_number" class="text-slate-700 mt-0.5 text-xs">SO {{ committee.so_number }}</p>
+            <p v-else class="text-slate-400 mt-0.5 text-xs">—</p>
+          </div>
+          <div v-if="committee.description" class="col-span-2">
             <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Description</p>
             <p class="text-slate-700 mt-0.5 text-xs leading-relaxed">{{ committee.description }}</p>
+          </div>
+          <div v-if="committee.is_revoked" class="col-span-2">
+            <p class="text-slate-500 font-medium text-xs uppercase tracking-wide">Revocation</p>
+            <p class="text-slate-700 mt-0.5 text-xs">
+              By {{ committee.revoked_by?.name ?? '—' }} on {{ formatDate(committee.revoked_at) }}
+              <span v-if="committee.revocation_reason">— {{ committee.revocation_reason }}</span>
+            </p>
+            <p v-if="committee.amended_into" class="text-xs text-indigo-600 mt-1">
+              Amended into: <Link :href="route('pm-committees.show', committee.amended_into.id)" class="hover:underline">{{ committee.amended_into.name }}</Link>
+            </p>
           </div>
         </div>
       </AppCard>
@@ -287,6 +334,24 @@ function canRateItem(item) {
                 <EmptyState title="No active members for this committee this term." />
               </template>
             </AppTable>
+          </AppCard>
+        </template>
+
+        <template #tab-history>
+          <AppCard>
+            <div v-if="!auditTrail.length" class="text-sm text-slate-400 italic py-6 text-center">
+              No history recorded for this committee yet.
+            </div>
+            <ol v-else class="relative border-l border-slate-200 ml-2 space-y-6">
+              <li v-for="log in auditTrail" :key="log.id" class="ml-4">
+                <span class="absolute -left-[7px] h-3 w-3 rounded-full bg-indigo-500 border-2 border-white"></span>
+                <p class="text-sm font-medium text-slate-800">{{ auditLabel(log) }}</p>
+                <p class="text-xs text-slate-400">{{ log.user_name }} — {{ formatDate(log.created_at) }}</p>
+                <div v-if="log.new_values" class="mt-1 text-xs text-slate-500 bg-slate-50 rounded px-2 py-1 inline-block">
+                  <span v-for="(v, k) in log.new_values" :key="k" class="mr-2">{{ k }}: {{ v }}</span>
+                </div>
+              </li>
+            </ol>
           </AppCard>
         </template>
       </AppTabs>

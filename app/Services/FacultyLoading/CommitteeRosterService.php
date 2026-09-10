@@ -74,7 +74,10 @@ class CommitteeRosterService
         }
         foreach ($committee->members as $member) {
             if ($member->id === $committee->head_id) continue;
-            $this->createIfMissing($committee, $member->id, 'member', $schoolYearId, $termId, $result);
+            $memberRole = in_array($member->pivot->role ?? 'member', ['secretary', 'co_chair'], true)
+                ? $member->pivot->role
+                : 'member';
+            $this->createIfMissing($committee, $member->id, $memberRole, $schoolYearId, $termId, $result, $member->pivot->load_units_override ?? null);
         }
 
         // Deactivate anyone with an active assignment who is no longer on the roster.
@@ -92,27 +95,47 @@ class CommitteeRosterService
                 $result['deactivated']++;
             });
 
-        // Keep the chairperson role in sync with committees.head_id — only
-        // touches the single 'chairperson' seat; co_chair/secretary are
-        // FL-only concepts the DM catalog doesn't model, left untouched.
+        // Keep member roles in sync with the DM catalog roster:
+        // chairperson is derived from committees.head_id; co_chair/secretary
+        // come from the committee_user pivot's own `role` column.
+        $pivotRoleByUserId = $committee->members->mapWithKeys(
+            fn ($m) => [$m->id => (in_array($m->pivot->role ?? 'member', ['secretary', 'co_chair'], true) ? $m->pivot->role : 'member')]
+        );
+        $pivotLoadOverrideByUserId = $committee->members->mapWithKeys(
+            fn ($m) => [$m->id => $m->pivot->load_units_override ?? null]
+        );
+
         FacultyCommitteeAssignment::where('committee_id', $committee->id)
             ->where('academic_term_id', $termId)
             ->where('status', 'active')
             ->whereIn('user_id', $rosterUserIds)
             ->get()
-            ->each(function (FacultyCommitteeAssignment $assignment) use ($committee, &$result) {
+            ->each(function (FacultyCommitteeAssignment $assignment) use ($committee, $pivotRoleByUserId, $pivotLoadOverrideByUserId, &$result) {
                 $shouldBeChair = $assignment->user_id === $committee->head_id;
                 $isChairRole   = $assignment->role === 'chairperson';
+                $override      = $pivotLoadOverrideByUserId->get($assignment->user_id);
 
                 if ($shouldBeChair && ! $isChairRole && $assignment->role !== 'co_chair') {
-                    $this->updateRole($assignment, $committee, 'chairperson', $result);
-                } elseif (! $shouldBeChair && $isChairRole) {
-                    $this->updateRole($assignment, $committee, 'member', $result);
+                    $this->updateRole($assignment, $committee, 'chairperson', $result, $override);
+                    return;
+                }
+
+                if (! $shouldBeChair && $isChairRole) {
+                    $targetRole = $pivotRoleByUserId->get($assignment->user_id, 'member');
+                    $this->updateRole($assignment, $committee, $targetRole, $result, $override);
+                    return;
+                }
+
+                if (! $shouldBeChair) {
+                    $targetRole = $pivotRoleByUserId->get($assignment->user_id, 'member');
+                    if ($targetRole !== $assignment->role || $override !== null) {
+                        $this->updateRole($assignment, $committee, $targetRole, $result, $override);
+                    }
                 }
             });
     }
 
-    private function createIfMissing(Committee $committee, int $userId, string $role, int $schoolYearId, int $termId, array &$result): void
+    private function createIfMissing(Committee $committee, int $userId, string $role, int $schoolYearId, int $termId, array &$result, ?float $loadUnitsOverride = null): void
     {
         $exists = FacultyCommitteeAssignment::where('user_id', $userId)
             ->where('academic_term_id', $termId)
@@ -127,7 +150,7 @@ class CommitteeRosterService
             return;
         }
 
-        $loadUnits = $committee->loadUnitsFor($role);
+        $loadUnits = $loadUnitsOverride ?? $committee->loadUnitsFor($role);
         $load      = $this->loads->findOrCreateFacultyLoad($userId, $schoolYearId, $termId);
 
         $la = LoadAssignment::create([
@@ -158,14 +181,14 @@ class CommitteeRosterService
         $result['created']++;
     }
 
-    private function updateRole(FacultyCommitteeAssignment $assignment, Committee $committee, string $newRole, array &$result): void
+    private function updateRole(FacultyCommitteeAssignment $assignment, Committee $committee, string $newRole, array &$result, ?float $loadUnitsOverride = null): void
     {
         if ($this->isLocked($assignment->user_id, $assignment->academic_term_id)) {
             $result['skipped_locked']++;
             return;
         }
 
-        $loadUnits = $committee->loadUnitsFor($newRole);
+        $loadUnits = $loadUnitsOverride ?? $committee->loadUnitsFor($newRole);
         $assignment->update(['role' => $newRole, 'load_units' => $loadUnits]);
 
         if ($assignment->load_assignment_id) {

@@ -732,6 +732,13 @@ export const menuItems = [
         permissions: ["accomplishments.view", "faculty_loading.manage"],
       },
       {
+        label: "My Committees",
+        routeName: "pm-committees.my",
+        href: route("pm-committees.my"),
+        icon: UserGroupIcon,
+        permissions: ["accomplishments.view", "faculty_loading.manage"],
+      },
+      {
         label: "Special Assignments",
         routeName: "pm-special-assignments.index",
         href: route("pm-special-assignments.index"),
