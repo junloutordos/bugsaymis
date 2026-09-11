@@ -158,6 +158,19 @@ class CommitteeNotificationService
         );
     }
 
+    /** Bell-only reminder to an overdue recurring task's assignee(s) and the committee's board managers. */
+    public function cadenceOverdue(User $recipient, Committee $committee, \App\Models\CommitteeTask $task, \Illuminate\Support\Carbon $dueDate): void
+    {
+        NotificationService::notifyUser(
+            $recipient,
+            'Committee Task Overdue',
+            $task->title,
+            'Accomplishment overdue since ' . $dueDate->format('M j, Y'),
+            route('pm-committees.show', ['committee' => $committee->parent_committee_id ?? $committee->id, 'tab' => 'board']),
+            "{$committee->name} — this task's {$task->submission_frequency} accomplishment submission is due."
+        );
+    }
+
     private function notify(
         User $recipient,
         Committee $committee,

@@ -29,6 +29,7 @@ class CommitteeAssignmentController extends Controller
         private readonly \App\Services\PerformanceManagement\CommitteeIpcrRatingService $ipcrRating,
         private readonly CommitteeRosterService $roster,
         private readonly \App\Services\PerformanceManagement\CommitteeNotificationService $notifications,
+        private readonly \App\Services\PerformanceManagement\CommitteeTaskAutoSyncService $taskAutoSync = new \App\Services\PerformanceManagement\CommitteeTaskAutoSyncService(),
         private readonly \App\Services\PerformanceManagement\CommitteePdfService $pdfExport = new \App\Services\PerformanceManagement\CommitteePdfService(),
         private readonly \App\Services\PerformanceManagement\CommitteeExcelService $excelExport = new \App\Services\PerformanceManagement\CommitteeExcelService(),
     ) {}
@@ -122,6 +123,7 @@ class CommitteeAssignmentController extends Controller
             'amended_into' => $c->amendedInto ? ['id' => $c->amendedInto->id, 'name' => $c->amendedInto->name] : null,
             'chairperson_load_units' => (float) $c->chairperson_load_units,
             'member_load_units' => (float) $c->member_load_units,
+            'default_submission_frequency' => $c->default_submission_frequency,
             'members' => $c->members->map($mapMember),
             'active_assignment_count' => $assignmentCounts->get($c->id, 0),
             'work_distribution_plans' => $c->workDistributionPlans->map(fn ($p) => ['id' => $p->id])->values(),
@@ -204,6 +206,7 @@ class CommitteeAssignmentController extends Controller
             'issuance_id'       => $validated['issuance_id'] ?? null,
             'chairperson_load_units' => $validated['chairperson_load_units'] ?? 0,
             'member_load_units'      => $validated['member_load_units'] ?? 0,
+            'default_submission_frequency' => $validated['default_submission_frequency'] ?? null,
         ]);
 
         $committee->workDistributionPlans()->sync($validated['plan_ids'] ?? []);
@@ -258,6 +261,7 @@ class CommitteeAssignmentController extends Controller
             'issuance_id'       => $validated['issuance_id'] ?? null,
             'chairperson_load_units' => $validated['chairperson_load_units'] ?? 0,
             'member_load_units'      => $validated['member_load_units'] ?? 0,
+            'default_submission_frequency' => $validated['default_submission_frequency'] ?? $committee->default_submission_frequency,
         ]);
         \App\Services\AuditLogger::logModelEvent($committee, 'updated');
 
@@ -344,6 +348,7 @@ class CommitteeAssignmentController extends Controller
             'issuance_id'                        => 'nullable|exists:issuances,id',
             'chairperson_load_units'              => 'nullable|numeric|min:0|max:5',
             'member_load_units'                  => 'nullable|numeric|min:0|max:5',
+            'default_submission_frequency'        => ['nullable', Rule::in(\App\Models\CommitteeTask::FREQUENCIES)],
             'sub_committees'                     => 'nullable|array',
             'sub_committees.*.id'                => 'nullable|exists:committees,id',
             'sub_committees.*.name'               => 'required_with:sub_committees|string|max:255',
@@ -447,6 +452,7 @@ class CommitteeAssignmentController extends Controller
             'issuance_id'                => $validated['issuance_id'] ?? null,
             'chairperson_load_units'     => $validated['chairperson_load_units'] ?? 0,
             'member_load_units'          => $validated['member_load_units'] ?? 0,
+            'default_submission_frequency' => $validated['default_submission_frequency'] ?? null,
             'amended_from_committee_id'  => $committee->id,
         ]);
 
@@ -574,6 +580,8 @@ class CommitteeAssignmentController extends Controller
 
     private function syncCatalogMembers(GlobalCommittee $committee, array $memberIds, array $memberTasks, array $memberRoles = [], array $memberLoadOverrides = []): void
     {
+        $previousMemberIds = $committee->members()->pluck('users.id')->all();
+
         $syncData = [];
         foreach ($memberIds as $userId) {
             $role = in_array($memberRoles[$userId] ?? 'member', ['secretary', 'co_chair'], true) ? $memberRoles[$userId] : 'member';
@@ -586,6 +594,24 @@ class CommitteeAssignmentController extends Controller
             ];
         }
         $committee->members()->sync($syncData);
+
+        // Materialize each member's roster "task" text into a real board
+        // task (idempotent — safe on every save), and unassign anyone
+        // dropped from the roster from their auto-synced task(s).
+        $actingUserId = auth()->id();
+        foreach ($memberIds as $userId) {
+            $taskText = $memberTasks[$userId] ?? null;
+            $user     = User::find($userId);
+            if ($user) {
+                $this->taskAutoSync->syncMemberTask($committee, $user, $taskText, $actingUserId);
+            }
+        }
+        foreach (array_diff($previousMemberIds, $memberIds) as $removedUserId) {
+            $removedUser = User::find($removedUserId);
+            if ($removedUser) {
+                $this->taskAutoSync->unassignMember($committee, $removedUser);
+            }
+        }
     }
 
     /**
@@ -662,6 +688,7 @@ class CommitteeAssignmentController extends Controller
         if ($member) {
             $loadUnits = (float) ($data['load_units_override'] ?? $committee->loadUnitsFor($data['role']));
             $this->notifications->assignmentAdded($globalCommittee, $member, $data['role'], $loadUnits);
+            $this->taskAutoSync->syncMemberTask($globalCommittee, $member, $data['task'] ?? null, auth()->id());
         }
 
         \App\Services\AuditLogger::logModelEvent($globalCommittee, 'committee_member_added');
@@ -691,6 +718,7 @@ class CommitteeAssignmentController extends Controller
         $this->roster->reconcileCurrentTerm($globalCommittee);
         $this->ipcrSync->syncForCommittee($committee->id);
         $this->notifications->assignmentRemoved($globalCommittee, $user, 'member');
+        $this->taskAutoSync->unassignMember($globalCommittee, $user);
 
         \App\Services\AuditLogger::logModelEvent($globalCommittee, 'committee_member_removed');
 
@@ -864,14 +892,28 @@ class CommitteeAssignmentController extends Controller
             'isChairperson'  => $isChairperson,
             'canManage'      => $canManage,
             'auditTrail'     => $auditTrail,
-            'tasks'            => \App\Models\CommitteeTask::with(['assignees:id,name', 'plan:id,success_indicator', 'period:id,label', 'updates.user:id,name'])
+            'tasks'            => \App\Models\CommitteeTask::with(['assignees:id,name', 'plan:id,success_indicator', 'period:id,label', 'updates.user:id,name', 'accomplishmentUpdates'])
                                     ->withCount('updates')
                                     ->where('committee_id', $committee->id)
                                     ->forPeriod(\App\Models\IPCRRatingPeriod::current()->value('id'))
                                     ->orderBy('sort_order')
-                                    ->get(),
+                                    ->get()
+                                    ->map(function (\App\Models\CommitteeTask $task) {
+                                        $latest = $task->accomplishmentUpdates->first();
+
+                                        return array_merge($task->toArray(), [
+                                            'next_due_date'         => $task->nextDueDate()?->toDateString(),
+                                            'latest_accomplishment' => $latest ? [
+                                                'id'         => $latest->id,
+                                                'body'       => $latest->body,
+                                                'mov_link'   => $latest->mov_link,
+                                                'created_at' => $latest->created_at->toIso8601String(),
+                                            ] : null,
+                                        ]);
+                                    }),
             'boardMembers'     => $assignments->map(fn ($a) => $a->faculty->only('id', 'name'))->unique('id')->values(),
             'canManageBoard'   => app(\App\Services\CommitteeBoardService::class)->canManageBoard($authUser, GlobalCommittee::find($committee->id)),
+            'defaultSubmissionFrequency' => $globalCommittee?->default_submission_frequency,
         ]);
     }
 

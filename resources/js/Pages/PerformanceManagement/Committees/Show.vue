@@ -37,9 +37,12 @@ const props = defineProps({
   selectedPeriodId: { type: Number, default: null },
   canManageBoard:   { type: Boolean, default: false },
   auditTrail:       { type: Array, default: () => [] },
+  defaultSubmissionFrequency: { type: String, default: null },
 })
 
-const activeTab = ref('members')
+const VALID_TABS = ['members', 'board', 'ratings', 'history']
+const requestedTab = new URLSearchParams(window.location.search).get('tab')
+const activeTab = ref(VALID_TABS.includes(requestedTab) ? requestedTab : 'members')
 const boardTabs = [
   { key: 'members', label: 'Members',                   icon: UsersIcon },
   { key: 'board',   label: 'Task Board',                icon: ClipboardDocumentListIcon },
@@ -108,18 +111,26 @@ function submitModal() {
   )
 }
 
-// monday-style rollup: pull the member's Done tasks (current period) into the
-// accomplishment text as evidence lines.
-const doneTasksFor = (userId) => props.tasks.filter(t =>
-  t.status === 'done' && (t.assignees ?? []).some(a => a.id === userId)
-)
-function compileDoneTasks() {
+// monday-style rollup: pull the member's most recent accomplishment-flagged
+// task update (body + MOV link) as a one-click starting point for the
+// chairperson's rating, instead of manually re-typing it from the board.
+const latestAccomplishmentFor = (userId) => {
+  const candidates = props.tasks
+    .filter(t => (t.assignees ?? []).some(a => a.id === userId) && t.latest_accomplishment)
+    .map(t => t.latest_accomplishment)
+  if (!candidates.length) return null
+  return candidates.reduce((latest, c) => (!latest || new Date(c.created_at) > new Date(latest.created_at)) ? c : latest, null)
+}
+function useLatestAccomplishment() {
   const member = modalEntry.value?.member
   if (!member) return
-  const lines = doneTasksFor(member.user_id).map(t => `• ${t.title}`)
-  if (!lines.length) return
+  const latest = latestAccomplishmentFor(member.user_id)
+  if (!latest) return
   const existing = rateForm.value.accomplishment?.trim()
-  rateForm.value.accomplishment = (existing ? existing + '\n' : '') + lines.join('\n')
+  rateForm.value.accomplishment = (existing ? existing + '\n' : '') + latest.body
+  if (latest.mov_link && !rateForm.value.mov_link?.trim()) {
+    rateForm.value.mov_link = latest.mov_link
+  }
 }
 
 // ── Add / Remove Member (Members tab) ──────────────────────────────────────
@@ -344,6 +355,7 @@ function auditLabel(log) { return AUDIT_ACTION_LABELS[log.action] ?? log.action 
             :can-manage-board="canManageBoard"
             :current-user-id="authUser.id"
             :plans="boardPlans"
+            :default-submission-frequency="defaultSubmissionFrequency"
           />
         </template>
 
@@ -455,10 +467,10 @@ function auditLabel(log) { return AUDIT_ACTION_LABELS[log.action] ?? log.action 
       :subtitle="committee.name" size="lg" @close="closeModal">
       <form @submit.prevent="submitModal" class="space-y-4">
         <AppTextarea v-model="rateForm.accomplishment" label="Accomplishment" :rows="3" />
-        <button v-if="modalEntry && doneTasksFor(modalEntry.member.user_id).length" type="button"
+        <button v-if="modalEntry && latestAccomplishmentFor(modalEntry.member.user_id)" type="button"
           class="text-xs text-indigo-600 hover:underline -mt-2"
-          @click="compileDoneTasks">
-          + Compile {{ doneTasksFor(modalEntry.member.user_id).length }} done task(s) from the board into the accomplishment
+          @click="useLatestAccomplishment">
+          + Use latest accomplishment submitted from the board
         </button>
         <AppInput v-model="rateForm.mov_link" type="url" label="MOV Link" placeholder="https://…" />
 

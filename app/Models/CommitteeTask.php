@@ -13,6 +13,13 @@ class CommitteeTask extends Model
 
     public const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
+    /**
+     * How often the assignee(s) are expected to submit an accomplishment
+     * for this task. `varies`/`one_time` need no "next due" computation;
+     * the others are computed from the latest accomplishment update.
+     */
+    public const FREQUENCIES = ['monthly', 'quarterly', 'end_of_rating_period', 'annually', 'varies', 'one_time'];
+
     protected $fillable = [
         'committee_id',
         'rating_period_id',
@@ -21,16 +28,19 @@ class CommitteeTask extends Model
         'description',
         'status',
         'priority',
+        'submission_frequency',
         'due_date',
         'sort_order',
         'created_by',
+        'auto_synced_from_roster',
         'completed_at',
     ];
 
     protected $casts = [
-        'due_date'     => 'date:Y-m-d',
-        'completed_at' => 'datetime',
-        'sort_order'   => 'integer',
+        'due_date'                => 'date:Y-m-d',
+        'completed_at'            => 'datetime',
+        'sort_order'               => 'integer',
+        'auto_synced_from_roster' => 'boolean',
     ];
 
     public function committee(): BelongsTo
@@ -46,6 +56,46 @@ class CommitteeTask extends Model
     public function updates(): HasMany
     {
         return $this->hasMany(CommitteeTaskUpdate::class)->latest();
+    }
+
+    /** Updates flagged as a formal accomplishment submission (not a plain progress note). */
+    public function accomplishmentUpdates(): HasMany
+    {
+        return $this->hasMany(CommitteeTaskUpdate::class)->where('is_accomplishment', true)->latest();
+    }
+
+    public function latestAccomplishment(): ?CommitteeTaskUpdate
+    {
+        return $this->accomplishmentUpdates()->first();
+    }
+
+    /**
+     * Next expected submission date for recurring cadences, computed from
+     * the latest accomplishment update (falling back to the task's
+     * creation date when none has been submitted yet). Returns null for
+     * frequencies that don't recur (`varies`, `one_time`) or when no
+     * cadence is set — the board shows no "Next due" badge in that case.
+     */
+    public function nextDueDate(): ?\Illuminate\Support\Carbon
+    {
+        if (! in_array($this->submission_frequency, ['monthly', 'quarterly', 'annually'], true)) {
+            return null;
+        }
+
+        $last = $this->relationLoaded('accomplishmentUpdates')
+            ? $this->accomplishmentUpdates->first()
+            : $this->latestAccomplishment();
+
+        $anchor = $last?->created_at ?? $this->created_at;
+        if (! $anchor) {
+            return null;
+        }
+
+        return match ($this->submission_frequency) {
+            'monthly'   => $anchor->copy()->addMonth(),
+            'quarterly' => $anchor->copy()->addMonths(3),
+            'annually'  => $anchor->copy()->addYear(),
+        };
     }
 
     public function plan(): BelongsTo

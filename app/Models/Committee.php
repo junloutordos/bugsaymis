@@ -14,7 +14,7 @@ class Committee extends Model
         'scope_type', 'school_year_id', 'season_starts_at', 'season_ends_at',
         'revoked_at', 'revoked_by', 'revocation_reason', 'amended_from_committee_id',
         'so_number', 'issuance_id', 'max_members',
-        'chairperson_load_units', 'member_load_units',
+        'chairperson_load_units', 'member_load_units', 'default_submission_frequency',
     ];
 
     protected $casts = [

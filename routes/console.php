@@ -63,6 +63,9 @@ Schedule::command('class-record:generate-ila-dates')->dailyAt('05:30')->withoutO
 // ── Committees: notify admins of committees below max_members capacity ───
 Schedule::command('committees:vacancy-alerts')->dailyAt('07:45')->withoutOverlapping();
 
+// ── Committees: notify assignees/board managers of overdue recurring task accomplishments ───
+Schedule::command('committees:cadence-reminders')->dailyAt('08:00')->withoutOverlapping();
+
 // Atlas Sentinel stale-device bell notifications removed 2026-07-17 (offline /
 // not-reporting devices were spamming IT staff). The command still exists for
 // manual runs: php artisan atlas-sentinel:notify-stale-devices

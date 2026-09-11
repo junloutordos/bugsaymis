@@ -11,7 +11,7 @@ import EmptyState from "@/Components/EmptyState.vue"
 import { useSubmit } from "@/Composables/useSubmit"
 import {
   PlusIcon, TrashIcon, PencilSquareIcon, ChatBubbleLeftRightIcon,
-  Squares2X2Icon, TableCellsIcon, CalendarDaysIcon, UserCircleIcon,
+  Squares2X2Icon, TableCellsIcon, CalendarDaysIcon, UserCircleIcon, CheckCircleIcon,
 } from "@heroicons/vue/24/outline"
 
 const props = defineProps({
@@ -23,11 +23,12 @@ const props = defineProps({
   canManageBoard:   { type: Boolean, default: false },
   currentUserId:    { type: Number, required: true },
   plans:            { type: Array, default: () => [] }, // [{id, success_indicator}]
+  defaultSubmissionFrequency: { type: String, default: null },
 })
 
 const { isSubmitting, submit } = useSubmit()
 
-// ── Status / priority definitions (monday.com defaults) ────────────────────
+// ── Status / priority / cadence definitions (monday.com defaults) ──────────
 const STATUSES = [
   { key: "not_started",   label: "Not Started",   badge: "slate" },
   { key: "working_on_it", label: "Working on it", badge: "amber" },
@@ -40,8 +41,17 @@ const PRIORITIES = [
   { key: "high",   label: "High",   badge: "amber" },
   { key: "urgent", label: "Urgent", badge: "red" },
 ]
+const FREQUENCIES = [
+  { key: "monthly",              label: "Monthly" },
+  { key: "quarterly",            label: "Quarterly" },
+  { key: "end_of_rating_period", label: "End of rating period" },
+  { key: "annually",             label: "Annually" },
+  { key: "varies",               label: "Varies / ad hoc" },
+  { key: "one_time",             label: "One-time" },
+]
 const statusDef   = (key) => STATUSES.find(s => s.key === key) ?? STATUSES[0]
 const priorityDef = (key) => PRIORITIES.find(p => p.key === key) ?? PRIORITIES[1]
+const frequencyLabel = (key) => FREQUENCIES.find(f => f.key === key)?.label ?? null
 const railColor = {
   not_started: "border-l-slate-300",
   working_on_it: "border-l-amber-400",
@@ -95,6 +105,7 @@ const memberProgress = computed(() => {
 })
 
 const isOverdue = (t) => t.due_date && t.status !== "done" && new Date(t.due_date) < new Date(new Date().toDateString())
+const isCadenceOverdue = (t) => t.next_due_date && new Date(t.next_due_date) < new Date(new Date().toDateString())
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : null
 const initials = (name) => (name ?? "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase()
 
@@ -125,6 +136,7 @@ const editingTask = ref(null)
 const taskForm = ref({})
 const emptyTaskForm = (status = "not_started") => ({
   title: "", description: "", status, priority: "medium", due_date: "",
+  submission_frequency: props.defaultSubmissionFrequency ?? "",
   rating_period_id: props.selectedPeriodId, work_distribution_plan_id: "",
   assignee_ids: props.canManageBoard ? [] : [props.currentUserId],
 })
@@ -138,6 +150,7 @@ const openEdit = (task) => {
   taskForm.value = {
     title: task.title, description: task.description ?? "", status: task.status,
     priority: task.priority, due_date: task.due_date ?? "",
+    submission_frequency: task.submission_frequency ?? "",
     rating_period_id: task.rating_period_id, work_distribution_plan_id: task.work_distribution_plan_id ?? "",
     assignee_ids: (task.assignees ?? []).map(a => a.id),
   }
@@ -153,6 +166,7 @@ const saveTask = () => {
     due_date: taskForm.value.due_date || null,
     work_distribution_plan_id: taskForm.value.work_distribution_plan_id || null,
     rating_period_id: taskForm.value.rating_period_id || null,
+    submission_frequency: taskForm.value.submission_frequency || null,
   }
   const opts = { preserveScroll: true, resetOnSuccess: true, onSuccess: () => { showTaskModal.value = false } }
   editingTask.value
@@ -164,18 +178,37 @@ const deleteTask = (task) => {
   submit.delete(route("committee-tasks.destroy", task.id), { preserveScroll: true, resetOnSuccess: true, onSuccess: () => { showDrawer.value = false } })
 }
 
-// ── Task drawer (details + updates feed) ────────────────────────────────────
+// ── Task drawer (details + updates feed + accomplishment submission) ───────
 const showDrawer = ref(false)
 const drawerTask = ref(null)
 const updateBody = ref("")
 const openDrawer = (task) => { drawerTask.value = task; showDrawer.value = true }
 const postUpdate = () => {
   if (!updateBody.value.trim()) return
-  submit.post(route("committee-tasks.updates.store", drawerTask.value.id), { body: updateBody.value }, {
+  submit.post(route("committee-tasks.updates.store", drawerTask.value.id), { body: updateBody.value, is_accomplishment: false }, {
     preserveScroll: true, resetOnSuccess: true,
     onSuccess: () => { updateBody.value = "" },
   })
 }
+
+const showAccomplishmentForm = ref(false)
+const accomplishmentForm = ref({ body: "", mov_link: "" })
+const openAccomplishmentForm = () => {
+  accomplishmentForm.value = { body: "", mov_link: "" }
+  showAccomplishmentForm.value = true
+}
+const submitAccomplishment = () => {
+  if (!accomplishmentForm.value.body.trim() || !accomplishmentForm.value.mov_link.trim()) return
+  submit.post(route("committee-tasks.updates.store", drawerTask.value.id), {
+    body: accomplishmentForm.value.body,
+    mov_link: accomplishmentForm.value.mov_link,
+    is_accomplishment: true,
+  }, {
+    preserveScroll: true, resetOnSuccess: true,
+    onSuccess: () => { showAccomplishmentForm.value = false; accomplishmentForm.value = { body: "", mov_link: "" } },
+  })
+}
+
 </script>
 
 <template>
@@ -279,6 +312,9 @@ const postUpdate = () => {
                       <span :class="['text-xs flex items-center gap-1', isOverdue(t) ? 'text-red-600 font-semibold' : 'text-slate-500']">
                         <CalendarDaysIcon class="w-3.5 h-3.5" /> {{ fmtDate(t.due_date) ?? '—' }}
                       </span>
+                      <span v-if="t.next_due_date" :class="['text-[10px] flex items-center gap-1 mt-0.5', isCadenceOverdue(t) ? 'text-red-600 font-semibold' : 'text-indigo-500']">
+                        Next due: {{ fmtDate(t.next_due_date) }}
+                      </span>
                     </td>
                     <td class="px-3 py-2.5"><AppBadge :color="priorityDef(t.priority).badge">{{ priorityDef(t.priority).label }}</AppBadge></td>
                     <td class="px-3 py-2.5 relative">
@@ -340,6 +376,9 @@ const postUpdate = () => {
             @click="openDrawer(t)">
             <p class="text-sm font-medium text-slate-700 leading-snug">{{ t.title }}</p>
             <div v-if="t.committee && t.committee.parent_committee_id" class="text-[11px] text-slate-400 mt-0.5">└ {{ t.committee.name }}</div>
+            <div v-if="t.next_due_date" :class="['text-[10px] mt-0.5', isCadenceOverdue(t) ? 'text-red-600 font-semibold' : 'text-indigo-500']">
+              Next due: {{ fmtDate(t.next_due_date) }}
+            </div>
             <div class="flex items-center justify-between mt-2">
               <div class="flex -space-x-1.5">
                 <span v-for="a in (t.assignees ?? []).slice(0, 3)" :key="a.id" :title="a.name"
@@ -374,10 +413,17 @@ const postUpdate = () => {
         </div>
 
         <div class="grid grid-cols-2 gap-3">
+          <AppSelect v-model="taskForm.submission_frequency" label="Accomplishment cadence">
+            <option value="">— Not set —</option>
+            <option v-for="f in FREQUENCIES" :key="f.key" :value="f.key">{{ f.label }}</option>
+          </AppSelect>
           <AppSelect v-model="taskForm.rating_period_id" label="Rating period">
             <option :value="null">All periods</option>
             <option v-for="p in ratingPeriods" :key="p.id" :value="p.id">{{ p.label }}</option>
           </AppSelect>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
           <AppSelect v-model="taskForm.work_distribution_plan_id" label="Linked plan (optional)">
             <option value="">— None —</option>
             <option v-for="pl in plans" :key="pl.id" :value="pl.id">{{ pl.success_indicator }}</option>
@@ -418,6 +464,14 @@ const postUpdate = () => {
         <p v-if="drawerTask.description" class="text-sm text-slate-600 whitespace-pre-line">{{ drawerTask.description }}</p>
         <p v-if="drawerTask.plan" class="text-xs text-slate-500">Linked plan: {{ drawerTask.plan.success_indicator }}</p>
 
+        <!-- Cadence -->
+        <div v-if="drawerTask.submission_frequency" class="flex items-center gap-2 text-xs">
+          <AppBadge color="indigo">{{ frequencyLabel(drawerTask.submission_frequency) }}</AppBadge>
+          <span v-if="drawerTask.next_due_date" :class="isCadenceOverdue(drawerTask) ? 'text-red-600 font-semibold' : 'text-slate-500'">
+            Next accomplishment due: {{ fmtDate(drawerTask.next_due_date) }}
+          </span>
+        </div>
+
         <div class="flex flex-wrap gap-1.5">
           <span v-for="a in (drawerTask.assignees ?? [])" :key="a.id" class="inline-flex items-center gap-1.5 bg-slate-100 rounded-full pl-1 pr-2.5 py-0.5 text-xs text-slate-600">
             <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-bold flex items-center justify-center">{{ initials(a.name) }}</span>
@@ -434,6 +488,36 @@ const postUpdate = () => {
           </button>
         </div>
 
+        <!-- Latest accomplishment summary -->
+        <div v-if="drawerTask.latest_accomplishment" class="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2.5">
+          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide mb-1">Latest Accomplishment</p>
+          <p class="text-sm text-slate-700 whitespace-pre-line">{{ drawerTask.latest_accomplishment.body }}</p>
+          <a v-if="drawerTask.latest_accomplishment.mov_link" :href="drawerTask.latest_accomplishment.mov_link" target="_blank" rel="noopener noreferrer"
+            class="text-xs text-indigo-600 hover:underline break-all">{{ drawerTask.latest_accomplishment.mov_link }}</a>
+          <p class="text-[10px] text-slate-400 mt-1">{{ new Date(drawerTask.latest_accomplishment.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) }}</p>
+        </div>
+
+        <!-- Submit Accomplishment -->
+        <div v-if="canWorkTask(drawerTask)" class="border-t border-slate-100 pt-3">
+          <button v-if="!showAccomplishmentForm" type="button"
+            class="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-800"
+            @click="openAccomplishmentForm">
+            <CheckCircleIcon class="w-4 h-4" /> Submit Accomplishment
+          </button>
+          <form v-else class="space-y-2" @submit.prevent="submitAccomplishment">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Submit Accomplishment</p>
+            <AppTextarea v-model="accomplishmentForm.body" placeholder="What did you actually deliver?" :rows="3" required />
+            <AppInput v-model="accomplishmentForm.mov_link" placeholder="Means of Verification (MOV) link — required" required />
+            <div class="flex justify-end gap-2">
+              <AppButton type="button" variant="secondary" size="sm" @click="showAccomplishmentForm = false">Cancel</AppButton>
+              <AppButton type="submit" size="sm" :loading="isSubmitting"
+                :disabled="isSubmitting || !accomplishmentForm.body.trim() || !accomplishmentForm.mov_link.trim()">
+                Submit
+              </AppButton>
+            </div>
+          </form>
+        </div>
+
         <!-- Updates feed -->
         <div class="border-t border-slate-100 pt-3">
           <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Updates</p>
@@ -442,12 +526,17 @@ const postUpdate = () => {
             <AppButton :disabled="isSubmitting || !updateBody.trim()" @click="postUpdate">Post</AppButton>
           </div>
           <div v-if="(drawerTask.updates ?? []).length" class="space-y-2 max-h-56 overflow-y-auto">
-            <div v-for="u in drawerTask.updates" :key="u.id" class="bg-slate-50 rounded-lg px-3 py-2">
+            <div v-for="u in drawerTask.updates" :key="u.id"
+              :class="['rounded-lg px-3 py-2', u.is_accomplishment ? 'bg-emerald-50 border border-emerald-100' : 'bg-slate-50']">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-slate-600">{{ u.user?.name }}</span>
+                <span class="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                  {{ u.user?.name }}
+                  <AppBadge v-if="u.is_accomplishment" color="green">Accomplishment</AppBadge>
+                </span>
                 <span class="text-[10px] text-slate-400">{{ new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) }}</span>
               </div>
               <p class="text-sm text-slate-600 mt-0.5 whitespace-pre-line">{{ u.body }}</p>
+              <a v-if="u.mov_link" :href="u.mov_link" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 hover:underline break-all">{{ u.mov_link }}</a>
             </div>
           </div>
           <p v-else class="text-xs text-slate-400">No updates yet — post progress notes here.</p>

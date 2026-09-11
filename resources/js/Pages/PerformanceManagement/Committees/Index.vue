@@ -86,7 +86,7 @@
             <td class="px-4 py-3 text-slate-700">{{ committee.work_distribution_plans?.length ?? 0 }}</td>
             <td class="px-4 py-3 text-center">
               <div class="flex items-center justify-center gap-1">
-                <Link :href="route('pm-committees.show', committee.id)" title="View Performance"
+                <Link :href="route('pm-committees.show', committee.id) + '?tab=board'" title="View Task Board"
                   class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
                   <ArrowRightIcon class="w-4 h-4" />
                 </Link>
@@ -108,8 +108,8 @@
             <td class="px-4 py-2 text-slate-400 text-xs">—</td>
             <td class="px-4 py-2 text-slate-400 text-xs">—</td>
             <td class="px-4 py-2 text-center">
-              <Link :href="route('pm-committees.show', sub.id)"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors mx-auto" title="View Performance">
+              <Link :href="route('pm-committees.show', sub.id) + '?tab=board'"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors mx-auto" title="View Task Board">
                 <ArrowRightIcon class="w-4 h-4" />
               </Link>
             </td>

@@ -27,6 +27,11 @@
 
     <table class="no-border">
         <tr>
+            <td style="font-weight: bold;"></td>
+            <td style="font-weight: bold;">Reviewed by</td>
+            <td style="font-weight: bold;">Approved by</td>
+        </tr>
+        <tr>
             <td class="center sig-block">
                 <strong>{{ $employeeName }}</strong><br>
                 Ratee<br>

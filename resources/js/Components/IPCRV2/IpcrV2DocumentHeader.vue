@@ -35,7 +35,7 @@ const targetApprovedLabel = computed(() => fmt(props.targetApprovedAt))
     <div class="overflow-x-auto">
       <table class="min-w-full text-sm">
         <tr class="font-semibold text-slate-700">
-          <td class="px-3 py-2 text-left w-1/3">Ratee</td>
+          <td class="px-3 py-2 text-left w-1/3"></td>
           <td class="px-3 py-2 text-left w-1/3">Reviewed by</td>
           <td class="px-3 py-2 text-left w-1/3">Approved by</td>
         </tr>

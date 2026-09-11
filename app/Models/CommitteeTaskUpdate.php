@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CommitteeTaskUpdate extends Model
 {
-    protected $fillable = ['committee_task_id', 'user_id', 'body'];
+    protected $fillable = ['committee_task_id', 'user_id', 'body', 'is_accomplishment', 'mov_link'];
+
+    protected $casts = ['is_accomplishment' => 'boolean'];
 
     public function task(): BelongsTo
     {

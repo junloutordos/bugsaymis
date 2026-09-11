@@ -52,6 +52,7 @@ class CommitteeTaskController extends Controller
             'description'               => $data['description'] ?? null,
             'status'                    => $data['status'] ?? 'not_started',
             'priority'                  => $data['priority'] ?? 'medium',
+            'submission_frequency'      => $data['submission_frequency'] ?? $committee->default_submission_frequency,
             'due_date'                  => $data['due_date'] ?? null,
             'sort_order'                => (int) (CommitteeTask::where('committee_id', $committee->id)->max('sort_order') + 1),
             'created_by'                => $user->id,
@@ -85,6 +86,7 @@ class CommitteeTaskController extends Controller
             'title'                     => $data['title'],
             'description'               => $data['description'] ?? null,
             'priority'                  => $data['priority'] ?? $task->priority,
+            'submission_frequency'      => $data['submission_frequency'] ?? $task->submission_frequency,
             'due_date'                  => $data['due_date'] ?? null,
         ]);
 
@@ -152,11 +154,20 @@ class CommitteeTaskController extends Controller
             'Only assignees or the committee head can post updates on this task.'
         );
 
-        $data = $request->validate(['body' => 'required|string|max:2000']);
+        $data = $request->validate([
+            'body'              => 'required|string|max:2000',
+            'is_accomplishment' => 'nullable|boolean',
+            'mov_link'          => 'nullable|required_if:is_accomplishment,true|string|max:500',
+        ]);
 
-        $task->updates()->create(['user_id' => $user->id, 'body' => $data['body']]);
+        $task->updates()->create([
+            'user_id'           => $user->id,
+            'body'              => $data['body'],
+            'is_accomplishment' => $data['is_accomplishment'] ?? false,
+            'mov_link'          => $data['mov_link'] ?? null,
+        ]);
 
-        return back()->with('success', 'Update posted.');
+        return back()->with('success', ($data['is_accomplishment'] ?? false) ? 'Accomplishment submitted.' : 'Update posted.');
     }
 
     public function destroy(CommitteeTask $task): RedirectResponse
@@ -201,6 +212,7 @@ class CommitteeTaskController extends Controller
             'description'               => 'nullable|string|max:5000',
             'status'                    => 'nullable|in:' . implode(',', CommitteeTask::STATUSES),
             'priority'                  => 'nullable|in:' . implode(',', CommitteeTask::PRIORITIES),
+            'submission_frequency'      => 'nullable|in:' . implode(',', CommitteeTask::FREQUENCIES),
             'due_date'                  => 'nullable|date',
             'rating_period_id'          => 'nullable|exists:ipcr_rating_periods,id',
             'work_distribution_plan_id' => 'nullable|exists:work_distribution_plans,id',
