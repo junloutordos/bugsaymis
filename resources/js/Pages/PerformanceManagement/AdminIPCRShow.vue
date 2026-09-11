@@ -132,8 +132,6 @@ const accViewerPlan = ref(null)
 const openAccViewer  = (plan) => { accViewerPlan.value = plan }
 const closeAccViewer = () => { accViewerPlan.value = null }
 const formatAccDate  = (d) => d ? new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : "—"
-
-const printIPCR = () => window.print()
 </script>
 
 <template>
@@ -154,7 +152,7 @@ const printIPCR = () => window.print()
           </div>
           <div class="flex items-center gap-3">
             <AppBadge :color="statusBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
-            <AppButton variant="secondary" @click="printIPCR">
+            <AppButton as="a" :href="route('employee-ipcr.pdf', ipcr.id)" target="_blank" variant="secondary">
               <PrinterIcon class="h-4 w-4" />
               Print IPCR
             </AppButton>
@@ -492,81 +490,3 @@ const printIPCR = () => window.print()
 
   </AdminLayout>
 </template>
-
-<style>
-@media print {
-  @page {
-    size: A4 landscape;
-    margin: 10mm;
-  }
-
-  body {
-    font-size: 8px !important;
-     padding-top: 0 !important;
-     padding-bottom: 0 !important;
-     margin: 0 !important;
-  }
-
-  body * {
-    visibility: hidden !important;
-    font-size: 8px !important;
-     padding-top: 0 !important;
-     padding-bottom: 0 !important;
-  }
-
-  #ipcr-printable,
-  #ipcr-printable * {
-    visibility: visible !important;
-    font-size: 8px !important;
-    padding-top: 0 !important;
-     padding-bottom: 0 !important;
-  }
-
-  #ipcr-printable {
-    position: absolute;
-    font-size: 8px !important;
-    left: 0;
-    top: 0;
-    width: 100% !important;
-  }
-
-  /* --------------------------------------- */
-  /*       KEEP HEADER/OTHER SECTIONS TOGETHER */
-  /* --------------------------------------- */
-  .keep-together {
-    display: block !important;
-    page-break-before: avoid !important;
-    page-break-after: avoid !important;
-
-    break-before: avoid !important;
-    break-after: avoid !important;
-
-    -webkit-region-break-before: avoid !important;
-    -webkit-region-break-after: avoid !important;
-  }
-
-  /* --------------------------------------- */
-  /*       TABLE STYLES                       */
-  /* --------------------------------------- */
-  table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    /* Allow table rows to break across pages */
-    page-break-inside: auto !important;
-    font-size: 8px !important;
-  }
-
-  table, th, td {
-    border: 1px solid #000 !important;
-  }
-
-  tr {
-    page-break-inside: avoid; /* prevent single rows from breaking */
-    page-break-after: auto;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-}
-</style>

@@ -1664,6 +1664,7 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::delete('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'destroy'])->name('employee-ipcr.destroy')->middleware('permission:ipcr.update');
         Route::post('/employee-ipcr/{employeeIPCR}/plans', [EmployeeIPCRController::class, 'addPlans'])->name('employee-ipcr.addPlans')->middleware('permission:ipcr.update');
         Route::get('/employee-ipcr/{id}', [EmployeeIPCRController::class, 'show'])->name('employee-ipcr.show');
+        Route::get('/employee-ipcr/{id}/pdf', [\App\Http\Controllers\IPCRV1PdfController::class, 'show'])->name('employee-ipcr.pdf');
         Route::put('employee-ipcr-plan/{ipcr}/{plan}', [EmployeeIPCRController::class, 'updateSelfRating'])->name('employee-ipcr-plan.updateSelfRating')->middleware('permission:ipcr.update');
         Route::post('/employee-ipcr/{employeeIPCR}/submit-review', [EmployeeIPCRController::class, 'submitForReview'])->name('employee-ipcr.submitReview')->middleware('permission:ipcr.submit');
         Route::post('/employee-ipcr/{employeeIPCR}/submit-rating', [EmployeeIPCRController::class, 'submitForRating'])->name('employee-ipcr.submitRating')->middleware('permission:ipcr.submit');

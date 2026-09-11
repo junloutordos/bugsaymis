@@ -354,8 +354,6 @@ const ipcrBadgeColor = (status) => {
   return map[status] ?? "slate";
 };
 
-const printIPCR = () => window.print();
-
 // ---------- Rating completeness (multi-rater awareness for CID) ----------
 const allPlansRated = computed(() =>
   (props.plans ?? []).every(p => p.pivot?.sup_average !== null && p.pivot?.sup_average !== undefined)
@@ -516,7 +514,7 @@ const formatSessionDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { y
           <AppButton v-if="isMutable && canEndorse && ipcr.status === 'PMT Returned for Revision'" variant="danger" @click="showReturnFromPMTModal = true">
             Return to Employee
           </AppButton>
-          <AppButton v-if="isAtRatedStage" variant="secondary" @click="printIPCR">
+          <AppButton v-if="isAtRatedStage" as="a" :href="route('employee-ipcr.pdf', ipcr.id)" target="_blank" variant="secondary">
             Print / View PDF
           </AppButton>
           <AppButton v-if="isAtRatedStage && canManageIpcr" variant="secondary" @click="openCoachingModal">
@@ -1084,30 +1082,3 @@ const formatSessionDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { y
 
   </AdminLayout>
 </template>
-
-<style>
-@media print {
-  @page { size: A4 landscape; margin: 10mm; }
-
-  body * { visibility: hidden !important; }
-  #ipcr-printable,
-  #ipcr-printable * { visibility: visible !important; }
-
-  #ipcr-printable {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    font-size: 8px;
-    font-family: Arial, sans-serif;
-    color: #000;
-    background: white;
-  }
-
-  #ipcr-printable table { border-collapse: collapse; width: 100%; }
-  #ipcr-printable th,
-  #ipcr-printable td { border: 1px solid #000 !important; padding: 3px 6px; }
-
-  .coaching-print-section { page-break-before: always; }
-  .coaching-session-card { page-break-inside: avoid; margin-bottom: 12px; }
-}
-</style>

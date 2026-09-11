@@ -132,8 +132,6 @@ const accViewerPlan = ref(null)
 const openAccViewer  = (plan) => { accViewerPlan.value = plan }
 const closeAccViewer = () => { accViewerPlan.value = null }
 const formatAccDate  = (d) => d ? new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : "—"
-
-const printIPCR = () => window.print()
 </script>
 
 <template>
@@ -154,7 +152,7 @@ const printIPCR = () => window.print()
           </div>
           <div class="flex items-center gap-3">
             <AppBadge :color="statusBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
-            <AppButton variant="secondary" @click="printIPCR">
+            <AppButton as="a" :href="route('employee-ipcr.pdf', ipcr.id)" target="_blank" variant="secondary">
               <PrinterIcon class="h-4 w-4" />
               Print IPCR
             </AppButton>

@@ -210,8 +210,6 @@ const returnForRevision = () => {
     }
   })
 }
-
-const printIPCR = () => window.print()
 </script>
 
 <template>
@@ -269,7 +267,7 @@ const printIPCR = () => window.print()
             <img :src="ipcr.director_signature" alt="Director Signature" class="h-10 object-contain" />
             <span>Signed by Director</span>
           </div>
-          <AppButton variant="secondary" @click="printIPCR">
+          <AppButton as="a" :href="route('employee-ipcr.pdf', ipcr.id)" target="_blank" variant="secondary">
             <PrinterIcon class="h-4 w-4" />
             Print / View PDF
           </AppButton>
@@ -529,62 +527,3 @@ const printIPCR = () => window.print()
     </div>
   </AdminLayout>
 </template>
-
-<style>
-@media print {
-  @page {
-    size: A4 landscape;
-    margin: 10mm;
-  }
-
-  body {
-    font-size: 8px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    margin: 0 !important;
-  }
-
-  body * {
-    visibility: hidden !important;
-    font-size: 8px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-  }
-
-  #ipcr-printable,
-  #ipcr-printable * {
-    visibility: visible !important;
-    font-size: 8px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-  }
-
-  #ipcr-printable {
-    position: absolute;
-    font-size: 8px !important;
-    left: 0;
-    top: 0;
-    width: 100% !important;
-  }
-
-  table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    page-break-inside: auto !important;
-    font-size: 8px !important;
-  }
-
-  table, th, td {
-    border: 1px solid #000 !important;
-  }
-
-  tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-}
-</style>
