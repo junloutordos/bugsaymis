@@ -22,6 +22,7 @@ const props = defineProps({
   filters:          { type: Object, default: () => ({}) },
   allRequirements:  { type: Array,  default: () => [] },
   salaryTable:      { type: Object, default: () => ({}) },  // grade => { step => rate }
+  can:              { type: Object, default: () => ({ manage: false, publish: false }) },
 })
 
 const page = usePage()
@@ -332,7 +333,7 @@ const regenerateArtCard = (item) => {
     <div>
       <AppPageHeader title="Job Items">
         <template #actions>
-          <AppButton @click="openModal()">+ New Job Item</AppButton>
+          <AppButton v-if="can.manage" @click="openModal()">+ New Job Item</AppButton>
         </template>
       </AppPageHeader>
 
@@ -410,11 +411,11 @@ const regenerateArtCard = (item) => {
           </td>
           <td class="px-4 py-3">
             <div class="flex items-center gap-1 justify-center flex-wrap">
-              <AppButton v-if="item.status === 'draft'" variant="secondary" size="sm" @click="openModal(item)">Edit</AppButton>
-              <AppButton v-if="item.status === 'draft'" variant="secondary" size="sm" @click="changeStatus(item, 'approved')">Approve</AppButton>
-              <AppButton v-if="item.status === 'approved'" size="sm" @click="openPublish(item)">Publish</AppButton>
-              <AppButton v-if="item.status === 'published'" variant="secondary" size="sm" @click="changeStatus(item, 'closed')">Close</AppButton>
-              <AppIconButton v-if="item.status === 'draft'" label="Delete" variant="danger" @click="deleteItem(item)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+              <AppButton v-if="item.status === 'draft' && can.manage" variant="secondary" size="sm" @click="openModal(item)">Edit</AppButton>
+              <AppButton v-if="item.status === 'draft' && can.manage" variant="secondary" size="sm" @click="changeStatus(item, 'approved')">Approve</AppButton>
+              <AppButton v-if="item.status === 'approved' && can.publish" size="sm" @click="openPublish(item)">Publish</AppButton>
+              <AppButton v-if="item.status === 'published' && can.manage" variant="secondary" size="sm" @click="changeStatus(item, 'closed')">Close</AppButton>
+              <AppIconButton v-if="item.status === 'draft' && can.manage" label="Delete" variant="danger" @click="deleteItem(item)"><TrashIcon class="w-4 h-4" /></AppIconButton>
               <!-- Art card buttons hidden until generation is fixed -->
               <template v-if="false">
                 <template v-if="item.art_card_generated_at">
@@ -455,11 +456,11 @@ const regenerateArtCard = (item) => {
               {{ item.requirements.length }} doc{{ item.requirements.length !== 1 ? 's' : '' }}
             </button>
             <div class="flex items-center gap-1 flex-wrap pt-1">
-              <AppButton v-if="item.status === 'draft'" variant="secondary" size="sm" @click="openModal(item)">Edit</AppButton>
-              <AppButton v-if="item.status === 'draft'" variant="secondary" size="sm" @click="changeStatus(item, 'approved')">Approve</AppButton>
-              <AppButton v-if="item.status === 'approved'" size="sm" @click="openPublish(item)">Publish</AppButton>
-              <AppButton v-if="item.status === 'published'" variant="secondary" size="sm" @click="changeStatus(item, 'closed')">Close</AppButton>
-              <AppIconButton v-if="item.status === 'draft'" label="Delete" variant="danger" @click="deleteItem(item)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+              <AppButton v-if="item.status === 'draft' && can.manage" variant="secondary" size="sm" @click="openModal(item)">Edit</AppButton>
+              <AppButton v-if="item.status === 'draft' && can.manage" variant="secondary" size="sm" @click="changeStatus(item, 'approved')">Approve</AppButton>
+              <AppButton v-if="item.status === 'approved' && can.publish" size="sm" @click="openPublish(item)">Publish</AppButton>
+              <AppButton v-if="item.status === 'published' && can.manage" variant="secondary" size="sm" @click="changeStatus(item, 'closed')">Close</AppButton>
+              <AppIconButton v-if="item.status === 'draft' && can.manage" label="Delete" variant="danger" @click="deleteItem(item)"><TrashIcon class="w-4 h-4" /></AppIconButton>
             </div>
           </div>
         </template>

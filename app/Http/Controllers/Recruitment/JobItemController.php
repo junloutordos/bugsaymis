@@ -61,6 +61,10 @@ class JobItemController extends Controller
             'filters'          => $request->only(['search', 'type_id', 'status']),
             'allRequirements'  => ApplicationRequirement::active()->get(['id', 'name', 'description', 'accepted_formats']),
             'salaryTable'      => $salaryTable,
+            'can'              => [
+                'manage'  => $request->user()->hasPermission('recruitment.manage'),
+                'publish' => $request->user()->hasPermission('recruitment.publish'),
+            ],
         ]);
     }
 

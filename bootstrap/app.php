@@ -42,5 +42,22 @@ return Application::configure(basePath: dirname(__DIR__))
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Inertia requests hitting a 403 (AuthorizationException from $this->authorize(),
+        // a FormRequest::authorize() failure, a policy denial, or the `permission:` middleware's
+        // abort(403, ...)) would otherwise get Laravel's raw HTML error page. Inertia's
+        // router.post()/put()/etc. has no Inertia-formatted response to work with in that case,
+        // so it forces a full-page browser navigation to that HTML page — which looks to the
+        // user like the form silently did nothing ("it's not saving"). Redirect back with a
+        // flashed error instead so the SPA experience stays intact.
+        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, \Illuminate\Http\Request $request) {
+            if ($request->header('X-Inertia')) {
+                return back()->with('error', $e->getMessage() ?: 'You do not have permission to perform this action.');
+            }
+        });
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
+            if ($e->getStatusCode() === 403 && $request->header('X-Inertia')) {
+                return back()->with('error', $e->getMessage() ?: 'You do not have permission to perform this action.');
+            }
+        });
     })->create();

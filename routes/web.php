@@ -1807,18 +1807,24 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::get('/job-items', [\App\Http\Controllers\Recruitment\JobItemController::class, 'index'])
             ->name('job-items.index');
         Route::post('/job-items', [\App\Http\Controllers\Recruitment\JobItemController::class, 'store'])
+            ->middleware('permission:recruitment.manage')
             ->name('job-items.store');
         Route::put('/job-items/{jobItem}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'update'])
+            ->middleware('permission:recruitment.manage')
             ->name('job-items.update');
         Route::patch('/job-items/{jobItem}/status', [\App\Http\Controllers\Recruitment\JobItemController::class, 'changeStatus'])
+            ->middleware('permission:recruitment.manage')
             ->name('job-items.status');
         Route::post('/job-items/{jobItem}/publish', [\App\Http\Controllers\Recruitment\JobItemController::class, 'publish'])
+            ->middleware('permission:recruitment.publish')
             ->name('job-items.publish');
         Route::delete('/job-items/{jobItem}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'destroy'])
+            ->middleware('permission:recruitment.manage')
             ->name('job-items.destroy');
         Route::get('/job-items/{jobItem}/art-card/{type}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'downloadArtCard'])
             ->name('job-items.art-card.download');
         Route::post('/job-items/{jobItem}/art-card/regenerate', [\App\Http\Controllers\Recruitment\JobItemController::class, 'regenerateArtCard'])
+            ->middleware('permission:recruitment.manage')
             ->name('job-items.art-card.regenerate');
 
         // ── Applicants ────────────────────────────────────────────────────────
