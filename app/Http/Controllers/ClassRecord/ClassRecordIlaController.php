@@ -280,7 +280,9 @@ class ClassRecordIlaController extends Controller
             'section_id' => $classRecord->section_id,
             'subject_id' => $classRecord->subject_id,
             'subject_type' => $classRecord->subject?->subject_type,
-            'is_graded' => true,
+            // Compliance-mode categories (e.g. Values Education) never count
+            // toward the graded cap — see WatRuleService::countsTowardGradedCap().
+            'is_graded' => WatRuleService::countsTowardGradedCap($category),
             'is_major' => $isMajor,
         ]];
         $dayCounts = WatRuleService::gradeCountsOnDate(

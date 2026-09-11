@@ -209,7 +209,9 @@ class AssessmentPlottingService
                     'section_id' => $record->section_id,
                     'subject_id' => $record->subject_id,
                     'subject_type' => $record->subject?->subject_type,
-                    'is_graded' => true,
+                    // Compliance-mode categories (e.g. Values Education) never
+                    // count toward the graded cap — see countsTowardGradedCap().
+                    'is_graded' => WatRuleService::countsTowardGradedCap($category),
                     'is_major' => $isMajor,
                 ]);
 

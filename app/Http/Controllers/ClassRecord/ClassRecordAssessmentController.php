@@ -103,6 +103,7 @@ class ClassRecordAssessmentController extends Controller
         $rows = WatRuleService::assessmentOccurrencesQuery($classRecord->school_year_id)
             ->whereIn('cr.section_id', $poolSectionIds)
             ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
+            ->leftJoin('grading_options as go', 'go.id', '=', 'gc.grading_option_id')
             ->orderByRaw(WatRuleService::OCCURRENCE_DATE_SQL)
             ->select([
                 'class_record_assessments.id',
@@ -110,6 +111,7 @@ class ClassRecordAssessmentController extends Controller
                 'class_record_assessments.assessment_type',
                 'class_record_assessments.is_graded',
                 'class_record_assessments.is_major',
+                'go.grading_mode',
                 'crad.id as assessment_date_id',
                 'cr.id as class_record_id',
                 'cr.subject_name',
@@ -146,7 +148,9 @@ class ClassRecordAssessmentController extends Controller
                         $date
                     )
                     : [
-                        'graded' => $items->where('is_graded', true)->count(),
+                        'graded' => $items->where('is_graded', true)
+                            ->filter(fn ($row) => ($row->grading_mode ?? 'numeric') !== 'compliance')
+                            ->count(),
                         'major' => $items->where('is_graded', true)->where('is_major', true)->count(),
                     ];
 
@@ -385,7 +389,10 @@ class ClassRecordAssessmentController extends Controller
                     ->map(fn ($date) => [
                         'activity_date' => $date,
                         'is_major' => $item['is_major'],
-                        'is_graded' => true,
+                        // Compliance-mode categories (e.g. Values Education)
+                        // never count toward the graded cap — see
+                        // WatRuleService::countsTowardGradedCap().
+                        'is_graded' => WatRuleService::countsTowardGradedCap($categories[$item['grading_category_id']]),
                         'assessment_key' => ! empty($item['id'])
                             ? $item['id']
                             : 'new:'.$item['grading_category_id'].':'.$item['assessment_number'],

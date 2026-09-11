@@ -963,6 +963,115 @@ class WeeklyAssessmentTrackerTest extends TestCase
                 ->where('summary.0.graded_count', 1));
     }
 
+    // ── Compliance-mode assessments (e.g. Values Education) are exempt from
+    //    the graded cap, the same way they're already exempt from major ────
+
+    public function test_compliance_mode_assessment_does_not_count_toward_the_graded_cap(): void
+    {
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+        $subject = $this->makeSubject();
+
+        $complianceOption = GradingOption::create([
+            'name' => 'Values Education', 'is_active' => true,
+            'grading_mode' => 'compliance', 'compliance_pass_threshold' => 0.75,
+        ]);
+        $complianceCategory = GradingCategory::create([
+            'grading_option_id' => $complianceOption->id, 'name' => 'Required Output', 'code' => 'A1',
+            'weight' => 1.0, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+
+        $veRecord = ClassRecord::create([
+            'subject_id' => $subject->id, 'section_id' => $section->id,
+            'grading_option_id' => $complianceOption->id, 'school_year_id' => $this->sy->id,
+            'school_year' => $this->sy->name, 'subject_name' => 'Values Education 1',
+            'year_level_section' => "G-{$section->levelid} {$section->sectionname}",
+            'teacher_id' => $teacher->id, 'status' => 'draft',
+        ]);
+        $veQuarter = ClassRecordQuarter::create([
+            'class_record_id' => $veRecord->id, 'grading_option_id' => $complianceOption->id, 'quarter' => 1,
+        ]);
+        ClassRecordAssessment::create([
+            'class_record_quarter_id' => $veQuarter->id, 'grading_category_id' => $complianceCategory->id,
+            'assessment_type' => null, 'is_graded' => true, 'is_major' => false,
+            'assessment_number' => 1, 'title' => 'Summative Reflection', 'activity_date' => '2025-09-01',
+            'plotted_at' => now(), 'max_score' => 1, 'sort_order' => 1,
+        ]);
+
+        // Three ordinary numeric-graded assessments already fill the daily
+        // cap (DAILY_GRADED_MAX = 3) — the compliance-mode VE item above must
+        // not be the thing that pushes the day over it.
+        $numericRecord = $this->makeClassRecord($section, $this->makeSubject(), $teacher);
+        $this->makeAssessmentInRecord($numericRecord, 1, '2025-09-01');
+        $this->makeAssessmentInRecord($numericRecord, 2, '2025-09-01');
+        $this->makeAssessmentInRecord($numericRecord, 3, '2025-09-01');
+
+        $wat = WatRuleService::weekData($section->id, $this->sy->id, '2025-09-01');
+        $monday = collect($wat['days'])->firstWhere('date', '2025-09-01');
+
+        // All 4 rows are visible (VE + 3 numeric)...
+        $this->assertCount(4, $monday['items']);
+        // ...but the graded/major tally only counts the 3 numeric ones — the
+        // VE item is excluded from the cap, and the day is NOT over the cap.
+        $this->assertSame(3, $monday['graded_count']);
+        $this->assertFalse($monday['over_daily']);
+        $this->assertSame(3, $wat['totals']['graded']);
+        $this->assertSame(0, $wat['totals']['major']);
+
+        $veItem = collect($monday['items'])->firstWhere('title', 'Summative Reflection');
+        $this->assertTrue($veItem['is_graded']);
+        $this->assertFalse($veItem['is_major']);
+    }
+
+    public function test_compliance_mode_assessment_upsert_does_not_trip_the_daily_graded_cap(): void
+    {
+        $admin = $this->admin();
+        $teacher = User::factory()->create();
+        $section = $this->makeSection();
+
+        $complianceOption = GradingOption::create([
+            'name' => 'Values Education', 'is_active' => true,
+            'grading_mode' => 'compliance', 'compliance_pass_threshold' => 0.75,
+        ]);
+        $complianceCategory = GradingCategory::create([
+            'grading_option_id' => $complianceOption->id, 'name' => 'Required Output', 'code' => 'A1',
+            'weight' => 1.0, 'max_assessments' => 5, 'sort_order' => 1,
+        ]);
+
+        // Three ordinary numeric-graded assessments already fill the daily cap.
+        $numericRecord = $this->makeClassRecord($section, $this->makeSubject(), $teacher);
+        $this->makeAssessmentInRecord($numericRecord, 1, '2025-09-01');
+        $this->makeAssessmentInRecord($numericRecord, 2, '2025-09-01');
+        $this->makeAssessmentInRecord($numericRecord, 3, '2025-09-01');
+
+        $veRecord = ClassRecord::create([
+            'section_id' => $section->id,
+            'grading_option_id' => $complianceOption->id, 'school_year_id' => $this->sy->id,
+            'school_year' => $this->sy->name, 'subject_name' => 'Values Education 1',
+            'year_level_section' => "G-{$section->levelid} {$section->sectionname}",
+            'teacher_id' => $teacher->id, 'status' => 'draft',
+        ]);
+
+        // Plotting a NEW compliance-mode assessment on the already-full day
+        // must still succeed — it is exempt from the daily graded cap.
+        $this->actingAs($admin)
+            ->postJson(route('class-records.assessments.upsert', ['classRecord' => $veRecord->id, 'q' => 1]), [
+                'assessments' => [[
+                    'grading_category_id' => $complianceCategory->id,
+                    'assessment_number' => 1,
+                    'title' => 'Summative Reflection',
+                    'activity_date' => '2025-09-01',
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('class_record_assessments', [
+            'grading_category_id' => $complianceCategory->id,
+            'title' => 'Summative Reflection',
+            'is_graded' => true,
+        ]);
+    }
+
     // ── Teacher-level plotting compliance (visibility-only analytics) ────────
 
     public function test_teacher_breakdown_marks_a_teacher_with_plotted_assessments_as_plotted(): void

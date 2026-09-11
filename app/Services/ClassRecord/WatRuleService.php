@@ -130,6 +130,23 @@ class WatRuleService
         return $perAssessmentShare >= self::MAJOR_WEIGHT_SHARE;
     }
 
+    // ── Graded-cap exemption for compliance-mode grading ──────────────────────
+
+    /**
+     * Compliance-mode grading options (e.g. Values Education) score a
+     * checkbox — "was this requirement completed?" — not a graded output
+     * competing for a student's limited assessment time the way a numeric
+     * quiz/exam/output does. They must not consume any of the section's
+     * daily (3) / weekly (15) graded-assessment budget, the same exemption
+     * they already get from the major-assessment budget via isMajor().
+     * Still shown in the tracker grid and still counts toward its own
+     * subject's grade — only the WAT cap arithmetic excludes it.
+     */
+    public static function countsTowardGradedCap(GradingCategory $category): bool
+    {
+        return ($category->gradingOption?->grading_mode ?? 'numeric') !== 'compliance';
+    }
+
     // ── Wednesday-before plotting deadline ─────────────────────────────────────
 
     public static function plottingDeadline(string $activityDate): Carbon
@@ -304,6 +321,8 @@ class WatRuleService
                     });
             })
             ->leftJoin('subjects as wat_subjects', 'wat_subjects.id', '=', 'cr.subject_id')
+            ->join('grading_categories as wat_gc', 'wat_gc.id', '=', 'class_record_assessments.grading_category_id')
+            ->leftJoin('grading_options as wat_go', 'wat_go.id', '=', 'wat_gc.grading_option_id')
             ->select([
                 'class_record_assessments.id as assessment_id',
                 'class_record_assessments.is_graded',
@@ -311,6 +330,7 @@ class WatRuleService
                 'cr.section_id',
                 'cr.subject_id',
                 'wat_subjects.subject_type',
+                'wat_go.grading_mode',
             ])
             ->selectRaw(self::OCCURRENCE_DATE_SQL.' as activity_date')
             ->get()
@@ -322,7 +342,10 @@ class WatRuleService
                 'section_id' => (int) $row->section_id,
                 'subject_id' => (int) $row->subject_id,
                 'subject_type' => $row->subject_type,
-                'is_graded' => (bool) $row->is_graded,
+                // Compliance-mode categories (e.g. Values Education) never
+                // count toward the graded cap, regardless of the stored
+                // is_graded value — see countsTowardGradedCap().
+                'is_graded' => (bool) $row->is_graded && ($row->grading_mode ?? 'numeric') !== 'compliance',
                 'is_major' => (bool) $row->is_major,
             ]);
 
@@ -637,6 +660,7 @@ class WatRuleService
         $rows = self::assessmentOccurrencesQuery($schoolYearId)
             ->whereIn('cr.section_id', $poolSectionIds)
             ->join('grading_categories as gc', 'class_record_assessments.grading_category_id', '=', 'gc.id')
+            ->leftJoin('grading_options as go', 'go.id', '=', 'gc.grading_option_id')
             ->leftJoin('subjects as wat_subjects', 'wat_subjects.id', '=', 'cr.subject_id')
             ->leftJoin('sections as sec', 'sec.id', '=', 'cr.section_id')
             ->whereRaw(
@@ -653,6 +677,7 @@ class WatRuleService
                 'class_record_assessments.is_graded',
                 'class_record_assessments.is_major',
                 'class_record_assessments.max_score',
+                'go.grading_mode',
                 'crad.id as assessment_date_id',
                 'cr.id as class_record_id',
                 'cr.subject_id',
@@ -785,6 +810,12 @@ class WatRuleService
                 'category_code' => $row->category_code,
                 'is_graded' => (bool) $row->is_graded,
                 'is_major' => (bool) $row->is_major,
+                // Cap-arithmetic-only flag: compliance-mode categories (e.g.
+                // Values Education) are still shown as graded here (they
+                // have a real compliance %/submitted count) but never count
+                // toward the WAT daily/weekly graded budget — see
+                // WatRuleService::countsTowardGradedCap().
+                '_wat_counts_graded' => (bool) $row->is_graded && ($row->grading_mode ?? 'numeric') !== 'compliance',
                 '_wat_section_id' => (int) $row->section_id,
                 '_wat_subject_id' => (int) $row->subject_id,
                 '_wat_subject_type' => $row->subject_type,
@@ -918,7 +949,12 @@ class WatRuleService
                 'subject_id' => (int) ($item['_wat_subject_id'] ?? 0),
                 'subject_type' => $item['_wat_subject_type'] ?? null,
                 'resolved_slot' => $item['_wat_block'] ?? null,
-                'is_graded' => (bool) $item['is_graded'],
+                // _wat_counts_graded (set by weekData() for real assessment
+                // rows) excludes compliance-mode categories from the graded
+                // cap while leaving the display-facing is_graded untouched;
+                // ILA items carry no such flag and fall back to is_graded
+                // (always false for the non-graded ILA rows built above).
+                'is_graded' => (bool) ($item['_wat_counts_graded'] ?? $item['is_graded']),
                 'is_major' => (bool) $item['is_major'],
             ]),
             $schoolYearId
